@@ -1,132 +1,149 @@
-# Kế hoạch công nghệ và triển khai đồ án C48
+# C48 Technology and Delivery Plan
 
-| Thuộc tính | Giá trị |
+| Attribute | Value |
 |---|---|
-| Tên đề tài | Hệ thống quản lý ứng phó khẩn cấp và cứu trợ thiên tai |
-| Mã đề tài | C48 |
-| Phiên bản | 1.0 — bản nghiên cứu và đề xuất thiết kế |
-| Ngày nghiên cứu | 29/09/2026 |
-| Thời lượng theo đề cương | 10 tuần; nhóm 3 thành viên |
+| Project | Emergency Response and Disaster Relief Management System |
+| Project code | C48 |
+| Version | 1.2 — expanded AI integration and storage reassessment |
+| Original research date | 2026-09-29 |
+| Duration in the project brief | 10 weeks; three team members |
+| Document role | Primary English reference for implementation and further research |
 
-Tài liệu này là baseline kỹ thuật để nhóm phát triển thành SRS, SDD, thiết kế dữ liệu/API, test case và hướng dẫn sử dụng. Nó không biến công nghệ, SLA, chính sách dữ liệu hay quy trình đề xuất thành yêu cầu đã được đơn vị cứu hộ phê duyệt.
+This document provides the technical baseline for the SRS, SDD, database/API design, test cases, and user guide. Proposed technologies, service levels, data policies, and workflows are not thereby approved by a rescue authority.
 
-## 1. Cách đọc và mức độ chắc chắn
+**For AI implementation and further research:** read Appendix A and the [storage research note](c48-storage-research.md) before using this plan. Sections 1–21 define the working baseline; Appendix A adds execution guidance and identifies unresolved design issues. Requirement, use-case, and test-case identifiers are preserved. Section 4.2 reviews framework documentation; Section 12 expands AI integration and evaluation; Section 6.3 and the storage note reassess MinIO. This document does not claim implementation benchmarks or executed product tests.
 
-| Nhãn | Ý nghĩa |
+## 1. Reading guide and confidence levels
+
+| Label | Meaning |
 |---|---|
-| **Nguồn đề cương** | Yêu cầu được tổng hợp trong [c48-project-context.md](c48-project-context.md). |
-| **Đề xuất** | Lựa chọn kỹ thuật hoặc quy tắc nghiệp vụ làm baseline cho đồ án. |
-| **Cần xác nhận** | Câu hỏi nhóm cần hỏi giảng viên/người có kinh nghiệm nghiệp vụ. |
+| **Project brief** | Requirements consolidated in [c48-project-context.md](c48-project-context.md). |
+| **Proposal** | Technical choice or business rule proposed as the capstone baseline. |
+| **Needs confirmation** | A question for the supervisor or someone with relevant operational experience. |
 
-Tài liệu OCHA/IFRC được dùng để tham khảo cách tổ chức quy trình nhân đạo, không thay thế quy định của cơ quan có thẩm quyền tại Việt Nam. OCHA mô tả chu trình phản ứng gồm phân tích, lập kế hoạch, huy động nguồn lực, thực hiện, giám sát/đánh giá và báo cáo. [OCHA — Humanitarian Programme Cycle](https://knowledge.base.unocha.org/wiki/spaces/hpc/overview)
+OCHA/IFRC materials inform humanitarian workflow design; they do not replace rules issued by competent authorities in Vietnam. OCHA describes a cycle covering analysis, planning, resource mobilization, implementation, monitoring/evaluation, and reporting. [OCHA — Humanitarian Programme Cycle](https://knowledge.base.unocha.org/wiki/spaces/hpc/overview)
 
-## 2. Tóm tắt đề xuất
+## 2. Recommendation summary
 
-| Hạng mục | Đề xuất baseline | Lý do |
+| Area | Proposed baseline | Rationale |
 |---|---|---|
-| Backend | Python + Django 5.2 LTS + Django REST Framework (DRF) | Theo mong muốn dùng Django; có ORM, migrations, authentication/admin và GeoDjango. Nhánh 5.2 LTS hiện được hỗ trợ bảo mật đến tháng 4/2028; chốt patch mới nhất khi khởi tạo repo. [Django releases](https://www.djangoproject.com/download/) |
-| Database | PostgreSQL + PostGIS | Dữ liệu quan hệ, giao dịch tồn kho và truy vấn vị trí; GeoDjango có hỗ trợ PostGIS phong phú hơn MySQL. [GeoDjango database API](https://docs.djangoproject.com/en/5.2/ref/contrib/gis/db-api/) |
-| Backend services | 5 service triển khai độc lập: Identity, Response, Logistics, Notification, Reporting | Đủ thể hiện service boundary, API/event và quyền sở hữu dữ liệu; không tách thành nhiều service nhỏ khó hoàn thiện trong 10 tuần. |
-| Messaging | Apache Kafka KRaft + transactional outbox + consumer idempotent | Hợp với event có nhiều consumer và cần phát lại; không khẳng định toàn hệ thống “exactly once”. [Kafka](https://kafka.apache.org/intro/), [transactional outbox](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html) |
-| Web | React + TypeScript + Vite | Phù hợp dashboard tác nghiệp; không cần SSR/SEO cho khu vực đăng nhập. [Vite guide](https://vite.dev/guide/) |
-| Mobile | React Native + Expo + TypeScript | Dùng chung TypeScript; đáp ứng GPS, ảnh và thông báo. Chỉ xin quyền vị trí khi cần, không bật tracking nền mặc định. [React Native TypeScript](https://reactnative.dev/docs/typescript), [Expo Location](https://docs.expo.dev/versions/latest/sdk/location/) |
-| File | Django storage API; SeaweedFS S3-compatible cho lab hoặc S3-compatible managed khi triển khai thật | Lưu file ngoài database. MinIO đã archive và repo ghi rõ không còn được duy trì. [MinIO repository](https://github.com/minio/minio), [SeaweedFS](https://github.com/seaweedfs/seaweedfs) |
-| Deployment | Docker Compose trên một máy demo; Nginx làm reverse proxy | Có nhiều container nhưng chưa cần nhiều máy vật lý. [Docker Compose production](https://docs.docker.com/compose/how-tos/production/) |
-| Kubernetes | kind là nhánh học thêm sau khi Compose end-to-end ổn | Đáp ứng mục tiêu học Kubernetes mà không chặn chức năng đồ án. kind chạy cluster local bằng Docker containers. [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/) |
-| AI | Advisor trả gợi ý có giải thích; điều phối viên quyết định | AI trong đề cương là hướng nghiên cứu hỗ trợ, không tự đổi ưu tiên hoặc phân công cứu hộ. |
+| Backend | Python + Django 5.2 LTS + Django REST Framework (DRF) | Selected through the framework comparison in Section 4.2 for integrated ORM/migrations, authentication/admin, and GeoDjango. The original research records security support through April 2028; select a supported patch when initializing the project. [Django releases](https://www.djangoproject.com/download/) |
+| Database | PostgreSQL + PostGIS | Relational data, inventory transactions, and location queries; GeoDjango provides richer PostGIS support than MySQL. [GeoDjango database API](https://docs.djangoproject.com/en/5.2/ref/contrib/gis/db-api/) |
+| Backend services | Five independently deployable services: Identity, Response, Logistics, Notification, Reporting | Demonstrates boundaries, APIs/events, and data ownership within a ten-week project. |
+| Messaging | Apache Kafka KRaft + transactional outbox + idempotent consumers | Supports multiple consumers and replay; no end-to-end exactly-once guarantee is claimed. [Kafka](https://kafka.apache.org/intro/), [transactional outbox](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html) |
+| Web | React + TypeScript + Vite | Suitable for operational dashboards; authenticated screens do not require SSR/SEO. [Vite guide](https://vite.dev/guide/) |
+| Mobile | React Native + Expo + TypeScript | Shares TypeScript skills and supports GPS, photos, and notifications. Request location permission when needed; no default background tracking. [React Native TypeScript](https://reactnative.dev/docs/typescript), [Expo Location](https://docs.expo.dev/versions/latest/sdk/location/) |
+| Files | Django storage API + django-storages/boto3; conditional MinIO AIStor Free lab profile, SeaweedFS fallback, managed S3 for a separately reviewed deployment | Distinguish archived Community from AIStor. Edition/license and integration checks remain prerequisites; see [storage research](c48-storage-research.md). |
+| Deployment | Docker Compose on one demo host; Nginx reverse proxy | Multiple containers do not require multiple physical machines. [Docker Compose production](https://docs.docker.com/compose/how-tos/production/) |
+| Kubernetes | kind learning extension after the Compose end-to-end workflow is stable | Supports the learning goal without blocking the capstone. kind runs local clusters in Docker containers. [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/) |
+| AI | Advisor with explanations; coordinator makes the decision | An optional research direction, with no automatic priority changes or rescue dispatch. |
 
-**Quy mô demo:** 5 container ứng dụng độc lập, Nginx, Kafka, PostgreSQL/PostGIS với database/user tách theo service, object storage và tùy chọn Prometheus/Grafana. Tất cả có thể chạy trên một máy; không phải thuê năm server.
+**Demo scale:** five independent application containers, Nginx, Kafka, PostgreSQL/PostGIS with separate databases/users per service, object storage, and optional Prometheus/Grafana. All can share one machine; five rented servers are unnecessary.
 
-## 3. Bài toán và quy trình nghiệp vụ
+## 3. Problem analysis and business workflow
 
-### 3.1 Rủi ro cần giải quyết
+### 3.1 Risks to address
 
-Theo bối cảnh đề cương, thông tin cứu trợ có thể đi qua nhiều kênh và nhiều nhóm. Các rủi ro cần kiểm chứng qua phỏng vấn/khảo sát gồm:
+The project context involves information passing through multiple channels and teams. Validate these risk hypotheses through interviews or surveys:
 
-- Yêu cầu thiếu vị trí, số người bị ảnh hưởng hoặc thời điểm ghi nhận.
-- Báo trùng một sự cố nhưng không liên kết, làm sai thống kê hoặc điều động lặp.
-- Điều phối viên khó thấy yêu cầu chờ xác minh, đội nào đã nhận nhiệm vụ, nguồn lực nào còn khả dụng.
-- Tồn kho không thống nhất giữa nhập, điều chuyển, giữ chỗ, xuất và phân phối; khó truy lịch sử khi số dư lệch.
-- Mạng yếu làm người gửi không biết SOS đã đến server chưa.
-- Dashboard từ nhiều nguồn có thể trễ hoặc đếm trùng nếu không xử lý event lặp.
-- Vị trí/thông tin liên hệ nhạy cảm có thể bị lộ nếu cấp quyền quá rộng.
+- Requests may lack location, affected-person count, or observation time.
+- Duplicate reports may remain unlinked, distorting statistics or causing repeated dispatch.
+- Coordinators may lack visibility into pending verification, accepted missions, and available resources.
+- Inventory may diverge across receipts, transfers, reservations, issues, and distributions, with insufficient history to explain differences.
+- Weak connectivity may leave a citizen unsure whether the server received an SOS.
+- Dashboards may lag or double-count events from multiple sources.
+- Broad access permissions may expose sensitive location/contact information.
 
-Đây là giả thuyết rủi ro của bài toán, không phải kết luận về một địa phương hay cơ quan cụ thể.
+These are problem hypotheses, not findings about a particular locality or authority.
 
-### 3.2 Quy trình mục tiêu
+### 3.2 Target workflow
 
-1. **Tiếp nhận:** người dân gửi yêu cầu; ghi tọa độ, độ chính xác, thời điểm và nguồn vị trí. Nếu offline, hiện “chờ gửi”; chỉ hiện đã tiếp nhận sau server ACK.
-2. **Sàng lọc:** validate dữ liệu, chống gửi lặp bằng idempotency key, đưa vào queue.
-3. **Xác minh:** coordinator liên hệ/bổ sung thông tin; từ chối hoặc gắn trùng phải có lý do và lịch sử.
-4. **Ưu tiên:** coordinator đặt mức ưu tiên theo tiêu chí đã xác nhận; AI nếu có chỉ là thông tin phụ.
-5. **Điều động:** giao nhiệm vụ cho team phù hợp; team accept/decline, cập nhật đang đi/đã đến/kết quả.
-6. **Cấp nguồn lực:** Response phát yêu cầu giữ hàng; Logistics kiểm tra tồn khả dụng. Giữ hàng và xuất hàng là hai bước riêng.
-7. **Xác nhận kết quả:** đội báo kết quả/bằng chứng; coordinator xác nhận nhu cầu đã đáp ứng. Một mission hoàn tất không tự đóng request nếu còn nhu cầu khác.
-8. **Theo dõi:** Notification gửi thông báo; Reporting cập nhật dashboard và hiển thị thời điểm dữ liệu mới nhất.
+1. **Intake:** a citizen submits a request with coordinates, accuracy, capture time, and location source. Offline submissions remain pending; only a server acknowledgement (ACK) means received.
+2. **Screening:** validate input, use an idempotency key to prevent duplicate submission, and add the request to the operational queue.
+3. **Verification:** a coordinator contacts the reporter or adds information. Rejection and duplicate linking require a reason and history.
+4. **Prioritization:** a coordinator applies agreed criteria. AI output, if enabled, is supplementary.
+5. **Dispatch:** offer a mission to a suitable team. The team accepts/declines and records travel, arrival, and results.
+6. **Resource allocation:** Response requests a reservation; Logistics checks available stock. Reservation and physical issue are separate steps.
+7. **Outcome confirmation:** the team provides results/evidence; a coordinator confirms whether needs are met. Completing one mission does not automatically close a request with remaining needs.
+8. **Monitoring:** Notification delivers updates; Reporting refreshes dashboards and exposes the latest data timestamp.
 
-Quy trình tham chiếu chu trình OCHA ở mức khái niệm; cần xác nhận thuật ngữ và trách nhiệm theo bối cảnh đồ án. [OCHA HPC](https://knowledge.base.unocha.org/wiki/spaces/hpc/overview)
+The workflow references the OCHA cycle conceptually. Validate terminology and responsibilities for this project. [OCHA HPC](https://knowledge.base.unocha.org/wiki/spaces/hpc/overview)
 
-## 4. So sánh công nghệ
+## 4. Technology comparisons
 
 ### 4.1 Database
 
-| Tiêu chí | PostgreSQL + PostGIS | MySQL 8.4 + InnoDB | MongoDB |
+| Criterion | PostgreSQL + PostGIS | MySQL 8.4 + InnoDB | MongoDB |
 |---|---|---|---|
-| Quan hệ và ràng buộc | Mạnh; hợp user, mission, giao dịch kho, audit | Mạnh; InnoDB có transaction và foreign key | Quan hệ cần tổ chức thêm ở tầng ứng dụng |
-| GPS/bản đồ | GeoDjango/PostGIS có nhiều phép toán và spatial index | GeoDjango ghi nhận spatial function ít phong phú hơn PostGIS | Có 2dsphere, nhưng cần tích hợp riêng với Django |
-| Tồn kho cạnh tranh | Transaction, constraint, row lock phù hợp chống xuất vượt số dư | InnoDB hỗ trợ transaction/locking | Có transaction nhiều document; mô hình liên kết/báo cáo cần cân nhắc |
-| Django | ORM và GeoDjango trực tiếp | ORM trực tiếp, GIS hạn chế hơn | Không phải backend ORM mặc định của Django |
-| Kết luận | **Chọn** | Dự phòng nếu nhóm có kinh nghiệm/vận hành MySQL | Không chọn làm database chính |
+| Relationships and constraints | Strong fit for users, missions, inventory transactions, and audit | Strong; InnoDB supports transactions and foreign keys | Relationships require additional application design |
+| GPS/maps | Rich GeoDjango/PostGIS operations and spatial indexes | GeoDjango documents fewer spatial functions than PostGIS | Supports 2dsphere; separate Django integration needed |
+| Concurrent inventory updates | Transactions, constraints, and row locks support preventing over-issue | InnoDB provides transactions and locking | Supports multi-document transactions; relational/reporting design needs consideration |
+| Django integration | Direct ORM and GeoDjango support | Direct ORM; more limited GIS support | Not a default Django ORM backend |
+| Decision | **Selected** | Fallback if the team already operates MySQL | Not selected as the primary database |
 
-PostGIS hỗ trợ GiST spatial index. Với điểm cần tìm trong bán kính, cân nhắc geography PointField với SRID 4326; dùng geometry cho polygon ranh giới và phép toán phù hợp. Không dùng geography cho mọi trường một cách máy móc. [PostGIS spatial indexes](https://postgis.net/documentation/faq/spatial-indexes/), [GeoDjango distance queries](https://docs.djangoproject.com/en/5.2/ref/contrib/gis/db-api/). MySQL có InnoDB transactions và MongoDB có geospatial indexes/transactions, nhưng GeoDjango ghi nhận spatial API của MySQL ít phong phú hơn PostGIS; MongoDB cần tích hợp riêng với Django. [MySQL InnoDB](https://dev.mysql.com/doc/refman/8.4/en/innodb-introduction.html), [MongoDB 2dsphere](https://www.mongodb.com/docs/manual/core/indexes/index-types/geospatial/2dsphere/), [MongoDB transactions](https://www.mongodb.com/docs/manual/core/transactions/)
+PostGIS supports GiST spatial indexes. Consider a geography PointField with SRID 4326 for radius queries; use geometry for boundary polygons and appropriate spatial operations. Do not mechanically use geography for every field. [PostGIS spatial indexes](https://postgis.net/documentation/faq/spatial-indexes/), [GeoDjango distance queries](https://docs.djangoproject.com/en/5.2/ref/contrib/gis/db-api/)
 
-Đối với tồn kho, dùng transaction, constraint và row lock trên số dư SKU/kho trong transaction ngắn. Tránh gọi Kafka hay object storage khi đang giữ database lock. [Django transactions](https://docs.djangoproject.com/en/5.2/topics/db/transactions/), [Django QuerySet locking](https://docs.djangoproject.com/en/5.2/ref/models/querysets/#select-for-update), [PostgreSQL explicit locking](https://www.postgresql.org/docs/18/explicit-locking.html)
+MySQL supports InnoDB transactions, and MongoDB supports geospatial indexes and transactions. The distinction is the fit with this relational domain and GeoDjango integration. [MySQL InnoDB](https://dev.mysql.com/doc/refman/8.4/en/innodb-introduction.html), [MongoDB 2dsphere](https://www.mongodb.com/docs/manual/core/indexes/index-types/geospatial/2dsphere/), [MongoDB transactions](https://www.mongodb.com/docs/manual/core/transactions/)
 
-### 4.2 Backend
+Inventory operations use short transactions, constraints, and row locks on SKU/warehouse balances. Do not call Kafka or object storage while holding database locks. [Django transactions](https://docs.djangoproject.com/en/5.2/topics/db/transactions/), [Django QuerySet locking](https://docs.djangoproject.com/en/5.2/ref/models/querysets/#select-for-update), [PostgreSQL explicit locking](https://www.postgresql.org/docs/18/explicit-locking.html)
 
-| Lựa chọn | Ưu điểm | Hạn chế với C48 | Kết luận |
+### 4.2 Backend framework evaluation and selection
+
+**Evaluation method:** qualitative comparison against C48's requirements, based on official documentation reviewed on 2026-09-29. This is a design assessment, not a measured performance benchmark. No framework is assumed to be mandatory in this comparison.
+
+The primary criteria are relational workflow implementation, transaction control, geospatial integration, authentication and operational administration, Kafka integration, and delivery/maintenance effort for five services over ten weeks. Sharing a language with clients and optional AI integration are secondary benefits. Actual team proficiency remains unmeasured and should be checked during setup.
+
+| Framework | Strengths relevant to C48 | Integration work and tradeoffs | Assessment |
 |---|---|---|---|
-| Django + DRF | Python, ORM/migrations, admin/auth, GeoDjango, CRUD nghiệp vụ nhanh | Cần quy ước service boundary và quyền rõ ràng | **Chọn** theo ưu tiên của nhóm |
-| FastAPI | Gọn cho API bất đồng bộ, OpenAPI thuận tiện | Tự ghép nhiều phần auth/admin/ORM; không tận dụng GeoDjango | Không chọn cho baseline này |
-| Flask | Nhỏ và linh hoạt | Nhiều phần nền phải tự ghép, tăng boilerplate giữa 5 service | Không chọn |
+| **Django + DRF (Python)** | Integrated ORM/migrations, authentication, administration, and GeoDjango; explicit database transactions; DRF API conventions | Kafka requires a client/worker integration; custom scoped permissions, outbox, and saga logic still need implementation; admin is not the operational dashboard | **Selected** for the combined relational, GIS, and administration workload |
+| **Spring Boot (Java/Kotlin ecosystem)** | Spring ecosystem supports application configuration, security, health/metrics, relational persistence, and Kafka integration | C48 would combine persistence, spatial mapping, security, API, and operational UI components; effort depends on Spring experience. No claim that JVM resource use makes it unsuitable | Strong alternative, especially with existing Spring expertise or a JVM deployment standard |
+| **NestJS (TypeScript/Node.js)** | Structured modules/providers, TypeScript shared with web/mobile, documented Kafka transport and API/security integrations | Select and integrate ORM/migrations and PostGIS access; operational administration and inventory rules remain application work | Strong alternative when end-to-end TypeScript and Node experience outweigh Django's integrated data/GIS tooling |
+| **FastAPI (Python)** | Type-based validation, generated OpenAPI, dependency injection, and asynchronous API support | Assemble ORM/migrations, administration, authentication policy, and spatial integration; less integrated for this broad CRUD/operations scope | Suitable for focused API workloads; not the primary framework here |
+| **Flask (Python)** | Small core, flexible extensions, explicit component choices | Database, migration, administration, API schema, and authentication choices require additional assembly across services | Viable, but its minimal core offers less benefit for this domain-heavy system |
 
-Dùng Django 5.2 LTS, DRF tương thích, Python còn được Django hỗ trợ; khóa dependency/image bằng lock file/tag. Trang Django liệt kê hỗ trợ bảo mật 5.2 LTS đến tháng 4/2028; kiểm tra patch mới nhất khi setup, không sao chép số patch từ tài liệu. [Django release/support schedule](https://www.djangoproject.com/download/)
+**Evidence for the comparison:** Django documents its model layer and administrative interface; GeoDjango supplies spatial database integration. Spring Boot documents standalone applications and operational features, while Spring for Apache Kafka provides producer/listener integration. NestJS documents TypeScript application structure and a Kafka transport. FastAPI documents validation/OpenAPI and dependency injection. Flask deliberately leaves components such as database integration to extensions. [Django overview](https://docs.djangoproject.com/en/5.2/intro/overview/), [GeoDjango](https://docs.djangoproject.com/en/5.2/ref/contrib/gis/db-api/), [Spring Boot](https://docs.spring.io/spring-boot/index.html), [Spring for Apache Kafka](https://docs.spring.io/spring-kafka/reference/), [NestJS](https://docs.nestjs.com/), [NestJS Kafka](https://docs.nestjs.com/microservices/kafka), [FastAPI features](https://fastapi.tiangolo.com/features/), [Flask design](https://flask.palletsprojects.com/en/stable/design/)
 
-Mỗi service là Django project có cấu hình, database và migrations riêng. Dùng chung quy ước API/event bằng tài liệu; chưa cần dựng framework nội bộ dùng chung khi chỉ có một cách triển khai.
+**Selection rationale — project-specific inference:** Django + DRF offers the most cohesive baseline for C48's combination of relational records, stock transactions, GPS queries, and account/administrative workflows. Its integrated components reduce the number of foundational components that must be assembled. This is the main reason for selection; access to Python AI libraries is a secondary benefit because AI is optional and can run behind a service boundary with any framework.
 
-### 4.3 Web, mobile, API
+**Tradeoffs accepted:** Django does not supply the complete Kafka/outbox/saga architecture, scoped object authorization, or the React operational UI. Those must be designed and tested explicitly. Spring Boot and NestJS remain technically capable alternatives; no assertion is made that Django is universally faster, more scalable, or more secure. Revisit the decision if a compatibility spike fails, measured constraints cannot be met, or actual team expertise changes the delivery assessment.
 
-| Kênh | Đề xuất | Phạm vi |
+Use Django 5.2 LTS, compatible DRF, and a Python version supported by Django. Lock dependencies and container images. The original research records Django 5.2 security support through April 2028; check current patches during setup instead of copying an old patch number from this plan. [Django release/support schedule](https://www.djangoproject.com/download/)
+
+Each service is a Django project with its own configuration, database, and migrations. Share documented API/event conventions; an internal framework is unnecessary without demonstrated reuse needs.
+
+### 4.3 Web, mobile, and API
+
+| Channel | Proposal | Scope |
 |---|---|---|
-| Web | React + TypeScript + Vite; React Router; TanStack Query cho server state | Dashboard, map/queue, verify/triage, mission, kho, báo cáo, admin |
-| Mobile | React Native + Expo + TypeScript | Citizen SOS/tracking; volunteer mission/progress; GPS foreground và ảnh |
-| API | REST/JSON /api/v1; OpenAPI riêng từng service bằng drf-spectacular | Contract cho web/mobile, mock và kiểm tra API |
-| Bản đồ | Map UI tách khỏi nghiệp vụ; PostGIS tìm kiếm; chọn tile/geocoding provider sau khi rà license, quota, privacy | Không gửi nội dung/PII sự cố sang nhà cung cấp bản đồ |
+| Web | React + TypeScript + Vite; React Router; TanStack Query for server state | Dashboard, map/queue, verification/triage, missions, inventory, reports, admin |
+| Mobile | React Native + Expo + TypeScript | Citizen SOS/status tracking; volunteer missions/progress; foreground GPS and photos |
+| API | REST/JSON /api/v1; per-service OpenAPI through drf-spectacular | Web/mobile contracts, mocks, and API checks |
+| Maps | Separate map UI from business logic; PostGIS queries; select tile/geocoding provider after license, quota, and privacy review | Do not send incident descriptions or personally identifiable information (PII) to map providers |
 
-Thiết kế màn hình khẩn cấp với ít bước, nút dễ thao tác, trạng thái gửi rõ và manual pin khi GPS bị từ chối/sai lệch. Không theo dõi vị trí nền mặc định; Expo yêu cầu cấu hình permission theo nền tảng và loại truy cập. [Expo Location](https://docs.expo.dev/versions/latest/sdk/location/), [Expo permissions](https://docs.expo.dev/guides/permissions/)
+Emergency screens should minimize steps, provide accessible controls, clearly show submission status, and allow a manual pin when GPS is denied or inaccurate. Do not enable background tracking by default. Expo permissions depend on platform and access type. [Expo Location](https://docs.expo.dev/versions/latest/sdk/location/), [Expo permissions](https://docs.expo.dev/guides/permissions/)
 
-### 4.4 Kafka hay queue đơn giản
+### 4.4 Kafka versus a simpler queue
 
-| Phương án | Phù hợp khi | Với C48 |
+| Option | Appropriate when | C48 decision |
 |---|---|---|
-| Kafka | Nhiều consumer, cần replay, reporting projection và học event-driven service | **Chọn** cho integration events |
-| RabbitMQ/Celery | Chủ yếu cần task nền/retry, không cần đọc lại event stream | Đơn giản hơn cho job queue, nhưng kém phù hợp mục tiêu Kafka đã duyệt |
+| Kafka | Multiple consumers, replay, reporting projections, learning event-driven services | **Selected** for integration events |
+| RabbitMQ/Celery | Background tasks/retries without replaying an event stream | Simpler for a job queue, but less aligned with the replay and multi-consumer integration goals |
 
-Kafka đảm bảo thứ tự trong từng partition, không có thứ tự toàn cục. Dùng aggregate ID làm key để các thay đổi cùng request/mission vào cùng partition. Message có thể giao lại; consumer phải idempotent. Không cam kết “exactly once” xuyên database, Kafka, push provider và reporting. [Kafka introduction](https://kafka.apache.org/intro/), [Kafka delivery semantics](https://kafka.apache.org/40/design/design/)
+Kafka ordering is per partition, not global. Use the aggregate ID as the message key to place changes for the same request/mission in the same partition. Messages may be redelivered; consumers must be idempotent. Do not promise exactly-once processing across databases, Kafka, push providers, and reporting. [Kafka introduction](https://kafka.apache.org/intro/), [Kafka delivery semantics](https://kafka.apache.org/40/design/design/)
 
-### 4.5 Chọn mức độ tách service
+### 4.5 Service decomposition
 
-| Mô hình | Ưu điểm | Chi phí/rủi ro | Đánh giá |
+| Model | Benefits | Cost/risk | Assessment |
 |---|---|---|---|
-| Django modular monolith + worker | Ít deploy/database, giao dịch đơn giản, dễ đạt MVP | Không thể hiện service deployment/data ownership rõ như mục tiêu học của nhóm | Phương án an toàn nếu lịch trễ |
-| 5 service bounded context | Có boundary/DB/API/event độc lập; vẫn đủ gọn cho demo một host | Auth liên-service, outbox, eventual consistency và saga cần test | **Chọn theo mục tiêu đã duyệt** |
-| 8+ service nhỏ | Scale/ownership có thể phân nhỏ hơn | Tăng hợp đồng, container, test tích hợp và lỗi vận hành; vượt nhu cầu đồ án | Không chọn |
+| Django modular monolith + workers | Fewer deployments/databases, simpler transactions, easier MVP delivery | Less explicit independent deployment and data ownership | Fallback if the schedule slips |
+| Five services with bounded contexts | Independent boundaries, databases, APIs, and events; feasible on one host | Cross-service auth, outbox, eventual consistency, and saga testing | **Selected for explicit service ownership and deployment boundaries** |
+| Eight or more small services | Finer ownership/scaling possibilities | More contracts, containers, integration tests, and operational failures | Not selected |
 
-Để chứng minh đây là microservice chứ không chỉ nhiều process, mỗi service có image/deploy riêng, database credential riêng, OpenAPI/event contract và không đọc bảng service khác. Chia sẻ cùng một host/PostgreSQL server trong demo không làm mất ranh giới logic; nó chỉ tạo shared host/database-server failure domain.
+Each service has its own image/deployment, database credentials, OpenAPI/event contracts, and no direct access to another service's tables. Sharing a host/PostgreSQL server for the demo preserves logical boundaries but creates a shared failure domain.
 
-## 5. Kiến trúc đề xuất
+## 5. Proposed architecture
 
-### 5.1 Sơ đồ
+### 5.1 Diagram
 
 ```mermaid
 flowchart LR
@@ -139,7 +156,7 @@ flowchart LR
   Logistics[Logistics Django Service]
   Notification[Notification Consumer]
   Reporting[Reporting Consumer + Read API]
-  PG[(PostgreSQL + PostGIS<br/>DB/user riêng theo service)]
+  PG[(PostgreSQL + PostGIS<br/>separate DB/user per service)]
   Kafka[(Kafka KRaft)]
   S3[(S3-compatible object storage)]
   Obs[Prometheus + Grafana optional]
@@ -171,27 +188,27 @@ flowchart LR
   Obs -. metrics .-> Logistics
 ```
 
-Nginx chỉ định tuyến; mỗi service vẫn xác thực/authorize. Producer ghi event vào outbox cùng transaction nghiệp vụ rồi relay mới publish.
+Nginx routes traffic; each service still authenticates and authorizes requests. Producers write to the outbox in the business transaction; a relay publishes afterward.
 
-### 5.2 Ranh giới và quyền dữ liệu
+### 5.2 Boundaries and data ownership
 
-| Service | Sở hữu dữ liệu/logic chuẩn | API chính | Event tiêu biểu |
+| Service | Authoritative data/logic | Main APIs | Representative events |
 |---|---|---|---|
-| **Identity** | Tài khoản, credentials, tổ chức, membership, role grant/scope | Login/refresh/logout, quản lý user/role | identity.user.created, identity.role.changed, identity.account.disabled |
-| **Response** | Campaign/incident, SOS/request, verify/priority, team/volunteer, mission/progress, evidence metadata | Gửi request, verify/triage, assign, transition, query map | response.campaign.activated/closed, response.request.submitted/verified/triaged, response.mission.assigned/status_changed/completed |
-| **Logistics** | Kho, item, stock balance/ledger, campaign reference projection, reservation, transfer, vehicle, relief point, distribution | Nhập/xuất/điều chuyển/giữ hàng/cấp phát | logistics.stock.reserved/rejected/issued, logistics.transfer.received, logistics.distribution.recorded |
-| **Notification** | Device destination, template, delivery attempt, retry, in-app notification | Thông báo của user, mark read, retry ops | Có thể phát delivery status nếu consumer cần |
-| **Reporting** | Projection/read model cho dashboard; không sở hữu dữ liệu nghiệp vụ chuẩn | Tổng hợp campaign/time/region, export | Chủ yếu là consumer |
+| **Identity** | Accounts, credentials, organizations, memberships, scoped role grants | Login/refresh/logout, user/role management | identity.user.created, identity.role.changed, identity.account.disabled |
+| **Response** | Campaign/incident, SOS/requests, verification/priority, teams/volunteers, missions/progress, evidence metadata | Submit, verify/triage, assign, transition, map queries | response.campaign.activated/closed, response.request.submitted/verified/triaged, response.mission.assigned/status_changed/completed |
+| **Logistics** | Warehouses, items, stock balances/ledger, campaign reference projection, reservations, transfers, vehicles, relief points, distributions | Receipt/issue/transfer/reservation/distribution | logistics.stock.reserved/rejected/issued, logistics.transfer.received, logistics.distribution.recorded |
+| **Notification** | Device destinations, templates, delivery attempts, retries, in-app notifications | User notifications, mark read, operational retries | Delivery status events if needed by a consumer |
+| **Reporting** | Dashboard projections/read models; no authoritative business data | Campaign/time/region aggregates, export | Primarily a consumer |
 
-Boundary:
+Boundary rules:
 
-- Mỗi service có database/user riêng; trên demo cùng PostgreSQL server để tiết kiệm tài nguyên. Không có foreign key hay query bảng xuyên service.
-- ID user/campaign/warehouse ngoài service là UUID tham chiếu logic. Dùng API/event/projection để xác minh.
-- Response sở hữu Campaign/Incident nghiệp vụ; Logistics sở hữu kho và phân phối theo campaign ID; Reporting nối projection qua event.
-- Request và mission cùng Response DB để state/assignment có transaction cục bộ. Inventory ở Logistics DB; workflow liên miền dùng saga.
-- Reporting có thể trễ; hiện generated time. Quyết định cứu hộ lấy từ dữ liệu chuẩn Response/Logistics.
+- Each service has a separate database/user; the demo may share one PostgreSQL server. No cross-service foreign keys or table queries.
+- External user/campaign/warehouse IDs are opaque UUID references. Validate them through APIs, events, or projections.
+- Response owns Campaign/Incident; Logistics owns inventory/distribution referenced by campaign ID; Reporting joins event-derived projections.
+- Requests and missions share the Response database for local state/assignment transactions. Inventory belongs to Logistics; cross-domain workflows use a saga.
+- Reporting may lag and must show its generated time. Operational decisions use authoritative Response/Logistics data.
 
-### 5.3 Event, outbox và retry
+### 5.3 Events, outbox, and retries
 
 ```json
 {
@@ -208,34 +225,34 @@ Boundary:
 }
 ```
 
-Không phát số điện thoại, mô tả tự do, signed URL hoặc tọa độ chính xác nếu consumer không cần. Event không phải bản sao đầy đủ của row. Version schema rõ ràng; JSON versioned envelope đủ cho scope đồ án.
+Do not include phone numbers, free text, signed URLs, or exact coordinates unless the consumer needs them. An event is not a full database row copy. Use explicit schema versions; a versioned JSON envelope is sufficient for the capstone.
 
-1. Trong transaction, ghi business state, audit/domain event và outbox.
-2. Relay gửi outbox chưa publish rồi đánh dấu. Nếu process chết sau publish nhưng trước mark, event có thể được gửi lại.
-3. Consumer ghi event ID vào inbox có unique constraint cùng transaction với projection/side effect.
-4. Duplicate không tạo notification/stock movement/report row lần hai. Lỗi tạm thời retry có backoff; poison event vào DLQ để kiểm tra/replay.
-5. Theo dõi outbox age, consumer lag, retry và DLQ count.
+1. Write business state, audit/domain events, and the outbox inside one transaction.
+2. The relay publishes pending entries and then marks them published. A crash between those steps can cause redelivery.
+3. A consumer records the event ID in a uniquely constrained inbox in the same transaction as its projection/database side effect.
+4. Duplicates must not create another notification, stock movement, or report row. Retry temporary failures with backoff; route poison events to a dead-letter queue (DLQ) for inspection/replay.
+5. Monitor outbox age, consumer lag, retries, and DLQ count.
 
-Outbox tránh DB đã commit nhưng message không gửi; AWS cũng nêu nguy cơ duplicate và khuyến nghị consumer idempotent. [AWS transactional outbox](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html)
+Outbox prevents committed business data from losing its event intent. Duplicate delivery remains possible and requires idempotent consumers. [AWS transactional outbox](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html)
 
-Không đưa vào baseline: Schema Registry, Avro, Debezium/CDC, service mesh, CQRS framework hay workflow engine. Chỉ bổ sung khi có nhu cầu được chứng minh.
+Schema Registry, Avro, Debezium/CDC, a service mesh, a CQRS framework, and a workflow engine are outside the baseline. Add them only for a demonstrated need.
 
-### 5.4 Saga giữ hàng cho mission
+### 5.4 Mission resource-reservation saga
 
-1. Coordinator tạo/assign mission trong Response; nếu cần hàng, mission ở WAITING_RESOURCES.
-2. Response ghi ReservationRequested vào outbox.
-3. Logistics nhận event, khóa số dư, kiểm tra available và atomically tạo reservation hoặc từ chối; kết quả đi qua outbox.
-4. Response nhận xác nhận thì mission chuyển READY_TO_DEPLOY; coordinator gửi offer cho team, request mới chuyển DISPATCHED. Team accept thì request chuyển IN_PROGRESS. Bị từ chối tài nguyên thì mission ở WAITING_RESOURCES để coordinator chọn kho/đổi lượng/hủy.
-5. Kho issue thật thì Logistics ghi movement ISSUE, reservation thành ISSUED. Hủy trước issue thì release; hủy sau issue không xóa movement.
-6. Hàng đã xuất quay lại phải ghi movement RETURN sau kiểm đếm.
+1. A coordinator creates/assigns a mission in Response. If goods are required, the mission starts in WAITING_RESOURCES.
+2. Response records ReservationRequested in its outbox.
+3. Logistics consumes the event, locks balances, checks available stock, and atomically creates or rejects the reservation. The result goes through its outbox.
+4. A confirmed reservation moves the mission to READY_TO_DEPLOY. The coordinator sends the team an offer, moving the request to DISPATCHED. Team acceptance moves the request to IN_PROGRESS. Rejection leaves the mission WAITING_RESOURCES so the coordinator can change warehouse/quantity or cancel.
+5. Physical issue creates an ISSUE movement and changes the reservation to ISSUED. Cancellation before issue releases stock; cancellation afterward does not delete movements.
+6. Returned goods create a RETURN movement after physical verification/counting.
 
-Nếu mission bị hủy trong khi reservation còn xử lý, Response ghi cancellation/release intent. Nếu xác nhận giữ hàng đến muộn, Logistics vẫn trả kết quả idempotent và Response phát release tiếp; không để reservation mồ côi.
+If a mission is cancelled while reservation processing is pending, Response records cancellation/release intent. A late reservation confirmation must trigger a release compensation; retries remain idempotent and must not leave an orphaned reservation.
 
-Đây là workflow nhiều transaction có bù trừ, không phải distributed transaction. Trạng thái trung gian/timeout phải hiện để điều phối viên xử lý.
+This is a workflow with multiple local transactions and compensating actions, not a distributed transaction. Intermediate states and timeouts must be visible to coordinators.
 
-## 6. Mô hình dữ liệu và toàn vẹn
+## 6. Data model and integrity
 
-### 6.1 ERD logic theo service
+### 6.1 Logical ERD by service
 
 ```mermaid
 erDiagram
@@ -305,110 +322,126 @@ erDiagram
   }
 ```
 
-Các FK trong sơ đồ là quan hệ bên trong service. ID user/campaign bên ngoài là UUID tham chiếu logic, không có cross-database foreign key. Model thực tế cần timestamp, audit fields, indexes, unique constraints, migrations và chính sách lưu trữ.
+Diagram relationships are local to a service. External user/campaign IDs are logical UUID references, with no cross-database foreign keys. Implementation still requires complete timestamps, audit fields, indexes, unique constraints, migrations, and retention policies.
 
-### 6.2 Thực thể cốt lõi
+### 6.2 Core entities
 
-| Database | Bảng/chủ thể tối thiểu |
+| Database | Minimum tables/entities |
 |---|---|
-| Identity | User, Organization, Membership, RoleGrant, trạng thái account, refresh session/revocation nếu dùng token rotation |
-| Response | Campaign, Incident, AssistanceRequest, RequestEvent, RescueTeam, TeamMember (opaque user ID), VolunteerProfile, Mission, MissionTeam, EvidenceMetadata, Outbox, Inbox |
+| Identity | User, Organization, Membership, RoleGrant, account status, refresh session/revocation if token rotation is used |
+| Response | Campaign, Incident, AssistanceRequest, RequestEvent, RescueTeam, TeamMember with opaque user ID, VolunteerProfile, Mission, MissionTeam, EvidenceMetadata, Outbox, Inbox; optional AnalysisSnapshot, AnalysisJob, TriageRecommendation, RecommendationReview (Section 12) |
 | Logistics | Warehouse, Item, StockBalance, StockMovement, CampaignReference projection, Reservation/lines, Transfer/lines, Distribution/lines, Vehicle, ReliefPoint, Outbox, Inbox |
 | Notification | DeviceEndpoint, Notification, DeliveryAttempt, retry state, Inbox |
-| Reporting | RequestDailyMetric, CampaignSnapshot, StockSnapshot, ProcessingTimeMetric, watermark/offset; chỉ tạo projection thật sự cần cho dashboard |
+| Reporting | RequestDailyMetric, CampaignSnapshot, StockSnapshot, ProcessingTimeMetric, watermark/offset; create only projections used by the dashboard |
 
-Tạo custom User model trong migration đầu của Identity service; thay user model sau khi đã có migration/domain data gây migration phức tạp. [Django custom user model](https://docs.djangoproject.com/en/5.2/topics/auth/customizing/)
+Create the custom User model in Identity's first migration. Changing it after migrations and domain data exist complicates migration work. [Django custom user model](https://docs.djangoproject.com/en/5.2/topics/auth/customizing/)
 
-### 6.3 GPS và file minh chứng
+### 6.3 GPS and evidence files
 
-- Tọa độ là WGS84/SRID 4326; GeoJSON lưu theo thứ tự longitude, latitude. Validate longitude trong -180..180, latitude trong -90..90, accuracy không âm. [RFC 7946](https://datatracker.ietf.org/doc/html/rfc7946)
-- Lưu capture time, accuracy mét, source (GPS, manual pin, geocoded) và server receive time riêng. Độ chính xác thiết bị không đồng nghĩa độ chính xác ngoài thực địa.
-- Lưu vị trí snapshot khi tạo SOS; chỉ thêm location history nếu có yêu cầu rõ. Không tracking nền liên tục trong MVP.
-- Map query giới hạn theo quyền, vùng/thời gian/status/bounding box; không trả mọi PII cho bản đồ.
-- File ở object storage; DB chỉ giữ object key, owner type/id, MIME đã kiểm tra, size, checksum, uploader, thời điểm và visibility. Bucket private; signed URL ngắn hạn nếu dùng truy cập trực tiếp.
-- Kiểm tra MIME thực, phần mở rộng và kích thước; không tin tên/MIME từ client. Tải lên chỉ qua nghiệp vụ có quyền.
-- Dữ liệu demo phải là dữ liệu giả, không lấy ảnh hoặc thông tin người gặp nạn thật.
-- Dùng Django storage API; filesystem local cho dev/test, SeaweedFS S3 gateway cho lab demo hoặc S3-compatible managed khi triển khai thật. MinIO repo đã archive ngày 25/04/2026 và ghi không còn được duy trì. Trước khi dùng SeaweedFS thật, kiểm tra compatibility, auth, backup/restore, signed URL và license. [MinIO archive notice](https://github.com/minio/minio), [SeaweedFS S3 API](https://github.com/seaweedfs/seaweedfs)
+- Coordinates use WGS84/SRID 4326; GeoJSON order is longitude, latitude. Validate longitude within -180..180, latitude within -90..90, and nonnegative accuracy. [RFC 7946](https://datatracker.ietf.org/doc/html/rfc7946)
+- Store capture time, accuracy in meters, source (GPS, manual pin, geocoded), and server receive time separately. Device-reported accuracy is not a guarantee of field accuracy.
+- Store a location snapshot with the SOS. Add location history only for an explicit requirement; continuous background tracking is outside the MVP.
+- Scope map queries by authorization, region/time/status/bounding box. Do not expose all PII through map responses.
+- Store files in object storage. The database holds object key, owner type/ID, validated MIME, size, checksum, uploader, time, and visibility. Keep buckets private; use short-lived signed URLs if direct access is used.
+- Validate actual MIME, extension, and size; do not trust client-provided names/MIME. Uploads require authorization on the owning business object.
+- Demo data must be synthetic; do not use real victims' images or personal information.
+- Use Django's storage API with django-storages/boto3 for S3-compatible providers; local filesystem is acceptable for lightweight development tests, while provider integration/restore tests require the selected storage service. The detailed [storage research](c48-storage-research.md) defines edition selection, upload states, access policies, and recovery.
 
-### 6.4 Tồn kho và audit
+#### Storage reassessment: can C48 use MinIO?
 
-- StockMovement là sổ biến động chỉ thêm: RECEIPT, RESERVE, RELEASE, ISSUE, TRANSFER_OUT, TRANSFER_IN, RETURN, ADJUSTMENT.
-- StockBalance là số dư hiện tại/projection cập nhật cùng transaction với movement; available = on_hand - reserved.
-- Constraint: on_hand ≥ 0, reserved ≥ 0, reserved ≤ on_hand; quantity dương, đơn vị đo khớp item. Điều chỉnh cần actor, lý do và quyền.
-- Unique constraint trên cặp warehouse/item cho StockBalance; khi reserve nhiều item, khóa theo thứ tự ID ổn định để tránh cập nhật trùng và giảm deadlock.
-- Transfer nhận ở kho đích là bước riêng; không cộng kho đích chỉ vì transfer đã được tạo.
-- Distribution ghi item, lượng, kho/điểm cấp, campaign, thời gian và actor. Không bắt buộc thu thập giấy tờ/tên người nhận khi không có nhu cầu được duyệt.
-- Dùng unique/idempotency key chống gửi lại receipt/issue/distribution; khóa hàng số dư để hai thao tác đồng thời không xuất quá tồn.
+**Yes, conditionally for the capstone lab.** The previous archive finding concerns MinIO Community, not all MinIO products. Community is archived; AIStor Free is a separate proprietary single-node option. Its agreement permits educational use, while its operational documentation limits features and provides no SLA. The proposed lab path is AIStor Free with synthetic data after terms/license and compatibility checks; SeaweedFS remains the self-hosted fallback. No artifact, license, or provider has been installed or activated during research. [Community repository](https://github.com/minio/minio), [AIStor Free agreement](https://www.min.io/legal/aistor-free-agreement), [AIStor license operations](https://docs.min.io/aistor/operations/licenses/)
 
-## 7. Yêu cầu hệ thống
+| Choice | Appropriate use | Limitation to record |
+|---|---|---|
+| MinIO AIStor Free | Conditional single-node capstone lab | Valid license/terms, no HA/SLA, tier-specific restrictions; do not reuse old Community setup instructions blindly |
+| MinIO Community | Historical or isolated disposable experiments | Archived/unmaintained; not the maintained shared-demo default |
+| SeaweedFS | Open-source S3-compatible lab fallback | Its own compatibility, policy, operations, and restore checks are still needed |
+| Managed S3-compatible storage | Later deployment with known region/privacy/budget | Provider-specific cost, network, IAM, and data-policy decisions |
 
-Trong bảng FR, **M** là cần cho demo cốt lõi, **S** là nên có nếu tiến độ cho phép, **O** là mở rộng. Đây là ưu tiên đề xuất, không có sẵn trong đề cương.
+For C48, start with uploads through the owning Django service: authorize → record PENDING → validate/stream/upload outside the DB transaction → record READY. A storage failure must not roll back an already received SOS. Response and Logistics use separate private buckets/credentials; other services have no blanket file access. Do not store signed URLs in PostgreSQL or Kafka. Signed links need a hostname reachable from both browser and physical mobile devices. Backup must include actual object bytes plus metadata; restoring PostgreSQL alone does not restore evidence. [Django S3 backend settings](https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html)
+
+If direct uploads are later added, validate finalized content and bind evidence to immutable verified bytes: presigned upload URLs may be reused until expiration. See the storage note for overwrite races, permission-revocation windows, reconciliation, and planned checks. [S3 presigned URL behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
+
+### 6.4 Inventory and audit
+
+- StockMovement is append-only: RECEIPT, RESERVE, RELEASE, ISSUE, TRANSFER_OUT, TRANSFER_IN, RETURN, ADJUSTMENT.
+- StockBalance is the current balance/projection, updated in the same transaction as its movement; available = on_hand - reserved.
+- Constraints: on_hand ≥ 0, reserved ≥ 0, reserved ≤ on_hand; quantities are positive and units match the item. Adjustments require actor, reason, and permission.
+- Enforce a unique warehouse/item pair for StockBalance. Lock multiple item balances in a stable ID order to prevent duplicate updates and reduce deadlocks.
+- Destination receipt is a separate transfer step. Creating a transfer alone does not increase destination stock.
+- Distribution records item, quantity, warehouse/relief point, campaign, time, and actor. Do not require beneficiary names/identity documents without an approved need.
+- Use unique/idempotency keys for receipt/issue/distribution retries and row locks to prevent concurrent over-issue.
+
+## 7. System requirements
+
+For FR priorities, **M** means required for the core demo, **S** means should have if time permits, and **O** means optional extension. These are proposed priorities, not classifications in the original brief.
 
 ### 7.1 User Requirements (UR)
 
-| ID | Actor | Nhu cầu |
+| ID | Actor | Need |
 |---|---|---|
-| UR-01 | Người dân | Gửi SOS/yêu cầu có vị trí, số người, thông tin sự cố và nhận xác nhận server đã tiếp nhận. |
-| UR-02 | Người dân | Theo dõi tiến độ, bổ sung thông tin và biết request bị từ chối/trùng/đóng vì lý do gì. |
-| UR-03 | Coordinator | Xác minh, liên kết yêu cầu trùng, đặt ưu tiên, xem map và phân công đội phù hợp. |
-| UR-04 | Volunteer/team | Chỉ xem mission được giao; accept/decline, cập nhật tiến độ và bằng chứng kết quả. |
-| UR-05 | Operations manager | Quản lý campaign, kho, phương tiện, điểm cứu trợ, giữ/điều chuyển/cấp/phân phối vật tư có thể truy vết. |
-| UR-06 | Admin/manager | Quản lý account/quyền theo phạm vi và xem dashboard/báo cáo hoạt động. |
-| UR-07 | Nhóm vận hành | Biết dữ liệu đang chờ gửi, consumer đang trễ/lỗi, dashboard cập nhật lúc nào và có cách phục hồi demo. |
+| UR-01 | Citizen | Submit an SOS/request with location, affected-person count, and incident information; receive confirmation of server receipt. |
+| UR-02 | Citizen | Track progress, add information, and understand rejection, duplicate, or closure reasons. |
+| UR-03 | Coordinator | Verify, link duplicates, prioritize, view maps, and assign suitable teams. |
+| UR-04 | Volunteer/team | Access assigned missions only; accept/decline, update progress, and submit outcome evidence. |
+| UR-05 | Operations manager | Manage campaigns, warehouses, vehicles, relief points, reservations, transfers, issues, and distributions with traceability. |
+| UR-06 | Admin/manager | Manage accounts/scoped permissions and view operational dashboards/reports. |
+| UR-07 | Operations team | See pending submissions, delayed/failed consumers, dashboard freshness, and recovery procedures. |
 
 ### 7.2 Functional Requirements (FR)
 
-| ID | Mức | Yêu cầu chức năng đề xuất | Tiêu chí kiểm chứng |
+| ID | Priority | Proposed functional requirement | Verification criterion |
 |---|---:|---|---|
-| FR-IAM-01 | M | Login, refresh/logout, vô hiệu hóa account và đổi thông tin xác thực | Token sai/hết hạn/account disabled nhận 401; logout vô hiệu refresh session |
-| FR-IAM-02 | M | Role theo scope tổ chức/khu vực/campaign; kiểm tra cả action lẫn object | Citizen không xem request người khác; volunteer chỉ thấy mission của team |
-| FR-IAM-03 | M | Admin quản lý account, organization và role theo least privilege | Ghi actor/time/trước-sau cho thay đổi quyền |
-| FR-REQ-01 | M | Tạo request: category, mô tả ngắn, số người, vị trí hoặc manual pin, thời gian/source | Validate dữ liệu; trả mã và server receive time |
-| FR-REQ-02 | M | Hỗ trợ người đăng nhập; guest SOS nếu quyết định được xác nhận | Guest chỉ tạo request/track capability riêng, không search/list |
-| FR-REQ-03 | M | Idempotency cho retry tạo SOS | Cùng key/payload không tạo row thứ hai; cùng key khác payload bị từ chối |
-| FR-REQ-04 | M | Verify, reject, duplicate-link; quyết định reject/duplicate có reason | Không xóa request trùng; duplicate link tới canonical request |
-| FR-REQ-05 | M | Priority thủ công P1–P4, ghi actor/time và lý do/override | Priority độc lập với status; không tự đổi từ AI |
-| FR-REQ-06 | M | List/map filter theo scope, bbox/khu vực, status, priority, time | Lọc quyền trước phân trang |
-| FR-REQ-07 | M | Người dân xem timeline và bổ sung thông tin cho request của mình trong state được phép | Chủ thể xem được; người khác không truy cập; nội dung bổ sung có actor/time |
-| FR-MSN-01 | M | Quản lý team, skill, availability, members qua opaque user ID | Không gán team inactive/unavailable hoặc thiếu skill bắt buộc |
-| FR-MSN-02 | M | Tạo mission, offer/assign, accept/decline, transition, kết quả | Chỉ state transition hợp lệ; ghi actor/time/reason |
-| FR-MSN-03 | M | Một request có thể có nhiều mission; MVP một mission gắn một request | Xong một mission không tự close request khi còn nhu cầu |
-| FR-MSN-04 | M | Tải evidence cho request/mission; coordinator xác nhận kết quả | Metadata và quyền tải gắn object scope |
-| FR-CAM-01 | M | Response quản lý campaign/incident, vùng hoạt động, thời gian và trạng thái | Chỉ role/scope phù hợp tạo/sửa; Logistics lưu campaign ID tham chiếu |
-| FR-LOG-01 | M | Quản lý warehouse, item, vehicle, relief point; gắn campaign ID tham chiếu khi cần | Entity active/inactive; không xóa lịch sử đã phát sinh |
-| FR-LOG-02 | M | Nhập, transfer, receive, reserve/release, issue, return, adjustment | Ledger có actor/time/quantity/reason; balance không âm |
-| FR-LOG-03 | M | Giữ hàng cho mission qua saga Response–Logistics | Kết quả idempotent; trung gian/timeout quan sát được |
-| FR-LOG-04 | M | Ghi distribution theo campaign, điểm, item, quantity, actor | Retry không nhân đôi distribution |
-| FR-NOT-01 | M | In-app notification khi request/mission đổi; push/email là mở rộng | Notification lỗi không rollback SOS/mission; retry state lưu được |
-| FR-RPT-01 | M | Dashboard request theo state/priority/region/campaign, lead time, stock/distribution | Khớp dataset kiểm thử; hiển thị watermark/update time |
-| FR-RPT-02 | S | Export CSV theo scope, che PII theo role | Không export trường ngoài quyền; audit export nhạy cảm |
-| FR-AUD-01 | M | Lưu state transition, quyết định, stock adjustment, phân phối và role change | Không ghi password/token; audit chỉ role phù hợp đọc |
-| FR-EVT-01 | M | Outbox atomically với business write; relay/retry và consumer dedupe | Relay dừng không làm mất committed event; replay không lặp side effect |
-| FR-FILE-01 | M | Upload private file, validate size/type, lưu metadata và kiểm soát download | MIME giả/size vượt ngưỡng bị từ chối; link hết hạn không tải |
-| FR-OFF-01 | S | Draft SOS offline, retry khi có mạng bằng cùng idempotency key | UI phân biệt QUEUED_ON_DEVICE và SUBMITTED |
-| FR-AI-01 | O | AI/rule trả gợi ý, yếu tố, version; người điều phối accept/override | Không auto-dispatch/ghi đè priority; có thể tắt mà core vẫn chạy |
+| FR-IAM-01 | M | Login, refresh/logout, account disabling, and credential changes | Invalid/expired tokens or disabled accounts receive 401; logout invalidates the refresh session |
+| FR-IAM-02 | M | Organization/region/campaign-scoped roles; action and object checks | Citizens cannot access another citizen's request; volunteers see their team's missions only |
+| FR-IAM-03 | M | Admin account, organization, and role management with least privilege | Permission changes record actor/time and before/after values |
+| FR-REQ-01 | M | Create requests with category, short description, headcount, location/manual pin, time/source | Validate input; return an identifier and server receive time |
+| FR-REQ-02 | M | Support authenticated users; guest SOS only if confirmed | Guests may create/track through a separate capability, never search/list |
+| FR-REQ-03 | M | Idempotent SOS creation retries | Same key/payload creates no second row; same key with different payload is rejected |
+| FR-REQ-04 | M | Verify, reject, and duplicate-link; rejection/duplicate decisions require reasons | Preserve duplicate requests and link them to a canonical request |
+| FR-REQ-05 | M | Manual P1–P4 priority with actor/time/reason and override history | Priority is separate from status; AI cannot change it automatically |
+| FR-REQ-06 | M | Scoped list/map filtering by bbox/region, status, priority, and time | Apply authorization filters before pagination |
+| FR-REQ-07 | M | Citizens view timelines and supplement their own requests in permitted states | Owner-only access; supplements record actor/time |
+| FR-MSN-01 | M | Manage teams, skills, availability, and members through opaque user IDs | Reject inactive/unavailable teams or missing mandatory skills |
+| FR-MSN-02 | M | Create missions, offer/assign, accept/decline, transition, and record results | Only valid transitions; record actor/time/reason |
+| FR-MSN-03 | M | One request may have multiple missions; one mission belongs to one request in the MVP | One completed mission does not close a request with remaining needs |
+| FR-MSN-04 | M | Request/mission evidence uploads and coordinator outcome confirmation | Metadata and download access follow object scope |
+| FR-CAM-01 | M | Response manages campaigns/incidents, operating regions, time, and status | Scoped creation/editing; Logistics stores campaign references |
+| FR-LOG-01 | M | Manage warehouses, items, vehicles, relief points, and campaign references where needed | Active/inactive entities; preserve existing history |
+| FR-LOG-02 | M | Receipts, transfers, receipt confirmation, reserve/release, issue, return, adjustment | Ledger records actor/time/quantity/reason; balances never negative |
+| FR-LOG-03 | M | Mission stock reservations through a Response–Logistics saga | Idempotent results; observable intermediate states/timeouts |
+| FR-LOG-04 | M | Distribution by campaign, point, item, quantity, and actor | Retries never duplicate a distribution |
+| FR-NOT-01 | M | In-app request/mission notifications; push/email are extensions | Notification failure never rolls back SOS/mission changes; persist retry state |
+| FR-RPT-01 | M | Dashboard by state/priority/region/campaign, lead time, stock/distribution | Matches the test dataset; exposes watermark/update time |
+| FR-RPT-02 | S | Scoped CSV export with role-based PII masking | No unauthorized fields; audit sensitive exports |
+| FR-AUD-01 | M | State, decision, adjustment, distribution, and role-change history | No passwords/tokens in audit; restricted readers |
+| FR-EVT-01 | M | Atomic business/outbox writes, relay/retry, consumer deduplication | Relay outages do not lose committed events; replay does not repeat side effects |
+| FR-FILE-01 | M | Private uploads, size/type validation, metadata, controlled downloads | Reject forged MIME/oversize files; expired links cannot download |
+| FR-OFF-01 | S | Offline SOS drafts and retry with the same idempotency key | Distinguish QUEUED_ON_DEVICE from SUBMITTED |
+| FR-AI-01 | O | AI/rule suggestions with factors/version and coordinator acceptance/override; optional detailed requirements FR-AI-02..06 in Section 12.8 | No automatic dispatch/priority overwrite; core works with AI disabled |
 
 ### 7.3 Non-functional Requirements (NFR)
 
-Đề cương chưa đưa ngưỡng số. Các con số dưới đây là mục tiêu khởi điểm cần giảng viên/nhóm xác nhận.
+The brief specifies no numeric thresholds. The numbers below are initial targets for supervisor/team confirmation.
 
-| ID | Chất lượng | Yêu cầu/tiêu chí đề xuất |
+| ID | Quality | Proposed requirement/criterion |
 |---|---|---|
-| NFR-SEC-01 | Bảo mật | Mặc định API yêu cầu login; chỉ endpoint guest SOS được public nếu phê duyệt. Service tự kiểm tra scope, không tin role từ client. |
-| NFR-SEC-02 | Bảo mật | Queryset list lọc theo quyền; object permission cho detail/action; validate input/file và rate limit phù hợp. DRF mặc định AllowAny nếu không đặt policy, và object permission không tự lọc mọi row của list. [DRF permissions](https://www.django-rest-framework.org/api-guide/permissions/) |
-| NFR-SEC-03 | Bảo mật | Không log token, password, signed URL hay vị trí chính xác nếu không cần; HTTPS ngoài môi trường local. |
-| NFR-PRV-01 | Riêng tư | Vị trí chỉ chủ thể, coordinator trong scope và team được giao xem; report mặc định aggregate. Retention cần xác nhận, không tự đặt chính sách chính thức. |
-| NFR-REL-01 | Tin cậy | Inventory không âm; state hợp lệ; retry không nhân đôi; consumer khôi phục; có kiểm thử restore backup. |
-| NFR-PERF-01 | Hiệu năng | Mục tiêu thảo luận: dataset 10.000 request, 20 concurrent trong demo; API đọc phổ thông p95 ≤ 2 giây; SOS create p95 ≤ 3 giây không tính upload. Ghi lại cấu hình máy đo. |
-| NFR-PERF-02 | Hiệu năng | Map dùng spatial index/bbox và giới hạn kết quả; dashboard hiện watermark thay vì giả realtime. |
-| NFR-UX-01 | Sử dụng | SOS ít bước, nút dễ thao tác, trạng thái gửi rõ, manual pin và lỗi GPS dễ hiểu. |
-| NFR-OFF-01 | Mạng yếu | Nếu làm offline queue, retry idempotent; không đồng bộ vị trí nền liên tục. |
-| NFR-OBS-01 | Vận hành | Health/readiness, log có correlation ID, metric latency/error, outbox age, Kafka lag, DLQ, DB connections/disk. |
-| NFR-OPS-01 | Khôi phục | Có hướng dẫn backup DB/object metadata và làm một lần restore demo; chốt RPO/RTO khi có yêu cầu thật. |
-| NFR-COMP-01 | Tương thích | API có version prefix/OpenAPI; migration kiểm soát; backend dùng UTC, UI cấu hình timezone. |
-| NFR-TEST-01 | Kiểm thử | Có test state, object permission, race tồn kho, duplicate event, outage/replay và end-to-end; coverage threshold chốt sau. |
+| NFR-SEC-01 | Security | Require authentication by default; public guest SOS only if approved. Services enforce scope and never trust client-supplied roles. |
+| NFR-SEC-02 | Security | Filter list querysets by authorization; enforce detail/action object permissions, input/file validation, and suitable rate limits. DRF defaults to AllowAny without configured policy; object permissions do not automatically filter every list row. [DRF permissions](https://www.django-rest-framework.org/api-guide/permissions/) |
+| NFR-SEC-03 | Security | Do not log tokens, passwords, signed URLs, or unnecessary exact locations; HTTPS outside local development. |
+| NFR-PRV-01 | Privacy | Exact locations are accessible only to the subject, scoped coordinators, and assigned teams; reports aggregate by default. Retention needs confirmation. |
+| NFR-REL-01 | Reliability | Nonnegative inventory, valid states, idempotent retries, consumer recovery, and backup restoration checks. |
+| NFR-PERF-01 | Performance | Discussion target: 10,000 requests and 20 concurrent users in the demo; common read API p95 ≤ 2 seconds; SOS creation p95 ≤ 3 seconds excluding upload. Record measurement hardware. |
+| NFR-PERF-02 | Performance | Spatial indexes/bbox/result limits for maps; dashboard watermark instead of an unqualified real-time claim. |
+| NFR-UX-01 | Usability | Few SOS steps, usable controls, clear submission status, manual pin, understandable GPS errors. |
+| NFR-OFF-01 | Weak connectivity | If an offline queue is implemented, retries are idempotent; no continuous background location synchronization. |
+| NFR-OBS-01 | Operations | Health/readiness, correlation IDs, latency/error metrics, outbox age, Kafka lag, DLQ, DB connections/disk. |
+| NFR-OPS-01 | Recovery | Document DB/object metadata backup and perform a demo restore; define RPO/RTO when real requirements exist. |
+| NFR-COMP-01 | Compatibility | Versioned API/OpenAPI, controlled migrations, UTC backend, configurable UI timezone. |
+| NFR-TEST-01 | Testing | State, object-permission, inventory-race, duplicate-event, outage/replay, and end-to-end tests; coverage threshold remains open. |
+| NFR-L10N-01 | Language — confirmed | All Web/Mobile user-facing content and backend human-readable messages are Vietnamese, including errors, notifications, and displayed AI explanations. Stable machine codes/fields remain English. Technical documents remain English. |
 
-## 8. Business rules và state machine
+## 8. Business rules and state machines
 
 ### 8.1 Assistance Request
 
@@ -434,14 +467,14 @@ stateDiagram-v2
   IN_PROGRESS --> CANCELLED
 ```
 
-- Priority là thuộc tính riêng, không phải status. P1–P4 là nháp: P1 nguy hiểm trực tiếp, P2 rất khẩn cấp, P3 cần hỗ trợ, P4 thông tin/không khẩn cấp. Cần xác nhận định nghĩa; hệ thống không tự hứa SLA.
-- VERIFIED mới được triage/dispatch theo baseline.
-- REJECTED cần reason; DUPLICATE cần canonical request ID và reason. Không xóa request gốc/trùng.
-- Mission còn WAITING_RESOURCES chưa làm request rời TRIAGED; request chỉ sang DISPATCHED khi offer tới team được gửi.
-- DISPATCHED khi offer nhiệm vụ đã được gửi cho team; IN_PROGRESS khi team đầu tiên accept.
-- Nếu mission bị decline/fail, request vẫn DISPATCHED khi còn assignment đang hoạt động; nếu hết assignment, coordinator đưa về TRIAGED để giao lại. Reopen từ CLOSED cần reason và audit.
-- RESOLVED do coordinator xác nhận nhu cầu đã đáp ứng; CLOSED là kết thúc quản trị. Mission completed không tự đóng request.
-- Coordinator trong scope mới được reopen/cancel; phải có reason/audit và xử lý mission đang chạy.
+- Priority is separate from status. Draft taxonomy: P1 immediate danger, P2 very urgent, P3 assistance needed, P4 informational/nonurgent. Confirm definitions; do not imply a guaranteed SLA.
+- Verification is required before triage/dispatch under this baseline.
+- REJECTED requires a reason; DUPLICATE requires a canonical request ID and reason. Preserve both records.
+- A WAITING_RESOURCES mission leaves the request TRIAGED; the request becomes DISPATCHED only after a team offer is sent.
+- DISPATCHED means a mission offer has been sent; IN_PROGRESS starts when the first team accepts.
+- The source says a declined/failed mission leaves the request DISPATCHED while another assignment remains active; otherwise a coordinator returns it to TRIAGED for reassignment. Reopening CLOSED requires reason/audit. **See Appendix A: this wording needs reconciliation when another mission has already been accepted.**
+- A coordinator confirms RESOLVED when needs are met; CLOSED is administrative completion. Mission completion never closes a request automatically.
+- Only scoped coordinators may reopen/cancel, with reason/audit and explicit handling of active missions.
 
 ### 8.2 Mission
 
@@ -467,12 +500,12 @@ stateDiagram-v2
   ON_SCENE --> CANCELLED
 ```
 
-- DECLINED, FAILED, CANCELLED, COMPLETED kết thúc một mission; reassign tạo mission/assignment mới.
-- Team chỉ xem/cập nhật mission được giao; coordinator trong scope xem và điều phối.
-- Lưu transition actor/time, reason, note và evidence reference; location update là tùy chọn, không tracking nền.
-- Request có thể có nhiều mission; coordinator xác nhận tổng thể trước khi resolve.
+- DECLINED, FAILED, CANCELLED, and COMPLETED terminate a mission; reassignment creates a new mission/assignment.
+- Teams access/update assigned missions only; scoped coordinators oversee them.
+- Store transition actor/time, reason, note, and evidence references. Location updates are optional, without background tracking.
+- Multiple missions can serve one request; a coordinator confirms the overall outcome before resolution.
 
-### 8.3 Inventory và transfer
+### 8.3 Inventory and transfers
 
 ```text
 Reservation: REQUESTED -> RESERVED -> ISSUED
@@ -480,251 +513,469 @@ Reservation: REQUESTED -> RESERVED -> ISSUED
                     +-> REJECTED
 
 Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
-                     |              |-> CANCELLED (trước khi nhận, có audit)
+                     |              |-> CANCELLED (before receipt, audited)
 ```
 
-- Command kiểm tra state/quyền; không cho client PATCH status tùy ý.
-- on_hand là lượng sở hữu; reserved là lượng giữ; available = on_hand - reserved.
-- ISSUE giảm on_hand và reserved khi xuất từ reservation; RELEASE giảm reserved nhưng không tăng on_hand.
-- Transfer giảm kho gửi khi xuất theo policy; kho nhận tăng khi xác nhận. Không cập nhật hai DB bằng một transaction.
-- Adjustment cần lý do, actor và audit; không sửa/xóa ledger cũ để “làm cho khớp”.
+- Commands check state and permission; clients cannot arbitrarily PATCH status.
+- on_hand represents stock held; reserved represents stock allocated; available = on_hand - reserved.
+- ISSUE from a reservation reduces on_hand and reserved. RELEASE reduces reserved without increasing on_hand.
+- A transfer reduces source stock on dispatch according to policy; destination stock increases on receipt confirmation. The source prohibits a transaction spanning two databases; both warehouse records belong to Logistics in this architecture. Resolve cancellation/accounting details before implementing transfers (Appendix A).
+- Adjustments require reason, actor, and audit; never edit/delete old ledger entries to force a balance to match.
 
-### 8.4 Quy tắc chung
+### 8.4 General rules
 
-- Server UTC là thời gian kiểm toán; client capture time được lưu riêng.
-- Command retry dùng idempotency; state/version check ngăn request cũ ghi đè state mới.
-- Không xóa cứng request/mission/stock movement đã có hoạt động; dùng trạng thái/archive theo policy.
-- Override priority/AI, reject request, cancel mission, stock adjustment và role change phải có actor/time/reason.
-- Campaign do Response sở hữu; vòng đời đề xuất DRAFT → ACTIVE → PAUSED → CLOSED. Chỉ campaign ACTIVE nhận request mới; đóng campaign không xóa request/reservation/ledger lịch sử. Logistics vẫn ghi nhận return/settlement sau khi campaign đóng.
+- Server UTC is the audit timestamp; keep client capture time separately.
+- Commands use idempotency; expected state/version checks prevent stale updates.
+- Do not hard-delete requests, missions, or stock movements with activity; use state/archive according to policy.
+- Priority/AI overrides, rejection, mission cancellation, stock adjustments, and role changes require actor/time/reason.
+- Response owns campaigns. Proposed lifecycle: DRAFT → ACTIVE → PAUSED → CLOSED. Only ACTIVE campaigns accept new requests. Closing preserves request/reservation/ledger history; Logistics can still record returns/settlements afterward.
 
-## 9. Use Case chính
+## 9. Main use cases
 
-### UC-01 — Gửi SOS/yêu cầu hỗ trợ
+### UC-01 — Submit an SOS/assistance request
 
-**Actor:** Người dân; guest nếu được duyệt.
+**Actor:** Citizen; guest if approved.
 
-**Điều kiện trước:** Ứng dụng mở; có GPS hoặc người dùng đặt manual pin.
+**Preconditions:** App open; GPS available or user supplies a manual pin.
 
-**Luồng chính:** Chọn loại hỗ trợ → nhập số người/thông tin → xác nhận vị trí/accuracy → thêm ảnh nếu có → gửi idempotency key → server validate và ghi request/event/outbox → trả request ID, SUBMITTED → Notification gửi xác nhận → người dân xem timeline và bổ sung thông tin khi state cho phép.
+**Main flow:** Select assistance category → enter headcount/information → confirm location/accuracy → optionally attach photos → submit with idempotency key → server validates and writes request/event/outbox → returns request ID and SUBMITTED → Notification delivers confirmation → citizen views timeline and supplements information when state permits.
 
-**Ngoại lệ:** Offline lưu QUEUED_ON_DEVICE, chưa được server nhận; GPS bị từ chối thì manual pin; validation lỗi giữ form; retry cùng key trả cùng request.
+**Exceptions:** Offline submissions stay QUEUED_ON_DEVICE and are not server-received; denied GPS permits manual pin; validation errors preserve the form; the same key returns the same request on retry.
 
-**Hậu điều kiện:** Request tồn tại đúng một lần, có thời gian server nhận; event được relay bất đồng bộ.
+**Postconditions:** Exactly one request record with server receive time; asynchronous event relay.
 
-### UC-02 — Xác minh và triage
+### UC-02 — Verify and triage
 
-**Actor:** Coordinator có scope.
+**Actor:** Scoped coordinator.
 
-**Điều kiện trước:** Request tồn tại, chưa terminal.
+**Preconditions:** Request exists and is not terminal.
 
-**Luồng chính:** Mở queue/map → xem dữ liệu trong scope → bổ sung/liên hệ → verify → reject có lý do hoặc link duplicate canonical → đặt priority/reason → lưu state/event/audit.
+**Source flow:** Open queue/map → view scoped data → supplement/contact → verify → reject with reason or link a canonical duplicate → set priority/reason → persist state/event/audit.
 
-**Ngoại lệ:** Ngoài scope bị từ chối; state đã đổi trả conflict; duplicate phải link bản chuẩn.
+**Clarification required:** The source writes these actions sequentially. Verification, rejection, and duplicate linking must be specified as alternative branches before implementation; do not prioritize an already rejected/duplicate request by mechanically following this sequence.
 
-**Hậu điều kiện:** Priority tách khỏi status; dashboard cập nhật sau consumer.
+**Exceptions:** Reject out-of-scope actions; return conflict if state changed; duplicates require a canonical link.
 
-### UC-03 — Giao và nhận mission
+**Postconditions:** Priority remains separate from status; the dashboard updates after consumer processing.
 
-**Actor:** Coordinator, leader/volunteer team.
+### UC-03 — Assign and accept a mission
 
-**Điều kiện trước:** Request verified/triaged; team active; coordinator có scope.
+**Actors:** Coordinator, team leader/volunteer.
 
-**Luồng chính:** Chọn team/skill/availability → nếu cần thì chờ reservation saga → offer assignment → notify → team accept → EN_ROUTE → ON_SCENE → ghi kết quả/evidence → coordinator xác nhận request.
+**Preconditions:** Request verified/triaged; team active; coordinator authorized for the scope.
 
-**Ngoại lệ:** Team decline/unavailable thì chọn lại; concurrent assignment dùng version/transaction, lệnh sau conflict; cần vật tư thì chạy reservation saga.
+**Main flow:** Select by team/skills/availability → await reservation saga if needed → offer assignment → notify → team accepts → EN_ROUTE → ON_SCENE → results/evidence → coordinator confirms the request outcome.
 
-**Hậu điều kiện:** Lịch sử mission/request nhất quán; coordinator mới xác nhận resolved.
+**Exceptions:** Select another team if declined/unavailable; concurrent assignments use version/transaction checks and conflicting commands reload; required supplies use the reservation saga.
 
-### UC-04 — Giữ, cấp và phân phối hàng
+**Postconditions:** Consistent mission/request history; only a coordinator confirms resolution.
 
-**Actor:** Operations manager/kho; Response gửi reservation event.
+### UC-04 — Reserve, issue, and distribute goods
 
-**Điều kiện trước:** Kho/item active; có thể có stock.
+**Actors:** Operations manager/warehouse operator; Response emits reservation events.
 
-**Luồng chính:** Kiểm tra available → reserve → xác nhận xuất thật → ghi movement/actor → ghi điểm/campaign/phân phối → dashboard nhận event.
+**Preconditions:** Warehouse/item active; stock may be available.
 
-**Ngoại lệ:** Hết hàng thì reject reservation; retry không nhân đôi; hủy trước issue release; đã issue chỉ return bằng movement.
+**Main flow:** Check available → reserve → confirm physical issue → record movement/actor → record point/campaign/distribution → dashboard receives events.
 
-**Hậu điều kiện:** Số dư và ledger khớp, dashboard có timestamp.
+**Exceptions:** Reject reservations for insufficient stock; retries do not duplicate; cancellation before issue releases; after issue, returns require new movements.
 
-### UC-05 — Dashboard/báo cáo
+**Postconditions:** Balance matches the ledger; dashboard includes a timestamp.
 
-**Actor:** Coordinator/manager/admin có scope.
+### UC-05 — Dashboard/reports
 
-**Luồng chính:** Chọn time/region/campaign → Reporting trả aggregate và last-updated → UI hiện phạm vi → export nếu quyền cho phép.
+**Actors:** Scoped coordinator/manager/admin.
 
-**Ngoại lệ:** Consumer lag thì cảnh báo stale; export thiếu quyền bị từ chối/audit; không có data hiển thị theo quy ước.
+**Main flow:** Select time/region/campaign → Reporting returns aggregates and last-updated time → UI displays scope → export if authorized.
 
-**Hậu điều kiện:** Không lộ PII ngoài quyền; projection không sửa dữ liệu nghiệp vụ.
+**Exceptions:** Consumer lag displays a stale warning; unauthorized export is denied/audited; no-data results follow an agreed convention.
 
-### UC-06 — Quản lý tài khoản và quyền
+**Postconditions:** No unauthorized PII exposure; projections never modify authoritative business data.
 
-**Actor:** Admin; user được mời.
+### UC-06 — Manage accounts and permissions
 
-**Luồng chính:** Admin tạo/vô hiệu hóa account, gán role/scope → Identity ghi audit và event → các service áp dụng policy → UI hiển thị chức năng theo quyền.
+**Actors:** Admin; invited user.
 
-**Ngoại lệ:** Không thể tự bỏ admin cuối cùng; disabled account không refresh token; access token cũ hết hạn/revoke theo policy.
+**Main flow:** Admin creates/disables an account or grants role/scope → Identity records audit/event → services apply policy → UI exposes permitted functions.
 
-**Hậu điều kiện:** Mọi API vẫn authorize ở backend; ẩn nút UI không thay bảo mật.
+**Exceptions:** Cannot remove the last administrator; disabled accounts cannot refresh tokens; existing access tokens expire or are revoked according to policy.
 
-### UC-07 — AI gợi ý ưu tiên (mở rộng)
+**Postconditions:** All APIs enforce backend authorization; hidden UI controls are not a security boundary.
+
+### UC-07 — AI-assisted priority suggestion (extension)
 
 **Actor:** Coordinator.
 
-**Luồng chính:** Backend gửi trường cấu trúc tối thiểu → advisor trả gợi ý/yếu tố/version → coordinator accept hoặc override kèm reason → audit.
+**Main flow:** Response persists an immutable minimized snapshot/job intent → asynchronous advisor returns versioned suggestion or abstention → coordinator inspects facts/reasons → authorized review checks freshness, request version, and verified/eligible state → human accepts or overrides with reason → atomic audit/priority/outbox write. See Section 12 for job, API, and failure contracts.
 
-**Ngoại lệ:** Timeout thì triage thủ công; thiếu data/score thấp thì không gợi ý.
+**Exceptions:** Timeout/failure leaves manual triage available; insufficient or unsupported data yields abstention; stale input, competing review, wrong scope, or ineligible state rejects acceptance. AI cannot change priority itself.
 
-**Hậu điều kiện:** Priority chính thức chỉ đổi bằng hành động coordinator.
+**Postconditions:** Official priority changes only through coordinator action.
 
-### UC-08 — Tạo và quản lý campaign cứu trợ
+### UC-08 — Create and manage a relief campaign
 
-**Actor:** Coordinator hoặc operations manager có scope campaign.
+**Actors:** Coordinator or operations manager with campaign scope.
 
-**Điều kiện trước:** Người dùng đăng nhập, có quyền quản lý khu vực/tổ chức.
+**Preconditions:** Authenticated user with region/organization management permission.
 
-**Luồng chính:** Tạo campaign với tên, mục tiêu, vùng và thời gian → lưu ở Response → mở campaign → gắn request vào campaign → Logistics dùng campaign ID để ghi reservation/distribution → manager tạm dừng/đóng campaign khi được phép.
+**Main flow:** Create campaign name/objective/region/time → persist in Response → activate → attach requests → Logistics references the campaign ID in reservations/distributions → manager pauses/closes when permitted.
 
-**Ngoại lệ:** Campaign đóng không nhận request mới; logistics vẫn có thể ghi nhận return/settlement; campaign ID không hợp lệ bị từ chối; đóng campaign không xóa ledger/request lịch sử.
+**Exceptions:** Closed campaigns cannot accept new requests; returns/settlements remain possible; reject invalid campaign IDs; closure preserves ledger/request history.
 
-**Hậu điều kiện:** Response là nguồn chuẩn campaign status; Logistics/Reporting chỉ giữ reference/projection.
+**Postconditions:** Response is authoritative for campaign status; Logistics/Reporting hold references/projections only.
 
-## 10. API và xác thực
+## 10. API and authentication
 
-### 10.1 Quy ước API
+### 10.1 API conventions
 
-- Base path /api/v1; REST/JSON; UUID; timestamp ISO-8601 UTC; pagination/filter có giới hạn; lỗi thống nhất gồm code, message, field errors và correlation ID.
-- Mỗi service có OpenAPI schema riêng, cùng thuật ngữ, pagination, error envelope và event definitions.
-- Dùng command endpoint tường minh cho transition nghiệp vụ, tránh PATCH status tổng quát.
-- POST có side effect lớn nhận Idempotency-Key; update state kiểm tra expected version/state trong transaction.
-- DRF giới thiệu drf-spectacular như lựa chọn tạo OpenAPI schema. [DRF schema generation](https://www.django-rest-framework.org/api-guide/schemas/)
+- Base path /api/v1; REST/JSON; UUID identifiers; ISO-8601 UTC timestamps; bounded pagination/filters; consistent errors with code, message, field errors, and correlation ID.
+- Separate per-service OpenAPI schemas with shared terminology, pagination, error envelope, and event definitions.
+- Explicit business command endpoints for transitions, rather than unrestricted status PATCH.
+- Significant side-effecting POST commands accept Idempotency-Key; state updates check expected state/version inside the transaction.
+- DRF identifies drf-spectacular as an OpenAPI schema generation option. [DRF schema generation](https://www.django-rest-framework.org/api-guide/schemas/)
 
-### 10.2 Endpoint phác thảo
+### 10.1.1 Vietnamese user-facing responses
 
-| Service | Endpoint minh họa | Quyền/ghi chú |
+**Confirmed product requirement:** human-readable API messages are Vietnamese, including validation, authentication/permission failures, business conflicts, upload failures, and notifications. JSON field names, error codes, enum values, event names, and URLs remain stable machine identifiers. Clients use codes for logic and Vietnamese labels for display; do not parse message text.
+
+Example error envelope:
+
+```json
+{
+  "code": "REQUEST_VERSION_CONFLICT",
+  "message": "Yêu cầu đã được cập nhật. Vui lòng tải lại trước khi tiếp tục.",
+  "field_errors": {},
+  "correlation_id": "uuid"
+}
+```
+
+Use Django/DRF translation support and reviewed Vietnamese message catalogs or explicit application messages. Set the application default language to Vietnamese and ensure an English Accept-Language header does not silently switch this Vietnamese-only product to English. Cover built-in validator/auth/pagination/throttling errors and custom exception handling; translate/sanitize third-party failures instead of returning their raw text. Workers must explicitly render Vietnamese notification text outside request locale context. Django/DRF provide translation mechanisms, but application-specific strings still require their own translations. [Django translation](https://docs.djangoproject.com/en/5.2/topics/i18n/translation/), [DRF internationalization](https://www.django-rest-framework.org/topics/internationalization/)
+
+Backend responses may contain user-entered text unchanged. Do not translate names, original reports, opaque IDs, or machine codes. Map internal AI reason codes to Vietnamese explanations; optional LLM summaries must satisfy the same language requirement before display, otherwise show a reviewed Vietnamese fallback.
+
+### 10.2 Endpoint sketches
+
+| Service | Example endpoints | Authorization/notes |
 |---|---|---|
-| Identity | POST /identity/auth/login, /refresh, /logout; GET /identity/me; POST /identity/users/{id}/roles | Gán role chỉ bởi admin; token không chứa PII/vị trí |
-| Response | POST /response/requests; GET /response/requests; POST /response/requests/{id}/verify, /triage, /duplicate; POST /response/requests/{id}/missions | Guest SOS nếu được duyệt là route AllowAny riêng; list/detail lọc theo scope |
-| Response | POST /response/campaigns; GET /response/campaigns; POST /response/campaigns/{id}/close | Campaign/incident thuộc Response; manager cần scope phù hợp |
-| Response | POST /response/missions/{id}/accept, /decline, /transition, /evidence | Volunteer chỉ sửa mission của team mình |
-| Logistics | POST /logistics/receipts, /transfers, /transfers/{id}/receive, /distributions, /adjustments | Idempotency, audit, unit validation, row locking |
-| Logistics | GET /logistics/stock?warehouse_id=...; /vehicles; /relief-points | Scope kho/khu vực |
-| Notification | GET /notifications; POST /notifications/{id}/read | Chỉ người nhận xem/đánh dấu |
-| Reporting | GET /reports/campaigns/{id}/summary, /requests-by-region, /inventory, /processing-times | Aggregate/read; kết quả kèm generated_at |
+| Identity | POST /identity/auth/login, /refresh, /logout; GET /identity/me; POST /identity/users/{id}/roles | Admin-only role grants; no PII/location in tokens |
+| Response | POST /response/requests; GET /response/requests; POST /response/requests/{id}/verify, /triage, /duplicate; POST /response/requests/{id}/missions | Approved guest SOS uses a separate AllowAny route; scope list/detail access |
+| Response | POST /response/campaigns; GET /response/campaigns; POST /response/campaigns/{id}/close | Response owns campaign/incident; managers need appropriate scope |
+| Response | POST /response/missions/{id}/accept, /decline, /transition, /evidence | Volunteers modify their team's missions only |
+| Logistics | POST /logistics/receipts, /transfers, /transfers/{id}/receive, /distributions, /adjustments | Idempotency, audit, unit validation, row locks |
+| Logistics | GET /logistics/stock?warehouse_id=...; /vehicles; /relief-points | Warehouse/region scope |
+| Notification | GET /notifications; POST /notifications/{id}/read | Recipient-only access/marking |
+| Reporting | GET /reports/campaigns/{id}/summary, /requests-by-region, /inventory, /processing-times | Read/aggregate with generated_at |
 
-Các path là bản phác thảo cho SDD; chốt lại sau OpenAPI và review luồng UI. API nội bộ không tin mù quáng header do client gửi; dùng credential/service identity nếu cần.
+These are SDD sketches, not final contracts. Finalize complete paths through OpenAPI and UI-flow review. Internal APIs must not blindly trust client headers; use service credentials/identity where needed.
 
-### 10.3 Ma trận quyền
+### 10.3 Authorization matrix
 
-| Tác nhân | Quyền cốt lõi đề xuất |
+| Actor | Proposed core permissions |
 |---|---|
-| Citizen | Tạo request, xem/bổ sung request của mình, xem thông báo của mình. Guest chỉ dùng secret capability khó đoán nếu phương án guest được duyệt. |
-| Volunteer | Xem mission team mình, accept/decline/update/evidence theo state; quản lý availability/profile giới hạn. |
-| Coordinator | Queue/map trong scope; verify, link duplicate, triage, assign, cancel/reopen và xác nhận kết quả. |
-| Operations Manager | Quản lý kho/điểm/xe/cấp phát trong scope; transfer/adjust theo policy; xem report vận hành. |
-| Admin | Quản lý account/role/config; quyền đọc case detail không tự động cấp nếu không cần. |
+| Citizen | Create, view, and supplement own requests; view own notifications. If approved, guests use a hard-to-guess secret capability. |
+| Volunteer | View team missions, accept/decline/update/evidence according to state; limited profile/availability management. |
+| Coordinator | Scoped queue/map; verify, duplicate-link, triage, assign, cancel/reopen, confirm outcomes. |
+| Operations Manager | Scoped warehouse/point/vehicle/distribution management; transfers/adjustments according to policy; operational reports. |
+| Admin | Accounts/roles/configuration; case-detail access is not automatically granted without need. |
 
-**Đề xuất auth:** Identity phát JWT bất đối xứng có issuer, audience, subject, expiry và role/scope tối thiểu; service xác thực chữ ký cục bộ. Access token ngắn hạn (mục tiêu 10–15 phút, cần xác nhận), refresh rotation; web/mobile lưu token theo cơ chế bảo vệ phù hợp nền tảng. Khi role bị thu hồi, vô hiệu refresh ngay; access token cũ hết hạn theo TTL hoặc bị chặn qua revocation mechanism nếu thực sự cần tức thời.
+**Proposed authentication:** Identity issues asymmetric JWTs containing issuer, audience, subject, expiry, and minimum role/scope data. Services validate signatures locally. Short access-token lifetime (proposed 10–15 minutes, unconfirmed), refresh rotation, and platform-appropriate protected token storage. Role revocation immediately invalidates refresh sessions; existing access tokens expire by TTL or are blocked through an explicit revocation mechanism if immediate revocation is required.
 
-Không đặt toàn bộ policy trong JWT: Response kiểm tra team/khu vực/request mà nó sở hữu; Logistics kiểm tra kho; Reporting kiểm tra scope trước khi aggregate. DRF không tự lọc object permission cho mọi row ở endpoint list, vì vậy phải lọc queryset theo quyền. [DRF object permissions and queryset filtering](https://www.django-rest-framework.org/api-guide/permissions/)
+Do not encode all policy in JWTs: Response checks its own team/region/request relationships, Logistics checks warehouses, and Reporting scopes before aggregation. DRF list endpoints need explicit authorized queryset filtering. [DRF object permissions and queryset filtering](https://www.django-rest-framework.org/api-guide/permissions/)
 
-## 11. Kiến trúc giao diện
+## 11. User-interface architecture
+
+**Language:** all user-facing Web/Mobile copy is Vietnamese, including controls, labels, placeholders, status descriptions, accessibility labels, empty/loading/error states, dialogs, notifications, and report/export headings. Render stable backend enums through Vietnamese labels; preserve original user-entered content. This requirement is independent of English technical documentation or the language used in developer conversations.
 
 ### Web
 
-- **Coordinator:** SOS queue/map, filter priority/status/age, request detail, verify/triage, team availability, mission board và audit timeline.
-- **Operations manager:** campaign, warehouse/item, stock ledger, reservation/transfer, vehicle, relief point, distribution.
-- **Admin:** account, organization, role grant, health/event overview; chỉ xem PII khi có vai trò tác nghiệp cụ thể.
-- **Reporting:** case theo vùng/status/priority; thời gian nhận→xác minh→điều động→đến nơi; mission chưa xong; stock received/reserved/issued/distributed; watermark projection.
+- **Coordinator:** SOS queue/map, priority/status/age filters, request details, verification/triage, team availability, mission board, audit timeline.
+- **Operations manager:** campaigns, warehouses/items, stock ledger, reservations/transfers, vehicles, relief points, distributions.
+- **Admin:** accounts, organizations, role grants, health/event overview; PII only with a relevant operational role.
+- **Reporting:** cases by region/status/priority; receipt-to-verification-to-dispatch-to-arrival times; unfinished missions; received/reserved/issued/distributed stock; projection watermark.
 
 ### Mobile
 
-- **Citizen:** gửi SOS; manual pin; ảnh tùy chọn; xác nhận có request ID; xem timeline và bổ sung thông tin.
-- **Volunteer:** mission được giao, thông tin cần thiết, accept/decline, các nút state, ảnh kết quả.
-- Offline thì giữ draft/queue cục bộ, hiện rõ chưa đồng bộ và retry cùng idempotency key. Hạn chế PII local; cần quyết định thời gian xóa cache và bảo vệ theo nền tảng.
-- Không xây chat nội bộ, live tracking nền, turn-by-turn navigation hoặc geocoding riêng trong MVP nếu chưa có yêu cầu xác nhận.
+- **Citizen:** SOS submission, manual pin, optional photos, confirmation with request ID, timeline, supplementary information.
+- **Volunteer:** assigned missions, necessary details, accept/decline, state actions, outcome photos.
+- Offline drafts/queues clearly indicate pending synchronization and reuse the same idempotency key. Minimize local PII; decide cache deletion and platform protection before implementing persistent caches.
+- Internal chat, background live tracking, turn-by-turn navigation, and a custom geocoding service are outside the MVP unless explicitly approved.
 
-## 12. Tích hợp AI ở mức backend
+## 12. Backend AI integration — researched design
 
-```text
-Response API -> validate/persist -> optional triage event
-  -> AI advisor/rules worker -> recommendation + factors + version
-  -> coordinator accepts/overrides -> audit event for final priority
+### 12.1 Purpose, scope, and evidence
+
+**Research reviewed: 2026-09-29. Status: proposed optional extension, not a validated emergency-triage system.** The goal is to help coordinators inspect incomplete reports and consider a priority suggestion, while preserving manual verification, assignment, and final decisions. The architecture below is a C48 design proposal; the cited sources establish technical mechanisms and evaluation practices, not the accuracy of this proposed application.
+
+NIST AI RMF organizes risk management around Govern, Map, Measure, and Manage, including human responsibilities and ongoing evaluation. C48 applies these ideas through recorded ownership, a bounded purpose, evaluation before activation, human review, and a disable/rollback path. This is not a claim of certification or operational readiness. [NIST AI RMF Core](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/)
+
+| Candidate capability | Input/output | Value and limitations | C48 recommendation |
+|---|---|---|---|
+| Priority suggestion | Structured incident facts → proposed P1–P4, reasons, missing facts | Helps review consistency; depends on agreed definitions and representative labels | Primary AI research experiment, always human-reviewed |
+| Missing-information detection | Required fields and contradictions → clarification checklist | Useful without a trained model; unknown facts must stay unknown | Implement as deterministic validation/rules first |
+| Report summarization/category extraction | Redacted narrative → short summary and proposed category | Can reduce reading effort; may omit or invent details | Optional LLM experiment after the structured flow works |
+| Duplicate candidates | Time window + PostGIS proximity + category/text similarity → possible related reports | Distinct households can share location and hazard | Optional suggestions only; never automatically merge or discard |
+| Team/resource matching | Skills, scope, availability, distance → candidate list | Hard constraints and query logic already cover baseline needs | Use ordinary filters/queries first; no AI required |
+| Image/video severity inference, demand forecasting, autonomous dispatch | Media/history → inferred severity/resource decision | Needs specialized data, evaluation, compute, and stronger governance | Outside this capstone AI slice |
+
+A versioned rule engine is a decision-support baseline, not evidence of machine learning. If the capstone claims an ML contribution, include a separately trained/evaluated model and compare it with the rules. If suitable labeled data is unavailable, report that limitation and retain an integration/rules demonstration.
+
+### 12.2 Technology options and selection
+
+| Option | Implementation | Strength | Limitation | Decision |
+|---|---|---|---|---|
+| Versioned rules | Python functions plus a reviewed rule table | Reproducible explanations; no training data dependency | Rule quality depends on domain review; no learned generalization | Baseline advisor mode |
+| Small supervised model | scikit-learn Pipeline; structured features; optional TF-IDF text with a linear classifier | CPU-feasible experiment, reproducible training and measurable comparison | Needs labels, leakage controls, imbalance analysis, and calibration | Preferred ML extension if data supports it |
+| Hosted LLM | Server-side provider call with a strict output schema | Useful experiment for summarization/extraction of Vietnamese narratives | Provider cost/availability, privacy, injection, hallucinations, version changes | Optional; provider remains unselected |
+| Local language model | Separate inference process called by the worker | Keeps inference within the chosen environment | Hardware/memory, deployment, license, and quality still need validation | Only after hardware and evaluation justify it |
+
+TF-IDF transforms text into numerical features; it does not by itself understand urgency. Fit preprocessing only on training data and package it with the estimator to avoid inconsistent training/inference transforms. [scikit-learn feature extraction](https://scikit-learn.org/stable/modules/feature_extraction.html#text-feature-extraction), [scikit-learn common pitfalls](https://scikit-learn.org/stable/common_pitfalls.html)
+
+**Proposed starting experiment:** compare reviewed rules with a small structured-feature classifier, then assess whether adding redacted text features improves held-out results. Evaluate Vietnamese text with diacritics, missing diacritics, negation, abbreviations, and contradictory statements. Do not assume that an English pretrained model works for Vietnamese emergency reports. No model/provider has been selected or benchmarked by this document.
+
+No vector database, RAG framework, agent framework, GPU, or additional message broker is needed for the baseline. A provider adapter can initially be one small Python module with a documented input/output function; introduce abstractions only when a second implementation is actually integrated.
+
+### 12.3 Placement within the five-service architecture
+
+**Start with an advisor component owned by Response.** Run it as a separate worker process/container using the Response codebase and Response-owned AI tables. This is a worker deployment, not a sixth independently owned microservice. It does not access Identity, Logistics, or Reporting databases directly. A future independently owned AI service would require its own database and API/event boundary; do not create that boundary merely to call the project microservices.
+
+```mermaid
+sequenceDiagram
+  participant C as Citizen / Coordinator
+  participant R as Response API
+  participant D as Response DB
+  participant K as Kafka
+  participant W as Response advisor worker
+  participant M as Rules / Model / Optional provider
+  C->>R: Submit or supplement request
+  R->>D: Transaction: request + audit + outbox
+  R-->>C: Server ACK without waiting for AI
+  D-->>K: Outbox relay publishes analysis request
+  K->>W: Consume request ID + input revision
+  W->>D: Transaction: inbox + durable job
+  Note over W,D: Commit DB, then acknowledge Kafka offset
+  W->>D: Claim job with bounded lease
+  W->>M: Analyze minimized immutable snapshot
+  Note over W,M: No DB lock held during inference
+  M-->>W: Validated suggestion or abstention
+  W->>D: Transaction: result + job status + outbox
+  C->>R: Read suggestion and source facts
+  C->>R: Review with expected request version
+  R->>D: Authorize + freshness check + human decision + audit
+  R-->>C: Confirm committed review result
 ```
 
-- Đầu vào bắt đầu từ trường có cấu trúc: category, số người, thời gian, hazard/nhu cầu khẩn cấp; dữ liệu nhạy cảm chỉ dùng khi có cơ sở thu thập. Không gửi ảnh/định danh cho LLM ngoài theo mặc định.
-- Baseline là rule minh bạch/versioned; nếu dùng model, lưu model/version, feature version, score, yếu tố giải thích và thời điểm.
-- AI không thay xác minh, không tự tạo mission, không tự đổi priority, không loại request vì score thấp. Coordinator accept/override và ghi lý do.
-- Có timeout/fallback; lỗi AI không ảnh hưởng luồng cứu hộ. Đánh giá false negative cẩn trọng; demo data không chứng minh độ chính xác thực tế.
-- Chỉ train model khi có dữ liệu gán nhãn phù hợp và cách đánh giá sai lệch/an toàn. NIST AI RMF nhấn mạnh human role và quản trị rủi ro; dùng làm tài liệu tham khảo, không tuyên bố đạt chuẩn chỉ vì có model. [NIST AI RMF Core](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/)
+The worker consumes `response.triage.analysis_requested.v1` on a dedicated consumer group. Use a topic such as `c48.response.ai.v1`, restricted to the necessary components, with request ID as the Kafka key. The exact topic name is a proposal. The event carries job ID, request ID, input revision/hash, policy version, and correlation ID, not raw descriptions, contact details, files, or precise coordinates. The worker reads the immutable snapshot from Response-owned tables.
 
-## 13. Kiểm thử và test case
+The consumer transaction creates the durable job and inbox record before committing the Kafka offset. A worker crash then leaves recoverable work in the job table; an inference call does not hold a partition open for its full duration. Kafka ordering/delivery semantics do not make database or external-provider side effects exactly once. [Kafka design and delivery semantics](https://kafka.apache.org/40/design/design/)
 
-### 13.1 Chiến lược
+Use short database transactions for job claims and result writes. Django transaction callbacks are useful for post-commit work but are not a durable substitute for the outbox. Provider calls occur outside database transactions/row locks. [Django transactions](https://docs.djangoproject.com/en/5.2/topics/db/transactions/)
 
-| Tầng | Nội dung | Công cụ gợi ý |
+### 12.4 Data model and input/output contract
+
+All following tables belong to Response. These are proposed additions, not existing migrations.
+
+| Entity | Minimum fields and constraints |
+|---|---|
+| AnalysisSnapshot | UUID, request ID, input revision, feature schema version, normalized/minimized feature JSON, input hash, capture time; immutable content; protected like the request |
+| AnalysisJob | UUID, snapshot ID, advisor/policy version, state, attempt count, available_at, lease_until, claim token, error code, timestamps; unique snapshot/advisor/policy tuple |
+| TriageRecommendation | UUID, job ID unique, suggested priority nullable, outcome, reason codes, missing fields, calibrated score nullable, score semantics, model/rule/prompt version, artifact hash, generated_at; immutable result |
+| RecommendationReview | UUID, recommendation ID unique for the authoritative review, decision, chosen priority nullable, reason, reviewer ID, reviewed request version, timestamp; conflict on a competing final review |
+
+Separate the job lifecycle from the recommendation review lifecycle:
+
+- Job: PENDING → RUNNING → SUCCEEDED or ABSTAINED; retryable failure → RETRY_WAIT → RUNNING; exhausted/permanent failure → FAILED. Disabling cancels unclaimed jobs; in-flight output is ignored or retained as disabled history, never applied.
+- Recommendation: PENDING_REVIEW → ACCEPTED, OVERRIDDEN, or DISMISSED. Input changes invalidate unreviewed recommendations as STALE. Expiration is an additional freshness guard, with its duration still to be agreed. Reviewed historical results remain historical and are not relabeled as current.
+
+Use a dedicated input revision for incident facts affecting analysis; do not invalidate a suggestion merely because a notification was marked read. Any relevant fact update creates a new snapshot/revision and makes old unreviewed results ineligible for acceptance. The review command also checks the current request version to catch competing human updates.
+
+Input uses known structured facts and explicit null/unknown values: category, reported needs, headcount, incident/capture time, and confirmed operational flags from the agreed taxonomy. Exact GPS, reporter identity, phone number, tokens, signed URLs, and images are excluded by default. If coarse location is justified, document why it is needed and assess regional bias. Unknown is not false or zero; headcount alone is not an urgency policy.
+
+Illustrative result envelope, **not a clinical rule or executable triage policy**:
+
+```json
+{
+  "recommendation_id": "uuid",
+  "request_id": "uuid",
+  "input_revision": 3,
+  "feature_schema_version": 1,
+  "advisor_kind": "rules",
+  "advisor_version": "rules-v1",
+  "policy_version": "draft-policy-v1",
+  "outcome": "SUGGESTION",
+  "suggested_priority": "P2",
+  "reason_codes": ["REVIEWED_RULE_MATCH"],
+  "missing_fields": [],
+  "confidence": null,
+  "confidence_kind": "NOT_APPLICABLE",
+  "generated_at": "2026-09-29T10:30:00Z"
+}
+```
+
+Validate priority/outcome enums, lengths, bounded arrays, source references, and version fields. A schema-valid response can still be factually wrong. For insufficient, contradictory, unsupported, or out-of-distribution input, use ABSTAIN with `suggested_priority = null`; route to the normal human queue. Rule match strength and an LLM's self-reported certainty are not calibrated probabilities.
+
+### 12.5 API, authorization, and human review
+
+| Proposed endpoint under /api/v1 | Behavior and permission |
+|---|---|
+| POST /response/requests/{id}/analysis-jobs | Scoped coordinator requests/retries analysis; idempotency required; return job ID and 202, or existing equivalent job |
+| GET /response/requests/{id}/recommendations | Scoped coordinator reads results with age, input revision, reasons, missing facts, and eligibility; no public/guest access |
+| POST /response/recommendations/{id}/review | Scoped coordinator supplies ACCEPT/OVERRIDE/DISMISS, reason, chosen priority when overriding, expected request version, and idempotency key |
+
+Automatic job creation after intake is allowed only when the AI feature is enabled; submission remains successful if AI is disabled or unavailable. An early suggestion may be displayed as unverified information. **Accept/override can affect priority only after request verification and only in a state permitting human priority changes.** Use the same domain command as manual triage; do not add a backdoor around normal guards. For VERIFIED requests it may perform the normal human-authorized transition to TRIAGED; for later eligible states it changes priority without rewinding progress. Reject terminal/ineligible states and stale input with a conflict.
+
+In one review transaction, check role/scope, request version, current input revision, recommendation freshness, and permitted state; then write review, human-authorized priority change where applicable, audit, and outbox. DISMISS records feedback without changing priority. An override requires the selected priority and a reason. A repeated identical idempotent command returns the original result; a conflicting second review fails.
+
+The worker has no credentials for priority/mission mutation APIs. Where practical, give its database connection privileges limited to required snapshot/job/result/inbox/outbox operations; do not assume a shared application image itself enforces least privilege. Web/mobile call Response only and never receive provider API keys. The citizen/volunteer UI displays authoritative human decisions, not unreviewed model scores.
+
+Coordinator UI must render explanations and summaries in Vietnamese, mapping stable reason codes to reviewed copy. It must show source facts beside the suggestion, mark it as advisory, distinguish missing data from low urgency, and leave manual triage available. Do not silently reorder or hide the operational queue based on AI scores. Any future AI-ranked view must be an explicitly labeled optional view with a normal queue available.
+
+### 12.6 Reliability, privacy, and deployment
+
+- **Retry budget:** propose at most three attempts with bounded backoff and a provider deadline; choose actual timeouts after measurement. Permanent validation/schema errors do not retry indefinitely. Rate limits respect provider guidance and a project cost budget.
+- **Lease recovery:** assign a fresh claim token per attempt. After a lease expires, another worker may retry; only the current token may commit a result. This prevents a late worker overwriting a newer attempt. Maintain one committed recommendation per job.
+- **External calls:** a crash after a provider response may incur a second call/cost. Use provider idempotency if supported, otherwise document this residual behavior; database deduplication cannot guarantee one billable call.
+- **Failure isolation:** Kafka outage leaves outbox intent pending; worker/model/provider outage leaves jobs pending/failed. Human intake, verification, priority changes, dispatch, and stock operations continue.
+- **Resource limits:** begin with one worker and CPU inference; cap concurrency and memory so analysis cannot starve Response. Benchmark before adding local LLM/GPU infrastructure. A separate model server is a runtime dependency, not automatically a new domain service.
+- **Data minimization:** use structured fields first; redact approved text before any external call. Redaction may be incomplete, so real sensitive-data egress still needs a provider/retention decision. Do not log full prompts, outputs, exact locations, credentials, or signed URLs by default.
+- **Untrusted text:** treat citizen narratives, OCR, and retrieved content as data. Give an LLM no tools, database mutation permissions, network actions, or storage credentials. Instructions embedded in a report must not change workflow or output policy. Prompt instructions and JSON validation alone do not eliminate injection risk. [OWASP prompt injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/)
+- **Model artifacts:** store trusted, versioned artifacts with checksum and training/environment metadata; load only approved artifacts. Pickle-based loading can execute code and version compatibility matters. Do not accept uploaded model files from users. [scikit-learn model persistence](https://scikit-learn.org/stable/model_persistence.html)
+- **Storage relationship:** MinIO/S3 may hold private model artifacts or authorized research datasets; model execution still happens in the worker. No vector database is required to store photos, JSON, or model files. Keep research/model buckets separate from evidence and restrict access.
+- **Disable/rollback:** feature flag off stops new analyses and disables review acceptance of pending suggestions; manual triage remains available. Pin the previous known version for rollback. A rollback must never undo past human decisions.
+- **Observability:** job age, completion/failure/abstention rates, attempt counts, stale-result count, inference latency, review latency, override rate, and optional provider cost. Logs use job/request/correlation IDs; dashboard metrics are aggregated, access-controlled, and not claims of model accuracy.
+
+### 12.7 Evaluation design and research validity
+
+**Dataset first:** define the unit of analysis, allowed inputs, label taxonomy, label timestamp, and data-use basis before training. Use domain-reviewed labels with a documented disagreement/adjudication process. Do not automatically treat coordinator acceptance as ground truth: exposure to suggestions can bias decisions. Record which facts were available at prediction time; later rescue outcomes and final priority must not leak into training features.
+
+Split by incident/campaign and, where feasible, by time so near-duplicate reports do not appear in both training and evaluation. Keep the test set untouched until the experiment is fixed. Group-aware splitting can prevent group overlap, but cannot guarantee class balance for every dataset; report rare/missing classes and limitations. Fit vectorizers, imputers, and scalers on training folds only. [scikit-learn common pitfalls](https://scikit-learn.org/stable/common_pitfalls.html), [StratifiedGroupKFold](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.StratifiedGroupKFold.html)
+
+| Evaluation area | Report | Why it matters |
 |---|---|---|
-| Domain/unit | State transitions, priority, stock math, permission predicates, event mapping | Django TestCase/unittest, DRF APIClient. [Django testing](https://docs.djangoproject.com/en/5.2/topics/testing/overview/), [DRF testing](https://www.django-rest-framework.org/api-guide/testing/) |
-| Database integration | PostGIS query, rollback, row lock/race, constraint/migration | PostgreSQL/PostGIS thật trong compose test profile; SQLite không thay thế được GIS/locking tương đương |
-| API/security | 401/403/404, object scope/list filter, validation, guest route, rate limit, upload | APIClient và ma trận role × endpoint × scope |
-| Event integration | Outbox relay, duplicate, retry, DLQ, replay, lag, reservation saga | Kafka + DB integration profile, event fixture có ID cố định |
-| Frontend | Form, state labels, navigation theo quyền, stale dashboard, offline pending | Unit/component tests; smoke use cases |
-| E2E/demo | Citizen send → coordinator triage → team update → Logistics issue → report | Playwright hoặc manual checklist/video evidence; chọn một cách để kiểm soát thời gian |
-| NFR | p95 theo đề xuất, restore, upload bounds, consumer restart, log redaction | Script tải nhỏ, kịch bản khôi phục và checklist security; ghi cấu hình đo |
+| Priority classification | Per-class precision/recall/F1, macro-F1, confusion matrix, class sample counts | Overall accuracy can conceal poor performance on rare urgent cases |
+| Under-prioritization | P1/P2 cases suggested less urgent, separated by degree of error | A one-level error and an urgent-to-nonurgent error should not be hidden in one score |
+| Abstention | Coverage, abstention rate, class-specific abstention, errors among answered cases | A model cannot look successful merely by avoiding difficult inputs |
+| Probability output | Reliability/calibration analysis and a suitable scoring metric if probabilities are exposed | A raw score is not necessarily a meaningful probability |
+| Text extraction/summary | Field correctness, unsupported claims, critical omissions, contradiction handling | Fluent language is not evidence of correct incident information |
+| Robustness | Negation, missing fields, duplicates, long text, dialect/diacritics, injection, unseen categories | Checks likely input variations and unsupported cases |
+| Operations | End-to-end analysis age, inference p95, CPU/RAM, failure recovery, cost | Determines whether the optional worker fits the demo environment |
+| Human workflow | Review completion/time and override reasons; usability observations | Checks usefulness without assuming acceptance means correctness |
 
-### 13.2 Test case cốt lõi
+Metric definitions and probability calibration guidance come from scikit-learn; the specific C48 evaluation plan above is a proposal. [Classification metrics](https://scikit-learn.org/stable/modules/model_evaluation.html), [Probability calibration](https://scikit-learn.org/stable/modules/calibration.html)
 
-Các dòng dưới đây là thiết kế test case, chưa phải kết quả chạy. Khi đưa vào test management, giữ tối thiểu: ID, FR/UR liên kết, precondition, test data, steps, expected result, actual result, status và build/commit được kiểm thử.
+Compare manual/rule baseline and ML on the same held-out dataset. Report dataset size, provenance, class distribution, split method, preprocessing, seed, model/version, parameters, threshold selection, and uncertainty/sample limitations. Keep synthetic fixtures for workflow testing, but do not present agreement with labels generated by the same rules/LLM as independent validation. Do not invent a required accuracy or critical-case recall threshold before domain review.
 
-#### Đặc tả chi tiết cho test rủi ro cao
+**Demo acceptance:** reproducible inference, truthful abstention, documented evaluation, no automatic decisions, validated failure recovery, and passing integration tests. **Real-world use:** requires separate operational validation and data/privacy decisions; a capstone benchmark is insufficient evidence.
 
-| ID / FR | Precondition và dữ liệu | Steps | Expected result |
+### 12.8 Additional optional requirements and planned tests
+
+These extend FR-AI-01 and UC-07 without making AI mandatory. Existing TC-26/TC-27 remain in the core matrix.
+
+| ID | Priority | Requirement | Acceptance criterion |
 |---|---|---|---|
-| TC-01 / FR-REQ-01, 03 | Citizen demo đã login; tọa độ giả, accuracy 12 m, 3 người; key chưa tồn tại | POST request hợp lệ; gửi lại cùng key/payload | Một request row và một outbox row; retry trả cùng kết quả; server receive time tách khỏi location capture time |
-| TC-06 / FR-IAM-02, FR-REQ-07 | Citizen A, Citizen B và request thuộc B | A GET request B; A gọi update; A gọi list | A không đọc/sửa request B; list chỉ chứa case của A; response không tiết lộ mô tả/vị trí |
-| TC-16 / FR-LOG-02 | Kho có available = 5; hai operator có quyền; mỗi lệnh issue 4 cùng SKU/kho | Gửi đồng thời hai lệnh issue với key khác nhau | Một lệnh thành công, lệnh kia conflict/insufficient stock; available còn 1; chỉ có một movement ISSUE |
-| TC-21 / FR-EVT-01, FR-NOT-01 | Một event ID chưa có trong inbox; notification consumer đang chạy | Publish cùng event ID hai lần | Inbox unique; mỗi notification recipient/channel chỉ tạo một lần; duplicate được metric/log mà không làm consumer chết |
-| TC-25 / FR-OFF-01, FR-REQ-03 | Mobile có SOS draft và idempotency key; test network toggle khả dụng | Tắt mạng và gửi; kiểm tra UI; bật mạng và retry hai lần | Trước ACK là pending; sau ACK là submitted; server chỉ có một request |
-| TC-30 / FR-CAM-01 | Campaign ACTIVE, coordinator có scope và dữ liệu lịch sử | Gắn request mới; đóng campaign; thử gắn request nữa; đọc lại lịch sử | Lần đầu thành công; lần sau bị từ chối; lịch sử request/ledger vẫn đọc đúng scope |
-| TC-31 / FR-LOG-03, FR-MSN-02 | Request TRIAGED; mission cần item chưa được reserve | Tạo mission; kiểm tra state/offer; xác nhận reservation; coordinator gửi offer; team accept | Trước reservation, mission WAITING_RESOURCES, request chưa DISPATCHED và team chưa nhận offer; sau xác nhận, mission READY_TO_DEPLOY → OFFERED → ACCEPTED, request DISPATCHED → IN_PROGRESS |
+| FR-AI-02 | O | Durable, idempotent asynchronous analysis jobs | Retries/redelivery cannot commit multiple results for one job; intake never waits for inference |
+| FR-AI-03 | O | Versioned inputs/results and stale-result protection | Relevant fact edits prevent acceptance of older suggestions |
+| FR-AI-04 | O | Authorized human review and audit | Only scoped coordinators can accept/override; expected version and normal state guards apply |
+| FR-AI-05 | O | Abstention, timeout, disable/rollback, and operational metrics | Manual workflows continue under outage; UI never maps failure/unknown to low urgency |
+| FR-AI-06 | O | Reproducible evaluation and artifact provenance | Record labels/splits/versions/metrics; no fabricated accuracy or untrusted artifacts |
 
-| ID | Kịch bản | Kết quả mong đợi |
+All tests below are **planned, not executed**. Expand them into executable cases using the test-record fields in Section 13.2.
+
+| Test ID | Requirement / use case | Preconditions and action | Expected result |
+|---|---|---|---|
+| TC-AI-01 | FR-AI-02 / UC-07 | Enable advisor; submit valid SOS while inference is blocked | SOS ACK succeeds; durable job remains pending; request priority unchanged |
+| TC-AI-02 | FR-AI-02 / UC-07 | Redeliver one analysis event and retry the trigger key | One logical job and at most one committed result; duplicate inbox is harmless |
+| TC-AI-03 | FR-AI-03 / UC-07 | Generate result at input revision 3; edit relevant facts to revision 4; accept old result | Conflict; no priority/state change; stale result remains historical |
+| TC-AI-04 | FR-AI-04 / UC-07 | Two scoped coordinators review the same suggestion/request version concurrently | One final review succeeds; second conflicts; one authoritative decision/event |
+| TC-AI-05 | FR-AI-04 / UC-07 | Citizen, unrelated coordinator, or worker attempts review | Denied without leaking the request or changing priority |
+| TC-AI-06 | FR-AI-01, FR-AI-05 / UC-07 | Missing/contradictory inputs or unsupported category | ABSTAIN/null suggestion with reasons; manual queue retained, no default P4 |
+| TC-AI-07 | FR-AI-05 / UC-07 | Provider times out/rate-limits across retry budget | Bounded retries then visible failure; intake/dispatch remain operational |
+| TC-AI-08 | FR-AI-01, FR-AI-04 / UC-07 | Model proposes lower urgency than current human P1 | No automatic downgrade; only an explicit eligible human command can change it |
+| TC-AI-09 | FR-AI-04 / UC-07 | Request unverified or terminal; attempt ACCEPT | State guard rejects; no bypass of verification or reopening |
+| TC-AI-10 | FR-AI-02 / UC-07 | Crash after job claim; lease expires; new attempt completes; old attempt returns | Recovery works; old claim token cannot overwrite new result |
+| TC-AI-11 | FR-AI-01, FR-AI-05 / UC-07 | Narrative contains instructions to ignore policy or call tools; output contains invalid priority | Text treated as data; no tool execution; invalid output rejected; no authoritative mutation |
+| TC-AI-12 | FR-AI-05 / UC-07 | Disable advisor with queued/running jobs and pending suggestions | Manual workflow remains available; pending AI acceptance blocked; completed human history unchanged |
+| TC-AI-13 | FR-AI-06 / UC-07 | Prepare train/test sets with related reports; inspect split and fitted preprocessing | No incident-group overlap; no test-fitted transforms; evaluation manifest records checks |
+| TC-AI-14 | FR-AI-06 / UC-07 | Artifact hash/version mismatch or unapproved model file | Refuse load and expose failure; no fallback to an arbitrary artifact |
+| TC-AI-15 | FR-AI-04 / UC-07 | Verified request/current suggestion; authorized ACCEPT or OVERRIDE with reason | One atomic human review/priority/audit/outbox change; replay returns original result |
+| TC-AI-16 | FR-AI-05 / UC-07 | Inspect provider request/logs with seeded phone/token/location markers | Disallowed fields absent; no provider secret appears in web/mobile responses |
+
+### 12.9 Delivery sequence and research artifacts
+
+1. **Contracts and fixtures:** agree advisor purpose, draft taxonomy, input schema, abstention, permissions, versions, and synthetic edge cases. Do this while Response contracts are designed.
+2. **Rules integration:** build the optional Response worker, durable jobs, result/read/review APIs, coordinator panel, and failure tests after manual triage works.
+3. **ML experiment if data exists:** create a reproducible dataset manifest, training/evaluation script, baseline comparison, and versioned artifact. Keep training outside request-serving processes.
+4. **Optional text assistance:** add a provider only after privacy/cost/output validation decisions; measure unsupported facts and critical omissions. Do not expand to tool-using agents.
+5. **Demo/report:** show stale-result rejection, outage fallback, human override, and a reproducible evaluation. Feature-freeze with AI disabled if the integration/evaluation is incomplete.
+
+Deliver a short advisor design note, data/label manifest, experiment report, model/rule card with intended use/limits, API/event schema, and the planned test execution record. Their content can live within the existing SDD/test report; a separate platform or registry is unnecessary.
+
+## 13. Testing and test cases
+
+### 13.1 Strategy
+
+| Layer | Coverage | Suggested tools |
 |---|---|---|
-| TC-01 | Gửi SOS hợp lệ với GPS | Lưu location, accuracy, source, capture/receive time; trả một ID và SUBMITTED |
-| TC-02 | Lat/lon ngoài miền, people count âm hoặc thiếu field | 400; không có request/outbox |
-| TC-03 | GPS bị từ chối, đặt manual pin | source là MANUAL_PIN; UI không nói đây là GPS chính xác |
-| TC-04 | Retry cùng Idempotency-Key sau timeout | Cùng request ID; không tạo row/event creation thứ hai |
-| TC-05 | Dùng cùng key với payload khác | Conflict; request cũ không bị ghi đè |
-| TC-06 | Citizen A GET/POST request của Citizen B | Không đọc/sửa được; không lộ dữ liệu nhạy cảm |
-| TC-07 | Volunteer lấy list mission | Chỉ mission được gán cho team/member |
-| TC-08 | Coordinator khu vực A đọc case khu vực B | Bị từ chối; map/list không lộ object |
-| TC-09 | Reject request thiếu reason | Validation error; state và event không đổi |
-| TC-10 | Đánh duplicate nhưng không có canonical request | Không ghi state DUPLICATE |
-| TC-11 | Transition SUBMITTED trực tiếp sang CLOSED | Conflict/validation; state/audit không đổi |
-| TC-12 | Assign team inactive/unavailable | Bị từ chối; request không thành dispatched |
-| TC-13 | Hai coordinator assign cùng request/version | Một lệnh thắng; lệnh còn lại conflict và phải tải lại |
-| TC-14 | Một trong hai mission của request hoàn tất | Mission complete; request không tự resolve/close |
-| TC-15 | Issue vượt available stock | Rollback; không tạo movement; on_hand/reserved giữ nguyên |
-| TC-16 | Hai lệnh issue đồng thời cùng số lượng khả dụng | Lock/constraint không cho tổng issue vượt tồn |
-| TC-17 | Nhận transfer retry cùng key | Chỉ cộng kho nhận một lần |
-| TC-18 | Cancel trước issue khi reservation đã RESERVED | Reservation release; available tăng, on_hand không đổi |
-| TC-19 | Cancel sau khi hàng ISSUE | Không xóa movement; return là movement mới có actor/reason |
-| TC-20 | Response transaction rollback sau khi tạo request | Không request, không committed outbox event |
-| TC-21 | Relay publish xong nhưng chết trước mark | Có thể duplicate; inbox chặn side effect thứ hai |
-| TC-22 | Notification consumer dừng rồi chạy lại | Catch-up; một notification record cho mỗi event ID; giao nhận push bên ngoài tùy semantics của provider |
-| TC-23 | Reporting consumer lag | Dashboard hiện watermark cũ và stale warning |
-| TC-24 | Upload MIME giả, loại cấm hoặc quá size | Từ chối; object rác cleanup; không cấp link |
-| TC-25 | Offline SOS retry nhiều lần sau reconnect | Pending chỉ thành submitted sau ACK; backend có đúng một request |
-| TC-26 | AI gợi ý thấp cho request coordinator đặt P1 | Không tự đổi P1/không xóa request; gợi ý riêng và có audit khi override |
-| TC-27 | AI service timeout | Triage thủ công hoạt động; không block SOS/verify/dispatch |
-| TC-28 | Role bị thu hồi, refresh token sau đó | Refresh bị từ chối; access token cũ hết hạn/revoke theo policy |
-| TC-29 | Backup/restore môi trường demo | Request, ledger và file metadata khớp; runbook nêu file object cần khôi phục |
-| TC-30 | Đóng campaign rồi thử gắn request mới | Response từ chối request mới; request/ledger lịch sử vẫn đọc được trong scope |
-| TC-31 | Dispatch mission cần vật tư | Không offer trước khi reservation xác nhận; sau xác nhận mới gửi offer và cập nhật request state |
+| Domain/unit | State transitions, priority, inventory arithmetic, permission predicates, event mapping | Django TestCase/unittest, DRF APIClient. [Django testing](https://docs.djangoproject.com/en/5.2/topics/testing/overview/), [DRF testing](https://www.django-rest-framework.org/api-guide/testing/) |
+| Database integration | PostGIS, rollback, locks/races, constraints/migrations | Real PostgreSQL/PostGIS in a Compose test profile; SQLite does not provide equivalent GIS/locking behavior |
+| API/security | 401/403/404, object scope/list filters, validation, guest route, rate limits, uploads | APIClient and role × endpoint × scope matrix |
+| Event integration | Outbox relay, duplicates, retries, DLQ, replay, lag, reservation saga | Kafka + DB integration profile; fixed event IDs |
+| Frontend | Forms, state labels, authorized navigation, stale dashboards, offline pending | Unit/component tests and smoke use cases |
+| E2E/demo | Citizen submission → coordinator triage → team progress → Logistics issue → report | Playwright or manual checklist/video evidence; choose a controlled scope |
+| NFR | Proposed p95 targets, restore, upload limits, consumer restart, log redaction | Small load scripts, recovery scenarios, security checklist; record measurement hardware |
 
-### 13.3 Traceability UR → FR → UC → Test
+### 13.2 Core test cases
 
-| UR | FR chính | Use case | Test case |
+These are **planned test cases, not execution results**. Test records must include ID, linked FR/UR, preconditions, data, steps, expected result, actual result, status, and tested build/commit.
+
+#### Detailed specifications for high-risk tests
+
+| ID / FR | Preconditions and data | Steps | Expected result |
+|---|---|---|---|
+| TC-01 / FR-REQ-01, 03 | Authenticated demo citizen; synthetic coordinates, accuracy 12 m, 3 people; unused key | POST valid request; repeat same key/payload | One request and one creation outbox row; same retry result; separate capture/receive times |
+| TC-06 / FR-IAM-02, FR-REQ-07 | Citizens A/B; request owned by B | A reads B's request, attempts update, then lists requests | Cannot read/update B's request; list contains only A's cases; no description/location disclosure |
+| TC-16 / FR-LOG-02 | available = 5; two authorized operators; each issues 4 of the same SKU/warehouse | Concurrent issue commands with different keys | One succeeds; one conflicts/reports insufficient stock; available = 1; one ISSUE movement |
+| TC-21 / FR-EVT-01, FR-NOT-01 | Event ID absent from inbox; notification consumer running | Publish the same event ID twice | Unique inbox; each recipient/channel notification created once; duplicate logged/metered without crashing consumer |
+| TC-25 / FR-OFF-01, FR-REQ-03 | Mobile SOS draft with idempotency key; network toggle available | Disable network and send; inspect UI; reconnect and retry twice | Pending before ACK, submitted afterward; exactly one server request |
+| TC-30 / FR-CAM-01 | ACTIVE campaign; scoped coordinator; existing history | Attach request; close campaign; attempt another attachment; read history | First attachment succeeds, second denied; authorized request/ledger history remains accessible |
+| TC-31 / FR-LOG-03, FR-MSN-02 | TRIAGED request; mission requires unreserved goods | Create mission; inspect state/offer; confirm reservation; coordinator offers; team accepts | Before reservation: WAITING_RESOURCES, no DISPATCHED request/offer. After confirmation: READY_TO_DEPLOY → OFFERED → ACCEPTED; request DISPATCHED → IN_PROGRESS |
+
+| ID | Scenario | Expected result |
+|---|---|---|
+| TC-01 | Valid GPS SOS | Store location, accuracy, source, capture/receive time; return one ID and SUBMITTED |
+| TC-02 | Out-of-range coordinates, negative headcount, or missing field | 400; no request/outbox |
+| TC-03 | GPS denied; manual pin provided | MANUAL_PIN source; UI does not claim precise GPS |
+| TC-04 | Retry same Idempotency-Key after timeout | Same request ID; no second row/creation event |
+| TC-05 | Same key with different payload | Conflict; existing request unchanged |
+| TC-06 | Citizen A reads/updates Citizen B's request | Access denied without sensitive disclosure |
+| TC-07 | Volunteer lists missions | Only missions assigned to the team/member |
+| TC-08 | Region A coordinator accesses region B case | Denied; map/list do not disclose the object |
+| TC-09 | Reject without reason | Validation error; state/event unchanged |
+| TC-10 | Duplicate designation without canonical request | Do not persist DUPLICATE |
+| TC-11 | SUBMITTED directly to CLOSED | Conflict/validation error; state/audit unchanged |
+| TC-12 | Assign inactive/unavailable team | Rejected; request not dispatched |
+| TC-13 | Two coordinators assign the same request/version | One succeeds; the other conflicts and reloads |
+| TC-14 | One of two missions completes | Mission completes; request does not automatically resolve/close |
+| TC-15 | Issue more than available | Rollback; no movement; unchanged on_hand/reserved |
+| TC-16 | Concurrent issues against the same available stock | Locks/constraints prevent total issue exceeding stock |
+| TC-17 | Retry transfer receipt with same key | Destination stock credited once |
+| TC-18 | Cancel a RESERVED reservation before issue | Release reservation; available increases, on_hand unchanged |
+| TC-19 | Cancel after ISSUE | Preserve movement; return is a new movement with actor/reason |
+| TC-20 | Response transaction rolls back after request creation | No request or committed outbox event |
+| TC-21 | Relay crashes after publish but before marking | Redelivery possible; inbox prevents repeated side effects |
+| TC-22 | Notification consumer stops and restarts | Catch-up; source specifies one notification record per event ID; external push semantics depend on provider. Clarify per-recipient/channel identity in Appendix A |
+| TC-23 | Reporting consumer lags | Old watermark and stale warning displayed |
+| TC-24 | Forged MIME, prohibited type, oversized upload | Reject; clean orphaned object; no download link |
+| TC-25 | Repeated offline SOS retries after reconnect | Pending becomes submitted only after ACK; exactly one request |
+| TC-26 | AI suggests lower urgency for coordinator-assigned P1 | No automatic downgrade/deletion; separate suggestion and audited override |
+| TC-27 | AI timeout | Manual triage works; no SOS/verification/dispatch blocking |
+| TC-28 | Refresh after role revocation | Refresh denied; existing access expires/is revoked per policy |
+| TC-29 | Restore demo backup | Requests, ledger, file metadata consistent; runbook identifies object files to restore |
+| TC-30 | Attach request after campaign closure | Response rejects new attachment; scoped historical request/ledger access remains |
+| TC-31 | Dispatch a mission requiring supplies | No offer until reservation confirmation; then offer and request state update |
+
+### 13.3 Traceability: UR → FR → UC → Test
+
+| UR | Main FR | Use case | Test case |
 |---|---|---|---|
 | UR-01 | FR-REQ-01..03, FR-FILE-01, FR-OFF-01 | UC-01 | TC-01..05, TC-24..25 |
 | UR-02 | FR-REQ-04, FR-REQ-07, FR-NOT-01 | UC-01, UC-02 | TC-06, TC-09..11, TC-22 |
@@ -734,124 +985,134 @@ Các dòng dưới đây là thiết kế test case, chưa phải kết quả ch
 | UR-06 | FR-IAM-01..03, FR-RPT-01..02, FR-AUD-01 | UC-05, UC-06 | TC-06..08, TC-23, TC-28 |
 | UR-07 | FR-EVT-01, NFR-OBS-01, NFR-OPS-01 | UC-01..05 | TC-20..23, TC-29 |
 
-## 14. Bảo mật, quyền riêng tư và vận hành
+### 13.4 Additional language and storage checks
 
-- Default deny; guest endpoint nếu có thì tách riêng, chỉ tạo SOS/track bằng secret capability, không search/list.
-- Authorization gồm role + scope + object relationship; áp dụng cả detail, list, export, file download và đăng ký thiết bị push.
-- Không dùng menu ẩn trên frontend làm bảo mật. OWASP API Security nêu Broken Object Level Authorization là rủi ro API trọng yếu. [OWASP API Security Top 10 — BOLA](https://api-security.owasp.org/editions/2023/en/0xa1-broken-object-level-authorization/)
-- Audit đủ truy vết nhưng không sao chép PII; giới hạn role đọc và làm rõ retention.
-- Xác định quyền xem vị trí, thời gian lưu vị trí/ảnh/audit, xử lý yêu cầu xóa, backup và provider nhận dữ liệu. IASC/ICRC data responsibility là tài liệu tham khảo; không dùng dữ liệu nạn nhân thật cho demo. [IASC guidance](https://emergency.unhcr.org/sites/default/files/2023-11/IASC%20Operational%20Guidance%20on%20Data%20Responsibility%20in%20Humanitarian%20Action%2C%202023.pdf), [ICRC handbook](https://www.icrc.org/en/publication/430501-handbook-data-protection-humanitarian-action-second-edition)
-- Compose single-host không phải high availability. Dùng healthchecks, restart policy, volumes, env example, migration/seed command, backup/restore runbook và log rotation.
-- Kafka single-broker KRaft có thể dùng cho demo tiết kiệm RAM; ghi rõ broker đơn không chịu lỗi node. Không dựng ba broker chỉ để tạo hình thức production.
-- Observability tùy chọn: Prometheus/Grafana cho API latency/error, consumer lag, outbox age, DLQ, DB connections/disk và storage. Tối thiểu luôn có health endpoint, structured log và correlation ID.
+The storage scenarios in [storage research, Section 7](c48-storage-research.md#7-implementation-checks-and-traceability) extend FR-FILE-01, TC-24, and TC-29, including private-policy enforcement, reachable signed links, storage-outage handling, and object-byte restoration. They are planned checks, not completed tests.
 
-## 15. Docker Compose và Kubernetes
+| Test ID | Requirement | Scenario | Expected result |
+|---|---|---|---|
+| TC-L10N-01 | NFR-L10N-01 | Exercise success, validation, login failure, denied scope, stale update, throttling, and upload failure, including English Accept-Language | Human-readable API text remains Vietnamese; stable codes and status semantics remain intact; no raw provider errors |
+| TC-L10N-02 | NFR-L10N-01 | Walk through Web/Mobile forms, states, accessibility labels, notifications, and report/export headings | Vietnamese copy with proper Unicode; machine enums displayed as Vietnamese labels; original user content preserved |
+| TC-L10N-03 | NFR-L10N-01, FR-AI-01 | Display rule explanation, optional model summary, abstention, and background notification | Vietnamese text or a reviewed Vietnamese fallback; no untranslated template/code exposed as user copy |
+
+## 14. Security, privacy, and operations
+
+- Default deny. If approved, isolate guest endpoints to SOS creation and secret-capability tracking; no search/list access.
+- Authorization combines role, scope, and object relationship across details, lists, exports, file downloads, and push-device registration.
+- Hidden frontend menus do not provide security. OWASP identifies Broken Object Level Authorization as a major API risk. [OWASP API Security Top 10 — BOLA](https://api-security.owasp.org/editions/2023/en/0xa1-broken-object-level-authorization/)
+- Audit enough to trace actions without copying unnecessary PII; restrict readers and clarify retention.
+- Decide location visibility, location/photo/audit retention, deletion requests, backups, and provider data exposure. IASC/ICRC guidance is reference material; use synthetic demo data. [IASC guidance](https://emergency.unhcr.org/sites/default/files/2023-11/IASC%20Operational%20Guidance%20on%20Data%20Responsibility%20in%20Humanitarian%20Action%2C%202023.pdf), [ICRC handbook](https://www.icrc.org/en/publication/430501-handbook-data-protection-humanitarian-action-second-edition)
+- Single-host Compose is not high availability. Provide healthchecks, restart policies, volumes, example environment configuration, migration/seed commands, backup/restore runbook, and log rotation.
+- Single-broker KRaft is acceptable for the demo to reduce RAM needs; document lack of node-failure tolerance. Three brokers are not needed merely to resemble production.
+- Optional Prometheus/Grafana: API latency/errors, lag, outbox age, DLQ, DB connections/disk, storage. Always provide health endpoints, structured logs, and correlation IDs.
+
+## 15. Docker Compose and Kubernetes
 
 ### Baseline: Docker Compose
 
 ```text
 Browser / Mobile
-    -> Nginx (một máy demo)
+    -> Nginx (one demo host)
     -> 5 application containers
-    -> PostgreSQL/PostGIS (database/user riêng theo service)
-    -> Kafka KRaft (single broker ở demo)
-    -> SeaweedFS S3 API (local profile)
+    -> PostgreSQL/PostGIS (separate database/user per service)
+    -> Kafka KRaft (single broker for demo)
+    -> S3 API (conditional MinIO AIStor Free lab / SeaweedFS fallback)
     -> Prometheus/Grafana (optional profile)
 ```
 
-- Có compose config cho dev/test và profile observability; healthcheck, volumes, .env.example, migration, seed/demo command, backup/restore.
-- Không commit .env/secrets; demo account/password tạo qua seed local.
-- Nginx định tuyến/rate limit baseline; backend vẫn xác thực/authorize.
-- Có thể tắt Grafana profile hoặc chạy Notification/Reporting gọn nếu máy thiếu RAM.
+- Provide development/test Compose configuration and an observability profile, healthchecks, volumes, .env.example, migrations, demo seed commands, and backup/restore procedures.
+- Do not commit .env files/secrets; create demo accounts/passwords through local seeding.
+- Nginx handles baseline routing/rate limits; services still authenticate and authorize.
+- Disable optional Grafana or use lightweight Notification/Reporting processes if RAM is constrained.
 
-### Nhánh học Kubernetes
+### Kubernetes learning extension
 
-Dùng kind sau khi Compose end-to-end ổn. Deploy Nginx và application services dưới dạng Deployment/Service; cấu hình bằng ConfigMap/Secret, readiness/liveness probes. Ingress/autoscaling chỉ là bài học mở rộng. Một node kind không phải HA hoặc production. [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/), [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/), [ConfigMaps](https://kubernetes.io/docs/concepts/configuration/configmap/), [Probes](https://kubernetes.io/docs/concepts/workloads/pods/probes/)
+Use kind after Compose end-to-end workflows stabilize. Deploy Nginx and application services with Deployment/Service resources, ConfigMap/Secret configuration, and readiness/liveness probes. Ingress/autoscaling are further learning exercises. A single-node kind cluster is neither HA nor a production deployment. [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/), [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/), [ConfigMaps](https://kubernetes.io/docs/concepts/configuration/configmap/), [Probes](https://kubernetes.io/docs/concepts/workloads/pods/probes/)
 
-Đặt timebox 2–3 ngày công sau tuần 7. Chỉ chuyển nếu app pod kết nối được PostgreSQL/Kafka/object storage và route vào cluster hoạt động. Dependency có thể nằm ngoài cluster cho lab, nhưng kiểm tra networking sớm; nếu tốn quá nhiều thời gian, giữ Compose là demo chính và trình bày đúng giới hạn của kind lab. Không chuyển stateful infra sang Kubernetes trong MVP. Kubernetes Secret không tự có nghĩa là mã hóa at rest; không commit secret production trong manifest. [Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
+Timebox to 2–3 person-days after week 7. Proceed only if app pods can connect to PostgreSQL/Kafka/object storage and external routing works. Dependencies may stay outside the cluster for the lab; check networking early. Keep Compose as the main demo if the extension consumes excessive time, and describe kind's limitations accurately. Do not migrate stateful infrastructure into Kubernetes for the MVP. Kubernetes Secrets do not automatically imply encryption at rest; do not commit production secrets in manifests. [Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
 
-## 16. Kế hoạch 10 tuần
+## 16. Ten-week delivery plan
 
-Kế hoạch giữ mốc đề cương: tuần 1 phân tích; tuần 2 thiết kế/setup; tuần 3–6 phát triển; tuần 7 tích hợp/kiểm thử; tuần 8 tài liệu/demo; tuần 9 bảo vệ; tuần 10 dự phòng.
+Preserve the brief's milestones: week 1 analysis; week 2 design/setup; weeks 3–6 development; week 7 integration/testing; week 8 documentation/demo; week 9 defense; week 10 buffer.
 
-| Tuần | Công việc | Bàn giao/checkpoint |
+| Week | Work | Deliverable/checkpoint |
 |---|---|---|
-| 1 | Khảo sát stakeholder; glossary/process map; UR/FR/NFR; state machine; xác nhận guest SOS, priority, role/scope | SRS v0.1, use case, quyết định mở; review giảng viên |
-| 2 | C4/container, DB/ERD, API/event contracts, wireframe, repo/Compose/CI/migrations; custom User từ đầu | SDD v0.1; skeleton 5 service healthy; OpenAPI nháp; Compose lên một máy |
-| 3 | Identity/auth/RBAC; Response skeleton; Web shell/login; Mobile shell và GPS permission spike | Login + permission matrix; seed role/data |
-| 4 | SOS, GPS/manual pin, idempotency, evidence storage, response list/map, mobile pending/ACK | Vertical slice citizen → API → PostGIS; TC-01..05/24..25 |
-| 5 | Verify/duplicate/priority, team/volunteer, mission assign/accept/update, audit | Luồng coordinator → team; state/permission tests |
-| 6 | Campaign, kho/item, stock ledger, transfer, distribution, reservation/release | Inventory không âm; race/idempotency tests |
-| 7 | Kafka KRaft, outbox/inbox, Notification/Reporting consumers, saga, dashboard projection, security/integration | Tắt/bật consumer, replay/dedupe; TC-15..23 |
-| 8 | Hoàn thiện Web/Mobile/map/filter/report; NFR baseline; tài liệu; AI rule prototype nếu còn sức; thử kind có timebox | Feature freeze; quyết định đưa AI/kind vào demo |
-| 9 | E2E regression, seed demo, backup/restore, demo script, slide, fix lỗi nghiêm trọng | Release candidate; bảo vệ theo đề cương |
-| 10 | Buffer cho lỗi bảo vệ/giảng viên, hướng dẫn cài đặt, tag release, bàn giao | Bản ổn định; không nhận feature lớn |
+| 1 | Stakeholder research, glossary/process map, UR/FR/NFR, state machines, guest SOS/priority/role-scope decisions | SRS v0.1, use cases, open decisions, supervisor review |
+| 2 | C4/container, DB/ERD, API/event contracts, wireframes, repo/Compose/CI/migrations, custom User | SDD v0.1; five healthy service skeletons; draft OpenAPI; one-host Compose |
+| 3 | Identity/auth/RBAC; Response skeleton; web shell/login; mobile shell/GPS permission spike | Login, permission matrix, seeded roles/data |
+| 4 | SOS, GPS/manual pin, idempotency, evidence storage, list/map, mobile pending/ACK | Citizen → API → PostGIS slice; TC-01..05/24..25 |
+| 5 | Verification/duplicates/priority, teams/volunteers, mission assignment/acceptance/progress, audit | Coordinator → team workflow; state/permission tests |
+| 6 | Campaigns, warehouses/items, stock ledger, transfers, distribution, reservation/release | Nonnegative inventory; race/idempotency tests |
+| 7 | Kafka KRaft, outbox/inbox, Notification/Reporting consumers, saga, projections, security/integration | Consumer restart, replay/dedupe; TC-15..23 |
+| 8 | Web/mobile/map/filter/report polish, NFR baseline, documentation, optional AI rule prototype, timeboxed kind | Feature freeze; decide whether AI/kind enter the demo |
+| 9 | E2E regression, demo seed, backup/restore, demo script, slides, critical fixes | Release candidate; defense per brief |
+| 10 | Defense/supervisor feedback buffer, installation guide, release tag, handover | Stable delivery; no major new features |
 
-### Phân công gợi ý cho ba thành viên
+### Suggested responsibilities for three members
 
-| Vai trò trọng tâm | Sở hữu chính | Phối hợp |
+| Focus | Primary ownership | Collaboration |
 |---|---|---|
-| A — Domain/Response | Nghiệp vụ, Response/PostGIS, request/mission/state machine, map API | Review permission; tích hợp coordinator UI |
-| B — Platform/Logistics | Identity/Logistics, Kafka/outbox/saga, Compose, database consistency/backup | Review event contract; CI/observability |
-| C — Client/Quality | Web/Mobile, API integration, Notification/Reporting UI, test matrix/user guide/demo | Review API/UX; theo dõi traceability |
+| A — Domain/Response | Domain analysis, Response/PostGIS, request/mission states, map API | Permission review; coordinator UI integration |
+| B — Platform/Logistics | Identity/Logistics, Kafka/outbox/saga, Compose, consistency/backups | Event contract review; CI/observability |
+| C — Client/Quality | Web/mobile, API integration, Notification/Reporting UI, test matrix, user guide/demo | API/UX review; traceability |
 
-Đây là trọng tâm, không cô lập ownership. Mỗi tuần có integration session; thay đổi contract cần một người ngoài owner review. A/B cùng review saga; C không nên là người duy nhất kiểm thử.
+These are focus areas, not isolated silos. Integrate weekly; contract changes need review by someone other than the owner. A/B jointly review the saga; C must not be the only tester.
 
-### Cut line nếu trễ lịch
+### Scope reduction if delayed
 
-Giữ: auth/scope, SOS + GPS/manual pin + server ACK/idempotency, verify/triage, assignment/progress, stock ledger/distribution, in-app notification, dashboard có timestamp, Kafka outbox/dedupe, test case và tài liệu/demo.
+Preserve auth/scope; SOS + GPS/manual pin + truthful ACK/idempotency; verification/triage; assignment/progress; stock ledger/distribution; in-app notifications; timestamped dashboards; Kafka outbox/deduplication; test cases, documentation, and demo.
 
-Giảm/bỏ theo thứ tự: provider push thật; offline queue đầy đủ (giữ draft/pending trung thực); Kubernetes; Grafana; CSV export; AI model (giữ rule PoC); vehicle tracking; map nâng cao/geocoding; nhiều cấp phê duyệt. Không bỏ authorization, inventory invariants, event dedupe hoặc restore demo để giữ feature phụ.
+Reduce in order: real push provider, full offline queue (retain honest draft/pending UI), Kubernetes, Grafana, CSV export, AI model (retain a rules proof of concept), vehicle tracking, advanced maps/geocoding, multilevel approvals. Never cut authorization, inventory invariants, event deduplication, or the restore demonstration to retain secondary features.
 
-## 17. Kịch bản demo bảo vệ
+## 17. Defense demonstration
 
-1. Citizen gửi SOS có vị trí/accuracy hoặc manual pin; retry cùng key và chứng minh chỉ có một request.
-2. Coordinator mở queue/map, verify, link request duplicate, đặt priority/lý do và giao team.
-3. Volunteer nhận mission, cập nhật EN_ROUTE → ON_SCENE, tải evidence, báo hoàn tất; request còn chờ coordinator xác nhận.
-4. Mission cần vật tư: Logistics nhận reservation, kho giữ/cấp hàng và ghi ledger; thử issue vượt available để chứng minh bị chặn.
-5. Kafka gửi notification và cập nhật Reporting; dashboard hiển thị generated time.
-6. Dừng Reporting/Notification consumer, phát event, bật lại; chứng minh catch-up không nhân đôi.
-7. Tùy chọn: AI suggestion được coordinator override; hoặc trình bày kind app deployment nếu qua checkpoint.
+1. A citizen submits an SOS with GPS/accuracy or manual pin; retry the same key and show one request.
+2. A coordinator opens queue/map, verifies, links a duplicate, sets priority/reason, and assigns a team.
+3. A volunteer accepts, progresses EN_ROUTE → ON_SCENE, uploads evidence, and reports completion; the request awaits coordinator confirmation.
+4. For a supply-dependent mission, Logistics reserves/issues stock and records the ledger; demonstrate rejection of an issue exceeding available stock.
+5. Kafka feeds notifications and Reporting; the dashboard shows generated time.
+6. Stop Reporting/Notification consumers, produce events, restart, and demonstrate catch-up without duplication.
+7. Optional: coordinator overrides an AI suggestion, or demonstrate kind app deployment after its checkpoint.
 
-Kịch bản thể hiện nghiệp vụ, quyền, GIS, saga và event reliability; không cần giả lập tải cấp quốc gia.
+The demo demonstrates domain logic, authorization, GIS, saga, and event reliability; national-scale load simulation is unnecessary.
 
-## 18. Tài liệu bàn giao
+## 18. Deliverable documentation
 
-| Tài liệu | Nội dung tối thiểu |
+| Document | Minimum contents |
 |---|---|
-| SRS | Scope, actors, glossary, assumptions, UR/FR/NFR có ID/acceptance criteria, use case, business rules, state machine, traceability, open decisions |
-| SDD | Context/container/component, service ownership, ERD, auth/RBAC, API/OpenAPI, event catalog/schema, outbox/saga, sequence/deployment, security/privacy, tradeoffs |
-| Test plan/cases | ID, requirement link, precondition, data, steps, expected result; unit/API/integration/security/E2E/NFR; kết quả và defect |
-| Cài đặt | Prerequisite, env, Compose profiles, migration/seed, demo accounts, backup/restore, troubleshooting, shutdown |
-| Hướng dẫn dùng | Luồng citizen, volunteer, coordinator, manager/admin; GPS/offline states; screenshot/video |
-| Demo/báo cáo | Dữ liệu giả, script, sơ đồ, quyết định kỹ thuật, giới hạn, test evidence; AI/Kubernetes là extension có kiểm soát |
+| SRS | Scope, actors, glossary, assumptions, identified UR/FR/NFR with acceptance criteria, use cases, business rules, states, traceability, open decisions |
+| SDD | Context/container/component views, ownership, ERD, auth/RBAC, API/OpenAPI, event catalog/schema, outbox/saga, sequence/deployment, security/privacy, tradeoffs |
+| Test plan/cases | IDs, requirement links, preconditions, data, steps, expected results; unit/API/integration/security/E2E/NFR; actual results and defects |
+| Installation guide | Prerequisites, environment, Compose profiles, migrations/seeds, demo accounts, backup/restore, troubleshooting, shutdown |
+| User guide | Citizen, volunteer, coordinator, manager/admin flows; GPS/offline states; screenshots/video |
+| Demo/report | Synthetic data, script, diagrams, technical decisions, limitations, test evidence; controlled AI/Kubernetes extensions |
 
-## 19. Rủi ro và quyết định còn mở
+## 19. Risks and open decisions
 
-| Quyết định | Mặc định đề xuất | Khi chốt |
+| Decision | Proposed default | Decision deadline |
 |---|---|---|
-| Login bắt buộc hay guest SOS? | Guest capability secret + rate limit, trừ khi giảng viên yêu cầu account | Tuần 1 |
-| Priority, SLA, ai verify/close/reopen? | P1–P4 nháp; coordinator có reason; không tự hứa SLA | Tuần 1, cần người hiểu nghiệp vụ |
-| Scope coordinator/team availability? | Role + campaign/khu vực + membership | Tuần 1–2 |
-| Map/tile/geocoding provider/license/quota? | UI map adapter; chọn provider đúng điều khoản; không gửi case PII | Trước tuần 4 |
-| Push/email? | In-app notification cho demo; provider mock nếu chưa có credential | Tuần 2 |
-| Offline sâu đến mức nào? | MVP hiển thị draft/pending trung thực; retry queue là Should | Tuần 1 |
-| File type/size/retention? | Giới hạn do nhóm đề xuất, private object, synthetic demo data | Tuần 2 |
-| Lưu vị trí/ảnh/audit/backup bao lâu? | Không tự đặt policy chính thức; cần xác nhận trước pilot | Trước deploy thật |
-| NFR tải và máy demo? | 10k request/20 concurrent là target thảo luận, hiệu chỉnh theo máy | Tuần 2 |
-| S3 self-host/managed? | SeaweedFS lab qua storage abstraction; managed khi có deploy environment | Tuần 2–4 |
-| Có data nhãn AI? | Không giả định; rule explainable đủ cho PoC; AI tắt mặc định | Tuần 8 |
-| Kubernetes tiêu chí chấm hay mục tiêu học? | kind stretch 2–3 ngày sau khi Compose core ổn | Sau tuần 7 |
+| Mandatory login or guest SOS? | Secret guest capability + rate limits unless the supervisor requires accounts; guest remains unapproved | Week 1 |
+| Priority, SLA, who verifies/closes/reopens? | Draft P1–P4; coordinator with reasons; no implicit SLA | Week 1 with domain input |
+| Coordinator scope/team availability? | Role + campaign/region + membership | Weeks 1–2 |
+| Map/tile/geocoding provider, license, quota? | Separate map UI; compliant provider; no incident PII | Before week 4 |
+| Push/email? | In-app demo; mock provider without credentials | Week 2 |
+| Offline depth? | Honest drafts/pending in MVP; retry queue is Should | Week 1 |
+| File types/sizes/retention? | Team-proposed limits, private objects, synthetic data | Week 2 |
+| Location/photo/audit/backup retention? | No invented official policy; confirm before a pilot | Before real deployment |
+| Load targets/demo hardware? | 10k requests/20 concurrent as discussion targets, adjusted to measured hardware | Week 2 |
+| Storage edition/provider and license? | Conditional MinIO AIStor Free single-node lab; SeaweedFS fallback; validate terms, artifact, private access, and restore before selection | Weeks 2–4 |
+| Labeled AI data? | Do not assume availability; explainable rules suffice for PoC; AI disabled by default | Week 8 |
+| Kubernetes grading requirement or learning goal? | kind stretch, 2–3 days after stable Compose core | After week 7 |
 
-## 20. Kết luận thiết kế
+## 20. Design conclusion
 
-Baseline đề xuất là **Django/DRF + PostgreSQL/PostGIS + React/Vite + React Native/Expo**, năm service sở hữu dữ liệu rõ, Kafka qua outbox/inbox cho notification/report và saga cho giữ hàng. Compose chạy trên một máy demo; Kubernetes kind là bài học có timebox. AI chỉ gợi ý có giải thích để coordinator duyệt.
+The proposed baseline is **Django/DRF + PostgreSQL/PostGIS + React/Vite + React Native/Expo**, five services with explicit ownership, Kafka outbox/inbox for notifications/reporting, and a reservation saga. Compose runs on one demo host; Kubernetes kind is a timeboxed learning extension. AI provides explanations and suggestions for coordinator review only.
 
-Đây là baseline để viết SRS/SDD, không thay các quyết định nghiệp vụ còn mở. Ba quyết định cần chốt trước tiên: guest SOS, quy tắc priority/đóng request và scope truy cập vị trí.
+This baseline supports SRS/SDD development; it does not resolve open business decisions. First clarify guest SOS, priority/request-closure rules, and access to exact locations.
 
-## 21. Nguồn tham khảo
+## 21. References
 
-### Context nghiệp vụ và dữ liệu
+### Business context and data
 
 - [OCHA — Humanitarian Programme Cycle](https://knowledge.base.unocha.org/wiki/spaces/hpc/overview)
 - [IFRC — Emergency Response Framework](https://www.ifrc.org/document/ifrc-emergency-response-framework)
@@ -860,6 +1121,13 @@ Baseline đề xuất là **Django/DRF + PostgreSQL/PostGIS + React/Vite + React
 
 ### Backend, database, API, security
 
+- [Django overview](https://docs.djangoproject.com/en/5.2/intro/overview/)
+- [Spring Boot documentation](https://docs.spring.io/spring-boot/index.html)
+- [Spring for Apache Kafka](https://docs.spring.io/spring-kafka/reference/)
+- [NestJS documentation](https://docs.nestjs.com/)
+- [NestJS Kafka transport](https://docs.nestjs.com/microservices/kafka)
+- [FastAPI features](https://fastapi.tiangolo.com/features/)
+- [Flask design decisions](https://flask.palletsprojects.com/en/stable/design/)
 - [Django releases/support schedule](https://www.djangoproject.com/download/)
 - [Django 5.2 GeoDjango Database API](https://docs.djangoproject.com/en/5.2/ref/contrib/gis/db-api/)
 - [Django transactions](https://docs.djangoproject.com/en/5.2/topics/db/transactions/)
@@ -895,10 +1163,105 @@ Baseline đề xuất là **Django/DRF + PostgreSQL/PostGIS + React/Vite + React
 - [Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
 - [Kubernetes probes](https://kubernetes.io/docs/concepts/workloads/pods/probes/)
 - [NIST AI RMF Core](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/)
+- [scikit-learn metrics](https://scikit-learn.org/stable/modules/model_evaluation.html)
+- [scikit-learn leakage and preprocessing pitfalls](https://scikit-learn.org/stable/common_pitfalls.html)
+- [scikit-learn probability calibration](https://scikit-learn.org/stable/modules/calibration.html)
+- [scikit-learn model persistence](https://scikit-learn.org/stable/model_persistence.html)
+- [OWASP prompt injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/)
+- [MinIO AIStor license operations](https://docs.min.io/aistor/operations/licenses/)
+- [MinIO AIStor Free agreement](https://www.min.io/legal/aistor-free-agreement)
+- [django-storages S3 backend](https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html)
+- [Django translation](https://docs.djangoproject.com/en/5.2/topics/i18n/translation/)
+- [DRF internationalization](https://www.django-rest-framework.org/topics/internationalization/)
 
-### Ghi chú nghiên cứu
+### Research notes
 
-- Tài liệu kỹ thuật được đối chiếu với nguồn chính thức ngày 29/09/2026; phiên bản, lịch hỗ trợ, API và trạng thái dự án có thể đổi. Kiểm tra dependency/tag trước khi khóa môi trường.
-- Chọn Django 5.2 vì nhánh LTS và GeoDjango, không phải vì đây là bản mới nhất. Không pin patch cũ từ tài liệu này.
-- SeaweedFS là lựa chọn self-host để thay MinIO đã archive; cần thử compatibility, auth, signed URL, backup/restore và license trước khi triển khai thật.
-- NFR định lượng, guest SOS, priority, retention, provider bản đồ/file/notification và cách dùng AI vẫn cần người hướng dẫn/nghiệp vụ xác nhận.
+- The initial research records verification against official sources on 2026-09-29. The expanded framework comparison in Section 4.2 was reviewed against the linked official documentation separately; other findings were carried forward. Versions, support schedules, APIs, and project status can change. Recheck dependencies/image tags before locking the environment.
+- Django 5.2 was selected for LTS support and GeoDjango, not as a claim that it is the newest release. Do not pin an old patch from this document.
+- Storage was reassessed against Community, AIStor, django-storages, and S3 documentation; see [dated storage research](c48-storage-research.md). AIStor Free is a conditional lab option, SeaweedFS the fallback. No compatibility or restore tests have been executed.
+- Quantitative NFRs, guest SOS, priorities, retention, map/file/notification providers, and AI usage still require relevant supervisor/domain confirmation.
+
+## Appendix A. AI implementation and research handoff
+
+**Execution guidance for AI use; the design is not yet a complete implementation specification.** Review notes identify ambiguities that must be resolved for the affected workflows.
+
+### A.1 Reading order and decision authority
+
+1. Read root AGENTS.md and any applicable directory instructions.
+2. Read [project context](c48-project-context.md) for the assigned scope and deliverables.
+3. Read this English plan, including the framework evaluation, expanded AI design in Section 12, storage research note, open decisions, and this appendix.
+4. Inspect the actual repository, existing contracts/migrations, and latest user instructions before writing code. Do not assume planned services or tests already exist.
+
+The current technical baseline is Django/DRF, five services with Kafka/outbox, PostgreSQL/PostGIS, React/Vite, and React Native/Expo. Section 4 records the selection rationale and alternatives. The project brief defines scope; technology choices are design decisions, not requirements imposed by the brief.
+
+Nginx and the five service boundaries are the working baseline. Storage research proposes a conditional MinIO AIStor Free lab profile with SeaweedFS fallback; edition, terms/license, artifact, compatibility, and provider setup still need verification. AI remains optional; Kubernetes is a learning extension that must not block core delivery. Draft business rules, numeric targets, and provider/retention policies remain open where marked.
+
+Use the recorded baseline for implementation. Revisit it when new evidence materially changes the tradeoffs, rather than repeatedly reopening settled choices. Record new decisions and ask only for information or authorization actually missing for the affected work. Routine reversible implementation choices may proceed with documented assumptions.
+
+### A.2 Implementation invariants
+
+- Own database credentials and migrations per service; no direct cross-service SQL or foreign keys.
+- Preserve requirement/use-case/test-case IDs across documents, code references, and test records.
+- Keep priority, request lifecycle, mission lifecycle, and stock reservation state distinct.
+- Enforce scope in querysets and object actions, including files, exports, and notifications.
+- Commit business changes and outbox intent atomically; deduplicate consumer database effects with a transactional inbox.
+- Preserve stock constraints, append-only movements, short transactions, deterministic locking, and idempotent commands.
+- Preserve coordinate order, location source, accuracy, capture time, and server receive time.
+- Never label an offline draft as received before server ACK.
+- Never let AI or reporting projections become authoritative dispatch/priority decisions.
+- Never report planned tests as passed, or a single-host demo as highly available.
+
+### A.3 Resolve before coding the affected workflow
+
+| Area | Ambiguity or missing contract | Required next step |
+|---|---|---|
+| Request aggregation | Section 8.1 says first acceptance means IN_PROGRESS but also says a decline/failure leaves DISPATCHED when another assignment remains active | Define an aggregation/transition table for multiple offered, accepted, failed, and completed missions; preserve active accepted work and test all combinations |
+| Verification | UC-02 writes verify/reject/duplicate/priority as a sequence | Define mutually exclusive outcome branches consistent with the state machine; terminal rejection/duplicate does not proceed to triage |
+| State coverage | Source diagrams are proposed, with no cancellation from VERIFIED/RESOLVED and no explicit campaign resume edge | Decide whether these transitions are prohibited or missing; specify actor, guard, reason, and effects rather than inventing endpoints |
+| Team acceptance | MissionTeam allows multiple teams, but the mission has a single acceptance/progress state | Decide single-team missions versus per-team assignments, who may accept on a team's behalf, and how availability is reserved/released |
+| Resource dependency | The saga gates resource-dependent mission offers on reservations | Define which missions genuinely require stock before departure; do not accidentally make urgent rescue dispatch depend on unrelated supplies |
+| Reservation cancellation | Late confirmation, timeout, rejection, cancellation, and issue may race | Specify intent IDs, legal transitions, compensation ownership, reconciliation, and retry behavior; never release physically issued goods as if still in the warehouse |
+| Transfers and distribution | The source permits cancellation while IN_TRANSIT but does not define physical return/loss accounting; issue and distribution may describe the same goods | Define in-transit stock and reconciliation/return movements; distinguish issue from beneficiary distribution to prevent double decrement. Both warehouses belong to Logistics; no cross-service database transaction is needed |
+| Campaign relationship | The ERD implies a required campaign, but citizen SOS may arrive before campaign selection | Decide campaign nullability and assignment authority. Define how Logistics handles a stale campaign projection on resource commands |
+| Authentication | FR-IAM-01 implies disabled accounts are rejected, while locally validated JWTs can remain valid until expiry | Define immediate versus TTL-bounded disable/revocation behavior, its propagation mechanism, and matching tests; do not promise both without implementation support |
+| Event ordering | Aggregate key ordering does not by itself order parallel outbox publishers or repair missing versions | Define relay ordering, aggregate-version handling, consumer offset commit after DB commit, retries/DLQ replay, and stale/gap handling |
+| Notification identity | TC-21 uses recipient/channel uniqueness; TC-22 abbreviates this as one record per event | Define uniqueness such as event + recipient + channel. Keep external provider delivery separate from transactional inbox effects; a DB transaction cannot roll back a sent push |
+| Contract completeness | Endpoint sketches omit full schemas, some CRUD/actions, event topic names, constraints, and error details | Write complete slice-specific OpenAPI/event/data contracts before implementing that slice; shorthand suffixes are not final route paths |
+| Test coverage | The 31 core cases and optional AI/storage cases are planned; several are summarized and do not cover every FR/NFR edge | Expand executable preconditions, steps, assertions, and traceability for the implemented slice; use appropriate real DB transaction tests for concurrency |
+
+These are review tasks for the relevant slices, not reasons to stop independent work. Material business decisions need domain/supervisor input; ordinary technical details can be recorded as design decisions. Update this primary English plan and affected contracts when a decision changes the baseline.
+
+### A.4 Implementation workflow for a future task
+
+1. Identify the requested slice and its UR/FR, use case, state transitions, and planned tests. Separate required behavior from Should/Optional scope.
+2. Inspect existing code and contracts before adding files or dependencies. Reuse native Django/PostgreSQL features where they satisfy the requirement.
+3. Resolve the slice's blocking decisions. Record assumptions and decision rationale; do not quietly select a guest policy, retention period, SLA, or external provider.
+4. Specify database constraints/indexes, API request/response/errors, authorization, event schema/version/key, transaction boundaries, and failure behavior.
+5. Implement the end-to-end slice: migrations, domain logic, API, client states, and workers only where needed. Keep resource-intensive infrastructure optional in local profiles.
+6. Follow the active task's testing authorization. When implementing under the approved delivery plan, use its corresponding tests and record exact commands/results, environment, and remaining gaps. Documentation translation alone does not execute product tests.
+7. Update traceability, setup instructions, and any changed contracts. Report completed work separately from recommendations and unverified behavior.
+
+The ten-week schedule is a planning baseline, not a command to delay all integration until week 7. Establish event contracts and a small integration path early enough to expose service-boundary errors.
+
+### A.5 Further research protocol
+
+- Recheck time-sensitive facts using primary sources before pinning versions/providers: Django/Python/DRF compatibility, PostgreSQL/PostGIS/GDAL/GEOS support, Kafka client/broker support, React Native/Expo permissions, object-storage maintenance/license, Kubernetes versions, and map/provider usage terms.
+- Treat the 2026-09-29 research findings as dated findings, not newly verified facts. A linked version-specific page is not automatically the selected runtime version.
+- Record the question, research date, primary-source URLs, findings, design impact, tradeoffs, and unresolved points. Distinguish a documented fact from an inference or recommendation.
+- Preserve approved architecture unless evidence justifies a change; record the reason and obtain any necessary decision before making a material switch.
+- For AI research, start with explainable rules and evaluation design. Do not claim real-world triage accuracy from synthetic demo data, or send PII to an external model without an approved basis.
+- Keep new research proportional to an actual decision. Do not add infrastructure solely because it is available.
+
+### A.6 Session handoff template
+
+When approaching the context limit or handing work to another AI, leave a concise Markdown handoff containing:
+
+- Objective and current authorized scope.
+- Files changed and relevant commit/branch, if any.
+- Completed work, incomplete work, and known defects.
+- Accepted decisions, assumptions, and unresolved questions with affected requirement IDs.
+- Commands/checks actually run, results, and checks not run.
+- Environment/dependency details needed to resume, excluding secrets.
+- The next concrete task and any real blocker.
+
+Link this English plan and project context. Do not present partial implementation as complete or reclassify proposed policy as approved in the handoff.
