@@ -4,14 +4,14 @@
 |---|---|
 | Project | Emergency Response and Disaster Relief Management System |
 | Project code | C48 |
-| Version | 2.3 — C48-aligned AI blueprint integration and acceptance cases |
-| Original research date | 2026-09-29 |
-| Duration in the project brief | 10 weeks; three team members |
+| Version | 2.4 — workflow adaptation and three-service baseline |
+| Initial research / plan revision | 2026-09-29 / 2026-09-30 |
+| Team context | Three members in the project brief; backend owned by one member |
 | Document role | Single technical plan for implementation and further research |
 
-This document provides the technical baseline for the SRS, SDD, database/API design, test cases, and user guide. Proposed technologies, service levels, data policies, and workflows are not thereby approved by a rescue authority.
+This document provides the proposed technical baseline for the SRS, SDD, database/API design, test cases, and user guide. The three-service architecture and adapted workflows below are C48 design proposals, not requirements imposed by the department or approved rescue policy.
 
-**For AI implementation and further research:** this is the single plan. Appendix A adds execution guidance and remaining slice-specific contract gates. Section 4.2 compares frameworks; Section 22 defines the solo-backend structure, decision baseline, and implementation gates; Section 12 specifies AI integration; Section 6.3 settles object storage. This plan does not claim implementation benchmarks or executed product tests.
+**For implementation and further research:** this is the single technical plan. Appendix A adds execution guidance and remaining slice-specific contract gates. Section 22 defines the backend structure and business invariants; Section 12 specifies the optional AI decision-support extension; Section 6.3 records the object-storage choice. This plan does not claim implementation benchmarks or executed product tests.
 
 ## 1. Reading guide and confidence levels
 
@@ -27,18 +27,17 @@ OCHA/IFRC materials inform humanitarian workflow design; they do not replace rul
 
 | Area | Proposed baseline | Rationale |
 |---|---|---|
-| Backend | NestJS + TypeScript on a supported Node.js LTS release | Selected after comparing NestJS with Spring Boot, Django/DRF, FastAPI, and Flask; it fits the TypeScript client stack and documents modular services, validation, OpenAPI, and Kafka integration. Pin compatible versions at setup. |
+| Backend | NestJS + TypeScript on a supported Node.js LTS release | Fits the TypeScript client stack and supports modular APIs, validation, and OpenAPI. Pin compatible versions at setup. |
 | Database | PostgreSQL + PostGIS, accessed through TypeORM and parameterized SQL for spatial operations | Relational workflows, inventory transactions, and indexed location queries; TypeORM documents PostgreSQL geometry/geography support. [TypeORM PostgreSQL spatial columns](https://typeorm.io/docs/drivers/postgres/) |
-| Backend services | Five independently deployable services: Identity, Response, Logistics, Notification, Reporting | Demonstrates boundaries, APIs/events, and data ownership within a ten-week project. |
-| Messaging | Apache Kafka KRaft + transactional outbox + idempotent consumers | Supports multiple consumers and replay; no end-to-end exactly-once guarantee is claimed. [Kafka](https://kafka.apache.org/intro/), [transactional outbox](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html) |
+| Backend services | Three independently deployable services: Identity, Response, Logistics | Shows meaningful ownership boundaries while keeping the capstone deployable and testable by one backend owner. |
+| Service communication | REST/JSON for user-facing and cross-service commands; local database transactions | Workflows are human-paced and need immediate responses. Broker-based messaging is deferred until a measured use case needs fan-out, replay, or independent consumers. |
 | Web | React + TypeScript + Vite | Suitable for operational dashboards; authenticated screens do not require SSR/SEO. [Vite guide](https://vite.dev/guide/) |
 | Mobile | React Native + Expo + TypeScript | Shares TypeScript skills and supports GPS, photos, and notifications. Request location permission when needed; no default background tracking. [React Native TypeScript](https://reactnative.dev/docs/typescript), [Expo Location](https://docs.expo.dev/versions/latest/sdk/location/) |
 | Files | MinIO AIStor Free, single-node lab deployment, through the AWS SDK for JavaScript S3 client | Final capstone choice for synthetic demo data. Obtain/use it under current license terms; do not redistribute software. Free tier has no HA/SLA and excludes at-rest encryption; retain private access and tested backup. |
 | Deployment | Docker Compose on one demo host; Nginx reverse proxy | Multiple containers do not require multiple physical machines. [Docker Compose production](https://docs.docker.com/compose/how-tos/production/) |
-| Kubernetes | kind learning extension after the Compose end-to-end workflow is stable | Supports the learning goal without blocking the capstone. kind runs local clusters in Docker containers. [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/) |
 | AI | Advisor with explanations; coordinator makes the decision | An optional research direction, with no automatic priority changes or rescue dispatch. |
 
-**Demo scale:** five independent application containers, Nginx, Kafka, PostgreSQL/PostGIS with separate databases/users per service, object storage, and optional Prometheus/Grafana. All can share one machine; five rented servers are unnecessary.
+**Demo scale:** three application services, PostgreSQL/PostGIS with separate database credentials, object storage, and optional lightweight metrics on one demo host. k6 can generate HTTP virtual-user traffic against the APIs without Kafka. [Grafana k6 virtual users](https://grafana.com/docs/k6/latest/get-started/running-k6/)
 
 ## 3. Problem analysis and business workflow
 
@@ -49,9 +48,9 @@ The project context involves information passing through multiple channels and t
 - Requests may lack location, affected-person count, or observation time.
 - Duplicate reports may remain unlinked, distorting statistics or causing repeated dispatch.
 - Coordinators may lack visibility into pending verification, accepted missions, and available resources.
-- Inventory may diverge across receipts, transfers, reservations, issues, and distributions, with insufficient history to explain differences.
+- Inventory and aid deliveries may diverge across receipts, transfers, commitments, issues, and distributions without a traceable history.
 - Weak connectivity may leave a citizen unsure whether the server received an SOS.
-- Dashboards may lag or double-count events from multiple sources.
+- Dashboards can mislead if their source, filter scope, or latest-data time is unclear.
 - Broad access permissions may expose sensitive location/contact information.
 
 These are problem hypotheses, not findings about a particular locality or authority.
@@ -63,9 +62,21 @@ These are problem hypotheses, not findings about a particular locality or author
 3. **Verification:** a coordinator contacts the reporter or adds information. Rejection and duplicate linking require a reason and history.
 4. **Prioritization:** a coordinator applies agreed criteria. AI output, if enabled, is supplementary.
 5. **Dispatch:** offer a mission to a suitable team. The team accepts/declines and records travel, arrival, and results.
-6. **Resource allocation:** Response requests a reservation; Logistics checks available stock. Reservation and physical issue are separate steps.
+6. **Resource allocation:** a coordinator records structured needs in Logistics; one or more warehouses commit contributions. Commitments, physical issue, and confirmed delivery remain separate stages.
 7. **Outcome confirmation:** the team provides results/evidence; a coordinator confirms whether needs are met. Completing one mission does not automatically close a request with remaining needs.
-8. **Monitoring:** Notification delivers updates; Reporting refreshes dashboards and exposes the latest data timestamp.
+8. **Monitoring:** each owning service exposes its operational status and reports the time at which its current dashboard data was read.
+
+### 3.3 Patterns adapted for C48
+
+The recommendations below reuse workflow ideas documented in [the disaster-response platform research](research/disaster-response-platform-patterns.md). They extend the project brief as proposals; they are not official requirements.
+
+| Inspiration | C48 adaptation | Why it fits |
+|---|---|---|
+| Ushahidi's review queue, moderation, and saved searches | Coordinator views for awaiting verification, verified-but-unassigned, active missions, and partially fulfilled requests; exact location/contact data stays scoped | Makes the handoff and backlog visible without automating human decisions |
+| Sahana ShaRe's partial commitments and separate logistics records | A fulfillment board shows requested, committed, issued, delivered, and outstanding quantities; more than one warehouse/organization can contribute | A request can remain open while some aid has been delivered, and one contribution does not hide the remaining need |
+| Peer capstones described in the CNTT catalogue: dispatch/logistics visibility, high-concurrency ticketing, and comparative traffic-simulation metrics | Add measurable workflow timings and a filtered outstanding-aid view by authorized request/region/item; use k6 for a modest API load scenario | Gives the demo a clear operational outcome and evidence without copying unrelated brokers, trading, or simulation domains |
+
+The workbook is a catalogue of project descriptions, not evidence that every listed technology or workload was implemented. C48's distinction is the traceable workflow from report verification through mission progress and partial aid fulfillment, supported by auditable quantities and response-time measurements.
 
 The workflow references the OCHA cycle conceptually. Validate terminology and responsibilities for this project. [OCHA HPC](https://knowledge.base.unocha.org/wiki/spaces/hpc/overview)
 
@@ -87,28 +98,28 @@ Prisma is a credible TypeScript alternative with generated types, but PostGIS ac
 
 Store points as GeoJSON with longitude, latitude order and SRID 4326; validate ranges before persistence. Consider `geography(Point,4326)` for meter-based radius behavior and geometry for boundaries; validate units/indexes with representative queries. [RFC 7946](https://datatracker.ietf.org/doc/html/rfc7946), [PostGIS spatial indexes](https://postgis.net/documentation/faq/spatial-indexes/)
 
-Inventory writes use short PostgreSQL transactions, deterministic row-lock order, and constraints such as `on_hand >= 0`, `reserved >= 0`, and `reserved <= on_hand`. Do not call Kafka or object storage while holding database locks. Test concurrency against PostgreSQL/PostGIS, not SQLite. [PostgreSQL explicit locking](https://www.postgresql.org/docs/18/explicit-locking.html)
+Inventory writes use short PostgreSQL transactions, deterministic row-lock order, and constraints such as `on_hand >= 0`, `reserved >= 0`, and `reserved <= on_hand`. Do not call another service or object storage while holding database locks. Test concurrency against PostgreSQL/PostGIS, not SQLite. [PostgreSQL explicit locking](https://www.postgresql.org/docs/18/explicit-locking.html)
 
 
 ### 4.2 Backend framework evaluation and selection
 
-**Evaluation method:** qualitative comparison against C48's five-service, TypeScript-client, PostgreSQL/PostGIS, Kafka, and ten-week delivery needs, using official documentation reviewed on 2026-09-30. This is not a performance benchmark. NestJS/TypeScript is the selected backend; no Python framework is part of the implementation stack.
+**Evaluation method:** qualitative comparison against C48's three-service, TypeScript, PostgreSQL/PostGIS, GIS, and solo-backend needs, using official documentation reviewed on 2026-09-30. This is not a performance benchmark. NestJS/TypeScript is the selected backend; no Python framework is part of the implementation stack.
 
 | Framework | Strengths relevant to C48 | Integration work and tradeoffs | Assessment |
 |---|---|---|---|
-| **NestJS (TypeScript/Node.js)** | Modules/providers/guards, TypeScript, OpenAPI and validation integrations, Kafka transport; one language family across backend and clients | ORM/migrations, PostGIS queries, domain authorization, outbox/saga, and operations UI need explicit implementation | **Selected** for five independently deployed services and TypeScript development |
-| **Spring Boot (Java/Kotlin)** | Mature application/security/operations ecosystem and Spring for Apache Kafka | Separate JVM language/tooling from clients; strong alternative if the team already has more Spring experience | Technically capable; larger language/tooling switch for this project |
-| **Django + DRF (Python)** | Integrated ORM, admin/auth and mature API conventions | Different backend language; Kafka/outbox reliability and domain rules still need explicit work | Capable alternative, not used in this plan |
-| **FastAPI (Python)** | Type-oriented validation, generated OpenAPI, async API support | Assemble ORM/migrations, admin, auth, permissions, GIS, and event reliability components | Capable for focused APIs, but adds a language/tooling split |
+| **NestJS (TypeScript/Node.js)** | Modules/providers/guards, TypeScript, OpenAPI and validation integrations; one language family across backend and clients | ORM/migrations, PostGIS queries, domain authorization, and operations UI still need explicit implementation | **Selected** for the three service boundaries and TypeScript development |
+| **Spring Boot (Java/Kotlin)** | Mature application/security/operations ecosystem | Separate JVM language/tooling from clients; strong alternative if the team already has more Spring experience | Technically capable; larger language/tooling switch for this project |
+| **Django + DRF (Python)** | Integrated ORM, admin/auth and mature API conventions | Different backend language; cross-service API contracts and domain rules still need explicit work | Capable alternative, not used in this plan |
+| **FastAPI (Python)** | Type-oriented validation, generated OpenAPI, async API support | Assemble ORM/migrations, admin, auth, permissions, and GIS components | Capable for focused APIs, but adds a language/tooling split |
 | **Flask (Python)** | Small core and flexible component selection | More foundational database, schema, authentication, and administration decisions across services | Flexible but adds assembly work and a language/tooling split |
 
-**Evidence:** Nest documents modules/providers, guards, validation, OpenAPI, database integrations, and Kafka transport. Spring documents standalone applications and operational features; Spring for Apache Kafka provides Kafka integration. Django/DRF, FastAPI, and Flask remain capable alternatives with different integration tradeoffs. [NestJS database integrations](https://docs.nestjs.com/techniques/database), [NestJS validation](https://docs.nestjs.com/techniques/validation), [NestJS OpenAPI](https://docs.nestjs.com/openapi/introduction), [NestJS Kafka transport](https://docs.nestjs.com/microservices/kafka), [Spring Boot](https://docs.spring.io/spring-boot/index.html), [Spring for Apache Kafka](https://docs.spring.io/spring-kafka/reference/), [Django overview](https://docs.djangoproject.com/en/5.2/intro/overview/), [FastAPI features](https://fastapi.tiangolo.com/features/), [Flask design](https://flask.palletsprojects.com/en/stable/design/)
+**Evidence:** Nest documents modules/providers, guards, validation, OpenAPI, and database integrations. Spring Boot, Django/DRF, FastAPI, and Flask remain capable alternatives with different integration tradeoffs. [NestJS database integrations](https://docs.nestjs.com/techniques/database), [NestJS validation](https://docs.nestjs.com/techniques/validation), [NestJS OpenAPI](https://docs.nestjs.com/openapi/introduction), [Spring Boot](https://docs.spring.io/spring-boot/index.html), [Django overview](https://docs.djangoproject.com/en/5.2/intro/overview/), [FastAPI features](https://fastapi.tiangolo.com/features/), [Flask design](https://flask.palletsprojects.com/en/stable/design/)
 
-**Selection rationale — project-specific:** NestJS matches a TypeScript client/backend workflow and documents patterns for modules, guards, OpenAPI, validation, and Kafka. TypeORM's PostgreSQL spatial types support the GIS baseline. This reduces language/tooling changes while keeping database, authorization, transactions, and events explicit. It does not imply Nest is universally superior or faster.
+**Selection rationale — project-specific:** NestJS matches a TypeScript client/backend workflow and documents patterns for modules, guards, OpenAPI, and validation. TypeORM's PostgreSQL spatial types support the GIS baseline. This reduces language/tooling changes while keeping database, authorization, and local transactions explicit. It does not imply Nest is universally superior or faster.
 
-**Selected implementation choices:** NestJS REST services on the default Express adapter; TypeScript; TypeORM + PostgreSQL/PostGIS; Nest `ValidationPipe` with DTO validation; `@nestjs/swagger` for OpenAPI; Passport/JWT for authentication; Nest Kafka transport/KafkaJS for events; AWS SDK for JavaScript v3 S3 client for MinIO. Pin compatible Node/Nest/dependency versions after the compatibility spike; avoid floating `latest` tags.
+**Selected implementation choices:** three NestJS REST services on the default Express adapter; TypeScript; TypeORM + PostgreSQL/PostGIS; Nest `ValidationPipe` with DTO validation; `@nestjs/swagger` for OpenAPI; Passport/JWT for authentication; AWS SDK for JavaScript v3 S3 client for MinIO. Pin compatible Node/Nest/dependency versions after the compatibility spike; avoid floating `latest` tags.
 
-Use one repository/workspace for five Nest applications, each with its own bootstrap, environment, image, migration set, database credentials, and deployment. Keep domain models and persistence code inside their owning service. Share only versioned API/event schemas where useful; do not share domain entities or database modules across services.
+Use one repository/workspace for three Nest applications, each with its own bootstrap, environment, image, migration set, database credentials, and deployment. Keep domain models and persistence code inside their owning service. Share API DTOs only where a concrete contract requires it; do not share domain entities or database modules across services.
 
 
 ### 4.3 Web, mobile, and API
@@ -122,24 +133,27 @@ Use one repository/workspace for five Nest applications, each with its own boots
 
 Emergency screens should minimize steps, provide accessible controls, clearly show submission status, and allow a manual pin when GPS is denied or inaccurate. Do not enable background tracking by default. Expo permissions depend on platform and access type. [Expo Location](https://docs.expo.dev/versions/latest/sdk/location/), [Expo permissions](https://docs.expo.dev/guides/permissions/)
 
-### 4.4 Kafka versus a simpler queue
+### 4.4 Service communication and asynchronous work
 
-| Option | Appropriate when | C48 decision |
+| Need | C48 baseline | Add a broker only when… |
 |---|---|---|
-| Kafka | Multiple consumers, replay, reporting projections, learning event-driven services | **Selected** for integration events |
-| RabbitMQ/job queue | Background tasks/retries without replaying an event stream | Simpler for isolated jobs, but less aligned with the replay and multi-consumer integration goals |
+| Login, request intake, verification, mission updates, stock/fulfillment commands | REST/JSON with bounded timeouts, stable error codes, idempotency on retryable commands | A user-facing operation must fan out to many independently deployed consumers and synchronous APIs no longer fit |
+| Dashboards and notifications | Read each service's authoritative API; store an in-app notice with the business change in its owning service | Independent consumers need durable event replay or measured traffic makes the current approach insufficient |
+| Optional AI analysis | Response-owned job row plus a worker that claims pending jobs; intake does not wait for analysis | Job volume, independent scaling, or operational requirements justify a separate queue |
 
-Kafka ordering is per partition, not global. Use the aggregate ID as the message key to place changes for the same request/mission in the same partition. Messages may be redelivered; consumers must be idempotent. Do not promise exactly-once processing across databases, Kafka, push providers, and reporting. [Kafka introduction](https://kafka.apache.org/intro/), [Kafka delivery semantics](https://kafka.apache.org/40/design/design/)
+Kafka is not required for k6 virtual users: k6 sends scripted HTTP/API requests and defines virtual-user counts and thresholds in the test configuration. [Grafana k6 HTTP requests](https://grafana.com/docs/k6/latest/using-k6/http-requests/), [k6 virtual users](https://grafana.com/docs/k6/latest/get-started/running-k6/)
+
+Reconsider Kafka only if C48 gains several independent consumers, needs durable event replay/reprocessing, or measured asynchronous backlog/fan-out cannot be handled by a small database-backed worker. Kafka provides durable event-stream storage and processing, but adds broker operation, schemas, retries, deduplication, monitoring, and recovery work. Those capabilities are not needed merely because the design has multiple services or load tests. [Apache Kafka documentation](https://kafka.apache.org/documentation/)
 
 ### 4.5 Service decomposition
 
 | Model | Benefits | Cost/risk | Assessment |
 |---|---|---|---|
-| NestJS modular monolith + workers | Fewer deployments/databases, simpler transactions, easier MVP delivery | Less explicit independent deployment and data ownership | Fallback if the schedule slips |
-| Five services with bounded contexts | Independent boundaries, databases, APIs, and events; feasible on one host | Cross-service auth, outbox, eventual consistency, and saga testing | **Selected for explicit service ownership and deployment boundaries** |
-| Eight or more small services | Finer ownership/scaling possibilities | More contracts, containers, integration tests, and operational failures | Not selected |
+| One modular monolith | Simplest deployment and cross-domain transactions | Less visible service ownership for the architecture goal | Valid fallback if service integration blocks delivery |
+| Three services: Identity, Response, Logistics | Clear account, emergency workflow, and supply ownership; manageable API boundaries | Requires documented REST contracts and cross-service failure handling | **Selected** |
+| Five or more services | More independently deployable components | Extra databases, contracts, and operations without a demonstrated workload need | Deferred |
 
-Each service has its own image/deployment, database credentials, OpenAPI/event contracts, and no direct access to another service's tables. Sharing a host/PostgreSQL server for the demo preserves logical boundaries but creates a shared failure domain.
+Each selected service has its own application boundary and database credentials; the demo may run all three on one host and PostgreSQL server. No service reads another service's tables. Use synchronous REST for the few cross-service checks; keep each database transaction within its owner.
 
 ## 5. Proposed architecture
 
@@ -147,108 +161,65 @@ Each service has its own image/deployment, database credentials, OpenAPI/event c
 
 ```mermaid
 flowchart LR
-  Citizen[Mobile Citizen]
-  Volunteer[Mobile Volunteer]
-  Staff[Web Coordinator / Manager / Admin]
-  Nginx[Nginx Reverse Proxy]
-  Identity[Identity NestJS Service]
-  Response[Response NestJS + TypeORM/PostGIS]
-  Logistics[Logistics NestJS Service]
-  Notification[Notification Consumer]
-  Reporting[Reporting Consumer + Read API]
-  PG[(PostgreSQL + PostGIS<br/>separate DB/user per service)]
-  Kafka[(Kafka KRaft)]
-  S3[(S3-compatible object storage)]
-  Obs[Prometheus + Grafana optional]
+  Clients[Web and mobile clients]
+  Proxy[Nginx reverse proxy]
+  Identity[Identity API]
+  Response[Response API + optional job worker]
+  Logistics[Logistics API]
+  DB[(PostgreSQL + PostGIS<br/>separate database/user per service)]
+  S3[(Private S3-compatible object storage)]
+  Load[k6 HTTP virtual users]
 
-  Citizen --> Nginx
-  Volunteer --> Nginx
-  Staff --> Nginx
-  Nginx --> Identity
-  Nginx --> Response
-  Nginx --> Logistics
-  Nginx --> Notification
-  Nginx --> Reporting
-  Identity --> PG
-  Response --> PG
-  Logistics --> PG
-  Notification --> PG
-  Reporting --> PG
+  Clients --> Proxy
+  Proxy --> Identity
+  Proxy --> Response
+  Proxy --> Logistics
+  Identity --> DB
+  Response --> DB
+  Logistics --> DB
   Response --> S3
   Logistics --> S3
-  Identity -. outbox .-> Kafka
-  Response -. outbox .-> Kafka
-  Logistics -. outbox .-> Kafka
-  Kafka --> Notification
-  Kafka --> Reporting
-  Kafka --> Response
-  Kafka --> Logistics
-  Obs -. metrics .-> Identity
-  Obs -. metrics .-> Response
-  Obs -. metrics .-> Logistics
+  Response <-->|REST contract| Identity
+  Logistics <-->|REST contract when needed| Response
+  Load --> Proxy
 ```
 
-Nginx routes traffic; each service still authenticates and authorizes requests. Producers write to the outbox in the business transaction; a relay publishes afterward.
+All three services can run as containers on one demo host. A shared PostgreSQL server is acceptable for the demo, while each service uses its own database and credentials. No service can query another service's tables. k6 generates HTTP requests to the API; it is not part of the runtime architecture.
 
 ### 5.2 Boundaries and data ownership
 
-| Service | Authoritative data/logic | Main APIs | Representative events |
-|---|---|---|---|
-| **Identity** | Accounts, credentials, organizations, memberships, scoped role grants | Login/refresh/logout, user/role management | identity.user.created, identity.role.changed, identity.account.disabled |
-| **Response** | Campaign/incident, SOS/requests, verification/priority, teams/volunteers, missions/progress, evidence metadata | Submit, verify/triage, assign, transition, map queries | response.campaign.activated/closed, response.request.submitted/verified/triaged, response.mission.assigned/status_changed/completed |
-| **Logistics** | Warehouses, items, stock balances/ledger, campaign reference projection, reservations, transfers, vehicles, relief points, distributions | Receipt/issue/transfer/reservation/distribution | logistics.stock.reserved/rejected/issued, logistics.transfer.received, logistics.distribution.recorded |
-| **Notification** | Device destinations, templates, delivery attempts, retries, in-app notifications | User notifications, mark read, operational retries | Delivery status events if needed by a consumer |
-| **Reporting** | Dashboard projections/read models; no authoritative business data | Campaign/time/region aggregates, export | Primarily a consumer |
+| Service | Owns | Example API surface |
+|---|---|---|
+| **Identity** | Accounts, credentials, organizations, memberships, scoped role grants, refresh sessions | Registration/login/session, user/role administration |
+| **Response** | Campaigns/incidents, assistance requests, verification and priority history, teams, missions/progress, request evidence, request timeline | Intake, verification, duplicate review, triage, assignment, mission actions, scoped map/queue |
+| **Logistics** | Item catalog, warehouses, stock balances/ledger, relief needs and commitments linked by opaque request ID, transfers, vehicles, relief points, distribution records | Receipts/issues/transfers, partial commitments and fulfillment, stock and outstanding-need views |
 
 Boundary rules:
 
-- Each service has a separate database/user; the demo may share one PostgreSQL server. No cross-service foreign keys or table queries.
-- External user/campaign/warehouse IDs are opaque UUID references. Validate them through APIs, events, or projections.
-- Response owns Campaign/Incident; Logistics owns inventory/distribution referenced by campaign ID; Reporting joins event-derived projections.
-- Requests and missions share the Response database for local state/assignment transactions. Inventory belongs to Logistics; cross-domain workflows use a saga.
-- Reporting may lag and must show its generated time. Operational decisions use authoritative Response/Logistics data.
+- Each service owns its schema, migrations, credentials, and local transaction. IDs crossing boundaries are opaque UUID references; no cross-service foreign keys or table queries.
+- Response remains authoritative for request and mission status. Logistics remains authoritative for stock, commitments, issued/delivered quantities, and fulfillment status.
+- The coordinator board composes scoped Response and Logistics API results. If one API is unavailable, show which panel is stale/unavailable; never imply that the other service completed its work.
+- In-app request/mission notices live in Response; stock/task notices live in Logistics. Each service exposes its own scoped reports and timestamps; there is no standalone Notification or Reporting service.
+- Cross-service REST calls happen outside database transactions. Commands that may be retried use an idempotency key. Do not imply cross-service atomicity.
 
-### 5.3 Events, outbox, and retries
+### 5.3 Request-to-fulfillment board
 
-```json
-{
-  "event_id": "uuid",
-  "event_type": "response.request.triaged",
-  "schema_version": 1,
-  "occurred_at": "2026-09-29T10:30:00Z",
-  "producer": "response",
-  "aggregate_type": "assistance_request",
-  "aggregate_id": "uuid",
-  "aggregate_version": 4,
-  "correlation_id": "uuid",
-  "data": {"campaign_id": "uuid", "priority": "P1", "region_code": "..."}
-}
-```
+This is the main workflow adaptation from Sahana ShaRe's partial commitments and Ushahidi's human-reviewed queue. [Research details and sources](research/disaster-response-platform-patterns.md)
 
-Do not include phone numbers, free text, signed URLs, or exact coordinates unless the consumer needs them. An event is not a full database row copy. Use explicit schema versions; a versioned JSON envelope is sufficient for the capstone.
+1. Response receives a request and keeps it in an internal verification queue. A coordinator records VERIFIED, REJECTED with reason, or DUPLICATE with a canonical request and reason. A possible duplicate search may suggest nearby reports by time, category, and location, but a person makes the decision.
+2. After verification, an authorized coordinator records structured assistance needs in Logistics. Logistics links each need to an opaque `request_id` and request work-cycle identifier; the request and need can be read together through the board without sharing tables.
+3. A need records requested quantity and item/unit. One or more warehouse/organization contributions can be committed. Under a transaction that locks the need row, delivered + committed/reserved + issued-but-not-delivered cannot exceed requested quantity. A cancellation releases an unissued commitment; an issued quantity must be delivered, returned, or recorded as loss.
+4. Track quantities separately: requested, committed/reserved, issued, delivered, and outstanding. `outstanding = requested - delivered`; partial delivery never makes the need complete. A coordinator can explicitly reduce/cancel a need with a reason, preserving its history.
+5. The request status, mission status, and fulfillment status remain separate. A mission completion does not close a request; a delivery does not mark a rescue mission complete. The coordinator confirms overall resolution after reviewing current mission and fulfillment evidence.
 
-1. Write business state, audit/domain events, and the outbox inside one transaction.
-2. The relay publishes pending entries and then marks them published. A crash between those steps can cause redelivery.
-3. A consumer records the event ID in a uniquely constrained inbox in the same transaction as its projection/database side effect.
-4. Duplicates must not create another notification, stock movement, or report row. Retry temporary failures with backoff; route poison events to a dead-letter queue (DLQ) for inspection/replay.
-5. Monitor outbox age, consumer lag, retries, and DLQ count.
+**Demo scenario:** a verified request needs 20 relief kits and rescue assistance. One warehouse commits and delivers 12 kits; the board shows PARTIALLY_FULFILLED with 8 outstanding, and the request remains open. A second contribution delivers the remaining 8; the board records both actors/times, and the coordinator explicitly confirms resolution. The demo also shows a suspected duplicate that a coordinator reviews and links manually.
 
-Outbox prevents committed business data from losing its event intent. Duplicate delivery remains possible and requires idempotent consumers. [AWS transactional outbox](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html)
+### 5.4 REST and background-job behavior
 
-Schema Registry, Avro, Debezium/CDC, a service mesh, a CQRS framework, and a workflow engine are outside the baseline. Add them only for a demonstrated need.
-
-### 5.4 Mission resource-reservation saga
-
-1. A coordinator creates/assigns a mission in Response. If goods are required, the mission starts in WAITING_RESOURCES.
-2. Response records ReservationRequested in its outbox.
-3. Logistics consumes the event, locks balances, checks available stock, and atomically creates or rejects the reservation. The result goes through its outbox.
-4. A confirmed reservation moves the mission to READY_TO_DEPLOY. The coordinator sends the team an offer, moving the request to DISPATCHED. Team acceptance moves the request to IN_PROGRESS. Rejection leaves the mission WAITING_RESOURCES so the coordinator can change warehouse/quantity or cancel.
-5. Physical issue creates an ISSUE movement and changes the reservation to ISSUED. A supply-dependent mission cannot enter EN_ROUTE until Response has confirmed all required lines were issued through a Logistics result or authenticated reconciliation. Terminal missions release unissued reservations; already-issued goods require distribution/return/loss settlement, never deletion of movements.
-6. Returned goods create a RETURN movement after physical verification/counting.
-
-If a mission is cancelled while reservation processing is pending, Response records cancellation/release intent. A late reservation confirmation must trigger a release compensation; retries remain idempotent and must not leave an orphaned reservation.
-
-This is a workflow with multiple local transactions and compensating actions, not a distributed transaction. Intermediate states and timeouts must be visible to coordinators.
+- REST handles immediate user actions and the small number of cross-service lookups. Use bounded timeouts, Vietnamese user-facing errors, stable machine error codes, and idempotency for retries.
+- Report aggregation is performed by each owning service or by the client composing two scoped API results. Include `generated_at` per response; do not call it globally real-time.
+- If optional AI analysis is enabled, write a durable job to the Response database in the same transaction as its request intent. A worker claims pending jobs with a lease, calls inference outside the transaction, and stores one versioned result. A failed worker leaves retryable work in the database; no message broker is required.
+- Do not add Kafka, Redis, a service mesh, schema registry, workflow engine, or a separate notification/reporting service to the baseline. Revisit only against the criteria in Section 4.4.
 
 ## 6. Data model and integrity
 
@@ -268,7 +239,10 @@ erDiagram
   LOGISTICS_WAREHOUSE ||--o{ LOGISTICS_STOCK_BALANCE : stores
   LOGISTICS_ITEM ||--o{ LOGISTICS_STOCK_BALANCE : counts
   LOGISTICS_STOCK_BALANCE ||--o{ LOGISTICS_STOCK_MOVEMENT : changes
-  LOGISTICS_RESERVATION ||--o{ LOGISTICS_RESERVATION_LINE : contains
+  LOGISTICS_RELIEF_NEED ||--o{ LOGISTICS_COMMITMENT : fulfilled_by
+  LOGISTICS_WAREHOUSE ||--o{ LOGISTICS_COMMITMENT : supplies
+  LOGISTICS_COMMITMENT ||--o{ LOGISTICS_COMMITMENT_LINE : contains
+  LOGISTICS_ITEM ||--o{ LOGISTICS_COMMITMENT_LINE : identifies
   LOGISTICS_TRANSFER ||--o{ LOGISTICS_TRANSFER_LINE : moves
   LOGISTICS_DISTRIBUTION ||--o{ LOGISTICS_DISTRIBUTION_LINE : issues
 
@@ -320,19 +294,42 @@ erDiagram
     uuid actor_user_id
     datetime occurred_at
   }
+  LOGISTICS_RELIEF_NEED {
+    uuid id PK
+    uuid request_id
+    int work_cycle
+    uuid item_id
+    decimal requested_quantity
+    string unit
+    string status
+  }
+  LOGISTICS_COMMITMENT {
+    uuid id PK
+    uuid relief_need_id
+    uuid warehouse_id
+    string status
+    datetime created_at
+  }
+  LOGISTICS_COMMITMENT_LINE {
+    uuid id PK
+    uuid commitment_id
+    uuid item_id
+    decimal quantity
+    string unit
+    decimal issued_quantity
+    decimal delivered_quantity
+  }
 ```
 
-Each mission has exactly one team; additional teams receive separate missions under the same request. A request may have no campaign until a scoped coordinator attaches it to an ACTIVE campaign. Diagram relationships are local to a service. External user/campaign IDs are logical UUID references, with no cross-database foreign keys. Implementation still requires complete timestamps, audit fields, indexes, unique constraints, migrations, and retention policies.
+Each mission has exactly one team; additional teams receive separate missions under the same request. A request may have no campaign until a scoped coordinator attaches it to an ACTIVE campaign. The Logistics `request_id` is an opaque cross-service reference, not an ERD relationship or foreign key. Other diagram relationships are local to a service. Implementation still requires complete timestamps, audit fields, indexes, unique constraints, migrations, and retention policies.
 
 ### 6.2 Core entities
 
 | Database | Minimum tables/entities |
 |---|---|
-| Identity | User, Organization, controlled Region catalog, Membership, RoleGrant, account status, RefreshSession with rotation/revocation, AuditRecord, Outbox |
-| Response | Campaign, Incident, RegionBoundary referencing the controlled region code, AssistanceRequest with organization_id and nullable region/campaign, RequestEvent, RescueTeam, TeamMember with opaque user ID, VolunteerProfile, Mission with one team_id, EvidenceMetadata, Outbox, Inbox; optional AnalysisSnapshot, AnalysisJob, TriageRecommendation, RecommendationReview (Section 12) |
-| Logistics | Warehouse, Item, StockBalance, StockMovement, CampaignReference projection, Reservation/lines, Transfer/lines, Distribution/lines, IssuedLineSettlement, TransferTransitLine, Vehicle, ReliefPoint, Outbox, Inbox |
-| Notification | DeviceEndpoint, Notification, DeliveryAttempt, retry state, Inbox |
-| Reporting | Inbox, PendingProjectionEvent, RequestDailyMetric, CampaignSnapshot, StockSnapshot, ProcessingTimeMetric, watermark/offset; create only projections used by the dashboard |
+| Identity | User, Organization, controlled Region catalog, Membership, RoleGrant, account status, RefreshSession with rotation/revocation, AuditRecord |
+| Response | Campaign, Incident, RegionBoundary referencing the controlled region code, AssistanceRequest with organization_id and nullable region/campaign, RequestEvent, RescueTeam, TeamMember with opaque user ID, VolunteerProfile, Mission with one team_id, EvidenceMetadata, scoped in-app Notification; optional AnalysisSnapshot, AnalysisJob, TriageRecommendation, RecommendationReview (Section 12) |
+| Logistics | Warehouse, Item, StockBalance, StockMovement, ReliefNeed/request reference, Commitment/lines, Transfer/lines, Distribution/lines, IssuedLineSettlement, TransferTransitLine, Vehicle, ReliefPoint, scoped in-app Notification |
 
 Define the Identity user entity and migration before other services rely on its contract; external services store opaque user UUIDs rather than duplicating credentials.
 
@@ -361,7 +358,7 @@ Define the Identity user entity and migration before other services rely on its 
 
 Use backend-mediated uploads through the owning NestJS service for the first implementation. Authorize the business object, persist attachment state as PENDING in a short database transaction, validate and stream bounded content to a generated immutable key outside the transaction, then record READY in a second short transaction. On failure, preserve the SOS and expose a retryable FAILED/PENDING attachment; reconcile crashes between object upload and metadata commit. Enforce extension/type/size rules using detected content, not client MIME or filename. Do not hold database locks during S3 calls or claim a cross-database/object-store atomic transaction. [AWS SDK for JavaScript S3 client](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/), [OWASP file upload guidance](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
 
-Keep buckets private and store only object metadata (owner, generated key, detected MIME, size, checksum, uploader, timestamps, visibility/state) in PostgreSQL. Do not persist object bytes or signed URLs in PostgreSQL, Kafka, logs, analytics, or reports. Authorize each download against the current business object before creating a short-lived signed URL; use a hostname reachable from the backend, browser, and physical mobile device. A signed URL remains a bearer capability until it expires, so document that revocation window or proxy downloads when immediate revocation is required. Direct client uploads are outside the initial scope: presigned upload URLs can be reused and can replace an existing key until expiry. [S3 presigned URL behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
+Keep buckets private and store only object metadata (owner, generated key, detected MIME, size, checksum, uploader, timestamps, visibility/state) in PostgreSQL. Do not persist object bytes or signed URLs in PostgreSQL, logs, analytics, or reports. Authorize each download against the current business object before creating a short-lived signed URL; use a hostname reachable from the backend, browser, and physical mobile device. A signed URL remains a bearer capability until it expires, so document that revocation window or proxy downloads when immediate revocation is required. Direct client uploads are outside the initial scope: presigned upload URLs can be reused and can replace an existing key until expiry. [S3 presigned URL behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
 
 Back up owning-service database metadata and object bytes together, with a manifest of keys, sizes, and checksums. Keep a backup outside the demo host; test restoration in an isolated environment and verify scoped download/denied access after restore. A PostgreSQL dump or a volume beside the original objects alone is not a verified backup. No backup/restore test has been executed yet.
 
@@ -387,9 +384,9 @@ For FR priorities, **M** means required for the core demo, **S** means should ha
 | UR-02 | Citizen | Track progress, add information, and understand rejection, duplicate, or closure reasons. |
 | UR-03 | Coordinator | Verify, link duplicates, prioritize, view maps, and assign suitable teams. |
 | UR-04 | Volunteer/team | Access assigned missions only; accept/decline, update progress, and submit outcome evidence. |
-| UR-05 | Operations manager | Manage campaigns, warehouses, vehicles, relief points, reservations, transfers, issues, and distributions with traceability. |
+| UR-05 | Operations manager | Manage campaigns, warehouses, vehicles, relief points, commitments, transfers, issues, and distributions with traceability. |
 | UR-06 | Admin/manager | Manage accounts/scoped permissions and view operational dashboards/reports. |
-| UR-07 | Operations team | See pending submissions, delayed/failed consumers, dashboard freshness, and recovery procedures. |
+| UR-07 | Operations team | See work queues, partially fulfilled needs, service health, dashboard timestamps, and recovery guidance. |
 
 ### 7.2 Functional Requirements (FR)
 
@@ -412,13 +409,15 @@ For FR priorities, **M** means required for the core demo, **S** means should ha
 | FR-CAM-01 | M | Response manages campaigns/incidents, operating regions, time, and status | Scoped creation/editing; Logistics stores campaign references |
 | FR-LOG-01 | M | Manage warehouses, items, vehicles, relief points, and campaign references where needed | Active/inactive entities; preserve existing history |
 | FR-LOG-02 | M | Receipts, transfers, receipt confirmation, reserve/release, issue, return, adjustment | Ledger records actor/time/quantity/reason; balances never negative |
-| FR-LOG-03 | M | Mission stock reservations through a Response–Logistics saga | Idempotent results; observable intermediate states/timeouts |
+| FR-LOG-03 | M | Link Logistics needs and commitments to a request by opaque ID; record commit/release/issue/delivery locally | Multiple contributions are supported; no cross-service transaction or direct table access |
 | FR-LOG-04 | M | Distribution by campaign, point, item, quantity, and actor | Retries never duplicate a distribution |
-| FR-NOT-01 | M | In-app request/mission notifications; push/email are extensions | Notification failure never rolls back SOS/mission changes; persist retry state |
-| FR-RPT-01 | M | Dashboard by state/priority/region/campaign, lead time, stock/distribution | Matches the test dataset; exposes watermark/update time |
+| FR-LOG-05 | M | Show requested, committed/reserved, issued, delivered, and outstanding quantities; allow partial fulfillment | Delivered + active committed/reserved + issued-but-not-delivered never exceeds requested; one partial contribution does not close the need |
+| FR-REQ-08 | S | Suggest possible duplicate reports using time/category/location filters | Suggestions are visibly non-authoritative; only a coordinator may link/reject |
+| FR-NOT-01 | M | In-app notices in the service that owns the changed request, mission, or stock task; push/email are extensions | Notice write is local to the business transaction; recipient scope is enforced |
+| FR-RPT-01 | M | Scoped dashboards for request states/timings and stock/fulfillment gaps | Totals match a fixed dataset; each API response includes generated_at |
 | FR-RPT-02 | S | Scoped CSV export with role-based PII masking | No unauthorized fields; audit sensitive exports |
 | FR-AUD-01 | M | State, decision, adjustment, distribution, and role-change history | No passwords/tokens in audit; restricted readers |
-| FR-EVT-01 | M | Atomic business/outbox writes, relay/retry, consumer deduplication | Relay outages do not lose committed events; replay does not repeat side effects |
+| FR-EVT-01 | O | Broker-based event streaming and replay are deferred exploration | Excluded from core acceptance unless Section 4.4 revisit criteria are demonstrated |
 | FR-FILE-01 | M | Private uploads, size/type validation, metadata, controlled downloads | Reject forged MIME/oversize files; expired links cannot download |
 | FR-OFF-01 | S | Offline SOS drafts and retry with the same idempotency key | Distinguish QUEUED_ON_DEVICE from SUBMITTED |
 | FR-AI-01 | O | AI/rule suggestions with factors/version and coordinator acceptance/override; optional detailed requirements FR-AI-02..06 in Section 12.8 | No automatic dispatch/priority overwrite; core works with AI disabled |
@@ -433,15 +432,15 @@ The brief specifies no numeric thresholds. The numbers below are initial targets
 | NFR-SEC-02 | Security | Filter list querysets by authorization; enforce detail/action object permissions, input/file validation, and suitable rate limits. route-level guards do not automatically scope returned rows; test object and list authorization separately. [NestJS guards](https://docs.nestjs.com/guards), [NestJS validation](https://docs.nestjs.com/techniques/validation) |
 | NFR-SEC-03 | Security | Do not log tokens, passwords, signed URLs, or unnecessary exact locations; HTTPS outside local development. |
 | NFR-PRV-01 | Privacy | Exact locations are accessible only to the subject, scoped coordinators, and assigned teams; reports aggregate by default. Retention needs confirmation. |
-| NFR-REL-01 | Reliability | Nonnegative inventory, valid states, idempotent retries, consumer recovery, and backup restoration checks. |
+| NFR-REL-01 | Reliability | Nonnegative inventory, valid states, idempotent API retries, visible cross-service errors, and backup restoration checks. |
 | NFR-PERF-01 | Performance | Discussion target: 10,000 requests and 20 concurrent users in the demo; common read API p95 ≤ 2 seconds; SOS creation p95 ≤ 3 seconds excluding upload. Record measurement hardware. |
-| NFR-PERF-02 | Performance | Spatial indexes/bbox/result limits for maps; dashboard watermark instead of an unqualified real-time claim. |
+| NFR-PERF-02 | Performance | Spatial indexes/bbox/result limits for maps; each dashboard panel shows its source timestamp instead of an unqualified real-time claim. |
 | NFR-UX-01 | Usability | Few SOS steps, usable controls, clear submission status, manual pin, understandable GPS errors. |
 | NFR-OFF-01 | Weak connectivity | If an offline queue is implemented, retries are idempotent; no continuous background location synchronization. |
-| NFR-OBS-01 | Operations | Health/readiness, correlation IDs, latency/error metrics, outbox age, Kafka lag, DLQ, DB connections/disk. |
+| NFR-OBS-01 | Operations | Health/readiness, correlation IDs, API latency/errors, database/storage health, and optional AI-job age/failure metrics. |
 | NFR-OPS-01 | Recovery | Document DB/object metadata backup and perform a demo restore; define RPO/RTO when real requirements exist. |
 | NFR-COMP-01 | Compatibility | Versioned API/OpenAPI, controlled migrations, UTC backend, configurable UI timezone. |
-| NFR-TEST-01 | Testing | State, object-permission, inventory-race, duplicate-event, outage/replay, and end-to-end tests; coverage threshold remains open. |
+| NFR-TEST-01 | Testing | State, object-permission, inventory-race, retry/idempotency, partial-fulfillment, API-outage, and end-to-end tests; coverage threshold remains open. |
 | NFR-L10N-01 | Language — confirmed | All Web/Mobile user-facing content and backend human-readable messages are Vietnamese, including errors, notifications, and displayed AI explanations. Stable machine codes/fields remain English. Technical documents remain English. |
 
 ## 8. Business rules and state machines
@@ -477,10 +476,10 @@ stateDiagram-v2
 - Priority is separate from status. Draft taxonomy: P1 immediate danger, P2 very urgent, P3 assistance needed, P4 informational/nonurgent. Confirm definitions; do not imply a guaranteed SLA.
 - Verification is required before triage/dispatch under this baseline.
 - REJECTED requires a reason; DUPLICATE requires a canonical request ID and reason. Preserve both records.
-- A WAITING_RESOURCES mission alone leaves the request TRIAGED; it never demotes progress from another active mission. Offering new work gives DISPATCHED only when no accepted work remains.
+- A partially fulfilled Logistics need does not change mission state; it never demotes progress from another active mission. Offering new work gives DISPATCHED only when no accepted work remains.
 - DISPATCHED means a mission offer has been sent; IN_PROGRESS starts when the first team accepts.
 - Recompute dispatch progress in the same Response transaction as a mission transition: any ACCEPTED/EN_ROUTE/ON_SCENE mission preserves IN_PROGRESS; otherwise any OFFERED mission gives DISPATCHED; otherwise the request returns to TRIAGED unless a coordinator has confirmed RESOLVED/CLOSED/CANCELLED. Completed missions remain evidence for human resolution, never an automatic closure. Section 22 specifies cancellation and reopen guards.
-- A coordinator confirms RESOLVED when needs are met; CLOSED is administrative completion. Mission completion never closes a request automatically.
+- A coordinator confirms RESOLVED when current-cycle needs are met; CLOSED is administrative completion. If missions were assigned, require completed evidence and no active mission; if no rescue mission was needed, record that human decision. Mission completion never closes a request automatically.
 - Only scoped coordinators may reopen/cancel, with reason/audit and explicit handling of active missions.
 - Canonical requests with inbound duplicate links cannot become DUPLICATE, REJECTED or CANCELLED; lock and recheck links as defined in UC-02 and Section 22.2.
 
@@ -488,15 +487,10 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-  [*] --> OFFERED: no resource reservation needed
-  [*] --> WAITING_RESOURCES: reservation required
-  WAITING_RESOURCES --> READY_TO_DEPLOY: reservation confirmed
-  READY_TO_DEPLOY --> OFFERED: coordinator sends offer
-  WAITING_RESOURCES --> CANCELLED
-  READY_TO_DEPLOY --> CANCELLED
+  [*] --> OFFERED
   OFFERED --> ACCEPTED
   OFFERED --> DECLINED
-  ACCEPTED --> EN_ROUTE: required goods issued, or no goods required
+  ACCEPTED --> EN_ROUTE
   EN_ROUTE --> ON_SCENE
   ON_SCENE --> COMPLETED
   ACCEPTED --> FAILED
@@ -509,18 +503,20 @@ stateDiagram-v2
 ```
 
 - DECLINED, FAILED, CANCELLED, and COMPLETED terminate a mission; reassignment creates a new mission/assignment.
-- Every terminal transition records durable cleanup intent for unissued reservations in the same Response transaction. Late reservation confirmations still trigger release; issued goods remain an outstanding settlement until physically distributed, returned, or recorded lost.
+- Mission state is independent of stock commitment and delivery state. A team can accept/progress a mission while a separate Logistics contribution is being fulfilled; the coordinator sees both on the request board.
 - Team members view assigned missions; only the active leader accepts/declines, advances and submits results/evidence. Scoped coordinators oversee missions and may cancel/fail with reason.
 - Store transition actor/time, reason, note, and evidence references. Location updates are optional, without background tracking.
 - Multiple missions can serve one request; a coordinator confirms the overall outcome before resolution.
 
 ### 8.3 Inventory and transfers
 
+For each Logistics need, show requested, committed/reserved, issued, delivered, and outstanding quantities. Count a delivery only after receipt is confirmed at the designated relief point or recipient. The board labels a need OPEN before any delivery, PARTIALLY_FULFILLED when some but not all requested quantity is delivered, FULFILLED after the requested quantity is delivered and coordinator-reviewed, or CANCELLED after an authorized reasoned cancellation. These are fulfillment labels, separate from request and mission states.
+
 ```text
-Reservation: REQUESTED -> RESERVED -> ISSUED
-                    |         |-> RELEASED
-                    +-> REJECTED
-                    +-> RELEASED (release tombstone before reservation confirmation)
+Commitment: PROPOSED -> COMMITTED -> ISSUED -> DELIVERED
+                |           |
+                +-> CANCELLED <-+
+ISSUED -> RETURNED or LOSS_RECORDED (physical settlement)
 
 Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
              |         |          |-> RECONCILED (received + returned + lost)
@@ -528,8 +524,8 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 ```
 
 - Commands check state and permission; clients cannot arbitrarily PATCH status.
-- on_hand represents stock held; reserved represents stock allocated; available = on_hand - reserved.
-- ISSUE from a reservation reduces on_hand and reserved. RELEASE reduces reserved without increasing on_hand.
+- on_hand represents stock held; reserved represents stock allocated; available = on_hand - reserved. A committed stock contribution reserves locally in Logistics; it does not change Response or mission status.
+- ISSUE reduces on_hand and reserved exactly once. Cancelling an unissued commitment releases reserved quantity without increasing on_hand. Issued goods require delivery, verified return, or audited loss settlement.
 - Dispatch decreases source on_hand and reserved once and creates in-transit quantities. Receipt credits only physically received quantities at the destination. After dispatch, cancellation is prohibited; verified return credits the source, and authorized loss reconciliation removes transit quantity with reason/audit. Each line satisfies dispatched = received + returned + lost + remaining_in_transit. Both warehouses belong to Logistics; short local transactions lock affected balances in stable order.
 - Adjustments require reason, actor, and audit; never edit/delete old ledger entries to force a balance to match.
 
@@ -539,7 +535,7 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 - Commands use idempotency; expected state/version checks prevent stale updates.
 - Do not hard-delete requests, missions, or stock movements with activity; use state/archive according to policy.
 - Priority/AI overrides, rejection, mission cancellation, stock adjustments, and role changes require actor/time/reason.
-- Response owns campaigns. Lifecycle: DRAFT → ACTIVE; ACTIVE → PAUSED; PAUSED → ACTIVE; DRAFT/ACTIVE/PAUSED → CLOSED. Scoped coordinators/managers execute commands with version checks and reasons for pause/close. Only ACTIVE campaigns accept new attachments. SOS creation never requires an existing campaign. Closure is blocked while linked requests are nonterminal; Logistics returns/settlements remain allowed. Section 22 defines resource-command validation.
+- Response owns campaigns. Lifecycle: DRAFT → ACTIVE; ACTIVE → PAUSED; PAUSED → ACTIVE; DRAFT/ACTIVE/PAUSED → CLOSED. Scoped coordinators/managers execute commands with version checks and reasons for pause/close. Only ACTIVE campaigns accept new attachments. SOS creation never requires an existing campaign. Campaign closure is blocked while linked requests are nonterminal; Logistics returns/settlements remain allowed.
 
 ## 9. Main use cases
 
@@ -549,11 +545,11 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 **Preconditions:** Citizen signed in; GPS available or user supplies a manual pin.
 
-**Main flow:** Select assistance category → enter headcount/information → confirm location/accuracy → optionally attach photos → submit with idempotency key → server validates and writes request/event/outbox → returns request ID and SUBMITTED → Notification delivers confirmation → citizen views timeline and supplements information when state permits.
+**Main flow:** Select assistance category → enter headcount/information → confirm location/accuracy → optionally attach photos → submit with idempotency key → Response validates and stores the request, audit, and timeline in one local transaction → returns request ID and SUBMITTED → citizen views the server-confirmed status and supplements information when state permits.
 
 **Exceptions:** Offline submissions stay QUEUED_ON_DEVICE and are not server-received; denied GPS permits manual pin; validation errors preserve the form; the same key returns the same request on retry.
 
-**Postconditions:** Exactly one request record with server receive time; asynchronous event relay.
+**Postconditions:** Exactly one request record with server receive time; retries return the same request.
 
 ### UC-02 — Verify and triage
 
@@ -561,13 +557,13 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 **Preconditions:** Request exists and is not terminal.
 
-**Main flow:** Open scoped queue/map → start VERIFYING → supplement/contact → choose exactly one outcome: VERIFIED, REJECTED with reason, or DUPLICATE with canonical reference/reason. Only VERIFIED proceeds to human triage with priority/reason. Each command writes state/event/audit atomically.
+**Main flow:** Open scoped queue/map → start VERIFYING → supplement/contact → choose exactly one outcome: VERIFIED, REJECTED with reason, or DUPLICATE with canonical reference/reason. Only VERIFIED proceeds to human triage with priority/reason. Each command writes state/history/audit atomically.
 
 **Duplicate guard:** Canonical target must be a different authorized, non-DUPLICATE/non-REJECTED/non-CANCELLED request. A request already referenced as canonical cannot itself become DUPLICATE, REJECTED or CANCELLED; linkers and those transitions lock the affected request rows in sorted ID order and recheck inbound links. Do not create chains or cycles. Preserve the original report and its history; the demo does not reparent duplicate links.
 
 **Exceptions:** Reject out-of-scope actions; return conflict if state changed; duplicates require a canonical link.
 
-**Postconditions:** Priority remains separate from status; the dashboard updates after consumer processing.
+**Postconditions:** Priority remains separate from status; the scoped board reads the authoritative Response state.
 
 ### UC-03 — Assign and accept a mission
 
@@ -575,39 +571,39 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 **Preconditions:** Request verified/triaged; team active; coordinator authorized for the scope.
 
-**Main flow:** Select by team/skills/scope/availability → await reservation saga if needed → offer assignment → notify → active team leader accepts → confirm physical issue of required goods → EN_ROUTE → ON_SCENE → results/evidence → coordinator confirms the request outcome. Resource-free missions skip the issue check.
+**Main flow:** Select a team by skills/scope/availability → offer assignment → active team leader accepts → EN_ROUTE → ON_SCENE → results/evidence → coordinator confirms mission outcome. The team assignment proceeds independently of Logistics fulfillment; both statuses appear on the request board.
 
-**Exceptions:** Select another team if declined/unavailable; terminal transitions trigger reservation cleanup. Concurrent assignments use version/transaction checks and conflicting commands reload. PAUSED campaigns block offers/acceptance; already accepted missions may continue under Section 22.3, including validated issue of their existing reservation.
+**Exceptions:** Select another team if declined/unavailable. Concurrent assignments use version/transaction checks and conflicting commands reload. PAUSED campaigns block offers/acceptance; already accepted missions may continue under the campaign rules.
 
 **Postconditions:** Consistent mission/request history; only a coordinator confirms resolution.
 
-### UC-04 — Reserve, issue, and distribute goods
+### UC-04 — Commit and partially fulfill a relief need
 
-**Actors:** Operations manager/warehouse operator; Response emits reservation events.
+**Actors:** Scoped coordinator and warehouse/operations manager.
 
 **Preconditions:** Warehouse/item active; stock may be available.
 
-**Main flow:** Check available → reserve → confirm physical issue → record movement/actor → record point/campaign/distribution → dashboard receives events.
+**Main flow:** Open a verified request on the board → define requested items/quantities in Logistics → one or more authorized warehouses commit partial quantities → confirm physical issue and later delivery → inspect remaining outstanding quantity → repeat or explicitly cancel/reduce the need with reason.
 
-**Exceptions:** Reject reservations for insufficient stock; retries do not duplicate; cancellation before issue releases; after issue, returns require new movements.
+**Exceptions:** Insufficient stock cannot be committed; retries do not duplicate; cancellation before issue releases reserved quantity; issued goods require delivery, return, or loss settlement. A partial delivery keeps the need open.
 
-**Postconditions:** Balance matches the ledger; dashboard includes a timestamp.
+**Postconditions:** Balance matches the ledger; each need shows requested/committed/issued/delivered/outstanding values and actor/time history.
 
 ### UC-05 — Dashboard/reports
 
 **Actors:** Scoped coordinator/manager/admin.
 
-**Main flow:** Select time/region/campaign → Reporting returns aggregates and last-updated time → UI displays scope → export if authorized.
+**Main flow:** Select time/region/campaign → scoped APIs in Response and Logistics return authoritative aggregates with generated_at → UI composes the result and shows each source timestamp → export if authorized.
 
-**Exceptions:** Consumer lag displays a stale warning; unauthorized export is denied/audited; no-data results follow an agreed convention.
+**Exceptions:** API outage marks only that source panel unavailable/stale; unauthorized export is denied/audited; no-data results follow an agreed convention.
 
-**Postconditions:** No unauthorized PII exposure; projections never modify authoritative business data.
+**Postconditions:** No unauthorized PII exposure; dashboards do not modify authoritative business data.
 
 ### UC-06 — Manage accounts and permissions
 
 **Actors:** Admin; citizen registering an account; invited staff/volunteer.
 
-**Main flow:** A citizen registers with a unique normalized username and password and receives CITIZEN only. Admin creates staff/volunteer accounts, disables accounts, or grants role/scope → Identity records audit/event → services apply policy → UI exposes permitted functions. Registration never accepts privileged roles or scopes from the client. Email/SMS verification and self-service password recovery are outside the initial provider-free demo; admin-assisted reset revokes sessions and requires a password change.
+**Main flow:** A citizen registers with a unique normalized username and password and receives CITIZEN only. Admin creates staff/volunteer accounts, disables accounts, or grants role/scope → Identity records audit → services apply policy → UI exposes permitted functions. Registration never accepts privileged roles or scopes from the client. Email/SMS verification and self-service password recovery are outside the initial demo; admin-assisted reset revokes sessions and requires a password change.
 
 **Exceptions:** Cannot remove the last administrator; disabled accounts cannot refresh tokens; existing access tokens are rejected through the current-session check described in Section 22.
 
@@ -617,7 +613,7 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 **Actor:** Coordinator.
 
-**Main flow:** Response persists an immutable minimized snapshot/job intent → asynchronous advisor returns versioned suggestion or abstention → coordinator inspects facts/reasons → authorized review checks freshness, request version, and verified/eligible state → human accepts or overrides with reason → atomic audit/priority/outbox write. See Section 12 for job, API, and failure contracts.
+**Main flow:** Response persists an immutable minimized snapshot and durable job → a Response-owned worker returns a versioned suggestion or abstention → coordinator inspects facts/reasons → authorized review checks freshness, request version, and verified/eligible state → human accepts or overrides with reason → atomic priority/audit write. See Section 12 for job, API, and failure contracts.
 
 **Exceptions:** Timeout/failure leaves manual triage available; insufficient or unsupported data yields abstention; stale input, competing review, wrong scope, or ineligible state rejects acceptance. AI cannot change priority itself.
 
@@ -629,25 +625,25 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 **Preconditions:** Authenticated user with region/organization management permission.
 
-**Main flow:** Create campaign name/objective/region/time → persist in Response → activate → attach requests → Logistics references the campaign ID in reservations/distributions → manager pauses/closes when permitted.
+**Main flow:** Create campaign name/objective/region/time → persist in Response → activate → attach requests → Logistics records an opaque campaign reference on related needs/commitments/distributions → manager pauses/closes when permitted.
 
 **Exceptions:** Closed campaigns cannot accept new requests; returns/settlements remain possible; reject invalid campaign IDs; closure preserves ledger/request history.
 
-**Postconditions:** Response is authoritative for campaign status; Logistics/Reporting hold references/projections only.
+**Postconditions:** Response is authoritative for campaign status; Logistics may store an opaque campaign reference where useful.
 
 ## 10. API and authentication
 
 ### 10.1 API conventions
 
 - Base path /api/v1; REST/JSON; UUID identifiers; ISO-8601 UTC timestamps; bounded pagination/filters; consistent errors with code, message, field errors, and correlation ID.
-- Separate per-service OpenAPI schemas with shared terminology, pagination, error envelope, and event definitions.
+- Separate OpenAPI schemas for the three APIs with shared terminology, pagination, error envelope, and authorization notes.
 - Explicit business command endpoints for transitions, rather than unrestricted status PATCH.
 - Significant side-effecting POST commands accept Idempotency-Key; state updates check expected state/version inside the transaction.
 - Generate per-service OpenAPI with `@nestjs/swagger` and review/version the published contract. [NestJS OpenAPI](https://docs.nestjs.com/openapi/introduction)
 
 ### 10.1.1 Vietnamese user-facing responses
 
-**Confirmed product requirement:** human-readable API messages are Vietnamese, including validation, authentication/permission failures, business conflicts, upload failures, and notifications. JSON field names, error codes, enum values, event names, and URLs remain stable machine identifiers. Clients use codes for logic and Vietnamese labels for display; do not parse message text.
+**Confirmed product requirement:** human-readable API messages are Vietnamese, including validation, authentication/permission failures, business conflicts, upload failures, and notifications. JSON field names, error codes, enum values, and URLs remain stable machine identifiers. Clients use codes for logic and Vietnamese labels for display; do not parse message text.
 
 Example error envelope:
 
@@ -669,13 +665,14 @@ Backend responses may contain user-entered text unchanged. Do not translate name
 | Service | Example endpoints | Authorization/notes |
 |---|---|---|
 | Identity | POST /identity/auth/register, /login, /refresh, /logout; GET /identity/me; POST /identity/users/{id}/roles | Admin-only role grants; no PII/location in tokens |
-| Response | POST /response/requests; GET /response/requests; POST /response/requests/{id}/verify, /triage, /duplicate; POST /response/requests/{id}/missions | Authenticated citizen intake; scope list/detail access; no guest route |
+| Response | POST /response/requests; GET /response/requests; POST /response/requests/{id}/verify, /triage, /duplicate, /resolve; POST /response/requests/{id}/missions | Authenticated citizen intake; scoped list/detail; resolution checks current Logistics fulfillment status |
 | Response | POST /response/campaigns; GET /response/campaigns; POST /response/campaigns/{id}/close | Response owns campaign/incident; managers need appropriate scope |
 | Response | POST /response/missions/{id}/accept, /decline, /transition, /evidence | Active team leader accepts/declines, advances and uploads evidence; scoped coordinator may cancel/fail |
-| Logistics | POST /logistics/receipts, /transfers, /transfers/{id}/receive, /distributions, /adjustments | Idempotency, audit, unit validation, row locks |
-| Logistics | GET /logistics/stock?warehouse_id=...; /vehicles; /relief-points | Warehouse/region scope |
-| Notification | GET /notifications; POST /notifications/{id}/read | Recipient-only access/marking |
-| Reporting | GET /reports/campaigns/{id}/summary, /requests-by-region, /inventory, /processing-times | Read/aggregate with generated_at |
+| Logistics | POST /logistics/needs; POST /logistics/needs/{id}/commitments; POST /logistics/commitments/{id}/issue, /deliver, /cancel | Need/commitment row locks; partial quantities; actor/reason audit |
+| Logistics | POST /logistics/receipts, /transfers, /transfers/{id}/receive, /distributions, /adjustments; GET /logistics/stock?warehouse_id=...; /vehicles; /relief-points | Idempotency, audit, unit validation, row locks, scoped report fields |
+| Logistics (internal) | GET /logistics/requests/{request_id}/fulfillment?work_cycle=... | Authenticated Response-to-Logistics check for request resolution; returns current version and open/partial need totals |
+| Response / Logistics | GET /{service}/notifications; POST /{service}/notifications/{id}/read | Each service returns only notices it owns and scopes by recipient |
+| Response / Logistics | GET /{service}/reports/... | Reports read the owning service's data and include generated_at |
 
 These are SDD sketches, not final contracts. Finalize complete paths through OpenAPI and UI-flow review. Internal APIs must not blindly trust client headers; use service credentials/identity where needed.
 
@@ -691,7 +688,7 @@ These are SDD sketches, not final contracts. Finalize complete paths through Ope
 
 **Proposed authentication:** Identity issues asymmetric JWTs containing issuer, audience, subject, expiry, and minimum role/scope data. Services validate signatures locally. Access tokens expire after 10 minutes for the demo; refresh sessions have a 7-day absolute expiry with rotation and reuse detection; rotation does not extend that expiry. These are capstone configuration defaults. Each protected HTTP request validates the JWT locally and obtains current account/session/grants from an authenticated Identity introspection API without a positive cache. Logout revokes that session; disabling, credential reset, or role changes revoke all affected sessions. Identity unavailability returns Vietnamese 503 and fails closed. A request already authorized may finish; this is request-boundary revocation, not cancellation of in-flight transactions. Section 22 defines the availability tradeoff.
 
-Do not encode all policy in JWTs: Response checks its own team/region/request relationships, Logistics checks warehouses, and Reporting scopes before aggregation. service queries must still filter rows by scope after Nest guards authorize the action. [NestJS guards](https://docs.nestjs.com/guards)
+Do not encode all policy in JWTs: Response checks its own team/region/request relationships and Logistics checks warehouses/commitments. Service queries must still filter rows by scope after Nest guards authorize the action. [NestJS guards](https://docs.nestjs.com/guards)
 
 ## 11. User-interface architecture
 
@@ -699,10 +696,10 @@ Do not encode all policy in JWTs: Response checks its own team/region/request re
 
 ### Web
 
-- **Coordinator:** SOS queue/map, priority/status/age filters, request details, verification/triage, team availability, mission board, audit timeline.
-- **Operations manager:** campaigns, warehouses/items, stock ledger, reservations/transfers, vehicles, relief points, distributions.
-- **Admin:** accounts, organizations, role grants, health/event overview; PII only with a relevant operational role.
-- **Reporting:** cases by region/status/priority; receipt-to-verification-to-dispatch-to-arrival times; unfinished missions; received/reserved/issued/distributed stock; projection watermark.
+- **Coordinator:** saved views for awaiting verification, verified-but-unassigned, active missions, and partially fulfilled needs; map and scoped filters; request details, team availability, mission board, and audit timeline.
+- **Operations manager:** campaigns, warehouses/items, stock ledger, commitments/transfers, vehicles, relief points, and distributions.
+- **Admin:** accounts, organizations, role grants, service health; PII only with a relevant operational role.
+- **Operational metrics:** cases by region/status/priority; time from receipt to verification/assignment/delivery; unfinished missions; requested/committed/issued/delivered/outstanding quantities per authorized request; source timestamps.
 
 ### Mobile
 
@@ -715,7 +712,7 @@ Do not encode all policy in JWTs: Response checks its own team/region/request re
 
 ### 12.1 Purpose, scope, and evidence
 
-**Original research: 2026-09-29; blueprint adaptation reviewed: 2026-09-30. Status: optional capstone integration design, not a validated emergency-triage system.** The goal is to help coordinators inspect incomplete reports and consider a priority suggestion, while preserving manual verification, assignment, and final decisions. Section 12.10 adapts the relevant ideas from [the supplied AI blueprint](Cuu_tro_thien_tai.pdf) to C48; the [review note](c48-ai-blueprint-review.md) records its limitations. The architecture below is a C48 design decision; the cited sources establish technical mechanisms and evaluation practices, not the accuracy of this proposed application.
+**Original research: 2026-09-29; blueprint adaptation reviewed: 2026-09-30. Status: optional capstone integration design, not a validated emergency-triage system.** The goal is to help coordinators inspect incomplete reports and consider a priority suggestion, while preserving manual verification, assignment, and final decisions. Section 12.10 adapts relevant ideas from the supplied AI blueprint; the [review note](c48-ai-blueprint-review.md) records the source analysis and limitations. The architecture below is a C48 design decision; the cited sources establish technical mechanisms and evaluation practices, not the accuracy of this proposed application.
 
 NIST AI RMF organizes risk management around Govern, Map, Measure, and Manage, including human responsibilities and ongoing evaluation. C48 applies these ideas through recorded ownership, a bounded purpose, evaluation before activation, human review, and a disable/rollback path. This is not a claim of certification or operational readiness. [NIST AI RMF Core](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/)
 
@@ -746,41 +743,34 @@ A text vectorizer does not by itself understand urgency. No ML framework or trai
 
 No vector database, RAG framework, agent framework, GPU, or additional message broker is needed for the baseline. Implement rules in a small TypeScript module. Add a provider adapter only when a hosted model is actually integrated.
 
-### 12.3 Placement within the five-service architecture
+### 12.3 Placement within the three-service architecture
 
-**Start with an advisor component owned by Response.** Run it as a separate worker process/container using the Response codebase and Response-owned AI tables. This is a worker deployment, not a sixth independently owned microservice. It does not access Identity, Logistics, or Reporting databases directly. A future independently owned AI service would require its own database and API/event boundary; do not create that boundary merely to call the project microservices.
+**Start with an advisor component owned by Response.** Run it as a worker process using the Response codebase and Response-owned AI tables. This is a worker for durable background work, not an independently owned service. It does not access Identity or Logistics databases directly. A future independently owned AI service would require a demonstrated scaling or governance need; do not create that boundary just to make an API call.
 
 ```mermaid
 sequenceDiagram
   participant C as Citizen / Coordinator
   participant R as Response API
   participant D as Response DB
-  participant K as Kafka
   participant W as Response advisor worker
   participant M as Rules / Model / Optional provider
   C->>R: Submit or supplement request
-  R->>D: Transaction: request + audit + outbox
+  R->>D: Transaction: request + audit + analysis job
   R-->>C: Server ACK without waiting for AI
-  D-->>K: Outbox relay publishes analysis request
-  K->>W: Consume request ID + input revision
-  W->>D: Transaction: inbox + durable job
-  Note over W,D: Commit DB, then acknowledge Kafka offset
-  W->>D: Claim job with bounded lease
+  W->>D: Claim pending job with bounded lease
   W->>M: Analyze minimized immutable snapshot
   Note over W,M: No DB lock held during inference
   M-->>W: Validated suggestion or abstention
-  W->>D: Transaction: result + job status + outbox
+  W->>D: Transaction: result + job status
   C->>R: Read suggestion and source facts
   C->>R: Review with expected request version
   R->>D: Authorize + freshness check + human decision + audit
   R-->>C: Confirm committed review result
 ```
 
-The worker consumes `response.triage.analysis_requested.v1` on a dedicated consumer group. Use a topic such as `c48.response.ai.v1`, restricted to the necessary components, with request ID as the Kafka key. The exact topic name is a proposal. The event carries job ID, request ID, input revision/hash, policy version, and correlation ID, not raw descriptions, contact details, files, or precise coordinates. The worker reads the immutable snapshot from Response-owned tables.
+The job row stores a request ID, input revision/hash, policy version, state, attempt count, and lease. The worker claims one pending job in a short transaction, then reads the immutable snapshot from Response-owned tables. It uses a unique job/recommendation constraint and claim token so retries cannot commit competing results. No raw description, contact detail, file, or precise coordinate needs to pass through a broker.
 
-The consumer transaction creates the durable job and inbox record before committing the Kafka offset. A worker crash then leaves recoverable work in the job table; an inference call does not hold a partition open for its full duration. Kafka ordering/delivery semantics do not make database or external-provider side effects exactly once. [Kafka design and delivery semantics](https://kafka.apache.org/40/design/design/)
-
-Use short database transactions for job claims and result writes. Nest lifecycle hooks/in-process callbacks are not a durable substitute for the outbox. Provider calls occur outside TypeORM transactions/row locks. [TypeORM transactions](https://typeorm.io/docs/advanced-topics/transactions/)
+Use short database transactions for job claims and result writes. Provider calls occur outside TypeORM transactions/row locks. If the worker is down, jobs remain pending for a later retry; the normal human workflow remains available. [TypeORM transactions](https://typeorm.io/docs/advanced-topics/transactions/)
 
 ### 12.4 Data model and input/output contract
 
@@ -841,9 +831,9 @@ Data quality and verification need are separate from urgency: improved GPS accur
 
 Automatic job creation after intake is allowed only when the AI feature is enabled; submission remains successful if AI is disabled or unavailable. An early suggestion may be displayed as unverified information. **Accept/override can affect priority only after request verification and only in a state permitting human priority changes.** Use the same domain command as manual triage; do not add a backdoor around normal guards. For VERIFIED requests it may perform the normal human-authorized transition to TRIAGED; for later eligible states it changes priority without rewinding progress. Reject terminal/ineligible states and stale input with a conflict.
 
-In one review transaction, check role/scope, request version, current input revision/work cycle, recommendation/context freshness, advisor review eligibility, and permitted state; then write review, human-authorized priority change where applicable, audit, and outbox. Research-only weighted outputs cannot be accepted or overridden through this command; a coordinator may always use eligible manual triage separately. DISMISS records feedback without changing priority. An override requires the selected priority and a reason. A repeated identical idempotent command returns the original result; a conflicting second review fails.
+In one review transaction, check role/scope, request version, current input revision/work cycle, recommendation/context freshness, advisor review eligibility, and permitted state; then write review, human-authorized priority change where applicable, and audit. Research-only weighted outputs cannot be accepted or overridden through this command; a coordinator may always use eligible manual triage separately. DISMISS records feedback without changing priority. An override requires the selected priority and a reason. A repeated identical idempotent command returns the original result; a conflicting second review fails.
 
-The worker has no credentials for priority/mission mutation APIs. Where practical, give its database connection privileges limited to required snapshot/job/result/inbox/outbox operations; do not assume a shared application image itself enforces least privilege. Web/mobile call Response only and never receive provider API keys. The citizen/volunteer UI displays authoritative human decisions, not unreviewed model scores.
+The worker has no credentials for priority/mission mutation APIs. Where practical, give its database connection privileges limited to required snapshot/job/result operations; do not assume a shared application image itself enforces least privilege. Web/mobile call Response only and never receive provider API keys. The citizen/volunteer UI displays authoritative human decisions, not unreviewed model scores.
 
 Coordinator UI must render explanations and summaries in Vietnamese, mapping stable reason codes to reviewed copy. It must show source facts beside the suggestion, mark it as advisory, distinguish missing data from low urgency, and leave manual triage available. Do not silently reorder or hide the operational queue based on AI scores. Any future AI-ranked view must be an explicitly labeled optional view with a normal queue available.
 
@@ -852,7 +842,7 @@ Coordinator UI must render explanations and summaries in Vietnamese, mapping sta
 - **Retry budget:** propose at most three attempts with bounded backoff and a provider deadline; choose actual timeouts after measurement. Permanent validation/schema errors do not retry indefinitely. Rate limits respect provider guidance and a project cost budget.
 - **Lease recovery:** assign a fresh claim token per attempt. After a lease expires, another worker may retry; only the current token may commit a result. This prevents a late worker overwriting a newer attempt. Maintain one committed recommendation per job.
 - **External calls:** a crash after a provider response may incur a second call/cost. Use provider idempotency if supported, otherwise document this residual behavior; database deduplication cannot guarantee one billable call.
-- **Failure isolation:** Kafka outage leaves outbox intent pending; worker/model/provider outage leaves jobs pending/failed. Human intake, verification, priority changes, dispatch, and stock operations continue.
+- **Failure isolation:** worker/model/provider outage leaves jobs pending/failed. Human intake, verification, priority changes, dispatch, and stock operations continue.
 - **Resource limits:** begin with one worker and CPU inference; cap concurrency and memory so analysis cannot starve Response. Benchmark before adding local LLM/GPU infrastructure. A separate model server is a runtime dependency, not automatically a new domain service.
 - **Data minimization:** use structured fields first; redact approved text before any external call. Redaction may be incomplete, so real sensitive-data egress still needs a provider/retention decision. Do not log full prompts, outputs, exact locations, credentials, or signed URLs by default.
 - **Untrusted text:** treat citizen narratives, OCR, and retrieved content as data. Give an LLM no tools, database mutation permissions, network actions, or storage credentials. Instructions embedded in a report must not change workflow or output policy. Prompt instructions and JSON validation alone do not eliminate injection risk. [OWASP prompt injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/)
@@ -903,9 +893,9 @@ All tests below are **planned, not executed**. Expand them into executable cases
 | Test ID | Requirement / use case | Preconditions and action | Expected result |
 |---|---|---|---|
 | TC-AI-01 | FR-AI-02 / UC-07 | Enable advisor; submit valid SOS while inference is blocked | SOS ACK succeeds; durable job remains pending; request priority unchanged |
-| TC-AI-02 | FR-AI-02 / UC-07 | Redeliver one analysis event and retry the trigger key | One logical job and at most one committed result; duplicate inbox is harmless |
+| TC-AI-02 | FR-AI-02 / UC-07 | Retry the same analysis-job command and run two workers against pending jobs | One logical job and at most one committed result; claim lease prevents competing commits |
 | TC-AI-03 | FR-AI-03 / UC-07 | Generate result at input revision 3; edit relevant facts to revision 4; accept old result | Conflict; no priority/state change; stale result remains historical |
-| TC-AI-04 | FR-AI-04 / UC-07 | Two scoped coordinators review the same suggestion/request version concurrently | One final review succeeds; second conflicts; one authoritative decision/event |
+| TC-AI-04 | FR-AI-04 / UC-07 | Two scoped coordinators review the same suggestion/request version concurrently | One final review succeeds; second conflicts; one authoritative decision |
 | TC-AI-05 | FR-AI-04 / UC-07 | Citizen, unrelated coordinator, or worker attempts review | Denied without leaking the request or changing priority |
 | TC-AI-06 | FR-AI-01, FR-AI-05 / UC-07 | Missing/contradictory inputs or unsupported category | ABSTAIN/null suggestion with reasons; manual queue retained, no default P4 |
 | TC-AI-07 | FR-AI-05 / UC-07 | Provider times out/rate-limits across retry budget | Bounded retries then visible failure; intake/dispatch remain operational |
@@ -916,7 +906,7 @@ All tests below are **planned, not executed**. Expand them into executable cases
 | TC-AI-12 | FR-AI-05 / UC-07 | Disable advisor with queued/running jobs and pending suggestions | Manual workflow remains available; pending AI acceptance blocked; completed human history unchanged |
 | TC-AI-13 | FR-AI-06 / UC-07 | Prepare train/test sets with related reports; inspect split and fitted preprocessing | No incident-group overlap; no test-fitted transforms; evaluation manifest records checks |
 | TC-AI-14 | FR-AI-06 / UC-07 | Artifact hash/version mismatch or unapproved model file | Refuse load and expose failure; no fallback to an arbitrary artifact |
-| TC-AI-15 | FR-AI-04 / UC-07 | Verified request/current suggestion; authorized ACCEPT or OVERRIDE with reason | One atomic human review/priority/audit/outbox change; replay returns original result |
+| TC-AI-15 | FR-AI-04 / UC-07 | Verified request/current suggestion; authorized ACCEPT or OVERRIDE with reason | One atomic human review/priority/audit change; retry returns original result |
 | TC-AI-16 | FR-AI-05 / UC-07 | Inspect provider request/logs with seeded phone/token/location markers | Disallowed fields absent; no provider secret appears in web/mobile responses |
 | TC-AI-17 | FR-AI-03/04 / UC-07 | Narrative omits total occupants, includes overlapping vulnerable groups or negated symptoms; extracted claim conflicts with verified headcount | Unsupported totals remain null; no invented sum or symptom; provenance/conflicts retained; verified request facts unchanged |
 | TC-AI-18 | FR-AI-01/05 / UC-07 | Hold danger facts constant; vary GPS accuracy/evidence confidence | Data-quality/verification signals may change; urgency does not change solely because confidence changed; unknown is not default P4 |
@@ -933,11 +923,11 @@ All tests below are **planned, not executed**. Expand them into executable cases
 4. **Optional text assistance and blueprint comparison:** add extraction/summarization only after privacy/cost/output validation decisions; measure unsupported facts and critical omissions. Run the weighted comparator and rule+LLM experiment under Section 12.7; comparator results remain research-only. Hybrid is deferred until evaluation demonstrates a benefit. Do not expand to tool-using agents.
 5. **Demo/report:** show stale-result rejection, outage fallback, human override, and a reproducible evaluation. Feature-freeze with AI disabled if the integration/evaluation is incomplete.
 
-Deliver a short advisor design note, data/label manifest, experiment report, model/rule card with intended use/limits, API/event schema, and the planned test execution record. Their content can live within the existing SDD/test report; a separate platform or registry is unnecessary.
+Deliver a short advisor design note, data/label manifest, experiment report, model/rule card with intended use/limits, API schema, and the planned test execution record. Their content can live within the existing SDD/test report; a separate platform or registry is unnecessary.
 
 ### 12.10 C48-aligned integration of the supplied AI blueprint
 
-**Adaptation decision: 2026-09-30.** The supplied [blueprint](Cuu_tro_thien_tai.pdf), especially its Sections 16–24 and 70–75, contributes an extraction/rules experiment and human-review workflow. C48's assigned scope, state machines, permissions, data ownership and delivery priorities govern integration. AI remains optional; importing the PDF does not replace the selected architecture or add mandatory research features.
+**Adaptation decision: 2026-09-30.** The supplied blueprint, as analyzed in the [review note](c48-ai-blueprint-review.md), contributes an extraction/rules experiment and human-review workflow. C48's assigned scope, state machines, permissions, data ownership, and delivery priorities govern integration. AI remains optional; the blueprint does not replace the selected architecture or add mandatory research features.
 
 ```mermaid
 flowchart TD
@@ -952,14 +942,14 @@ flowchart TD
   Comparator --> Experiment[Evaluation report only]
   Rules --> Review[Scoped coordinator views Vietnamese reasons and source facts]
   Review --> Command[Existing manual triage command with state and freshness guards]
-  Command --> Commit[Human priority decision, audit and outbox]
+  Command --> Commit[Human priority decision and audit]
 ```
 
-- **Reuse the baseline:** existing Response snapshots/jobs/recommendations/reviews, TypeScript rules and Kafka/outbox/inbox recovery. LLM calls run outside DB transactions and have no operational tools or mutation permissions. Two small evaluation functions suffice for a comparison; introduce abstractions only for actual reuse.
+- **Reuse the baseline:** existing Response snapshots/jobs/recommendations/reviews and TypeScript rules. LLM calls run outside DB transactions and have no operational tools or mutation permissions. Two small evaluation functions suffice for a comparison; introduce abstractions only for actual reuse.
 - **Keep decisions human-owned:** extraction proposes facts; rules propose priority or verification need. Neither changes verified facts, official P1–P4, mission state or assignment. Manual processing remains available with AI disabled or unavailable.
 - **Use only supported context:** preserve unknown totals, overlapping groups, negation and contradictory updates as Section 12.4 specifies. Compute optional hazard features locally; version and expire time/hazard-dependent results. The PDF's unsupported `peopleCount=4` and uncalibrated `semanticUrgency=0.95` are counterexamples, not contract defaults.
 - **Separate operational advisor and experiment:** rules are the baseline advisor; optional rule+LLM supports extraction and summarization. Weighted scoring is a research comparator with documented dilution limits, separate confidence and independently reviewed labels. A future hybrid requires evaluation and an explicit policy revision before it becomes review-eligible.
-- **Keep adjacent extensions deferred:** live/background tracking, route replay, forecast feeds, ETA/hazard-aware routing, Redis/WebSocket and additional role/service boundaries are not adopted by this AI integration. Team scope, mandatory skills and availability remain hard constraints in ordinary Response queries. The selected stack remains five NestJS services with TypeORM, PostgreSQL/PostGIS, Kafka and MinIO AIStor Free; no Python runtime is introduced.
+- **Keep adjacent extensions deferred:** live/background tracking, route replay, forecast feeds, ETA/hazard-aware routing, Redis/WebSocket and additional service boundaries are not adopted by this AI integration. Team scope, mandatory skills and availability remain hard constraints in ordinary Response queries. The selected stack remains three NestJS services with TypeORM, PostgreSQL/PostGIS, and MinIO AIStor Free; no Python runtime or broker is introduced.
 
 Before enabling this extension, finalize extraction provenance schemas, rule taxonomy/precedence, bounded fields, expiry/context version checks, Vietnamese reason mappings, provider/data-egress decisions when applicable and the tests in Section 12.8. The PDF's example weights and urgency rules are unvalidated research proposals, not rescue-authority policy. Core delivery proceeds independently of this optional integration.
 
@@ -969,13 +959,13 @@ Before enabling this extension, finalize extraction provenance schemas, rule tax
 
 | Layer | Coverage | Suggested tools |
 |---|---|---|
-| Domain/unit | State transitions, priority, inventory arithmetic, permission predicates, event mapping | NestJS TestingModule/Jest and Supertest; use real PostgreSQL/PostGIS for locking and GIS. [NestJS testing](https://docs.nestjs.com/fundamentals/testing) |
+| Domain/unit | State transitions, priority, inventory arithmetic, permission predicates, DTO mapping | NestJS TestingModule/Jest and Supertest; use real PostgreSQL/PostGIS for locking and GIS. [NestJS testing](https://docs.nestjs.com/fundamentals/testing) |
 | Database integration | PostGIS, rollback, locks/races, constraints/migrations | Real PostgreSQL/PostGIS in a Compose test profile; SQLite does not provide equivalent GIS/locking behavior |
 | API/security | 401/403/404, registration/revocation, object scope/list filters, validation, rate limits, uploads | Supertest and role × endpoint × scope matrix |
-| Event integration | Outbox relay, duplicates, retries, DLQ, replay, lag, reservation saga | Kafka + DB integration profile; fixed event IDs |
+| Cross-service integration | JWT/scope checks, REST timeouts/errors, idempotent retries, partial results when one API is unavailable | Supertest against the three APIs in a Compose test profile |
 | Frontend | Forms, state labels, authorized navigation, stale dashboards, offline pending | Unit/component tests and smoke use cases |
-| E2E/demo | Citizen submission → coordinator triage → team progress → Logistics issue → report | Playwright or manual checklist/video evidence; choose a controlled scope |
-| NFR | Proposed p95 targets, restore, upload limits, consumer restart, log redaction | Small load scripts, recovery scenarios, security checklist; record measurement hardware |
+| E2E/demo | Citizen submission → coordinator verification → team progress + partial Logistics fulfillment → human resolution | Playwright or manual checklist/video evidence; use synthetic data |
+| NFR | API latency/error thresholds, restore, upload limits, database contention, log redaction | k6 HTTP load script, recovery scenarios, security checklist; record measurement hardware |
 
 ### 13.2 Core test cases
 
@@ -985,25 +975,25 @@ These are **planned test cases, not execution results**. Test records must inclu
 
 | ID / FR | Preconditions and data | Steps | Expected result |
 |---|---|---|---|
-| TC-01 / FR-REQ-01, 03 | Authenticated demo citizen; synthetic coordinates, accuracy 12 m, 3 people; unused key | POST valid request; repeat same key/payload | One request and one creation outbox row; same retry result; separate capture/receive times |
+| TC-01 / FR-REQ-01, 03 | Authenticated demo citizen; synthetic coordinates, accuracy 12 m, 3 people; unused key | POST valid request; repeat same key/payload | One request and one ID; same retry result; separate capture/receive times |
 | TC-06 / FR-IAM-02, FR-REQ-07 | Citizens A/B; request owned by B | A reads B's request, attempts update, then lists requests | Cannot read/update B's request; list contains only A's cases; no description/location disclosure |
 | TC-16 / FR-LOG-02 | on_hand = 5, reserved = 0; two authorized operators; each requests direct issue-and-distribution of 4 of the same SKU/warehouse | Concurrent commands with different keys; each atomically reserves/issues its own available goods and records distribution | One succeeds; one conflicts/reports insufficient stock; available = 1; one ISSUE movement |
-| TC-21 / FR-EVT-01, FR-NOT-01 | Event ID absent from inbox; notification consumer running | Publish the same event ID twice | Unique inbox; each recipient/channel notification created once; duplicate logged/metered without crashing consumer |
+| TC-21 / FR-NOT-01 | Request transition and one recipient; retryable command has a fixed idempotency key | Submit the same state-change command twice | One state transition and one in-app notice for that transition/recipient |
 | TC-25 / FR-OFF-01, FR-REQ-03 | Mobile SOS draft with idempotency key; network toggle available | Disable network and send; inspect UI; reconnect and retry twice | Pending before ACK, submitted afterward; exactly one server request |
 | TC-30 / FR-CAM-01 | ACTIVE campaign; scoped coordinator; existing history | Attach request; attempt close while request nonterminal; complete/resolve/close request; close campaign; attempt another attachment; read history | Premature close conflicts; close after terminal request succeeds; new attachment denied; scoped history remains accessible |
-| TC-31 / FR-LOG-03, FR-MSN-02 | TRIAGED request; mission requires unreserved goods | Create mission; inspect state/offer; confirm reservation; coordinator offers; team accepts | Before reservation: WAITING_RESOURCES, no DISPATCHED request/offer. After confirmation: READY_TO_DEPLOY → OFFERED → ACCEPTED; request DISPATCHED → IN_PROGRESS |
+| TC-31 / FR-LOG-03, FR-LOG-05, FR-MSN-02 | Verified request needs 20 kits; warehouse A can provide 12 and warehouse B can provide 8 | Create need; commit/deliver 12; inspect board; commit/deliver 8; coordinator resolves request | First contribution shows 12 delivered and 8 outstanding; second completes 20; separate mission/request/fulfillment statuses and both contribution audits remain visible |
 
 | ID | Scenario | Expected result |
 |---|---|---|
 | TC-01 | Valid GPS SOS | Store location, accuracy, source, capture/receive time; return one ID and SUBMITTED |
-| TC-02 | Out-of-range coordinates, negative headcount, or missing field | 400; no request/outbox |
+| TC-02 | Out-of-range coordinates, negative headcount, or missing field | 400; no request or audit record |
 | TC-03 | GPS denied; manual pin provided | MANUAL_PIN source; UI does not claim precise GPS |
-| TC-04 | Retry same Idempotency-Key after timeout | Same request ID; no second row/creation event |
+| TC-04 | Retry same Idempotency-Key after timeout | Same request ID; no second row |
 | TC-05 | Same key with different payload | Conflict; existing request unchanged |
 | TC-06 | Citizen A reads/updates Citizen B's request | Access denied without sensitive disclosure |
 | TC-07 | Volunteer lists missions | Only missions assigned to the team/member |
 | TC-08 | Region A coordinator accesses region B case | Denied; map/list do not disclose the object |
-| TC-09 | Reject without reason | Validation error; state/event unchanged |
+| TC-09 | Reject without reason | Validation error; state/history unchanged |
 | TC-10 | Duplicate designation without canonical request | Do not persist DUPLICATE |
 | TC-11 | SUBMITTED directly to CLOSED | Conflict/validation error; state/audit unchanged |
 | TC-12 | Assign inactive/unavailable team | Rejected; request not dispatched |
@@ -1012,12 +1002,12 @@ These are **planned test cases, not execution results**. Test records must inclu
 | TC-15 | Issue more than available | Rollback; no movement; unchanged on_hand/reserved |
 | TC-16 | Concurrent issues against the same available stock | Locks/constraints prevent total issue exceeding stock |
 | TC-17 | Retry transfer receipt with same key | Destination stock credited once |
-| TC-18 | Cancel a RESERVED reservation before issue | Release reservation; available increases, on_hand unchanged |
-| TC-19 | Cancel after ISSUE | Preserve movement; return is a new movement with actor/reason |
-| TC-20 | Response transaction rolls back after request creation | No request or committed outbox event |
-| TC-21 | Relay crashes after publish but before marking | Redelivery possible; inbox prevents repeated side effects |
-| TC-22 | Notification consumer stops and restarts | Catch-up; one notification per event ID + recipient ID + channel; external push semantics depend on provider |
-| TC-23 | Reporting consumer lags | Old watermark and stale warning displayed |
+| TC-18 | Cancel an unissued commitment | Reserved quantity is released; on_hand is unchanged; need remains outstanding |
+| TC-19 | Cancel a commitment after ISSUE | Reject direct cancellation; require delivery, verified return, or audited loss |
+| TC-20 | Response transaction rolls back after request creation | No request or partial audit/timeline rows |
+| TC-21 | Retry the same notification-triggering command | One transition and one notice per recipient for that transition |
+| TC-22 | Identity or Logistics API is temporarily unavailable | Caller gets a Vietnamese retryable error; no false success or duplicate side effect after retry |
+| TC-23 | One dashboard source API lags/fails | UI shows its generated_at or marks that panel stale/unavailable; other source data remains labeled correctly |
 | TC-24 | Forged MIME, prohibited type, oversized upload | Reject; clean orphaned object; no download link |
 | TC-25 | Repeated offline SOS retries after reconnect | Pending becomes submitted only after ACK; exactly one request |
 | TC-26 | AI suggests lower urgency for coordinator-assigned P1 | No automatic downgrade/deletion; separate suggestion and audited override |
@@ -1025,7 +1015,7 @@ These are **planned test cases, not execution results**. Test records must inclu
 | TC-28 | Refresh after role revocation | Refresh denied; existing access is rejected on the next protected request via Identity introspection |
 | TC-29 | Restore demo backup | Requests, ledger, file metadata consistent; runbook identifies object files to restore |
 | TC-30 | Attach request after campaign closure | Response rejects new attachment; scoped historical request/ledger access remains |
-| TC-31 | Dispatch a mission requiring supplies | No offer until reservation confirmation; then offer and request state update |
+| TC-31 | Partially fulfill a request from multiple warehouses | Need remains partially fulfilled until delivered quantity meets the current requested quantity; each contribution reconciles to stock ledger |
 
 ### 13.3 Traceability: UR → FR → UC → Test
 
@@ -1035,9 +1025,9 @@ These are **planned test cases, not execution results**. Test records must inclu
 | UR-02 | FR-REQ-04, FR-REQ-07, FR-NOT-01 | UC-01, UC-02 | TC-06, TC-09..11, TC-22 |
 | UR-03 | FR-REQ-04..06, FR-MSN-01..03, FR-LOG-03 | UC-02, UC-03 | TC-06, TC-08..14, TC-31 |
 | UR-04 | FR-MSN-02..04 | UC-03 | TC-07, TC-14, TC-24 |
-| UR-05 | FR-CAM-01, FR-LOG-01..04 | UC-04, UC-08 | TC-15..19, TC-30..31 |
+| UR-05 | FR-CAM-01, FR-LOG-01..05 | UC-04, UC-08 | TC-15..19, TC-30..31 |
 | UR-06 | FR-IAM-01..03, FR-RPT-01..02, FR-AUD-01 | UC-05, UC-06 | TC-06..08, TC-23, TC-28 |
-| UR-07 | FR-EVT-01, NFR-OBS-01, NFR-OPS-01 | UC-01..05 | TC-20..23, TC-29 |
+| UR-07 | FR-LOG-05, NFR-OBS-01, NFR-OPS-01 | UC-01..05 | TC-20..23, TC-29, TC-31 |
 
 ### 13.4 Additional language and storage checks
 
@@ -1057,108 +1047,90 @@ The storage checks in Section 6.3 extend FR-FILE-01, TC-24, and TC-29, including
 - Audit enough to trace actions without copying unnecessary PII; restrict readers and clarify retention.
 - Decide location visibility, location/photo/audit retention, deletion requests, backups, and provider data exposure. IASC/ICRC guidance is reference material; use synthetic demo data. [IASC guidance](https://emergency.unhcr.org/sites/default/files/2023-11/IASC%20Operational%20Guidance%20on%20Data%20Responsibility%20in%20Humanitarian%20Action%2C%202023.pdf), [ICRC handbook](https://www.icrc.org/en/publication/430501-handbook-data-protection-humanitarian-action-second-edition)
 - Single-host Compose is not high availability. Provide healthchecks, restart policies, volumes, example environment configuration, migration/seed commands, backup/restore runbook, and log rotation.
-- Single-broker KRaft is acceptable for the demo to reduce RAM needs; document lack of node-failure tolerance. Three brokers are not needed merely to resemble production.
-- Optional Prometheus/Grafana: API latency/errors, lag, outbox age, DLQ, DB connections/disk, storage. Always provide health endpoints, structured logs, and correlation IDs.
+- Optional Prometheus/Grafana: API latency/errors, database connections/disk, object storage, and (only if AI worker is enabled) job age/failures. Always provide health endpoints, structured logs, and correlation IDs.
 
-## 15. Docker Compose and Kubernetes
+## 15. Deployment baseline
 
 ### Baseline: Docker Compose
 
 ```text
 Browser / Mobile
     -> Nginx (one demo host)
-    -> 5 application containers
+    -> Identity, Response, Logistics (3 application services)
     -> PostgreSQL/PostGIS (separate database/user per service)
-    -> Kafka KRaft (single broker for demo)
     -> MinIO AIStor Free S3 API (single-node lab)
     -> Prometheus/Grafana (optional profile)
 ```
 
-- Provide development/test Compose configuration and an observability profile, healthchecks, volumes, .env.example, migrations, demo seed commands, and backup/restore procedures.
+- Provide development/test Compose configuration, healthchecks, volumes, .env.example, migrations, demo seed commands, and backup/restore procedures.
 - Do not commit .env files/secrets; create demo accounts/passwords through local seeding.
 - Nginx handles baseline routing/rate limits; services still authenticate and authorize.
-- Disable optional Grafana or use lightweight Notification/Reporting processes if RAM is constrained.
+- Disable optional metrics dashboards if RAM is constrained. Keep the Response job worker in the same application/service boundary; run a second worker process only if the optional job queue is enabled.
 
-### Kubernetes learning extension
+## 16. Backend implementation sequence
 
-Use kind after Compose end-to-end workflows stabilize. Deploy Nginx and application services with Deployment/Service resources, ConfigMap/Secret configuration, and readiness/liveness probes. Ingress/autoscaling are further learning exercises. A single-node kind cluster is neither HA nor a production deployment. [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/), [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/), [ConfigMaps](https://kubernetes.io/docs/concepts/configuration/configmap/), [Probes](https://kubernetes.io/docs/concepts/workloads/pods/probes/)
+The backend owner's stated target is two to three weeks of focused backend work. Treat that as an execution estimate, not evidence that work is complete; each slice needs its tests and acceptance evidence. Keep optional features out until the core workflow is stable.
 
-Timebox to 2–3 person-days after week 7. Proceed only if app pods can connect to PostgreSQL/Kafka/object storage and external routing works. Dependencies may stay outside the cluster for the lab; check networking early. Keep Compose as the main demo if the extension consumes excessive time, and describe kind's limitations accurately. Do not migrate stateful infrastructure into Kubernetes for the MVP. Kubernetes Secrets do not automatically imply encryption at rest; do not commit production secrets in manifests. [Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
-
-## 16. Ten-week delivery plan
-
-Preserve the brief's milestones: week 1 analysis; week 2 design/setup; weeks 3–6 development; week 7 integration/testing; week 8 documentation/demo; week 9 defense; week 10 buffer.
-
-| Week | Work | Deliverable/checkpoint |
+| Order | Complete slice | Exit evidence |
 |---|---|---|
-| 1 | Stakeholder research, glossary/process map, UR/FR/NFR, state machines, guest SOS/priority/role-scope decisions | SRS v0.1, use cases, open decisions, supervisor review |
-| 2 | C4/container, DB/ERD, API/event contracts, wireframes, repo/Compose/CI/migrations, custom User | SDD v0.1; five healthy service skeletons; draft OpenAPI; one-host Compose |
-| 3 | Identity/auth/RBAC; Response skeleton; web shell/login; mobile shell/GPS permission spike | Login, permission matrix, seeded roles/data |
-| 4 | SOS, GPS/manual pin, idempotency, evidence storage, list/map, mobile pending/ACK; first outbox → Kafka → Notification inbox path | Citizen → API → PostGIS → notification slice; TC-01..06/08/20..22; TC-24 and TC-25 when storage/offline queue is included |
-| 5 | Verification/duplicates/priority, teams/volunteers, mission assignment/acceptance/progress, audit | Coordinator → team workflow; state/permission tests |
-| 6 | Campaigns, warehouses/items, stock ledger, transfers, distribution, reservation/release | Nonnegative inventory; race/idempotency tests |
-| 7 | Harden existing Kafka/outbox/inbox and reservation saga; integrate Reporting/rebuild, security and recovery | Consumer restart, replay/dedupe; TC-15..23 and TC-BE-07/14 |
-| 8 | Web/mobile/map/filter/report polish, NFR baseline, documentation; AI/kind only after core acceptance | Feature freeze; disable incomplete optional work |
-| 9 | E2E regression, demo seed, backup/restore, demo script, slides, critical fixes | Release candidate; defense per brief |
-| 10 | Defense/supervisor feedback buffer, installation guide, release tag, handover | Stable delivery; no major new features |
+| 1 | Workspace, Compose, three service boundaries, migrations, Vietnamese errors, Identity registration/session/scope | Repeatable setup; auth and object-scope checks; each service starts and migrates independently |
+| 2 | SOS intake, PostGIS, idempotency, request timeline, scoped verification queue | Retry creates one request; unknown/ambiguous region remains visible to designated intake staff |
+| 3 | Verification outcomes, manual priority, duplicate review, team assignment and mission progress | State/permission tests; duplicates require human decision; team workflow completes without a broker |
+| 4 | Logistics catalog, warehouses, stock ledger, commitments, partial issue/delivery, transfers and relief points | Inventory constraints and concurrency tests; 12-of-20 demo stays open with 8 outstanding |
+| 5 | Compose board integration, dashboards/timings, storage, recovery, k6 smoke/load check, documentation and demo | Three API contracts verified together; partial outage labels are truthful; restore and end-to-end evidence recorded |
 
-### Solo backend ownership and integration
+Implement one end-to-end slice at a time. The project brief describes a three-member team; the user confirmed one person owns backend work, so coordinate interfaces with the other workstreams without splitting backend ownership. No separate Notification, Reporting, AI, or broker service is part of the baseline.
 
-The project brief still describes three team members; the user confirmed on 2026-09-30 that one person owns the entire backend. Client/documentation work can be coordinated with the remaining team; do not assign backend modules to hypothetical additional developers.
+### Scope reduction if the backend estimate slips
 
-Implement one complete slice at a time, including migrations, API, permissions, events, tests, and contract updates. Keep the five-service baseline, one workspace, and one Compose host. Do not develop five unfinished services in parallel. Establish an outbox → Kafka → inbox path during the first SOS slice; week 7 is recovery/integration hardening, not the first messaging integration. Section 22 gives the backend sequence and exit gates. The ten-week dates remain planning targets; optional work must not displace core acceptance.
-
-### Scope reduction if delayed
-
-Preserve auth/scope; SOS + GPS/manual pin + truthful ACK/idempotency; verification/triage; assignment/progress; stock ledger/distribution; in-app notifications; timestamped dashboards; Kafka outbox/deduplication; test cases, documentation, and demo.
-
-Reduce in order: real push provider, full offline queue (retain honest draft/pending UI), Kubernetes, Grafana, CSV export, all AI integration (a rules proof of concept is optional too), vehicle tracking, advanced maps/geocoding, multilevel approvals. Never cut authorization, inventory invariants, event deduplication, or the restore demonstration to retain secondary features.
+Keep authentication/scope, SOS with truthful server acknowledgement and idempotency, verification/duplicate decisions, team mission progress, stock ledger, partial fulfillment board, and core Vietnamese messages. Defer real push/email, offline retry queues, CSV export, optional AI, advanced routing, and non-required infrastructure before weakening authorization or inventory rules.
 
 ## 17. Defense demonstration
 
 1. A citizen submits an SOS with GPS/accuracy or manual pin; retry the same key and show one request.
-2. A coordinator opens queue/map, verifies, links a duplicate, sets priority/reason, and assigns a team.
-3. A volunteer accepts, progresses EN_ROUTE → ON_SCENE, uploads evidence, and reports completion; the request awaits coordinator confirmation.
-4. For a supply-dependent mission, Logistics reserves/issues stock and records the ledger; demonstrate rejection of an issue exceeding available stock.
-5. Kafka feeds notifications and Reporting; the dashboard shows generated time.
-6. Stop Reporting/Notification consumers, produce events, restart, and demonstrate catch-up without duplication.
-7. Optional: coordinator overrides an AI suggestion, or demonstrate kind app deployment after its checkpoint.
+2. A coordinator opens the verification queue, checks a suspected duplicate, records a human decision and reason, sets priority, and assigns a team.
+3. A volunteer accepts, progresses EN_ROUTE → ON_SCENE, uploads evidence, and reports completion; mission completion alone does not resolve the request.
+4. Logistics records a 20-kit need. Warehouse A delivers 12, leaving the request open with 8 outstanding; warehouse B delivers the remaining 8; the coordinator confirms overall resolution.
+5. Show the audit trail, quantities by fulfillment stage, time-to-verify/assign/deliver, and timestamped dashboard panels.
+6. Run a small k6 HTTP scenario and report the virtual-user count, duration, p95 latency, error rate, and test hardware.
+7. Optional: coordinator reviews an AI suggestion; the manual workflow still succeeds with the worker disabled.
 
-The demo demonstrates domain logic, authorization, GIS, saga, and event reliability; national-scale load simulation is unnecessary.
+The demo proves the workflow, authorization, GIS, inventory integrity, and measured API behavior. It does not claim nationwide capacity or automatic dispatch.
 
 ## 18. Deliverable documentation
 
 | Document | Minimum contents |
 |---|---|
 | SRS | Scope, actors, glossary, assumptions, identified UR/FR/NFR with acceptance criteria, use cases, business rules, states, traceability, open decisions |
-| SDD | Context/container/component views, ownership, ERD, auth/RBAC, API/OpenAPI, event catalog/schema, outbox/saga, sequence/deployment, security/privacy, tradeoffs |
+| SDD | Context/container/component views, three-service ownership, ERD, auth/RBAC, API/OpenAPI, fulfillment workflow, sequence/deployment, security/privacy, tradeoffs |
 | Test plan/cases | IDs, requirement links, preconditions, data, steps, expected results; unit/API/integration/security/E2E/NFR; actual results and defects |
 | Installation guide | Prerequisites, environment, Compose profiles, migrations/seeds, demo accounts, backup/restore, troubleshooting, shutdown |
 | User guide | Citizen, volunteer, coordinator, manager/admin flows; GPS/offline states; screenshots/video |
-| Demo/report | Synthetic data, script, diagrams, technical decisions, limitations, test evidence; controlled AI/Kubernetes extensions |
+| Demo/report | Synthetic data, script, diagrams, technical decisions, limitations, k6 measurements, and test evidence; optional AI extension |
 
 ## 19. Risks and open decisions
 
 | Decision | Proposed default | Decision deadline |
 |---|---|---|
 | Mandatory login or guest SOS? | Authenticated citizen registration/login selected for capstone; guest disabled unless scope is explicitly changed | Settled for demo |
-| Priority, SLA, who verifies/closes/reopens? | Draft P1–P4; coordinator with reasons; no implicit SLA | Week 1 with domain input |
+| Priority, SLA, who verifies/closes/reopens? | Draft P1–P4; coordinator with reasons; no implicit SLA | Before policy is represented as approved |
 | Coordinator scope/team availability? | Current grants + object relationships; one-team missions, capacity one, leader actions in Section 22 | Settled for demo |
-| Map/tile/geocoding provider, license, quota? | Separate map UI; compliant provider; no incident PII | Before week 4 |
-| Push/email? | In-app demo; mock provider without credentials | Week 2 |
-| Offline depth? | Honest drafts/pending in MVP; retry queue is Should | Week 1 |
-| File types/sizes/retention? | Team-proposed limits, private objects, synthetic data | Week 2 |
+| Map/tile/geocoding provider, license, quota? | Separate map UI; compliant provider; no incident PII | Before integration |
+| Push/email? | In-app demo; mock provider without credentials | Before client integration |
+| Offline depth? | Honest pending/draft behavior; retry queue is Should | Before client contract freeze |
+| File types/sizes/retention? | Team-proposed limits, private objects, synthetic data | Before file integration |
 | Location/photo/audit/backup retention? | No invented official policy; confirm before a pilot | Before real deployment |
-| Load targets/demo hardware? | 10k requests/20 concurrent as discussion targets, adjusted to measured hardware | Week 2 |
-| Storage edition/provider and license? | MinIO AIStor Free single-node lab selected; team members obtain it under current terms; validate private access and restore before demo | Weeks 2–4 |
-| Labeled AI data? | Do not assume availability; explainable rules suffice for PoC; AI disabled by default | Week 8 |
-| Kubernetes grading requirement or learning goal? | kind stretch, 2–3 days after stable Compose core | After week 7 |
+| Load targets/demo hardware? | Start with 20 HTTP virtual users as a discussion target; record hardware and measured result before claiming an NFR | Before performance acceptance |
+| Storage edition/provider and license? | MinIO AIStor Free single-node lab selected; team members obtain it under current terms; validate private access and restore before demo | Before storage integration |
+| Labeled AI data? | Do not assume availability; explainable rules suffice for PoC; AI disabled by default | Before optional evaluation |
+| Partial-fulfillment policy | Demo uses coordinator-created needs and confirmed delivery; validate real workflow with domain reviewer | Before claiming operational policy |
+| Kafka/event broker? | Not in baseline; revisit only if the criteria in Section 4.4 are demonstrated | Only after measured need |
 
 ## 20. Design conclusion
 
-The proposed baseline is **NestJS/TypeScript + TypeORM + PostgreSQL/PostGIS + React/Vite + React Native/Expo**, five services with explicit ownership, Kafka outbox/inbox for notifications/reporting, MinIO AIStor Free for synthetic single-node lab storage, and a reservation saga. Compose runs on one demo host; Kubernetes kind is a timeboxed learning extension. AI provides explanations and suggestions for coordinator review only.
+The proposed baseline is **NestJS/TypeScript + TypeORM + PostgreSQL/PostGIS + React/Vite + React Native/Expo**, with three services: Identity, Response, and Logistics. REST handles immediate operations; each service owns its database and reports; Logistics links partial aid commitments to opaque request IDs. Compose runs the demo on one host. Kafka, standalone Notification/Reporting services, and distributed stock-reservation sagas are deferred. MinIO AIStor Free is the selected single-node lab object store. AI is optional and provides coordinator-reviewed suggestions only.
 
-This baseline and Section 22 support incremental backend implementation. The solo-developer capstone decisions resolve the earlier workflow contradictions; they are project assumptions, not official emergency-response policy. Each slice still requires complete reviewed API/event/data contracts and executed acceptance evidence before it is called complete.
+This baseline and Section 22 support incremental backend implementation. The workflow additions are proposals inspired by humanitarian platforms and peer-project patterns; they are not official emergency-response policy. Each slice still requires reviewed API/data contracts and executed acceptance evidence before it is called complete.
 
 ## 21. References
 
@@ -1172,7 +1144,6 @@ This baseline and Section 22 support incremental backend implementation. The sol
 ### Backend, database, API, security
 
 - [Spring Boot documentation](https://docs.spring.io/spring-boot/index.html)
-- [Spring for Apache Kafka](https://docs.spring.io/spring-kafka/reference/)
 - [NestJS documentation](https://docs.nestjs.com/)
 - [NestJS database integrations](https://docs.nestjs.com/techniques/database)
 - [NestJS validation](https://docs.nestjs.com/techniques/validation)
@@ -1180,7 +1151,6 @@ This baseline and Section 22 support incremental backend implementation. The sol
 - [NestJS authentication](https://docs.nestjs.com/techniques/authentication)
 - [NestJS file upload](https://docs.nestjs.com/techniques/file-upload)
 - [NestJS testing](https://docs.nestjs.com/fundamentals/testing)
-- [NestJS Kafka transport](https://docs.nestjs.com/microservices/kafka)
 - [TypeORM PostgreSQL driver and spatial columns](https://typeorm.io/docs/drivers/postgres/)
 - [TypeORM transactions](https://typeorm.io/docs/advanced-topics/transactions/)
 - [Django overview (framework comparison only)](https://docs.djangoproject.com/en/5.2/intro/overview/)
@@ -1198,10 +1168,13 @@ This baseline and Section 22 support incremental backend implementation. The sol
 
 ### Messaging, storage, frontend, deployment
 
-- [Apache Kafka introduction](https://kafka.apache.org/intro/)
-- [Apache Kafka delivery semantics](https://kafka.apache.org/40/design/design/)
-- [Apache Kafka 4.0 KRaft release announcement](https://kafka.apache.org/blog/2025/03/18/apache-kafka-4.0.0-release-announcement/)
-- [AWS transactional outbox](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html)
+- [Apache Kafka event-streaming documentation](https://kafka.apache.org/documentation/)
+- [Grafana k6 HTTP requests](https://grafana.com/docs/k6/latest/using-k6/http-requests/)
+- [Grafana k6 virtual users and test execution](https://grafana.com/docs/k6/latest/get-started/running-k6/)
+- [Sahana ShaRe request and partial-commitment use cases](https://eden-legacy.sahanafoundation.org/wiki/BluePrint/ShaRe/UseCases)
+- [Sahana logistics modules](https://eden-legacy.sahanafoundation.org/wiki/DeveloperGuidelines/Logistics)
+- [Ushahidi incoming-data review and moderation](https://docs.ushahidi.com/platform-user-manual/6.-managing-data-in-your-deployment)
+- [Ushahidi saved searches](https://docs.ushahidi.com/platform-user-manual/7.-analysing-data-on-your-deployment/7.1-saved-searches)
 - [MinIO Community repository status](https://github.com/minio/minio)
 - [MinIO AIStor Free agreement](https://www.min.io/legal/aistor-free-agreement)
 - [MinIO AIStor license operations and feature limits](https://docs.min.io/aistor/operations/licenses/)
@@ -1213,11 +1186,6 @@ This baseline and Section 22 support incremental backend implementation. The sol
 - [React Native TypeScript](https://reactnative.dev/docs/typescript)
 - [Expo Location](https://docs.expo.dev/versions/latest/sdk/location/)
 - [Docker Compose production](https://docs.docker.com/compose/how-tos/production/)
-- [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/)
-- [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
-- [Kubernetes ConfigMaps](https://kubernetes.io/docs/concepts/configuration/configmap/)
-- [Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
-- [Kubernetes probes](https://kubernetes.io/docs/concepts/workloads/pods/probes/)
 - [NIST AI RMF Core](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/)
 - [OWASP prompt injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/)
 
@@ -1226,11 +1194,12 @@ This baseline and Section 22 support incremental backend implementation. The sol
 - Initial research was conducted on 2026-09-29; the NestJS framework comparison and MinIO AIStor Free decision were checked against linked primary sources on 2026-09-30. Versions, support schedules, APIs, license terms, and project status can change. Recheck release compatibility and current AIStor terms before implementation.
 - NestJS/TypeScript was selected after a qualitative comparison with Spring Boot, Django/DRF, FastAPI, and Flask. This was not a performance benchmark; team familiarity should be confirmed during setup.
 - MinIO AIStor Free single-node is the one selected capstone storage option. MinIO Community is not selected. Current terms, artifact/license validity, S3 compatibility, private policy behavior, and restoration still need to be checked during setup; none have been tested by this research.
-- Section 22 records the later solo-backend decisions, including authenticated-only SOS. Quantitative NFRs, official priority rules, retention, external providers and AI operational use still need the relevant confirmation.
+- The workflow adaptation report reviews Ushahidi, Sahana Eden, and KoboToolbox; the separate CNTT workbook scan is summarized in that note and should be read as project descriptions, not implementation verification.
+- Section 22 records the current three-service and partial-fulfillment decisions, including authenticated-only SOS. Quantitative NFRs, official priority rules, retention, external providers, and operational AI use still need the relevant confirmation.
 
 ## 22. Solo backend implementation baseline
 
-**Decision date: 2026-09-30. Authority: the backend owner authorized correction of the plan.** These are implementation decisions for the synthetic capstone demo, not policies approved by a rescue authority. Preserve the assigned functional scope and the five-service architecture. Sections 8–10 use these decisions; replace conflicting wording rather than implementing both alternatives.
+**Decision date: 2026-09-30. Authority: the backend owner authorized correction of the plan.** These are implementation decisions for the synthetic capstone demo, not policies approved by a rescue authority. Preserve the assigned functional scope and use three core services. This revision supersedes earlier five-service, Kafka, and reservation-saga proposals throughout this document.
 
 ### 22.1 Repository structure and clean-code rules
 
@@ -1240,16 +1209,13 @@ backend/
     identity/src/
     response/src/
     logistics/src/
-    notification/src/
-    reporting/src/
   packages/
-    contracts/src/          # versioned transport schemas/types, no entities
-    platform/src/           # reused technical bootstrap/errors/auth only
+    contracts/src/          # only if a contract is shared by two services
   infra/                   # Compose, Nginx, database initialization
   scripts/                 # migration, seed, backup/restore commands
 ```
 
-Each app owns `main.ts`, `app.module.ts`, `config/`, `database/data-source.ts`, `database/migrations/`, and `modules/<business-module>/`. A business module uses `<name>.module.ts`, `<name>.controller.ts` when it has HTTP routes, `<name>.service.ts`, `dto/`, and `entities/` as needed. Keep workers and outbox/inbox infrastructure within the owning app. Each app has its own environment validation, image, migration command, database credentials, and health/readiness routes. Create only directories used by the current slice. Use one package manager/workspace and pin versions after a primary-source compatibility check; this document selects no exact runtime releases.
+Each app owns `main.ts`, `app.module.ts`, `config/`, `database/data-source.ts`, `database/migrations/`, and `modules/<business-module>/`. A business module uses `<name>.module.ts`, `<name>.controller.ts` when it has HTTP routes, `<name>.service.ts`, `dto/`, and `entities/` as needed. The optional AI job worker stays inside Response. Each service has its own environment validation, image, migration command, database credentials, and health/readiness routes. Create only directories used by the current slice. Use one package manager/workspace and pin versions after a primary-source compatibility check; this document selects no exact runtime releases.
 
 - Controllers parse validated DTOs, invoke use cases, and map responses; they contain no SQL or business state transitions. Services own business guards, transaction boundaries, and authorization of actions/objects. List/map queries apply scope before pagination or aggregation.
 - Use TypeORM repositories/QueryBuilder and the transaction's EntityManager directly. Add a dedicated query/persistence component only when real complexity warrants it; no generic base repository, one-implementation interface, or pass-through layer.
@@ -1257,7 +1223,7 @@ Each app owns `main.ts`, `app.module.ts`, `config/`, `database/data-source.ts`, 
 - Keep entities/migrations/domain rules in their owner app. Share transport schemas and proven technical code only; no shared business services or database connection module. Do not build a platform package ahead of actual reuse.
 - Enable TypeScript strict checks, ESLint and formatting. Avoid untyped `any`, swallowed errors, magic status strings, circular module dependencies, and runtime schema synchronization. Use named enums/types, bounded DTO validation, parameterized SQL, DB constraints, and reviewed migrations.
 - Centralize Vietnamese exception/validation copy and stable error codes, including 404, 413, 429, auth, provider, and worker paths. Log technical codes/correlation IDs without passwords, tokens, signed links, or unnecessary PII.
-- Every nontrivial slice includes meaningful automated checks for its invariants. PostgreSQL/PostGIS and Kafka integration checks cover actual concurrency/replay behavior; mocks do not establish those guarantees. Run the relevant checks before recording completion.
+- Every nontrivial slice includes meaningful automated checks for its invariants. PostgreSQL/PostGIS and API integration checks cover actual concurrency and service-boundary behavior; mocks do not establish those guarantees. Run the relevant checks before recording completion.
 
 ### 22.2 Identity, scope, and request decisions
 
@@ -1265,57 +1231,50 @@ Each app owns `main.ts`, `app.module.ts`, `config/`, `database/data-source.ts`, 
 |---|---|
 | Citizen onboarding | Public rate-limited registration grants CITIZEN only. Unique normalized username; passwords are hashed with an appropriate maintained implementation selected at setup. Account/password errors do not disclose credential existence. Staff/volunteer roles are admin-granted. Guest SOS is disabled. |
 | Scope | Each grant binds a role/action set to one scope: organization, region, campaign or explicitly granted system scope. Alternative matching grants are OR; inside an organization/region/campaign match, the action, owning organization and selected scope must all match (AND). System scope is an explicit cross-organization exception for its named actions only, never implicit in ADMIN. Region/campaign grants carry their parent organization; geographic overlap alone never crosses organization boundaries. Owner/team relationships are separate explicit permissions, not inferred staff grants. Admin account management does not imply access to victim details. Exact GPS is limited to the reporter, authorized coordinators and assigned teams. |
-| Revocation | JWT local checks include approved algorithm, issuer, audience, expiry and session ID. Identity introspection is authenticated as a service, checks active account/session and returns current grants. No positive auth cache in demo. Identity outage fails closed with 503; recovery restores authenticated access. Notifications/reporting background projection work continues without making new user-authorized mutations. This trades availability for simple request-boundary revocation. |
+| Revocation | JWT checks include approved algorithm, issuer, audience, expiry and session ID. Identity introspection is authenticated as a service and checks active account/session/current grants. No positive auth cache in demo. Identity outage fails closed with Vietnamese 503. This trades availability for simple request-boundary revocation. |
 | Request intake | campaign_id is nullable. Backend configuration assigns the synthetic demo intake organization; citizens cannot set organization or staff scope. Identity owns controlled region codes; Response owns seeded region boundary geometry and derives region from the location. Unknown/ambiguous boundary results keep region null and enter an explicit unassigned queue. Only coordinators with organization-wide intake permission or explicit system intake grants can view/correct that queue; campaign-only grants cannot. No match must not reject SOS or silently hide it from all intake operators. Region correction is versioned/audited. Only authorized coordinators attach/reassign requests to ACTIVE campaigns with compatible organization/operating region. |
 | Priority | P1–P4 labels remain the draft taxonomy in Section 8.1. Human coordinator selects priority/reason after verification. No SLA is implied and no automatic queue ranking/dispatch is derived from these labels. |
 | Supplements | Reporter may add information in SUBMITTED/VERIFYING/VERIFIED/TRIAGED/DISPATCHED/IN_PROGRESS. Preserve earlier facts as history. Terminal requests reject supplements; coordinate reopen separately. |
-| Cancellation/resolution | Scoped coordinator may cancel a nonterminal request with reason, subject to the canonical-reference guard below. Acquire request locks in sorted ID order, then team IDs sorted, then mission IDs sorted; cancel nonterminal missions, release team capacity and enqueue reservation cleanup atomically in Response. COMPLETED evidence is preserved. Coordinator resolves from IN_PROGRESS or TRIAGED with completed evidence, no nonterminal missions, and a recorded needs-met confirmation; CLOSED follows RESOLVED. CLOSED reopens to TRIAGED with reason; old terminal missions remain historical. |
+| Cancellation/resolution | Scoped coordinator may cancel a nonterminal request with reason, subject to the canonical-reference guard below. In a Response transaction, cancel nonterminal missions and release team capacity; keep completed evidence. Then explicitly settle linked Logistics needs: cancel unissued commitments, and preserve issued goods for delivery/return/loss accounting. Before RESOLVED, Response performs an authenticated Logistics lookup for the current work cycle; an unavailable API or any open/partial need blocks resolution. Record the returned fulfillment version with the human confirmation. This check is not a distributed transaction; unexpected later need changes require an audited reopen. CLOSED follows RESOLVED. CLOSED reopens to TRIAGED with reason; old terminal missions remain historical. |
 | Duplicate/rejection | Outcomes branch only from VERIFYING. Duplicate target must be authorized and cannot be self, DUPLICATE, REJECTED or CANCELLED. Lock source/target request rows in sorted ID order before checking state and inbound links. A canonical request with inbound duplicate links cannot become DUPLICATE, REJECTED or CANCELLED; every linker/rejection/cancellation uses the same locks and recheck. No duplicate chains/cycles or automatic link reparenting. Terminal REJECTED/DUPLICATE/CANCELLED records are historical; a new report is created for renewed need. |
-| Campaign pause/close | PAUSED blocks new attachments, mission creation/offers and acceptance of existing offers. Coordinators may cancel waiting/ready/offered missions; existing reservations remain visible until resume or explicit cleanup, never silently expire. Already ACCEPTED/EN_ROUTE/ON_SCENE missions may continue, including physical issue against their existing reservation under the continuation validation below. Resume is PAUSED → ACTIVE. Close requires all attached requests terminal (CLOSED/REJECTED/DUPLICATE/CANCELLED). Returns, receipts and issued-goods settlements remain allowed after closure. |
+| Campaign pause/close | PAUSED blocks new attachments, mission creation/offers and acceptance of existing offers. Coordinators may cancel offered missions; accepted missions may finish. New campaign-linked needs/commitments are blocked while paused; already-issued goods can still be delivered, returned, or settled. Resume is PAUSED → ACTIVE. Close requires all attached requests terminal (CLOSED/REJECTED/DUPLICATE/CANCELLED). Preserve all fulfillment and stock history after closure. |
 
-Use a request work_cycle counter incremented on reopen; tag each new mission with that cycle. Historical completed missions cannot resolve a reopened request without current-cycle evidence. For active request dispatch progress, compute under a request row lock after every mission offer/accept/decline/failure/completion. Ignore historical missions for newly reopened work. Accepted/travelling/on-scene work takes precedence over offers; offers take precedence over returning to TRIAGED. No mission event changes a human terminal outcome or automatically marks RESOLVED. A fully completed set remains TRIAGED pending explicit coordinator confirmation; the resolution command may also transition TRIAGED → RESOLVED when completed mission evidence exists, no active mission remains, and the coordinator confirms all needs met. This additional edge must be present in the state diagram and transition tests.
+Use a request work-cycle counter incremented on reopen; tag each new mission and Logistics need with that cycle. Historical missions/needs cannot resolve a reopened request. For request dispatch progress, recompute under a Response request-row lock after each mission transition. Accepted/travelling/on-scene work takes precedence over offers; offers take precedence over returning to TRIAGED. No mission transition changes a human terminal outcome or automatically marks RESOLVED. A request stays TRIAGED/IN_PROGRESS until a coordinator confirms the overall need is met. If the cycle has missions, resolution requires at least one completed mission with current-cycle evidence and no active missions; if no rescue mission was assigned, the coordinator records that it was not required. In both cases, perform a fresh Logistics fulfillment check before resolution.
 
-For commands touching campaigns and requests, acquire campaign rows first in sorted ID order, then request rows sorted, teams sorted and missions sorted. Campaign close and request attachment/reassignment/reopen use this same order and recheck linked states. Reopening a request attached to a CLOSED campaign requires authorized attachment to an ACTIVE compatible campaign or audited detachment first; do not leave a nonterminal request attached to a CLOSED campaign. Duplicate decisions lock all affected requests in sorted order without acquiring campaign locks afterward.
+For commands touching campaigns and requests in Response, acquire campaign rows first in sorted ID order, then request rows, team rows, and mission rows in stable order. Reopening a request attached to a CLOSED campaign requires authorized attachment to an ACTIVE compatible campaign or audited detachment first. Duplicate decisions lock affected request rows in sorted order; do not add unrelated Logistics rows to the same transaction.
 
-### 22.3 Team, reservation, and stock decisions
+### 22.3 Team, fulfillment, and stock decisions
 
-- One mission belongs to one request and exactly one team. Team leader is an active team member and the only volunteer actor allowed to accept/decline or advance that mission; coordinator can cancel/fail with reason. Team leader writes results/evidence. Individual volunteers can view assigned team work and maintain their own profile/availability; solo volunteers use a one-member team.
-- Demo teams have capacity one active mission. Under locks acquired in one documented order (request IDs sorted, then team IDs sorted, then mission IDs sorted), OFFERED reserves team availability until accept/decline/cancel; ACCEPTED/EN_ROUTE/ON_SCENE retain it; terminal transition releases it. WAITING_RESOURCES/READY_TO_DEPLOY do not reserve a team; recheck membership, required skills, organization/operating-region compatibility and availability when offering. Campaign-linked creation/offer/accept also locks its campaign before request/team/mission locks, so pause and those commands serialize locally. No automatic offer expiration in the demo; expose offer age for manual cancellation. Concurrent offers cannot both acquire the same team.
-- Resource-free rescue can be offered immediately after triage. Coordinator explicitly marks whether a mission requires stock; only those missions enter WAITING_RESOURCES. Reservation confirmation gives READY_TO_DEPLOY; rejection remains visible with its reason. Retry with changed warehouse/quantity creates a new reservation intent after the previous intent is REJECTED or confirmed RELEASED; never silently overwrite an old intent.
-- Each reservation intent has a unique ID and immutable mission/warehouse/item/quantity payload. REQUESTED → RESERVED/REJECTED/RELEASED; RESERVED → ISSUED/RELEASED. Release received before request creates a RELEASED tombstone, so late request cannot reserve. All commands lock the intent, deduplicate event/command IDs and enforce the payload identity. A release racing issue has exactly one winner: release prevents issue; issue prevents a stock release and produces an already-issued result.
-- Every DECLINED/FAILED/CANCELLED/COMPLETED transition atomically records Response-owned reservation cleanup intent and retries compensation; Logistics owns stock transitions. REQUESTED/RESERVED intents are released, including release tombstones and late confirmations for any terminal mission. ISSUED intents never receive artificial stock credit: remaining quantities require physical distribution/return or documented loss, visible as outstanding settlement. REJECTED/RELEASED intents need no stock effect. Mission completion does not imply inventory settlement; campaign closure preserves outstanding settlement records. Do not expire stock reservations automatically. A configurable demo overdue threshold exposes pending work; timeout does not prove rejection. Reconciliation queries authenticated owning-service APIs by intent ID and retries the original idempotent command.
-- Supply-dependent missions require authoritative confirmation that all required lines of the current intent are ISSUED before ACCEPTED → EN_ROUTE. A RESERVED result is insufficient. Response stores the confirmed result through its inbox or authenticated reconciliation; stale results from previous intents cannot unlock departure. Resource-free missions bypass this check. No pickup-at-scene exception is included in the demo.
-- ISSUE reduces on_hand and reserved exactly once. Direct issue-and-distribution atomically checks available stock, reserves/issues its own quantity and records distribution in one Logistics transaction. Distribution references issued lines and records beneficiaries' aggregate quantities; it never decrements the warehouse again. Distributed + returned + recorded loss cannot exceed issued quantity. Direct distribution records against the issue created in that same transaction. Transfers use their separate dispatch/transit/receipt accounting and cannot masquerade as beneficiary distributions.
-- Stock quantities use fixed-precision database decimals with item unit/scale validation and decimal strings in API contracts; no JavaScript floating-point balance arithmetic. Negative/zero command quantities and incompatible units are rejected. Reservation and physical issue remain separate.
-- Before new campaign-linked reserve/issue/transfer commands and direct issue-and-distribution commands, Logistics validates ACTIVE status through an authenticated Response API outside DB locks; a stale projection is insufficient. The sole PAUSED exception is issue against an existing reservation for a mission already ACCEPTED/EN_ROUTE/ON_SCENE: Response validates mission state, current intent and campaign in the same authenticated continuation check. CLOSED never permits new issue. Logistics also checks caller warehouse permissions and warehouse/campaign organization compatibility; transfers require authority over both source and destination. Unavailability returns retryable 503. Validation may precede concurrent pause/close/cancellation: document this request-boundary window and compensate issue/cancellation races; do not claim global atomic campaign closure. Release, return, receipt and beneficiary settlement of already-issued goods remain possible without ACTIVE status.
+- One mission belongs to one request/work cycle and exactly one team. Only an active team leader accepts/declines, advances, and submits results; scoped coordinators can assign or cancel with reason. Team members can view their team's work; solo volunteers use a one-member team.
+- Demo teams have capacity one active mission. OFFERED, ACCEPTED, EN_ROUTE, and ON_SCENE reserve capacity; terminal transitions release it. Recheck membership, required skills, organization/operating-region compatibility, and availability in the same Response transaction as the offer. No automatic offer expiry; expose offer age for manual follow-up.
+- Logistics owns ReliefNeed, Commitment, stock, transfer, and distribution records. A need references `request_id` and `work_cycle` without a cross-database foreign key. Validate request/scope through the Response API before creating a linked need; make the API call before opening a Logistics transaction.
+- A need has item, unit, requested quantity, state, and version. A commitment has an immutable need/warehouse/quantity reference and states PROPOSED → COMMITTED → ISSUED → DELIVERED, with CANCELLED available before issue. Lock the need row before creating or changing commitments; `delivered + committed/reserved + issued-but-not-delivered` cannot exceed the requested quantity. Keep each organization's/warehouse's contribution separately attributable.
+- Derive committed/reserved, issued, delivered, and outstanding totals from commitment lines and stock movements. `outstanding = requested - delivered`; a partial delivery never marks the need complete. An authorized coordinator may reduce or cancel a need with a reason. Do not delete prior commitments or stock movements.
+- ISSUE reduces on_hand and reserved exactly once. Distribution/delivery references issued lines and never decrements warehouse stock again. Delivered + returned + recorded loss cannot exceed issued quantity. Transfers separately reconcile dispatched = received + returned + lost + remaining_in_transit; a dispatched transfer cannot be cancelled as if stock were still at the source.
+- Stock quantities use fixed-precision database decimals with item unit/scale validation and decimal strings in API contracts. Reject negative/zero command quantities and incompatible units. Lock multiple item balances in stable ID order; enforce `on_hand >= 0`, `reserved >= 0`, and `reserved <= on_hand`.
+- No cross-service atomicity is claimed. If Response is unavailable, Logistics cannot create a new request-linked need; if Logistics is unavailable, the SOS/mission remains in Response and the board reports Logistics unavailable. A retry uses the same idempotency key. Closing/cancelling a request requires a separate explicit Logistics settlement action for linked needs; issued items retain their physical ledger history.
+- For campaign-linked commands, validate current campaign eligibility through an authenticated Response API before the local Logistics transaction. Do not hold stock locks during that call. A pause/close racing the check may be observed on the next command; the board must show the authoritative status and coordinators must settle already issued goods. This is a documented demo boundary, not a claim of distributed atomicity.
 
-### 22.4 API, event, and reliability contracts
+### 22.4 API and reliability contracts
 
-Before coding each slice, add full contracts alongside that slice in `backend/packages/contracts` and review its per-service OpenAPI: exact `/api/v1` paths, DTOs, success/status codes, error codes and Vietnamese messages, filters/limits, actor/scope matrix, expected_version, idempotency and event examples. Include complete CRUD/actions used by the clients for accounts, campaigns, incidents, teams/profiles, requests/missions, warehouses/items, vehicles/relief points, stock, notifications and reports. Endpoint sketches in Section 10 are not substitutes for these artifacts.
+Before coding each slice, review its OpenAPI contract: exact `/api/v1` paths, DTOs, success/status codes, error codes and Vietnamese messages, filters/limits, actor/scope matrix, expected_version, and idempotency examples. Include only CRUD/actions used by the clients for accounts, campaigns, incidents, teams/profiles, requests/missions, warehouses/items, vehicles/relief points, stock, commitments, notifications, and reports. Endpoint sketches in Section 10 are not substitutes for these artifacts.
 
-- Persist idempotency records under a unique actor/service/command/key scope in the business transaction. Store canonical validated-payload hash and original response; identical replay returns the original result, changed payload returns 409. Preserve records for the demo; retention must be defined before cleanup. Unique constraints and version checks govern concurrent retries, not in-memory maps.
-- Producers maintain an incrementing per-aggregate event sequence independent of optimistic entity version; use that sequence as aggregate_version in the event envelope. Unique aggregate/type/sequence constraints and request/team/stock locks serialize conflicting writes. Publish with aggregate ID as Kafka key.
-- Run one outbox relay per producer app in the demo, protected by a database advisory leadership lock. Publish committed rows in sequence; mark only acknowledged sends. Do not publish later rows for an aggregate while its earlier row is pending. Failure stops that aggregate until retry; other aggregates may continue. This deliberate throughput ceiling can move to partitioned relays when measurement justifies it.
-- Use versioned topics `c48.identity.events.v1`, `c48.response.events.v1`, `c48.logistics.events.v1` and service-specific consumer groups. Optional AI uses its separately restricted topic. Build a catalog enumerating each event, required payload, authorized consumers, key, schema version and failure policy before adding its producer.
-- Consumer DB side effects and inbox commit together; Kafka offsets commit afterward with auto-commit disabled. Store only the next contiguous processed offset per partition. Crashes can redeliver, and inbox uniqueness absorbs duplicates. Unknown schema/permanent invalid payload moves to a durable DLQ before advancing its offset. Temporary failures retry with bounded backoff; do not silently skip.
-- Version-aware projections subscribe to a documented complete aggregate event stream. Stale versions do not regress state; gaps are persisted as pending and alerted while the complete stream or an authenticated snapshot repairs them. Do not apply later arithmetic deltas across a gap. A durably stored pending event may acknowledge Kafka, but its database side effect remains incomplete until reconciliation. Command consumers rely on intent state/identity and inbox rather than assuming every aggregate event is relevant.
-- Notification uniqueness is `(event_id, recipient_id, channel)`. In-app is the mandatory channel. External providers remain optional; delivery attempt/retry is separate from inbox consumption because DB rollback cannot undo an external send.
-- Reporting owns event-derived scoped aggregates with watermark, not business decisions. Dashboard contracts define totals, time windows, timezone, lead-time formula, empty results and stale threshold per slice; do not compare unaligned snapshots as exact live totals.
-- Configure Reporting subscriptions with fromBeginning=true for new consumer groups; existing groups resume committed offsets. Keep all demo integration events with explicit retention.ms=-1 and retention.bytes=-1, cleanup.policy=delete, bounded synthetic input and disk monitoring; no compaction or topic deletion during the demo. Rebuild pauses the old projector, creates a fresh projection generation/inbox with a new group, replays the complete retained streams and reconciles against an authoritative fixed dataset before switching the read API. Capture and reach per-topic/partition end-offset watermarks, drain pending gaps, and continue consumption after the switch; fixed-dataset equality alone is not a live cutover guarantee. Never clear only projection rows while retaining the deduplication inbox. If history is incomplete, mark rebuild unavailable/stale and restore a matching Kafka+projection backup or reset/reseed the synthetic environment; do not present partial aggregates as complete. Define a finite retention and snapshot bootstrap protocol before any real deployment. [KafkaJS consumer start offsets](https://kafka.js.org/docs/consuming), [Kafka topic retention configuration](https://kafka.apache.org/42/configuration/topic-configs/)
+- Persist idempotency records under a unique actor/service/command/key scope in the business transaction. Store the canonical validated-payload hash and original response; an identical retry returns the original result and a changed payload returns 409. Use database uniqueness/version checks for concurrent retries, not in-memory maps.
+- Cross-service REST calls use service credentials, bounded timeouts, stable error codes, and no open database transaction. Retry only idempotent commands with the same key. A service outage is reported as unavailable; do not fabricate success or silently duplicate a command.
+- Write in-app notices with the owning business change in the same local transaction. Uniqueness includes source record, source version, recipient, and notice type so a command retry cannot create duplicate notices. Push/email stay optional and require provider-specific retry/idempotency decisions.
+- Reporting reads each service's own data and includes `generated_at`. A composed dashboard shows source timestamps and partial unavailability; it does not treat a cross-service view as a globally atomic snapshot.
+- Optional AI jobs are durable Response rows claimed with a bounded lease and claim token. Unique job/result constraints prevent two workers from committing competing results; provider calls run outside database transactions.
 
 ### 22.5 Solo backend sequence and acceptance gates
 
 | Order | Complete slice | Exit evidence |
 |---|---|---|
-| 1 | Workspace, Compose, five app boundaries as needed, config, migrations, errors, Identity registration/sessions/grants | Repeatable setup; strict type/lint/build checks; auth/scope/revocation/outage and Vietnamese-message checks |
-| 2 | SOS, nullable campaign, controlled regions/unassigned intake, PostGIS, idempotency, own timeline, first outbox/Kafka/Notification path | TC-01..06/08, TC-20..22, TC-BE-12; one committed SOS under retries; scoped map/list; consumer recovery |
-| 3 | Campaign/incident, verification branches, human priority, duplicate links | TC-09..11, TC-BE-11; transition/duplicate/campaign guards; scope and audit evidence; UC-02/08 |
-| 4 | Team/profile/availability, one-team missions, progress/confirmation/cancellation | TC-07/12..14, TC-BE-04/13; aggregation combinations; concurrent team offers; owner/leader permissions; pause continuation with stock is verified in slice 5 |
-| 5 | Warehouse/item/vehicle/point, receipts/ledger/reservations/issue, mission saga | TC-15..19/31, TC-BE-09/10 and stock continuation in TC-BE-13; cancellation/late-confirmation/issue races; real database constraint checks |
-| 6 | Transfers/transit reconciliation, distribution/returns/loss, Reporting | TC-BE-06/14; quantity reconciliation; no double decrement; dashboards match fixed dataset; watermark/lag/rebuild checks |
-| 7 | File integration and full recovery/security/demo hardening | TC-24/29/30 and TC-L10N; private uploads/downloads; bounded files; object+DB restore; complete E2E |
+| 1 | Workspace, Compose, three apps, migrations, errors, Identity registration/sessions/grants | Repeatable setup; auth/scope/revocation and Vietnamese-message checks |
+| 2 | SOS, controlled regions, PostGIS, idempotency, own timeline, verification queue | TC-01..14, TC-BE-01..04/11/12; scoped map/list; human-reviewed duplicate and priority decisions |
+| 3 | Logistics catalog/stock/commitments, request board, partial delivery, campaign/relief-point links | TC-15..19/31, TC-BE-05/06/09/10/13/15; no over-issue; partial fulfillment and API error behavior |
+| 4 | UI/API integration, dashboards, file storage, recovery, k6 run, documentation/demo | TC-20..30, TC-BE-07/08/14/16, TC-L10N; truthful source timestamps, private files, backup restore, end-to-end evidence |
 
-File metadata/contracts start with SOS/missions; real object-store integration may be completed earlier when the licensed lab artifact is available. Do not claim evidence-upload FRs complete before storage acceptance. Each slice updates traceability, contract examples, migrations, seed data and actual command/results. Core FRs marked M must all be covered before full backend completion; AI, CSV export, push/email, full offline queue and kind remain optional/Should. Do not create a parallel Python runtime, new brokers or a sixth domain service.
+File metadata/contracts start with SOS/missions; do not claim evidence-upload requirements complete before storage acceptance. Each slice updates traceability, API examples, migrations, seed data, and actual command/results. The partial-fulfillment demo and authorization/inventory invariants are core; AI, CSV export, push/email, and full offline queue remain optional. Do not add another runtime, broker, or service without evidence.
 
 ### 22.6 Additional acceptance cases for corrected decisions
 
@@ -1327,16 +1286,18 @@ These planned cases extend existing IDs without renumbering them. They are not e
 | TC-BE-02 | FR-REQ-01, FR-CAM-01 | SOS succeeds without campaign; out-of-scope/inactive attachment fails; pause/resume/close guards and historical settlements are consistent |
 | TC-BE-03 | FR-REQ-04, FR-MSN-03 | Verification outcomes are exclusive; self/chain/cycle duplicate links fail; accepted work survives sibling decline; offered-only fallback and human resolution behave correctly |
 | TC-BE-04 | FR-MSN-01..03 | Two offers to a capacity-one team yield one winner; unauthorized member cannot accept; terminal transition releases capacity; reopened cycle excludes old outcome evidence |
-| TC-BE-05 | FR-LOG-02..03 | Release-before-request tombstone prevents reservation; cancellation with late confirmation converges; concurrent issue/release cannot both consume or credit stock; timeout never proves rejection |
+| TC-BE-05 | FR-LOG-02..05 | Concurrent commitments to one need cannot exceed requested quantity; partial delivery leaves the correct outstanding amount; repeated commands do not double reserve or issue |
 | TC-BE-06 | FR-LOG-02..04 | Transfer receipt/return/loss reconciles transit; in-transit cancellation fails; distribution of issued goods does not decrement stock again; over-settlement and repeated commands fail safely |
-| TC-BE-07 | FR-EVT-01, FR-RPT-01 | Relay preserves aggregate sequence; duplicate/stale/gap/schema failures cannot regress projections; offsets follow durable DB writes; pending/DLQ replay repairs without duplicate effects |
-| TC-BE-08 | FR-NOT-01, NFR-L10N-01 | One event can create multiple recipient notifications once each; cross-recipient access fails; HTTP, worker and reverse-proxy error messages exposed to clients remain Vietnamese |
-| TC-BE-09 | FR-MSN-02, FR-LOG-03 | DECLINED/FAILED/CANCELLED/COMPLETED with pending/reserved goods records durable cleanup; late confirmation releases once; issued goods remain visible for settlement without artificial stock credit |
-| TC-BE-10 | FR-MSN-02, FR-LOG-03 | Required goods RESERVED cannot unlock EN_ROUTE; confirmation of all current-intent issued lines unlocks departure; old-intent results do not; resource-free mission can depart without stock |
+| TC-BE-07 | FR-LOG-03, FR-RPT-01 | Response or Logistics API outage is visible; resolution fails closed if Logistics cannot confirm no open need; retrying a command with the same key creates no duplicate side effect |
+| TC-BE-08 | FR-NOT-01, NFR-L10N-01 | Notice is visible only to its recipient and created once per source version; HTTP and worker-facing messages shown to users remain Vietnamese |
+| TC-BE-09 | FR-LOG-03, FR-LOG-05 | Cancelling an unissued commitment releases stock but preserves requested quantity; issued goods require delivery/return/loss settlement |
+| TC-BE-10 | FR-MSN-02, FR-LOG-05 | Mission status changes do not fabricate stock delivery; request cannot be resolved from mission completion alone |
 | TC-BE-11 | FR-REQ-04 | B links to A; attempting A → C duplicate, rejection or cancellation conflicts. Concurrent B → A and A → C cannot create a chain/cycle or an invalid canonical target |
 | TC-BE-12 | FR-IAM-02, FR-REQ-01/06 | Grants match action AND organization AND selected scope, with OR across matching grants; no cross-organization access. Unknown/ambiguous region SOS succeeds and is visible to designated intake coordinator only; campaign-only coordinator cannot read it; scoped correction is audited |
-| TC-BE-13 | FR-CAM-01, FR-MSN-02, FR-LOG-03 | Pause blocks creation/offer/acceptance, including existing OFFERED work. Already accepted mission may obtain existing reserved goods through continuation validation and finish; unaccepted work cannot issue. Cancel releases unissued goods; resume restores permitted commands; CLOSED request cannot reopen in CLOSED campaign |
-| TC-BE-14 | FR-EVT-01, FR-RPT-01 | Start Reporting after historical SOS/mission/stock events; fromBeginning replay matches fixed dataset. Rebuild with fresh inbox/group yields identical totals without duplication; incomplete retained history is reported unavailable/stale rather than complete |
+| TC-BE-13 | FR-CAM-01, FR-MSN-02, FR-LOG-03 | Pause blocks new attachments, missions, and campaign-linked commitments; accepted work and already-issued goods remain visible; resume restores permitted commands; CLOSED request cannot reopen in CLOSED campaign |
+| TC-BE-14 | FR-RPT-01, NFR-OBS-01 | Dashboard composes a fixed Response/Logistics dataset with correct scope, totals, separate source timestamps, and a clear unavailable state when one API is stopped |
+| TC-BE-15 | FR-LOG-03..05, FR-REQ-08 | One request need is fulfilled by 12 of 20 units, then another 8; delivered/outstanding totals, stock ledger, partial state, audit actors, and human resolution all reconcile |
+| TC-BE-16 | FR-REQ-06, FR-REQ-08 | Duplicate-candidate filter returns nearby/time/category matches only as suggestions; coordinator can ignore or link with a reason; unauthorized regions remain hidden |
 
 ### 22.7 Remaining decisions and current repository status
 
@@ -1346,7 +1307,7 @@ Before setup, verify primary-source runtime/image/client compatibility and curre
 
 ## Appendix A. AI implementation and research handoff
 
-**Execution guidance for AI use.** Section 22 supplies the corrected capstone workflow baseline; concrete OpenAPI/event/migration artifacts and execution evidence must be produced per slice.
+**Execution guidance for AI use.** Section 22 supplies the current capstone workflow baseline; concrete OpenAPI/migration artifacts and execution evidence must be produced per slice.
 
 ### A.1 Reading order and decision authority
 
@@ -1355,9 +1316,9 @@ Before setup, verify primary-source runtime/image/client compatibility and curre
 3. Read this English plan, including the framework evaluation, expanded AI design in Section 12, storage decision in Section 6.3, open decisions, and this appendix.
 4. Inspect the actual repository, existing contracts/migrations, and latest user instructions before writing code. Do not assume planned services or tests already exist.
 
-The current technical baseline is NestJS/TypeScript, five services with Kafka/outbox, TypeORM, PostgreSQL/PostGIS, React/Vite, and React Native/Expo. Section 4 records the selection rationale and alternatives. The project brief defines scope; technology choices are design decisions, not requirements imposed by the brief.
+The current technical baseline is NestJS/TypeScript, three services (Identity, Response, Logistics), REST/JSON, TypeORM, PostgreSQL/PostGIS, React/Vite, and React Native/Expo. Section 4 records the selection rationale and alternatives. The project brief defines scope; technology choices are design decisions, not requirements imposed by the brief.
 
-Nginx and five NestJS service boundaries are the working baseline. MinIO AIStor Free is the selected single-node lab object store; each operator must obtain/use it under current terms, and the team must verify the artifact, private access, and restore path. AI remains optional; Kubernetes is a learning extension that must not block core delivery. Draft business rules, numeric targets, and provider/retention policies remain open where marked.
+Nginx and three NestJS service boundaries are the working baseline. MinIO AIStor Free is the selected single-node lab object store; each operator must obtain/use it under current terms, and the team must verify the artifact, private access, and restore path. AI remains optional. Draft business rules, numeric targets, and provider/retention policies remain open where marked.
 
 Use the recorded baseline for implementation. Revisit it when new evidence materially changes the tradeoffs, rather than repeatedly reopening settled choices. Record new decisions and ask only for information or authorization actually missing for the affected work. Routine reversible implementation choices may proceed with documented assumptions.
 
@@ -1365,9 +1326,9 @@ Use the recorded baseline for implementation. Revisit it when new evidence mater
 
 - Own database credentials and migrations per service; no direct cross-service SQL or foreign keys.
 - Preserve requirement/use-case/test-case IDs across documents, code references, and test records.
-- Keep priority, request lifecycle, mission lifecycle, and stock reservation state distinct.
+- Keep priority, request lifecycle, mission lifecycle, and fulfillment state distinct.
 - Enforce scope in querysets and object actions, including files, exports, and notifications.
-- Commit business changes and outbox intent atomically; deduplicate consumer database effects with a transactional inbox.
+- Commit each service's business change, audit history, and in-app notice atomically; make retryable commands idempotent.
 - Preserve stock constraints, append-only movements, short transactions, deterministic locking, and idempotent commands.
 - Preserve coordinate order, location source, accuracy, capture time, and server receive time.
 - Never label an offline draft as received before server ACK.
@@ -1376,25 +1337,25 @@ Use the recorded baseline for implementation. Revisit it when new evidence mater
 
 ### A.3 Decision baseline and remaining slice gates
 
-Section 22 supersedes the earlier unresolved technical review list: multi-mission aggregation, single-team missions, campaign optionality/resume, mutually exclusive verification, reservation compensation, transfer accounting, revocation, event ordering, and notification uniqueness now have capstone decisions. Do not reopen them without evidence or a changed user instruction.
+Section 22 supersedes the earlier architecture draft: three-service ownership, REST integration, multi-mission aggregation, single-team missions, campaign optionality/resume, mutually exclusive verification, partial fulfillment, stock accounting, revocation, and notification uniqueness. Do not reintroduce broker workflows without evidence meeting Section 4.4.
 
-Before implementing a slice, finish its OpenAPI schemas, database migration constraints/indexes, event payload/topic catalog, authorization cases, and executable acceptance cases. These concrete artifacts are not yet present in this documentation-only repository. Priority definitions, external providers, real-data retention, and operational SLA remain subject to domain review before real use. Ordinary reversible implementation choices may proceed under the documented demo defaults.
+Before implementing a slice, finish its OpenAPI schemas, database migration constraints/indexes, authorization cases, and executable acceptance cases. These concrete artifacts are not yet present in this documentation-only repository. Priority definitions, external providers, real-data retention, and operational SLA remain subject to domain review before real use. Ordinary reversible implementation choices may proceed under the documented demo defaults.
 
 ### A.4 Implementation workflow for a future task
 
 1. Identify the requested slice and its UR/FR, use case, state transitions, and planned tests. Separate required behavior from Should/Optional scope.
 2. Inspect existing code and contracts before adding files or dependencies. Use Nest guards/pipes, TypeORM migrations/transactions, PostgreSQL constraints, and TypeScript types where they satisfy the requirement.
 3. Resolve the slice's blocking decisions. Record assumptions and decision rationale; do not quietly select a guest policy, retention period, SLA, or external provider.
-4. Specify database constraints/indexes, API request/response/errors, authorization, event schema/version/key, transaction boundaries, and failure behavior.
+4. Specify database constraints/indexes, API request/response/errors, authorization, transaction boundaries, idempotency behavior, and failure responses.
 5. Implement the end-to-end slice: migrations, domain logic, API, client states, and workers only where needed. Keep resource-intensive infrastructure optional in local profiles.
 6. Follow the active task's testing authorization. When implementing under the approved delivery plan, use its corresponding tests and record exact commands/results, environment, and remaining gaps. Documentation translation alone does not execute product tests.
 7. Update traceability, setup instructions, and any changed contracts. Report completed work separately from recommendations and unverified behavior.
 
-The ten-week schedule is a planning baseline, not a command to delay all integration until week 7. Establish event contracts and a small integration path early enough to expose service-boundary errors.
+Use the implementation sequence and acceptance gates in Sections 16 and 22. Complete each slice end to end before adding optional infrastructure.
 
 ### A.5 Further research protocol
 
-- Recheck time-sensitive facts using primary sources before pinning versions/providers: Node/Nest/TypeORM compatibility and PostgreSQL/PostGIS image support, Kafka client/broker support, React Native/Expo permissions, object-storage maintenance/license, Kubernetes versions, and map/provider usage terms.
+- Recheck time-sensitive facts using primary sources before pinning versions/providers: Node/Nest/TypeORM compatibility and PostgreSQL/PostGIS image support, React Native/Expo permissions, object-storage maintenance/license, and map/provider usage terms.
 - Treat the 2026-09-29 research findings as dated findings, not newly verified facts. A linked version-specific page is not automatically the selected runtime version.
 - Record the question, research date, primary-source URLs, findings, design impact, tradeoffs, and unresolved points. Distinguish a documented fact from an inference or recommendation.
 - Preserve approved architecture unless evidence justifies a change; record the reason and obtain any necessary decision before making a material switch.
