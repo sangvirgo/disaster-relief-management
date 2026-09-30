@@ -4,14 +4,14 @@
 |---|---|
 | Project | Emergency Response and Disaster Relief Management System |
 | Project code | C48 |
-| Version | 1.2 — expanded AI integration and storage reassessment |
+| Version | 2.2 — reservation cleanup, dispatch guards, scope and replay corrections |
 | Original research date | 2026-09-29 |
 | Duration in the project brief | 10 weeks; three team members |
-| Document role | Primary English reference for implementation and further research |
+| Document role | Single technical plan for implementation and further research |
 
 This document provides the technical baseline for the SRS, SDD, database/API design, test cases, and user guide. Proposed technologies, service levels, data policies, and workflows are not thereby approved by a rescue authority.
 
-**For AI implementation and further research:** read Appendix A and the [storage research note](c48-storage-research.md) before using this plan. Sections 1–21 define the working baseline; Appendix A adds execution guidance and identifies unresolved design issues. Requirement, use-case, and test-case identifiers are preserved. Section 4.2 reviews framework documentation; Section 12 expands AI integration and evaluation; Section 6.3 and the storage note reassess MinIO. This document does not claim implementation benchmarks or executed product tests.
+**For AI implementation and further research:** this is the single plan. Appendix A adds execution guidance and remaining slice-specific contract gates. Section 4.2 compares frameworks; Section 22 defines the solo-backend structure, decision baseline, and implementation gates; Section 12 specifies AI integration; Section 6.3 settles object storage. This plan does not claim implementation benchmarks or executed product tests.
 
 ## 1. Reading guide and confidence levels
 
@@ -27,13 +27,13 @@ OCHA/IFRC materials inform humanitarian workflow design; they do not replace rul
 
 | Area | Proposed baseline | Rationale |
 |---|---|---|
-| Backend | Python + Django 5.2 LTS + Django REST Framework (DRF) | Selected through the framework comparison in Section 4.2 for integrated ORM/migrations, authentication/admin, and GeoDjango. The original research records security support through April 2028; select a supported patch when initializing the project. [Django releases](https://www.djangoproject.com/download/) |
-| Database | PostgreSQL + PostGIS | Relational data, inventory transactions, and location queries; GeoDjango provides richer PostGIS support than MySQL. [GeoDjango database API](https://docs.djangoproject.com/en/5.2/ref/contrib/gis/db-api/) |
+| Backend | NestJS + TypeScript on a supported Node.js LTS release | Selected after comparing NestJS with Spring Boot, Django/DRF, FastAPI, and Flask; it fits the TypeScript client stack and documents modular services, validation, OpenAPI, and Kafka integration. Pin compatible versions at setup. |
+| Database | PostgreSQL + PostGIS, accessed through TypeORM and parameterized SQL for spatial operations | Relational workflows, inventory transactions, and indexed location queries; TypeORM documents PostgreSQL geometry/geography support. [TypeORM PostgreSQL spatial columns](https://typeorm.io/docs/drivers/postgres/) |
 | Backend services | Five independently deployable services: Identity, Response, Logistics, Notification, Reporting | Demonstrates boundaries, APIs/events, and data ownership within a ten-week project. |
 | Messaging | Apache Kafka KRaft + transactional outbox + idempotent consumers | Supports multiple consumers and replay; no end-to-end exactly-once guarantee is claimed. [Kafka](https://kafka.apache.org/intro/), [transactional outbox](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html) |
 | Web | React + TypeScript + Vite | Suitable for operational dashboards; authenticated screens do not require SSR/SEO. [Vite guide](https://vite.dev/guide/) |
 | Mobile | React Native + Expo + TypeScript | Shares TypeScript skills and supports GPS, photos, and notifications. Request location permission when needed; no default background tracking. [React Native TypeScript](https://reactnative.dev/docs/typescript), [Expo Location](https://docs.expo.dev/versions/latest/sdk/location/) |
-| Files | Django storage API + django-storages/boto3; conditional MinIO AIStor Free lab profile, SeaweedFS fallback, managed S3 for a separately reviewed deployment | Distinguish archived Community from AIStor. Edition/license and integration checks remain prerequisites; see [storage research](c48-storage-research.md). |
+| Files | MinIO AIStor Free, single-node lab deployment, through the AWS SDK for JavaScript S3 client | Final capstone choice for synthetic demo data. Obtain/use it under current license terms; do not redistribute software. Free tier has no HA/SLA and excludes at-rest encryption; retain private access and tested backup. |
 | Deployment | Docker Compose on one demo host; Nginx reverse proxy | Multiple containers do not require multiple physical machines. [Docker Compose production](https://docs.docker.com/compose/how-tos/production/) |
 | Kubernetes | kind learning extension after the Compose end-to-end workflow is stable | Supports the learning goal without blocking the capstone. kind runs local clusters in Docker containers. [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/) |
 | AI | Advisor with explanations; coordinator makes the decision | An optional research direction, with no automatic priority changes or rescue dispatch. |
@@ -71,45 +71,45 @@ The workflow references the OCHA cycle conceptually. Validate terminology and re
 
 ## 4. Technology comparisons
 
-### 4.1 Database
+### 4.1 Database and NestJS persistence
 
 | Criterion | PostgreSQL + PostGIS | MySQL 8.4 + InnoDB | MongoDB |
 |---|---|---|---|
-| Relationships and constraints | Strong fit for users, missions, inventory transactions, and audit | Strong; InnoDB supports transactions and foreign keys | Relationships require additional application design |
-| GPS/maps | Rich GeoDjango/PostGIS operations and spatial indexes | GeoDjango documents fewer spatial functions than PostGIS | Supports 2dsphere; separate Django integration needed |
-| Concurrent inventory updates | Transactions, constraints, and row locks support preventing over-issue | InnoDB provides transactions and locking | Supports multi-document transactions; relational/reporting design needs consideration |
-| Django integration | Direct ORM and GeoDjango support | Direct ORM; more limited GIS support | Not a default Django ORM backend |
-| Decision | **Selected** | Fallback if the team already operates MySQL | Not selected as the primary database |
+| Relationships and constraints | Strong fit for users, missions, inventory transactions, and audit | Strong; InnoDB supports transactions and foreign keys | Relationships and cross-entity reporting need more application design |
+| GPS/maps | PostGIS spatial operators and GiST indexes; TypeORM maps PostgreSQL geometry/geography to GeoJSON | MySQL has spatial features, but the selected ORM/query path needs more verification | 2dsphere indexes; a document model does not simplify stock-ledger constraints |
+| Concurrent inventory updates | Transactions, check/unique constraints, and row locks prevent over-issue | InnoDB supports transactions and locking | Multi-document transactions exist; inventory consistency still needs deliberate rules |
+| NestJS integration | PostgreSQL driver and `@nestjs/typeorm`; TypeORM supports spatial column types | TypeORM supported; GIS is not the reason to select it | Nest provides Mongoose integration; not the chosen fit for the relational ledger |
+| Decision | **Selected** | Not selected | Not selected as the primary database |
 
-PostGIS supports GiST spatial indexes. Consider a geography PointField with SRID 4326 for radius queries; use geometry for boundary polygons and appropriate spatial operations. Do not mechanically use geography for every field. [PostGIS spatial indexes](https://postgis.net/documentation/faq/spatial-indexes/), [GeoDjango distance queries](https://docs.djangoproject.com/en/5.2/ref/contrib/gis/db-api/)
+TypeORM is selected because Nest documents a maintained `@nestjs/typeorm` integration and TypeORM's PostgreSQL driver documents geometry/geography columns with GeoJSON exchange. Use migrations, not runtime schema synchronization. Use TypeORM transactions and row locks for inventory; use parameterized SQL/QueryBuilder for spatial predicates such as `ST_DWithin` where repository methods do not express the required operation. Keep SRID, index/operator choice, and geography-versus-geometry explicit. [NestJS database integrations](https://docs.nestjs.com/techniques/database), [TypeORM PostgreSQL spatial columns](https://typeorm.io/docs/drivers/postgres/), [PostGIS spatial indexes](https://postgis.net/documentation/faq/spatial-indexes/)
 
-MySQL supports InnoDB transactions, and MongoDB supports geospatial indexes and transactions. The distinction is the fit with this relational domain and GeoDjango integration. [MySQL InnoDB](https://dev.mysql.com/doc/refman/8.4/en/innodb-introduction.html), [MongoDB 2dsphere](https://www.mongodb.com/docs/manual/core/indexes/index-types/geospatial/2dsphere/), [MongoDB transactions](https://www.mongodb.com/docs/manual/core/transactions/)
+Prisma is a credible TypeScript alternative with generated types, but PostGIS access uses unsupported/custom-type and raw-query paths. Drizzle is also viable if the team prefers SQL-first queries and verifies migration/spatial needs. Use one ORM across services. The selection is **TypeORM**, subject to an early compatibility spike covering geometry migration, spatial query, and transaction/row-lock behavior on the selected PostgreSQL/PostGIS image. [Prisma unsupported database features](https://www.prisma.io/docs/orm/prisma-schema/data-model/unsupported-database-features), [Drizzle PostgreSQL](https://orm.drizzle.team/docs/get-started-postgresql)
 
-Inventory operations use short transactions, constraints, and row locks on SKU/warehouse balances. Do not call Kafka or object storage while holding database locks. [Django transactions](https://docs.djangoproject.com/en/5.2/topics/db/transactions/), [Django QuerySet locking](https://docs.djangoproject.com/en/5.2/ref/models/querysets/#select-for-update), [PostgreSQL explicit locking](https://www.postgresql.org/docs/18/explicit-locking.html)
+Store points as GeoJSON with longitude, latitude order and SRID 4326; validate ranges before persistence. Consider `geography(Point,4326)` for meter-based radius behavior and geometry for boundaries; validate units/indexes with representative queries. [RFC 7946](https://datatracker.ietf.org/doc/html/rfc7946), [PostGIS spatial indexes](https://postgis.net/documentation/faq/spatial-indexes/)
+
+Inventory writes use short PostgreSQL transactions, deterministic row-lock order, and constraints such as `on_hand >= 0`, `reserved >= 0`, and `reserved <= on_hand`. Do not call Kafka or object storage while holding database locks. Test concurrency against PostgreSQL/PostGIS, not SQLite. [PostgreSQL explicit locking](https://www.postgresql.org/docs/18/explicit-locking.html)
+
 
 ### 4.2 Backend framework evaluation and selection
 
-**Evaluation method:** qualitative comparison against C48's requirements, based on official documentation reviewed on 2026-09-29. This is a design assessment, not a measured performance benchmark. No framework is assumed to be mandatory in this comparison.
-
-The primary criteria are relational workflow implementation, transaction control, geospatial integration, authentication and operational administration, Kafka integration, and delivery/maintenance effort for five services over ten weeks. Sharing a language with clients and optional AI integration are secondary benefits. Actual team proficiency remains unmeasured and should be checked during setup.
+**Evaluation method:** qualitative comparison against C48's five-service, TypeScript-client, PostgreSQL/PostGIS, Kafka, and ten-week delivery needs, using official documentation reviewed on 2026-09-30. This is not a performance benchmark. NestJS/TypeScript is the selected backend; no Python framework is part of the implementation stack.
 
 | Framework | Strengths relevant to C48 | Integration work and tradeoffs | Assessment |
 |---|---|---|---|
-| **Django + DRF (Python)** | Integrated ORM/migrations, authentication, administration, and GeoDjango; explicit database transactions; DRF API conventions | Kafka requires a client/worker integration; custom scoped permissions, outbox, and saga logic still need implementation; admin is not the operational dashboard | **Selected** for the combined relational, GIS, and administration workload |
-| **Spring Boot (Java/Kotlin ecosystem)** | Spring ecosystem supports application configuration, security, health/metrics, relational persistence, and Kafka integration | C48 would combine persistence, spatial mapping, security, API, and operational UI components; effort depends on Spring experience. No claim that JVM resource use makes it unsuitable | Strong alternative, especially with existing Spring expertise or a JVM deployment standard |
-| **NestJS (TypeScript/Node.js)** | Structured modules/providers, TypeScript shared with web/mobile, documented Kafka transport and API/security integrations | Select and integrate ORM/migrations and PostGIS access; operational administration and inventory rules remain application work | Strong alternative when end-to-end TypeScript and Node experience outweigh Django's integrated data/GIS tooling |
-| **FastAPI (Python)** | Type-based validation, generated OpenAPI, dependency injection, and asynchronous API support | Assemble ORM/migrations, administration, authentication policy, and spatial integration; less integrated for this broad CRUD/operations scope | Suitable for focused API workloads; not the primary framework here |
-| **Flask (Python)** | Small core, flexible extensions, explicit component choices | Database, migration, administration, API schema, and authentication choices require additional assembly across services | Viable, but its minimal core offers less benefit for this domain-heavy system |
+| **NestJS (TypeScript/Node.js)** | Modules/providers/guards, TypeScript, OpenAPI and validation integrations, Kafka transport; one language family across backend and clients | ORM/migrations, PostGIS queries, domain authorization, outbox/saga, and operations UI need explicit implementation | **Selected** for five independently deployed services and TypeScript development |
+| **Spring Boot (Java/Kotlin)** | Mature application/security/operations ecosystem and Spring for Apache Kafka | Separate JVM language/tooling from clients; strong alternative if the team already has more Spring experience | Technically capable; larger language/tooling switch for this project |
+| **Django + DRF (Python)** | Integrated ORM, admin/auth and mature API conventions | Different backend language; Kafka/outbox reliability and domain rules still need explicit work | Capable alternative, not used in this plan |
+| **FastAPI (Python)** | Type-oriented validation, generated OpenAPI, async API support | Assemble ORM/migrations, admin, auth, permissions, GIS, and event reliability components | Capable for focused APIs, but adds a language/tooling split |
+| **Flask (Python)** | Small core and flexible component selection | More foundational database, schema, authentication, and administration decisions across services | Flexible but adds assembly work and a language/tooling split |
 
-**Evidence for the comparison:** Django documents its model layer and administrative interface; GeoDjango supplies spatial database integration. Spring Boot documents standalone applications and operational features, while Spring for Apache Kafka provides producer/listener integration. NestJS documents TypeScript application structure and a Kafka transport. FastAPI documents validation/OpenAPI and dependency injection. Flask deliberately leaves components such as database integration to extensions. [Django overview](https://docs.djangoproject.com/en/5.2/intro/overview/), [GeoDjango](https://docs.djangoproject.com/en/5.2/ref/contrib/gis/db-api/), [Spring Boot](https://docs.spring.io/spring-boot/index.html), [Spring for Apache Kafka](https://docs.spring.io/spring-kafka/reference/), [NestJS](https://docs.nestjs.com/), [NestJS Kafka](https://docs.nestjs.com/microservices/kafka), [FastAPI features](https://fastapi.tiangolo.com/features/), [Flask design](https://flask.palletsprojects.com/en/stable/design/)
+**Evidence:** Nest documents modules/providers, guards, validation, OpenAPI, database integrations, and Kafka transport. Spring documents standalone applications and operational features; Spring for Apache Kafka provides Kafka integration. Django/DRF, FastAPI, and Flask remain capable alternatives with different integration tradeoffs. [NestJS database integrations](https://docs.nestjs.com/techniques/database), [NestJS validation](https://docs.nestjs.com/techniques/validation), [NestJS OpenAPI](https://docs.nestjs.com/openapi/introduction), [NestJS Kafka transport](https://docs.nestjs.com/microservices/kafka), [Spring Boot](https://docs.spring.io/spring-boot/index.html), [Spring for Apache Kafka](https://docs.spring.io/spring-kafka/reference/), [Django overview](https://docs.djangoproject.com/en/5.2/intro/overview/), [FastAPI features](https://fastapi.tiangolo.com/features/), [Flask design](https://flask.palletsprojects.com/en/stable/design/)
 
-**Selection rationale — project-specific inference:** Django + DRF offers the most cohesive baseline for C48's combination of relational records, stock transactions, GPS queries, and account/administrative workflows. Its integrated components reduce the number of foundational components that must be assembled. This is the main reason for selection; access to Python AI libraries is a secondary benefit because AI is optional and can run behind a service boundary with any framework.
+**Selection rationale — project-specific:** NestJS matches a TypeScript client/backend workflow and documents patterns for modules, guards, OpenAPI, validation, and Kafka. TypeORM's PostgreSQL spatial types support the GIS baseline. This reduces language/tooling changes while keeping database, authorization, transactions, and events explicit. It does not imply Nest is universally superior or faster.
 
-**Tradeoffs accepted:** Django does not supply the complete Kafka/outbox/saga architecture, scoped object authorization, or the React operational UI. Those must be designed and tested explicitly. Spring Boot and NestJS remain technically capable alternatives; no assertion is made that Django is universally faster, more scalable, or more secure. Revisit the decision if a compatibility spike fails, measured constraints cannot be met, or actual team expertise changes the delivery assessment.
+**Selected implementation choices:** NestJS REST services on the default Express adapter; TypeScript; TypeORM + PostgreSQL/PostGIS; Nest `ValidationPipe` with DTO validation; `@nestjs/swagger` for OpenAPI; Passport/JWT for authentication; Nest Kafka transport/KafkaJS for events; AWS SDK for JavaScript v3 S3 client for MinIO. Pin compatible Node/Nest/dependency versions after the compatibility spike; avoid floating `latest` tags.
 
-Use Django 5.2 LTS, compatible DRF, and a Python version supported by Django. Lock dependencies and container images. The original research records Django 5.2 security support through April 2028; check current patches during setup instead of copying an old patch number from this plan. [Django release/support schedule](https://www.djangoproject.com/download/)
+Use one repository/workspace for five Nest applications, each with its own bootstrap, environment, image, migration set, database credentials, and deployment. Keep domain models and persistence code inside their owning service. Share only versioned API/event schemas where useful; do not share domain entities or database modules across services.
 
-Each service is a Django project with its own configuration, database, and migrations. Share documented API/event conventions; an internal framework is unnecessary without demonstrated reuse needs.
 
 ### 4.3 Web, mobile, and API
 
@@ -117,7 +117,7 @@ Each service is a Django project with its own configuration, database, and migra
 |---|---|---|
 | Web | React + TypeScript + Vite; React Router; TanStack Query for server state | Dashboard, map/queue, verification/triage, missions, inventory, reports, admin |
 | Mobile | React Native + Expo + TypeScript | Citizen SOS/status tracking; volunteer missions/progress; foreground GPS and photos |
-| API | REST/JSON /api/v1; per-service OpenAPI through drf-spectacular | Web/mobile contracts, mocks, and API checks |
+| API | REST/JSON /api/v1; per-service OpenAPI through `@nestjs/swagger` | Web/mobile contracts, mocks, and API checks |
 | Maps | Separate map UI from business logic; PostGIS queries; select tile/geocoding provider after license, quota, and privacy review | Do not send incident descriptions or personally identifiable information (PII) to map providers |
 
 Emergency screens should minimize steps, provide accessible controls, clearly show submission status, and allow a manual pin when GPS is denied or inaccurate. Do not enable background tracking by default. Expo permissions depend on platform and access type. [Expo Location](https://docs.expo.dev/versions/latest/sdk/location/), [Expo permissions](https://docs.expo.dev/guides/permissions/)
@@ -127,7 +127,7 @@ Emergency screens should minimize steps, provide accessible controls, clearly sh
 | Option | Appropriate when | C48 decision |
 |---|---|---|
 | Kafka | Multiple consumers, replay, reporting projections, learning event-driven services | **Selected** for integration events |
-| RabbitMQ/Celery | Background tasks/retries without replaying an event stream | Simpler for a job queue, but less aligned with the replay and multi-consumer integration goals |
+| RabbitMQ/job queue | Background tasks/retries without replaying an event stream | Simpler for isolated jobs, but less aligned with the replay and multi-consumer integration goals |
 
 Kafka ordering is per partition, not global. Use the aggregate ID as the message key to place changes for the same request/mission in the same partition. Messages may be redelivered; consumers must be idempotent. Do not promise exactly-once processing across databases, Kafka, push providers, and reporting. [Kafka introduction](https://kafka.apache.org/intro/), [Kafka delivery semantics](https://kafka.apache.org/40/design/design/)
 
@@ -135,7 +135,7 @@ Kafka ordering is per partition, not global. Use the aggregate ID as the message
 
 | Model | Benefits | Cost/risk | Assessment |
 |---|---|---|---|
-| Django modular monolith + workers | Fewer deployments/databases, simpler transactions, easier MVP delivery | Less explicit independent deployment and data ownership | Fallback if the schedule slips |
+| NestJS modular monolith + workers | Fewer deployments/databases, simpler transactions, easier MVP delivery | Less explicit independent deployment and data ownership | Fallback if the schedule slips |
 | Five services with bounded contexts | Independent boundaries, databases, APIs, and events; feasible on one host | Cross-service auth, outbox, eventual consistency, and saga testing | **Selected for explicit service ownership and deployment boundaries** |
 | Eight or more small services | Finer ownership/scaling possibilities | More contracts, containers, integration tests, and operational failures | Not selected |
 
@@ -151,9 +151,9 @@ flowchart LR
   Volunteer[Mobile Volunteer]
   Staff[Web Coordinator / Manager / Admin]
   Nginx[Nginx Reverse Proxy]
-  Identity[Identity Django Service]
-  Response[Response Django + GeoDjango]
-  Logistics[Logistics Django Service]
+  Identity[Identity NestJS Service]
+  Response[Response NestJS + TypeORM/PostGIS]
+  Logistics[Logistics NestJS Service]
   Notification[Notification Consumer]
   Reporting[Reporting Consumer + Read API]
   PG[(PostgreSQL + PostGIS<br/>separate DB/user per service)]
@@ -243,7 +243,7 @@ Schema Registry, Avro, Debezium/CDC, a service mesh, a CQRS framework, and a wor
 2. Response records ReservationRequested in its outbox.
 3. Logistics consumes the event, locks balances, checks available stock, and atomically creates or rejects the reservation. The result goes through its outbox.
 4. A confirmed reservation moves the mission to READY_TO_DEPLOY. The coordinator sends the team an offer, moving the request to DISPATCHED. Team acceptance moves the request to IN_PROGRESS. Rejection leaves the mission WAITING_RESOURCES so the coordinator can change warehouse/quantity or cancel.
-5. Physical issue creates an ISSUE movement and changes the reservation to ISSUED. Cancellation before issue releases stock; cancellation afterward does not delete movements.
+5. Physical issue creates an ISSUE movement and changes the reservation to ISSUED. A supply-dependent mission cannot enter EN_ROUTE until Response has confirmed all required lines were issued through a Logistics result or authenticated reconciliation. Terminal missions release unissued reservations; already-issued goods require distribution/return/loss settlement, never deletion of movements.
 6. Returned goods create a RETURN movement after physical verification/counting.
 
 If a mission is cancelled while reservation processing is pending, Response records cancellation/release intent. A late reservation confirmation must trigger a release compensation; retries remain idempotent and must not leave an orphaned reservation.
@@ -259,12 +259,11 @@ erDiagram
   IDENTITY_USER ||--o{ IDENTITY_ROLE_GRANT : receives
   IDENTITY_ORGANIZATION ||--o{ IDENTITY_MEMBERSHIP : has
   IDENTITY_USER ||--o{ IDENTITY_MEMBERSHIP : joins
-  RESPONSE_CAMPAIGN ||--o{ RESPONSE_REQUEST : groups
+  RESPONSE_CAMPAIGN |o--o{ RESPONSE_REQUEST : groups
   RESPONSE_REQUEST ||--o{ RESPONSE_REQUEST_EVENT : records
   RESPONSE_REQUEST ||--o{ RESPONSE_MISSION : dispatches
   RESPONSE_TEAM ||--o{ RESPONSE_TEAM_MEMBER : has
-  RESPONSE_MISSION ||--o{ RESPONSE_MISSION_TEAM : assigns
-  RESPONSE_TEAM ||--o{ RESPONSE_MISSION_TEAM : receives
+  RESPONSE_TEAM ||--o{ RESPONSE_MISSION : receives
   RESPONSE_REQUEST ||--o{ RESPONSE_EVIDENCE : includes
   LOGISTICS_WAREHOUSE ||--o{ LOGISTICS_STOCK_BALANCE : stores
   LOGISTICS_ITEM ||--o{ LOGISTICS_STOCK_BALANCE : counts
@@ -303,6 +302,7 @@ erDiagram
     uuid request_id
     string status
     uuid coordinator_user_id
+    uuid team_id
     datetime created_at
   }
   LOGISTICS_STOCK_BALANCE {
@@ -322,19 +322,19 @@ erDiagram
   }
 ```
 
-Diagram relationships are local to a service. External user/campaign IDs are logical UUID references, with no cross-database foreign keys. Implementation still requires complete timestamps, audit fields, indexes, unique constraints, migrations, and retention policies.
+Each mission has exactly one team; additional teams receive separate missions under the same request. A request may have no campaign until a scoped coordinator attaches it to an ACTIVE campaign. Diagram relationships are local to a service. External user/campaign IDs are logical UUID references, with no cross-database foreign keys. Implementation still requires complete timestamps, audit fields, indexes, unique constraints, migrations, and retention policies.
 
 ### 6.2 Core entities
 
 | Database | Minimum tables/entities |
 |---|---|
-| Identity | User, Organization, Membership, RoleGrant, account status, refresh session/revocation if token rotation is used |
-| Response | Campaign, Incident, AssistanceRequest, RequestEvent, RescueTeam, TeamMember with opaque user ID, VolunteerProfile, Mission, MissionTeam, EvidenceMetadata, Outbox, Inbox; optional AnalysisSnapshot, AnalysisJob, TriageRecommendation, RecommendationReview (Section 12) |
-| Logistics | Warehouse, Item, StockBalance, StockMovement, CampaignReference projection, Reservation/lines, Transfer/lines, Distribution/lines, Vehicle, ReliefPoint, Outbox, Inbox |
+| Identity | User, Organization, controlled Region catalog, Membership, RoleGrant, account status, RefreshSession with rotation/revocation, AuditRecord, Outbox |
+| Response | Campaign, Incident, RegionBoundary referencing the controlled region code, AssistanceRequest with organization_id and nullable region/campaign, RequestEvent, RescueTeam, TeamMember with opaque user ID, VolunteerProfile, Mission with one team_id, EvidenceMetadata, Outbox, Inbox; optional AnalysisSnapshot, AnalysisJob, TriageRecommendation, RecommendationReview (Section 12) |
+| Logistics | Warehouse, Item, StockBalance, StockMovement, CampaignReference projection, Reservation/lines, Transfer/lines, Distribution/lines, IssuedLineSettlement, TransferTransitLine, Vehicle, ReliefPoint, Outbox, Inbox |
 | Notification | DeviceEndpoint, Notification, DeliveryAttempt, retry state, Inbox |
-| Reporting | RequestDailyMetric, CampaignSnapshot, StockSnapshot, ProcessingTimeMetric, watermark/offset; create only projections used by the dashboard |
+| Reporting | Inbox, PendingProjectionEvent, RequestDailyMetric, CampaignSnapshot, StockSnapshot, ProcessingTimeMetric, watermark/offset; create only projections used by the dashboard |
 
-Create the custom User model in Identity's first migration. Changing it after migrations and domain data exist complicates migration work. [Django custom user model](https://docs.djangoproject.com/en/5.2/topics/auth/customizing/)
+Define the Identity user entity and migration before other services rely on its contract; external services store opaque user UUIDs rather than duplicating credentials.
 
 ### 6.3 GPS and evidence files
 
@@ -345,22 +345,25 @@ Create the custom User model in Identity's first migration. Changing it after mi
 - Store files in object storage. The database holds object key, owner type/ID, validated MIME, size, checksum, uploader, time, and visibility. Keep buckets private; use short-lived signed URLs if direct access is used.
 - Validate actual MIME, extension, and size; do not trust client-provided names/MIME. Uploads require authorization on the owning business object.
 - Demo data must be synthetic; do not use real victims' images or personal information.
-- Use Django's storage API with django-storages/boto3 for S3-compatible providers; local filesystem is acceptable for lightweight development tests, while provider integration/restore tests require the selected storage service. The detailed [storage research](c48-storage-research.md) defines edition selection, upload states, access policies, and recovery.
+- Use the AWS SDK for JavaScript v3 S3 client from the owning NestJS service. Configure separate service credentials and private buckets for Response and Logistics. Unit tests may mock S3; provider integration and restore checks must use the selected MinIO AIStor Free lab instance.
 
-#### Storage reassessment: can C48 use MinIO?
+#### Selected object storage: MinIO AIStor Free
 
-**Yes, conditionally for the capstone lab.** The previous archive finding concerns MinIO Community, not all MinIO products. Community is archived; AIStor Free is a separate proprietary single-node option. Its agreement permits educational use, while its operational documentation limits features and provides no SLA. The proposed lab path is AIStor Free with synthetic data after terms/license and compatibility checks; SeaweedFS remains the self-hosted fallback. No artifact, license, or provider has been installed or activated during research. [Community repository](https://github.com/minio/minio), [AIStor Free agreement](https://www.min.io/legal/aistor-free-agreement), [AIStor license operations](https://docs.min.io/aistor/operations/licenses/)
+**Final choice for this capstone: MinIO AIStor Free, single-node lab deployment, using synthetic data.** MinIO Community is not selected: its repository is archived and marked unmaintained. AIStor Free is a separate proprietary product; its agreement allows standalone educational/research use, and its operations documentation sets edition-specific limits. This is a lab choice, not a production recommendation. No MinIO artifact/license, application integration, or restore test has been installed or verified as part of this plan. [Community repository](https://github.com/minio/minio), [AIStor Free agreement](https://www.min.io/legal/aistor-free-agreement), [AIStor license operations](https://docs.min.io/aistor/operations/licenses/)
 
-| Choice | Appropriate use | Limitation to record |
-|---|---|---|
-| MinIO AIStor Free | Conditional single-node capstone lab | Valid license/terms, no HA/SLA, tier-specific restrictions; do not reuse old Community setup instructions blindly |
-| MinIO Community | Historical or isolated disposable experiments | Archived/unmaintained; not the maintained shared-demo default |
-| SeaweedFS | Open-source S3-compatible lab fallback | Its own compatibility, policy, operations, and restore checks are still needed |
-| Managed S3-compatible storage | Later deployment with known region/privacy/budget | Provider-specific cost, network, IAM, and data-policy decisions |
+| Decision | C48 baseline |
+|---|---|
+| Product/edition | MinIO AIStor Free; do not substitute a Community image or third-party rebuild |
+| Topology/data | One node for the lab; synthetic demo data only; no HA or production availability claim |
+| License/package | Operators must obtain and use the product under the current agreement and active license. Do not modify or redistribute the AIStor binary/image or license in the repository/submission unless the applicable terms expressly allow it. Record the exact release and license validity before the demo. |
+| Free-tier limits | Do not rely on distributed deployment, replication, lifecycle transitions, version-specific deletion, encryption at rest, or an SLA/SLO. The current docs state AIStor Free support begins with `minio.RELEASE.2025-12-20T04-58-37Z`; recheck the requirement against the release chosen for setup. |
+| Application integration | Private S3 API; AWS SDK for JavaScript v3; separate least-privilege Response and Logistics credentials/buckets; no blanket access for other services |
 
-For C48, start with uploads through the owning Django service: authorize → record PENDING → validate/stream/upload outside the DB transaction → record READY. A storage failure must not roll back an already received SOS. Response and Logistics use separate private buckets/credentials; other services have no blanket file access. Do not store signed URLs in PostgreSQL or Kafka. Signed links need a hostname reachable from both browser and physical mobile devices. Backup must include actual object bytes plus metadata; restoring PostgreSQL alone does not restore evidence. [Django S3 backend settings](https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html)
+Use backend-mediated uploads through the owning NestJS service for the first implementation. Authorize the business object, persist attachment state as PENDING in a short database transaction, validate and stream bounded content to a generated immutable key outside the transaction, then record READY in a second short transaction. On failure, preserve the SOS and expose a retryable FAILED/PENDING attachment; reconcile crashes between object upload and metadata commit. Enforce extension/type/size rules using detected content, not client MIME or filename. Do not hold database locks during S3 calls or claim a cross-database/object-store atomic transaction. [AWS SDK for JavaScript S3 client](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/), [OWASP file upload guidance](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
 
-If direct uploads are later added, validate finalized content and bind evidence to immutable verified bytes: presigned upload URLs may be reused until expiration. See the storage note for overwrite races, permission-revocation windows, reconciliation, and planned checks. [S3 presigned URL behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
+Keep buckets private and store only object metadata (owner, generated key, detected MIME, size, checksum, uploader, timestamps, visibility/state) in PostgreSQL. Do not persist object bytes or signed URLs in PostgreSQL, Kafka, logs, analytics, or reports. Authorize each download against the current business object before creating a short-lived signed URL; use a hostname reachable from the backend, browser, and physical mobile device. A signed URL remains a bearer capability until it expires, so document that revocation window or proxy downloads when immediate revocation is required. Direct client uploads are outside the initial scope: presigned upload URLs can be reused and can replace an existing key until expiry. [S3 presigned URL behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
+
+Back up owning-service database metadata and object bytes together, with a manifest of keys, sizes, and checksums. Keep a backup outside the demo host; test restoration in an isolated environment and verify scoped download/denied access after restore. A PostgreSQL dump or a volume beside the original objects alone is not a verified backup. No backup/restore test has been executed yet.
 
 ### 6.4 Inventory and audit
 
@@ -392,11 +395,11 @@ For FR priorities, **M** means required for the core demo, **S** means should ha
 
 | ID | Priority | Proposed functional requirement | Verification criterion |
 |---|---:|---|---|
-| FR-IAM-01 | M | Login, refresh/logout, account disabling, and credential changes | Invalid/expired tokens or disabled accounts receive 401; logout invalidates the refresh session |
+| FR-IAM-01 | M | Citizen registration, login, refresh/logout, account disabling, and credential changes | Invalid/expired tokens or disabled accounts receive 401; logout invalidates the refresh session |
 | FR-IAM-02 | M | Organization/region/campaign-scoped roles; action and object checks | Citizens cannot access another citizen's request; volunteers see their team's missions only |
 | FR-IAM-03 | M | Admin account, organization, and role management with least privilege | Permission changes record actor/time and before/after values |
 | FR-REQ-01 | M | Create requests with category, short description, headcount, location/manual pin, time/source | Validate input; return an identifier and server receive time |
-| FR-REQ-02 | M | Support authenticated users; guest SOS only if confirmed | Guests may create/track through a separate capability, never search/list |
+| FR-REQ-02 | M | Authenticated citizens submit and track SOS; guest endpoints disabled in capstone | Registration grants CITIZEN only; unauthenticated creation/tracking is denied |
 | FR-REQ-03 | M | Idempotent SOS creation retries | Same key/payload creates no second row; same key with different payload is rejected |
 | FR-REQ-04 | M | Verify, reject, and duplicate-link; rejection/duplicate decisions require reasons | Preserve duplicate requests and link them to a canonical request |
 | FR-REQ-05 | M | Manual P1–P4 priority with actor/time/reason and override history | Priority is separate from status; AI cannot change it automatically |
@@ -404,7 +407,7 @@ For FR priorities, **M** means required for the core demo, **S** means should ha
 | FR-REQ-07 | M | Citizens view timelines and supplement their own requests in permitted states | Owner-only access; supplements record actor/time |
 | FR-MSN-01 | M | Manage teams, skills, availability, and members through opaque user IDs | Reject inactive/unavailable teams or missing mandatory skills |
 | FR-MSN-02 | M | Create missions, offer/assign, accept/decline, transition, and record results | Only valid transitions; record actor/time/reason |
-| FR-MSN-03 | M | One request may have multiple missions; one mission belongs to one request in the MVP | One completed mission does not close a request with remaining needs |
+| FR-MSN-03 | M | One request may have multiple missions; one mission belongs to one request and one team in the MVP | One completed mission does not close a request with remaining needs |
 | FR-MSN-04 | M | Request/mission evidence uploads and coordinator outcome confirmation | Metadata and download access follow object scope |
 | FR-CAM-01 | M | Response manages campaigns/incidents, operating regions, time, and status | Scoped creation/editing; Logistics stores campaign references |
 | FR-LOG-01 | M | Manage warehouses, items, vehicles, relief points, and campaign references where needed | Active/inactive entities; preserve existing history |
@@ -427,7 +430,7 @@ The brief specifies no numeric thresholds. The numbers below are initial targets
 | ID | Quality | Proposed requirement/criterion |
 |---|---|---|
 | NFR-SEC-01 | Security | Require authentication by default; public guest SOS only if approved. Services enforce scope and never trust client-supplied roles. |
-| NFR-SEC-02 | Security | Filter list querysets by authorization; enforce detail/action object permissions, input/file validation, and suitable rate limits. DRF defaults to AllowAny without configured policy; object permissions do not automatically filter every list row. [DRF permissions](https://www.django-rest-framework.org/api-guide/permissions/) |
+| NFR-SEC-02 | Security | Filter list querysets by authorization; enforce detail/action object permissions, input/file validation, and suitable rate limits. route-level guards do not automatically scope returned rows; test object and list authorization separately. [NestJS guards](https://docs.nestjs.com/guards), [NestJS validation](https://docs.nestjs.com/techniques/validation) |
 | NFR-SEC-03 | Security | Do not log tokens, passwords, signed URLs, or unnecessary exact locations; HTTPS outside local development. |
 | NFR-PRV-01 | Privacy | Exact locations are accessible only to the subject, scoped coordinators, and assigned teams; reports aggregate by default. Retention needs confirmation. |
 | NFR-REL-01 | Reliability | Nonnegative inventory, valid states, idempotent retries, consumer recovery, and backup restoration checks. |
@@ -456,25 +459,30 @@ stateDiagram-v2
   TRIAGED --> DISPATCHED
   DISPATCHED --> TRIAGED: all offers ended or mission failed
   DISPATCHED --> IN_PROGRESS
-  IN_PROGRESS --> TRIAGED: all active missions failed
+  IN_PROGRESS --> TRIAGED: no active work, awaiting reassignment or confirmation
+  IN_PROGRESS --> DISPATCHED: only unaccepted offers remain
   DISPATCHED --> CANCELLED
   IN_PROGRESS --> RESOLVED
+  TRIAGED --> RESOLVED: completed evidence and human confirmation
   RESOLVED --> CLOSED
   CLOSED --> TRIAGED: reopen with reason
   SUBMITTED --> CANCELLED
   VERIFYING --> CANCELLED
   TRIAGED --> CANCELLED
+  VERIFIED --> CANCELLED
+  RESOLVED --> CANCELLED
   IN_PROGRESS --> CANCELLED
 ```
 
 - Priority is separate from status. Draft taxonomy: P1 immediate danger, P2 very urgent, P3 assistance needed, P4 informational/nonurgent. Confirm definitions; do not imply a guaranteed SLA.
 - Verification is required before triage/dispatch under this baseline.
 - REJECTED requires a reason; DUPLICATE requires a canonical request ID and reason. Preserve both records.
-- A WAITING_RESOURCES mission leaves the request TRIAGED; the request becomes DISPATCHED only after a team offer is sent.
+- A WAITING_RESOURCES mission alone leaves the request TRIAGED; it never demotes progress from another active mission. Offering new work gives DISPATCHED only when no accepted work remains.
 - DISPATCHED means a mission offer has been sent; IN_PROGRESS starts when the first team accepts.
-- The source says a declined/failed mission leaves the request DISPATCHED while another assignment remains active; otherwise a coordinator returns it to TRIAGED for reassignment. Reopening CLOSED requires reason/audit. **See Appendix A: this wording needs reconciliation when another mission has already been accepted.**
+- Recompute dispatch progress in the same Response transaction as a mission transition: any ACCEPTED/EN_ROUTE/ON_SCENE mission preserves IN_PROGRESS; otherwise any OFFERED mission gives DISPATCHED; otherwise the request returns to TRIAGED unless a coordinator has confirmed RESOLVED/CLOSED/CANCELLED. Completed missions remain evidence for human resolution, never an automatic closure. Section 22 specifies cancellation and reopen guards.
 - A coordinator confirms RESOLVED when needs are met; CLOSED is administrative completion. Mission completion never closes a request automatically.
 - Only scoped coordinators may reopen/cancel, with reason/audit and explicit handling of active missions.
+- Canonical requests with inbound duplicate links cannot become DUPLICATE, REJECTED or CANCELLED; lock and recheck links as defined in UC-02 and Section 22.2.
 
 ### 8.2 Mission
 
@@ -488,7 +496,7 @@ stateDiagram-v2
   READY_TO_DEPLOY --> CANCELLED
   OFFERED --> ACCEPTED
   OFFERED --> DECLINED
-  ACCEPTED --> EN_ROUTE
+  ACCEPTED --> EN_ROUTE: required goods issued, or no goods required
   EN_ROUTE --> ON_SCENE
   ON_SCENE --> COMPLETED
   ACCEPTED --> FAILED
@@ -501,7 +509,8 @@ stateDiagram-v2
 ```
 
 - DECLINED, FAILED, CANCELLED, and COMPLETED terminate a mission; reassignment creates a new mission/assignment.
-- Teams access/update assigned missions only; scoped coordinators oversee them.
+- Every terminal transition records durable cleanup intent for unissued reservations in the same Response transaction. Late reservation confirmations still trigger release; issued goods remain an outstanding settlement until physically distributed, returned, or recorded lost.
+- Team members view assigned missions; only the active leader accepts/declines, advances and submits results/evidence. Scoped coordinators oversee missions and may cancel/fail with reason.
 - Store transition actor/time, reason, note, and evidence references. Location updates are optional, without background tracking.
 - Multiple missions can serve one request; a coordinator confirms the overall outcome before resolution.
 
@@ -511,15 +520,17 @@ stateDiagram-v2
 Reservation: REQUESTED -> RESERVED -> ISSUED
                     |         |-> RELEASED
                     +-> REJECTED
+                    +-> RELEASED (release tombstone before reservation confirmation)
 
 Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
-                     |              |-> CANCELLED (before receipt, audited)
+             |         |          |-> RECONCILED (received + returned + lost)
+             +---------+-> CANCELLED (before dispatch only)
 ```
 
 - Commands check state and permission; clients cannot arbitrarily PATCH status.
 - on_hand represents stock held; reserved represents stock allocated; available = on_hand - reserved.
 - ISSUE from a reservation reduces on_hand and reserved. RELEASE reduces reserved without increasing on_hand.
-- A transfer reduces source stock on dispatch according to policy; destination stock increases on receipt confirmation. The source prohibits a transaction spanning two databases; both warehouse records belong to Logistics in this architecture. Resolve cancellation/accounting details before implementing transfers (Appendix A).
+- Dispatch decreases source on_hand and reserved once and creates in-transit quantities. Receipt credits only physically received quantities at the destination. After dispatch, cancellation is prohibited; verified return credits the source, and authorized loss reconciliation removes transit quantity with reason/audit. Each line satisfies dispatched = received + returned + lost + remaining_in_transit. Both warehouses belong to Logistics; short local transactions lock affected balances in stable order.
 - Adjustments require reason, actor, and audit; never edit/delete old ledger entries to force a balance to match.
 
 ### 8.4 General rules
@@ -528,15 +539,15 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 - Commands use idempotency; expected state/version checks prevent stale updates.
 - Do not hard-delete requests, missions, or stock movements with activity; use state/archive according to policy.
 - Priority/AI overrides, rejection, mission cancellation, stock adjustments, and role changes require actor/time/reason.
-- Response owns campaigns. Proposed lifecycle: DRAFT → ACTIVE → PAUSED → CLOSED. Only ACTIVE campaigns accept new requests. Closing preserves request/reservation/ledger history; Logistics can still record returns/settlements afterward.
+- Response owns campaigns. Lifecycle: DRAFT → ACTIVE; ACTIVE → PAUSED; PAUSED → ACTIVE; DRAFT/ACTIVE/PAUSED → CLOSED. Scoped coordinators/managers execute commands with version checks and reasons for pause/close. Only ACTIVE campaigns accept new attachments. SOS creation never requires an existing campaign. Closure is blocked while linked requests are nonterminal; Logistics returns/settlements remain allowed. Section 22 defines resource-command validation.
 
 ## 9. Main use cases
 
 ### UC-01 — Submit an SOS/assistance request
 
-**Actor:** Citizen; guest if approved.
+**Actor:** Authenticated citizen.
 
-**Preconditions:** App open; GPS available or user supplies a manual pin.
+**Preconditions:** Citizen signed in; GPS available or user supplies a manual pin.
 
 **Main flow:** Select assistance category → enter headcount/information → confirm location/accuracy → optionally attach photos → submit with idempotency key → server validates and writes request/event/outbox → returns request ID and SUBMITTED → Notification delivers confirmation → citizen views timeline and supplements information when state permits.
 
@@ -550,9 +561,9 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 **Preconditions:** Request exists and is not terminal.
 
-**Source flow:** Open queue/map → view scoped data → supplement/contact → verify → reject with reason or link a canonical duplicate → set priority/reason → persist state/event/audit.
+**Main flow:** Open scoped queue/map → start VERIFYING → supplement/contact → choose exactly one outcome: VERIFIED, REJECTED with reason, or DUPLICATE with canonical reference/reason. Only VERIFIED proceeds to human triage with priority/reason. Each command writes state/event/audit atomically.
 
-**Clarification required:** The source writes these actions sequentially. Verification, rejection, and duplicate linking must be specified as alternative branches before implementation; do not prioritize an already rejected/duplicate request by mechanically following this sequence.
+**Duplicate guard:** Canonical target must be a different authorized, non-DUPLICATE/non-REJECTED/non-CANCELLED request. A request already referenced as canonical cannot itself become DUPLICATE, REJECTED or CANCELLED; linkers and those transitions lock the affected request rows in sorted ID order and recheck inbound links. Do not create chains or cycles. Preserve the original report and its history; the demo does not reparent duplicate links.
 
 **Exceptions:** Reject out-of-scope actions; return conflict if state changed; duplicates require a canonical link.
 
@@ -560,13 +571,13 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 ### UC-03 — Assign and accept a mission
 
-**Actors:** Coordinator, team leader/volunteer.
+**Actors:** Coordinator and active team leader; other volunteers have read access to their team's assignments.
 
 **Preconditions:** Request verified/triaged; team active; coordinator authorized for the scope.
 
-**Main flow:** Select by team/skills/availability → await reservation saga if needed → offer assignment → notify → team accepts → EN_ROUTE → ON_SCENE → results/evidence → coordinator confirms the request outcome.
+**Main flow:** Select by team/skills/scope/availability → await reservation saga if needed → offer assignment → notify → active team leader accepts → confirm physical issue of required goods → EN_ROUTE → ON_SCENE → results/evidence → coordinator confirms the request outcome. Resource-free missions skip the issue check.
 
-**Exceptions:** Select another team if declined/unavailable; concurrent assignments use version/transaction checks and conflicting commands reload; required supplies use the reservation saga.
+**Exceptions:** Select another team if declined/unavailable; terminal transitions trigger reservation cleanup. Concurrent assignments use version/transaction checks and conflicting commands reload. PAUSED campaigns block offers/acceptance; already accepted missions may continue under Section 22.3, including validated issue of their existing reservation.
 
 **Postconditions:** Consistent mission/request history; only a coordinator confirms resolution.
 
@@ -594,11 +605,11 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 ### UC-06 — Manage accounts and permissions
 
-**Actors:** Admin; invited user.
+**Actors:** Admin; citizen registering an account; invited staff/volunteer.
 
-**Main flow:** Admin creates/disables an account or grants role/scope → Identity records audit/event → services apply policy → UI exposes permitted functions.
+**Main flow:** A citizen registers with a unique normalized username and password and receives CITIZEN only. Admin creates staff/volunteer accounts, disables accounts, or grants role/scope → Identity records audit/event → services apply policy → UI exposes permitted functions. Registration never accepts privileged roles or scopes from the client. Email/SMS verification and self-service password recovery are outside the initial provider-free demo; admin-assisted reset revokes sessions and requires a password change.
 
-**Exceptions:** Cannot remove the last administrator; disabled accounts cannot refresh tokens; existing access tokens expire or are revoked according to policy.
+**Exceptions:** Cannot remove the last administrator; disabled accounts cannot refresh tokens; existing access tokens are rejected through the current-session check described in Section 22.
 
 **Postconditions:** All APIs enforce backend authorization; hidden UI controls are not a security boundary.
 
@@ -632,7 +643,7 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 - Separate per-service OpenAPI schemas with shared terminology, pagination, error envelope, and event definitions.
 - Explicit business command endpoints for transitions, rather than unrestricted status PATCH.
 - Significant side-effecting POST commands accept Idempotency-Key; state updates check expected state/version inside the transaction.
-- DRF identifies drf-spectacular as an OpenAPI schema generation option. [DRF schema generation](https://www.django-rest-framework.org/api-guide/schemas/)
+- Generate per-service OpenAPI with `@nestjs/swagger` and review/version the published contract. [NestJS OpenAPI](https://docs.nestjs.com/openapi/introduction)
 
 ### 10.1.1 Vietnamese user-facing responses
 
@@ -649,7 +660,7 @@ Example error envelope:
 }
 ```
 
-Use Django/DRF translation support and reviewed Vietnamese message catalogs or explicit application messages. Set the application default language to Vietnamese and ensure an English Accept-Language header does not silently switch this Vietnamese-only product to English. Cover built-in validator/auth/pagination/throttling errors and custom exception handling; translate/sanitize third-party failures instead of returning their raw text. Workers must explicitly render Vietnamese notification text outside request locale context. Django/DRF provide translation mechanisms, but application-specific strings still require their own translations. [Django translation](https://docs.djangoproject.com/en/5.2/topics/i18n/translation/), [DRF internationalization](https://www.django-rest-framework.org/topics/internationalization/)
+Implement a centralized NestJS exception filter and `ValidationPipe` exception factory that map stable validation/auth/business error codes to reviewed Vietnamese messages. Do not return class-validator or provider error strings directly. Set the API locale to Vietnamese regardless of `Accept-Language`; workers use the same Vietnamese message catalog outside HTTP request context. [NestJS validation](https://docs.nestjs.com/techniques/validation), [NestJS exception filters](https://docs.nestjs.com/exception-filters)
 
 Backend responses may contain user-entered text unchanged. Do not translate names, original reports, opaque IDs, or machine codes. Map internal AI reason codes to Vietnamese explanations; optional LLM summaries must satisfy the same language requirement before display, otherwise show a reviewed Vietnamese fallback.
 
@@ -657,10 +668,10 @@ Backend responses may contain user-entered text unchanged. Do not translate name
 
 | Service | Example endpoints | Authorization/notes |
 |---|---|---|
-| Identity | POST /identity/auth/login, /refresh, /logout; GET /identity/me; POST /identity/users/{id}/roles | Admin-only role grants; no PII/location in tokens |
-| Response | POST /response/requests; GET /response/requests; POST /response/requests/{id}/verify, /triage, /duplicate; POST /response/requests/{id}/missions | Approved guest SOS uses a separate AllowAny route; scope list/detail access |
+| Identity | POST /identity/auth/register, /login, /refresh, /logout; GET /identity/me; POST /identity/users/{id}/roles | Admin-only role grants; no PII/location in tokens |
+| Response | POST /response/requests; GET /response/requests; POST /response/requests/{id}/verify, /triage, /duplicate; POST /response/requests/{id}/missions | Authenticated citizen intake; scope list/detail access; no guest route |
 | Response | POST /response/campaigns; GET /response/campaigns; POST /response/campaigns/{id}/close | Response owns campaign/incident; managers need appropriate scope |
-| Response | POST /response/missions/{id}/accept, /decline, /transition, /evidence | Volunteers modify their team's missions only |
+| Response | POST /response/missions/{id}/accept, /decline, /transition, /evidence | Active team leader accepts/declines, advances and uploads evidence; scoped coordinator may cancel/fail |
 | Logistics | POST /logistics/receipts, /transfers, /transfers/{id}/receive, /distributions, /adjustments | Idempotency, audit, unit validation, row locks |
 | Logistics | GET /logistics/stock?warehouse_id=...; /vehicles; /relief-points | Warehouse/region scope |
 | Notification | GET /notifications; POST /notifications/{id}/read | Recipient-only access/marking |
@@ -672,15 +683,15 @@ These are SDD sketches, not final contracts. Finalize complete paths through Ope
 
 | Actor | Proposed core permissions |
 |---|---|
-| Citizen | Create, view, and supplement own requests; view own notifications. If approved, guests use a hard-to-guess secret capability. |
-| Volunteer | View team missions, accept/decline/update/evidence according to state; limited profile/availability management. |
+| Citizen | Create, view, and supplement own requests; view own notifications. Guest SOS is disabled in the capstone baseline. |
+| Volunteer | View assigned team missions and maintain own profile/availability. Only the active team leader accepts/declines, advances missions and submits results/evidence. |
 | Coordinator | Scoped queue/map; verify, duplicate-link, triage, assign, cancel/reopen, confirm outcomes. |
 | Operations Manager | Scoped warehouse/point/vehicle/distribution management; transfers/adjustments according to policy; operational reports. |
 | Admin | Accounts/roles/configuration; case-detail access is not automatically granted without need. |
 
-**Proposed authentication:** Identity issues asymmetric JWTs containing issuer, audience, subject, expiry, and minimum role/scope data. Services validate signatures locally. Short access-token lifetime (proposed 10–15 minutes, unconfirmed), refresh rotation, and platform-appropriate protected token storage. Role revocation immediately invalidates refresh sessions; existing access tokens expire by TTL or are blocked through an explicit revocation mechanism if immediate revocation is required.
+**Proposed authentication:** Identity issues asymmetric JWTs containing issuer, audience, subject, expiry, and minimum role/scope data. Services validate signatures locally. Access tokens expire after 10 minutes for the demo; refresh sessions have a 7-day absolute expiry with rotation and reuse detection; rotation does not extend that expiry. These are capstone configuration defaults. Each protected HTTP request validates the JWT locally and obtains current account/session/grants from an authenticated Identity introspection API without a positive cache. Logout revokes that session; disabling, credential reset, or role changes revoke all affected sessions. Identity unavailability returns Vietnamese 503 and fails closed. A request already authorized may finish; this is request-boundary revocation, not cancellation of in-flight transactions. Section 22 defines the availability tradeoff.
 
-Do not encode all policy in JWTs: Response checks its own team/region/request relationships, Logistics checks warehouses, and Reporting scopes before aggregation. DRF list endpoints need explicit authorized queryset filtering. [DRF object permissions and queryset filtering](https://www.django-rest-framework.org/api-guide/permissions/)
+Do not encode all policy in JWTs: Response checks its own team/region/request relationships, Logistics checks warehouses, and Reporting scopes before aggregation. service queries must still filter rows by scope after Nest guards authorize the action. [NestJS guards](https://docs.nestjs.com/guards)
 
 ## 11. User-interface architecture
 
@@ -723,16 +734,16 @@ A versioned rule engine is a decision-support baseline, not evidence of machine 
 
 | Option | Implementation | Strength | Limitation | Decision |
 |---|---|---|---|---|
-| Versioned rules | Python functions plus a reviewed rule table | Reproducible explanations; no training data dependency | Rule quality depends on domain review; no learned generalization | Baseline advisor mode |
-| Small supervised model | scikit-learn Pipeline; structured features; optional TF-IDF text with a linear classifier | CPU-feasible experiment, reproducible training and measurable comparison | Needs labels, leakage controls, imbalance analysis, and calibration | Preferred ML extension if data supports it |
+| Versioned rules | TypeScript functions plus a reviewed rule table | Reproducible explanations; no training data dependency | Rule quality depends on domain review; no learned generalization | Baseline advisor mode |
+| Supervised model | Defer to a separate research spike using a Node-compatible inference runtime and versioned artifact | Could add learned ranking after rules baseline | Requires labels, leakage controls, class-imbalance analysis, runtime compatibility, and calibration | Not in the core delivery stack |
 | Hosted LLM | Server-side provider call with a strict output schema | Useful experiment for summarization/extraction of Vietnamese narratives | Provider cost/availability, privacy, injection, hallucinations, version changes | Optional; provider remains unselected |
 | Local language model | Separate inference process called by the worker | Keeps inference within the chosen environment | Hardware/memory, deployment, license, and quality still need validation | Only after hardware and evaluation justify it |
 
-TF-IDF transforms text into numerical features; it does not by itself understand urgency. Fit preprocessing only on training data and package it with the estimator to avoid inconsistent training/inference transforms. [scikit-learn feature extraction](https://scikit-learn.org/stable/modules/feature_extraction.html#text-feature-extraction), [scikit-learn common pitfalls](https://scikit-learn.org/stable/common_pitfalls.html)
+A text vectorizer does not by itself understand urgency. No ML framework or training runtime is selected for the baseline. Any later model experiment must use a Node.js-compatible runtime, version its feature transformations, and be evaluated on held-out, grouped data before it is considered for integration.
 
-**Proposed starting experiment:** compare reviewed rules with a small structured-feature classifier, then assess whether adding redacted text features improves held-out results. Evaluate Vietnamese text with diacritics, missing diacritics, negation, abbreviations, and contradictory statements. Do not assume that an English pretrained model works for Vietnamese emergency reports. No model/provider has been selected or benchmarked by this document.
+**Optional future experiment:** if suitable labeled data and a Node.js-compatible model tool are available, compare reviewed rules with a small structured-feature model, then assess whether approved text features improve held-out results. Evaluate Vietnamese text with diacritics, missing diacritics, negation, abbreviations, and contradictory statements. Do not assume that an English pretrained model works for Vietnamese emergency reports. No model/provider has been selected or benchmarked by this document.
 
-No vector database, RAG framework, agent framework, GPU, or additional message broker is needed for the baseline. A provider adapter can initially be one small Python module with a documented input/output function; introduce abstractions only when a second implementation is actually integrated.
+No vector database, RAG framework, agent framework, GPU, or additional message broker is needed for the baseline. Implement rules in a small TypeScript module. Add a provider adapter only when a hosted model is actually integrated.
 
 ### 12.3 Placement within the five-service architecture
 
@@ -768,7 +779,7 @@ The worker consumes `response.triage.analysis_requested.v1` on a dedicated consu
 
 The consumer transaction creates the durable job and inbox record before committing the Kafka offset. A worker crash then leaves recoverable work in the job table; an inference call does not hold a partition open for its full duration. Kafka ordering/delivery semantics do not make database or external-provider side effects exactly once. [Kafka design and delivery semantics](https://kafka.apache.org/40/design/design/)
 
-Use short database transactions for job claims and result writes. Django transaction callbacks are useful for post-commit work but are not a durable substitute for the outbox. Provider calls occur outside database transactions/row locks. [Django transactions](https://docs.djangoproject.com/en/5.2/topics/db/transactions/)
+Use short database transactions for job claims and result writes. Nest lifecycle hooks/in-process callbacks are not a durable substitute for the outbox. Provider calls occur outside TypeORM transactions/row locks. [TypeORM transactions](https://typeorm.io/docs/advanced-topics/transactions/)
 
 ### 12.4 Data model and input/output contract
 
@@ -838,8 +849,8 @@ Coordinator UI must render explanations and summaries in Vietnamese, mapping sta
 - **Resource limits:** begin with one worker and CPU inference; cap concurrency and memory so analysis cannot starve Response. Benchmark before adding local LLM/GPU infrastructure. A separate model server is a runtime dependency, not automatically a new domain service.
 - **Data minimization:** use structured fields first; redact approved text before any external call. Redaction may be incomplete, so real sensitive-data egress still needs a provider/retention decision. Do not log full prompts, outputs, exact locations, credentials, or signed URLs by default.
 - **Untrusted text:** treat citizen narratives, OCR, and retrieved content as data. Give an LLM no tools, database mutation permissions, network actions, or storage credentials. Instructions embedded in a report must not change workflow or output policy. Prompt instructions and JSON validation alone do not eliminate injection risk. [OWASP prompt injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/)
-- **Model artifacts:** store trusted, versioned artifacts with checksum and training/environment metadata; load only approved artifacts. Pickle-based loading can execute code and version compatibility matters. Do not accept uploaded model files from users. [scikit-learn model persistence](https://scikit-learn.org/stable/model_persistence.html)
-- **Storage relationship:** MinIO/S3 may hold private model artifacts or authorized research datasets; model execution still happens in the worker. No vector database is required to store photos, JSON, or model files. Keep research/model buckets separate from evidence and restrict access.
+- **Model artifacts:** store trusted, versioned artifacts with checksums and training/environment metadata; load only approved artifacts. Do not accept uploaded model files from users.
+- **Storage relationship:** MinIO may hold private authorized research datasets or trusted model artifacts; inference runs in the NestJS worker or an approved provider endpoint. No vector database is required to store photos, JSON, or model files. Keep research/model buckets separate from evidence and restrict access.
 - **Disable/rollback:** feature flag off stops new analyses and disables review acceptance of pending suggestions; manual triage remains available. Pin the previous known version for rollback. A rollback must never undo past human decisions.
 - **Observability:** job age, completion/failure/abstention rates, attempt counts, stale-result count, inference latency, review latency, override rate, and optional provider cost. Logs use job/request/correlation IDs; dashboard metrics are aggregated, access-controlled, and not claims of model accuracy.
 
@@ -847,7 +858,7 @@ Coordinator UI must render explanations and summaries in Vietnamese, mapping sta
 
 **Dataset first:** define the unit of analysis, allowed inputs, label taxonomy, label timestamp, and data-use basis before training. Use domain-reviewed labels with a documented disagreement/adjudication process. Do not automatically treat coordinator acceptance as ground truth: exposure to suggestions can bias decisions. Record which facts were available at prediction time; later rescue outcomes and final priority must not leak into training features.
 
-Split by incident/campaign and, where feasible, by time so near-duplicate reports do not appear in both training and evaluation. Keep the test set untouched until the experiment is fixed. Group-aware splitting can prevent group overlap, but cannot guarantee class balance for every dataset; report rare/missing classes and limitations. Fit vectorizers, imputers, and scalers on training folds only. [scikit-learn common pitfalls](https://scikit-learn.org/stable/common_pitfalls.html), [StratifiedGroupKFold](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.StratifiedGroupKFold.html)
+Split by incident/campaign and, where feasible, by time so near-duplicate reports do not appear in both training and evaluation. Keep the test set untouched until the experiment is fixed. Group-aware splitting can prevent group overlap, but cannot guarantee class balance for every dataset; report rare/missing classes and limitations. Fit every learned preprocessing step on training folds only.
 
 | Evaluation area | Report | Why it matters |
 |---|---|---|
@@ -860,7 +871,7 @@ Split by incident/campaign and, where feasible, by time so near-duplicate report
 | Operations | End-to-end analysis age, inference p95, CPU/RAM, failure recovery, cost | Determines whether the optional worker fits the demo environment |
 | Human workflow | Review completion/time and override reasons; usability observations | Checks usefulness without assuming acceptance means correctness |
 
-Metric definitions and probability calibration guidance come from scikit-learn; the specific C48 evaluation plan above is a proposal. [Classification metrics](https://scikit-learn.org/stable/modules/model_evaluation.html), [Probability calibration](https://scikit-learn.org/stable/modules/calibration.html)
+Classification metrics and calibration concepts in the C48 evaluation plan are proposals; select compatible tooling only if a model is added.
 
 Compare manual/rule baseline and ML on the same held-out dataset. Report dataset size, provenance, class distribution, split method, preprocessing, seed, model/version, parameters, threshold selection, and uncertainty/sample limitations. Keep synthetic fixtures for workflow testing, but do not present agreement with labels generated by the same rules/LLM as independent validation. Do not invent a required accuracy or critical-case recall threshold before domain review.
 
@@ -903,7 +914,7 @@ All tests below are **planned, not executed**. Expand them into executable cases
 
 1. **Contracts and fixtures:** agree advisor purpose, draft taxonomy, input schema, abstention, permissions, versions, and synthetic edge cases. Do this while Response contracts are designed.
 2. **Rules integration:** build the optional Response worker, durable jobs, result/read/review APIs, coordinator panel, and failure tests after manual triage works.
-3. **ML experiment if data exists:** create a reproducible dataset manifest, training/evaluation script, baseline comparison, and versioned artifact. Keep training outside request-serving processes.
+3. **Optional ML experiment:** only if suitable data, evaluation support, and a Node.js-compatible runtime are available; create a reproducible dataset manifest and compare against the rules baseline. Otherwise keep the documented rules-only advisor.
 4. **Optional text assistance:** add a provider only after privacy/cost/output validation decisions; measure unsupported facts and critical omissions. Do not expand to tool-using agents.
 5. **Demo/report:** show stale-result rejection, outage fallback, human override, and a reproducible evaluation. Feature-freeze with AI disabled if the integration/evaluation is incomplete.
 
@@ -915,9 +926,9 @@ Deliver a short advisor design note, data/label manifest, experiment report, mod
 
 | Layer | Coverage | Suggested tools |
 |---|---|---|
-| Domain/unit | State transitions, priority, inventory arithmetic, permission predicates, event mapping | Django TestCase/unittest, DRF APIClient. [Django testing](https://docs.djangoproject.com/en/5.2/topics/testing/overview/), [DRF testing](https://www.django-rest-framework.org/api-guide/testing/) |
+| Domain/unit | State transitions, priority, inventory arithmetic, permission predicates, event mapping | NestJS TestingModule/Jest and Supertest; use real PostgreSQL/PostGIS for locking and GIS. [NestJS testing](https://docs.nestjs.com/fundamentals/testing) |
 | Database integration | PostGIS, rollback, locks/races, constraints/migrations | Real PostgreSQL/PostGIS in a Compose test profile; SQLite does not provide equivalent GIS/locking behavior |
-| API/security | 401/403/404, object scope/list filters, validation, guest route, rate limits, uploads | APIClient and role × endpoint × scope matrix |
+| API/security | 401/403/404, registration/revocation, object scope/list filters, validation, rate limits, uploads | Supertest and role × endpoint × scope matrix |
 | Event integration | Outbox relay, duplicates, retries, DLQ, replay, lag, reservation saga | Kafka + DB integration profile; fixed event IDs |
 | Frontend | Forms, state labels, authorized navigation, stale dashboards, offline pending | Unit/component tests and smoke use cases |
 | E2E/demo | Citizen submission → coordinator triage → team progress → Logistics issue → report | Playwright or manual checklist/video evidence; choose a controlled scope |
@@ -933,10 +944,10 @@ These are **planned test cases, not execution results**. Test records must inclu
 |---|---|---|---|
 | TC-01 / FR-REQ-01, 03 | Authenticated demo citizen; synthetic coordinates, accuracy 12 m, 3 people; unused key | POST valid request; repeat same key/payload | One request and one creation outbox row; same retry result; separate capture/receive times |
 | TC-06 / FR-IAM-02, FR-REQ-07 | Citizens A/B; request owned by B | A reads B's request, attempts update, then lists requests | Cannot read/update B's request; list contains only A's cases; no description/location disclosure |
-| TC-16 / FR-LOG-02 | available = 5; two authorized operators; each issues 4 of the same SKU/warehouse | Concurrent issue commands with different keys | One succeeds; one conflicts/reports insufficient stock; available = 1; one ISSUE movement |
+| TC-16 / FR-LOG-02 | on_hand = 5, reserved = 0; two authorized operators; each requests direct issue-and-distribution of 4 of the same SKU/warehouse | Concurrent commands with different keys; each atomically reserves/issues its own available goods and records distribution | One succeeds; one conflicts/reports insufficient stock; available = 1; one ISSUE movement |
 | TC-21 / FR-EVT-01, FR-NOT-01 | Event ID absent from inbox; notification consumer running | Publish the same event ID twice | Unique inbox; each recipient/channel notification created once; duplicate logged/metered without crashing consumer |
 | TC-25 / FR-OFF-01, FR-REQ-03 | Mobile SOS draft with idempotency key; network toggle available | Disable network and send; inspect UI; reconnect and retry twice | Pending before ACK, submitted afterward; exactly one server request |
-| TC-30 / FR-CAM-01 | ACTIVE campaign; scoped coordinator; existing history | Attach request; close campaign; attempt another attachment; read history | First attachment succeeds, second denied; authorized request/ledger history remains accessible |
+| TC-30 / FR-CAM-01 | ACTIVE campaign; scoped coordinator; existing history | Attach request; attempt close while request nonterminal; complete/resolve/close request; close campaign; attempt another attachment; read history | Premature close conflicts; close after terminal request succeeds; new attachment denied; scoped history remains accessible |
 | TC-31 / FR-LOG-03, FR-MSN-02 | TRIAGED request; mission requires unreserved goods | Create mission; inspect state/offer; confirm reservation; coordinator offers; team accepts | Before reservation: WAITING_RESOURCES, no DISPATCHED request/offer. After confirmation: READY_TO_DEPLOY → OFFERED → ACCEPTED; request DISPATCHED → IN_PROGRESS |
 
 | ID | Scenario | Expected result |
@@ -962,13 +973,13 @@ These are **planned test cases, not execution results**. Test records must inclu
 | TC-19 | Cancel after ISSUE | Preserve movement; return is a new movement with actor/reason |
 | TC-20 | Response transaction rolls back after request creation | No request or committed outbox event |
 | TC-21 | Relay crashes after publish but before marking | Redelivery possible; inbox prevents repeated side effects |
-| TC-22 | Notification consumer stops and restarts | Catch-up; source specifies one notification record per event ID; external push semantics depend on provider. Clarify per-recipient/channel identity in Appendix A |
+| TC-22 | Notification consumer stops and restarts | Catch-up; one notification per event ID + recipient ID + channel; external push semantics depend on provider |
 | TC-23 | Reporting consumer lags | Old watermark and stale warning displayed |
 | TC-24 | Forged MIME, prohibited type, oversized upload | Reject; clean orphaned object; no download link |
 | TC-25 | Repeated offline SOS retries after reconnect | Pending becomes submitted only after ACK; exactly one request |
 | TC-26 | AI suggests lower urgency for coordinator-assigned P1 | No automatic downgrade/deletion; separate suggestion and audited override |
 | TC-27 | AI timeout | Manual triage works; no SOS/verification/dispatch blocking |
-| TC-28 | Refresh after role revocation | Refresh denied; existing access expires/is revoked per policy |
+| TC-28 | Refresh after role revocation | Refresh denied; existing access is rejected on the next protected request via Identity introspection |
 | TC-29 | Restore demo backup | Requests, ledger, file metadata consistent; runbook identifies object files to restore |
 | TC-30 | Attach request after campaign closure | Response rejects new attachment; scoped historical request/ledger access remains |
 | TC-31 | Dispatch a mission requiring supplies | No offer until reservation confirmation; then offer and request state update |
@@ -987,7 +998,7 @@ These are **planned test cases, not execution results**. Test records must inclu
 
 ### 13.4 Additional language and storage checks
 
-The storage scenarios in [storage research, Section 7](c48-storage-research.md#7-implementation-checks-and-traceability) extend FR-FILE-01, TC-24, and TC-29, including private-policy enforcement, reachable signed links, storage-outage handling, and object-byte restoration. They are planned checks, not completed tests.
+The storage checks in Section 6.3 extend FR-FILE-01, TC-24, and TC-29, including private-policy enforcement, reachable signed links, storage-outage handling, and object-byte restoration. They are planned checks, not completed tests.
 
 | Test ID | Requirement | Scenario | Expected result |
 |---|---|---|---|
@@ -997,7 +1008,7 @@ The storage scenarios in [storage research, Section 7](c48-storage-research.md#7
 
 ## 14. Security, privacy, and operations
 
-- Default deny. If approved, isolate guest endpoints to SOS creation and secret-capability tracking; no search/list access.
+- Default deny. Citizen registration/login are the public authentication routes; SOS and tracking require authentication. Guest endpoints are disabled.
 - Authorization combines role, scope, and object relationship across details, lists, exports, file downloads, and push-device registration.
 - Hidden frontend menus do not provide security. OWASP identifies Broken Object Level Authorization as a major API risk. [OWASP API Security Top 10 — BOLA](https://api-security.owasp.org/editions/2023/en/0xa1-broken-object-level-authorization/)
 - Audit enough to trace actions without copying unnecessary PII; restrict readers and clarify retention.
@@ -1016,7 +1027,7 @@ Browser / Mobile
     -> 5 application containers
     -> PostgreSQL/PostGIS (separate database/user per service)
     -> Kafka KRaft (single broker for demo)
-    -> S3 API (conditional MinIO AIStor Free lab / SeaweedFS fallback)
+    -> MinIO AIStor Free S3 API (single-node lab)
     -> Prometheus/Grafana (optional profile)
 ```
 
@@ -1040,29 +1051,25 @@ Preserve the brief's milestones: week 1 analysis; week 2 design/setup; weeks 3�
 | 1 | Stakeholder research, glossary/process map, UR/FR/NFR, state machines, guest SOS/priority/role-scope decisions | SRS v0.1, use cases, open decisions, supervisor review |
 | 2 | C4/container, DB/ERD, API/event contracts, wireframes, repo/Compose/CI/migrations, custom User | SDD v0.1; five healthy service skeletons; draft OpenAPI; one-host Compose |
 | 3 | Identity/auth/RBAC; Response skeleton; web shell/login; mobile shell/GPS permission spike | Login, permission matrix, seeded roles/data |
-| 4 | SOS, GPS/manual pin, idempotency, evidence storage, list/map, mobile pending/ACK | Citizen → API → PostGIS slice; TC-01..05/24..25 |
+| 4 | SOS, GPS/manual pin, idempotency, evidence storage, list/map, mobile pending/ACK; first outbox → Kafka → Notification inbox path | Citizen → API → PostGIS → notification slice; TC-01..06/08/20..22; TC-24 and TC-25 when storage/offline queue is included |
 | 5 | Verification/duplicates/priority, teams/volunteers, mission assignment/acceptance/progress, audit | Coordinator → team workflow; state/permission tests |
 | 6 | Campaigns, warehouses/items, stock ledger, transfers, distribution, reservation/release | Nonnegative inventory; race/idempotency tests |
-| 7 | Kafka KRaft, outbox/inbox, Notification/Reporting consumers, saga, projections, security/integration | Consumer restart, replay/dedupe; TC-15..23 |
-| 8 | Web/mobile/map/filter/report polish, NFR baseline, documentation, optional AI rule prototype, timeboxed kind | Feature freeze; decide whether AI/kind enter the demo |
+| 7 | Harden existing Kafka/outbox/inbox and reservation saga; integrate Reporting/rebuild, security and recovery | Consumer restart, replay/dedupe; TC-15..23 and TC-BE-07/14 |
+| 8 | Web/mobile/map/filter/report polish, NFR baseline, documentation; AI/kind only after core acceptance | Feature freeze; disable incomplete optional work |
 | 9 | E2E regression, demo seed, backup/restore, demo script, slides, critical fixes | Release candidate; defense per brief |
 | 10 | Defense/supervisor feedback buffer, installation guide, release tag, handover | Stable delivery; no major new features |
 
-### Suggested responsibilities for three members
+### Solo backend ownership and integration
 
-| Focus | Primary ownership | Collaboration |
-|---|---|---|
-| A — Domain/Response | Domain analysis, Response/PostGIS, request/mission states, map API | Permission review; coordinator UI integration |
-| B — Platform/Logistics | Identity/Logistics, Kafka/outbox/saga, Compose, consistency/backups | Event contract review; CI/observability |
-| C — Client/Quality | Web/mobile, API integration, Notification/Reporting UI, test matrix, user guide/demo | API/UX review; traceability |
+The project brief still describes three team members; the user confirmed on 2026-09-30 that one person owns the entire backend. Client/documentation work can be coordinated with the remaining team; do not assign backend modules to hypothetical additional developers.
 
-These are focus areas, not isolated silos. Integrate weekly; contract changes need review by someone other than the owner. A/B jointly review the saga; C must not be the only tester.
+Implement one complete slice at a time, including migrations, API, permissions, events, tests, and contract updates. Keep the five-service baseline, one workspace, and one Compose host. Do not develop five unfinished services in parallel. Establish an outbox → Kafka → inbox path during the first SOS slice; week 7 is recovery/integration hardening, not the first messaging integration. Section 22 gives the backend sequence and exit gates. The ten-week dates remain planning targets; optional work must not displace core acceptance.
 
 ### Scope reduction if delayed
 
 Preserve auth/scope; SOS + GPS/manual pin + truthful ACK/idempotency; verification/triage; assignment/progress; stock ledger/distribution; in-app notifications; timestamped dashboards; Kafka outbox/deduplication; test cases, documentation, and demo.
 
-Reduce in order: real push provider, full offline queue (retain honest draft/pending UI), Kubernetes, Grafana, CSV export, AI model (retain a rules proof of concept), vehicle tracking, advanced maps/geocoding, multilevel approvals. Never cut authorization, inventory invariants, event deduplication, or the restore demonstration to retain secondary features.
+Reduce in order: real push provider, full offline queue (retain honest draft/pending UI), Kubernetes, Grafana, CSV export, all AI integration (a rules proof of concept is optional too), vehicle tracking, advanced maps/geocoding, multilevel approvals. Never cut authorization, inventory invariants, event deduplication, or the restore demonstration to retain secondary features.
 
 ## 17. Defense demonstration
 
@@ -1091,24 +1098,24 @@ The demo demonstrates domain logic, authorization, GIS, saga, and event reliabil
 
 | Decision | Proposed default | Decision deadline |
 |---|---|---|
-| Mandatory login or guest SOS? | Secret guest capability + rate limits unless the supervisor requires accounts; guest remains unapproved | Week 1 |
+| Mandatory login or guest SOS? | Authenticated citizen registration/login selected for capstone; guest disabled unless scope is explicitly changed | Settled for demo |
 | Priority, SLA, who verifies/closes/reopens? | Draft P1–P4; coordinator with reasons; no implicit SLA | Week 1 with domain input |
-| Coordinator scope/team availability? | Role + campaign/region + membership | Weeks 1–2 |
+| Coordinator scope/team availability? | Current grants + object relationships; one-team missions, capacity one, leader actions in Section 22 | Settled for demo |
 | Map/tile/geocoding provider, license, quota? | Separate map UI; compliant provider; no incident PII | Before week 4 |
 | Push/email? | In-app demo; mock provider without credentials | Week 2 |
 | Offline depth? | Honest drafts/pending in MVP; retry queue is Should | Week 1 |
 | File types/sizes/retention? | Team-proposed limits, private objects, synthetic data | Week 2 |
 | Location/photo/audit/backup retention? | No invented official policy; confirm before a pilot | Before real deployment |
 | Load targets/demo hardware? | 10k requests/20 concurrent as discussion targets, adjusted to measured hardware | Week 2 |
-| Storage edition/provider and license? | Conditional MinIO AIStor Free single-node lab; SeaweedFS fallback; validate terms, artifact, private access, and restore before selection | Weeks 2–4 |
+| Storage edition/provider and license? | MinIO AIStor Free single-node lab selected; team members obtain it under current terms; validate private access and restore before demo | Weeks 2–4 |
 | Labeled AI data? | Do not assume availability; explainable rules suffice for PoC; AI disabled by default | Week 8 |
 | Kubernetes grading requirement or learning goal? | kind stretch, 2–3 days after stable Compose core | After week 7 |
 
 ## 20. Design conclusion
 
-The proposed baseline is **Django/DRF + PostgreSQL/PostGIS + React/Vite + React Native/Expo**, five services with explicit ownership, Kafka outbox/inbox for notifications/reporting, and a reservation saga. Compose runs on one demo host; Kubernetes kind is a timeboxed learning extension. AI provides explanations and suggestions for coordinator review only.
+The proposed baseline is **NestJS/TypeScript + TypeORM + PostgreSQL/PostGIS + React/Vite + React Native/Expo**, five services with explicit ownership, Kafka outbox/inbox for notifications/reporting, MinIO AIStor Free for synthetic single-node lab storage, and a reservation saga. Compose runs on one demo host; Kubernetes kind is a timeboxed learning extension. AI provides explanations and suggestions for coordinator review only.
 
-This baseline supports SRS/SDD development; it does not resolve open business decisions. First clarify guest SOS, priority/request-closure rules, and access to exact locations.
+This baseline and Section 22 support incremental backend implementation. The solo-developer capstone decisions resolve the earlier workflow contradictions; they are project assumptions, not official emergency-response policy. Each slice still requires complete reviewed API/event/data contracts and executed acceptance evidence before it is called complete.
 
 ## 21. References
 
@@ -1121,24 +1128,26 @@ This baseline supports SRS/SDD development; it does not resolve open business de
 
 ### Backend, database, API, security
 
-- [Django overview](https://docs.djangoproject.com/en/5.2/intro/overview/)
 - [Spring Boot documentation](https://docs.spring.io/spring-boot/index.html)
 - [Spring for Apache Kafka](https://docs.spring.io/spring-kafka/reference/)
 - [NestJS documentation](https://docs.nestjs.com/)
+- [NestJS database integrations](https://docs.nestjs.com/techniques/database)
+- [NestJS validation](https://docs.nestjs.com/techniques/validation)
+- [NestJS OpenAPI](https://docs.nestjs.com/openapi/introduction)
+- [NestJS authentication](https://docs.nestjs.com/techniques/authentication)
+- [NestJS file upload](https://docs.nestjs.com/techniques/file-upload)
+- [NestJS testing](https://docs.nestjs.com/fundamentals/testing)
 - [NestJS Kafka transport](https://docs.nestjs.com/microservices/kafka)
+- [TypeORM PostgreSQL driver and spatial columns](https://typeorm.io/docs/drivers/postgres/)
+- [TypeORM transactions](https://typeorm.io/docs/advanced-topics/transactions/)
+- [Django overview (framework comparison only)](https://docs.djangoproject.com/en/5.2/intro/overview/)
 - [FastAPI features](https://fastapi.tiangolo.com/features/)
 - [Flask design decisions](https://flask.palletsprojects.com/en/stable/design/)
-- [Django releases/support schedule](https://www.djangoproject.com/download/)
-- [Django 5.2 GeoDjango Database API](https://docs.djangoproject.com/en/5.2/ref/contrib/gis/db-api/)
-- [Django transactions](https://docs.djangoproject.com/en/5.2/topics/db/transactions/)
-- [Django QuerySet select_for_update](https://docs.djangoproject.com/en/5.2/ref/models/querysets/#select-for-update)
-- [Django custom user model](https://docs.djangoproject.com/en/5.2/topics/auth/customizing/)
 - [PostgreSQL constraints](https://www.postgresql.org/docs/18/ddl-constraints.html)
 - [PostgreSQL explicit locking](https://www.postgresql.org/docs/18/explicit-locking.html)
+- [PostgreSQL transactions](https://www.postgresql.org/docs/18/tutorial-transactions.html)
 - [PostGIS spatial indexes](https://postgis.net/documentation/faq/spatial-indexes/)
 - [RFC 7946 — GeoJSON](https://datatracker.ietf.org/doc/html/rfc7946)
-- [DRF permissions](https://www.django-rest-framework.org/api-guide/permissions/)
-- [DRF schema generation](https://www.django-rest-framework.org/api-guide/schemas/)
 - [OWASP API Security Top 10 — BOLA](https://api-security.owasp.org/editions/2023/en/0xa1-broken-object-level-authorization/)
 - [MongoDB geospatial indexes](https://www.mongodb.com/docs/manual/core/indexes/index-types/geospatial/2dsphere/)
 - [MongoDB transactions](https://www.mongodb.com/docs/manual/core/transactions/)
@@ -1150,8 +1159,12 @@ This baseline supports SRS/SDD development; it does not resolve open business de
 - [Apache Kafka delivery semantics](https://kafka.apache.org/40/design/design/)
 - [Apache Kafka 4.0 KRaft release announcement](https://kafka.apache.org/blog/2025/03/18/apache-kafka-4.0.0-release-announcement/)
 - [AWS transactional outbox](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html)
-- [MinIO repository archive/maintenance notice](https://github.com/minio/minio)
-- [SeaweedFS repository and S3 gateway](https://github.com/seaweedfs/seaweedfs)
+- [MinIO Community repository status](https://github.com/minio/minio)
+- [MinIO AIStor Free agreement](https://www.min.io/legal/aistor-free-agreement)
+- [MinIO AIStor license operations and feature limits](https://docs.min.io/aistor/operations/licenses/)
+- [AWS SDK for JavaScript v3 S3 client](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/)
+- [Amazon S3 presigned URL behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
+- [OWASP file upload guidance](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
 - [React — build an app from scratch](https://react.dev/learn/build-a-react-app-from-scratch)
 - [Vite guide](https://vite.dev/guide/)
 - [React Native TypeScript](https://reactnative.dev/docs/typescript)
@@ -1163,38 +1176,145 @@ This baseline supports SRS/SDD development; it does not resolve open business de
 - [Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
 - [Kubernetes probes](https://kubernetes.io/docs/concepts/workloads/pods/probes/)
 - [NIST AI RMF Core](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/)
-- [scikit-learn metrics](https://scikit-learn.org/stable/modules/model_evaluation.html)
-- [scikit-learn leakage and preprocessing pitfalls](https://scikit-learn.org/stable/common_pitfalls.html)
-- [scikit-learn probability calibration](https://scikit-learn.org/stable/modules/calibration.html)
-- [scikit-learn model persistence](https://scikit-learn.org/stable/model_persistence.html)
 - [OWASP prompt injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/)
-- [MinIO AIStor license operations](https://docs.min.io/aistor/operations/licenses/)
-- [MinIO AIStor Free agreement](https://www.min.io/legal/aistor-free-agreement)
-- [django-storages S3 backend](https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html)
-- [Django translation](https://docs.djangoproject.com/en/5.2/topics/i18n/translation/)
-- [DRF internationalization](https://www.django-rest-framework.org/topics/internationalization/)
 
 ### Research notes
 
-- The initial research records verification against official sources on 2026-09-29. The expanded framework comparison in Section 4.2 was reviewed against the linked official documentation separately; other findings were carried forward. Versions, support schedules, APIs, and project status can change. Recheck dependencies/image tags before locking the environment.
-- Django 5.2 was selected for LTS support and GeoDjango, not as a claim that it is the newest release. Do not pin an old patch from this document.
-- Storage was reassessed against Community, AIStor, django-storages, and S3 documentation; see [dated storage research](c48-storage-research.md). AIStor Free is a conditional lab option, SeaweedFS the fallback. No compatibility or restore tests have been executed.
-- Quantitative NFRs, guest SOS, priorities, retention, map/file/notification providers, and AI usage still require relevant supervisor/domain confirmation.
+- Initial research was conducted on 2026-09-29; the NestJS framework comparison and MinIO AIStor Free decision were checked against linked primary sources on 2026-09-30. Versions, support schedules, APIs, license terms, and project status can change. Recheck release compatibility and current AIStor terms before implementation.
+- NestJS/TypeScript was selected after a qualitative comparison with Spring Boot, Django/DRF, FastAPI, and Flask. This was not a performance benchmark; team familiarity should be confirmed during setup.
+- MinIO AIStor Free single-node is the one selected capstone storage option. MinIO Community is not selected. Current terms, artifact/license validity, S3 compatibility, private policy behavior, and restoration still need to be checked during setup; none have been tested by this research.
+- Section 22 records the later solo-backend decisions, including authenticated-only SOS. Quantitative NFRs, official priority rules, retention, external providers and AI operational use still need the relevant confirmation.
+
+## 22. Solo backend implementation baseline
+
+**Decision date: 2026-09-30. Authority: the backend owner authorized correction of the plan.** These are implementation decisions for the synthetic capstone demo, not policies approved by a rescue authority. Preserve the assigned functional scope and the five-service architecture. Sections 8–10 use these decisions; replace conflicting wording rather than implementing both alternatives.
+
+### 22.1 Repository structure and clean-code rules
+
+```text
+backend/
+  apps/
+    identity/src/
+    response/src/
+    logistics/src/
+    notification/src/
+    reporting/src/
+  packages/
+    contracts/src/          # versioned transport schemas/types, no entities
+    platform/src/           # reused technical bootstrap/errors/auth only
+  infra/                   # Compose, Nginx, database initialization
+  scripts/                 # migration, seed, backup/restore commands
+```
+
+Each app owns `main.ts`, `app.module.ts`, `config/`, `database/data-source.ts`, `database/migrations/`, and `modules/<business-module>/`. A business module uses `<name>.module.ts`, `<name>.controller.ts` when it has HTTP routes, `<name>.service.ts`, `dto/`, and `entities/` as needed. Keep workers and outbox/inbox infrastructure within the owning app. Each app has its own environment validation, image, migration command, database credentials, and health/readiness routes. Create only directories used by the current slice. Use one package manager/workspace and pin versions after a primary-source compatibility check; this document selects no exact runtime releases.
+
+- Controllers parse validated DTOs, invoke use cases, and map responses; they contain no SQL or business state transitions. Services own business guards, transaction boundaries, and authorization of actions/objects. List/map queries apply scope before pagination or aggregation.
+- Use TypeORM repositories/QueryBuilder and the transaction's EntityManager directly. Add a dedicated query/persistence component only when real complexity warrants it; no generic base repository, one-implementation interface, or pass-through layer.
+- Never return entities directly as public response contracts. Explicit DTO mapping avoids credentials/internal fields leaking and keeps OpenAPI stable.
+- Keep entities/migrations/domain rules in their owner app. Share transport schemas and proven technical code only; no shared business services or database connection module. Do not build a platform package ahead of actual reuse.
+- Enable TypeScript strict checks, ESLint and formatting. Avoid untyped `any`, swallowed errors, magic status strings, circular module dependencies, and runtime schema synchronization. Use named enums/types, bounded DTO validation, parameterized SQL, DB constraints, and reviewed migrations.
+- Centralize Vietnamese exception/validation copy and stable error codes, including 404, 413, 429, auth, provider, and worker paths. Log technical codes/correlation IDs without passwords, tokens, signed links, or unnecessary PII.
+- Every nontrivial slice includes meaningful automated checks for its invariants. PostgreSQL/PostGIS and Kafka integration checks cover actual concurrency/replay behavior; mocks do not establish those guarantees. Run the relevant checks before recording completion.
+
+### 22.2 Identity, scope, and request decisions
+
+| Area | Capstone implementation decision |
+|---|---|
+| Citizen onboarding | Public rate-limited registration grants CITIZEN only. Unique normalized username; passwords are hashed with an appropriate maintained implementation selected at setup. Account/password errors do not disclose credential existence. Staff/volunteer roles are admin-granted. Guest SOS is disabled. |
+| Scope | Each grant binds a role/action set to one scope: organization, region, campaign or explicitly granted system scope. Alternative matching grants are OR; inside an organization/region/campaign match, the action, owning organization and selected scope must all match (AND). System scope is an explicit cross-organization exception for its named actions only, never implicit in ADMIN. Region/campaign grants carry their parent organization; geographic overlap alone never crosses organization boundaries. Owner/team relationships are separate explicit permissions, not inferred staff grants. Admin account management does not imply access to victim details. Exact GPS is limited to the reporter, authorized coordinators and assigned teams. |
+| Revocation | JWT local checks include approved algorithm, issuer, audience, expiry and session ID. Identity introspection is authenticated as a service, checks active account/session and returns current grants. No positive auth cache in demo. Identity outage fails closed with 503; recovery restores authenticated access. Notifications/reporting background projection work continues without making new user-authorized mutations. This trades availability for simple request-boundary revocation. |
+| Request intake | campaign_id is nullable. Backend configuration assigns the synthetic demo intake organization; citizens cannot set organization or staff scope. Identity owns controlled region codes; Response owns seeded region boundary geometry and derives region from the location. Unknown/ambiguous boundary results keep region null and enter an explicit unassigned queue. Only coordinators with organization-wide intake permission or explicit system intake grants can view/correct that queue; campaign-only grants cannot. No match must not reject SOS or silently hide it from all intake operators. Region correction is versioned/audited. Only authorized coordinators attach/reassign requests to ACTIVE campaigns with compatible organization/operating region. |
+| Priority | P1–P4 labels remain the draft taxonomy in Section 8.1. Human coordinator selects priority/reason after verification. No SLA is implied and no automatic queue ranking/dispatch is derived from these labels. |
+| Supplements | Reporter may add information in SUBMITTED/VERIFYING/VERIFIED/TRIAGED/DISPATCHED/IN_PROGRESS. Preserve earlier facts as history. Terminal requests reject supplements; coordinate reopen separately. |
+| Cancellation/resolution | Scoped coordinator may cancel a nonterminal request with reason, subject to the canonical-reference guard below. Acquire request locks in sorted ID order, then team IDs sorted, then mission IDs sorted; cancel nonterminal missions, release team capacity and enqueue reservation cleanup atomically in Response. COMPLETED evidence is preserved. Coordinator resolves from IN_PROGRESS or TRIAGED with completed evidence, no nonterminal missions, and a recorded needs-met confirmation; CLOSED follows RESOLVED. CLOSED reopens to TRIAGED with reason; old terminal missions remain historical. |
+| Duplicate/rejection | Outcomes branch only from VERIFYING. Duplicate target must be authorized and cannot be self, DUPLICATE, REJECTED or CANCELLED. Lock source/target request rows in sorted ID order before checking state and inbound links. A canonical request with inbound duplicate links cannot become DUPLICATE, REJECTED or CANCELLED; every linker/rejection/cancellation uses the same locks and recheck. No duplicate chains/cycles or automatic link reparenting. Terminal REJECTED/DUPLICATE/CANCELLED records are historical; a new report is created for renewed need. |
+| Campaign pause/close | PAUSED blocks new attachments, mission creation/offers and acceptance of existing offers. Coordinators may cancel waiting/ready/offered missions; existing reservations remain visible until resume or explicit cleanup, never silently expire. Already ACCEPTED/EN_ROUTE/ON_SCENE missions may continue, including physical issue against their existing reservation under the continuation validation below. Resume is PAUSED → ACTIVE. Close requires all attached requests terminal (CLOSED/REJECTED/DUPLICATE/CANCELLED). Returns, receipts and issued-goods settlements remain allowed after closure. |
+
+Use a request work_cycle counter incremented on reopen; tag each new mission with that cycle. Historical completed missions cannot resolve a reopened request without current-cycle evidence. For active request dispatch progress, compute under a request row lock after every mission offer/accept/decline/failure/completion. Ignore historical missions for newly reopened work. Accepted/travelling/on-scene work takes precedence over offers; offers take precedence over returning to TRIAGED. No mission event changes a human terminal outcome or automatically marks RESOLVED. A fully completed set remains TRIAGED pending explicit coordinator confirmation; the resolution command may also transition TRIAGED → RESOLVED when completed mission evidence exists, no active mission remains, and the coordinator confirms all needs met. This additional edge must be present in the state diagram and transition tests.
+
+For commands touching campaigns and requests, acquire campaign rows first in sorted ID order, then request rows sorted, teams sorted and missions sorted. Campaign close and request attachment/reassignment/reopen use this same order and recheck linked states. Reopening a request attached to a CLOSED campaign requires authorized attachment to an ACTIVE compatible campaign or audited detachment first; do not leave a nonterminal request attached to a CLOSED campaign. Duplicate decisions lock all affected requests in sorted order without acquiring campaign locks afterward.
+
+### 22.3 Team, reservation, and stock decisions
+
+- One mission belongs to one request and exactly one team. Team leader is an active team member and the only volunteer actor allowed to accept/decline or advance that mission; coordinator can cancel/fail with reason. Team leader writes results/evidence. Individual volunteers can view assigned team work and maintain their own profile/availability; solo volunteers use a one-member team.
+- Demo teams have capacity one active mission. Under locks acquired in one documented order (request IDs sorted, then team IDs sorted, then mission IDs sorted), OFFERED reserves team availability until accept/decline/cancel; ACCEPTED/EN_ROUTE/ON_SCENE retain it; terminal transition releases it. WAITING_RESOURCES/READY_TO_DEPLOY do not reserve a team; recheck membership, required skills, organization/operating-region compatibility and availability when offering. Campaign-linked creation/offer/accept also locks its campaign before request/team/mission locks, so pause and those commands serialize locally. No automatic offer expiration in the demo; expose offer age for manual cancellation. Concurrent offers cannot both acquire the same team.
+- Resource-free rescue can be offered immediately after triage. Coordinator explicitly marks whether a mission requires stock; only those missions enter WAITING_RESOURCES. Reservation confirmation gives READY_TO_DEPLOY; rejection remains visible with its reason. Retry with changed warehouse/quantity creates a new reservation intent after the previous intent is REJECTED or confirmed RELEASED; never silently overwrite an old intent.
+- Each reservation intent has a unique ID and immutable mission/warehouse/item/quantity payload. REQUESTED → RESERVED/REJECTED/RELEASED; RESERVED → ISSUED/RELEASED. Release received before request creates a RELEASED tombstone, so late request cannot reserve. All commands lock the intent, deduplicate event/command IDs and enforce the payload identity. A release racing issue has exactly one winner: release prevents issue; issue prevents a stock release and produces an already-issued result.
+- Every DECLINED/FAILED/CANCELLED/COMPLETED transition atomically records Response-owned reservation cleanup intent and retries compensation; Logistics owns stock transitions. REQUESTED/RESERVED intents are released, including release tombstones and late confirmations for any terminal mission. ISSUED intents never receive artificial stock credit: remaining quantities require physical distribution/return or documented loss, visible as outstanding settlement. REJECTED/RELEASED intents need no stock effect. Mission completion does not imply inventory settlement; campaign closure preserves outstanding settlement records. Do not expire stock reservations automatically. A configurable demo overdue threshold exposes pending work; timeout does not prove rejection. Reconciliation queries authenticated owning-service APIs by intent ID and retries the original idempotent command.
+- Supply-dependent missions require authoritative confirmation that all required lines of the current intent are ISSUED before ACCEPTED → EN_ROUTE. A RESERVED result is insufficient. Response stores the confirmed result through its inbox or authenticated reconciliation; stale results from previous intents cannot unlock departure. Resource-free missions bypass this check. No pickup-at-scene exception is included in the demo.
+- ISSUE reduces on_hand and reserved exactly once. Direct issue-and-distribution atomically checks available stock, reserves/issues its own quantity and records distribution in one Logistics transaction. Distribution references issued lines and records beneficiaries' aggregate quantities; it never decrements the warehouse again. Distributed + returned + recorded loss cannot exceed issued quantity. Direct distribution records against the issue created in that same transaction. Transfers use their separate dispatch/transit/receipt accounting and cannot masquerade as beneficiary distributions.
+- Stock quantities use fixed-precision database decimals with item unit/scale validation and decimal strings in API contracts; no JavaScript floating-point balance arithmetic. Negative/zero command quantities and incompatible units are rejected. Reservation and physical issue remain separate.
+- Before new campaign-linked reserve/issue/transfer commands and direct issue-and-distribution commands, Logistics validates ACTIVE status through an authenticated Response API outside DB locks; a stale projection is insufficient. The sole PAUSED exception is issue against an existing reservation for a mission already ACCEPTED/EN_ROUTE/ON_SCENE: Response validates mission state, current intent and campaign in the same authenticated continuation check. CLOSED never permits new issue. Logistics also checks caller warehouse permissions and warehouse/campaign organization compatibility; transfers require authority over both source and destination. Unavailability returns retryable 503. Validation may precede concurrent pause/close/cancellation: document this request-boundary window and compensate issue/cancellation races; do not claim global atomic campaign closure. Release, return, receipt and beneficiary settlement of already-issued goods remain possible without ACTIVE status.
+
+### 22.4 API, event, and reliability contracts
+
+Before coding each slice, add full contracts alongside that slice in `backend/packages/contracts` and review its per-service OpenAPI: exact `/api/v1` paths, DTOs, success/status codes, error codes and Vietnamese messages, filters/limits, actor/scope matrix, expected_version, idempotency and event examples. Include complete CRUD/actions used by the clients for accounts, campaigns, incidents, teams/profiles, requests/missions, warehouses/items, vehicles/relief points, stock, notifications and reports. Endpoint sketches in Section 10 are not substitutes for these artifacts.
+
+- Persist idempotency records under a unique actor/service/command/key scope in the business transaction. Store canonical validated-payload hash and original response; identical replay returns the original result, changed payload returns 409. Preserve records for the demo; retention must be defined before cleanup. Unique constraints and version checks govern concurrent retries, not in-memory maps.
+- Producers maintain an incrementing per-aggregate event sequence independent of optimistic entity version; use that sequence as aggregate_version in the event envelope. Unique aggregate/type/sequence constraints and request/team/stock locks serialize conflicting writes. Publish with aggregate ID as Kafka key.
+- Run one outbox relay per producer app in the demo, protected by a database advisory leadership lock. Publish committed rows in sequence; mark only acknowledged sends. Do not publish later rows for an aggregate while its earlier row is pending. Failure stops that aggregate until retry; other aggregates may continue. This deliberate throughput ceiling can move to partitioned relays when measurement justifies it.
+- Use versioned topics `c48.identity.events.v1`, `c48.response.events.v1`, `c48.logistics.events.v1` and service-specific consumer groups. Optional AI uses its separately restricted topic. Build a catalog enumerating each event, required payload, authorized consumers, key, schema version and failure policy before adding its producer.
+- Consumer DB side effects and inbox commit together; Kafka offsets commit afterward with auto-commit disabled. Store only the next contiguous processed offset per partition. Crashes can redeliver, and inbox uniqueness absorbs duplicates. Unknown schema/permanent invalid payload moves to a durable DLQ before advancing its offset. Temporary failures retry with bounded backoff; do not silently skip.
+- Version-aware projections subscribe to a documented complete aggregate event stream. Stale versions do not regress state; gaps are persisted as pending and alerted while the complete stream or an authenticated snapshot repairs them. Do not apply later arithmetic deltas across a gap. A durably stored pending event may acknowledge Kafka, but its database side effect remains incomplete until reconciliation. Command consumers rely on intent state/identity and inbox rather than assuming every aggregate event is relevant.
+- Notification uniqueness is `(event_id, recipient_id, channel)`. In-app is the mandatory channel. External providers remain optional; delivery attempt/retry is separate from inbox consumption because DB rollback cannot undo an external send.
+- Reporting owns event-derived scoped aggregates with watermark, not business decisions. Dashboard contracts define totals, time windows, timezone, lead-time formula, empty results and stale threshold per slice; do not compare unaligned snapshots as exact live totals.
+- Configure Reporting subscriptions with fromBeginning=true for new consumer groups; existing groups resume committed offsets. Keep all demo integration events with explicit retention.ms=-1 and retention.bytes=-1, cleanup.policy=delete, bounded synthetic input and disk monitoring; no compaction or topic deletion during the demo. Rebuild pauses the old projector, creates a fresh projection generation/inbox with a new group, replays the complete retained streams and reconciles against an authoritative fixed dataset before switching the read API. Capture and reach per-topic/partition end-offset watermarks, drain pending gaps, and continue consumption after the switch; fixed-dataset equality alone is not a live cutover guarantee. Never clear only projection rows while retaining the deduplication inbox. If history is incomplete, mark rebuild unavailable/stale and restore a matching Kafka+projection backup or reset/reseed the synthetic environment; do not present partial aggregates as complete. Define a finite retention and snapshot bootstrap protocol before any real deployment. [KafkaJS consumer start offsets](https://kafka.js.org/docs/consuming), [Kafka topic retention configuration](https://kafka.apache.org/42/configuration/topic-configs/)
+
+### 22.5 Solo backend sequence and acceptance gates
+
+| Order | Complete slice | Exit evidence |
+|---|---|---|
+| 1 | Workspace, Compose, five app boundaries as needed, config, migrations, errors, Identity registration/sessions/grants | Repeatable setup; strict type/lint/build checks; auth/scope/revocation/outage and Vietnamese-message checks |
+| 2 | SOS, nullable campaign, controlled regions/unassigned intake, PostGIS, idempotency, own timeline, first outbox/Kafka/Notification path | TC-01..06/08, TC-20..22, TC-BE-12; one committed SOS under retries; scoped map/list; consumer recovery |
+| 3 | Campaign/incident, verification branches, human priority, duplicate links | TC-09..11, TC-BE-11; transition/duplicate/campaign guards; scope and audit evidence; UC-02/08 |
+| 4 | Team/profile/availability, one-team missions, progress/confirmation/cancellation | TC-07/12..14, TC-BE-04/13; aggregation combinations; concurrent team offers; owner/leader permissions; pause continuation with stock is verified in slice 5 |
+| 5 | Warehouse/item/vehicle/point, receipts/ledger/reservations/issue, mission saga | TC-15..19/31, TC-BE-09/10 and stock continuation in TC-BE-13; cancellation/late-confirmation/issue races; real database constraint checks |
+| 6 | Transfers/transit reconciliation, distribution/returns/loss, Reporting | TC-BE-06/14; quantity reconciliation; no double decrement; dashboards match fixed dataset; watermark/lag/rebuild checks |
+| 7 | File integration and full recovery/security/demo hardening | TC-24/29/30 and TC-L10N; private uploads/downloads; bounded files; object+DB restore; complete E2E |
+
+File metadata/contracts start with SOS/missions; real object-store integration may be completed earlier when the licensed lab artifact is available. Do not claim evidence-upload FRs complete before storage acceptance. Each slice updates traceability, contract examples, migrations, seed data and actual command/results. Core FRs marked M must all be covered before full backend completion; AI, CSV export, push/email, full offline queue and kind remain optional/Should. Do not create a parallel Python runtime, new brokers or a sixth domain service.
+
+### 22.6 Additional acceptance cases for corrected decisions
+
+These planned cases extend existing IDs without renumbering them. They are not executed tests.
+
+| ID | Linked requirements | Required assertions |
+|---|---|---|
+| TC-BE-01 | FR-IAM-01..03 | Registration cannot grant staff privileges; refresh reuse revokes the session family; logout/disable/reset/role change rejects the next protected call; Identity outage gives Vietnamese 503 |
+| TC-BE-02 | FR-REQ-01, FR-CAM-01 | SOS succeeds without campaign; out-of-scope/inactive attachment fails; pause/resume/close guards and historical settlements are consistent |
+| TC-BE-03 | FR-REQ-04, FR-MSN-03 | Verification outcomes are exclusive; self/chain/cycle duplicate links fail; accepted work survives sibling decline; offered-only fallback and human resolution behave correctly |
+| TC-BE-04 | FR-MSN-01..03 | Two offers to a capacity-one team yield one winner; unauthorized member cannot accept; terminal transition releases capacity; reopened cycle excludes old outcome evidence |
+| TC-BE-05 | FR-LOG-02..03 | Release-before-request tombstone prevents reservation; cancellation with late confirmation converges; concurrent issue/release cannot both consume or credit stock; timeout never proves rejection |
+| TC-BE-06 | FR-LOG-02..04 | Transfer receipt/return/loss reconciles transit; in-transit cancellation fails; distribution of issued goods does not decrement stock again; over-settlement and repeated commands fail safely |
+| TC-BE-07 | FR-EVT-01, FR-RPT-01 | Relay preserves aggregate sequence; duplicate/stale/gap/schema failures cannot regress projections; offsets follow durable DB writes; pending/DLQ replay repairs without duplicate effects |
+| TC-BE-08 | FR-NOT-01, NFR-L10N-01 | One event can create multiple recipient notifications once each; cross-recipient access fails; HTTP, worker and reverse-proxy error messages exposed to clients remain Vietnamese |
+| TC-BE-09 | FR-MSN-02, FR-LOG-03 | DECLINED/FAILED/CANCELLED/COMPLETED with pending/reserved goods records durable cleanup; late confirmation releases once; issued goods remain visible for settlement without artificial stock credit |
+| TC-BE-10 | FR-MSN-02, FR-LOG-03 | Required goods RESERVED cannot unlock EN_ROUTE; confirmation of all current-intent issued lines unlocks departure; old-intent results do not; resource-free mission can depart without stock |
+| TC-BE-11 | FR-REQ-04 | B links to A; attempting A → C duplicate, rejection or cancellation conflicts. Concurrent B → A and A → C cannot create a chain/cycle or an invalid canonical target |
+| TC-BE-12 | FR-IAM-02, FR-REQ-01/06 | Grants match action AND organization AND selected scope, with OR across matching grants; no cross-organization access. Unknown/ambiguous region SOS succeeds and is visible to designated intake coordinator only; campaign-only coordinator cannot read it; scoped correction is audited |
+| TC-BE-13 | FR-CAM-01, FR-MSN-02, FR-LOG-03 | Pause blocks creation/offer/acceptance, including existing OFFERED work. Already accepted mission may obtain existing reserved goods through continuation validation and finish; unaccepted work cannot issue. Cancel releases unissued goods; resume restores permitted commands; CLOSED request cannot reopen in CLOSED campaign |
+| TC-BE-14 | FR-EVT-01, FR-RPT-01 | Start Reporting after historical SOS/mission/stock events; fromBeginning replay matches fixed dataset. Rebuild with fresh inbox/group yields identical totals without duplication; incomplete retained history is reported unavailable/stale rather than complete |
+
+### 22.7 Remaining decisions and current repository status
+
+The repository currently has documentation only. No NestJS workspace, migrations, OpenAPI artifacts, running services, or executed product tests are established by this plan edit. Section 22 fixes design inconsistencies and defines the implementation path; it is not evidence of a working backend.
+
+Before setup, verify primary-source runtime/image/client compatibility and current AIStor package/license. Before file integration, record an explicit MIME allowlist, size/count limits and signed-link TTL as demo configuration and test them. Before performance acceptance, record hardware and adopted numeric targets. External map/push/email/LLM providers remain unselected. Official priority/SLA, retention, real-data privacy and disaster-authority policies need separate confirmation before real deployment. These limitations do not block independent synthetic-demo slices.
 
 ## Appendix A. AI implementation and research handoff
 
-**Execution guidance for AI use; the design is not yet a complete implementation specification.** Review notes identify ambiguities that must be resolved for the affected workflows.
+**Execution guidance for AI use.** Section 22 supplies the corrected capstone workflow baseline; concrete OpenAPI/event/migration artifacts and execution evidence must be produced per slice.
 
 ### A.1 Reading order and decision authority
 
 1. Read root AGENTS.md and any applicable directory instructions.
 2. Read [project context](c48-project-context.md) for the assigned scope and deliverables.
-3. Read this English plan, including the framework evaluation, expanded AI design in Section 12, storage research note, open decisions, and this appendix.
+3. Read this English plan, including the framework evaluation, expanded AI design in Section 12, storage decision in Section 6.3, open decisions, and this appendix.
 4. Inspect the actual repository, existing contracts/migrations, and latest user instructions before writing code. Do not assume planned services or tests already exist.
 
-The current technical baseline is Django/DRF, five services with Kafka/outbox, PostgreSQL/PostGIS, React/Vite, and React Native/Expo. Section 4 records the selection rationale and alternatives. The project brief defines scope; technology choices are design decisions, not requirements imposed by the brief.
+The current technical baseline is NestJS/TypeScript, five services with Kafka/outbox, TypeORM, PostgreSQL/PostGIS, React/Vite, and React Native/Expo. Section 4 records the selection rationale and alternatives. The project brief defines scope; technology choices are design decisions, not requirements imposed by the brief.
 
-Nginx and the five service boundaries are the working baseline. Storage research proposes a conditional MinIO AIStor Free lab profile with SeaweedFS fallback; edition, terms/license, artifact, compatibility, and provider setup still need verification. AI remains optional; Kubernetes is a learning extension that must not block core delivery. Draft business rules, numeric targets, and provider/retention policies remain open where marked.
+Nginx and five NestJS service boundaries are the working baseline. MinIO AIStor Free is the selected single-node lab object store; each operator must obtain/use it under current terms, and the team must verify the artifact, private access, and restore path. AI remains optional; Kubernetes is a learning extension that must not block core delivery. Draft business rules, numeric targets, and provider/retention policies remain open where marked.
 
 Use the recorded baseline for implementation. Revisit it when new evidence materially changes the tradeoffs, rather than repeatedly reopening settled choices. Record new decisions and ask only for information or authorization actually missing for the affected work. Routine reversible implementation choices may proceed with documented assumptions.
 
@@ -1211,30 +1331,16 @@ Use the recorded baseline for implementation. Revisit it when new evidence mater
 - Never let AI or reporting projections become authoritative dispatch/priority decisions.
 - Never report planned tests as passed, or a single-host demo as highly available.
 
-### A.3 Resolve before coding the affected workflow
+### A.3 Decision baseline and remaining slice gates
 
-| Area | Ambiguity or missing contract | Required next step |
-|---|---|---|
-| Request aggregation | Section 8.1 says first acceptance means IN_PROGRESS but also says a decline/failure leaves DISPATCHED when another assignment remains active | Define an aggregation/transition table for multiple offered, accepted, failed, and completed missions; preserve active accepted work and test all combinations |
-| Verification | UC-02 writes verify/reject/duplicate/priority as a sequence | Define mutually exclusive outcome branches consistent with the state machine; terminal rejection/duplicate does not proceed to triage |
-| State coverage | Source diagrams are proposed, with no cancellation from VERIFIED/RESOLVED and no explicit campaign resume edge | Decide whether these transitions are prohibited or missing; specify actor, guard, reason, and effects rather than inventing endpoints |
-| Team acceptance | MissionTeam allows multiple teams, but the mission has a single acceptance/progress state | Decide single-team missions versus per-team assignments, who may accept on a team's behalf, and how availability is reserved/released |
-| Resource dependency | The saga gates resource-dependent mission offers on reservations | Define which missions genuinely require stock before departure; do not accidentally make urgent rescue dispatch depend on unrelated supplies |
-| Reservation cancellation | Late confirmation, timeout, rejection, cancellation, and issue may race | Specify intent IDs, legal transitions, compensation ownership, reconciliation, and retry behavior; never release physically issued goods as if still in the warehouse |
-| Transfers and distribution | The source permits cancellation while IN_TRANSIT but does not define physical return/loss accounting; issue and distribution may describe the same goods | Define in-transit stock and reconciliation/return movements; distinguish issue from beneficiary distribution to prevent double decrement. Both warehouses belong to Logistics; no cross-service database transaction is needed |
-| Campaign relationship | The ERD implies a required campaign, but citizen SOS may arrive before campaign selection | Decide campaign nullability and assignment authority. Define how Logistics handles a stale campaign projection on resource commands |
-| Authentication | FR-IAM-01 implies disabled accounts are rejected, while locally validated JWTs can remain valid until expiry | Define immediate versus TTL-bounded disable/revocation behavior, its propagation mechanism, and matching tests; do not promise both without implementation support |
-| Event ordering | Aggregate key ordering does not by itself order parallel outbox publishers or repair missing versions | Define relay ordering, aggregate-version handling, consumer offset commit after DB commit, retries/DLQ replay, and stale/gap handling |
-| Notification identity | TC-21 uses recipient/channel uniqueness; TC-22 abbreviates this as one record per event | Define uniqueness such as event + recipient + channel. Keep external provider delivery separate from transactional inbox effects; a DB transaction cannot roll back a sent push |
-| Contract completeness | Endpoint sketches omit full schemas, some CRUD/actions, event topic names, constraints, and error details | Write complete slice-specific OpenAPI/event/data contracts before implementing that slice; shorthand suffixes are not final route paths |
-| Test coverage | The 31 core cases and optional AI/storage cases are planned; several are summarized and do not cover every FR/NFR edge | Expand executable preconditions, steps, assertions, and traceability for the implemented slice; use appropriate real DB transaction tests for concurrency |
+Section 22 supersedes the earlier unresolved technical review list: multi-mission aggregation, single-team missions, campaign optionality/resume, mutually exclusive verification, reservation compensation, transfer accounting, revocation, event ordering, and notification uniqueness now have capstone decisions. Do not reopen them without evidence or a changed user instruction.
 
-These are review tasks for the relevant slices, not reasons to stop independent work. Material business decisions need domain/supervisor input; ordinary technical details can be recorded as design decisions. Update this primary English plan and affected contracts when a decision changes the baseline.
+Before implementing a slice, finish its OpenAPI schemas, database migration constraints/indexes, event payload/topic catalog, authorization cases, and executable acceptance cases. These concrete artifacts are not yet present in this documentation-only repository. Priority definitions, external providers, real-data retention, and operational SLA remain subject to domain review before real use. Ordinary reversible implementation choices may proceed under the documented demo defaults.
 
 ### A.4 Implementation workflow for a future task
 
 1. Identify the requested slice and its UR/FR, use case, state transitions, and planned tests. Separate required behavior from Should/Optional scope.
-2. Inspect existing code and contracts before adding files or dependencies. Reuse native Django/PostgreSQL features where they satisfy the requirement.
+2. Inspect existing code and contracts before adding files or dependencies. Use Nest guards/pipes, TypeORM migrations/transactions, PostgreSQL constraints, and TypeScript types where they satisfy the requirement.
 3. Resolve the slice's blocking decisions. Record assumptions and decision rationale; do not quietly select a guest policy, retention period, SLA, or external provider.
 4. Specify database constraints/indexes, API request/response/errors, authorization, event schema/version/key, transaction boundaries, and failure behavior.
 5. Implement the end-to-end slice: migrations, domain logic, API, client states, and workers only where needed. Keep resource-intensive infrastructure optional in local profiles.
@@ -1245,7 +1351,7 @@ The ten-week schedule is a planning baseline, not a command to delay all integra
 
 ### A.5 Further research protocol
 
-- Recheck time-sensitive facts using primary sources before pinning versions/providers: Django/Python/DRF compatibility, PostgreSQL/PostGIS/GDAL/GEOS support, Kafka client/broker support, React Native/Expo permissions, object-storage maintenance/license, Kubernetes versions, and map/provider usage terms.
+- Recheck time-sensitive facts using primary sources before pinning versions/providers: Node/Nest/TypeORM compatibility and PostgreSQL/PostGIS image support, Kafka client/broker support, React Native/Expo permissions, object-storage maintenance/license, Kubernetes versions, and map/provider usage terms.
 - Treat the 2026-09-29 research findings as dated findings, not newly verified facts. A linked version-specific page is not automatically the selected runtime version.
 - Record the question, research date, primary-source URLs, findings, design impact, tradeoffs, and unresolved points. Distinguish a documented fact from an inference or recommendation.
 - Preserve approved architecture unless evidence justifies a change; record the reason and obtain any necessary decision before making a material switch.

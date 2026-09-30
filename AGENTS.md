@@ -9,7 +9,7 @@ Before analysis, design, implementation, or further research, read:
 1. [Project context](docs/c48-project-context.md): the assigned scope and deliverables consolidated from the project brief and DOCX outline.
 2. [Technology and delivery plan](docs/c48-technology-and-delivery-plan.md): the primary English technical baseline, including framework/database comparisons, requirements, architecture, and delivery plan.
 3. Appendix A of the plan: implementation invariants, unresolved design issues, research protocol, and session handoff instructions.
-4. For file storage or AI work, read the plan's expanded Section 12 and [storage research](docs/c48-storage-research.md), including the distinction between MinIO Community and AIStor Free.
+4. For file storage or AI work, read Sections 6.3 and 12 of the plan, including the MinIO AIStor Free decision and its implementation limits.
 
 ## Main scope
 
@@ -21,7 +21,7 @@ Before analysis, design, implementation, or further research, read:
 ## Working conventions
 
 - Maintain project documentation, code identifiers, and technical contracts in English. Apply the mandatory Vietnamese language policy below to communication and all user-facing product content.
-- Use the technical comparison in the plan to explain technology choices. Django/DRF is the selected baseline based on relational workflows, GeoDjango, integrated administration, and delivery effort compared with Spring Boot, NestJS, FastAPI, and Flask.
+- Use the technical comparison in the plan to explain technology choices. NestJS/TypeScript was selected after comparison with Spring Boot, Django/DRF, FastAPI, and Flask. The implementation baseline is NestJS with TypeORM and PostgreSQL/PostGIS; do not introduce a Python service or runtime. MinIO AIStor Free single-node is the selected capstone object store, subject to its current license terms and documented tier limits.
 - Distinguish source requirements, design decisions, proposals, and unresolved policies. Detailed API contracts, providers, performance thresholds, retention, and some business rules remain open.
 - Preserve UR/FR/NFR/UC/TC identifiers and maintain traceability as implementation progresses.
 - Keep Web, Mobile, APIs, events, state transitions, authorization, and data ownership consistent.
