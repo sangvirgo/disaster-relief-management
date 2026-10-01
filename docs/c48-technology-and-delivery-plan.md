@@ -4,14 +4,14 @@
 |---|---|
 | Project | Emergency Response and Disaster Relief Management System |
 | Project code | C48 |
-| Version | 2.4 — workflow adaptation and three-service baseline |
-| Initial research / plan revision | 2026-09-29 / 2026-09-30 |
+| Version | 2.6 — consistency fixes after architecture review (guest SOS, contact data, cancellation guard, internal API exposure, distribution flow, ERD) |
+| Initial research / plan revision | 2026-09-29 / 2026-10-01 |
 | Team context | Three members in the project brief; backend owned by one member |
 | Document role | Single technical plan for implementation and further research |
 
 This document provides the proposed technical baseline for the SRS, SDD, database/API design, test cases, and user guide. The three-service architecture and adapted workflows below are C48 design proposals, not requirements imposed by the department or approved rescue policy.
 
-**For implementation and further research:** this is the single technical plan. Appendix A adds execution guidance and remaining slice-specific contract gates. Section 22 defines the backend structure and business invariants; Section 12 specifies the optional AI decision-support extension; Section 6.3 records the object-storage choice. This plan does not claim implementation benchmarks or executed product tests.
+**For implementation and further research:** this is the single technical plan. Appendix A adds execution guidance and remaining slice-specific contract gates. Sections 22 and 23 define the backend structure, business invariants, and resolved architecture-review decisions; Section 12 specifies the optional AI decision-support extension; Section 6.3 records the object-storage choice. This plan does not claim implementation benchmarks or executed product tests.
 
 ## 1. Reading guide and confidence levels
 
@@ -127,7 +127,7 @@ Use one repository/workspace for three Nest applications, each with its own boot
 | Channel | Proposal | Scope |
 |---|---|---|
 | Web | React + TypeScript + Vite; React Router; TanStack Query for server state | Dashboard, map/queue, verification/triage, missions, inventory, reports, admin |
-| Mobile | React Native + Expo + TypeScript | Citizen SOS/status tracking; volunteer missions/progress; foreground GPS and photos |
+| Mobile | React Native + Expo + TypeScript | Citizen SOS/status tracking; volunteer missions/progress; foreground GPS and bounded photo/video evidence |
 | API | REST/JSON /api/v1; per-service OpenAPI through `@nestjs/swagger` | Web/mobile contracts, mocks, and API checks |
 | Maps | Separate map UI from business logic; PostGIS queries; select tile/geocoding provider after license, quota, and privacy review | Do not send incident descriptions or personally identifiable information (PII) to map providers |
 
@@ -149,7 +149,7 @@ Reconsider Kafka only if C48 gains several independent consumers, needs durable 
 
 | Model | Benefits | Cost/risk | Assessment |
 |---|---|---|---|
-| One modular monolith | Simplest deployment and cross-domain transactions | Less visible service ownership for the architecture goal | Valid fallback if service integration blocks delivery |
+| One modular monolith | Simplest deployment and cross-domain transactions | Does not provide independently deployable ownership | Evaluated alternative; the user confirmed the three-service baseline and sufficient delivery time on 2026-10-01 |
 | Three services: Identity, Response, Logistics | Clear account, emergency workflow, and supply ownership; manageable API boundaries | Requires documented REST contracts and cross-service failure handling | **Selected** |
 | Five or more services | More independently deployable components | Extra databases, contracts, and operations without a demonstrated workload need | Deferred |
 
@@ -191,7 +191,7 @@ All three services can run as containers on one demo host. A shared PostgreSQL s
 | Service | Owns | Example API surface |
 |---|---|---|
 | **Identity** | Accounts, credentials, organizations, memberships, scoped role grants, refresh sessions | Registration/login/session, user/role administration |
-| **Response** | Campaigns/incidents, assistance requests, verification and priority history, teams, missions/progress, request evidence, request timeline | Intake, verification, duplicate review, triage, assignment, mission actions, scoped map/queue |
+| **Response** | Campaigns, assistance requests and their incident categories, verification and priority history, teams, missions/progress, request evidence, request timeline | Intake, verification, duplicate review, triage, assignment, mission actions, scoped map/queue |
 | **Logistics** | Item catalog, warehouses, stock balances/ledger, relief needs and commitments linked by opaque request ID, transfers, vehicles, relief points, distribution records | Receipts/issues/transfers, partial commitments and fulfillment, stock and outstanding-need views |
 
 Boundary rules:
@@ -232,6 +232,7 @@ erDiagram
   IDENTITY_USER ||--o{ IDENTITY_MEMBERSHIP : joins
   RESPONSE_CAMPAIGN |o--o{ RESPONSE_REQUEST : groups
   RESPONSE_REQUEST ||--o{ RESPONSE_REQUEST_EVENT : records
+  LOGISTICS_FULFILLMENT_CYCLE ||--o{ LOGISTICS_RELIEF_NEED : guards
   RESPONSE_REQUEST ||--o{ RESPONSE_MISSION : dispatches
   RESPONSE_TEAM ||--o{ RESPONSE_TEAM_MEMBER : has
   RESPONSE_TEAM ||--o{ RESPONSE_MISSION : receives
@@ -241,10 +242,11 @@ erDiagram
   LOGISTICS_STOCK_BALANCE ||--o{ LOGISTICS_STOCK_MOVEMENT : changes
   LOGISTICS_RELIEF_NEED ||--o{ LOGISTICS_COMMITMENT : fulfilled_by
   LOGISTICS_WAREHOUSE ||--o{ LOGISTICS_COMMITMENT : supplies
-  LOGISTICS_COMMITMENT ||--o{ LOGISTICS_COMMITMENT_LINE : contains
-  LOGISTICS_ITEM ||--o{ LOGISTICS_COMMITMENT_LINE : identifies
   LOGISTICS_TRANSFER ||--o{ LOGISTICS_TRANSFER_LINE : moves
   LOGISTICS_DISTRIBUTION ||--o{ LOGISTICS_DISTRIBUTION_LINE : issues
+  RESPONSE_REQUEST ||--o{ RESPONSE_RESOLUTION_INTENT : guards
+  LOGISTICS_COMMITMENT ||--o{ LOGISTICS_ISSUED_LINE_SETTLEMENT : settles
+  LOGISTICS_TRANSFER_LINE ||--o{ LOGISTICS_TRANSFER_TRANSIT_LINE : tracks
 
   IDENTITY_USER {
     uuid id PK
@@ -260,8 +262,13 @@ erDiagram
   }
   RESPONSE_REQUEST {
     uuid id PK
+    uuid organization_id
+    string region_code
+    int work_cycle
+    int version
     uuid campaign_id
     uuid reporter_user_id
+    string tracking_token_hash
     string status
     string priority
     geography location
@@ -269,11 +276,13 @@ erDiagram
     float location_accuracy_m
     string location_source
     int people_affected
+    string contact_phone
     datetime created_at
   }
   RESPONSE_MISSION {
     uuid id PK
     uuid request_id
+    int work_cycle
     string status
     uuid coordinator_user_id
     uuid team_id
@@ -294,9 +303,21 @@ erDiagram
     uuid actor_user_id
     datetime occurred_at
   }
+  LOGISTICS_FULFILLMENT_CYCLE {
+    uuid id PK
+    uuid request_id
+    int work_cycle
+    string state
+    int version
+    uuid seal_id
+    uuid intent_id
+  }
   LOGISTICS_RELIEF_NEED {
     uuid id PK
     uuid request_id
+    uuid campaign_id
+    uuid organization_id
+    string region_code
     int work_cycle
     uuid item_id
     decimal requested_quantity
@@ -307,17 +328,40 @@ erDiagram
     uuid id PK
     uuid relief_need_id
     uuid warehouse_id
+    decimal quantity
+    decimal released_quantity
+    decimal issued_quantity
+    decimal delivered_quantity
+    decimal returned_quantity
+    decimal lost_quantity
     string status
     datetime created_at
   }
-  LOGISTICS_COMMITMENT_LINE {
+  RESPONSE_RESOLUTION_INTENT {
+    uuid id PK
+    uuid request_id
+    int work_cycle
+    string kind
+    string state
+    uuid actor_user_id
+    int expected_request_version
+    string previous_state
+  }
+  LOGISTICS_ISSUED_LINE_SETTLEMENT {
     uuid id PK
     uuid commitment_id
-    uuid item_id
+    string settlement_type
     decimal quantity
-    string unit
-    decimal issued_quantity
-    decimal delivered_quantity
+    uuid actor_user_id
+    datetime occurred_at
+  }
+  LOGISTICS_TRANSFER_TRANSIT_LINE {
+    uuid id PK
+    uuid transfer_line_id
+    decimal dispatched
+    decimal received
+    decimal returned
+    decimal lost
   }
 ```
 
@@ -328,8 +372,8 @@ Each mission has exactly one team; additional teams receive separate missions un
 | Database | Minimum tables/entities |
 |---|---|
 | Identity | User, Organization, controlled Region catalog, Membership, RoleGrant, account status, RefreshSession with rotation/revocation, AuditRecord |
-| Response | Campaign, Incident, RegionBoundary referencing the controlled region code, AssistanceRequest with organization_id and nullable region/campaign, RequestEvent, RescueTeam, TeamMember with opaque user ID, VolunteerProfile, Mission with one team_id, EvidenceMetadata, scoped in-app Notification; optional AnalysisSnapshot, AnalysisJob, TriageRecommendation, RecommendationReview (Section 12) |
-| Logistics | Warehouse, Item, StockBalance, StockMovement, ReliefNeed/request reference, Commitment/lines, Transfer/lines, Distribution/lines, IssuedLineSettlement, TransferTransitLine, Vehicle, ReliefPoint, scoped in-app Notification |
+| Response | Campaign, ResolutionIntent, RegionBoundary referencing the controlled region code, AssistanceRequest with organization_id and nullable region/campaign, RequestEvent, RescueTeam, TeamMember with opaque user ID, VolunteerProfile, Mission with one team_id, EvidenceMetadata, scoped in-app Notification; optional AnalysisSnapshot, AnalysisJob, TriageRecommendation, RecommendationReview (Section 12) |
+| Logistics | Warehouse, Item, StockBalance, StockMovement, ReliefNeed/request reference, Commitment (one need/item per contribution), FulfillmentCycle, Transfer/lines, Distribution/lines, IssuedLineSettlement, TransferTransitLine, Vehicle, ReliefPoint, scoped in-app Notification |
 
 Define the Identity user entity and migration before other services rely on its contract; external services store opaque user UUIDs rather than duplicating credentials.
 
@@ -361,6 +405,8 @@ Use backend-mediated uploads through the owning NestJS service for the first imp
 Keep buckets private and store only object metadata (owner, generated key, detected MIME, size, checksum, uploader, timestamps, visibility/state) in PostgreSQL. Do not persist object bytes or signed URLs in PostgreSQL, logs, analytics, or reports. Authorize each download against the current business object before creating a short-lived signed URL; use a hostname reachable from the backend, browser, and physical mobile device. A signed URL remains a bearer capability until it expires, so document that revocation window or proxy downloads when immediate revocation is required. Direct client uploads are outside the initial scope: presigned upload URLs can be reused and can replace an existing key until expiry. [S3 presigned URL behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
 
 Back up owning-service database metadata and object bytes together, with a manifest of keys, sizes, and checksums. Keep a backup outside the demo host; test restoration in an isolated environment and verify scoped download/denied access after restore. A PostgreSQL dump or a volume beside the original objects alone is not a verified backup. No backup/restore test has been executed yet.
+
+Section 23.5 adopts the demo media allowlist, size/count/aggregate limits and 60-second download TTL.
 
 ### 6.4 Inventory and audit
 
@@ -395,8 +441,8 @@ For FR priorities, **M** means required for the core demo, **S** means should ha
 | FR-IAM-01 | M | Citizen registration, login, refresh/logout, account disabling, and credential changes | Invalid/expired tokens or disabled accounts receive 401; logout invalidates the refresh session |
 | FR-IAM-02 | M | Organization/region/campaign-scoped roles; action and object checks | Citizens cannot access another citizen's request; volunteers see their team's missions only |
 | FR-IAM-03 | M | Admin account, organization, and role management with least privilege | Permission changes record actor/time and before/after values |
-| FR-REQ-01 | M | Create requests with category, short description, headcount, location/manual pin, time/source | Validate input; return an identifier and server receive time |
-| FR-REQ-02 | M | Authenticated citizens submit and track SOS; guest endpoints disabled in capstone | Registration grants CITIZEN only; unauthenticated creation/tracking is denied |
+| FR-REQ-01 | M | Create requests with category, short description, headcount, reporter contact phone (required; verification needs a way to reach the reporter), location/manual pin, time/source | Validate input incl. phone format; return an identifier and server receive time; contact phone is visible only to the reporter, scoped coordinators and assigned team leaders, and excluded from maps, reports and AI input |
+| FR-REQ-02 | M | Anyone may submit an SOS without an account (guest SOS); an optional signed-in citizen's request is linked to the account. Guests track and supplement through a high-entropy tracking token issued once at creation; a guest can later claim the request after signing in | Unauthenticated creation succeeds with rate limiting; the token is stored only as a hash and shown once; without the token (or ownership) tracking/supplement is denied; registration still grants CITIZEN only; SOS creation and token tracking never call Identity |
 | FR-REQ-03 | M | Idempotent SOS creation retries | Same key/payload creates no second row; same key with different payload is rejected |
 | FR-REQ-04 | M | Verify, reject, and duplicate-link; rejection/duplicate decisions require reasons | Preserve duplicate requests and link them to a canonical request |
 | FR-REQ-05 | M | Manual P1–P4 priority with actor/time/reason and override history | Priority is separate from status; AI cannot change it automatically |
@@ -406,14 +452,16 @@ For FR priorities, **M** means required for the core demo, **S** means should ha
 | FR-MSN-02 | M | Create missions, offer/assign, accept/decline, transition, and record results | Only valid transitions; record actor/time/reason |
 | FR-MSN-03 | M | One request may have multiple missions; one mission belongs to one request and one team in the MVP | One completed mission does not close a request with remaining needs |
 | FR-MSN-04 | M | Request/mission evidence uploads and coordinator outcome confirmation | Metadata and download access follow object scope |
-| FR-CAM-01 | M | Response manages campaigns/incidents, operating regions, time, and status | Scoped creation/editing; Logistics stores campaign references |
+| FR-CAM-01 | M | Response manages campaigns, incident categories on requests, operating regions, time, and status | Scoped creation/editing; Logistics stores campaign references |
 | FR-LOG-01 | M | Manage warehouses, items, vehicles, relief points, and campaign references where needed | Active/inactive entities; preserve existing history |
 | FR-LOG-02 | M | Receipts, transfers, receipt confirmation, reserve/release, issue, return, adjustment | Ledger records actor/time/quantity/reason; balances never negative |
 | FR-LOG-03 | M | Link Logistics needs and commitments to a request by opaque ID; record commit/release/issue/delivery locally | Multiple contributions are supported; no cross-service transaction or direct table access |
 | FR-LOG-04 | M | Distribution by campaign, point, item, quantity, and actor | Retries never duplicate a distribution |
 | FR-LOG-05 | M | Show requested, committed/reserved, issued, delivered, and outstanding quantities; allow partial fulfillment | Delivered + active committed/reserved + issued-but-not-delivered never exceeds requested; one partial contribution does not close the need |
 | FR-REQ-08 | S | Suggest possible duplicate reports using time/category/location filters | Suggestions are visibly non-authoritative; only a coordinator may link/reject |
+| FR-REQ-09 | M | Human resolution with a durable current-cycle Logistics seal and recoverable intent | Concurrent fulfillment changes cannot invalidate a committed resolution; timeout recovery preserves one outcome |
 | FR-NOT-01 | M | In-app notices in the service that owns the changed request, mission, or stock task; push/email are extensions | Notice write is local to the business transaction; recipient scope is enforced |
+| FR-NOT-02 | S | Push alert for new mission offers and request status changes to registered devices (Expo push), sent from the owning service after commit via a small outbox row; guests rely on the token tracking page | Push failure never rolls back or blocks the business change; payload carries only a Vietnamese generic text and notice ID, no exact location or contact data; retry is idempotent per notice and device |
 | FR-RPT-01 | M | Scoped dashboards for request states/timings and stock/fulfillment gaps | Totals match a fixed dataset; each API response includes generated_at |
 | FR-RPT-02 | S | Scoped CSV export with role-based PII masking | No unauthorized fields; audit sensitive exports |
 | FR-AUD-01 | M | State, decision, adjustment, distribution, and role-change history | No passwords/tokens in audit; restricted readers |
@@ -424,16 +472,16 @@ For FR priorities, **M** means required for the core demo, **S** means should ha
 
 ### 7.3 Non-functional Requirements (NFR)
 
-The brief specifies no numeric thresholds. The numbers below are initial targets for supervisor/team confirmation.
+The brief specifies no numeric thresholds. Section 23.6 adopts the numeric synthetic-demo targets under the user's delegated design authority; these do not establish an operational SLA.
 
 | ID | Quality | Proposed requirement/criterion |
 |---|---|---|
-| NFR-SEC-01 | Security | Require authentication by default; public guest SOS only if approved. Services enforce scope and never trust client-supplied roles. |
+| NFR-SEC-01 | Security | Require authentication by default. The only public unauthenticated routes are registration/login/refresh, guest SOS creation, guest evidence upload and token-based tracking. Guest routes are rate limited per IP and per contact phone, validate input strictly, and never expose other reports. A guest report is untrusted until a coordinator verifies it and cannot reach triage or dispatch before then. Services enforce scope and never trust client-supplied roles. |
 | NFR-SEC-02 | Security | Filter list querysets by authorization; enforce detail/action object permissions, input/file validation, and suitable rate limits. route-level guards do not automatically scope returned rows; test object and list authorization separately. [NestJS guards](https://docs.nestjs.com/guards), [NestJS validation](https://docs.nestjs.com/techniques/validation) |
 | NFR-SEC-03 | Security | Do not log tokens, passwords, signed URLs, or unnecessary exact locations; HTTPS outside local development. |
 | NFR-PRV-01 | Privacy | Exact locations are accessible only to the subject, scoped coordinators, and assigned teams; reports aggregate by default. Retention needs confirmation. |
 | NFR-REL-01 | Reliability | Nonnegative inventory, valid states, idempotent API retries, visible cross-service errors, and backup restoration checks. |
-| NFR-PERF-01 | Performance | Discussion target: 10,000 requests and 20 concurrent users in the demo; common read API p95 ≤ 2 seconds; SOS creation p95 ≤ 3 seconds excluding upload. Record measurement hardware. |
+| NFR-PERF-01 | Performance | Adopted synthetic-demo target: 10,000 stored assistance requests; 20 concurrent k6 virtual users; common read API p95 ≤ 2 seconds and SOS creation p95 ≤ 3 seconds excluding upload; unexpected HTTP failure rate < 1% during a 10-minute measured steady interval after a 2-minute warm-up. Include Identity introspection. Record hardware and workload mix as Section 23.6 specifies. |
 | NFR-PERF-02 | Performance | Spatial indexes/bbox/result limits for maps; each dashboard panel shows its source timestamp instead of an unqualified real-time claim. |
 | NFR-UX-01 | Usability | Few SOS steps, usable controls, clear submission status, manual pin, understandable GPS errors. |
 | NFR-OFF-01 | Weak connectivity | If an offline queue is implemented, retries are idempotent; no continuous background location synchronization. |
@@ -461,15 +509,16 @@ stateDiagram-v2
   IN_PROGRESS --> TRIAGED: no active work, awaiting reassignment or confirmation
   IN_PROGRESS --> DISPATCHED: only unaccepted offers remain
   DISPATCHED --> CANCELLED
-  IN_PROGRESS --> RESOLVED
-  TRIAGED --> RESOLVED: completed evidence and human confirmation
+  IN_PROGRESS --> RESOLVING: human confirmation and mission guards
+  TRIAGED --> RESOLVING: human confirmation and mission guards
+  RESOLVING --> RESOLVED: Logistics cycle sealed
+  RESOLVING --> TRIAGED: audited abort after seal release
   RESOLVED --> CLOSED
   CLOSED --> TRIAGED: reopen with reason
   SUBMITTED --> CANCELLED
   VERIFYING --> CANCELLED
   TRIAGED --> CANCELLED
   VERIFIED --> CANCELLED
-  RESOLVED --> CANCELLED
   IN_PROGRESS --> CANCELLED
 ```
 
@@ -481,6 +530,7 @@ stateDiagram-v2
 - Recompute dispatch progress in the same Response transaction as a mission transition: any ACCEPTED/EN_ROUTE/ON_SCENE mission preserves IN_PROGRESS; otherwise any OFFERED mission gives DISPATCHED; otherwise the request returns to TRIAGED unless a coordinator has confirmed RESOLVED/CLOSED/CANCELLED. Completed missions remain evidence for human resolution, never an automatic closure. Section 22 specifies cancellation and reopen guards.
 - A coordinator confirms RESOLVED when current-cycle needs are met; CLOSED is administrative completion. If missions were assigned, require completed evidence and no active mission; if no rescue mission was needed, record that human decision. Mission completion never closes a request automatically.
 - Only scoped coordinators may reopen/cancel, with reason/audit and explicit handling of active missions.
+- Cancellation is available only from SUBMITTED, VERIFYING, VERIFIED, TRIAGED, DISPATCHED and IN_PROGRESS. It is rejected from RESOLVING and RESOLVED because the Logistics cycle is then being sealed or is already sealed and cannot be frozen. A RESOLVED request moves to CLOSED, or is reopened with a reason; an abandoned finalization uses the audited abort path in Section 23.2.
 - Canonical requests with inbound duplicate links cannot become DUPLICATE, REJECTED or CANCELLED; lock and recheck links as defined in UC-02 and Section 22.2.
 
 ### 8.2 Mission
@@ -513,10 +563,10 @@ stateDiagram-v2
 For each Logistics need, show requested, committed/reserved, issued, delivered, and outstanding quantities. Count a delivery only after receipt is confirmed at the designated relief point or recipient. The board labels a need OPEN before any delivery, PARTIALLY_FULFILLED when some but not all requested quantity is delivered, FULFILLED after the requested quantity is delivered and coordinator-reviewed, or CANCELLED after an authorized reasoned cancellation. These are fulfillment labels, separate from request and mission states.
 
 ```text
-Commitment: PROPOSED -> COMMITTED -> ISSUED -> DELIVERED
-                |           |
-                +-> CANCELLED <-+
-ISSUED -> RETURNED or LOSS_RECORDED (physical settlement)
+Commitment summary: PROPOSED -> COMMITTED -> ISSUED -> DELIVERED or SETTLED
+PROPOSED/COMMITTED -> CANCELLED only when no quantity was issued.
+Partial issue/delivery and mixed return/loss are quantity-derived summaries
+as defined in Section 23.4; they are not arbitrary status PATCHes.
 
 Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
              |         |          |-> RECONCILED (received + returned + lost)
@@ -528,6 +578,7 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 - ISSUE reduces on_hand and reserved exactly once. Cancelling an unissued commitment releases reserved quantity without increasing on_hand. Issued goods require delivery, verified return, or audited loss settlement.
 - Dispatch decreases source on_hand and reserved once and creates in-transit quantities. Receipt credits only physically received quantities at the destination. After dispatch, cancellation is prohibited; verified return credits the source, and authorized loss reconciliation removes transit quantity with reason/audit. Each line satisfies dispatched = received + returned + lost + remaining_in_transit. Both warehouses belong to Logistics; short local transactions lock affected balances in stable order.
 - Adjustments require reason, actor, and audit; never edit/delete old ledger entries to force a balance to match.
+- Two stock-out paths exist and must not be confused. (a) **Request-linked aid:** commitment → ISSUE → delivery/return/loss settlement against a ReliefNeed. (b) **Campaign/relief-point distribution:** a Distribution not tied to a request need reserves and issues atomically in one local transaction. Each unit leaves stock through exactly one ISSUE movement; a Distribution line for request-linked aid references the issued commitment and never creates a second ISSUE. TC-16 exercises path (b); TC-BE-05/06 exercise path (a).
 
 ### 8.4 General rules
 
@@ -541,11 +592,11 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 ### UC-01 — Submit an SOS/assistance request
 
-**Actor:** Authenticated citizen.
+**Actor:** Citizen, with or without an account (guest).
 
-**Preconditions:** Citizen signed in; GPS available or user supplies a manual pin.
+**Preconditions:** GPS available or user supplies a manual pin. Signing in is optional; a guest receives a tracking token and tracking code on submission.
 
-**Main flow:** Select assistance category → enter headcount/information → confirm location/accuracy → optionally attach photos → submit with idempotency key → Response validates and stores the request, audit, and timeline in one local transaction → returns request ID and SUBMITTED → citizen views the server-confirmed status and supplements information when state permits.
+**Main flow:** Select assistance category → enter headcount/information and a contact phone (prefilled from the last request when available; stored on the request, not in Identity) → confirm location/accuracy → optionally attach photos/video within Section 23.5 limits → submit with idempotency key → Response validates and stores the request, audit, and timeline in one local transaction → returns request ID and SUBMITTED → citizen views the server-confirmed status and supplements information when state permits.
 
 **Exceptions:** Offline submissions stay QUEUED_ON_DEVICE and are not server-received; denied GPS permits manual pin; validation errors preserve the form; the same key returns the same request on retry.
 
@@ -631,6 +682,16 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 **Postconditions:** Response is authoritative for campaign status; Logistics may store an opaque campaign reference where useful.
 
+### UC-09 — Manage vehicles and relief points
+
+**Actor:** Scoped operations manager.
+
+**Main flow:** Create/edit an asset with its organization/region and validated type/capacity or location/operating fields → list/view only authorized assets → select an active relief point as a distribution destination → inactivate an unused or retired asset with audit.
+
+**Exceptions:** Reject cross-scope access, invalid values and selection of an inactive point for new distribution. Inactivation never deletes previous distribution references; asset management does not fabricate stock or imply routing/maintenance workflows.
+
+**Postconditions:** Asset catalog and operational history remain consistent. FR-LOG-01/04 and TC-BE-21 define acceptance.
+
 ## 10. API and authentication
 
 ### 10.1 API conventions
@@ -665,28 +726,33 @@ Backend responses may contain user-entered text unchanged. Do not translate name
 | Service | Example endpoints | Authorization/notes |
 |---|---|---|
 | Identity | POST /identity/auth/register, /login, /refresh, /logout; GET /identity/me; POST /identity/users/{id}/roles | Admin-only role grants; no PII/location in tokens |
-| Response | POST /response/requests; GET /response/requests; POST /response/requests/{id}/verify, /triage, /duplicate, /resolve; POST /response/requests/{id}/missions | Authenticated citizen intake; scoped list/detail; resolution checks current Logistics fulfillment status |
-| Response | POST /response/campaigns; GET /response/campaigns; POST /response/campaigns/{id}/close | Response owns campaign/incident; managers need appropriate scope |
+| Response | POST /response/requests; GET /response/requests; POST /response/requests/{id}/verify, /triage, /duplicate, /resolve; POST /response/requests/{id}/missions | Public rate-limited intake (guest or signed-in); `GET /response/requests/track` with tracking token for guests; scoped staff list/detail; resolution obtains a current-cycle Logistics resolution seal |
+| Response | POST /response/campaigns; GET /response/campaigns; POST /response/campaigns/{id}/close | Response owns campaigns and request incident categories; managers need appropriate scope |
 | Response | POST /response/missions/{id}/accept, /decline, /transition, /evidence | Active team leader accepts/declines, advances and uploads evidence; scoped coordinator may cancel/fail |
 | Logistics | POST /logistics/needs; POST /logistics/needs/{id}/commitments; POST /logistics/commitments/{id}/issue, /deliver, /cancel | Need/commitment row locks; partial quantities; actor/reason audit |
 | Logistics | POST /logistics/receipts, /transfers, /transfers/{id}/receive, /distributions, /adjustments; GET /logistics/stock?warehouse_id=...; /vehicles; /relief-points | Idempotency, audit, unit validation, row locks, scoped report fields |
-| Logistics (internal) | GET /logistics/requests/{request_id}/fulfillment?work_cycle=... | Authenticated Response-to-Logistics check for request resolution; returns current version and open/partial need totals |
+| Logistics (internal) | GET /logistics/requests/{request_id}/fulfillment?work_cycle=...; POST /logistics/requests/{request_id}/cycles/{cycle}/seal, /unseal, /freeze | Authenticated service read and idempotent resolution seal; returns scoped totals or an immutable seal after all current-cycle needs and issued quantities are settled |
 | Response / Logistics | GET /{service}/notifications; POST /{service}/notifications/{id}/read | Each service returns only notices it owns and scopes by recipient |
 | Response / Logistics | GET /{service}/reports/... | Reports read the owning service's data and include generated_at |
 
-These are SDD sketches, not final contracts. Finalize complete paths through OpenAPI and UI-flow review. Internal APIs must not blindly trust client headers; use service credentials/identity where needed.
+These are SDD sketches, not final contracts. Finalize complete paths through OpenAPI and UI-flow review. Internal APIs must not blindly trust client headers.
+
+**Internal API exposure and service credentials:** Identity introspection and the Logistics fulfillment/seal/unseal/freeze endpoints are internal. Nginx exposes only the public routes and returns 404 for internal paths (e.g. `/api/v1/identity/internal/*`, `/api/v1/logistics/internal/*`); internal calls use the Compose private network. Service-to-service calls authenticate with short-lived, audience-restricted service JWTs that Identity issues through a client-credentials grant to each service (per-service secret from the environment, never committed). The receiving service verifies issuer, audience and the allowed caller. Actor/scope context travels in signed token claims or in a body validated against the actor's own session, never in free client headers. Test that a public caller cannot reach internal paths (add to TC-BE-07 and TC-BE-20).
 
 ### 10.3 Authorization matrix
 
 | Actor | Proposed core permissions |
 |---|---|
-| Citizen | Create, view, and supplement own requests; view own notifications. Guest SOS is disabled in the capstone baseline. |
+| Guest (no account) | Create an SOS; with the tracking token, view its status/timeline and supplement it. No access to anything else. |
+| Citizen | Create, view, and supplement own requests (including claimed guest requests); view own notifications. |
 | Volunteer | View assigned team missions and maintain own profile/availability. Only the active team leader accepts/declines, advances missions and submits results/evidence. |
 | Coordinator | Scoped queue/map; verify, duplicate-link, triage, assign, cancel/reopen, confirm outcomes. |
 | Operations Manager | Scoped warehouse/point/vehicle/distribution management; transfers/adjustments according to policy; operational reports. |
 | Admin | Accounts/roles/configuration; case-detail access is not automatically granted without need. |
 
-**Proposed authentication:** Identity issues asymmetric JWTs containing issuer, audience, subject, expiry, and minimum role/scope data. Services validate signatures locally. Access tokens expire after 10 minutes for the demo; refresh sessions have a 7-day absolute expiry with rotation and reuse detection; rotation does not extend that expiry. These are capstone configuration defaults. Each protected HTTP request validates the JWT locally and obtains current account/session/grants from an authenticated Identity introspection API without a positive cache. Logout revokes that session; disabling, credential reset, or role changes revoke all affected sessions. Identity unavailability returns Vietnamese 503 and fails closed. A request already authorized may finish; this is request-boundary revocation, not cancellation of in-flight transactions. Section 22 defines the availability tradeoff.
+**Proposed authentication:** Identity issues asymmetric JWTs containing issuer, audience, subject, expiry, and minimum role/scope data. Services validate signatures locally. Access tokens expire after 10 minutes for the demo; refresh sessions have a 7-day absolute expiry with rotation and reuse detection; rotation does not extend that expiry. These are capstone configuration defaults. Each protected HTTP request validates the JWT locally and obtains current account/session/grants from an authenticated Identity introspection API without a positive cache. Logout revokes that session; disabling, credential reset, or role changes revoke all affected sessions. Identity unavailability returns Vietnamese 503 and fails closed for authenticated routes. Guest SOS creation, guest evidence upload and token-based tracking are deliberately independent of Identity: if a bearer token is present on SOS creation, Response validates its signature locally only (ownership link) and never calls introspection, so an Identity outage cannot block an emergency report. A request already authorized may finish; this is request-boundary revocation, not cancellation of in-flight transactions. Section 22 defines the availability tradeoff.
+
+Section 23.1 fixes the browser/native transport, cookie/CSRF controls and client storage for these sessions.
 
 Do not encode all policy in JWTs: Response checks its own team/region/request relationships and Logistics checks warehouses/commitments. Service queries must still filter rows by scope after Nest guards authorize the action. [NestJS guards](https://docs.nestjs.com/guards)
 
@@ -703,8 +769,8 @@ Do not encode all policy in JWTs: Response checks its own team/region/request re
 
 ### Mobile
 
-- **Citizen:** SOS submission, manual pin, optional photos, confirmation with request ID, timeline, supplementary information.
-- **Volunteer:** assigned missions, necessary details, accept/decline, state actions, outcome photos.
+- **Citizen:** SOS submission, manual pin, optional photos/video, confirmation with request ID, timeline, supplementary information.
+- **Volunteer:** assigned missions, necessary details, accept/decline, state actions, outcome photos/video.
 - Offline drafts/queues clearly indicate pending synchronization and reuse the same idempotency key. Minimize local PII; decide cache deletion and platform protection before implementing persistent caches.
 - Internal chat, background live tracking, turn-by-turn navigation, and a custom geocoding service are outside the MVP unless explicitly approved.
 
@@ -975,7 +1041,7 @@ These are **planned test cases, not execution results**. Test records must inclu
 
 | ID / FR | Preconditions and data | Steps | Expected result |
 |---|---|---|---|
-| TC-01 / FR-REQ-01, 03 | Authenticated demo citizen; synthetic coordinates, accuracy 12 m, 3 people; unused key | POST valid request; repeat same key/payload | One request and one ID; same retry result; separate capture/receive times |
+| TC-01 / FR-REQ-01, 03 | Guest or demo citizen; synthetic coordinates, accuracy 12 m, 3 people; unused key | POST valid request; repeat same key/payload | One request and one ID; same retry result; separate capture/receive times |
 | TC-06 / FR-IAM-02, FR-REQ-07 | Citizens A/B; request owned by B | A reads B's request, attempts update, then lists requests | Cannot read/update B's request; list contains only A's cases; no description/location disclosure |
 | TC-16 / FR-LOG-02 | on_hand = 5, reserved = 0; two authorized operators; each requests direct issue-and-distribution of 4 of the same SKU/warehouse | Concurrent commands with different keys; each atomically reserves/issues its own available goods and records distribution | One succeeds; one conflicts/reports insufficient stock; available = 1; one ISSUE movement |
 | TC-21 / FR-NOT-01 | Request transition and one recipient; retryable command has a fixed idempotency key | Submit the same state-change command twice | One state transition and one in-app notice for that transition/recipient |
@@ -1023,9 +1089,9 @@ These are **planned test cases, not execution results**. Test records must inclu
 |---|---|---|---|
 | UR-01 | FR-REQ-01..03, FR-FILE-01, FR-OFF-01 | UC-01 | TC-01..05, TC-24..25 |
 | UR-02 | FR-REQ-04, FR-REQ-07, FR-NOT-01 | UC-01, UC-02 | TC-06, TC-09..11, TC-22 |
-| UR-03 | FR-REQ-04..06, FR-MSN-01..03, FR-LOG-03 | UC-02, UC-03 | TC-06, TC-08..14, TC-31 |
+| UR-03 | FR-REQ-04..06, FR-REQ-09, FR-MSN-01..03, FR-LOG-03 | UC-02, UC-03, UC-04 | TC-06, TC-08..14, TC-31, TC-BE-17..18 |
 | UR-04 | FR-MSN-02..04 | UC-03 | TC-07, TC-14, TC-24 |
-| UR-05 | FR-CAM-01, FR-LOG-01..05 | UC-04, UC-08 | TC-15..19, TC-30..31 |
+| UR-05 | FR-CAM-01, FR-LOG-01..05 | UC-04, UC-08, UC-09 | TC-15..19, TC-30..31, TC-BE-19/21/23 |
 | UR-06 | FR-IAM-01..03, FR-RPT-01..02, FR-AUD-01 | UC-05, UC-06 | TC-06..08, TC-23, TC-28 |
 | UR-07 | FR-LOG-05, NFR-OBS-01, NFR-OPS-01 | UC-01..05 | TC-20..23, TC-29, TC-31 |
 
@@ -1041,7 +1107,7 @@ The storage checks in Section 6.3 extend FR-FILE-01, TC-24, and TC-29, including
 
 ## 14. Security, privacy, and operations
 
-- Default deny. Citizen registration/login are the public authentication routes; SOS and tracking require authentication. Guest endpoints are disabled.
+- Default deny. Public routes are limited to registration/login/refresh, guest SOS creation, guest evidence upload and token-based tracking (NFR-SEC-01). Guest SOS abuse controls: Nginx and application rate limits per IP and per contact phone, strict DTO/size limits, idempotency key required, the tracking token is 128-bit-or-more random, stored hashed, returned once and compared in constant time, and guest uploads use the same media limits with a lower per-IP quota. Spam is contained by the verification gate: nothing unverified is triaged, dispatched or counted in operational reports. Add a captcha only if abuse is observed.
 - Authorization combines role, scope, and object relationship across details, lists, exports, file downloads, and push-device registration.
 - Hidden frontend menus do not provide security. OWASP identifies Broken Object Level Authorization as a major API risk. [OWASP API Security Top 10 — BOLA](https://api-security.owasp.org/editions/2023/en/0xa1-broken-object-level-authorization/)
 - Audit enough to trace actions without copying unnecessary PII; restrict readers and clarify retention.
@@ -1069,7 +1135,7 @@ Browser / Mobile
 
 ## 16. Backend implementation sequence
 
-The backend owner's stated target is two to three weeks of focused backend work. Treat that as an execution estimate, not evidence that work is complete; each slice needs its tests and acceptance evidence. Keep optional features out until the core workflow is stable.
+The backend owner's stated target is two to three weeks of focused backend work. The user confirmed on 2026-10-01 that the available time is sufficient and authorized resolving the architecture-review decisions. Keep three independently deployable services; each slice needs its tests and acceptance evidence. Keep optional features out until the core workflow is stable.
 
 | Order | Complete slice | Exit evidence |
 |---|---|---|
@@ -1112,15 +1178,15 @@ The demo proves the workflow, authorization, GIS, inventory integrity, and measu
 
 | Decision | Proposed default | Decision deadline |
 |---|---|---|
-| Mandatory login or guest SOS? | Authenticated citizen registration/login selected for capstone; guest disabled unless scope is explicitly changed | Settled for demo |
+| Mandatory login or guest SOS? | Guest SOS enabled (decided 2026-10-01): no account needed in an emergency; tracking token for guests; optional account for history and claiming; rate limits and the verification gate control abuse | Settled for demo |
 | Priority, SLA, who verifies/closes/reopens? | Draft P1–P4; coordinator with reasons; no implicit SLA | Before policy is represented as approved |
 | Coordinator scope/team availability? | Current grants + object relationships; one-team missions, capacity one, leader actions in Section 22 | Settled for demo |
-| Map/tile/geocoding provider, license, quota? | Separate map UI; compliant provider; no incident PII | Before integration |
-| Push/email? | In-app demo; mock provider without credentials | Before client integration |
+| Map/tile/geocoding provider, license, quota? | MapLibre-style client map behind a thin adapter; tile source whose terms permit demo and load-test use (public OpenStreetMap tile servers are not used for k6 or heavy testing); no geocoding in the MVP beyond manual pin; no incident PII sent to providers | Before Web/Mobile map integration (must be settled before the coordinator map slice) |
+| Push/email? | In-app notices are the authoritative record (core). Expo push for mission offers and status changes is a Should (FR-NOT-02) via a local outbox; a mock sender runs without credentials; email/SMS stay out of scope | Before client integration |
 | Offline depth? | Honest pending/draft behavior; retry queue is Should | Before client contract freeze |
-| File types/sizes/retention? | Team-proposed limits, private objects, synthetic data | Before file integration |
+| File types/sizes/retention? | Section 23.5 fixes demo media limits and signed-link TTL; real-data retention remains separate | Limits settled for demo; retention before pilot |
 | Location/photo/audit/backup retention? | No invented official policy; confirm before a pilot | Before real deployment |
-| Load targets/demo hardware? | Start with 20 HTTP virtual users as a discussion target; record hardware and measured result before claiming an NFR | Before performance acceptance |
+| Load targets/demo hardware? | Section 23.6 adopts the workload and numeric demo thresholds; record actual host details and measured results | Hardware at setup; results before performance acceptance |
 | Storage edition/provider and license? | MinIO AIStor Free single-node lab selected; team members obtain it under current terms; validate private access and restore before demo | Before storage integration |
 | Labeled AI data? | Do not assume availability; explainable rules suffice for PoC; AI disabled by default | Before optional evaluation |
 | Partial-fulfillment policy | Demo uses coordinator-created needs and confirmed delivery; validate real workflow with domain reviewer | Before claiming operational policy |
@@ -1195,7 +1261,7 @@ This baseline and Section 22 support incremental backend implementation. The wor
 - NestJS/TypeScript was selected after a qualitative comparison with Spring Boot, Django/DRF, FastAPI, and Flask. This was not a performance benchmark; team familiarity should be confirmed during setup.
 - MinIO AIStor Free single-node is the one selected capstone storage option. MinIO Community is not selected. Current terms, artifact/license validity, S3 compatibility, private policy behavior, and restoration still need to be checked during setup; none have been tested by this research.
 - The workflow adaptation report reviews Ushahidi, Sahana Eden, and KoboToolbox; the separate CNTT workbook scan is summarized in that note and should be read as project descriptions, not implementation verification.
-- Section 22 records the current three-service and partial-fulfillment decisions, including authenticated-only SOS. Quantitative NFRs, official priority rules, retention, external providers, and operational AI use still need the relevant confirmation.
+- Section 22 records the current three-service and partial-fulfillment decisions, including guest-capable SOS intake. Quantitative NFRs, official priority rules, retention, external providers, and operational AI use still need the relevant confirmation.
 
 ## 22. Solo backend implementation baseline
 
@@ -1229,17 +1295,17 @@ Each app owns `main.ts`, `app.module.ts`, `config/`, `database/data-source.ts`, 
 
 | Area | Capstone implementation decision |
 |---|---|
-| Citizen onboarding | Public rate-limited registration grants CITIZEN only. Unique normalized username; passwords are hashed with an appropriate maintained implementation selected at setup. Account/password errors do not disclose credential existence. Staff/volunteer roles are admin-granted. Guest SOS is disabled. |
+| Citizen onboarding | Public rate-limited registration grants CITIZEN only. Unique normalized username; passwords are hashed with an appropriate maintained implementation selected at setup. Account/password errors do not disclose credential existence. Staff/volunteer roles are admin-granted. Registration is optional for SOS (guest SOS enabled; see NFR-SEC-01 and Section 14). Idempotency for guest SOS is scoped by the client-generated key (random UUID) plus payload hash; a guest can claim a request by presenting its tracking token while signed in, which sets reporter_user_id once and audits it. |
 | Scope | Each grant binds a role/action set to one scope: organization, region, campaign or explicitly granted system scope. Alternative matching grants are OR; inside an organization/region/campaign match, the action, owning organization and selected scope must all match (AND). System scope is an explicit cross-organization exception for its named actions only, never implicit in ADMIN. Region/campaign grants carry their parent organization; geographic overlap alone never crosses organization boundaries. Owner/team relationships are separate explicit permissions, not inferred staff grants. Admin account management does not imply access to victim details. Exact GPS is limited to the reporter, authorized coordinators and assigned teams. |
 | Revocation | JWT checks include approved algorithm, issuer, audience, expiry and session ID. Identity introspection is authenticated as a service and checks active account/session/current grants. No positive auth cache in demo. Identity outage fails closed with Vietnamese 503. This trades availability for simple request-boundary revocation. |
 | Request intake | campaign_id is nullable. Backend configuration assigns the synthetic demo intake organization; citizens cannot set organization or staff scope. Identity owns controlled region codes; Response owns seeded region boundary geometry and derives region from the location. Unknown/ambiguous boundary results keep region null and enter an explicit unassigned queue. Only coordinators with organization-wide intake permission or explicit system intake grants can view/correct that queue; campaign-only grants cannot. No match must not reject SOS or silently hide it from all intake operators. Region correction is versioned/audited. Only authorized coordinators attach/reassign requests to ACTIVE campaigns with compatible organization/operating region. |
 | Priority | P1–P4 labels remain the draft taxonomy in Section 8.1. Human coordinator selects priority/reason after verification. No SLA is implied and no automatic queue ranking/dispatch is derived from these labels. |
 | Supplements | Reporter may add information in SUBMITTED/VERIFYING/VERIFIED/TRIAGED/DISPATCHED/IN_PROGRESS. Preserve earlier facts as history. Terminal requests reject supplements; coordinate reopen separately. |
-| Cancellation/resolution | Scoped coordinator may cancel a nonterminal request with reason, subject to the canonical-reference guard below. In a Response transaction, cancel nonterminal missions and release team capacity; keep completed evidence. Then explicitly settle linked Logistics needs: cancel unissued commitments, and preserve issued goods for delivery/return/loss accounting. Before RESOLVED, Response performs an authenticated Logistics lookup for the current work cycle; an unavailable API or any open/partial need blocks resolution. Record the returned fulfillment version with the human confirmation. This check is not a distributed transaction; unexpected later need changes require an audited reopen. CLOSED follows RESOLVED. CLOSED reopens to TRIAGED with reason; old terminal missions remain historical. |
+| Cancellation/resolution | Scoped coordinator may cancel a request in SUBMITTED through IN_PROGRESS (not RESOLVING or RESOLVED, see Section 8.1) with reason, subject to the canonical-reference guard below. First freeze the Logistics cycle through the durable cancellation intent in Section 23.2. In a Response transaction, commit cancellation, cancel nonterminal missions and release team capacity; keep completed evidence. Then explicitly settle linked Logistics needs: cancel unissued commitments, and preserve issued goods for delivery/return/loss accounting. Before RESOLVED, Response obtains an idempotent Logistics resolution seal for the current work cycle under the protocol in Section 23.2. An unavailable API, open/partial need, or unsettled issued quantity blocks sealing and resolution. Record the immutable seal ID/version with the human confirmation. The seal prevents concurrent or later need changes in that cycle; reopening creates a new cycle. CLOSED follows RESOLVED. CLOSED reopens to TRIAGED with reason; old terminal missions remain historical. |
 | Duplicate/rejection | Outcomes branch only from VERIFYING. Duplicate target must be authorized and cannot be self, DUPLICATE, REJECTED or CANCELLED. Lock source/target request rows in sorted ID order before checking state and inbound links. A canonical request with inbound duplicate links cannot become DUPLICATE, REJECTED or CANCELLED; every linker/rejection/cancellation uses the same locks and recheck. No duplicate chains/cycles or automatic link reparenting. Terminal REJECTED/DUPLICATE/CANCELLED records are historical; a new report is created for renewed need. |
 | Campaign pause/close | PAUSED blocks new attachments, mission creation/offers and acceptance of existing offers. Coordinators may cancel offered missions; accepted missions may finish. New campaign-linked needs/commitments are blocked while paused; already-issued goods can still be delivered, returned, or settled. Resume is PAUSED → ACTIVE. Close requires all attached requests terminal (CLOSED/REJECTED/DUPLICATE/CANCELLED). Preserve all fulfillment and stock history after closure. |
 
-Use a request work-cycle counter incremented on reopen; tag each new mission and Logistics need with that cycle. Historical missions/needs cannot resolve a reopened request. For request dispatch progress, recompute under a Response request-row lock after each mission transition. Accepted/travelling/on-scene work takes precedence over offers; offers take precedence over returning to TRIAGED. No mission transition changes a human terminal outcome or automatically marks RESOLVED. A request stays TRIAGED/IN_PROGRESS until a coordinator confirms the overall need is met. If the cycle has missions, resolution requires at least one completed mission with current-cycle evidence and no active missions; if no rescue mission was assigned, the coordinator records that it was not required. In both cases, perform a fresh Logistics fulfillment check before resolution.
+Use a request work-cycle counter incremented on reopen; tag each new mission and Logistics need with that cycle. Historical missions/needs cannot resolve a reopened request. For request dispatch progress, recompute under a Response request-row lock after each mission transition. Accepted/travelling/on-scene work takes precedence over offers; offers take precedence over returning to TRIAGED. No mission transition changes a human terminal outcome or automatically marks RESOLVED. A request stays TRIAGED/IN_PROGRESS until a coordinator begins the guarded RESOLVING workflow. If the cycle has missions, resolution requires at least one completed mission with current-cycle evidence and no active missions; if no rescue mission was assigned, the coordinator records that it was not required. In both cases, obtain the current-cycle Logistics resolution seal before resolution as defined in Section 23.2.
 
 For commands touching campaigns and requests in Response, acquire campaign rows first in sorted ID order, then request rows, team rows, and mission rows in stable order. Reopening a request attached to a CLOSED campaign requires authorized attachment to an ACTIVE compatible campaign or audited detachment first. Duplicate decisions lock affected request rows in sorted order; do not add unrelated Logistics rows to the same transaction.
 
@@ -1248,16 +1314,16 @@ For commands touching campaigns and requests in Response, acquire campaign rows 
 - One mission belongs to one request/work cycle and exactly one team. Only an active team leader accepts/declines, advances, and submits results; scoped coordinators can assign or cancel with reason. Team members can view their team's work; solo volunteers use a one-member team.
 - Demo teams have capacity one active mission. OFFERED, ACCEPTED, EN_ROUTE, and ON_SCENE reserve capacity; terminal transitions release it. Recheck membership, required skills, organization/operating-region compatibility, and availability in the same Response transaction as the offer. No automatic offer expiry; expose offer age for manual follow-up.
 - Logistics owns ReliefNeed, Commitment, stock, transfer, and distribution records. A need references `request_id` and `work_cycle` without a cross-database foreign key. Validate request/scope through the Response API before creating a linked need; make the API call before opening a Logistics transaction.
-- A need has item, unit, requested quantity, state, and version. A commitment has an immutable need/warehouse/quantity reference and states PROPOSED → COMMITTED → ISSUED → DELIVERED, with CANCELLED available before issue. Lock the need row before creating or changing commitments; `delivered + committed/reserved + issued-but-not-delivered` cannot exceed the requested quantity. Keep each organization's/warehouse's contribution separately attributable.
-- Derive committed/reserved, issued, delivered, and outstanding totals from commitment lines and stock movements. `outstanding = requested - delivered`; a partial delivery never marks the need complete. An authorized coordinator may reduce or cancel a need with a reason. Do not delete prior commitments or stock movements.
-- ISSUE reduces on_hand and reserved exactly once. Distribution/delivery references issued lines and never decrements warehouse stock again. Delivered + returned + recorded loss cannot exceed issued quantity. Transfers separately reconcile dispatched = received + returned + lost + remaining_in_transit; a dispatched transfer cannot be cancelled as if stock were still at the source.
+- A need has item, unit, requested quantity, state, and version. A commitment has an immutable need/warehouse/quantity reference and quantity-derived summaries PROPOSED/COMMITTED/ISSUED/DELIVERED/SETTLED/CANCELLED, with partial quantities and guards defined in Section 23.4. Lock the need row before creating or changing commitments; `delivered + committed/reserved + issued-but-not-delivered` cannot exceed the requested quantity. Keep each organization's/warehouse's contribution separately attributable.
+- Derive committed/reserved, issued, delivered, and outstanding totals from single-item commitments, settlement records, and stock movements. `outstanding = requested - delivered`; a partial delivery never marks the need complete. An authorized coordinator may reduce or cancel a need with a reason under the protected-quantity and physical-settlement guards in Section 23.4. Do not delete prior commitments or stock movements.
+- ISSUE reduces on_hand and reserved exactly once. Distribution/delivery references issued commitment quantities and never decrements warehouse stock again. Delivered + returned + recorded loss cannot exceed issued quantity. Transfers separately reconcile dispatched = received + returned + lost + remaining_in_transit; a dispatched transfer cannot be cancelled as if stock were still at the source.
 - Stock quantities use fixed-precision database decimals with item unit/scale validation and decimal strings in API contracts. Reject negative/zero command quantities and incompatible units. Lock multiple item balances in stable ID order; enforce `on_hand >= 0`, `reserved >= 0`, and `reserved <= on_hand`.
-- No cross-service atomicity is claimed. If Response is unavailable, Logistics cannot create a new request-linked need; if Logistics is unavailable, the SOS/mission remains in Response and the board reports Logistics unavailable. A retry uses the same idempotency key. Closing/cancelling a request requires a separate explicit Logistics settlement action for linked needs; issued items retain their physical ledger history.
+- No cross-service atomicity is claimed. If Response is unavailable, Logistics cannot create a new request-linked need; if Logistics is unavailable, the SOS/mission remains in Response and the board reports Logistics unavailable. A retry uses the same idempotency key. Cancelling first freezes its Logistics cycle; closing/resolving requires its resolution seal. Explicit Logistics settlement handles linked cancelled needs; issued items retain their physical ledger history.
 - For campaign-linked commands, validate current campaign eligibility through an authenticated Response API before the local Logistics transaction. Do not hold stock locks during that call. A pause/close racing the check may be observed on the next command; the board must show the authoritative status and coordinators must settle already issued goods. This is a documented demo boundary, not a claim of distributed atomicity.
 
 ### 22.4 API and reliability contracts
 
-Before coding each slice, review its OpenAPI contract: exact `/api/v1` paths, DTOs, success/status codes, error codes and Vietnamese messages, filters/limits, actor/scope matrix, expected_version, and idempotency examples. Include only CRUD/actions used by the clients for accounts, campaigns, incidents, teams/profiles, requests/missions, warehouses/items, vehicles/relief points, stock, commitments, notifications, and reports. Endpoint sketches in Section 10 are not substitutes for these artifacts.
+Before coding each slice, review its OpenAPI contract: exact `/api/v1` paths, DTOs, success/status codes, error codes and Vietnamese messages, filters/limits, actor/scope matrix, expected_version, and idempotency examples. Include only CRUD/actions used by the clients for accounts, campaigns, request incident categories, teams/profiles, requests/missions, warehouses/items, vehicles/relief points, stock, commitments, notifications, and reports. Endpoint sketches in Section 10 are not substitutes for these artifacts.
 
 - Persist idempotency records under a unique actor/service/command/key scope in the business transaction. Store the canonical validated-payload hash and original response; an identical retry returns the original result and a changed payload returns 409. Use database uniqueness/version checks for concurrent retries, not in-memory maps.
 - Cross-service REST calls use service credentials, bounded timeouts, stable error codes, and no open database transaction. Retry only idempotent commands with the same key. A service outage is reported as unavailable; do not fabricate success or silently duplicate a command.
@@ -1296,14 +1362,134 @@ These planned cases extend existing IDs without renumbering them. They are not e
 | TC-BE-12 | FR-IAM-02, FR-REQ-01/06 | Grants match action AND organization AND selected scope, with OR across matching grants; no cross-organization access. Unknown/ambiguous region SOS succeeds and is visible to designated intake coordinator only; campaign-only coordinator cannot read it; scoped correction is audited |
 | TC-BE-13 | FR-CAM-01, FR-MSN-02, FR-LOG-03 | Pause blocks new attachments, missions, and campaign-linked commitments; accepted work and already-issued goods remain visible; resume restores permitted commands; CLOSED request cannot reopen in CLOSED campaign |
 | TC-BE-14 | FR-RPT-01, NFR-OBS-01 | Dashboard composes a fixed Response/Logistics dataset with correct scope, totals, separate source timestamps, and a clear unavailable state when one API is stopped |
-| TC-BE-15 | FR-LOG-03..05, FR-REQ-08 | One request need is fulfilled by 12 of 20 units, then another 8; delivered/outstanding totals, stock ledger, partial state, audit actors, and human resolution all reconcile |
+| TC-BE-15 | FR-LOG-03..05, FR-REQ-09 | One request need is fulfilled by 12 of 20 units, then another 8; delivered/outstanding totals, stock ledger, partial state, audit actors, and human resolution all reconcile |
 | TC-BE-16 | FR-REQ-06, FR-REQ-08 | Duplicate-candidate filter returns nearby/time/category matches only as suggestions; coordinator can ignore or link with a reason; unauthorized regions remain hidden |
 
 ### 22.7 Remaining decisions and current repository status
 
 The repository currently has documentation only. No NestJS workspace, migrations, OpenAPI artifacts, running services, or executed product tests are established by this plan edit. Section 22 fixes design inconsistencies and defines the implementation path; it is not evidence of a working backend.
 
-Before setup, verify primary-source runtime/image/client compatibility and current AIStor package/license. Before file integration, record an explicit MIME allowlist, size/count limits and signed-link TTL as demo configuration and test them. Before performance acceptance, record hardware and adopted numeric targets. External map/push/email/LLM providers remain unselected. Official priority/SLA, retention, real-data privacy and disaster-authority policies need separate confirmation before real deployment. These limitations do not block independent synthetic-demo slices.
+Before setup, verify primary-source runtime/image/client compatibility and current AIStor package/license. Section 23 adopts authentication transport, resolution sealing, quantity rules, asset/media scope, file limits and numeric performance targets. Before integration, turn these decisions into versioned OpenAPI and migrations; before acceptance, record actual hardware and executed results. External map/push/email/LLM providers remain unselected. Official priority/SLA, retention, real-data privacy and disaster-authority policies need separate confirmation before real deployment. These limitations do not block independent synthetic-demo slices.
+
+## 23. Architecture review decisions — 2026-10-01
+
+**Authority and scope:** the user authorized resolving the review findings using best practice and confirmed sufficient delivery time. Retain Identity, Response and Logistics as independently deployable NestJS services. These are synthetic-demo design decisions; they do not establish official rescue policy. This section supersedes earlier wording where the resolution lookup, commitment model, media limits or acceptance thresholds differ. It adds documentation and planned acceptance cases, not application code or executed product tests.
+
+### 23.1 Web and Mobile session transport
+
+- Identity remains the issuer and owner of sessions. Web is served through the same HTTPS Nginx origin as the three APIs. Browser access and refresh tokens are issued only through `HttpOnly; Secure; SameSite=Strict` host-only cookies with no `Domain` attribute. Access-cookie path is `/api/v1`; refresh-cookie path is `/api/v1/identity/auth`. Cookie expiry cannot exceed the existing 10-minute access/7-day absolute refresh lifetimes. Login/refresh responses for Web contain session metadata, never token JSON. No browser token goes into localStorage, sessionStorage, URLs or client-state persistence.
+- All browser state-changing routes, including login, registration, refresh and logout, require an allowed `Origin` and a session/pre-session-bound CSRF token in a custom header. Identity supplies a pre-session CSRF token for public auth forms and rotates it on login/session rotation. CSRF tokens are distinct from authentication credentials. Missing/invalid tokens fail with Vietnamese errors. CORS allows only configured development origins; production is same-origin. Nginx strips caller-provided internal identity headers.
+- Mobile uses `Authorization: Bearer` for access tokens kept in memory and Expo SecureStore for the rotating refresh token. Native login/refresh has an explicit transport contract and returns tokens only to that flow; it must not also issue browser cookies. Browser routes cannot bypass CSRF by selecting a native transport. Native endpoints reject browser cookie authentication and browser Origin requests. Passwords are never persisted; logout/reset/revocation clears SecureStore, in-memory tokens and sensitive query caches. Sensitive API responses use `Cache-Control: no-store`.
+- Both clients serialize refresh attempts per session. Identity rotates under a session-row lock; an old refresh token is single-use. Reuse revokes the family as already specified. A lost refresh response may require login again; do not weaken reuse detection to silently recover it. Web tabs coordinate refresh through native browser locking where available; otherwise a conflict prompts login. Immediate request-boundary introspection/revocation remains the chosen tradeoff; load and outage tests include it.
+
+Sources: [OWASP Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html), [OWASP CSRF Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html), [React Native Security](https://reactnative.dev/docs/security). Cookie/CSRF configuration above is the C48 design, not a claim that cookie flags alone prevent every attack.
+
+### 23.2 Resolution seal and cross-service recovery
+
+A read followed by a Response write cannot prevent a concurrent Logistics need creation. Use a small durable REST workflow with an authoritative Logistics write barrier:
+
+1. Response authorizes the coordinator and checks request version, work cycle, current mission evidence and lifecycle. In a short local transaction it records a unique resolution intent and marks the request `RESOLVING`, retaining its previous state for a possible abort. While RESOLVING, reject mission offers/progress, need-change authorizations, supplements, cancellation and competing resolution; allow scoped reads. No cross-service call holds a Response transaction open.
+2. Response calls the authenticated, idempotent Logistics seal command with intent ID, request ID and work cycle. Logistics owns `FulfillmentCycle`, unique on `(request_id, work_cycle)`, with OPEN/FROZEN/SEALED, version, seal ID and intent ID. Every need creation/edit/cancellation, commitment/issue/delivery/return/loss command locks this cycle row first, then need/commitment rows and sorted stock balances. Creating a missing cycle uses the unique constraint and then locks the winner. This also applies to delayed commands that validated Response before RESOLVING.
+3. Under that same cycle lock, Logistics refuses sealing if any need is OPEN/PARTIALLY_FULFILLED, any stock remains reserved, or any issued quantity remains unsettled. Otherwise it writes an immutable seal and blocks all later fulfillment mutations for that cycle. An empty cycle is explicitly created and sealed; it is not treated as an unprotected absence. A concurrent mutation either commits before the seal and participates in its checks, or sees SEALED and fails.
+4. Response verifies the seal belongs to its intent/current cycle. In a local transaction it rechecks version, authorization and mission guards, then records RESOLVED, seal ID/version, audit and notice and completes the intent. CLOSED remains the subsequent administrative command. Reopen increments work_cycle and uses a new Logistics cycle; old seals/history remain immutable.
+5. Timeout/crash leaves the intent durable. A small Response recovery task queries/retries the same seal/intent; it never assumes timeout means failure. A sealed cycle remains sealed even if Response is temporarily unavailable. If the coordinator cancels finalization, Response first durably marks the intent ABORTING so no finalizer can commit RESOLVED. Logistics may unseal only after an authenticated Response check confirms that exact intent is ABORTING and the request is neither RESOLVED nor CLOSED. It then idempotently releases the seal; Response restores recomputed prior progress (TRIAGED when no active work remains) with audit. No TTL or automatic unseal is allowed. If a seal cannot be released, keep a visible recoverable RESOLVING state.
+
+Request enum/state diagram includes `RESOLVING`, displayed as “Đang xác nhận hoàn tất”; it is nonterminal and prevents campaign closure. ResolutionIntent records operation kind (RESOLUTION/CANCELLATION), actor, expected request version, previous state, cycle, idempotency scope, PENDING/ABORTING/COMPLETED/ABORTED state and timestamps. Recovery uses trusted service credentials and current actor grants; if authorization has been revoked, keep the intent visible for an authorized coordinator to adopt or abort. Resolution APIs return 202 plus operation ID while recovery is pending and 200 when committed; the request cannot claim resolution before completion. Service credentials must be audience-restricted; actor/scope context comes from authenticated service contracts, never arbitrary client headers. This protocol guarantees a sealed cycle has no open fulfillment work, without claiming a distributed database transaction. Campaign pause eligibility retains the documented command-boundary behavior in Section 22.3; physical stock settlement remains permitted after pause/cancellation.
+
+Cancellation uses the same write-barrier principle: record a cancellation intent in Response, block new Response actions, and idempotently freeze the Logistics cycle before committing CANCELLED and cancelling missions/releasing team capacity. FROZEN rejects new needs, demand increases, commitments and issues, including previously authorized delayed commands; it permits only release, need cancellation and physical delivery/return/loss settlement. A crash retries the same freeze/intent. Completion seals the cycle once all needs and goods are settled. Campaign closure may preserve cancelled-request settlements but cannot revive its cycle. The cancellation intent is a distinct operation kind in the same durable intent table; a failed freeze leaves cancellation pending rather than reporting false completion.
+
+### 23.3 Domain and schema decisions
+
+- No independent `Incident` aggregate is needed for the current scope. An AssistanceRequest carries a controlled incident category and reported incident facts; Campaign groups the organized response. Use these meanings consistently in SRS, ERD, DTOs and UI. A future shared hazard event requires a demonstrated requirement before adding an entity.
+- One ReliefNeed represents one item/unit for one request/work cycle. One Commitment represents one warehouse contribution to that need, with immutable original quantity and cumulative released/issued/delivered/returned/lost quantities. Remove CommitmentLine; multiple requested items use separate needs/commitments. Transfer and Distribution keep line tables because they genuinely contain multiple items. Delivery/distribution lines reference the issued commitment and settlement operation; no second stock decrement.
+- Logistics stores nullable opaque `campaign_id` plus organization/region attribution on linked needs, copied from authenticated Response context for scoped reporting. These are historical attribution, not current campaign authority. A request with existing needs cannot silently change campaign, organization or region attribution: block reassignment until old-cycle needs are cancelled/settled, then explicitly establish new attribution with audit. Current campaign eligibility still comes from Response. Do not rewrite past distributions when a campaign changes.
+- **Region data:** Identity owns the controlled region code catalog; Response owns boundary geometry seeded from simplified polygons derived from an openly licensed administrative-boundary dataset (record dataset, version and license in the seed README) or hand-drawn synthetic regions for the demo. Seed at least one region with boundaries covering the demo coordinates, plus a deliberately uncovered coordinate for the unassigned-queue test (TC-BE-12). Without seeded boundaries every SOS would land in the unassigned queue.
+- Final migrations include work_cycle/version/audit fields, unique cycle and stock pairs, immutable operation references, quantity constraints and the spatial indexes already specified. The logical ERD is a view of these decisions, not a full physical schema.
+
+### 23.4 Quantity changes and partial commitment summaries
+
+For a contribution, `reserved_remaining = quantity - released - issued`, and `unsettled_issued = issued - delivered - returned - lost`; both must stay nonnegative. ISSUE decreases stock and reserved_remaining once. Returns credit stock only on confirmed physical warehouse receipt. Returned/lost quantities free unmet demand for a replacement contribution; they never count as delivered. All settlement records are immutable and independently idempotent.
+
+A need remains constrained by `delivered_total + reserved_remaining_total + unsettled_issued_total <= requested_quantity`. Reduce requested quantity only down to that protected total; below it returns a Vietnamese 409 without changing anything. Release unissued contributions or settle issued goods first, then retry the reduction. Never reduce below delivered_total, so outstanding cannot be negative. Increasing demand uses the same cycle lock and is forbidden after sealing.
+
+Cancel a need by releasing all unissued reservations atomically. Reject cancellation while issued goods remain unsettled. Preserve requested quantity and actual delivered history; record the remaining demand as cancelled, expose `cancelled_remaining = requested - delivered`, and label the need CANCELLED. Resolution checks terminal need state plus physical settlement, rather than inventing delivery for cancelled demand.
+
+Commitment status is derived: PROPOSED before reservation; COMMITTED while reserved remainder exists; ISSUED while no reservation remains but issued goods are unsettled; DELIVERED when the original contribution was completely delivered; SETTLED when all goods were released/delivered/returned/lost with a mixed outcome; CANCELLED only if nothing was issued and the entire contribution was released. Show quantity progress beside status; partial issue/delivery is supported without an arbitrary state PATCH. Need FULFILLED additionally requires coordinator confirmation after delivered equals requested.
+
+### 23.5 Asset, media and acceptance coverage
+
+Vehicles and relief points remain mandatory. Vehicle scope is CRUD, organization/region, identifier, type, capacity/unit and active/inactive status; no routing, fuel, maintenance or automatic assignment engine. ReliefPoint scope is CRUD, scoped location, contact/operating information and active/inactive status, plus selection as a distribution destination. Inactivation blocks new use and preserves historical distributions. Neither entity implies an independent warehouse stock balance.
+
+Photo and video evidence are supported. Demo allowlist: detected JPEG/PNG images up to 10 MiB each, MP4 with allowed H.264 video/AAC audio up to 50 MiB each; at most five READY/PENDING attachments and 100 MiB total per request/mission. Reserve attachment count and declared-byte quota under the owning object lock before upload, reject streams above the reservation/limit, and reconcile abandoned PENDING reservations so concurrent uploads cannot exceed quota. Each upload contains one media file; allow bounded multipart overhead in the HTTP body limit. Reject SVG, HTML, executables and unsupported container/codecs. Validate actual media/container content with maintained tooling selected in the setup spike; bound parser time/memory, stream uploads and configure matching Nginx/API body limits. No transcoding or AI media inference. Serve originals as private downloads with safe Content-Disposition and nosniff; previews must use validated media. Generated immutable keys and crash reconciliation remain required. Signed download TTL is 60 seconds; current authorization is checked before signing. Synthetic media only; real-data retention remains a pilot decision.
+
+### 23.6 Adopted demonstration measurements and setup gates
+
+Performance dataset: 10,000 synthetic stored requests across seeded regions, states and priorities, with representative needs/missions. Workload: 20 k6 VUs; 2-minute warm-up followed by a 10-minute measured interval; 80% scoped read requests and 20% valid SOS creation with unique idempotency keys. Keep the prepared 10,000-record baseline and report the resulting dataset growth. Use fixed seed, bounded filters and no upload in the SOS timing. Read p95 <= 2 s, SOS p95 <= 3 s, unexpected HTTP failures < 1%; negative/security scenarios are separate. Include Nginx and Identity introspection; record CPU/RAM/disk, OS, image/dependency versions, network placement and complete workload. These are demo targets, not national-scale or availability claims.
+
+Node 24 LTS is the setup baseline; pin the exact supported patch, compatible Nest/TypeORM versions and PostgreSQL/PostGIS image digest after a migration/spatial-query/locking/OpenAPI compatibility spike. Choose CommonJS and Jest for the existing documented testing approach; verify against the selected Nest major. Current Nest documentation distinguishes application and CLI runtime floors. [Node releases](https://nodejs.org/en/about/previous-releases), [Nest migration guide](https://docs.nestjs.com/migration-guide).
+
+Keep MinIO AIStor Free as selected. Verify the actual Free license, S3 read/write, private policies and isolated restore before acceptance; current Free licenses report no expiry, which must not be confused with a trial. Free still lacks MinIO encryption at rest/HA/SLA. [AIStor license info](https://docs.min.io/aistor/reference/cli/mc-license/mc-license-info/), [AIStor license limits](https://docs.min.io/aistor/operations/licenses/). Map/provider procurement and real-data policy remain separate gates; optional push/email/LLM are unnecessary for the core demo. AI stays disabled until its own contract/evaluation gates pass.
+
+### 23.7 Additional planned acceptance cases
+
+Preserve existing IDs. These cases are specifications and have not been executed.
+
+| ID | Links | Required assertions |
+|---|---|---|
+| TC-BE-17 | FR-REQ-09, FR-LOG-03/05, NFR-REL-01 | Concurrent resolve and need creation/edit cannot produce RESOLVED with an open need; prevalidated delayed commands see the cycle seal; empty cycles are protected |
+| TC-BE-18 | FR-REQ-09, NFR-REL-01 | Crash/timeout before/after seal and Response commit recovers with the same intent; abort cannot race a finalizer; no timed unseal; reopened cycle excludes old seal; cancellation freeze blocks delayed new needs/issues while permitting existing physical settlements |
+| TC-BE-19 | FR-LOG-02..05 | Reduction below protected/delivered quantity conflicts; cancellation releases reservations, rejects unsettled issue and preserves history; return/loss allows replacement without overcommitment |
+| TC-BE-20 | FR-IAM-01..03, NFR-SEC-02, NFR-L10N-01 | Web auth tokens absent from JS storage/JSON/URLs; cookie flags/paths, CSRF and Origin enforcement; native transport cannot bypass browser protection; concurrent refresh and logout cleanup behave as specified |
+| TC-BE-21 | FR-LOG-01/04 | Vehicle/point CRUD and inactivation enforce scope, validation and history; inactive point cannot receive new distribution; unrelated organizations cannot access assets |
+| TC-BE-22 | FR-FILE-01, FR-MSN-04 | JPEG/PNG/MP4 content and codecs, per-file/count/aggregate limits, orphan recovery, Vietnamese 413/errors and 60-second signed links; storage failure preserves the SOS |
+| TC-BE-23 | FR-CAM-01, FR-LOG-03, FR-RPT-01 | Multi-item requests use separate needs/single-item contributions; attribution-changing reassignment is guarded; campaign reports retain historical scope and totals |
+| TC-BE-24 | FR-REQ-02, FR-REQ-03, NFR-SEC-01 | Guest SOS succeeds with Identity stopped; retry with the same key returns one request and the same token behavior; token stored only hashed and shown once; wrong/missing token cannot read or supplement; rate limit returns Vietnamese 429; unverified guest request cannot be triaged/dispatched; claiming after sign-in links the owner once and audits it; a guest cannot reach any other route |
+| TC-PERF-01 | NFR-PERF-01/02 | Reproduce Section 23.6 with recorded host/build, per-operation p95 and unexpected failure rate; include introspection and real PostGIS queries |
+
+Enforce one nonterminal intent per request with a database uniqueness constraint; adopt/abort commands use expected version and idempotency.
+
+Slice 2 (SOS intake) additionally requires TC-BE-24.
+
+Slice gates in Section 22.5 additionally require TC-BE-20 for Identity, TC-BE-17/18/19/21/23 for workflow/Logistics, and TC-BE-22/TC-PERF-01 for integration. Produce concrete OpenAPI/migrations before each slice rather than treating this decision table as executable contracts.
+
+## 24. Risk register and defense preparation
+
+**Status as of 2026-10-01:** this repository contains documentation only. Nothing below has been implemented, executed or measured. Cross-references (FR/TC/UC identifiers) were machine-checked for dangling links on 2026-10-01; semantic consistency was reviewed by reading only. This section records residual risks accepted by the team and the answers prepared for the capstone defense. It does not change any requirement.
+
+### 24.1 Risk register
+
+| ID | Risk | Likelihood / impact | Mitigation or early signal | Owner action |
+|---|---|---|---|---|
+| R-01 | No working product at review time; all figures are targets, not results | High / Critical | Build Slice 1-2 end to end first (guest SOS, verification queue, map); record real command output and k6 results; never present planned tests as passed | Backend owner |
+| R-02 | SRS/SDD/test-case/user-guide deliverables are not yet separate documents | High / High | Derive SRS and SDD from this plan; keep identifiers; plan Sections 7, 9, 13 map directly to SRS, Section 5, 6, 10, 22, 23 to SDD | Whole team |
+| R-03 | Three-service design and the seal/intent protocol (Section 23.2) are the most complex parts; defects here are likely | Medium / High | Implement and test TC-BE-17/18 early with real PostgreSQL; if it slips, fall back to a documented simplified check (resolve blocked while any need is open) and state the limitation; do not claim distributed atomicity | Backend owner |
+| R-04 | TypeORM + PostGIS + row-lock behavior unverified | Medium / High | One-day compatibility spike before Slice 1 (geometry migration, ST_DWithin, SELECT FOR UPDATE, concurrency test); switch ORM only if the spike fails | Backend owner |
+| R-05 | MinIO AIStor Free license, artifact, S3 behavior and restore are unverified | Medium / Medium | Verify current terms from the primary source before use; code against the S3 client so the store is replaceable; keep local fallback for development; do not redistribute the binary | Backend owner |
+| R-06 | Map/tile provider not selected | Medium / Medium | Select before the coordinator map slice; adapter keeps the choice swappable | Web owner |
+| R-07 | Priority taxonomy, verification and closure policy are team proposals, not rescue-authority policy | High / Medium | State this openly; interview or survey a domain contact if possible; keep all labels configurable and "draft" | Whole team |
+| R-08 | Guest SOS invites spam or malicious reports | Medium / Medium | Rate limits, strict validation, verification gate, hashed tracking token; add captcha if abuse is seen; keep guest uploads on a lower quota | Backend owner |
+| R-09 | Identity introspection on every authenticated request is a single point of failure for staff routes | Medium / Medium | Deliberate trade-off for immediate revocation; SOS intake does not depend on it; if k6 shows it as a bottleneck, add a short (seconds) cache and document the revocation window | Backend owner |
+| R-10 | Single-host Compose has no high availability; scalability is not demonstrated beyond the stated k6 workload | Certain / Low | Claim only what is measured (Section 23.6); describe the scale-out path (stateless services, managed PostgreSQL, S3) as design intent | Whole team |
+| R-11 | AI advisor is rules-based, not machine learning; labeled data is unavailable | Certain / Low | Present it as explainable rules with human review; claim no accuracy; keep disabled by default | AI/research owner |
+| R-12 | Push notifications (FR-NOT-02) and offline queue (FR-OFF-01) are Should and may be dropped | Medium / Low | In-app notices and honest "pending" UI remain core; drop push before weakening authorization or inventory | Mobile owner |
+| R-13 | Real-data privacy (location retention, deletion requests, provider data egress) is unresolved | High if used with real data / High | Use synthetic data only; say so in the demo; settle retention before any pilot | Whole team |
+| R-14 | Plan was edited in many passes; residual contradictions between Sections 22/23 and earlier sections are possible | Medium / Medium | Treat Sections 22/23/24 as authoritative; fix any conflict found during SRS/SDD writing and bump the version | Whole team |
+| R-15 | The original brief PDF `docs/Cuu_tro_thien_tai.pdf` is deleted in the working tree | Medium / Medium | Keep a copy outside the repository before committing | Whole team |
+
+### 24.2 Prepared answers for likely defense questions
+
+| Question | Answer grounded in this plan |
+|---|---|
+| Why three services instead of a monolith? | Separate data ownership and failure domains for accounts, emergency workflow and supplies: an Identity or Logistics outage must not stop SOS intake or mission progress, and each service owns its schema and migrations. The cost is explicit: cross-service flows use REST with idempotency, and resolution needs the seal protocol (Section 23.2). A modular monolith would be simpler; the team chose three services to demonstrate bounded contexts and independent deployability. |
+| Why not Kafka or microservices at larger scale? | No independent consumers or replay need exists; measured need is the criterion in Section 4.4. |
+| Why does a citizen not need an account? | In an emergency, registration is a barrier; the tracking token gives the reporter access, and the verification gate plus rate limits contain abuse (Section 14). |
+| How do you stop false or duplicate reports? | Idempotency keys, human verification, duplicate linking with a canonical request, and no dispatch before verification. |
+| How do you prevent over-issuing stock? | Append-only ledger, check constraints, row locks in stable order, and the concurrency test TC-16 (to be executed). |
+| What if a warehouse delivers only part of the need? | Requested, committed, issued, delivered and outstanding are tracked separately; the request stays open (demo: 12 of 20). |
+| What if one service is down? | The board shows which panel is unavailable and its generated_at; SOS intake works without Identity; resolution fails closed. |
+| Is the AI trustworthy? | It is an optional rule-based advisor; a coordinator decides; no accuracy is claimed; it can be disabled without affecting the workflow. |
+| Is it scalable? | Demonstrated only to the Section 23.6 workload on one host; the stateless services can be replicated, which is a design path and not a measured result. |
+| What is verified? | State precisely at the time of the defense which TC cases were executed, on which commit and hardware. Anything else is planned. |
 
 ## Appendix A. AI implementation and research handoff
 
@@ -1337,7 +1523,7 @@ Use the recorded baseline for implementation. Revisit it when new evidence mater
 
 ### A.3 Decision baseline and remaining slice gates
 
-Section 22 supersedes the earlier architecture draft: three-service ownership, REST integration, multi-mission aggregation, single-team missions, campaign optionality/resume, mutually exclusive verification, partial fulfillment, stock accounting, revocation, and notification uniqueness. Do not reintroduce broker workflows without evidence meeting Section 4.4.
+Sections 22 and 23 supersede the earlier architecture draft: three-service ownership, REST integration, multi-mission aggregation, single-team missions, campaign optionality/resume, mutually exclusive verification, partial fulfillment, stock accounting, revocation, and notification uniqueness. Do not reintroduce broker workflows without evidence meeting Section 4.4.
 
 Before implementing a slice, finish its OpenAPI schemas, database migration constraints/indexes, authorization cases, and executable acceptance cases. These concrete artifacts are not yet present in this documentation-only repository. Priority definitions, external providers, real-data retention, and operational SLA remain subject to domain review before real use. Ordinary reversible implementation choices may proceed under the documented demo defaults.
 
