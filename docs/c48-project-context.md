@@ -156,3 +156,9 @@ The original outline does not prescribe a language, framework, database, API pro
 - Define inventory, transfers, and distribution records so reports can be reconciled with operational history.
 - Establish measurable acceptance criteria for non-functional requirements.
 - Treat AI output as research/proposals until scope and human-review mechanisms are defined.
+
+## 11. User-authorized extension — in-kind donations (2026-10-04)
+
+This extension comes from the user's subsequent instructions, not the original department brief. Warehouse managers may open donation drives; citizens may donate supplies while signed in or as guests. Donors record quantities handed over, warehouse staff independently count and verify intake, and the system preserves discrepancies and supporting records for reconciliation. Accepted donations must be traceable through stock movements and relief distribution. The user authorized best-practice design choices and requested research into comparable applications; AI is included only where justified. Cash collection and payment processing were not requested.
+
+Section 25 of the [technical plan](c48-technology-and-delivery-plan.md) defines the adopted design, requirements, permissions, data ownership, reconciliation controls, distribution handoffs, optional AI gates, and planned acceptance cases. Software provides accountability and investigation evidence; it does not prove or guarantee the absence of corruption.
