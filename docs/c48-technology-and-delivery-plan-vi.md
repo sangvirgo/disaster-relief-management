@@ -1550,245 +1550,297 @@ Dùng ràng buộc unique cơ sở dữ liệu để chỉ có một intent chư
 Lát 2 (tiếp nhận SOS) cần bổ sung TC-BE-24 và TC-BE-25.
 
 Cổng lát ở Mục 22.5 còn cần TC-BE-20 cho Identity; TC-BE-17/18/19/21/23/26 cho workflow/Logistics; và TC-BE-22/27/28/29 cùng TC-PERF-01 cho tích hợp. Tạo OpenAPI/migration cụ thể trước mỗi lát, không coi bảng quyết định này là hợp đồng thực thi.
-- MinIO AIStor Free một nút là lựa chọn lưu trữ capstone duy nhất. Không chọn MinIO Community. Trong giai đoạn thiết lập vẫn cần kiểm tra điều khoản hiện hành, hiệu lực artifact/giấy phép, tương thích S3, hành vi policy riêng tư và phục hồi; nghiên cứu này chưa kiểm thử các mục đó.
-- Báo cáo điều chỉnh quy trình xem xét Ushahidi, Sahana Eden và KoboToolbox; lượt rà soát workbook CNTT riêng được tóm tắt trong ghi chú đó và chỉ nên hiểu là mô tả đồ án, không phải xác minh đã triển khai.
-- Mục 22 ghi các quyết định hiện hành về ba dịch vụ và đáp ứng một phần, gồm tiếp nhận SOS cho khách. NFR định lượng, quy tắc ưu tiên chính thức, thời hạn lưu dữ liệu, nhà cung cấp ngoài và việc dùng AI vận hành vẫn cần được xác nhận phù hợp.
 
-**Điều kiện sau:** Không làm lộ PII trái phép; bảng điều hành không sửa dữ liệu nghiệp vụ có thẩm quyền.
+## 24. Sổ rủi ro và chuẩn bị bảo vệ đồ án
 
-### UC-06 — Quản lý tài khoản và quyền
+**Trạng thái ngày 2026-10-04 (đã áp dụng hiệu chỉnh v2.8; soạn ban đầu ngày 2026-10-01):** repository này chỉ có tài liệu. Chưa có nội dung nào dưới đây được triển khai, chạy hoặc đo. Tham chiếu chéo (ID FR/TC/UC) đã được kiểm tra tự động để tìm liên kết thiếu ngày 2026-10-01; tính nhất quán ngữ nghĩa chỉ được rà soát bằng cách đọc. Mục này ghi nhận rủi ro còn lại mà nhóm chấp nhận và câu trả lời đã chuẩn bị cho buổi bảo vệ capstone. Mục này không đổi yêu cầu nào.
 
-**Tác nhân:** Quản trị viên; công dân đăng ký tài khoản; nhân viên/tình nguyện viên được mời.
+### 24.1. Sổ rủi ro
 
-**Luồng chính:** Công dân đăng ký bằng username và mật khẩu đã chuẩn hóa, duy nhất; chỉ nhận vai trò CITIZEN. Quản trị viên tạo tài khoản nhân viên/tình nguyện viên, vô hiệu hóa tài khoản hoặc cấp vai trò/phạm vi → Identity ghi audit → các dịch vụ áp dụng chính sách → UI chỉ hiển thị chức năng được phép. Đăng ký không chấp nhận vai trò/phạm vi đặc quyền do client gửi. Xác minh email/SMS và tự khôi phục mật khẩu nằm ngoài demo ban đầu; đặt lại có hỗ trợ của quản trị viên sẽ thu hồi phiên và yêu cầu đổi mật khẩu.
+| ID | Rủi ro | Khả năng / tác động | Giảm thiểu hoặc tín hiệu sớm | Hành động của người phụ trách |
+|---|---|---|---|---|
+| R-01 | Chưa có sản phẩm hoạt động khi rà soát; mọi số liệu chỉ là mục tiêu, không phải kết quả | Cao / Nghiêm trọng | Làm end-to-end Lát 1–2 trước (SOS khách, hàng đợi xác minh, bản đồ); ghi output lệnh và kết quả k6 thực tế; không trình bày test dự kiến như đã đạt | Người phụ trách backend |
+| R-02 | SRS/SDD/ca kiểm thử/hướng dẫn người dùng chưa tách thành tài liệu riêng | Cao / Cao | Tạo SRS/SDD từ kế hoạch này; giữ ID; Mục 7, 9, 13 ánh xạ trực tiếp sang SRS; Mục 5, 6, 10, 22, 23 sang SDD | Cả nhóm |
+| R-03 | Thiết kế ba dịch vụ và giao thức seal/intent (Mục 23.2) là phần phức tạp nhất; dễ có lỗi | Trung bình / Cao | Triển khai/kiểm thử TC-BE-17/18 sớm trên PostgreSQL thật. Seal là phạm vi được bảo vệ: kiểm tra rồi ghi (đọc nhu cầu mở, sau đó ghi RESOLVED) **không tương đương**, vì Logistics có thể tạo need giữa lúc đọc và ghi, nên không được chấp nhận làm phương án dự phòng. Nếu thiếu thời gian, cắt phạm vi khác trước theo thứ tự Mục 16; chỉ khi vẫn không hoàn thiện seal mới tắt lệnh RESOLVE cho yêu cầu có need Logistics liên kết (cắt tính năng, ghi là giới hạn), đồng thời sửa FR-REQ-09, TC-BE-17/18, kịch bản demo và nội dung bảo vệ. Không bao giờ tuyên bố có tính nguyên tử phân tán | Người phụ trách backend |
+| R-04 | Chưa xác minh hành vi TypeORM + PostGIS + khóa dòng | Trung bình / Cao | Thử nghiệm tương thích một ngày trước Lát 1 (migration geometry, ST_DWithin, SELECT FOR UPDATE, kiểm thử đồng thời); chỉ đổi ORM nếu thử nghiệm thất bại | Người phụ trách backend |
+| R-05 | Chưa xác minh license, artifact, hành vi S3 và phục hồi MinIO AIStor Free | Trung bình / Trung bình | Trước khi dùng, kiểm tra điều khoản hiện hành từ nguồn chính; viết qua S3 client để có thể thay kho; giữ phương án cục bộ dự phòng cho phát triển; không phân phối lại binary | Người phụ trách backend |
+| R-06 | Chưa chọn nhà cung cấp bản đồ/tile | Trung bình / Trung bình | Chọn trước lát bản đồ điều phối viên; adapter giúp thay lựa chọn được | Người phụ trách Web |
+| R-07 | Taxonomy ưu tiên, quy tắc xác minh/đóng là đề xuất nhóm, không phải policy cơ quan cứu hộ | Cao / Trung bình | Nêu rõ điều này; nếu có thể thì phỏng vấn/khảo sát người có chuyên môn; giữ mọi nhãn có thể cấu hình và ở trạng thái “dự thảo” | Cả nhóm |
+| R-08 | SOS khách có thể dẫn đến spam/báo cáo độc hại | Trung bình / Trung bình | Giới hạn tần suất, xác thực nghiêm, cổng xác minh, hash tracking secret client tạo; chỉ thêm captcha nếu quan sát thấy lạm dụng; quota upload khách thấp hơn | Người phụ trách backend |
+| R-09 | Introspection Identity trên mỗi request xác thực là điểm lỗi đơn cho route nhân viên | Trung bình / Trung bình | Đánh đổi có chủ đích để thu hồi tức thời; tiếp nhận SOS không phụ thuộc nó; nếu k6 thấy nghẽn, thêm cache ngắn (vài giây) và ghi rõ cửa sổ thu hồi | Người phụ trách backend |
+| R-10 | Compose một máy chủ không có high availability; chưa chứng minh mở rộng ngoài workload k6 đã nêu | Chắc chắn / Thấp | Chỉ tuyên bố nội dung đã đo (Mục 23.6); mô tả đường scale-out (dịch vụ stateless, PostgreSQL quản lý, S3) là ý định thiết kế | Cả nhóm |
+| R-11 | AI advisor dựa trên quy tắc, không phải học máy; không có dữ liệu gán nhãn | Chắc chắn / Thấp | Trình bày là quy tắc giải thích được, có người rà soát; không tuyên bố độ chính xác; mặc định tắt | Người phụ trách AI/nghiên cứu |
+| R-12 | Push (FR-NOT-02) và hàng đợi ngoại tuyến (FR-OFF-01) là Should, có thể bị cắt | Trung bình / Thấp | Thông báo trong ứng dụng và UI “đang chờ” trung thực vẫn cốt lõi; cắt push trước khi làm yếu phân quyền hoặc tồn kho | Người phụ trách Mobile |
+| R-13 | Quyền riêng tư dữ liệu thật (lưu vị trí, yêu cầu xóa, gửi dữ liệu cho nhà cung cấp) chưa giải quyết | Cao nếu dùng dữ liệu thật / Cao | Chỉ dùng dữ liệu tổng hợp; nói rõ trong demo; chốt lưu trữ trước mọi pilot | Cả nhóm |
+| R-14 | Kế hoạch được chỉnh sửa qua nhiều lượt; có thể còn mâu thuẫn giữa Mục 22/23 và các mục trước | Trung bình / Trung bình | Coi Mục 22/23/24 là nguồn có thẩm quyền; khi viết SRS/SDD, sửa mâu thuẫn phát hiện và tăng version | Cả nhóm |
+| R-15 | PDF đề cương gốc `docs/Cuu_tro_thien_tai.pdf` đã bị xóa khỏi working tree | Trung bình / Trung bình | Giữ bản sao ngoài repository trước khi commit | Cả nhóm |
+| R-16 | Đội cứu hộ thực địa mất thao tác cập nhật nhiệm vụ khi Identity introspection ngừng hoạt động (đánh đổi fail-closed của R-09) | Trung bình / Cao | Chấp nhận và nêu rõ trong demo; Mobile giữ thao tác chờ trên thiết bị cùng idempotency key và hiển thị “chưa gửi được” đến khi có xác nhận (FR-OFF-01 bao quát thao tác nhiệm vụ; nếu cắt, UI vẫn phải hiện lỗi “chưa gửi” rõ ràng, không báo đã xong); nếu k6/test outage cho thấy không chấp nhận được, thêm cache cửa sổ thu hồi ngắn có tài liệu, chỉ cho lệnh cập nhật tiến độ nhiệm vụ | Người phụ trách backend/Mobile |
+| R-17 | Khách đóng trình duyệt rồi mất tracking secret SOS | Trung bình / Trung bình | Màn hình xác nhận cho phép lưu/sao chép code và secret rõ ràng; nhận quyền sở hữu sau đăng nhập; điều phối viên hỗ trợ gắn secret mới có audit qua số liên hệ người báo | Người phụ trách Web |
+| R-18 | Một người phụ trách backend gánh ba dịch vụ và phần quyên góp Mục 25; lịch trình là rủi ro bàn giao lớn nhất | Cao / Cao | Theo bảng tích hợp theo tuần/thứ tự cắt ở Mục 16; ước lượng lại sau thử nghiệm R-04; quyết định cắt vào cuối tuần 5 và 7, không đợi đến cuối dự án | Cả nhóm |
 
-**Ngoại lệ:** Không thể gỡ quản trị viên cuối cùng; tài khoản vô hiệu không làm mới được token; token truy cập hiện hữu bị từ chối qua kiểm tra phiên hiện hành như mô tả ở Mục 22.
+### 24.2. Câu trả lời chuẩn bị cho các câu hỏi có thể gặp khi bảo vệ
 
-**Điều kiện sau:** Mọi API thực thi phân quyền ở backend; ẩn nút UI không phải ranh giới bảo mật.
+| Câu hỏi | Trả lời theo kế hoạch này |
+|---|---|
+| Vì sao chọn ba dịch vụ thay vì monolith? | Tách quyền sở hữu dữ liệu và phạm vi lỗi cho tài khoản, quy trình khẩn cấp và nguồn hàng: mỗi dịch vụ sở hữu schema/migration; khi một dịch vụ lỗi, ảnh hưởng có giới hạn. Tiếp nhận/theo dõi SOS khách vẫn hoạt động khi Identity dừng, còn thao tác nhân viên/đội cứu hộ (kể cả tiến độ nhiệm vụ) fail-closed với 503 tiếng Việt vì request xác thực nào cũng kiểm tra grant hiện tại ở Identity. Logistics lỗi không chặn SOS/tiến độ nhiệm vụ, chỉ làm panel nguồn hàng và lệnh nhu cầu không khả dụng. Đánh đổi được nêu rõ: mọi request xác thực phụ thuộc Identity introspection (Mục 10.3, R-09), luồng liên dịch vụ dùng REST/idempotency, resolve cần giao thức seal (Mục 23.2). Ba container và một PostgreSQL trên một máy chứng minh quyền sở hữu/khả năng triển khai độc lập, không chứng minh hạ tầng chịu lỗi. Modular monolith đơn giản hơn; nhóm chọn ba dịch vụ để trình bày bounded context và khả năng triển khai độc lập. |
+| Vì sao không dùng Kafka hoặc microservice ở quy mô lớn hơn? | Chưa có nhu cầu consumer độc lập hay replay; tiêu chí ở Mục 4.4 là nhu cầu đo được. |
+| Nếu đã lưu SOS nhưng mất phản hồi thì sao? | Client tạo tracking secret/idempotency key và lưu trước khi gửi. Retry cùng key/payload/secret trả ID yêu cầu/mã theo dõi ban đầu; máy chủ không cần cấp lại secret (Mục 22.2, TC-BE-24). |
+| Nếu không gọi được người báo qua điện thoại? | Yêu cầu giữ VERIFYING và vẫn hiển thị; log từng lần thử; cờ nguy hiểm đã khai báo và ngưỡng quá hạn báo điều phối viên khác; xác minh có thể dựa trên đối chiếu, bằng chứng hoặc phán đoán hai điều phối viên; có thể ghi chuyển cơ quan. Demo không gọi dịch vụ khẩn cấp; ngưỡng là mặc định nhóm, chờ chuyên gia miền rà soát (Mục 8.1, FR-REQ-10). |
+| Nhóm đã khảo sát ai về quy trình này, P1–P4 được định nghĩa ra sao? | Nêu bằng chứng thực sự đã thu thập (danh sách ở Mục 18). Nếu chưa có, nói rõ tiêu chí ưu tiên, quy tắc xác minh/ngưỡng là quy tắc mô phỏng của nhóm, dựa trên thực hành nhân đạo đã công bố nhưng chưa được cơ quan cứu hộ xác thực (R-07). |
+| Hệ thống có ngăn tham nhũng được không? | Không. Hệ thống hỗ trợ truy vết, đối soát và phát hiện chênh lệch. Hai người rà soát vẫn có thể thông đồng; hồ sơ khớp nhau không chứng minh hàng đã đến hộ dân (giới hạn ở Mục 25). |
+| AI có thực sự là AI không? | Advisor Mục 12 là quy tắc giải thích được, có người rà soát; hãy gọi là bộ quy tắc hỗ trợ quyết định. Khớp dữ liệu do cùng quy tắc tạo không chứng minh độ chính xác thực tế. Báo cáo nghiên cứu về phương án, dữ liệu, đánh giá và lý do tích hợp hay không. |
+| Vì sao công dân không cần tài khoản? | Trong khẩn cấp, đăng ký là rào cản; tracking secret do client tạo giúp người báo truy cập, còn cổng xác minh và giới hạn tần suất kiềm chế lạm dụng (Mục 14). |
+| Làm sao ngăn báo cáo giả hoặc trùng? | Idempotency key, xác minh thủ công, liên kết trùng đến yêu cầu chuẩn và không điều động trước xác minh. |
+| Ngăn xuất kho vượt tồn bằng cách nào? | Ledger chỉ ghi nối tiếp, check constraint, khóa dòng theo thứ tự ổn định và kiểm thử đồng thời TC-16 (cần thực hiện). |
+| Nếu kho chỉ giao được một phần nhu cầu thì sao? | Tách riêng số lượng yêu cầu/đã cam kết/đã xuất/đã giao/còn thiếu; yêu cầu vẫn mở (demo: 12/20). |
+| Nếu một dịch vụ ngừng thì sao? | Bảng cho biết panel nào không khả dụng cùng `generated_at`; tiếp nhận SOS không cần Identity; resolve fail-closed. |
+| AI có đáng tin không? | Đây là advisor theo quy tắc tùy chọn; điều phối viên quyết định; không tuyên bố độ chính xác; có thể tắt mà không ảnh hưởng quy trình. |
+| Hệ thống có mở rộng được không? | Chỉ chứng minh đến workload Mục 23.6 trên một máy; dịch vụ stateless có thể nhân bản, đó là đường thiết kế, chưa phải kết quả đo. |
+| Nội dung nào đã được xác minh? | Nêu chính xác tại thời điểm bảo vệ ca TC nào đã chạy, trên commit/phần cứng nào. Mọi nội dung khác là dự kiến. |
 
-### UC-07 — Gợi ý ưu tiên có hỗ trợ AI (phần mở rộng)
+## 25. Quyên góp hiện vật, đối soát và phân phối có trách nhiệm
 
-**Tác nhân:** Điều phối viên.
+**Ngày quyết định: 2026-10-04.** Đây là phần mở rộng được người dùng cho phép; kiểm soát cốt lõi quyên góp/phân phối thuộc phạm vi Must. Mục này mở rộng Mục 6–16 và 22–24, đồng thời chi phối tiếp nhận/điều chỉnh/phân phối mở rộng khi mô tả trước đó chưa đủ cụ thể. Quyền sở hữu dịch vụ, khóa đáp ứng, seal giải quyết và chính sách tiếng Việt hiện có vẫn bắt buộc. Đây là thiết kế, không phải chức năng đã triển khai hay bằng chứng phần mềm loại bỏ tham nhũng.
 
-**Luồng chính:** Response lưu snapshot đã giảm thiểu dữ liệu theo cách bất biến và job bền vững → worker do Response sở hữu trả gợi ý có phiên bản hoặc từ chối đưa gợi ý → điều phối viên xem dữ kiện/lý do → bước rà soát được cấp quyền kiểm tra độ mới, phiên bản yêu cầu và trạng thái đã xác minh/đủ điều kiện → con người chấp nhận hoặc ghi đè kèm lý do → ghi ưu tiên/audit nguyên tử. Xem Mục 12 về hợp đồng job, API và xử lý lỗi.
+### 25.1. Nghiên cứu và phạm vi
 
-**Ngoại lệ:** Timeout/lỗi không chặn phân loại thủ công; dữ liệu không đủ/không được hỗ trợ dẫn đến từ chối gợi ý; dữ liệu cũ, có đánh giá cạnh tranh, sai phạm vi hoặc trạng thái không đủ điều kiện thì từ chối chấp nhận. AI không tự đổi ưu tiên.
+Ghi chú nghiên cứu [nguồn chính](research/in-kind-donation-reconciliation-patterns.md) lưu bằng chứng có ngày và giới hạn.
 
-**Điều kiện sau:** Ưu tiên chính thức chỉ thay đổi qua thao tác của điều phối viên.
+| Nguồn | Mô hình áp dụng | Ranh giới |
+|---|---|---|
+| Tài liệu lịch sử inventory/deployment của Sahana Eden | Danh sách mặt hàng cần, đóng góp một phần, lượng gốc so với lượng nhận, biên nhận/phiếu gửi | Blueprint cũ trộn tính năng đã triển khai/đề xuất; truy cập khách là quyết định riêng của C48 |
+| Hướng dẫn Logistics Cluster / WFP | Kiểm đếm/kiểm tra thực tế, phiếu nhận hàng, chênh lệch có ghi chép, xuất hàng được cấp quyền và bằng chứng nhận | Tham khảo quy trình, không tuyên bố được chứng nhận |
+| Hướng dẫn Logistics Xanh IFRC | Tiếp nhận theo nhu cầu, tiêu chí chất lượng/hạn dùng, hiển thị quyên góp hỏng/hết hạn | Không tối đa hóa tổng quyên góp bằng cách nhận hàng không dùng được |
+| Tài liệu lô hàng Odoo | Truy xuất lô nguồn từ tiếp nhận đến movement đầu ra | Không phụ thuộc Odoo hay tuần tự hóa từng món |
 
-### UC-08 — Tạo và quản lý chiến dịch cứu trợ
+Chỉ hàng hóa hiện vật: tiền mặt, thanh toán và biên nhận thuế nằm ngoài phạm vi. Logistics sở hữu đợt quyên góp, khai báo, tiếp nhận, xuất xứ, đối soát và phân phối. Response tiếp tục sở hữu chiến dịch/yêu cầu cứu hộ; tham chiếu là ID không hàm nghĩa, không phải khóa ngoại xuyên dịch vụ. Identity cấp grant nhân viên theo phạm vi. Tạo/theo dõi cho khách không gọi Identity. Không cần dịch vụ thứ tư, runtime Python, broker hay blockchain.
 
-**Tác nhân:** Điều phối viên hoặc quản lý vận hành có phạm vi chiến dịch.
+### 25.2. Thuật ngữ và quy trình
 
-**Điều kiện trước:** Người dùng đã xác thực và có quyền quản lý khu vực/tổ chức.
+Phân biệt rõ: DonationDrive (đợt tiếp nhận của kho, không phải Response Campaign), DonationPledge (dự kiến đóng góp trong tương lai), DonationDelivery (một lần bàn giao vật lý), lượng người quyên góp khai đã bàn giao, lượng nhân viên kiểm đếm thực tế, tồn kho được chấp nhận sau phê duyệt độc lập, xuất kho, nhận hàng tại điểm cứu trợ và phát cuối cho người hưởng lợi. Một pledge có thể có nhiều lần giao từng phần. Pledge không bao giờ cộng tồn kho.
 
-**Luồng chính:** Tạo tên/mục tiêu/khu vực/thời gian chiến dịch → lưu trong Response → kích hoạt → liên kết yêu cầu → Logistics lưu tham chiếu chiến dịch không hàm nghĩa cho nhu cầu/cam kết/phân phối liên quan → quản lý tạm dừng/đóng khi đủ điều kiện.
-
-**Ngoại lệ:** Chiến dịch đã đóng không nhận yêu cầu mới; vẫn cho xử lý trả hàng/quyết toán; từ chối campaign ID không hợp lệ; đóng chiến dịch giữ nguyên ledger/lịch sử yêu cầu.
-
-**Điều kiện sau:** Response là nguồn thẩm quyền về trạng thái chiến dịch; Logistics có thể lưu tham chiếu campaign không hàm nghĩa khi hữu ích.
-
-### UC-09 — Quản lý phương tiện và điểm cứu trợ
-
-**Tác nhân:** Quản lý vận hành theo phạm vi.
-
-**Luồng chính:** Tạo/sửa tài sản cùng tổ chức/khu vực, loại/sức chứa đã xác thực hoặc thông tin vị trí/vận hành → chỉ liệt kê/xem tài sản được cấp quyền → chọn điểm cứu trợ đang hoạt động làm đích phân phối → vô hiệu hóa tài sản không dùng/đã nghỉ, có audit.
-
-**Ngoại lệ:** Từ chối truy cập khác phạm vi, giá trị không hợp lệ và chọn điểm không hoạt động cho phân phối mới. Vô hiệu hóa không xóa tham chiếu phân phối cũ; quản lý tài sản không tạo ra tồn kho giả hay hàm ý có quy trình định tuyến/bảo trì.
-
-**Điều kiện sau:** Danh mục tài sản và lịch sử vận hành nhất quán. FR-LOG-01/04 và TC-BE-21 xác định tiêu chí chấp nhận.
-
-## 10. API và xác thực
-
-Các ca sử dụng quyên góp UC-10..14, API quyên góp, chi tiết UI và ca kiểm thử chấp nhận tương ứng được nêu ở Mục 25. Chúng mở rộng lát Logistics hiện có, không tạo thêm dịch vụ.
-
-### 10.1. Quy ước API
-
-- Đường dẫn gốc `/api/v1`; REST/JSON; ID UUID; dấu thời gian UTC theo ISO-8601; phân trang/bộ lọc có giới hạn; định dạng lỗi thống nhất gồm code, message, lỗi trường và correlation ID.
-- Schema OpenAPI riêng cho ba API, dùng chung thuật ngữ, phân trang, phong bì lỗi và ghi chú phân quyền.
-- Dùng endpoint lệnh nghiệp vụ tường minh cho chuyển trạng thái, không PATCH trạng thái tùy ý.
-- Lệnh POST có tác động đáng kể chấp nhận `Idempotency-Key`; cập nhật trạng thái kiểm tra trạng thái/phiên bản kỳ vọng ngay trong giao dịch.
-- Sinh OpenAPI theo từng dịch vụ bằng `@nestjs/swagger`; rà soát và quản lý phiên bản hợp đồng đã công bố. [OpenAPI trong NestJS](https://docs.nestjs.com/openapi/introduction)
-
-### 10.1.1. Phản hồi hiển thị cho người dùng bằng tiếng Việt
-
-**Yêu cầu sản phẩm đã xác nhận:** thông báo API dễ đọc phải bằng tiếng Việt, bao gồm lỗi xác thực dữ liệu, xác thực tài khoản/quyền, xung đột nghiệp vụ, lỗi tải lên và thông báo. Tên trường JSON, mã lỗi, giá trị enum và URL vẫn là mã định danh ổn định cho máy. Client dùng code để xử lý logic và nhãn tiếng Việt để hiển thị; không phân tích nội dung chuỗi message.
-
-Ví dụ phong bì lỗi:
-
-```json
-{
-  "code": "REQUEST_VERSION_CONFLICT",
-  "message": "Yêu cầu đã được cập nhật. Vui lòng tải lại trước khi tiếp tục.",
-  "field_errors": {},
-  "correlation_id": "uuid"
-}
+```text
+Quản lý mở đợt -> công dân có thể đăng ký -> người quyên góp khai số thực bàn giao
+-> nhân viên đếm/kiểm tra -> so sánh khai báo/số đếm/tình trạng -> rà soát độc lập
+-> ghi tồn kho được chấp nhận một lần -> phân bổ nguồn -> xuất đã duyệt + phiếu gửi
+-> xác nhận nhận hàng độc lập -> phát cho người hưởng lợi -> đối soát.
 ```
 
-Triển khai exception filter tập trung trong NestJS và exception factory cho `ValidationPipe`, ánh xạ mã lỗi xác thực/ủy quyền/nghiệp vụ ổn định sang thông báo tiếng Việt đã rà soát. Không trả trực tiếp chuỗi lỗi của class-validator hay nhà cung cấp. Cố định locale API là tiếng Việt bất kể `Accept-Language`; worker ngoài ngữ cảnh HTTP cũng dùng cùng danh mục thông báo tiếng Việt. [Validation trong NestJS](https://docs.nestjs.com/techniques/validation), [Exception filter của NestJS](https://docs.nestjs.com/exception-filters)
+Hỗ trợ quyên góp trực tiếp không cần pledge. Bản ghi walk-in do nhân viên tạo không thể giả làm xác nhận của người quyên góp: thiếu xác nhận thì giữ UNCONFIRMED. Giao ít hơn đã pledge là lời hứa chưa hoàn thành, không tự động là chênh lệch kho. Truy cập khách không xác lập danh tính đã xác minh. Hỗ trợ ghi nhận công khai ẩn danh; không bắt buộc đăng ký công dân/xác minh điện thoại.
 
-Phản hồi backend có thể giữ nguyên văn bản do người dùng nhập. Không dịch tên, báo cáo gốc, ID không hàm nghĩa hay mã cho máy. Ánh xạ mã lý do nội bộ của AI sang giải thích tiếng Việt; phần tóm tắt LLM tùy chọn phải đáp ứng yêu cầu ngôn ngữ trước khi hiển thị, nếu không thì dùng nội dung dự phòng tiếng Việt đã rà soát.
+### 25.3. Thẩm quyền và vòng đời đợt quyên góp
 
-### 10.2. Phác thảo endpoint
-
-| Dịch vụ | Endpoint ví dụ | Phân quyền/ghi chú |
-|---|---|---|
-| Identity | POST `/identity/auth/register`, `/login`, `/refresh`, `/logout`; GET `/identity/me`; POST `/identity/users/{id}/roles` | Chỉ quản trị viên cấp vai trò; không đưa PII/vị trí vào token |
-| Response | POST `/response/requests`; GET `/response/requests`; POST `/response/requests/{id}/verify`, `/triage`, `/duplicate`, `/resolve`; POST `/response/requests/{id}/missions` | Tiếp nhận công khai có giới hạn tần suất (khách hoặc đã đăng nhập); khách dùng `GET /response/requests/track` với secret theo dõi trong authorization header; danh sách/chi tiết nhân viên theo phạm vi; resolve lấy seal Logistics của chu kỳ hiện tại |
-| Response | POST `/response/campaigns`; GET `/response/campaigns`; POST `/response/campaigns/{id}/close` | Response sở hữu chiến dịch và nhóm sự cố của yêu cầu; quản lý cần đúng phạm vi |
-| Response | POST `/response/missions/{id}/accept`, `/decline`, `/transition`, `/evidence` | Trưởng đội đang hoạt động nhận/từ chối, cập nhật và tải bằng chứng; điều phối viên đúng phạm vi có thể hủy/đánh dấu thất bại |
-| Logistics | POST `/logistics/needs`; POST `/logistics/needs/{id}/commitments`; POST `/logistics/commitments/{id}/issue`, `/deliver`, `/cancel` | Khóa dòng nhu cầu/cam kết; số lượng một phần; audit người thực hiện/lý do |
-| Logistics | POST `/logistics/receipts`, `/transfers`, `/transfers/{id}/receive`, `/distributions`, `/adjustments`; GET `/logistics/stock?warehouse_id=...`; `/vehicles`; `/relief-points` | Idempotency, audit, xác thực đơn vị, khóa dòng, trường báo cáo theo phạm vi |
-| Logistics (nội bộ) | GET `/logistics/requests/{request_id}/fulfillment?work_cycle=...`; POST `/logistics/requests/{request_id}/cycles/{cycle}/seal`, `/unseal`, `/freeze` | Đọc qua dịch vụ đã xác thực và seal giải quyết idempotent; trả tổng theo phạm vi hoặc seal bất biến sau khi mọi nhu cầu chu kỳ hiện tại và lượng đã xuất được quyết toán |
-| Response / Logistics | GET `/{service}/notifications`; POST `/{service}/notifications/{id}/read` | Mỗi dịch vụ chỉ trả thông báo mình sở hữu, giới hạn theo người nhận |
-| Response / Logistics | GET `/{service}/reports/...` | Báo cáo đọc dữ liệu của dịch vụ sở hữu và có `generated_at` |
-
-Đây là phác thảo SDD, chưa phải hợp đồng cuối cùng. Hoàn thiện đường dẫn qua rà soát OpenAPI và luồng UI. API nội bộ không được tin tưởng mù quáng các header client.
-
-**Phơi lộ API nội bộ và thông tin xác thực dịch vụ:** Identity introspection và các endpoint Logistics fulfillment/seal/unseal/freeze là nội bộ. Nginx chỉ phơi lộ route công khai và trả 404 cho đường dẫn nội bộ (ví dụ `/api/v1/identity/internal/*`, `/api/v1/logistics/internal/*`); lời gọi nội bộ dùng mạng riêng Compose. Giao tiếp dịch vụ với dịch vụ xác thực bằng JWT dịch vụ thời hạn ngắn, giới hạn audience, do Identity cấp theo client-credentials grant cho từng dịch vụ (secret riêng mỗi dịch vụ lấy từ môi trường, không commit). Dịch vụ nhận kiểm tra issuer, audience và caller được cho phép. Ngữ cảnh actor/scope đi trong claim token đã ký hoặc body được xác thực với session của chính actor, không lấy từ header tùy ý do client cung cấp. Kiểm thử caller công khai không thể gọi route nội bộ (bổ sung vào TC-BE-07 và TC-BE-20).
-
-### 10.3. Ma trận phân quyền
-
-| Tác nhân | Quyền cốt lõi đề xuất |
+| Thao tác | Grant / guard |
 |---|---|
-| Khách (không tài khoản) | Tạo SOS; có secret theo dõi SOS thì xem trạng thái/dòng thời gian và bổ sung thông tin. Xem các đợt quyên góp đang mở đã làm sạch; tạo đăng ký/khai báo giao hàng và, với secret capability dành cho quyên góp, chỉ theo dõi/khiếu nại/đính kèm bằng chứng cho khoản quyên góp đó (Mục 25.4). Secret SOS và secret quyên góp không dùng thay nhau. Không có quyền nào khác. |
-| Công dân | Tạo/xem/bổ sung yêu cầu của mình (kể cả yêu cầu khách đã nhận quyền sở hữu); xem thông báo của mình. |
-| Tình nguyện viên | Xem nhiệm vụ của đội được phân công và cập nhật hồ sơ/tình trạng sẵn sàng cá nhân. Chỉ trưởng đội đang hoạt động nhận/từ chối, cập nhật nhiệm vụ và gửi kết quả/bằng chứng. |
-| Điều phối viên | Hàng đợi/bản đồ theo phạm vi; xác minh, liên kết trùng, phân loại ưu tiên, giao nhiệm vụ, hủy/mở lại, xác nhận kết quả. |
-| Quản lý vận hành | Quản lý kho/điểm/phương tiện/phân phối theo phạm vi; điều chuyển/điều chỉnh theo chính sách; báo cáo vận hành. |
-| Quản trị viên | Tài khoản/vai trò/cấu hình; không mặc nhiên được xem chi tiết vụ việc nếu không có nhu cầu nghiệp vụ. |
+| Tạo/mở/tạm dừng/đóng đợt | `DONATION_DRIVE_MANAGE` theo kho, thường do quản lý kho |
+| Khai báo/xem khoản quyên góp của mình/khiếu nại | Công dân sở hữu hoặc capability riêng cho khoản quyên góp; không có quyền tồn kho |
+| Kiểm đếm/kiểm tra tiếp nhận | `DONATION_INTAKE` theo kho |
+| Rà soát biên nhận/chênh lệch | `DONATION_REVIEW` theo phạm vi; người rà soát phải khác mọi người đã kiểm đếm lượt tiếp nhận |
+| Chuẩn bị / phê duyệt phân phối | `DISTRIBUTION_PREPARE` / `DISTRIBUTION_REVIEW`; người dùng khác nhau |
+| Xác nhận bàn giao custody | Người giữ hàng bên nhận được cấp quyền, khác người xuất |
+| Phê duyệt điều chỉnh kiểm kê | `STOCK_ADJUSTMENT_REVIEW`; khác người kiểm đếm/chuẩn bị |
 
-**Xác thực đề xuất:** Identity cấp JWT bất đối xứng chứa issuer, audience, subject, expiry và thông tin vai trò/phạm vi tối thiểu. Dịch vụ tự kiểm tra chữ ký. Token truy cập demo hết hạn sau 10 phút; phiên refresh hết hạn tuyệt đối sau 7 ngày, có xoay vòng và phát hiện tái sử dụng; xoay vòng không kéo dài hạn này. Đây là mặc định cấu hình cho đồ án. Mỗi HTTP request được bảo vệ kiểm tra JWT cục bộ rồi lấy tài khoản/session/grant hiện hành từ API introspection Identity đã xác thực, không dùng cache dương. Đăng xuất thu hồi phiên đó; vô hiệu hóa, đặt lại thông tin xác thực hoặc đổi vai trò thu hồi mọi phiên liên quan. Identity không khả dụng thì route đã xác thực trả 503 tiếng Việt và từ chối đóng khi an toàn. Tạo SOS khách, tải bằng chứng khách và theo dõi bằng secret được cố ý tách khỏi Identity: nếu có bearer token trong lúc tạo SOS, Response chỉ tự xác thực chữ ký (để liên kết quyền sở hữu), không gọi introspection, nhờ vậy sự cố Identity không chặn báo cáo khẩn cấp. Yêu cầu đã được cấp quyền có thể hoàn tất; đây là thu hồi ở ranh giới request, không phải hủy giao dịch đang chạy. Mục 22 mô tả đánh đổi khả dụng.
+Quản lý vận hành có thể giữ grant rà soát. Có nhiều vai trò vẫn không được tự phê duyệt; quyền quản lý vai trò admin không cấp quyền phê duyệt nghiệp vụ ngầm định. Seed ít nhất hai tài khoản nhân viên. Người rà soát vắng mặt tạo công việc chờ/nhắc xử lý, không tạo đường vòng im lặng.
 
-Mục 23.1 chốt cách truyền session trên trình duyệt/native, biện pháp cookie/CSRF và nơi client lưu session.
+`DRAFT -> OPEN <-> PAUSED -> CLOSED`, đồng thời cho `OPEN -> CLOSED`. Chỉ OPEN cho tạo pledge/giao hàng mới. Đóng dừng vận động quyên góp nhưng vẫn cho hoàn tất bàn giao đã ghi, rà soát, khiếu nại và hàng trả lại. Bắt buộc lý do/version; biên nhận tồn đọng vẫn hiển thị và việc đóng không đồng nghĩa đã đối soát. Công bố mặt hàng/đơn vị chuẩn, lượng mục tiêu, địa điểm/giờ tiếp nhận, tiêu chí chất lượng/hạn dùng. Mục tiêu chỉ để tham khảo; nhận vượt mức cần lý do quản lý. Campaign Response tạm dừng vẫn có ranh giới tranh chấp liên dịch vụ đã ghi nhận; đợt quyên góp không đổi vòng đời campaign.
 
-Không mã hóa toàn bộ chính sách vào JWT: Response tự kiểm tra quan hệ đội/khu vực/yêu cầu; Logistics tự kiểm tra kho/cam kết. Sau khi Nest guard cho phép thao tác, truy vấn dịch vụ vẫn phải lọc dòng theo phạm vi. [NestJS guards](https://docs.nestjs.com/guards)
+### 25.4. Bảo mật khách và luồng tiếng Việt
 
-## 11. Kiến trúc giao diện người dùng
+Trang công khai chỉ lộ nhu cầu/ngày/địa điểm tiếp nhận đã làm sạch và tiến độ tổng hợp. Người quyên góp đã đăng nhập dùng quyền sở hữu tài khoản. Trước khi tạo, client khách sinh secret mật mã 32 byte ngẫu nhiên và idempotency key riêng, gửi qua TLS rồi lưu cả hai để retry. Logistics xác thực định dạng/độ dài secret, chỉ lưu hash gắn với mục đích và giới hạn tra cứu phát lại theo capability đó. Cùng key/body/secret chỉ tạo một bản ghi; body thay đổi gây conflict. Mất phản hồi tạo không được làm mất quyền truy cập hoặc tạo khoản quyên góp trùng.
 
-**Ngôn ngữ:** mọi nội dung Web/Mobile hướng đến người dùng đều bằng tiếng Việt, gồm điều khiển, nhãn, placeholder, mô tả trạng thái, nhãn trợ năng, trạng thái rỗng/đang tải/lỗi, hộp thoại, thông báo và tiêu đề báo cáo/xuất dữ liệu. Hiển thị enum backend ổn định qua nhãn tiếng Việt; giữ nguyên nội dung gốc người dùng nhập. Yêu cầu này độc lập với ngôn ngữ tài liệu kỹ thuật tiếng Anh hay ngôn ngữ trao đổi với lập trình viên.
+Khách theo dõi bằng authorization header, không dùng query string, log, analytics hay QR biên nhận công khai. Số biên nhận là định danh, không phải thông tin xác thực. Web dùng session storage/bộ nhớ và cung cấp tải mã khôi phục riêng tư tường minh; Mobile dùng SecureStore. Giải thích khôi phục bằng tiếng Việt. Mất secret cần nhân viên hỗ trợ chứng minh quyền sở hữu có audit rồi thu hồi/cấp lại; riêng số điện thoại/tên không đủ và khôi phục thất bại không tiết lộ gì. Nhận quyền sở hữu khoản quyên góp khách cần đồng thời tài khoản đã xác thực và capability hợp lệ; claim nguyên tử gắn quyền sở hữu, thu hồi quyền khách. Secret SOS và quyên góp không dùng thay nhau.
 
-### Web
+Áp dụng throttling, giới hạn payload, phân trang theo phạm vi và kiểm soát Origin/CSRF trình duyệt ở Mục 23.1. Khách tải bằng chứng cần capability có sẵn; Logistics sở hữu metadata bằng chứng riêng tư và áp dụng giới hạn Mục 6.3/23.5. Không có danh sách người quyên góp công khai hay danh tính người hưởng lợi. Claim của khách không cấp quyền nhân viên.
 
-- **Điều phối viên:** chế độ xem đã lưu cho yêu cầu chờ xác minh, đã xác minh nhưng chưa phân công, nhiệm vụ đang hoạt động và nhu cầu mới đáp ứng một phần; bản đồ/bộ lọc theo phạm vi; chi tiết yêu cầu, tình trạng sẵn sàng của đội, bảng nhiệm vụ và dòng thời gian audit.
-- **Quản lý vận hành:** chiến dịch, kho/mặt hàng, sổ tồn kho, cam kết/điều chuyển, phương tiện, điểm cứu trợ và phân phối.
-- **Quản trị viên:** tài khoản, tổ chức, cấp vai trò, tình trạng dịch vụ; chỉ xem PII khi có vai trò vận hành liên quan.
-- **Chỉ số vận hành:** vụ việc theo khu vực/trạng thái/ưu tiên; thời gian từ nhận đến xác minh/phân công/giao hàng; nhiệm vụ chưa xong; số lượng yêu cầu/đã cam kết/đã xuất/đã giao/còn thiếu theo từng yêu cầu được phép xem; dấu thời gian nguồn.
+Web/Mobile công dân: duyệt đợt, pledge tùy chọn, form bàn giao thực tế, biên nhận riêng, chênh lệch/khiếu nại và tiến độ nguồn đã làm sạch. Web nhân viên: hàng đợi tiếp nhận, so sánh kiểm đếm/bằng chứng, rà soát độc lập, tồn kho theo nguồn, hàng đợi xuất/nhận/phát và đối soát. Dùng nhãn tiếng Việt riêng: “Dự kiến đóng góp”, “Số lượng đã bàn giao”, “Kho kiểm đếm”, “Đã tiếp nhận”, “Đang chờ đối chiếu”, “Đã giao đến điểm cứu trợ”, “Đã phát cho người nhận”. Bản nháp ngoại tuyến chưa được tiếp nhận trước ACK máy chủ. Giữ nguyên tên/nội dung đã nhập; validation, thông báo và xuất dữ liệu theo chính sách tiếng Việt hiện tại.
 
-### Mobile
+### 25.5. So sánh, rà soát và ghi tồn kho
 
-- **Công dân:** gửi SOS, ghim thủ công, ảnh/video tùy chọn, xác nhận có ID yêu cầu, dòng thời gian, thông tin bổ sung.
-- **Tình nguyện viên:** nhiệm vụ được phân công, chi tiết cần thiết, nhận/từ chối, thao tác trạng thái, ảnh/video kết quả.
-- Bản nháp/hàng đợi ngoại tuyến phải cho biết rõ đang chờ đồng bộ và tái sử dụng cùng khóa idempotency. Giảm thiểu PII lưu cục bộ; quyết định xóa cache và biện pháp bảo vệ nền tảng trước khi triển khai cache tồn tại lâu.
-- Chat nội bộ, theo dõi trực tiếp nền, dẫn đường từng chặng và dịch vụ geocoding tự xây nằm ngoài MVP trừ khi được phê duyệt rõ.
+Đơn vị/số lượng chuẩn dùng PostgreSQL `numeric(18,3)`, serialize thành chuỗi decimal; từ chối phần thập phân vượt scale mặt hàng (đơn vị cái yêu cầu số nguyên). Không so sánh bằng floating point. Quy đổi đóng gói gắn với từng mặt hàng, được duyệt, có version/snapshot; không tự coi thùng bằng cái hay tự hiểu tên mặt hàng không rõ.
 
-## 12. Tích hợp AI backend — thiết kế dựa trên nghiên cứu
+Theo từng mặt hàng/lần giao, ghi pledge nếu có, số đã bàn giao do người quyên góp khai báo có thể null, số đếm thực tế, accepted, held và rejected. Bắt buộc `counted = accepted + held + rejected`. Nếu có khai báo, `count_delta = counted - donor_declared`. Từ chối vì chất lượng được ghi riêng, kể cả khi số đếm khớp. Lưu tình trạng/hạn dùng, đơn vị chuẩn, actor/thời gian, phiên bản khai báo/kiểm đếm bất biến, lý do/bằng chứng. So sánh từng lần bàn giao một phần, không dùng lại tổng pledge nhiều lần.
 
-### 12.1. Mục tiêu, phạm vi và căn cứ
+Thay đổi trước rà soát tạo revision bất biến và làm mất hiệu lực phê duyệt chờ. Người rà soát kiểm tra expected version tường minh. Mọi biên nhận cần rà soát độc lập, kể cả số đếm khớp. Chênh lệch cần cách xử lý có ghi chép và thông báo người quyên góp. Im lặng không phải đồng ý. Người rà soát có thể duyệt lượng dùng được, có bằng chứng dù người quyên góp không đồng ý, kèm override có lý do; khiếu nại vẫn OPEN và hiển thị cho vận hành. Hàng chưa xác định/an toàn tiếp tục ở trạng thái held và không khả dụng. Tiếp nhận held về sau cần quyết định đã rà soát; hàng bị từ chối cần bằng chứng custody trả/xử lý.
 
-**Nghiên cứu ban đầu: 2026-09-29; rà soát điều chỉnh blueprint: 2026-09-30. Trạng thái: thiết kế tích hợp tùy chọn cho đồ án, không phải hệ thống phân loại khẩn cấp đã được kiểm chứng.** Mục tiêu là giúp điều phối viên xem xét báo cáo chưa đầy đủ và cân nhắc gợi ý ưu tiên, đồng thời giữ việc xác minh thủ công, phân công và quyết định cuối cùng cho con người. Mục 12.10 điều chỉnh các ý phù hợp từ blueprint AI được cung cấp; [ghi chú rà soát](c48-ai-blueprint-review.md) lưu phân tích và giới hạn của nguồn. Kiến trúc dưới đây là quyết định thiết kế C48; các nguồn trích dẫn nêu cơ chế kỹ thuật/phương pháp đánh giá, không chứng minh độ chính xác của ứng dụng được đề xuất.
+Ghi số lượng được chấp nhận đúng một lần trong giao dịch Logistics ngắn: revision biên nhận chính xác đã duyệt, source batch/số dư, movement RECEIPT, số dư tổng, audit và notice. Ràng buộc unique cho receipt-line/revision cùng idempotency ngăn cộng tồn kho hai lần. Không gọi bên ngoài khi đang giữ khóa. Sau khi ghi sổ, sửa sai dùng movement bù trừ được duyệt độc lập, tham chiếu bản gốc, không ghi đè/xóa lịch sử ledger. Điều chỉnh không thể giảm on-hand dưới reserved; trước đó giải phóng/tái phân bổ đặt trước theo guard cycle hoặc trả conflict. Hàng người quyên góp nhận lại dùng stock-out được phép, liên kết nguồn và bằng chứng bàn giao, không dùng aid ISSUE.
 
-NIST AI RMF tổ chức quản trị rủi ro thành Govern, Map, Measure và Manage, bao gồm trách nhiệm con người và đánh giá liên tục. C48 áp dụng các ý này qua ghi nhận người chịu trách nhiệm, mục đích giới hạn, đánh giá trước khi kích hoạt, rà soát bởi con người và đường tắt/tắt/quay lui. Đây không phải tuyên bố được chứng nhận hay sẵn sàng vận hành. [NIST AI RMF Core](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/)
+### 25.6. Mô hình logic và hạch toán nguồn
 
-| Năng lực dự kiến | Đầu vào/đầu ra | Giá trị và giới hạn | Khuyến nghị C48 |
-|---|---|---|---|
-| Gợi ý ưu tiên | Dữ kiện sự cố có cấu trúc → đề xuất P1–P4, lý do, dữ kiện còn thiếu | Hỗ trợ rà soát nhất quán; phụ thuộc định nghĩa thống nhất và nhãn đại diện | Thử nghiệm AI chính, luôn do con người rà soát |
-| Phát hiện thiếu thông tin | Trường bắt buộc và mâu thuẫn → danh sách cần hỏi thêm | Có ích mà không cần mô hình huấn luyện; dữ kiện chưa biết phải giữ là chưa biết | Trước tiên triển khai bằng validation/quy tắc xác định |
-| Tóm tắt/trích xuất nhóm từ báo cáo | Nội dung đã loại thông tin nhận dạng → tóm tắt ngắn và nhóm dự kiến | Có thể giảm công đọc; có thể bỏ sót hoặc tự thêm chi tiết | Thử nghiệm LLM tùy chọn sau khi luồng có cấu trúc hoạt động |
-| Gợi ý báo cáo trùng | Khoảng thời gian + khoảng cách PostGIS + độ tương đồng nhóm/văn bản → báo cáo có thể liên quan | Các hộ khác nhau có thể cùng vị trí và hiểm họa | Chỉ gợi ý tùy chọn; không tự gộp hoặc loại bỏ |
-| Ghép đội/nguồn lực | Kỹ năng, phạm vi, sẵn sàng, khoảng cách → danh sách ứng viên | Điều kiện cứng và logic truy vấn đã đủ cho cơ sở ban đầu | Dùng bộ lọc/truy vấn thông thường trước; không cần AI |
-| Suy luận mức độ nghiêm trọng từ ảnh/video, dự báo nhu cầu, điều động tự động | Media/lịch sử → mức độ nghiêm trọng/ quyết định nguồn lực được suy luận | Cần dữ liệu chuyên biệt, đánh giá, năng lực tính toán và quản trị chặt hơn | Nằm ngoài phần AI đồ án này |
-
-Bộ quy tắc có phiên bản là cơ sở hỗ trợ quyết định, không phải bằng chứng về học máy. Nếu đồ án tuyên bố có đóng góp ML, cần mô hình được huấn luyện/đánh giá riêng và so sánh với bộ quy tắc. Nếu không có dữ liệu gán nhãn phù hợp, báo cáo hạn chế đó và giữ lại demo tích hợp/quy tắc.
-
-### 12.2. Các lựa chọn công nghệ và quyết định
-
-| Lựa chọn | Triển khai | Điểm mạnh | Giới hạn | Quyết định |
-|---|---|---|---|---|
-| Bộ quy tắc có phiên bản | Hàm TypeScript cùng bảng quy tắc đã rà soát | Giải thích tái lập được; không phụ thuộc dữ liệu huấn luyện | Chất lượng quy tắc phụ thuộc rà soát miền; không tự khái quát theo dữ liệu đã học | Chế độ tư vấn cơ sở |
-| Chấm điểm có trọng số | Bộ đánh giá TypeScript nhỏ, có phiên bản, trên các yếu tố tường minh đã biết | Bộ so sánh dễ giải thích cho thử nghiệm blueprint | Tính trung bình có thể làm loãng tín hiệu trọng yếu; trọng số/ngưỡng chưa được kiểm chứng | Bộ so sánh nghiên cứu tùy chọn; không đưa thẳng ra thành khuyến nghị có thể hành động |
-| Mô hình giám sát | Hoãn thành thử nghiệm nghiên cứu riêng bằng runtime suy luận tương thích Node và artifact có phiên bản | Có thể bổ sung xếp hạng đã học sau khi có cơ sở quy tắc | Cần nhãn, kiểm soát rò rỉ, phân tích mất cân bằng lớp, tương thích runtime và hiệu chỉnh | Không thuộc ngăn xếp triển khai cốt lõi |
-| LLM lưu trữ | Backend gọi nhà cung cấp với schema đầu ra nghiêm ngặt | Thử nghiệm hữu ích cho tóm tắt/trích xuất tường thuật tiếng Việt | Chi phí/khả dụng nhà cung cấp, quyền riêng tư, prompt injection, hallucination, thay đổi phiên bản | Tùy chọn; chưa chọn nhà cung cấp |
-| Mô hình ngôn ngữ cục bộ | Tiến trình suy luận riêng do worker gọi | Giữ suy luận trong môi trường đã chọn | Phần cứng/bộ nhớ, triển khai, giấy phép và chất lượng vẫn cần xác minh | Chỉ thực hiện khi phần cứng và đánh giá chứng minh được giá trị |
-
-Vectorizer văn bản tự nó không hiểu mức độ khẩn cấp. Cơ sở mặc định chưa chọn framework ML hay runtime huấn luyện nào. Thử nghiệm mô hình về sau phải dùng runtime tương thích Node.js, quản lý phiên bản phép biến đổi feature và đánh giá trên dữ liệu tách riêng theo nhóm trước khi xem xét tích hợp.
-
-**Thử nghiệm tương lai tùy chọn:** nếu có dữ liệu gán nhãn phù hợp và công cụ mô hình tương thích Node.js, so sánh bộ quy tắc đã rà soát với mô hình dùng feature có cấu trúc nhỏ, rồi đánh giá liệu feature văn bản được phê duyệt có cải thiện kết quả trên tập giữ lại hay không. Đánh giá tiếng Việt có dấu, thiếu dấu, phủ định, viết tắt và phát biểu mâu thuẫn. Không giả định mô hình pretrained tiếng Anh phù hợp với báo cáo khẩn cấp bằng tiếng Việt. Tài liệu này chưa chọn hay benchmark mô hình/nhà cung cấp nào.
-
-Cơ sở ban đầu không cần vector database, framework RAG/agent, GPU hay message broker bổ sung. Triển khai quy tắc trong module TypeScript nhỏ. Chỉ thêm adapter nhà cung cấp khi thực sự tích hợp mô hình hosted.
-
-### 12.3. Vị trí trong kiến trúc ba dịch vụ
-
-**Bắt đầu bằng thành phần advisor do Response sở hữu.** Chạy thành tiến trình worker dùng codebase Response và các bảng AI do Response sở hữu. Đây là worker xử lý công việc nền bền vững, không phải dịch vụ có quyền sở hữu độc lập. Worker không truy cập trực tiếp cơ sở dữ liệu Identity hoặc Logistics. Chỉ tạo dịch vụ AI độc lập trong tương lai khi có nhu cầu mở rộng hoặc quản trị được chứng minh; không dựng ranh giới đó chỉ để gọi một API.
+Mở rộng ERD Mục 6.1 bằng các entity do Logistics sở hữu dưới đây; dùng lại Item, Warehouse, StockMovement và Distribution hiện có.
 
 ```mermaid
-sequenceDiagram
-  participant C as Công dân / Điều phối viên
-  participant R as Response API
-  participant D as Response DB
-  participant W as Response advisor worker
-  participant M as Quy tắc / Mô hình / Nhà cung cấp tùy chọn
-  C->>R: Gửi hoặc bổ sung yêu cầu
-  R->>D: Giao dịch: yêu cầu + audit + analysis job
-  R-->>C: ACK từ máy chủ, không chờ AI
-  W->>D: Nhận job đang chờ với lease có giới hạn
-  W->>M: Phân tích snapshot bất biến đã giảm thiểu dữ liệu
-  Note over W,M: Không giữ khóa DB trong lúc suy luận
-  M-->>W: Gợi ý hợp lệ hoặc từ chối đưa gợi ý
-  W->>D: Giao dịch: kết quả + trạng thái job
-  C->>R: Đọc gợi ý và dữ kiện nguồn
-  C->>R: Rà soát với phiên bản yêu cầu kỳ vọng
-  R->>D: Phân quyền + kiểm tra độ mới + quyết định con người + audit
-  R-->>C: Xác nhận kết quả rà soát đã commit
+erDiagram
+  DONATION_DRIVE ||--o{ DONATION_DRIVE_ITEM : requests
+  DONATION_DRIVE ||--o{ DONATION_PLEDGE : attracts
+  DONATION_DRIVE ||--o{ DONATION_DELIVERY : receives
+  DONATION_PLEDGE |o--o{ DONATION_DELIVERY : partially_fulfills
+  DONATION_DELIVERY ||--o{ DONOR_DECLARATION_REVISION : preserves
+  DONATION_DELIVERY ||--o{ DONATION_RECEIPT : inspected_by
+  DONATION_RECEIPT ||--o{ DONATION_RECEIPT_LINE : counts
+  DONATION_RECEIPT ||--o{ RECEIPT_REVIEW : reviewed_by
+  DONATION_RECEIPT ||--o{ RECONCILIATION_CASE : investigates
+  DONATION_RECEIPT_LINE ||--o{ STOCK_SOURCE_BATCH : originates
+  STOCK_SOURCE_BATCH ||--o{ SOURCE_BALANCE : located_at
+  STOCK_SOURCE_BATCH ||--o{ MOVEMENT_ALLOCATION : traces
+  STOCK_MOVEMENT ||--o{ MOVEMENT_ALLOCATION : allocates
+  DISTRIBUTION ||--o{ CUSTODY_HANDOFF : records
+  CUSTODY_HANDOFF ||--o{ HANDOUT_LINE : distributes
+  STOCKTAKE ||--o{ STOCKTAKE_LINE : compares
 ```
 
-Dòng job lưu ID yêu cầu, revision/hash đầu vào, phiên bản policy, trạng thái, số lần thử và lease. Worker nhận một job đang chờ trong giao dịch ngắn, rồi đọc snapshot bất biến từ các bảng Response do nó sở hữu. Dùng ràng buộc unique job/recommendation và claim token để retry không thể commit kết quả cạnh tranh. Không cần đưa mô tả thô, thông tin liên hệ, tệp hay tọa độ chính xác qua broker.
+Trường tối thiểu: phạm vi kho/tổ chức, donor user ID không hàm nghĩa có thể null, hash guest capability, số lượng/đơn vị chuẩn, version khai báo/đếm bất biến, ID người rà soát, tham chiếu và bằng chứng riêng tư. Ràng buộc/index schema chính xác là cổng triển khai. Mỗi receipt line được nhận tạo một source batch; receipt thông thường/tồn đầu kỳ cũng có source root tường minh. SourceBalance lưu on-hand/reserved dùng được theo kho/mặt hàng/nguồn cùng điều kiện/hạn dùng. Tổng phân bổ bằng lượng movement; tổng source balance bằng tổng balance kho/mặt hàng.
 
-Dùng giao dịch cơ sở dữ liệu ngắn để nhận job và ghi kết quả. Lời gọi nhà cung cấp diễn ra ngoài TypeORM transaction/khóa dòng. Worker ngừng chạy thì job vẫn chờ để thử lại sau; quy trình thông thường do người xử lý vẫn hoạt động. [Giao dịch TypeORM](https://typeorm.io/docs/advanced-topics/transactions/)
+Đặt trước/giải phóng, xuất, điều chuyển, trả, điều chỉnh và quyết toán giữ phân bổ nguồn. Điều chuyển giữ nguyên receipt root; hàng trả được xác minh giữ nguồn và kiểm tra tình trạng. Chọn hàng đủ điều kiện theo hạn dùng sớm trước, rồi thời điểm tiếp nhận/source ID; ghi lý do khi override. Hàng held/hết hạn không được xuất. Với hàng trộn, báo cáo tiến độ người quyên góp là phân bổ kế toán, không phải vật thể vật lý có thể nhận dạng. Điều khoản quyên góp cơ sở thông báo có thể gộp hàng trong mục đích của đợt; không hứa earmark cứng/chuyển sang mục đích khác, các việc đó ngoài phạm vi.
 
-### 12.4. Mô hình dữ liệu và hợp đồng đầu vào/đầu ra
+Mở rộng thứ tự khóa: FulfillmentCycle hiện hành trước với lệnh gắn yêu cầu, tiếp theo header need/commitment hoặc distribution, header receipt/stocktake nếu cần, rồi balance tổng theo kho/mặt hàng đã sắp xếp, rồi source balance đã sắp xếp. Duyệt receipt khóa header trước stock. Không lấy khóa cycle sau khóa stock. Unique key xử lý dòng source mới; constraint tổng/nguồn, version phê duyệt và idempotency commit cùng nhau. Không có giao dịch phân tán.
 
-Tất cả bảng dưới đây thuộc Response. Đây là phần bổ sung được đề xuất, chưa phải migration hiện hữu.
+Mọi lệnh làm đổi số dư/đặt trước phải kiểm tra cờ cửa sổ kiểm kê bền vững trong khi giữ cùng khóa balance kho/mặt hàng được dùng để bắt đầu stocktake; điều này ngăn race kiểu kiểm tra-rồi-ghi. Bắt đầu cửa sổ kiểm kê không lấy khóa cycle sau khóa stock. Correction cần giải phóng reservation yêu cầu được đưa thành các lệnh thông thường theo thứ tự cycle-first ở ngoài giao dịch duyệt stocktake, sau đó làm mới kiểm kê; không đảo thứ tự khóa để ép điều chỉnh. Bàn giao vật lý và rà soát hành chính đang chờ có thể tiếp tục mà không đổi số dư dùng được đã đóng băng.
 
-| Thực thể | Trường và ràng buộc tối thiểu |
+### 25.7. Phân phối và custody vật lý
+
+DistributionPlan chứa mục đích, tham chiếu need/request hoặc campaign, kho, điểm/đích, người giữ/đội, số lượng và phương tiện khi liên quan. `DRAFT -> APPROVED -> DISPATCHED -> RECONCILED`; chỉ hủy trước dispatch. Người rà soát khác duyệt đúng version; thay đổi trọng yếu làm mất phê duyệt. Duyệt không trừ tồn kho. Dispatch kiểm tra lại phạm vi/version, nguồn còn hàng/hạn dùng và guard cycle; tạo waybill cùng một ISSUE nguyên tử.
+
+Giữ hai luồng xuất kho ở Mục 8.3: Distribution gắn yêu cầu tham chiếu commitment đã xuất và không ISSUE lần nữa; phân phối trực tiếp cho điểm/campaign đặt trước/xuất đúng một lần tại chỗ. Mỗi đơn vị rời kho chỉ qua một ISSUE. Lưu actor/thời gian/số lượng thực và custodian nhận, không chỉ tên tài xế dự kiến.
+
+Bên nhận xác nhận số thực tại điểm, chênh lệch và hàng còn đang vận chuyển theo từng nguồn, độc lập với bên gửi. Điểm nhận xác lập xong chặng custody đó, không phải giao cuối cho người hưởng lợi. Tồn tại điểm là hàng Logistics đang giữ, không phải tồn kho kho còn khả dụng. Giao thẳng cho người nhận cuối có thể bỏ qua giai đoạn điểm; cần ghi rõ loại bàn giao.
+
+Hồ sơ handout ghi ngày, vị trí ở mức khái quát, số lượng mặt hàng/nguồn, số hộ nhận hoặc xác nhận giả danh và xác nhận độc lập. Không bắt buộc ID quốc gia, ảnh người hưởng lợi hay tên công khai. Handout một phần giữ phần còn lại tại điểm. Mỗi chặng: `dispatched = confirmed_received + verified_returned + approved_lost + remaining_in_transit`. Tại điểm: `received = final_handouts + forwarded + returned_from_point + point_loss + still_held`. Hàng nhận bị từ chối/giữ lại là custody chưa giải quyết cho đến khi có quyết định. Chuyển tiếp tạo chặng liên kết, không ISSUE kho lần nữa. Hàng trả chỉ cộng tồn sau khi thực nhận/kiểm tra; thất thoát cần phê duyệt độc lập có lý do.
+
+Ngữ nghĩa giao nhu cầu phải rõ: need có điểm cứu trợ chỉ định hiện hữu có thể quyết toán khi điểm xác nhận nhận; need cho hộ cuối chỉ hoàn tất khi phát tận tay. Thêm `delivery_target_kind` bất biến (`RELIEF_POINT` hoặc `FINAL_RECIPIENT`) khi tạo need; đóng băng sau khi có cam kết. **Quy tắc chọn (không tùy ý chọn lúc hoàn tất):** need gắn yêu cầu Response mặc định `FINAL_RECIPIENT`; chỉ cho `RELIEF_POINT` khi điều phối viên nêu một điểm đang hoạt động được chỉ định và ghi lý do, hiển thị trên bảng và dòng thời gian yêu cầu. Need tạo cho campaign hoặc bổ sung hàng cho điểm mặc định `RELIEF_POINT`. Không thể đổi kind sau khi có commitment; chỉ điều phối viên đúng phạm vi có quyền quản lý need được đặt kind; nhân viên đáp ứng không tự chọn/đổi. Need `RELIEF_POINT` được đáp ứng tại thời điểm điểm nhận phải mang nhãn “Đã giao đến điểm cứu trợ” trên bảng; yêu cầu không thể RESOLVED dựa trên đó trừ khi bản ghi giải quyết của điều phối viên xác nhận không chờ phát đến hộ cuối. Quy trình điểm đã mô tả mặc định RELIEF_POINT trong migration tương lai. Seal yêu cầu bảo vệ target đã chọn, không suy luận giao cứu trợ cuối từ việc điểm nhận trung gian. Số dư giữ tại điểm vẫn báo cáo riêng sau khi đóng yêu cầu.
+
+### 25.8. Báo cáo và kiểm kê
+
+Chế độ xem người quyên góp giữ khác biệt giữa khai báo/kiểm đếm/chấp nhận, quyết định xử lý, khiếu nại và tiến độ nguồn đã làm sạch. Tổng công khai chỉ hiện mặt hàng/đích rộng cùng `generated_at`; không lộ liên hệ, capability, bằng chứng riêng tư hay danh tính người hưởng lợi. Chế độ vận hành theo phạm vi hiện bàn giao chưa khớp, hàng held, phê duyệt cũ, khiếu nại mở và custody quá hạn. Đây là tín hiệu điều tra, không phải cáo buộc trộm cắp/đút lót.
+
+Tách sự kiện lũy kế khỏi vị trí hiện tại. Theo nguồn, đối soát hàng vào được chấp nhận/tồn đầu kỳ và correction đã duyệt với tồn kho hiện tại (reserved là tập con), vận chuyển chưa xử lý, hàng do điểm giữ, handout cuối, thất thoát được duyệt, hàng người quyên góp trả và tiêu hủy. Điều chuyển/lượt trả hàng thay đổi vị trí, không phải quyên góp mới. Hàng đầu vào bị từ chối nằm ngoài tồn dùng được; hàng held có sổ custody vật lý riêng. Không cộng khác đơn vị hay đếm một hàng trả/điều chuyển hai lần. Báo cáo truy vết tham chiếu receipt → source movement → dispatch → receipt → handout. Lịch sử append-only trong ứng dụng không chống sửa đổi bởi quản trị viên host/database; vẫn cần giới hạn truy cập và backup riêng.
+
+Stocktake: người chuẩn bị theo phạm vi mở cửa sổ đếm bền vững cho mặt hàng/kho đã chọn → chặn movement tồn kho → snapshot số sách/phiên bản → kiểm đếm → reviewer khác duyệt correction gắn nguồn → đóng cửa sổ. Không giữ giao dịch DB trong lúc kiểm đếm thực tế. Hàng vật lý mới đến có thể vào custody pending nhưng không ghi vào balance đang đóng băng; hàng tồn không liên quan vẫn xử lý. Sau lỗi, tiếp tục/hủy tường minh có audit, không tự hết hạn im lặng. Snapshot thay đổi ngoài dự kiến làm mất phê duyệt và cần đếm lại. Ràng buộc không âm/reserved vẫn áp dụng; đổi tình trạng/hạn dùng có thể cần cách ly và giải phóng reservation thay vì điều chỉnh số học.
+
+### 25.9. API và ca sử dụng
+
+Tất cả path thuộc Logistics `/api/v1`; lệnh thay đổi dùng idempotency và version kỳ vọng. Mã lỗi ổn định bằng tiếng Anh, thông báo dễ đọc bằng tiếng Việt.
+
+| Nhóm tài nguyên/lệnh | Quyền truy cập |
 |---|---|
-| AnalysisSnapshot | UUID, ID yêu cầu, work_cycle, revision đầu vào, phiên bản schema feature, JSON feature đã chuẩn hóa/giảm thiểu có nguồn gốc dữ kiện, hash đầu vào/ngữ cảnh, thời điểm ghi nhận/đánh giá và tùy chọn nguồn/phiên bản/hiệu lực hiểm họa; nội dung bất biến; bảo vệ như yêu cầu |
-| AnalysisJob | UUID, snapshot ID, phiên bản advisor/policy, trạng thái, số lần thử, available_at, lease_until, claim token, mã lỗi, dấu thời gian; tuple snapshot/advisor/policy unique |
-| TriageRecommendation | UUID, job ID unique, mức ưu tiên đề xuất có thể rỗng, kết quả, mã lý do, trường thiếu/mâu thuẫn, nhận định trích xuất/tham chiếu nguồn, tín hiệu chất lượng dữ liệu/xác minh riêng biệt, điểm đã hiệu chuẩn có thể rỗng, ngữ nghĩa điểm, phiên bản model/rule/prompt, hash artifact, evaluated_at, generated_at, expires_at; kết quả bất biến |
-| RecommendationReview | UUID, recommendation ID unique cho lần rà soát có thẩm quyền, quyết định, mức ưu tiên chọn có thể rỗng, lý do, ID người rà soát, phiên bản yêu cầu đã rà soát, thời điểm; xung đột nếu có lần rà soát cuối cạnh tranh |
+| `GET /donation-drives`, `GET /donation-drives/:id` | Đợt OPEN công khai đã làm sạch; lịch sử nhân viên theo phạm vi riêng |
+| `POST /donation-drives`, `POST /donation-drives/:id/{open,pause,resume,close}` | Quản lý kho theo phạm vi |
+| `POST /donation-drives/:id/pledges`, `POST /donation-drives/:id/deliveries` | Công dân hoặc khách; pledge tham chiếu phải cùng chủ sở hữu/đợt |
+| `GET /donations/:id`, `POST /donations/:id/{declarations,disputes,claim}` | Chủ sở hữu/capability; claim cần cả tài khoản |
+| `POST /donation-receipts`, `POST /donation-receipts/:id/{counts,review,post}` | Tách người tiếp nhận/người rà soát; post đúng một lần theo revision được duyệt |
+| `POST /distributions/:id/{approve,dispatch,receive,handouts,return,settle-loss}` | Nhân viên theo phạm vi cho từng giai đoạn; bàn giao độc lập |
+| `POST /stocktakes`, `POST /stocktakes/:id/{start,counts,approve,cancel}` | Người chuẩn bị/duyệt theo phạm vi; cửa sổ đếm bền vững |
+| `GET /reconciliation`, `GET /donation-reports/:id` | Báo cáo vận hành theo phạm vi hoặc báo cáo đã làm sạch cho chủ sở hữu |
 
-Tách vòng đời job khỏi vòng đời rà soát recommendation:
+UC-10 — Quản lý đợt quyên góp: công bố nhu cầu/mở; thực thi phạm vi/trạng thái; đóng đợt vẫn để review còn thiếu hiển thị. UC-11 — Quyên góp với tư cách công dân/khách: pledge tùy chọn, khai báo bàn giao thực tế, theo dõi riêng, giao từng phần và retry an toàn. UC-12 — Xác minh biên nhận: kiểm đếm/duyệt/post độc lập; giữ bất đồng với người quyên góp và các lần sửa. UC-13 — Phân phối cứu trợ: xuất có duyệt độc lập, xác nhận bên nhận, phát cuối và trả/mất một phần. UC-14 — Đối soát kiểm kê: snapshot/đếm/duyệt bền vững và điều chỉnh bù trừ. Các UC này mở rộng Mục 9; tạo schema OpenAPI/ràng buộc migration chính xác trước khi triển khai từng lát.
 
-- Job: PENDING → RUNNING → SUCCEEDED hoặc ABSTAINED; lỗi có thể thử lại → RETRY_WAIT → RUNNING; hết lượt thử/lỗi vĩnh viễn → FAILED. Khi tắt tính năng, hủy job chưa nhận; kết quả đang chạy bị bỏ qua hoặc giữ trong lịch sử đã tắt, không bao giờ áp dụng.
-- Recommendation: PENDING_REVIEW → ACCEPTED, OVERRIDDEN hoặc DISMISSED. Thay đổi đầu vào làm recommendation chưa rà soát thành STALE. Hết hạn là một chốt độ mới bổ sung, thời lượng vẫn cần thống nhất. Kết quả đã rà soát vẫn là lịch sử, không gắn nhãn lại thành hiện hành.
+### 25.10. Chỉ dùng AI khi có lý do
 
-Dùng revision đầu vào riêng cho dữ kiện sự cố ảnh hưởng phân tích; không làm gợi ý thành cũ chỉ vì thông báo được đánh dấu đã đọc. Mỗi lần cập nhật dữ kiện liên quan tạo snapshot/revision mới và khiến kết quả chưa rà soát cũ không còn đủ điều kiện chấp nhận. Lệnh rà soát cũng kiểm tra phiên bản yêu cầu hiện tại để phát hiện cập nhật cạnh tranh của con người.
+**Đối soát và phân phối cốt lõi không cần AI.** So sánh đơn vị chính xác, bảo toàn số liệu SQL, FEFO, kiểm tra phạm vi/actor và quy tắc custody quá hạn đều tái lập được. Số học khớp không chứng minh số đếm trung thực; bằng chứng vật lý và rà soát độc lập mới là kiểm soát.
 
-Giữ riêng dữ kiện công dân báo, dữ kiện điều phối viên xác minh và gợi ý trích xuất của mô hình, kèm revision đầu vào/nguồn cùng xuất xứ reported/inferred. Nhận định trích xuất không bao giờ ghi đè dữ kiện đã xác minh hoặc số người/vị trí có thẩm quyền trên yêu cầu. Tổng số còn thiếu vẫn là null trong kết quả trích xuất; điều này không nới lỏng yêu cầu phải có số người hợp lệ khi tạo SOS. Nhóm dễ tổn thương có thể chồng lấp, nên không được cộng số đếm nhóm để suy ra tổng người. Phủ định, mâu thuẫn và suy luận không có căn cứ tạo chỉ dấu thiếu/mâu thuẫn và, khi dữ kiện trọng yếu chưa đủ, dẫn đến abstention. Sửa dữ kiện tạo revision/snapshot mới; kết quả lịch sử giữ bất biến.
+FR-AI-07 tùy chọn điền trước mặt hàng/đơn vị/số lượng từ ảnh ghi chú sau khi luồng thủ công hoạt động. Đánh giá tài liệu tiếng Việt đại diện trên tập giữ lại so với nhập thủ công: độ đúng từng trường, lỗi nghiêm trọng về số lượng/đơn vị và thời gian sửa. Chỉ bật nếu đo được lợi ích thời gian và bắt buộc rà soát mọi trường trọng yếu; nếu chưa thì giữ thao tác thủ công. Nhận diện mã QR/vạch là phần mềm thông thường, không phải AI.
 
-Độ mới còn phụ thuộc thời gian và ngữ cảnh bên ngoài. Nếu dùng thời gian chờ, ghi nguồn gốc là thời điểm bắt đầu trên server của chu kỳ hiện tại (lần nhận đầu hoặc mở lại có audit), `evaluated_at` và thời hạn hết hiệu lực tại ranh giới policy liên quan kế tiếp hoặc tuổi kết quả tối đa đã cấu hình, lấy thời điểm nào đến trước. Thời điểm nhận ban đầu không được làm cũ chu kỳ đã mở lại. Nếu dùng feature hiểm họa, tính cục bộ trong Response từ geometry tổng hợp/thủ công được cấp quyền, kèm nguồn, phiên bản và hiệu lực; nhà cung cấp chỉ nhận nhóm dữ liệu đã giảm thiểu thay vì GPS chính xác. Dữ liệu hiểm họa thiếu/cũ vẫn là chưa biết. Bước rà soát kiểm tra work_cycle, hạn dùng và phiên bản hiểm họa/ngữ cảnh hiện tại kể cả khi input_revision chưa đổi. Đánh giá lại tạo snapshot/job ngữ cảnh bất biến mới; ngữ cảnh tương đương không đổi vẫn được khử trùng lặp bằng time bucket của policy cùng phiên bản hiểm họa/ngữ cảnh, không dùng một thời điểm đồng hồ khác nhau cho mỗi lần retry. Ghi nhận cấu hình hết hạn/đánh giá lại thực tế trước khi bật policy liên quan.
+Nếu có căn cứ, dùng job/worker bất biến do Logistics sở hữu cùng mẫu kiểm tra độ mới/lỗi có giới hạn ở Mục 12; không truy cập bảng AI do Response sở hữu, không thêm dịch vụ hay Python. Tài liệu là dữ liệu không đáng tin; giảm thiểu/che PII, xác thực schema đầu ra, gắn gợi ý với bằng chứng, vô hiệu gợi ý cũ và yêu cầu con người xác nhận. Chưa chọn nhà cung cấp; không tự upload ra ngoài. Đầu ra bằng tiếng Việt. AI không được phê duyệt, đổi tồn kho, quyết định điều kiện, phân bổ/điều động hàng hay cáo buộc ai. Không có chấm điểm gian lận/dự báo đã học nếu thiếu dữ liệu/đánh giá phù hợp. Nhà cung cấp lỗi thì mọi luồng cốt lõi vẫn dùng được.
 
-Đầu vào dùng dữ kiện có cấu trúc đã biết và giá trị null/chưa rõ tường minh: nhóm sự cố, nhu cầu khai báo, số người, thời gian sự cố/ghi nhận và cờ vận hành đã xác nhận từ taxonomy thống nhất. Mặc định loại GPS chính xác, định danh/số điện thoại người báo, tracking secret/token, URL ký số, ảnh, ghi chú ContactAttempt và AuthorityReferral. Cờ nguy hiểm do người báo tin khai báo (Mục 8.1) chỉ có thể được đưa vào như dữ kiện reported, chưa xác minh, kèm nguồn gốc; nó không được tính là xác minh và tự nó không đổi trạng thái xác minh, thứ tự hàng đợi hay mức ưu tiên. Nếu có lý do dùng vị trí thô, ghi rõ lý do và đánh giá thiên lệch vùng miền. Chưa biết không đồng nghĩa sai hoặc bằng 0; chỉ riêng số người không phải chính sách xác định mức khẩn cấp.
+### 25.11. Chấp nhận dự kiến và thứ tự triển khai
 
-Phong bì kết quả minh họa, **không phải quy tắc lâm sàng hay chính sách phân loại có thể thực thi**:
+Các ca dưới đây là dự kiến, chưa phải kiểm thử sản phẩm đã thực hiện.
 
-```json
-{
-  "recommendation_id": "uuid",
-  "request_id": "uuid",
-  "input_revision": 3,
-  "feature_schema_version": 1,
-  "advisor_kind": "rules",
-  "advisor_version": "rules-v1",
-  "policy_version": "draft-policy-v1",
-  "outcome": "SUGGESTION",
-  "suggested_priority": "P2",
-  "reason_codes": ["REVIEWED_RULE_MATCH"],
-  "missing_fields": [],
-  "confidence": null,
-  "confidence_kind": "NOT_APPLICABLE",
-  "generated_at": "2026-09-29T10:30:00Z"
-}
-```
+| Test | Yêu cầu | Bằng chứng mong đợi |
+|---|---|---|
+| TC-DON-01 | FR-DON-01 | Quản lý theo phạm vi mở/đóng; từ chối thao tác xuyên kho; rà soát đang chờ vẫn hiển thị |
+| TC-DON-02 | FR-DON-02 | Quyên góp công dân/khách/walk-in/một phần; retry sau mất phản hồi chỉ tạo một bản ghi, không phụ thuộc Identity |
+| TC-DON-03 | FR-DON-03 | Pledge 100, bàn giao 60, đếm 58, chấp nhận 55/từ chối 3: thiếu pledge 40, chênh kiểm đếm -2, từ chối 3 hiển thị riêng |
+| TC-DON-04 | FR-DON-04 | Tất cả người kiểm đếm bị từ chối tự rà soát; tồn kho accepted được ghi một lần; hàng held không khả dụng |
+| TC-DON-05 | FR-DON-03/04 | Khai báo/kiểm đếm thay đổi làm mất phê duyệt; retry phê duyệt/post cạnh tranh chỉ cộng tồn một lần |
+| TC-DON-06 | FR-DON-05 | Bất đồng người quyên góp còn hiển thị sau override rà soát có lý do; im lặng không biến thành đồng ý |
+| TC-DON-07 | FR-DON-02/05 | QR biên nhận/secret người khác/secret SOS bị từ chối; claim thu hồi capability khách; khôi phục không làm lộ hồ sơ riêng |
+| TC-DON-08 | FR-DON-06 | Điều chuyển/trả một phần giữ nguồn biên nhận; tổng phân bổ movement bằng balance nguồn/tổng |
+| TC-DON-09 | FR-DON-03/06 | Từ chối đơn vị/độ chính xác/quy đổi sai, lô hết hạn/held và thiếu nguồn |
+| TC-DIST-01 | FR-LOG-06 | Duyệt độc lập có version; chỉnh sửa làm mất hiệu lực; cả hai luồng xuất kho chỉ ISSUE đúng một lần |
+| TC-DIST-02 | FR-LOG-06/07 | Xuất 55, điểm nhận 50/mất 5, phát 35/còn 15; không trừ kho lần nữa hoặc nhận nhầm là đã giao cuối |
+| TC-DIST-03 | FR-LOG-07 | Từ chối/chuyển tiếp/trả/mất bảo toàn custody; không tự xác nhận nhận hàng hay bịa việc trả về kho |
+| TC-DIST-04 | FR-LOG-06/07 | Xuất đồng thời tôn trọng seal yêu cầu; need FINAL_RECIPIENT không hoàn tất lúc điểm nhận; need gắn yêu cầu mặc định FINAL_RECIPIENT; RELIEF_POINT cần điểm được nêu tên/lý do; nhân viên không có grant quản lý need không đặt/đổi kind; kind bị đóng băng sau cam kết đầu |
+| TC-REC-01 | FR-REC-01 | Bộ dữ liệu cố định đối soát mọi giai đoạn, không đếm lặp điều chuyển/đặt trước/trả lại |
+| TC-REC-02 | FR-REC-02 | Cửa sổ kiểm đếm chặn thay đổi được chọn; phục hồi/hủy bền vững; snapshot cũ cần đếm lại |
+| TC-REC-03 | FR-REC-02 | Điều chỉnh độc lập giữ lịch sử cùng bất biến không âm/reserved |
+| TC-AI-DON-01 | FR-AI-07 | AI tắt/không khả dụng không bao giờ chặn luồng cốt lõi |
+| TC-AI-DON-02 | FR-AI-07 | OCR sai đơn vị/số lượng, đầu vào cũ hoặc injection không thể phê duyệt/post; cần người xác nhận |
+| TC-AI-DON-03 | FR-AI-07 | Ghi kết quả so sánh độ chính xác/thời gian tiếng Việt trên tập giữ lại trước khi kích hoạt |
 
-Xác thực enum priority/outcome, độ dài, giới hạn mảng, tham chiếu nguồn và trường version. Phản hồi đúng schema vẫn có thể sai sự thật. Với đầu vào không đủ, mâu thuẫn, không được hỗ trợ hoặc ngoài phân bố, trả ABSTAIN với `suggested_priority = null`; chuyển vào hàng đợi người xử lý thông thường. Độ mạnh của khớp quy tắc và mức chắc chắn LLM tự khai không phải xác suất đã hiệu chuẩn.
+Mở rộng TC-L10N-01..03 và kiểm tra tệp/xuất riêng tư cho quyên góp khách, chênh lệch, khiếu nại, bàn giao và OCR tùy chọn. SRS/SDD/ca kiểm thử/hướng dẫn người dùng phải giữ các ID này.
+
+Thứ tự triển khai: hợp đồng/grant/đơn vị → đợt công khai và khai báo → tiếp nhận/post độc lập → phân bổ nguồn cho mọi thay đổi tồn kho hiện hữu → phân phối/custody/handout được duyệt → stocktake/báo cáo → trích xuất tùy chọn đã đánh giá. Không mở tiếp nhận quyên góp công khai trước khi luồng ghi sổ/xuất xứ hoạt động được xác minh. Demo quyên góp khớp và chênh lệch 100/60/58/55, từ chối tự phê duyệt, retry không cộng trùng, handout tại điểm một phần và tổng đối soát. Không bắt buộc AI.
+
+Các cổng triển khai còn lại: schema/ràng buộc chính xác, tiêu chí chất lượng/hạn dùng theo mặt hàng, grant đã phân công, nội dung tiếng Việt đã rà soát và bằng chứng thực thi được cấp quyền. Mặc định demo tổng hợp cho khiếu nại mở đến khi giải quyết và khôi phục truy cập thủ công có audit. Policy pháp lý/vận hành thật, thời hạn phản hồi và hiệu quả chống gian lận production chưa được kế hoạch capstone này xác lập. Các quyết định thiết kế thông thường đã được giao quyền; không mở lại kiến trúc đã chốt.
+
+## Phụ lục A. Bàn giao triển khai và nghiên cứu AI
+
+**Hướng dẫn thực thi khi dùng AI.** Mục 22 cung cấp cơ sở quy trình capstone hiện tại; cần tạo artifact OpenAPI/migration cụ thể và bằng chứng thực hiện cho từng lát.
+
+### A.1. Thứ tự đọc và thẩm quyền quyết định
+
+1. Đọc AGENTS.md ở gốc và mọi hướng dẫn áp dụng cho thư mục.
+2. Đọc [bối cảnh dự án](c48-project-context.md) để nắm phạm vi/phần bàn giao được giao.
+3. Đọc kế hoạch tiếng Anh này, gồm đánh giá framework, thiết kế AI mở rộng ở Mục 12, quyết định lưu trữ ở Mục 6.3, các quyết định còn mở và phụ lục này.
+4. Trước khi viết code, kiểm tra repository thực tế, hợp đồng/migration hiện có và chỉ dẫn mới nhất của người dùng. Không giả định dịch vụ/test dự kiến đã tồn tại.
+
+Cơ sở kỹ thuật hiện tại là NestJS/TypeScript, ba dịch vụ (Identity, Response, Logistics), REST/JSON, TypeORM, PostgreSQL/PostGIS, React/Vite và React Native/Expo. Mục 4 ghi lý do chọn/phương án thay thế. Đề cương dự án xác định phạm vi; lựa chọn công nghệ là quyết định thiết kế, không phải yêu cầu do đề cương áp đặt.
+
+Nginx và ba ranh giới dịch vụ NestJS là cơ sở đang dùng. MinIO AIStor Free là kho đối tượng lab một nút đã chọn; mỗi người vận hành phải tự nhận/dùng theo điều khoản hiện hành, nhóm phải xác minh artifact, truy cập riêng và đường phục hồi. AI vẫn tùy chọn. Quy tắc nghiệp vụ dự thảo, mục tiêu số và policy nhà cung cấp/lưu giữ còn mở ở chỗ được đánh dấu.
+
+Dùng cơ sở đã ghi cho triển khai. Chỉ xem xét lại khi có bằng chứng mới làm thay đổi đáng kể đánh đổi, thay vì liên tục mở lại quyết định đã chốt. Ghi nhận quyết định mới và chỉ hỏi thông tin/ủy quyền thực sự còn thiếu cho phần việc liên quan. Có thể tự xử lý lựa chọn triển khai thông thường, đảo ngược được, bằng giả định đã ghi.
+
+### A.2. Bất biến triển khai
+
+- Mỗi dịch vụ có thông tin xác thực DB và migration riêng; không SQL hay khóa ngoại trực tiếp xuyên dịch vụ.
+- Giữ ID yêu cầu/ca sử dụng/ca kiểm thử nhất quán qua tài liệu, tham chiếu code và bản ghi test.
+- Tách trạng thái ưu tiên, vòng đời yêu cầu, vòng đời nhiệm vụ và trạng thái đáp ứng.
+- Thực thi phạm vi trong queryset và thao tác đối tượng, gồm tệp, export và thông báo.
+- Commit thay đổi nghiệp vụ/audit/notice trong ứng dụng của mỗi dịch vụ một cách nguyên tử; lệnh retry phải idempotent.
+- Giữ ràng buộc tồn kho, movement append-only, giao dịch ngắn, khóa xác định và lệnh idempotent.
+- Áp dụng Mục 25: khai báo không cộng tồn; người rà soát độc lập phê duyệt kiểm đếm; phân bổ nguồn bảo toàn số lượng; điểm nhận không đồng nghĩa phát cuối.
+- Giữ thứ tự tọa độ, nguồn vị trí, độ chính xác, thời gian ghi nhận và thời gian máy chủ nhận.
+- Không gắn nhãn bản nháp ngoại tuyến là đã nhận trước ACK máy chủ.
+- Không biến AI hay projection báo cáo thành quyết định ưu tiên/điều động có thẩm quyền.
+- Không báo kiểm thử dự kiến là đạt hoặc demo một máy là high availability.
+
+### A.3. Cơ sở quyết định và cổng còn lại của từng lát
+
+Mục 22/23 thay thế bản nháp kiến trúc trước: quyền sở hữu ba dịch vụ, tích hợp REST, tổng hợp nhiều nhiệm vụ, mỗi nhiệm vụ một đội, campaign tùy chọn/tiếp tục, xác minh loại trừ lẫn nhau, đáp ứng một phần, hạch toán tồn kho, thu hồi quyền và tính duy nhất của thông báo. Không khôi phục luồng broker nếu không có bằng chứng đáp ứng tiêu chí Mục 4.4.
+
+Trước khi triển khai lát, hoàn tất schema OpenAPI, ràng buộc/chỉ mục migration, ca phân quyền và ca chấp nhận chạy được. Các artifact cụ thể này chưa có trong repository chỉ chứa tài liệu. Định nghĩa ưu tiên, nhà cung cấp bên ngoài, lưu dữ liệu thật và SLA vận hành cần chuyên gia miền rà soát trước khi dùng thật. Có thể tiếp tục các lựa chọn triển khai thông thường, đảo ngược được theo mặc định demo đã ghi.
+
+### A.4. Quy trình cho tác vụ triển khai tương lai
+
+1. Xác định lát được yêu cầu cùng UR/FR, ca sử dụng, chuyển trạng thái và test dự kiến. Tách phần bắt buộc khỏi phạm vi Should/Optional.
+2. Kiểm tra code/hợp đồng hiện có trước khi thêm tệp/phụ thuộc. Dùng Nest guard/pipe, TypeORM migration/giao dịch, ràng buộc PostgreSQL và kiểu TypeScript khi đáp ứng yêu cầu.
+3. Giải quyết quyết định đang chặn lát. Ghi giả định/lý do; không âm thầm chọn policy khách, thời hạn lưu, SLA hay nhà cung cấp ngoài.
+4. Đặc tả ràng buộc/chỉ mục DB, request/response/lỗi API, phân quyền, ranh giới giao dịch, hành vi idempotency và phản hồi khi lỗi.
+5. Triển khai lát end-to-end: migration, logic miền, API, trạng thái client và worker chỉ khi cần. Giữ hạ tầng tốn tài nguyên là tùy chọn trong profile local.
+6. Tuân theo quyền kiểm thử của tác vụ hiện tại. Khi triển khai theo kế hoạch bàn giao đã được duyệt, chạy test tương ứng, ghi chính xác lệnh/kết quả/môi trường và khoảng trống còn lại. Chỉ dịch tài liệu không đồng nghĩa đã chạy test sản phẩm.
+7. Cập nhật truy vết, hướng dẫn setup và hợp đồng thay đổi. Báo cáo riêng phần đã hoàn tất với khuyến nghị/hành vi chưa xác minh.
+
+Dùng trình tự triển khai/cổng chấp nhận ở Mục 16 và 22. Hoàn tất từng lát end-to-end trước khi bổ sung hạ tầng tùy chọn.
+
+### A.5. Quy trình nghiên cứu tiếp theo
+
+- Trước khi cố định phiên bản/nhà cung cấp, kiểm tra lại thông tin có thể thay đổi bằng nguồn chính: tương thích Node/Nest/TypeORM và image PostgreSQL/PostGIS, quyền React Native/Expo, bảo trì/giấy phép kho đối tượng, điều khoản sử dụng bản đồ/nhà cung cấp.
+- Coi kết quả nghiên cứu 2026-09-29 là kết quả có ngày, không phải sự kiện vừa được xác minh. Trang liên kết có phiên bản cụ thể không mặc nhiên là phiên bản runtime được chọn.
+- Ghi câu hỏi, ngày nghiên cứu, URL nguồn chính, phát hiện, ảnh hưởng thiết kế, đánh đổi và điểm còn bỏ ngỏ. Phân biệt dữ kiện có tài liệu với suy luận/khuyến nghị.
+- Giữ kiến trúc được duyệt trừ khi bằng chứng biện minh thay đổi; ghi lý do và xin quyết định cần thiết trước thay đổi trọng yếu.
+- Nghiên cứu AI bắt đầu bằng quy tắc giải thích được và thiết kế đánh giá. Không tuyên bố chính xác phân loại khẩn cấp thực tế từ dữ liệu demo tổng hợp hay gửi PII tới mô hình ngoài khi chưa có căn cứ được duyệt.
+- Quy mô nghiên cứu mới tương xứng với quyết định thực tế. Không thêm hạ tầng chỉ vì có sẵn.
+
+### A.6. Mẫu bàn giao phiên làm việc
+
+Khi sắp hết ngữ cảnh hoặc bàn giao cho AI khác, để lại ghi chú Markdown ngắn gồm:
+
+- Mục tiêu và phạm vi hiện được phép.
+- Tệp đã đổi và commit/branch liên quan nếu có.
+- Việc đã xong/chưa xong và lỗi đã biết.
+- Quyết định/giả định đã chấp nhận và câu hỏi còn mở cùng ID yêu cầu liên quan.
+- Lệnh/kiểm tra thực sự đã chạy, kết quả và kiểm tra chưa chạy.
+- Chi tiết môi trường/phụ thuộc cần để tiếp tục, không gồm secret.
+- Tác vụ cụ thể kế tiếp và chướng ngại thực sự nếu có.
+
+Liên kết tới kế hoạch tiếng Anh và bối cảnh dự án. Không trình bày triển khai dở dang là hoàn tất hay đổi trạng thái policy đề xuất thành policy đã phê duyệt trong ghi chú bàn giao.
