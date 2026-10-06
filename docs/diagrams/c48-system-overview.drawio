@@ -1,0 +1,133 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net" type="device" version="24.7.17">
+  <diagram id="c48-system-overview" name="C48 | System overview — SOS at the center">
+    <mxGraphModel dx="1200" dy="1060" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1060">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="C48 | System overview — SOS at the center" style="text;html=0;fontSize=23;fontStyle=1;align=left;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="40" y="8" width="1120" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="system" value="Emergency Response and Disaster Relief System" style="rounded=0;whiteSpace=wrap;html=0;verticalAlign=top;align=left;spacingLeft=18;spacingTop=12;fontStyle=1;fontSize=17;fillColor=#f8fafc;strokeColor=#64748b;" vertex="1" parent="1">
+          <mxGeometry x="260" y="180" width="680" height="690" as="geometry" />
+        </mxCell>
+        <mxCell id="edge0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=none;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.6424242424242425;exitY=0.4588235294117647;exitPerimeter=0;entryX=0.0;entryY=0.49166666666666664;entryPerimeter=0;" edge="1" parent="1" source="citizen" target="intake">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=none;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.6424242424242425;exitY=0.4588235294117647;exitPerimeter=0;entryX=0.0;entryY=0.5;entryPerimeter=0;" edge="1" parent="1" source="donor" target="relief">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="240" y="689" />
+              <mxPoint x="240" y="590" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=none;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.35625;exitY=0.4588235294117647;exitPerimeter=0;entryX=1.0;entryY=0.5;entryPerimeter=0;" edge="1" parent="1" source="coord" target="verify">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="970" y="324" />
+              <mxPoint x="970" y="330" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=none;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.35625;exitY=0.4588235294117647;exitPerimeter=0;entryX=1.0;entryY=0.5;entryPerimeter=0;" edge="1" parent="1" source="team" target="mission">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="970" y="664" />
+              <mxPoint x="970" y="590" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=none;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.23333333333333334;exitY=1.0;exitPerimeter=0;entryX=0.5;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="ops" target="relief">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="520" y="160" />
+              <mxPoint x="230" y="160" />
+              <mxPoint x="230" y="510" />
+              <mxPoint x="440" y="510" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=1.0;exitY=0.5;exitPerimeter=0;entryX=0.0;entryY=0.5;entryPerimeter=0;" edge="1" parent="1" source="intake" target="verify">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.5;exitY=1.0;exitPerimeter=0;entryX=0.5;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="verify" target="mission">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.21428571428571427;exitY=1.0;exitPerimeter=0;entryX=0.7142857142857143;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="verify" target="relief">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="680" y="460" />
+              <mxPoint x="500" y="460" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=none;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.0;exitY=0.5;exitPerimeter=0;entryX=1.0;entryY=0.5;entryPerimeter=0;" edge="1" parent="1" source="mission" target="relief">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=none;endFill=1;strokeColor=#475569;fontSize=12;exitX=1.0;exitY=0.7916666666666666;exitPerimeter=0;entryX=0.8333333333333334;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="verify" target="authority">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="925" y="365" />
+              <mxPoint x="925" y="900" />
+              <mxPoint x="720" y="900" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="citizen" value="Citizen / remote reporter" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="45" y="290" width="165" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="donor" value="Guest / signed-in donor" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="45" y="650" width="165" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="coord" value="Coordinator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="990" y="285" width="160" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="team" value="Volunteer / military /&#10;government team leader" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="990" y="625" width="160" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="ops" value="Campaign / operations manager" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ffffff;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="450" y="80" width="300" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="authority" value="External local authority&#10;Manual contact / referral" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ffffff;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="420" y="930" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="intake" value="SOS intake&#10;SELF / signed-in PROXY" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#e0f2fe;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="300" y="270" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="verify" value="Verify and coordinate&#10;Priority / balanced team offers" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#e0f2fe;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="620" y="270" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="relief" value="In-kind donation and relief&#10;Count / review / partial delivery" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ecfdf5;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="300" y="530" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="mission" value="Rescue missions&#10;Leader progress / human outcome" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#e0f2fe;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="620" y="530" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="support" value="Scoped accounts • audit • private evidence&#10;Filtered heatmap • timestamped reports" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ffffff;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="330" y="740" width="540" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="note0" value="System boundary contains software capabilities, not an official emergency authority." style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=#ffffff;align=center;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="470" y="1016" width="260" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="note1" value="human assignment" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=#ffffff;align=center;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="630" y="441" width="260" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="note2" value="confirmed needs" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=#ffffff;align=center;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="415" y="431" width="260" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="note3" value="manual referral record" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=#ffffff;align=center;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="705" y="876" width="260" height="24" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -4,14 +4,14 @@
 |---|---|
 | Project | Emergency Response and Disaster Relief Management System |
 | Project code | C48 |
-| Version | 2.8 — defense-review corrections: client-generated SOS tracking secret, verification and unreachable-reporter rules, P1–P4 criteria, seal-protected scope, integrated schedule, cancelled-need accounting; builds on 2.7 donation extension |
-| Initial research / plan revision | 2026-09-29 / 2026-10-04 |
+| Version | 3.1 — diagram semantics review: complete local relationships/keys, actor permissions and state consistency; retains v3.0 supervisor-feedback scope |
+| Initial research / plan revision | 2026-09-29 / 2026-10-06 |
 | Team context | Three members in the project brief; backend owned by one member |
 | Document role | Single technical plan for implementation and further research |
 
 This document provides the proposed technical baseline for the SRS, SDD, database/API design, test cases, and user guide. The three-service architecture and adapted workflows below are C48 design proposals, not requirements imposed by the department or approved rescue policy.
 
-**For implementation and further research:** this is the single technical plan. Appendix A adds execution guidance and remaining slice-specific contract gates. Sections 22 and 23 define the backend structure, business invariants, and resolved architecture-review decisions; Section 25 extends the baseline with in-kind donations, independent receipt verification, source accounting and relief handouts. Section 12 specifies the optional AI decision-support extension; Section 6.3 records the object-storage choice. This plan does not claim implementation benchmarks or executed product tests.
+**For implementation and further research:** this is the single technical plan. Appendix A adds execution guidance and remaining slice-specific contract gates. Sections 22 and 23 define the backend structure, business invariants, and resolved architecture-review decisions; Section 25 defines the reduced in-kind donation and delivery scope. Section 26 records supervisor feedback, unresolved interpretations and new acceptance cases; it governs scope where older detailed examples differ. Section 12 specifies the optional AI decision-support extension; Section 6.3 records the object-storage choice. This plan does not claim implementation benchmarks or executed product tests.
 
 ## 1. Reading guide and confidence levels
 
@@ -23,7 +23,35 @@ This document provides the proposed technical baseline for the SRS, SDD, databas
 
 OCHA/IFRC materials inform humanitarian workflow design; they do not replace rules issued by competent authorities in Vietnam. OCHA describes a cycle covering analysis, planning, resource mobilization, implementation, monitoring/evaluation, and reporting. [OCHA — Humanitarian Programme Cycle](https://knowledge.base.unocha.org/wiki/spaces/hpc/overview)
 
+### 1.1 Revision authority and reading order — 2026-10-06
+
+The user requested revision of **this English plan only**, with clearer diagrams and less warehouse management. The user explicitly confirmed **in-kind donations only; no money collection or payments**. Original project requirements remain recorded in the project context; this revision narrows implementation depth, not the existence of the required resource/distribution workflow.
+
+Read the system overview and container architecture in Section 5, conceptual and logical models in Section 6, actor/use-case diagrams in Section 9, and the feedback decisions in Section 26 before implementation details. Section 16 is the current delivery schedule. Section 25 replaces the previous expanded warehouse extension. Sections 22–24 retain applicable security, state and cross-service safeguards; deferred warehouse examples are not additional Must scope.
+
+| Current scope | Commitment |
+|---|---|
+| Core | SOS intake; signed-in proxy reporting; human verification and duplicate review; scoped authorization; nearby eligible team candidates with workload balance; missions; operational heatmap; campaigns; guest in-kind donations; independent receipt approval; basic stock/partial delivery and reports |
+| Deferred | Future pledges; inter-warehouse transfers; receipt-source allocation across pooled stock; FEFO automation; full stocktakes; multi-leg forwarding and source-level reconciliation; push/offline queues/AI remain conditional |
+| Excluded | Cash, bank transfers, payment gateways, checkout/order/payment flows, procurement, warehouse ERP, autonomous rescue triage/dispatch |
+
+The product emphasizes public donation opportunities and receipt/progress transparency. The ambiguous commerce note is not authority to introduce sales or money collection. Warehouse staff receive, count and issue supplies; campaign managers publish appeals and coordinators decide rescue priorities and allocations.
+
 ## 2. Recommendation summary
+
+### 2.1 Product priorities
+
+| Priority | Planned outcome | Completion gate |
+|---|---|---|
+| 1 | Credible SOS and remote household reporting | Separate reporter/subject data; truthful receipt; human verification and private tracking |
+| 2 | Rescue coordination across team affiliations | Capability/capacity checks, nearby workload comparison, human offer and recorded outcome |
+| 3 | Accessible in-kind campaign contributions | Guest name/phone flow; independent count/review; accepted-stock and delivery evidence |
+| 4 | Operational visibility | Scoped heatmap, grouped queues, partial-need totals and actor/time history |
+| Supporting scope | Basic warehouses/items/types/units, vehicles and points | Only the records/commands required for intake, allocation and delivery |
+
+Section 16 turns these priorities into integrated weekly slices. Section 7 supplies requirement IDs, Sections 8–10 the states/use cases/permissions, and Sections 13/25/26 the planned acceptance evidence. The diagrams in Sections 5/6/9 explain this plan; they do not substitute for these workflow rules.
+
+### 2.2 Technical baseline
 
 | Area | Proposed baseline | Rationale |
 |---|---|---|
@@ -55,16 +83,21 @@ The project context involves information passing through multiple channels and t
 
 These are problem hypotheses, not findings about a particular locality or authority.
 
-### 3.2 Target workflow
+### 3.2 Target workflow — revised product baseline
 
-1. **Intake:** a citizen submits a request with coordinates, accuracy, capture time, and location source. Offline submissions remain pending; only a server acknowledgement (ACK) means received.
-2. **Screening:** validate input, use an idempotency key to prevent duplicate submission, and add the request to the operational queue.
-3. **Verification:** a coordinator contacts the reporter or adds information. Rejection and duplicate linking require a reason and history.
-4. **Prioritization:** a coordinator applies agreed criteria. AI output, if enabled, is supplementary.
-5. **Dispatch:** offer a mission to a suitable team. The team accepts/declines and records travel, arrival, and results.
-6. **Resource allocation:** a coordinator records structured needs in Logistics; one or more warehouses commit contributions. Commitments, physical issue, and confirmed delivery remain separate stages.
-7. **Outcome confirmation:** the team provides results/evidence; a coordinator confirms whether needs are met. Completing one mission does not automatically close a request with remaining needs.
-8. **Monitoring:** each owning service exposes its operational status and reports the time at which its current dashboard data was read.
+1. **Intake:** SELF SOS accepts guest or signed-in reporters. PROXY requires a current signed-in account and separately captures the reporter's phone, relationship and the affected household's pin/headcount/last-known situation. A victim's account or working phone is not required. Device drafts remain pending until a server ACK.
+2. **Screening:** validate bounded inputs/media and idempotent retries. Possible spam, conflicting facts and nearby repeats enter visible review lanes; neither login nor coordinates verify a report. Keep reporter/beneficiary/alternate contacts private.
+3. **Verification:** a scoped coordinator records contact attempts and evidence/source limitations. Remote PROXY needs independent corroboration/evidence or reasoned concurrence from two distinct coordinators. Unreachable victims during power outages are not automatically rejected. Duplicate linking preserves each original and does not merge nearby different households.
+4. **Human priority:** coordinator selects P1–P4 and reason after verification. Priority is separate from lifecycle, declared danger and workload; no automatic AI triage or dispatch.
+5. **Balanced team selection:** compare available, capable volunteer/military/government teams with fresh position and free capacity. Among similarly nearby teams, suggest the one with lighter recent mission burden. Show distance/count/time rather than one opaque score; coordinator chooses and the offer rechecks capacity atomically (Section 26.3).
+6. **Rescue progress:** active team leader accepts/declines and reports travel, arrival, outcome/evidence. A mission is one team serving one request; several teams use separate missions. Completion of one mission does not resolve unmet relief needs.
+7. **Relief allocation:** coordinator states item/quantity/target needs; operations manager approves supply allocation. Intake/warehouse staff handle accepted stock and approved issue. Commit, issue, point receipt and household delivery stay distinct; partial delivery remains visible.
+8. **Human closure:** coordinator reviews current-cycle mission evidence and fulfilled/cancelled needs, obtains the Logistics seal and confirms resolution. No automatic closure from a map, mission completion or shipment.
+9. **Monitoring:** scoped grouped queues and confirmed-request heatmap show time/filters and canonical counts; donations/delivery reports show per-item totals and source timestamps. An unavailable panel does not imply success.
+
+#### 3.2.1 Public in-kind donation flow
+
+Campaign/operations manager publishes a needed-item appeal → guest leaves name/phone and declares actual goods handed over without login → intake staff independently count/inspect → a different reviewer approves exact quantities → accepted stock posts once → approved dispatch and independent handoff → private donor receipt and sanitized campaign progress. This is the second core workflow, supporting rescue and relief; no cash or checkout is planned. Formal warehouse transfers, pooled receipt-source allocation and stocktakes are deferred.
 
 ### 3.3 Patterns adapted for C48
 
@@ -157,34 +190,47 @@ Each selected service has its own application boundary and database credentials;
 
 ## 5. Proposed architecture
 
-### 5.1 Diagram
+### 5.1 System overview and container architecture
+
+![System overview](diagrams/c48-system-overview.svg)
+
+[Editable overview](diagrams/c48-system-overview.drawio). The square central system groups intake, verification/coordination, rescue and relief. People and external authorities sit outside its boundary. Connections represent participation; they do not imply that a household or external authority has an account.
+
+![Container architecture](diagrams/c48-container-architecture.svg)
+
+[Editable container architecture](diagrams/c48-container-architecture.drawio). Response occupies the middle; supporting Identity and Logistics have separate data stores. The Mermaid equivalent below remains editable in this plan.
 
 ```mermaid
-flowchart LR
-  Clients[Web and mobile clients]
-  Proxy[Nginx reverse proxy]
-  Identity[Identity API]
-  Response[Response API + optional job worker]
-  Logistics[Logistics API]
-  DB[(PostgreSQL + PostGIS<br/>separate database/user per service)]
-  S3[(Private S3-compatible object storage)]
-  Load[k6 HTTP virtual users]
-
-  Clients --> Proxy
+flowchart TB
+  Web[Web: public donation pages and scoped operations]
+  Mobile[Mobile: citizen reports and team missions]
+  Proxy[Nginx: public API boundary]
+  subgraph Applications[Three independently deployable NestJS services]
+    direction LR
+    Identity[Identity: accounts and scoped grants]
+    Response[Response: SOS, verification, teams, missions, campaigns]
+    Logistics[Logistics: in-kind intake, basic stock and delivery]
+    Identity <-->|current grants| Response
+    Response <-->|request and fulfillment contracts| Logistics
+    Logistics -->|current grants| Identity
+  end
+  IDB[(Identity database)]
+  RDB[(Response database + PostGIS)]
+  LDB[(Logistics database)]
+  Files[(Private MinIO AIStor Free)]
+  Web --> Proxy
+  Mobile --> Proxy
   Proxy --> Identity
   Proxy --> Response
   Proxy --> Logistics
-  Identity --> DB
-  Response --> DB
-  Logistics --> DB
-  Response --> S3
-  Logistics --> S3
-  Response <-->|REST contract| Identity
-  Logistics <-->|REST contract when needed| Response
-  Load --> Proxy
+  Identity --> IDB
+  Response --> RDB
+  Logistics --> LDB
+  Response --> Files
+  Logistics --> Files
 ```
 
-All three services can run as containers on one demo host. A shared PostgreSQL server is acceptable for the demo, while each service uses its own database and credentials. No service can query another service's tables. k6 generates HTTP requests to the API; it is not part of the runtime architecture.
+Response is the central emergency workflow owner. Each database has separate credentials even on one PostgreSQL host. REST calls cross ownership boundaries; no cross-service table access or foreign keys. Guest SOS and guest donations work without Identity. Authenticated staff operations use current-session checks. Optional AI is a Response worker, not another domain service. k6 is test tooling, outside the runtime architecture.
 
 ### 5.2 Boundaries and data ownership
 
@@ -192,7 +238,7 @@ All three services can run as containers on one demo host. A shared PostgreSQL s
 |---|---|---|
 | **Identity** | Accounts, credentials, organizations, memberships, scoped role grants, refresh sessions | Registration/login/session, user/role administration |
 | **Response** | Campaigns, assistance requests and their incident categories, verification and priority history, teams, missions/progress, request evidence, request timeline | Intake, verification, duplicate review, triage, assignment, mission actions, scoped map/queue |
-| **Logistics** | Item catalog, warehouses, stock balances/ledger, relief needs and commitments linked by opaque request ID, transfers, vehicles, relief points, distribution records | Receipts/issues/transfers, partial commitments and fulfillment, stock and outstanding-need views |
+| **Logistics** | Item/type/unit catalog, intake sites/basic stock, drives/declarations/receipts/reviews, opaque request-linked needs/commitments, vehicles, points and distributions | Guest in-kind intake, independently approved receipts, stock/issues, partial fulfillment and basic reconciliation; transfers/source batches/stocktakes deferred |
 
 Boundary rules:
 
@@ -223,126 +269,237 @@ This is the main workflow adaptation from Sahana ShaRe's partial commitments and
 
 ## 6. Data model and integrity
 
-### 6.1 Logical ERD by service
+### 6.1 Conceptual ERD and modeling levels
+
+![Conceptual ERD](diagrams/c48-conceptual-erd.svg)
+
+[Editable conceptual ERD](diagrams/c48-conceptual-erd.drawio). This model shows business concepts and cardinalities, without database keys or service prefixes. The SOS/Assistance Request is central. A Reporter is distinct from the Affected Household; a Donor need not have an account. A Campaign may exist without SOS reports and an SOS may exist without a campaign. A Donation Drive is a collection appeal, not a rescue mission or a sales order.
+
+| Level | Purpose | Included here |
+|---|---|---|
+| Conceptual | Explain people, business objects and their relationships | Central overview and conceptual ERD; no SQL types, locks or credentials |
+| Logical | Define entities, keys, cardinalities and ownership | Separate ERDs below; association tables and local foreign keys; explicit opaque-reference register |
+| Physical | Implement storage constraints, indexes and migrations | Future per-slice artifacts; not claimed as a completed schema by this plan |
+
+Conceptual Reporter and Donor represent participant roles: one person may make several reports/handover declarations. Implementation stores their contact snapshots on each report/donation rather than maintaining global person registries. The Affected Household is a request-scoped subject snapshot, with exactly one subject per SOS; similar snapshots are not presumed to identify the same household. A household may be reported repeatedly, but identity is not deduced from phone/location. Detailed audit, upload, notification and idempotency columns follow Sections 6.3, 10 and 22; they are omitted from overview pictures to keep them legible.
+
+#### 6.1.1 Identity — local relationships
 
 ```mermaid
 erDiagram
-  IDENTITY_USER ||--o{ IDENTITY_ROLE_GRANT : receives
-  IDENTITY_ORGANIZATION ||--o{ IDENTITY_MEMBERSHIP : has
-  IDENTITY_USER ||--o{ IDENTITY_MEMBERSHIP : joins
-  RESPONSE_CAMPAIGN |o--o{ RESPONSE_REQUEST : groups
-  RESPONSE_REQUEST ||--o{ RESPONSE_REQUEST_EVENT : records
-  LOGISTICS_FULFILLMENT_CYCLE ||--o{ LOGISTICS_RELIEF_NEED : guards
-  RESPONSE_REQUEST ||--o{ RESPONSE_MISSION : dispatches
-  RESPONSE_TEAM ||--o{ RESPONSE_TEAM_MEMBER : has
-  RESPONSE_TEAM ||--o{ RESPONSE_MISSION : receives
-  RESPONSE_REQUEST ||--o{ RESPONSE_EVIDENCE : includes
-  LOGISTICS_WAREHOUSE ||--o{ LOGISTICS_STOCK_BALANCE : stores
-  LOGISTICS_ITEM ||--o{ LOGISTICS_STOCK_BALANCE : counts
-  LOGISTICS_STOCK_BALANCE ||--o{ LOGISTICS_STOCK_MOVEMENT : changes
-  LOGISTICS_RELIEF_NEED ||--o{ LOGISTICS_COMMITMENT : fulfilled_by
-  LOGISTICS_WAREHOUSE ||--o{ LOGISTICS_COMMITMENT : supplies
-  LOGISTICS_TRANSFER ||--o{ LOGISTICS_TRANSFER_LINE : moves
-  LOGISTICS_DISTRIBUTION ||--o{ LOGISTICS_DISTRIBUTION_LINE : issues
-  RESPONSE_REQUEST ||--o{ RESPONSE_RESOLUTION_INTENT : guards
-  LOGISTICS_COMMITMENT ||--o{ LOGISTICS_ISSUED_LINE_SETTLEMENT : settles
-  LOGISTICS_TRANSFER_LINE ||--o{ LOGISTICS_TRANSFER_TRANSIT_LINE : tracks
-
-  IDENTITY_USER {
+  ORGANIZATION ||..o{ MEMBERSHIP : contains
+  USER ||..o{ MEMBERSHIP : joins
+  ORGANIZATION |o..o{ ROLE_GRANT : scopes
+  USER ||..o{ ROLE_GRANT : receives
+  ROLE ||..o{ ROLE_GRANT : grants
+  ROLE ||--o{ ROLE_PERMISSION : contains
+  PERMISSION ||--o{ ROLE_PERMISSION : enables
+  USER ||..o{ REFRESH_SESSION : opens
+  USER {
     uuid id PK
     string username UK
+    string password_hash
     string status
   }
-  IDENTITY_ROLE_GRANT {
+  ORGANIZATION {
     uuid id PK
-    uuid user_id
-    string role
-    string scope_type
-    uuid scope_id
+    string name
+    string organization_kind
+    string status
   }
-  RESPONSE_REQUEST {
+  MEMBERSHIP {
     uuid id PK
+    uuid user_id FK
+    uuid organization_id FK
+    string status
+  }
+  ROLE_GRANT {
+    uuid id PK
+    uuid user_id FK
+    uuid role_id FK
+    uuid parent_organization_id FK
+    string scope_type
+    string scope_reference
+  }
+  ROLE_PERMISSION {
+    uuid role_id PK, FK
+    uuid permission_id PK, FK
+  }
+  ROLE {
+    uuid id PK
+    string code UK
+  }
+  PERMISSION {
+    uuid id PK
+    string code UK
+  }
+  REFRESH_SESSION {
+    uuid id PK
+    uuid user_id FK
+    string token_hash
+    datetime absolute_expires_at
+    datetime revoked_at
+  }
+  REGION {
+    string code PK
+    string name
+    string status
+  }
+```
+
+Solid ERD edges identify children whose PK contains the parent FK; dotted edges are non-identifying. Min/max cardinality is independent of that line style. Nullable attributes and conditional guards are stated below; an FK marker alone does not mean NOT NULL. ROLE and PERMISSION have unique codes; fixed seeds suffice for the demo. REGION is a controlled Identity catalog. REFRESH_SESSION has a local user FK and rotation/revocation fields. Region/campaign scope references are validated against the owning catalog/API; a campaign scope is never a cross-service FK. Nullable organization on a grant is allowed only for explicitly permitted SYSTEM actions. A government body can be represented by ORGANIZATION.organization_kind; this does not grant official authority or require government integration.
+
+#### 6.1.2 Response — reports, verification and rescue
+
+```mermaid
+erDiagram
+  CAMPAIGN |o..o{ ASSISTANCE_REQUEST : groups
+  INCIDENT_CATEGORY ||..o{ ASSISTANCE_REQUEST : classifies
+  ASSISTANCE_REQUEST ||--|| REQUEST_SUBJECT : describes
+  ASSISTANCE_REQUEST ||..o{ CONTACT_ATTEMPT : records
+  ASSISTANCE_REQUEST ||..o{ VERIFICATION_DECISION : preserves
+  ASSISTANCE_REQUEST ||..o{ REQUEST_EVENT : records
+  ASSISTANCE_REQUEST ||..o{ AUTHORITY_REFERRAL : refers
+  ASSISTANCE_REQUEST ||..o{ RESOLUTION_INTENT : guards
+  ASSISTANCE_REQUEST ||..o{ MISSION : receives
+  ASSISTANCE_REQUEST |o..o{ EVIDENCE_METADATA : request_evidence
+  MISSION |o..o{ EVIDENCE_METADATA : mission_evidence
+  ASSISTANCE_REQUEST |o..o{ ASSISTANCE_REQUEST : canonical_for
+  RESCUE_TEAM ||--o{ TEAM_MEMBER : contains
+  RESCUE_TEAM ||--o{ TEAM_SKILL : has
+  SKILL ||--o{ TEAM_SKILL : qualifies
+  RESCUE_TEAM ||--o| TEAM_POSITION : reports
+  RESCUE_TEAM ||..o{ MISSION : executes
+  ASSISTANCE_REQUEST {
+    uuid id PK
+    uuid campaign_id FK
+    uuid incident_category_id FK
+    uuid canonical_request_id FK
+    uuid reporter_user_id
+    string reporter_name
+    string reporter_contact_phone
+    string report_mode
+    string tracking_secret_hash
     uuid organization_id
     string region_code
-    int work_cycle
-    int version
-    uuid campaign_id
-    uuid reporter_user_id
-    string tracking_secret_hash
     string status
     string priority
-    string priority_basis
     boolean reporter_declared_danger
-    string verification_basis
-    geography location
-    datetime location_captured_at
-    float location_accuracy_m
-    string location_source
-    int people_affected
-    string contact_phone
-    datetime created_at
+    int work_cycle
+    int version
+    datetime received_at
   }
-  RESPONSE_MISSION {
+  REQUEST_SUBJECT {
+    uuid request_id PK, FK
+    string household_reference_note
+    string reporter_relationship
+    string beneficiary_contact_phone
+    string alternate_contact_name
+    string alternate_contact_phone
+    int people_affected
+    geography location
+    string location_source
+    decimal location_accuracy_m
+    datetime location_captured_at
+    datetime last_known_situation_at
+    string information_source
+    string contactability
+  }
+  CONTACT_ATTEMPT {
     uuid id PK
-    uuid request_id
+    uuid request_id FK
+    uuid actor_user_id
+    string contact_target
+    string outcome
+    datetime attempted_at
+  }
+  VERIFICATION_DECISION {
+    uuid id PK
+    uuid request_id FK
+    string outcome
+    string basis
+    uuid reviewer_user_id
+    uuid concurring_user_id
+    string reason
+    int input_revision
+    datetime decided_at
+  }
+  RESCUE_TEAM {
+    uuid id PK
+    uuid organization_id
+    string operating_region_code
+    string name
+    string availability
+    string team_kind
+    int capacity
+  }
+  TEAM_MEMBER {
+    uuid team_id PK, FK
+    uuid user_id PK
+    string member_role
+    string status
+  }
+  TEAM_POSITION {
+    uuid team_id PK, FK
+    geography location
+    decimal accuracy_m
+    datetime captured_at
+    string source
+  }
+  MISSION {
+    uuid id PK
+    uuid request_id FK
+    uuid team_id FK
     int work_cycle
     string status
     uuid coordinator_user_id
-    uuid team_id
-    datetime created_at
-  }
-  LOGISTICS_STOCK_BALANCE {
-    uuid id PK
-    uuid warehouse_id
-    uuid item_id
-    decimal on_hand
-    decimal reserved
-  }
-  LOGISTICS_STOCK_MOVEMENT {
-    uuid id PK
-    uuid balance_id
-    string movement_type
-    decimal quantity
-    uuid actor_user_id
-    datetime occurred_at
-  }
-  LOGISTICS_FULFILLMENT_CYCLE {
-    uuid id PK
-    uuid request_id
-    int work_cycle
-    string state
     int version
-    uuid seal_id
-    uuid intent_id
   }
-  LOGISTICS_RELIEF_NEED {
+  CAMPAIGN {
     uuid id PK
-    uuid request_id
-    uuid campaign_id
     uuid organization_id
     string region_code
-    int work_cycle
-    uuid item_id
-    decimal requested_quantity
-    string unit
+    string name
+    string objective
+    string status
+    datetime starts_at
+    datetime ends_at
+    int version
+  }
+  INCIDENT_CATEGORY {
+    uuid id PK
+    string code UK
+    string name
     string status
   }
-  LOGISTICS_COMMITMENT {
+  SKILL {
     uuid id PK
-    uuid relief_need_id
-    uuid warehouse_id
-    decimal quantity
-    decimal released_quantity
-    decimal issued_quantity
-    decimal delivered_quantity
-    decimal returned_quantity
-    decimal lost_quantity
-    string status
-    datetime created_at
+    string code UK
+    string name
   }
-  RESPONSE_RESOLUTION_INTENT {
+  TEAM_SKILL {
+    uuid team_id PK, FK
+    uuid skill_id PK, FK
+  }
+  REQUEST_EVENT {
     uuid id PK
-    uuid request_id
+    uuid request_id FK
+    uuid actor_user_id
+    string event_type
+    string reason
+    datetime occurred_at
+  }
+  AUTHORITY_REFERRAL {
+    uuid id PK
+    uuid request_id FK
+    uuid actor_user_id
+    string referred_body
+    string note
+    datetime referred_at
+  }
+  RESOLUTION_INTENT {
+    uuid id PK
+    uuid request_id FK
     int work_cycle
     string kind
     string state
@@ -350,35 +507,301 @@ erDiagram
     int expected_request_version
     string previous_state
   }
-  LOGISTICS_ISSUED_LINE_SETTLEMENT {
+  EVIDENCE_METADATA {
     uuid id PK
-    uuid commitment_id
+    uuid request_id FK
+    uuid mission_id FK
+    string object_key UK
+    string state
+    string detected_mime
+    bigint size_bytes
+    string checksum
+    uuid uploader_user_id
+    datetime created_at
+  }
+```
+
+Campaign/category tables have local keys and stable codes where appropriate. TEAM_SKILL has `(team_id, skill_id)` as its primary key. REQUEST_EVENT, AUTHORITY_REFERRAL and RESOLUTION_INTENT have local request FKs plus actor/time/reason; intent fields and uniqueness follow Section 23.2. VERIFICATION_DECISION stores immutable outcomes; the request projection stores the current verification basis. Evidence metadata links to exactly one local request or mission with an XOR constraint; never invent a polymorphic SQL FK. Optional AI entities remain in Section 12.
+
+Every request has one subject snapshot created atomically with intake. SELF and PROXY reports use the affected location, never the remote reporter's GPS. `reporter_user_id` is nullable for guest SELF and required for PROXY after current-session authorization. `report_mode` is SELF or PROXY. Existing top-level API `contact_phone`, `location`, `people_affected` and capture fields retain their meaning: reporter contact and affected-subject facts; DTO mapping writes them to the corresponding request/subject entities. Final nested payload choices must not silently change these meanings. Subject contact fields are optional when power/connectivity is unavailable. Contact attempts identify REPORTER, BENEFICIARY, ALTERNATE or AUTHORITY, without implying that any of those people has an account. `canonical_request_id` is optional; a canonical request can have many duplicates, but a duplicate can target only one canonical record, with no chain/cycle (UC-02).
+
+#### 6.1.3 Logistics — public donations and verified intake
+
+```mermaid
+erDiagram
+  WAREHOUSE ||..o{ DONATION_DRIVE : intake_site
+  DONATION_DRIVE ||--o{ DRIVE_ITEM : requests
+  ITEM ||--o{ DRIVE_ITEM : identifies
+  ITEM_TYPE ||..o{ ITEM : classifies
+  UNIT ||..o{ ITEM : measures
+  DONATION_DRIVE ||..o{ DONATION_DELIVERY : receives
+  DONATION_DELIVERY ||..|{ DONATION_LINE : declares
+  ITEM ||..o{ DONATION_LINE : identifies
+  DONATION_DELIVERY ||..o| DONATION_RECEIPT : inspected_by
+  DONATION_RECEIPT ||..|{ RECEIPT_LINE : counts
+  DONATION_LINE ||..o| RECEIPT_LINE : compared_with
+  DONATION_RECEIPT ||..o{ RECEIPT_REVIEW : reviewed_by
+  DONATION_DELIVERY ||..o{ DONATION_DISPUTE : questioned_by
+  DONATION_RECEIPT |o..o{ DONATION_DISPUTE : reviewed_dispute
+  WAREHOUSE ||..o{ DONATION_RECEIPT : receives
+  WAREHOUSE ||..o{ STOCK_BALANCE : holds
+  ITEM ||..o{ STOCK_BALANCE : balances
+  STOCK_BALANCE ||..o{ STOCK_MOVEMENT : changes
+  RECEIPT_LINE |o..o{ STOCK_MOVEMENT : receipt_source
+  DONATION_DRIVE {
+    uuid id PK
+    uuid campaign_id
+    uuid organization_id
+    uuid intake_warehouse_id FK
+    string title
+    string status
+    datetime opens_at
+    datetime closes_at
+  }
+  ITEM {
+    uuid id PK
+    uuid item_type_id FK
+    uuid unit_id FK
+    string name
+    int quantity_scale
+    string acceptance_criteria
+    string status
+  }
+  DONATION_DELIVERY {
+    uuid id PK
+    uuid drive_id FK
+    uuid donor_user_id
+    string donor_name
+    string donor_phone
+    string capability_hash
+    string status
+    int version
+  }
+  DONATION_LINE {
+    uuid id PK
+    uuid delivery_id FK
+    uuid item_id FK
+    decimal declared_quantity
+    int declaration_revision
+  }
+  RECEIPT_LINE {
+    uuid id PK
+    uuid receipt_id FK
+    uuid donation_line_id FK, UK
+    decimal counted_quantity
+    decimal accepted_quantity
+    decimal held_quantity
+    decimal rejected_quantity
+    int count_revision
+  }
+  STOCK_BALANCE {
+    uuid id PK
+    uuid warehouse_id FK
+    uuid item_id FK
+    decimal on_hand
+    decimal reserved
+  }
+  STOCK_MOVEMENT {
+    uuid id PK
+    uuid balance_id FK
+    uuid receipt_line_id FK
+    string movement_type
+    decimal quantity
+    uuid actor_user_id
+    datetime occurred_at
+  }
+  ITEM_TYPE {
+    uuid id PK
+    string code UK
+    string display_name
+  }
+  UNIT {
+    uuid id PK
+    string code UK
+    string display_name
+  }
+  DRIVE_ITEM {
+    uuid drive_id PK, FK
+    uuid item_id PK, FK
+    decimal target_quantity
+  }
+  WAREHOUSE {
+    uuid id PK
+    uuid organization_id
+    string region_code
+    string name
+    geography location
+    string status
+  }
+  DONATION_RECEIPT {
+    uuid id PK
+    uuid delivery_id FK, UK
+    uuid warehouse_id FK
+    string status
+    int version
+  }
+  RECEIPT_REVIEW {
+    uuid id PK
+    uuid receipt_id FK
+    uuid reviewer_user_id
+    int declaration_revision
+    int count_revision
+    string decision
+    string reason
+    datetime reviewed_at
+  }
+  DONATION_DISPUTE {
+    uuid id PK
+    uuid delivery_id FK
+    uuid receipt_id FK
+    string status
+    string reason
+    datetime opened_at
+  }
+```
+
+ITEM_TYPE and UNIT have unique codes and Vietnamese display labels (e.g. food/water/medical/shelter/hygiene; kg/litre/piece). They classify goods, not incident severity or donation/payment kinds. DRIVE_ITEM is unique on `(drive_id, item_id)` with target quantity. One delivery has one current receipt aggregate, count/declaration revisions are immutable history, and receipt reviews reference exact revisions. A receipt line references a donation line from the same delivery and canonical item; Initial posting is unique per receipt line, not merely per revision. After posting, any changed count/acceptance uses a separately authorized compensating movement; replaying a newer revision cannot credit the full quantity again. Held goods accepted later post only the reviewed additional quantity with a unique operation reference. Non-donation opening balances have explicit opening records rather than fabricated donor receipts. Independent receipt review and exactly-once posting are core; source-batch allocation after pooling is deferred.
+
+#### 6.1.4 Logistics — minimal fulfillment and handoff
+
+```mermaid
+erDiagram
+  FULFILLMENT_CYCLE ||..o{ RELIEF_NEED : protects
+  ITEM ||..o{ RELIEF_NEED : specifies
+  RELIEF_POINT |o..o{ RELIEF_NEED : designated_target
+  RELIEF_NEED ||..o{ COMMITMENT : receives
+  WAREHOUSE ||..o{ COMMITMENT : supplies
+  COMMITMENT ||..o{ ISSUED_LINE_SETTLEMENT : settles
+  DISTRIBUTION ||..|{ DISTRIBUTION_LINE : lists
+  ITEM ||..o{ DISTRIBUTION_LINE : specifies
+  COMMITMENT |o..o{ DISTRIBUTION_LINE : references
+  WAREHOUSE ||..o{ DISTRIBUTION : dispatches
+  RELIEF_POINT |o..o{ DISTRIBUTION : receives
+  VEHICLE |o..o{ DISTRIBUTION : carries
+  DISTRIBUTION ||..o{ HANDOFF_RECORD : confirms
+  DISTRIBUTION_LINE ||..o{ HANDOFF_LINE : quantifies
+  HANDOFF_RECORD ||..|{ HANDOFF_LINE : contains
+  HANDOFF_LINE |o..o{ ISSUED_LINE_SETTLEMENT : delivery_evidence
+  FULFILLMENT_CYCLE {
+    uuid id PK
+    uuid request_id
+    int work_cycle
+    string state
+    uuid seal_id
+    uuid intent_id
+    int version
+  }
+  RELIEF_NEED {
+    uuid id PK
+    uuid cycle_id FK
+    uuid item_id FK
+    uuid campaign_id
+    decimal requested_quantity
+    string delivery_target_kind
+    uuid designated_point_id FK
+    string status
+    int version
+  }
+  COMMITMENT {
+    uuid id PK
+    uuid relief_need_id FK
+    uuid warehouse_id FK
+    decimal quantity
+    decimal released_quantity
+    decimal issued_quantity
+    decimal delivered_quantity
+    decimal returned_quantity
+    decimal lost_quantity
+  }
+  DISTRIBUTION_LINE {
+    uuid id PK
+    uuid distribution_id FK
+    uuid item_id FK
+    uuid commitment_id FK
+    decimal quantity
+  }
+  HANDOFF_RECORD {
+    uuid id PK
+    uuid distribution_id FK
+    string handoff_kind
+    uuid receiver_user_id
+    uuid recorder_user_id
+    datetime occurred_at
+    string confirmation_basis
+  }
+  HANDOFF_LINE {
+    uuid id PK
+    uuid handoff_id FK
+    uuid distribution_line_id FK
+    decimal quantity
+  }
+  ITEM {
+    uuid id PK
+    string name
+  }
+  WAREHOUSE {
+    uuid id PK
+    uuid organization_id
+    string name
+  }
+  RELIEF_POINT {
+    uuid id PK
+    uuid organization_id
+    string region_code
+    string name
+    geography location
+    string status
+  }
+  VEHICLE {
+    uuid id PK
+    uuid organization_id
+    string identifier
+    string vehicle_type
+    decimal capacity
+    string capacity_unit
+    string status
+  }
+  DISTRIBUTION {
+    uuid id PK
+    uuid warehouse_id FK
+    uuid relief_point_id FK
+    uuid vehicle_id FK
+    uuid campaign_id
+    uuid organization_id
+    string region_code
+    string purpose
+    string status
+    uuid preparer_user_id
+    uuid approver_user_id
+    uuid dispatch_actor_user_id
+    int version
+  }
+  ISSUED_LINE_SETTLEMENT {
+    uuid id PK
+    uuid commitment_id FK
+    uuid handoff_line_id FK
     string settlement_type
     decimal quantity
     uuid actor_user_id
     datetime occurred_at
   }
-  LOGISTICS_TRANSFER_TRANSIT_LINE {
-    uuid id PK
-    uuid transfer_line_id
-    decimal dispatched
-    decimal received
-    decimal returned
-    decimal lost
-  }
 ```
 
-Each mission has exactly one team; additional teams receive separate missions under the same request. A request may have no campaign until a scoped coordinator attaches it to an ACTIVE campaign. The Logistics `request_id` is an opaque cross-service reference, not an ERD relationship or foreign key. Other diagram relationships are local to a service. Implementation still requires complete timestamps, audit fields, indexes, unique constraints, migrations, and retention policies.
+FULFILLMENT_CYCLE is unique on `(request_id, work_cycle)`; request and campaign IDs are opaque Response references. A need has one item and target kind, a commitment one need/warehouse, a mission one team. A distribution has one source warehouse, optional vehicle/point, scope, purpose, state/version and distinct approval/dispatch actors. A handoff line must belong to the same distribution as its header. Keep direct household delivery or one point followed by household handout; multi-leg forwarding is deferred. Request-linked distribution lines reference issued commitments and cannot create another ISSUE. Handouts and returns/losses remain bounded by physically issued/received quantities.
 
-### 6.2 Core entities
+### 6.2 Ownership, optionality and modeling checklist
 
-| Database | Minimum tables/entities |
-|---|---|
-| Identity | User, Organization, controlled Region catalog, Membership, RoleGrant, account status, RefreshSession with rotation/revocation, AuditRecord |
-| Response | Campaign, ResolutionIntent, RegionBoundary referencing the controlled region code, AssistanceRequest with organization_id and nullable region/campaign, RequestEvent, ContactAttempt, AuthorityReferral, RescueTeam, TeamMember with opaque user ID, VolunteerProfile, Mission with one team_id, EvidenceMetadata, scoped in-app Notification; optional AnalysisSnapshot, AnalysisJob, TriageRecommendation, RecommendationReview (Section 12) |
-| Logistics | Warehouse, Item, StockBalance, StockMovement, ReliefNeed/request reference, Commitment (one need/item per contribution), FulfillmentCycle, Transfer/lines, Distribution/lines, IssuedLineSettlement, TransferTransitLine, Vehicle, ReliefPoint, scoped in-app Notification |
+| Reference | Owner | Consumer field | Enforcement |
+|---|---|---|---|
+| Account / staff actor | Identity | Response/Logistics `*_user_id` | Opaque UUID; grants/session through authenticated API; no local credential copy |
+| Organization / region | Identity catalog | Response/Logistics organization and region attribution | Validated catalog/API reference, no cross-service FK |
+| Campaign | Response | Logistics `campaign_id` on drive/need/distribution | Optional opaque reference; public drive sanitization and eligibility through scoped API |
+| SOS/request | Response | Logistics cycle `request_id` | Opaque reference; REST eligibility and cycle seal; never a local request FK |
+| Warehouse/item/unit/point | Logistics | Logistics local references | Local FKs and item-specific unit/quantity constraints |
 
-Define the Identity user entity and migration before other services rely on its contract; external services store opaque user UUIDs rather than duplicating credentials.
+Reporter/donor accounts are optional except for PROXY creation. Unauthenticated donors supply name and phone, with an object-specific private capability for tracking; phone is neither a login nor proof of ownership. The affected household is not forced to register. Required audit/time/version/idempotency fields and indexed spatial columns belong in the physical SDD, not the conceptual ERD.
+
+Model review checklist: distinguish reporter/beneficiary/donor; show optional campaign and account links; resolve many-to-many team skills and role permissions; cover items/types/units, receipt lines and final handoff; keep priority/status/verification separate; label cross-service references; preserve history and cardinalities. Mermaid relationship syntax follows [the official ERD documentation](https://mermaid.js.org/syntax/entityRelationshipDiagram.html) (checked 2026-10-06).
 
 ### 6.3 GPS and evidence files
 
@@ -429,15 +852,15 @@ For FR priorities, **M** means required for the core demo, **S** means should ha
 
 | ID | Actor | Need |
 |---|---|---|
-| UR-01 | Citizen | Submit an SOS/request with location, affected-person count, and incident information; receive confirmation of server receipt. |
+| UR-01 | Citizen / signed-in proxy reporter | Submit an SOS for self or an affected household with its location and report provenance; distinguish reporter contact from beneficiary contact; receive server confirmation. |
 | UR-02 | Citizen | Track progress, add information, and understand rejection, duplicate, or closure reasons. |
-| UR-03 | Coordinator | Verify, link duplicates, prioritize, view maps, and assign suitable teams. |
+| UR-03 | Coordinator | Verify reports, review duplicates, inspect the heatmap and assign capable nearby teams while considering recent workload. |
 | UR-04 | Volunteer/team | Access assigned missions only; accept/decline, update progress, and submit outcome evidence. |
-| UR-05 | Operations manager | Manage campaigns, warehouses, vehicles, relief points, commitments, transfers, issues, and distributions with traceability. |
+| UR-05 | Campaign / operations manager | Manage campaigns, collection appeals, relief points and basic supply allocations/deliveries; advanced warehouse operations are deferred. |
 | UR-06 | Admin/manager | Manage accounts/scoped permissions and view operational dashboards/reports. |
 | UR-07 | Operations team | See work queues, partially fulfilled needs, service health, dashboard timestamps, and recovery guidance. |
 | UR-08 | Signed-in or guest donor | Find donation drives, declare supplies handed over, inspect verified receipt and distribution progress, and dispute differences. |
-| UR-09 | Warehouse manager / intake staff / independent reviewer | Open drives, count receipts independently, approve intake and reconcile stock without overwriting donor statements. |
+| UR-09 | Intake staff / independent operations reviewer | Receive and count supplies, independently approve receipts, preserve discrepancies and post accepted stock once; campaign managers publish drives. |
 | UR-10 | Distribution staff / receiving party | Authorize dispatch, record custody changes and beneficiary handouts, and reconcile shortages, returns and losses. |
 
 ### 7.2 Functional Requirements (FR)
@@ -460,24 +883,27 @@ For FR priorities, **M** means required for the core demo, **S** means should ha
 | FR-MSN-04 | M | Request/mission evidence uploads and coordinator outcome confirmation | Metadata and download access follow object scope |
 | FR-CAM-01 | M | Response manages campaigns, incident categories on requests, operating regions, time, and status | Scoped creation/editing; Logistics stores campaign references |
 | FR-LOG-01 | M | Manage warehouses, items, vehicles, relief points, and campaign references where needed | Active/inactive entities; preserve existing history |
-| FR-LOG-02 | M | Receipts, transfers, receipt confirmation, reserve/release, issue, return, adjustment | Ledger records actor/time/quantity/reason; balances never negative |
+| FR-LOG-02 | M | Basic receipt, reserve/release, issue, verified return and independently reviewed correction; inter-warehouse transfers are deferred (S) | Ledger records actor/time/quantity/reason; balances never negative |
 | FR-LOG-03 | M | Link Logistics needs and commitments to a request by opaque ID; record commit/release/issue/delivery locally | Multiple contributions are supported; no cross-service transaction or direct table access |
 | FR-LOG-04 | M | Distribution by campaign, point, item, quantity, and actor | Retries never duplicate a distribution |
 | FR-LOG-05 | M | Show requested, committed/reserved, issued, delivered, and outstanding quantities; allow partial fulfillment | Delivered + active committed/reserved + issued-but-not-delivered never exceeds requested; one partial contribution does not close the need |
-| FR-DON-01 | M | Warehouse-scoped managers publish donation drives with needed items, units, intake periods and acceptance criteria | Only authorized managers open/pause/close; donation drives are distinct from Response campaigns |
-| FR-DON-02 | M | Signed-in and guest citizens pledge and separately declare actual handed-over quantities | Guest capability is donation-scoped; retries do not duplicate records; declarations never credit stock |
+| FR-DON-01 | M | Campaign/operations managers publish drives with optional campaign link, intake location, items/types/units and acceptance criteria | Staff without drive-management grant cannot publish; drive and campaign remain distinct |
+| FR-DON-02 | M | Signed-in or guest donors leave name/phone and declare supplies handed over without mandatory registration; future pledges are deferred (S) | Guest capability is donation-scoped; retries do not duplicate records; declarations never credit stock |
 | FR-DON-03 | M | Preserve donor declarations, independent physical counts, condition and accepted/rejected/held quantities | Immutable submitted revisions and explicit missing confirmation; compare matching canonical units |
 | FR-DON-04 | M | Independent review and exactly-once posting of accepted receipts | Reviewer differs from intake actor; pending/held goods cannot be allocated; posting and ledger/audit are atomic |
 | FR-DON-05 | M | Private donor receipt, discrepancy notification and dispute history | Receipt number alone grants no access; silence never becomes donor agreement; no deletion of disagreements |
-| FR-DON-06 | M | Trace receipt-source allocations through reserve, issue, transfer, return and settlement | Per-source balances reconcile with aggregate stock; mixed goods are described as accounting allocations |
-| FR-REC-01 | M | Reconcile declarations, custody, stock and relief handoffs | Unit-normalized equations, separate cumulative/current totals, explicit unmatched and overdue custody |
-| FR-REC-02 | M | Versioned stocktakes and independently approved corrective movements | No overwrite of posted counts; stale stocktake conflicts; adjustment cannot violate reserved/nonnegative constraints |
+| FR-DON-06 | S | Trace receipt-source allocations through reserve, issue, transfer, return and settlement | Per-source balances reconcile with aggregate stock; mixed goods are described as accounting allocations |
+| FR-REC-01 | M | Basic per-item campaign/intake/stock/delivery totals with separate held and outstanding quantities | No summing unlike units; trace receipt and distribution records; source-level pooled allocation is deferred |
+| FR-REC-02 | S | Versioned stocktakes and independently approved corrective movements | No overwrite of posted counts; stale stocktake conflicts; adjustment cannot violate reserved/nonnegative constraints |
 | FR-LOG-06 | M | Independently approve distribution plans and record dispatch/receipt evidence | No self-approval or duplicate ISSUE; relief-point receipt is distinct from beneficiary handout |
-| FR-LOG-07 | M | Record partial beneficiary handouts and point-held stock with returns/loss settlement | A unit is counted at its actual handoff stage; delivery never decrements warehouse stock again |
+| FR-LOG-07 | M | Record direct household delivery or one point receipt followed by partial handouts, with verified return/loss; multi-leg forwarding is deferred | A unit is counted at its actual handoff stage; delivery never decrements warehouse stock again |
 | FR-AI-07 | O | Human-reviewed donation-document extraction only after a measured benefit gate | No automatic approval, stock mutation, allocation or accusation; deterministic reconciliation works with AI disabled |
 | FR-REQ-08 | S | Suggest possible duplicate reports using time/category/location filters | Suggestions are visibly non-authoritative; only a coordinator may link/reject |
 | FR-REQ-09 | M | Human resolution with a durable current-cycle Logistics seal and recoverable intent | Concurrent fulfillment changes cannot invalidate a committed resolution; timeout recovery preserves one outcome |
 | FR-REQ-10 | M | Minimum verification evidence and unreachable-reporter handling: contact-attempt log, verification basis, overdue escalation, authority-referral record, reporter-declared danger flag kept separate from status and priority | NO_ANSWER alone never verifies or rejects; rejection for unreachability needs the demo minimum attempts and a reason; TWO_COORDINATOR_JUDGMENT needs a distinct second coordinator; overdue and declared-danger requests are visible to other scoped coordinators; no automatic ranking, triage or dispatch |
+| FR-REQ-11 | M | Authenticated PROXY reports for an affected household, with relationship, last-known information and optional alternate contact | Subject pin is not reporter GPS; current login checked for PROXY; neither login nor relationship verifies the report; private access remains reporter/scoped staff/assigned team only |
+| FR-MSN-05 | M | Candidate teams from volunteer, military and government organizations, filtered by capability, scope, availability and capacity, then nearby distance and recent workload | Section 26.3 shows comparison factors and stale-position exclusion; a slightly farther, less-burdened eligible team can be suggested; coordinator decides and offer transaction rechecks capacity |
+| FR-MAP-01 | M | Scoped operational heatmap with explicit time/status filters and canonical-report counts | Verified canonical requests only by default; unverified queue separate; duplicate reports never inflate confirmed totals; no PII or exact households in aggregate response; no automatic dispatch |
 | FR-NOT-01 | M | In-app notices in the service that owns the changed request, mission, or stock task; push/email are extensions | Notice write is local to the business transaction; recipient scope is enforced |
 | FR-NOT-02 | S | Push alert for new mission offers and request status changes to registered devices (Expo push), sent from the owning service after commit via a small outbox row; guests rely on the secret-based tracking page | Push failure never rolls back or blocks the business change; payload carries only a Vietnamese generic text and notice ID, no exact location or contact data; retry is idempotent per notice and device |
 | FR-RPT-01 | M | Scoped dashboards for request states/timings and stock/fulfillment gaps | Totals match a fixed dataset; each API response includes generated_at |
@@ -494,7 +920,7 @@ The brief specifies no numeric thresholds. Section 23.6 adopts the numeric synth
 
 | ID | Quality | Proposed requirement/criterion |
 |---|---|---|
-| NFR-SEC-01 | Security | Require authentication by default. The only public unauthenticated routes are registration/login/refresh; guest SOS creation, evidence upload and secret-based tracking; and the Section 25 donation routes: sanitized read-only donation-drive listing/detail and capability-based guest donation pledge/delivery creation, tracking, dispute and evidence upload. Guest routes are throttled per IP and per contact phone under the never-drop rule of Section 14, validate input strictly, and never expose other reports. A guest report is untrusted until a coordinator verifies it and cannot reach triage or dispatch before then. Services enforce scope and never trust client-supplied roles. |
+| NFR-SEC-01 | Security | Require authentication by default. The only public unauthenticated routes are registration/login/refresh; guest SOS creation, evidence upload and secret-based tracking; and the Section 25 donation routes: sanitized read-only donation-drive listing/detail and campaign summaries and capability-based guest actual-donation declaration creation (pledges deferred), tracking, dispute and evidence upload. Guest routes are throttled per IP and per contact phone under the never-drop rule of Section 14, validate input strictly, and never expose other reports. A guest report is untrusted until a coordinator verifies it and cannot reach triage or dispatch before then. Services enforce scope and never trust client-supplied roles. |
 | NFR-SEC-02 | Security | Filter list querysets by authorization; enforce detail/action object permissions, input/file validation, and suitable rate limits. route-level guards do not automatically scope returned rows; test object and list authorization separately. [NestJS guards](https://docs.nestjs.com/guards), [NestJS validation](https://docs.nestjs.com/techniques/validation) |
 | NFR-SEC-03 | Security | Do not log tokens, passwords, signed URLs, or unnecessary exact locations; HTTPS outside local development. |
 | NFR-SEC-04 | Security | Web hardening per Section 14: strict CSP, nosniff, no-referrer, no-store on sensitive responses, escaped rendering of all user-entered text, secrets only in authorization headers, dependency audit recorded before the demo. Tested by TC-BE-27. |
@@ -533,7 +959,8 @@ stateDiagram-v2
   RESOLVING --> RESOLVED: Logistics cycle sealed
   RESOLVING --> TRIAGED: audited abort after seal release
   RESOLVED --> CLOSED
-  CLOSED --> TRIAGED: reopen with reason
+  RESOLVED --> TRIAGED: reopen with reason and new cycle
+  CLOSED --> TRIAGED: reopen with reason and new cycle
   SUBMITTED --> CANCELLED
   VERIFYING --> CANCELLED
   TRIAGED --> CANCELLED
@@ -558,10 +985,18 @@ stateDiagram-v2
 - A partially fulfilled Logistics need does not change mission state; it never demotes progress from another active mission. Offering new work gives DISPATCHED only when no accepted work remains.
 - DISPATCHED means a mission offer has been sent; IN_PROGRESS starts when the first team accepts.
 - Recompute dispatch progress in the same Response transaction as a mission transition: any ACCEPTED/EN_ROUTE/ON_SCENE mission preserves IN_PROGRESS; otherwise any OFFERED mission gives DISPATCHED; otherwise the request returns to TRIAGED unless a coordinator has confirmed RESOLVED/CLOSED/CANCELLED. Completed missions remain evidence for human resolution, never an automatic closure. Section 22 specifies cancellation and reopen guards.
-- A coordinator confirms RESOLVED when current-cycle needs are met; CLOSED is administrative completion. If missions were assigned, require completed evidence and no active mission; if no rescue mission was needed, record that human decision. Mission completion never closes a request automatically.
+- A coordinator confirms RESOLVED when current-cycle needs are met; CLOSED is administrative completion. If missions were assigned, require completed evidence and no active mission; if no rescue mission was needed, record that human decision. If assigned work failed and no mission completed, keep the case open for reassignment; failed work is not proof of resolution. Mission completion never closes a request automatically.
 - Only scoped coordinators may reopen/cancel, with reason/audit and explicit handling of active missions.
 - Cancellation is available only from SUBMITTED, VERIFYING, VERIFIED, TRIAGED, DISPATCHED and IN_PROGRESS. It is rejected from RESOLVING and RESOLVED because the Logistics cycle is then being sealed or is already sealed and cannot be frozen. A RESOLVED request moves to CLOSED, or is reopened with a reason; an abandoned finalization uses the audited abort path in Section 23.2.
 - Canonical requests with inbound duplicate links cannot become DUPLICATE, REJECTED or CANCELLED; lock and recheck links as defined in UC-02 and Section 22.2.
+
+### 8.1.1 Proxy reports and verification
+
+A signed-in citizen outside the disaster area can report relatives needing aid (UC-15). PROXY creation checks the current session, unlike optional account linking on guest/self SOS; an Identity outage leaves an honest retryable error and the existing guest SELF channel remains available. Client fallback must never silently relabel a PROXY report as SELF.
+
+Keep reporter name/phone and user ownership separate from the household location, reported headcount, relationship and last-known situation. Do not copy the reporter's city/GPS into the subject pin or require victim login/phone availability. Mark REMOTE_REPORT and contactability explicitly; no GPS accuracy is fabricated for a manually supplied pin. Allow an alternate contact (neighbor/local representative) with optional phone and stated source. All such fields are private.
+
+The coordinator contacts the reporter and, where possible, an alternate/local contact or authorized field team. A reached reporter confirms only what they know; it does not prove current household danger. For PROXY, record independent corroboration/evidence or a distinct second coordinator's reasoned concurrence before VERIFIED. A failed victim call during a power outage is neither evidence of fabrication nor grounds for automatic rejection. Similar reports are candidates for review, not automatic duplicate decisions; different households in one building remain separate needs. Section 8.1 contact/overdue rules continue to apply; the reporter-unreachability threshold cannot be satisfied by failed beneficiary calls alone. Claimed relationship, account age, photographs or coordinates alone are not proof. Preserve evidence limitations, decisions and every attempted contact.
 
 ### 8.2 Mission
 
@@ -589,9 +1024,11 @@ stateDiagram-v2
 - Multiple missions can serve one request; a coordinator confirms the overall outcome before resolution.
 - An OFFERED mission past the overdue threshold (Section 22.3) is flagged for human follow-up; the system never reassigns automatically.
 
-### 8.3 Inventory and transfers
+### 8.3 Basic inventory and deferred transfers
 
-For each Logistics need, show requested, committed/reserved, issued, delivered, and outstanding quantities. Count a delivery only after receipt is confirmed at the designated relief point or recipient. The board labels a need OPEN before any delivery, PARTIALLY_FULFILLED when some but not all requested quantity is delivered, FULFILLED after the requested quantity is delivered and coordinator-reviewed, or CANCELLED after an authorized reasoned cancellation. These are fulfillment labels, separate from request and mission states.
+Transfer states and transfer-only rules below are retained for the deferred extension, not core implementation. Basic stock, commitment and delivery invariants remain core.
+
+For each Logistics need, show requested, committed/reserved, issued, delivered, and outstanding quantities. Count delivery only at the immutable `delivery_target_kind`: FINAL_RECIPIENT requires household handoff; RELIEF_POINT requires the named point receipt. An intermediate point receipt never satisfies a FINAL_RECIPIENT need. The board labels a need OPEN before any delivery, PARTIALLY_FULFILLED when some but not all requested quantity is delivered, FULFILLED after the requested quantity is delivered and coordinator-reviewed, or CANCELLED after an authorized reasoned cancellation. These are fulfillment labels, separate from request and mission states.
 
 ```text
 Commitment summary: PROPOSED -> COMMITTED -> ISSUED -> DELIVERED or SETTLED
@@ -621,13 +1058,28 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 ## 9. Main use cases
 
+### 9.0 Actor and use-case diagrams
+
+![Response use cases](diagrams/c48-response-use-cases.svg)
+
+[Editable response UML](diagrams/c48-response-use-cases.drawio). Actors are outside the system boundary, use cases are ellipses, associations are solid lines. UC-01 describes common SOS intake; UC-15 specializes it for remote PROXY and requires a signed-in citizen. It is not a mandatory substep of every SOS. Verification (UC-02) is a prerequisite for assignment, not a diagram arrow claiming automatic execution. Team leader specializes the team-member actor and inherits UC-17 read access. UC-03 has one ellipse associated only with coordinator/active leader; membership alone cannot accept or advance missions.
+
+![Donation and support use cases](diagrams/c48-donation-use-cases.svg)
+
+[Editable donation UML](diagrams/c48-donation-use-cases.drawio). A guest donor and an authenticated donor can perform UC-11; there is no include-login relationship. Intake and independent review are distinct participating actors in UC-12. Warehouse staff do not inherit campaign, verification, dispatch or account-administration permissions. UC-14 stocktakes and UC-07 AI are deferred extensions and are absent from core diagrams. UC-05 and UC-06 appear as support use cases; sensitive reports still require operational scope.
+
+
+![Management use cases](diagrams/c48-management-use-cases.svg)
+
+[Editable management UML](diagrams/c48-management-use-cases.drawio). Completes core actor coverage for UC-04, UC-08 and UC-09, with UC-05/06 support. Supply staff execute scoped approved actions; campaign ownership and account administration remain distinct. All core use-case IDs are represented across the three actor views; optional UC-07 and deferred UC-14 remain in text only.
+
 ### UC-01 — Submit an SOS/assistance request
 
 **Actor:** Citizen, with or without an account (guest).
 
 **Preconditions:** GPS available or user supplies a manual pin. Signing in is optional; the guest client generates and persists the tracking secret and idempotency key before submitting, and the server returns a request ID and tracking code on acknowledgement.
 
-**Main flow:** Select assistance category → enter headcount/information and a contact phone (prefilled from the last request when available; stored on the request, not in Identity) → confirm location/accuracy → optionally attach photos/video within Section 23.5 limits → submit with idempotency key and (guest) client-generated tracking secret → Response validates and stores the request, audit, and timeline in one local transaction → returns request ID and SUBMITTED → citizen views the server-confirmed status and supplements information when state permits.
+**Main flow:** Choose report mode (the ordinary SELF flow is described here; remote PROXY follows UC-15 while retaining these common intake steps) → select assistance category → enter headcount/information and a contact phone (prefilled from the last request when available; stored on the request, not in Identity) → confirm location/accuracy → optionally attach photos/video within Section 23.5 limits → submit with idempotency key and (guest) client-generated tracking secret → Response validates and stores the request, audit, and timeline in one local transaction → returns request ID and SUBMITTED → citizen views the server-confirmed status and supplements information when state permits.
 
 **Exceptions:** Offline submissions stay QUEUED_ON_DEVICE and are not server-received; denied GPS permits manual pin; validation errors preserve the form; the same key, payload and secret return the same request on retry, including when the first response was lost. The submission screen always shows a Vietnamese notice that the system is not a substitute for emergency lines and that a person in immediate danger should call 113/114/115 (copy subject to review); it states that a request is received only after the server acknowledgement.
 
@@ -653,11 +1105,45 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 **Preconditions:** Request verified/triaged; team active; coordinator authorized for the scope.
 
-**Main flow:** Select a team by skills/scope/availability → offer assignment → active team leader accepts → EN_ROUTE → ON_SCENE → results/evidence → coordinator confirms mission outcome. The team assignment proceeds independently of Logistics fulfillment; both statuses appear on the request board.
+**Main flow:** Compare eligible nearby teams by skills/scope/availability, fresh position and recent workload (Section 26.3) → record chosen team and reason if overriding the suggestion → offer assignment → active team leader accepts → EN_ROUTE → ON_SCENE → results/evidence → coordinator confirms mission outcome. The team assignment proceeds independently of Logistics fulfillment; both statuses appear on the request board.
 
 **Exceptions:** Select another team if declined/unavailable. Concurrent assignments use version/transaction checks and conflicting commands reload. PAUSED campaigns block offers/acceptance; already accepted missions may continue under the campaign rules.
 
 **Postconditions:** Consistent mission/request history; only a coordinator confirms resolution.
+
+### UC-15 — Report an affected household remotely
+
+**Actor:** Signed-in citizen, e.g. a relative outside the affected region.
+
+**Preconditions:** Current account/session authorized; user provides household location/manual pin and reporter phone. The affected household need not have electricity, network access or an account.
+
+**Main flow:** Choose “Báo cứu trợ cho người thân” → enter relationship, affected location/headcount, information source/time, contactability and optional alternate contact → submit with idempotency key → Response stores PROXY ownership and subject snapshot → coordinator reviews provenance, attempts contacts and records independent corroboration/evidence or two-person concurrence → normal UC-02/UC-03 processing → reporter tracks private updates.
+
+**Exceptions:** Login does not bypass verification; invalid/missing session cannot create PROXY; missing victim phone does not block intake; report location cannot silently use reporter GPS; uncertain reports stay VERIFYING; duplicate suggestions need human review; no automatic dispatch.
+
+**Postconditions:** Reporter and household are distinguishable in data/UI; one server-acknowledged report, private timeline and audit; reporter cannot impersonate or administer the household.
+
+### UC-17 — View assigned team missions
+
+**Actor:** Active team member, including the team leader.
+
+**Preconditions:** Current session and active team membership.
+
+**Main flow:** Open assignments → Response filters by current team/member relationship → read required task details, timeline and authorized evidence. No accept/decline/progress mutation is granted by this use case.
+
+**Exceptions:** Inactive/unrelated members cannot read missions; exact contacts/coordinates follow assigned-team scope and leader-only contact rules. Leader mutations remain UC-03.
+
+**Postconditions:** Read-only access; no mission state or team-capacity change. Links: UR-04, FR-IAM-02, FR-MSN-01, TC-07, TC-BE-04.
+
+### UC-16 — Inspect operational heatmap and grouped queue
+
+**Actor:** Scoped coordinator or operations manager with map/report grant.
+
+**Main flow:** Select region/time/status → Response aggregates eligible canonical reports within scope → display request-count density, legend, filters and generated_at → select a cell to open the authorized underlying queue → manually inspect reports and team candidates.
+
+**Exceptions:** Unverified layer explicitly separate; duplicates excluded from confirmed counts; low data density is not proof an area is safe; missing data/outage is labelled; counts never estimate victims or hazard severity.
+
+**Postconditions:** Display only; no report merge, priority change or assignment.
 
 ### UC-04 — Commit and partially fulfill a relief need
 
@@ -763,7 +1249,7 @@ Backend responses may contain user-entered text unchanged. Do not translate name
 | Response | POST /response/campaigns; GET /response/campaigns; POST /response/campaigns/{id}/close | Response owns campaigns and request incident categories; managers need appropriate scope |
 | Response | POST /response/missions/{id}/accept, /decline, /transition, /evidence | Active team leader accepts/declines, advances and uploads evidence; scoped coordinator may cancel/fail |
 | Logistics | POST /logistics/needs; POST /logistics/needs/{id}/commitments; POST /logistics/commitments/{id}/issue, /deliver, /cancel | Need/commitment row locks; partial quantities; actor/reason audit |
-| Logistics | POST /logistics/receipts, /transfers, /transfers/{id}/receive, /distributions, /adjustments; GET /logistics/stock?warehouse_id=...; /vehicles; /relief-points | Idempotency, audit, unit validation, row locks, scoped report fields |
+| Logistics | POST /logistics/receipts, /distributions, /adjustments; GET /logistics/stock?warehouse_id=...; /vehicles; /relief-points | Idempotency, audit, unit validation, row locks, scoped report fields |
 | Logistics (internal) | GET /logistics/requests/{request_id}/fulfillment?work_cycle=...; POST /logistics/requests/{request_id}/cycles/{cycle}/seal, /unseal, /freeze | Authenticated service read and idempotent resolution seal; returns scoped totals or an immutable seal after all current-cycle needs and issued quantities are settled |
 | Response / Logistics | GET /{service}/notifications; POST /{service}/notifications/{id}/read | Each service returns only notices it owns and scopes by recipient |
 | Response / Logistics | GET /{service}/reports/... | Reports read the owning service's data and include generated_at |
@@ -774,16 +1260,21 @@ These are SDD sketches, not final contracts. Finalize complete paths through Ope
 
 ### 10.3 Authorization matrix
 
+Public campaign summaries contain approved title/objective/broad region/time and sanitized drive links only. They are a separate allowlisted Response read projection, not the protected campaign-detail API. No exact SOS coordinates, household/contact lists, private evidence or internal work queues are exposed.
+
+
 | Actor | Proposed core permissions |
 |---|---|
-| Guest (no account) | Create an SOS; with the SOS tracking secret, view its status/timeline and supplement it. View sanitized open donation drives; create a pledge or delivery declaration and, with the donation-scoped capability secret, track, dispute and attach evidence to that donation only (Section 25.4). SOS and donation secrets are not interchangeable. No access to anything else. |
-| Citizen | Create, view, and supplement own requests (including claimed guest requests); view own notifications. |
+| Guest (no account) | Create an SOS; with the SOS tracking secret, view its status/timeline and supplement it. View sanitized campaign summaries and open donation drives; create an actual delivery declaration (future pledges deferred) and, with the donation-scoped capability secret, track, dispute and attach evidence to that donation only (Section 25.4). SOS and donation secrets are not interchangeable. No access to anything else. |
+| Citizen | Create SELF/PROXY reports, view and supplement owned requests (including claimed guest requests); optional account-linked donations. No household identity or staff authority follows from reporting a relative. |
 | Volunteer | View assigned team missions and maintain own profile/availability. Only the active team leader accepts/declines, advances missions and submits results/evidence. |
 | Coordinator | Scoped queue/map; verify, duplicate-link, triage, assign, cancel/reopen, confirm outcomes. |
-| Operations Manager | Scoped warehouse/point/vehicle/distribution management; transfers/adjustments according to policy; operational reports. |
+| Campaign / Operations Manager | Scoped campaign/drive management, allocation/distribution approval and operational reports; independent receipt review only with an explicit grant. |
+| Warehouse / Intake Staff | Scoped receipt counts and approved stock issue; cannot publish campaigns, prioritize SOS or dispatch rescue teams. Cannot review own count. |
+| Government / military team | Same scoped team-member/leader permissions as volunteer teams; affiliation is verified staff-maintained organization metadata, not a privilege escalation. |
 | Admin | Accounts/roles/configuration; case-detail access is not automatically granted without need. |
 
-**Proposed authentication:** Identity issues asymmetric JWTs containing issuer, audience, subject, expiry, and minimum role/scope data. Services validate signatures locally. Access tokens expire after 10 minutes for the demo; refresh sessions have a 7-day absolute expiry with rotation and reuse detection; rotation does not extend that expiry. These are capstone configuration defaults. Each protected HTTP request validates the JWT locally and obtains current account/session/grants from an authenticated Identity introspection API without a positive cache. Logout revokes that session; disabling, credential reset, or role changes revoke all affected sessions. Identity unavailability returns Vietnamese 503 and fails closed for authenticated routes. Guest SOS creation, guest evidence upload and secret-based tracking are deliberately independent of Identity: if a bearer token is present on SOS creation, Response validates its signature locally only (ownership link) and never calls introspection, so an Identity outage cannot block an emergency report. A request already authorized may finish; this is request-boundary revocation, not cancellation of in-flight transactions. Section 22 defines the availability tradeoff.
+**Proposed authentication:** Identity issues asymmetric JWTs containing issuer, audience, subject, expiry, and minimum role/scope data. Services validate signatures locally. Access tokens expire after 10 minutes for the demo; refresh sessions have a 7-day absolute expiry with rotation and reuse detection; rotation does not extend that expiry. These are capstone configuration defaults. Each protected HTTP request validates the JWT locally and obtains current account/session/grants from an authenticated Identity introspection API without a positive cache. Logout revokes that session; disabling, credential reset, or role changes revoke all affected sessions. Identity unavailability returns Vietnamese 503 and fails closed for authenticated routes. Guest SOS creation, guest evidence upload and secret-based tracking are deliberately independent of Identity: for SELF only, if a bearer token is present on SOS creation, Response validates its signature locally only (ownership link) and never calls introspection; PROXY always checks the current session, so an Identity outage cannot block an emergency report. A request already authorized may finish; this is request-boundary revocation, not cancellation of in-flight transactions. Section 22 defines the availability tradeoff.
 
 Section 23.1 fixes the browser/native transport, cookie/CSRF controls and client storage for these sessions.
 
@@ -796,13 +1287,16 @@ Do not encode all policy in JWTs: Response checks its own team/region/request re
 ### Web
 
 - **Coordinator:** saved views for awaiting verification, verified-but-unassigned, active missions, and partially fulfilled needs; map and scoped filters; request details, team availability, mission board, and audit timeline.
-- **Operations manager:** campaigns, warehouses/items, stock ledger, commitments/transfers, vehicles, relief points, and distributions.
+- **Campaign/operations manager:** campaigns, public collection appeals, item/type/unit needs, receipt review, basic allocations/deliveries and reports.
+- **Intake staff:** receiving/count queue and approved issue actions; separate from campaign ownership and SOS dispatch. Advanced warehouse screens are deferred.
+- **Public donor:** browse sanitized campaigns/drives; leave name/phone and actual items/quantities; receive a private tracking capability without account registration.
 - **Admin:** accounts, organizations, role grants, service health; PII only with a relevant operational role.
 - **Operational metrics:** cases by region/status/priority; time from receipt to verification/assignment/delivery; unfinished missions; requested/committed/issued/delivered/outstanding quantities per authorized request; source timestamps.
 
 ### Mobile
 
-- **Citizen:** SOS submission, manual pin, optional photos/video, confirmation with request ID, timeline, supplementary information.
+- **Citizen:** SELF SOS and signed-in PROXY mode; separately labelled reporter and household location/contact; manual pin, optional evidence, server confirmation and private timeline.
+- **Map:** canonical verified-request density with visible legend/time/filter/source timestamp; unverified layer separate; team candidates show distance, recent workload and position age.
 - **Volunteer:** assigned missions, necessary details, accept/decline, state actions, outcome photos/video.
 - Offline drafts/queues clearly indicate pending synchronization and reuse the same idempotency key. Minimize local PII; decide cache deletion and platform protection before implementing persistent caches.
 - Internal chat, background live tracking, turn-by-turn navigation, and a custom geocoding service are outside the MVP unless explicitly approved.
@@ -1070,6 +1564,8 @@ Before enabling this extension, finalize extraction provenance schemas, rule tax
 
 ### 13.2 Core test cases
 
+**v3.0 scope:** transfer-only TC-17 and transfer subpaths of TC-BE-06 are conditional extensions. Keep the non-transfer stock/return/distribution assertions. Section 25.11 labels deferred donation/source/stocktake cases. New proxy, workload and heatmap cases are in Section 26.6; no historic ID is renumbered.
+
 These are **planned test cases, not execution results**. Test records must include ID, linked FR/UR, preconditions, data, steps, expected result, actual result, status, and tested build/commit.
 
 #### Detailed specifications for high-risk tests
@@ -1122,16 +1618,16 @@ These are **planned test cases, not execution results**. Test records must inclu
 
 | UR | Main FR | Use case | Test case |
 |---|---|---|---|
-| UR-01 | FR-REQ-01..03, FR-FILE-01, FR-OFF-01 | UC-01 | TC-01..05, TC-24..25, TC-BE-24, TC-BE-27 |
+| UR-01 | FR-REQ-01..03/11, FR-FILE-01, FR-OFF-01 | UC-01, UC-15 | TC-01..05, TC-24..25, TC-BE-24/27, TC-REV-01..04 |
 | UR-02 | FR-REQ-04, FR-REQ-07, FR-NOT-01 | UC-01, UC-02 | TC-06, TC-09..11, TC-22 |
-| UR-03 | FR-REQ-04..06, FR-REQ-09, FR-REQ-10, FR-MSN-01..03, FR-LOG-03 | UC-02, UC-03, UC-04 | TC-06, TC-08..14, TC-31, TC-BE-17..18, TC-BE-25 |
-| UR-04 | FR-MSN-01..04 | UC-03 | TC-07, TC-14, TC-24, TC-BE-04, TC-BE-10 |
-| UR-05 | FR-CAM-01, FR-LOG-01..05 | UC-04, UC-08, UC-09 | TC-15..19, TC-30..31, TC-BE-19/21/23 |
+| UR-03 | FR-REQ-04..06/09..11, FR-MSN-01..03/05, FR-MAP-01, FR-LOG-03 | UC-02/03/04/15/16 | TC-06/08..14/31, TC-BE-17/18/25, TC-REV-04..08 |
+| UR-04 | FR-MSN-01..05 | UC-03, UC-17 | TC-07/14/24, TC-BE-04/10, TC-REV-05..07 |
+| UR-05 | FR-CAM-01, FR-LOG-01..05 | UC-04, UC-08, UC-09 | TC-15/16/18/19/30/31, TC-BE-19/21/23; TC-17 transfers deferred |
 | UR-06 | FR-IAM-01..03, FR-RPT-01..02, FR-AUD-01 | UC-05, UC-06 | TC-06..08, TC-23, TC-28, TC-BE-01, TC-BE-20, TC-BE-29 |
 | UR-07 | FR-LOG-05, NFR-OBS-01, NFR-OPS-01 | UC-01..05 | TC-20..23, TC-29, TC-31 |
-| UR-08 | FR-DON-01..06, FR-REC-01 | UC-10, UC-11, UC-12 | TC-DON-01..08, TC-REC-01 |
-| UR-09 | FR-DON-01/03/04/06, FR-REC-01..02 | UC-10, UC-12, UC-14 | TC-DON-03..09, TC-REC-01..03 |
-| UR-10 | FR-LOG-06..07, FR-DON-06, FR-REC-01 | UC-13 | TC-DIST-01..04, TC-REC-01 |
+| UR-08 | FR-DON-01..05, FR-REC-01; FR-DON-06 deferred | UC-10, UC-11, UC-12 | TC-DON-01..07/09, TC-REC-01, TC-REV-09/10; TC-DON-08 deferred |
+| UR-09 | FR-DON-03/04, FR-REC-01; FR-DON-06/FR-REC-02 deferred | UC-12; UC-14 deferred | TC-DON-03..07/09, TC-REC-01; source/stocktake cases conditional |
+| UR-10 | FR-LOG-06..07, FR-REC-01; FR-DON-06 deferred | UC-13 | TC-DIST-01..04 core subpaths, TC-REC-01 |
 
 Supplementary traceability for quality and optional requirements:
 
@@ -1150,6 +1646,9 @@ Supplementary traceability for quality and optional requirements:
 | FR-REQ-08 | TC-BE-16 |
 | FR-AI-01..06 | TC-26, TC-27, TC-AI-01..22 |
 | FR-AI-07 | TC-AI-DON-01..03 |
+| FR-REQ-11 / UR-01 / UC-15 | TC-REV-01..04, TC-REV-10 |
+| FR-MSN-05 / UR-03..04 / UC-03 | TC-REV-05..07, TC-REV-10 |
+| FR-MAP-01 / UR-03 / UC-16 | TC-REV-08, TC-REV-10 |
 
 ### 13.4 Additional language and storage checks
 
@@ -1163,7 +1662,7 @@ The storage checks in Section 6.3 extend FR-FILE-01, TC-24, and TC-29, including
 
 ## 14. Security, privacy, and operations
 
-- Default deny. Public routes are limited to those listed in NFR-SEC-01: registration/login/refresh, guest SOS creation/evidence/tracking, and the Section 25 sanitized drive listing plus capability-based guest donation routes. Guest SOS abuse controls: Nginx and application throttling per IP and per contact phone, strict DTO/size limits, idempotency key required, the tracking secret is a client-generated random value of at least 128 bits (the plan uses 32 bytes), stored only as a purpose-bound hash, never returned or logged and compared in constant time, and guest uploads use the same media limits with a lower per-IP quota. Spam is contained by the verification gate: nothing unverified is triaged, dispatched or counted in operational reports. Add a captcha only if abuse is observed.
+- Default deny. Public routes are limited to those listed in NFR-SEC-01: registration/login/refresh, guest SOS creation/evidence/tracking, and sanitized public campaign summaries plus the Section 25 drive listing and capability-based guest donation routes. Guest SOS abuse controls: Nginx and application throttling per IP and per contact phone, strict DTO/size limits, idempotency key required, the tracking secret is a client-generated random value of at least 128 bits (the plan uses 32 bytes), stored only as a purpose-bound hash, never returned or logged and compared in constant time, and guest uploads use the same media limits with a lower per-IP quota. Spam is contained by the verification gate: nothing unverified is triaged, dispatched or counted in operational reports. Add a captcha only if abuse is observed.
 - **Never-drop throttling for SOS:** disaster conditions put many legitimate reporters behind one carrier-grade NAT or shelter Wi-Fi IP, and an attacker could submit with a victim's phone number to lock that number out. Therefore a per-IP or per-phone *soft* threshold never rejects a plausible SOS: the report is stored, tagged `RATE_LIMITED_REVIEW` and shown in a separate coordinator review lane (so spam cannot bury real reports, and declared-danger badges still show). Only a high *hard* ceiling (demo default ten times the soft threshold, per IP only) returns a Vietnamese 429 that tells the person to call 113/114/115 and retry. A phone number is never used as a lock-out key. Guest uploads and donation routes may reject at their quota because they are not the life-safety path.
 - **Web hardening (NFR-SEC-04):** serve a strict Content-Security-Policy (`default-src 'self'`, no inline script, `frame-ancestors 'none'`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and `Cache-Control: no-store` on authenticated and tracking responses. Render all user-entered text (descriptions, names, notes, donor declarations) as escaped text; never use raw-HTML rendering for it. Tracking and donation secrets travel only in an authorization header, never in a URL or Referer. Run a dependency vulnerability audit before the demo and record the result.
 - Authorization combines role, scope, and object relationship across details, lists, exports, file downloads, and push-device registration.
@@ -1191,68 +1690,60 @@ Browser / Mobile
 - Nginx handles baseline routing/rate limits; services still authenticate and authorize.
 - Disable optional metrics dashboards if RAM is constrained. Keep the Response job worker in the same application/service boundary; run a second worker process only if the optional job queue is enabled.
 
-## 16. Backend implementation sequence
+## 16. Revised implementation and delivery sequence
 
-The backend owner's stated target is two to three weeks of focused backend work. The user confirmed on 2026-10-01 that the available time is sufficient for Slices 1–5 of the original scope and authorized resolving the architecture-review decisions. **That confirmation predates the Section 25 donation extension (2026-10-04) and must be re-confirmed:** two to three weeks does not cover Slices 5–6 as Must scope, so the integrated schedule below spreads backend work over project weeks 3–7 and the owner re-estimates after the R-04 spike. Keep three independently deployable services; each slice needs its tests and acceptance evidence. Keep optional features out until the core workflow is stable.
+**Scope revision: 2026-10-06.** Rescue coordination and guest in-kind donations are the main flows. Warehouse work is supporting intake/stock/issue rather than a full logistics product. The earlier two-to-three-week backend estimate is not a fresh estimate for this revision: re-estimate at the compatibility spike. The ten-week outline remains the project reference, not a claim about elapsed calendar weeks.
 
-| Order | Complete slice | Exit evidence |
+| Order | End-to-end slice | Required exit evidence (planned) |
 |---|---|---|
-| 1 | Workspace, Compose, three service boundaries, migrations, Vietnamese errors, Identity registration/session/scope | Repeatable setup; auth and object-scope checks; each service starts and migrates independently |
-| 2 | SOS intake, PostGIS, idempotency, request timeline, scoped verification queue | Retry creates one request; unknown/ambiguous region remains visible to designated intake staff |
-| 3 | Verification outcomes, manual priority, duplicate review, team assignment and mission progress | State/permission tests; duplicates require human decision; team workflow completes without a broker |
-| 4 | Logistics catalog, warehouses, stock ledger, commitments, partial issue/delivery, transfers and relief points | Inventory constraints and concurrency tests; 12-of-20 demo stays open with 8 outstanding |
-| 5 | Section 25 donation core: drives, pledges/declarations with client secret, independent count/review, exactly-once posting, source roots | TC-DON-01..07/09; no double credit; self-review denied; guest lost-response retry creates one record |
-| 6 | Section 25 distribution and reconciliation: approved dispatch, custody legs, handouts, source allocations on every stock mutation, reconciliation views, stocktakes | TC-DIST-01..04, TC-DON-08, TC-REC-01..03; 55/50/5/35/15 scenario reconciles |
-| 7 | Compose board integration, dashboards/timings, storage, recovery, k6 smoke/load check, documentation and demo | Three API contracts verified together; partial outage labels are truthful; restore and end-to-end evidence recorded |
+| 1 | Confirm concepts/actors; square overview, conceptual/logical ERDs; scope/grants and Vietnamese copy; setup three apps and compatibility/storage spike | Model/cardinality/reference review; contracts for SELF/PROXY and donations; compatible migration/GIS/locks; no application results claimed before execution |
+| 2 | Identity + SELF guest SOS + signed-in PROXY; separate subject pin, provenance, tracking/retry; private evidence | TC-01..08, TC-BE-01/12/20/22/24, TC-REV-01..03 and language cases |
+| 3 | Verification/contacts/duplicates/priority; mixed team organizations, fresh positions, nearby workload-balanced candidates; missions; grouped queue and heatmap | UC-02/03/15/16; TC-BE-03/04/11/25, TC-REV-04..08 |
+| 4 | Campaign/drive public pages; items/types/units; guest name/phone handover declaration; independent count/review/post | TC-DON-01..07/09; no mandatory login, double stock credit or self-review |
+| 5 | Minimal stock/commitment/partial delivery; direct or one-point handoff; guarded human resolution | TC-15/16/18/19/31, TC-BE-05/09/10/15/17/18/19/21/23/26; core TC-DIST and TC-REC-01 |
+| 6 | Integrated dashboards/privacy/recovery/load checks, mobile evidence, SRS/SDD/user/install guides and defense | Existing relevant TC, TC-REV-09/10, TC-L10N and TC-PERF-01; actual build/commands/results recorded |
 
-Implement one end-to-end slice at a time. The project brief describes a three-member team; the user confirmed one person owns backend work, so coordinate interfaces with the other workstreams without splitting backend ownership. No separate Notification, Reporting, AI, or broker service is part of the baseline.
+### Integrated weekly schedule
 
-### Integrated weekly schedule (three members)
+B = backend owner; W = Web owner; M = Mobile owner. Each week produces one integrated demonstration using real APIs once they exist.
 
-Weeks refer to the ten-week outline in the project context. B = backend owner, W = Web owner, M = Mobile owner. Each week ends with an integrated demo of that week's slice against the real APIs, not mocks.
-
-| Week | Backend (B) | Web (W) | Mobile (M) | End-of-week output |
+| Week | B | W | M | Output |
 |---|---|---|---|---|
-| 1–2 | R-04 spike, MinIO terms check, OpenAPI for Slices 1–4, ERD | Wireframes, Vietnamese copy list | SOS flow wireframes, secret/idempotency design | SRS draft, survey/interview evidence started, contracts reviewed |
-| 3 | Slice 1 (Identity/sessions/grants) and start Slice 2 | Login, session, scoped shell | SOS form: GPS/manual pin, client secret + key persisted, queue-on-device state | Guest SOS submits end to end; retry returns one request |
-| 4 | Finish Slice 2; Slice 3 (verification, contact attempts, duplicates, priority, missions) | Verification queue, map, duplicate review, priority | Tracking by secret; team mission screens | Verify → triage → assign → accept demo |
-| 5 | Slice 4 (stock, commitments, board) and seal protocol TC-BE-17/18 | Fulfillment board, warehouse/point screens | Mission progress and evidence upload | 12-of-20 partial fulfillment demo; seal tests run |
-| 6 | Slice 5 (donation core) | Drive management, intake count/review screens | Citizen/guest donation declaration and tracking | 100/60/58/55 donation scenario with denied self-review |
-| 7 | Slice 6 (distribution, custody, reconciliation, stocktakes); integration fixes | Distribution/receiving/handout and reconciliation views, dashboards | Real-device pass: denied GPS, network loss mid-send, retry, guest tracking | System test run; 55/50/5/35/15 scenario; TC results recorded |
-| 8 | Slice 7: k6, backup/restore, documentation | User guide screenshots, report | User guide, device evidence | SDD/test report/installation guide, demo rehearsal |
-| 9 | Defense | Defense | Defense | Defense with recorded evidence |
-| 10 | Contingency | Contingency | Contingency | Buffer only |
+| 1–2 | Models, grants/contracts, compatibility/storage spike | Public/operations wireframes and map design | SELF/PROXY wireframes and truthful submission states | Reviewed SRS/SDD diagrams and scoped contracts |
+| 3 | Identity, guest SELF and authenticated PROXY | Auth, SOS/proxy and public shell | GPS/manual household pin, retry and tracking | Remote household SOS stored once |
+| 4 | Verification, contacts, duplicates, teams/missions and workload candidate query | Queue, map/heatmap, comparison and dispatch | Team leader progress and evidence | Human verification → balanced assignment → mission |
+| 5 | Campaigns/drives, item types/units, guest intake and independent review | Public drives, guest donation form and staff intake/review | Guest donation/tracking | Handover 60, count 58, accept 55/reject 3 |
+| 6 | Stock/partial delivery, fulfillment seal and basic reports | Allocation/delivery and timestamped board | Evidence and delivery handoff | 12-of-20 then remaining 8; controlled resolution |
+| 7 | Relevant integration/security/concurrency cases and fixes | Privacy, language, accessibility checks | Real-device GPS/network/PROXY checks | Actual test records and defects |
+| 8 | Recovery/load evidence and documentation | User guide/demo screenshots | Device evidence and user guide | Installation, SDD, test report and rehearsal |
+| 9 | Defense | Defense | Defense | Demonstrate only executed behavior |
+| 10 | Contingency | Contingency | Contingency | Buffer |
 
-### Scope reduction if the backend estimate slips
+### Explicit cuts and protected scope
 
-Never cut: authentication/scope, SOS with truthful server acknowledgement and idempotency, verification/duplicate decisions, the resolution seal, independent receipt review with exactly-once posting, the append-only stock ledger, and core Vietnamese messages. Cut in this order, and with each cut update the requirement priority, traceability, test cases, demo script and defense claims together so nothing is claimed that was dropped:
+Already deferred: future pledges, transfers, source-batch pooling/FEFO, formal stocktakes and multi-leg forwarding. FR-DON-06 and FR-REC-02 are Should; transfer/forwarding subpaths are not core acceptance. Capacity and recent workload are separate: the demo has one active slot per team, while recent mission counts inform fair selection among free nearby teams. Their IDs remain reserved with conditional cases in Section 25.11. Do not scaffold them during core slices.
 
-1. Real push/email, offline retry queue, CSV export, advanced routing, non-required infrastructure.
-2. Optional AI (Section 12 and FR-AI-07).
-3. Stocktakes (FR-REC-02, TC-REC-02/03): downgrade to Should and keep reconciliation reports.
-4. Pledges (keep direct handover declarations) and earliest-expiry source selection (keep receipt-root source tracing).
-5. If the seal still cannot be finished, apply the R-03 feature cut, not a check-then-write substitute.
+Cut optional AI, push, full offline queue and CSV before any core correctness/security check. Preserve independent receipt review, once-only posting, nonnegative stock, item units, direct/point handoff distinction, human verification, workload/capacity checks, Vietnamese content, privacy and truthful server ACK. The existing resolution seal remains required for request-linked Logistics needs; R-03's documented feature cut is the only fallback if it cannot be delivered.
 
-## 17. Defense demonstration
+## 17. Revised defense demonstration
 
-1. A citizen submits an SOS with GPS/accuracy or manual pin; retry the same key and show one request.
-2. A coordinator opens the verification queue, checks a suspected duplicate, records a human decision and reason, sets priority, and assigns a team.
-3. A volunteer accepts, progresses EN_ROUTE → ON_SCENE, uploads evidence, and reports completion; mission completion alone does not resolve the request.
-4. Logistics records a 20-kit need. Warehouse A delivers 12, leaving the request open with 8 outstanding; warehouse B delivers the remaining 8; the coordinator confirms overall resolution.
-5. Show the audit trail, quantities by fulfillment stage, time-to-verify/assign/deliver, and timestamped dashboard panels.
-6. Run a small k6 HTTP scenario and report the virtual-user count, duration, p95 latency, error rate, and test hardware.
-7. Guest SOS retry after a simulated lost response returns the same request and tracking code; an unreachable reporter stays VERIFYING with logged attempts and an overdue badge until a coordinator decides.
-8. Section 25 scenarios: pledge 100, handover 60, count 58, accepted 55/rejected 3 with denied self-review; dispatch 55, point receipt 50, approved loss 5, handout 35, 15 still held; reconciled totals.
-9. Optional: coordinator reviews an AI suggestion; the manual workflow still succeeds with the worker disabled.
+1. A guest sends SELF SOS, retries a lost response and obtains one report with private tracking.
+2. A citizen in another city signs in and reports an unreachable relative. Show separate reporter and affected location; victim phone is optional; no premature verification.
+3. Coordinator records contact attempts/corroboration and human priority; two reports about the same household are reviewed manually, while nearby different households stay separate.
+4. Compare nearby volunteer/military/government teams. Reject busy/incapable/stale-position teams; show a slightly farther team with lighter recent workload and human selection.
+5. Leader accepts and records mission progress/evidence. Display confirmed-request heatmap with source time; unverified reports do not inflate confirmed counts.
+6. Campaign manager publishes an in-kind appeal. Guest leaves name/phone and hands over 60 units; staff count 58 and approve 55/reject 3 through a distinct reviewer. Private receipt shows differences; no money or mandatory donor login.
+7. Deliver 12 of 20 requested kits, then 8; warehouse stock changes once per issue. A point receipt is not household handout. Coordinator resolves only through current-cycle guards/seal.
+8. Show denied cross-scope/self-review, retry/notification audit, timestamped reports and executed recovery/load/device evidence. Optional AI can be shown only if its evaluation is complete; manual flow remains usable.
 
-The demo proves the workflow, authorization, GIS, inventory integrity, and measured API behavior. It does not claim nationwide capacity or automatic dispatch.
+These are planned scenes, not evidence that a working product or tests already exist.
 
 ## 18. Deliverable documentation
 
 | Document | Minimum contents |
 |---|---|
 | SRS | Scope, actors, glossary, assumptions, identified UR/FR/NFR with acceptance criteria, use cases, business rules, states, traceability, open decisions |
-| SDD | Context/container/component views, three-service ownership, ERD, auth/RBAC, API/OpenAPI, fulfillment workflow, sequence/deployment, security/privacy, tradeoffs |
+| SDD | Central system/container views, true actor/use-case diagrams, conceptual and separate service-owned logical ERDs, three-service ownership, auth/RBAC, API/OpenAPI, fulfillment workflow, sequence/deployment, security/privacy, tradeoffs |
 | Test plan/cases | IDs, requirement links, preconditions, data, steps, expected results; unit/API/integration/security/E2E/NFR; actual results and defects |
 | Installation guide | Prerequisites, environment, Compose profiles, migrations/seeds, demo accounts, backup/restore, troubleshooting, shutdown |
 | User guide | Citizen, volunteer, coordinator, manager/admin flows; GPS/offline states; screenshots/video |
@@ -1377,7 +1868,7 @@ backend/
   test/                    # cross-service integration and k6 scripts (per-app unit tests stay beside their app)
 ```
 
-Each app owns `main.ts`, `app.module.ts`, `config/`, `database/data-source.ts`, `database/migrations/`, and `modules/<business-module>/`. A business module uses `<name>.module.ts`, `<name>.controller.ts` when it has HTTP routes, `<name>.service.ts`, `dto/`, and `entities/` as needed. Keep modules small and named for business capabilities so no single module becomes a catch-all: for example Response `requests`, `verification`, `missions`, `campaigns`, `advisor`; Logistics `stock`, `needs`, `commitments`, `transfers`, `distributions`, `donations`, `receipts`, `reconciliation`, `stocktakes`; Identity `auth`, `sessions`, `grants`. Per-service Vietnamese message catalogs live in the owning app; the shared technical helpers take a purpose string (for example `sos-tracking`, `donation-capability`) so one service's secrets can never validate in another. The optional AI job worker stays inside Response. Each service has its own environment validation, image, migration command, database credentials, and health/readiness routes. Create only directories used by the current slice. Use one package manager/workspace and pin versions after a primary-source compatibility check; this document selects no exact runtime releases.
+Each app owns `main.ts`, `app.module.ts`, `config/`, `database/data-source.ts`, `database/migrations/`, and `modules/<business-module>/`. A business module uses `<name>.module.ts`, `<name>.controller.ts` when it has HTTP routes, `<name>.service.ts`, `dto/`, and `entities/` as needed. Keep modules small and named for business capabilities so no single module becomes a catch-all: for example Response `requests`, `verification`, `missions`, `campaigns`, `advisor`; Logistics `stock`, `needs`, `commitments`, `distributions`, `donations`, `receipts`, `reports` (transfers/source accounting/stocktakes are deferred); Identity `auth`, `sessions`, `grants`. Per-service Vietnamese message catalogs live in the owning app; the shared technical helpers take a purpose string (for example `sos-tracking`, `donation-capability`) so one service's secrets can never validate in another. The optional AI job worker stays inside Response. Each service has its own environment validation, image, migration command, database credentials, and health/readiness routes. Create only directories used by the current slice. Use one package manager/workspace and pin versions after a primary-source compatibility check; this document selects no exact runtime releases.
 
 - Controllers parse validated DTOs, invoke use cases, and map responses; they contain no SQL or business state transitions. Services own business guards, transaction boundaries, and authorization of actions/objects. List/map queries apply scope before pagination or aggregation.
 - Use TypeORM repositories/QueryBuilder and the transaction's EntityManager directly. Add a dedicated query/persistence component only when real complexity warrants it; no generic base repository, one-implementation interface, or pass-through layer.
@@ -1430,15 +1921,7 @@ Before coding each slice, review its OpenAPI contract: exact `/api/v1` paths, DT
 
 ### 22.5 Solo backend sequence and acceptance gates
 
-| Order | Complete slice | Exit evidence |
-|---|---|---|
-| 1 | Workspace, Compose, three apps, migrations, errors, Identity registration/sessions/grants | Repeatable setup; auth/scope/revocation and Vietnamese-message checks |
-| 2 | SOS, controlled regions, PostGIS, idempotency, own timeline, verification queue | TC-01..14, TC-BE-01..04/11/12/24/25; scoped map/list; human-reviewed duplicate and priority decisions |
-| 3 | Logistics catalog/stock/commitments, request board, partial delivery, campaign/relief-point links | TC-15..19/31, TC-BE-05/06/09/10/13/15; no over-issue; partial fulfillment and API error behavior |
-| 4 | Section 25 donation core, distribution/custody and reconciliation (see Section 16 slices 5–6 and its cut order) | TC-DON-01..09, TC-DIST-01..04, TC-REC-01..03; independent review, single posting, conservation equations |
-| 5 | UI/API integration, dashboards, file storage, recovery, k6 run, documentation/demo | TC-20..30, TC-BE-07/08/14/16, TC-L10N; truthful source timestamps, private files, backup restore, end-to-end evidence |
-
-File metadata/contracts start with SOS/missions; do not claim evidence-upload requirements complete before storage acceptance. Each slice updates traceability, API examples, migrations, seed data, and actual command/results. The partial-fulfillment demo and authorization/inventory invariants are core; AI, CSV export, push/email, and full offline queue remain optional. Do not add another runtime, broker, or service without evidence.
+Use Section 16's revised sequence and scope, Section 25's minimal donation path and Section 26's new cases. Implement one end-to-end slice at a time. Deferred transfer/source/stocktake cases are conditional, not core blockers. File metadata begins with SOS/missions; evidence-upload completion still requires storage checks. Keep applicable authorization, physical quantities, retry, concurrency, Vietnamese copy and resolution-seal gates; update traceability and actual command results per slice.
 
 ### 22.6 Additional acceptance cases for corrected decisions
 
@@ -1516,7 +1999,7 @@ Commitment status is derived: PROPOSED before reservation; COMMITTED while reser
 
 ### 23.5 Asset, media and acceptance coverage
 
-Vehicles and relief points remain mandatory. Vehicle scope is CRUD, organization/region, identifier, type, capacity/unit and active/inactive status; no routing, fuel, maintenance or automatic assignment engine. ReliefPoint scope is CRUD, scoped location, contact/operating information and active/inactive status, plus selection as a distribution destination. Inactivation blocks new use and preserves historical distributions. Neither entity implies an independent warehouse stock balance.
+Vehicles and relief points remain basic catalog entries; advanced fleet and warehouse workflows are deferred. Vehicle scope is CRUD, organization/region, identifier, type, capacity/unit and active/inactive status; no routing, fuel, maintenance or automatic assignment engine. ReliefPoint scope is CRUD, scoped location, contact/operating information and active/inactive status, plus selection as a distribution destination. Inactivation blocks new use and preserves historical distributions. Neither entity implies an independent warehouse stock balance.
 
 Photo and video evidence are supported. Demo allowlist: detected JPEG/PNG images up to 10 MiB each, MP4 with allowed H.264 video/AAC audio up to 50 MiB each; at most five READY/PENDING attachments and 100 MiB total per request/mission. Reserve attachment count and declared-byte quota under the owning object lock before upload, reject streams above the reservation/limit, and reconcile abandoned PENDING reservations so concurrent uploads cannot exceed quota. Each upload contains one media file; allow bounded multipart overhead in the HTTP body limit. Reject SVG, HTML, executables and unsupported container/codecs. Validate actual media/container content with maintained tooling selected in the setup spike; bound parser time/memory, stream uploads and configure matching Nginx/API body limits. No transcoding or AI media inference. Serve originals as private downloads with safe Content-Disposition and nosniff; previews must use validated media. Generated immutable keys and crash reconciliation remain required. Signed download TTL is 60 seconds; current authorization is checked before signing. Synthetic media only; real-data retention remains a pilot decision.
 
@@ -1576,11 +2059,11 @@ Slice gates in Section 22.5 additionally require TC-BE-20 for Identity, TC-BE-17
 | R-11 | AI advisor is rules-based, not machine learning; labeled data is unavailable | Certain / Low | Present it as explainable rules with human review; claim no accuracy; keep disabled by default | AI/research owner |
 | R-12 | Push notifications (FR-NOT-02) and offline queue (FR-OFF-01) are Should and may be dropped | Medium / Low | In-app notices and honest "pending" UI remain core; drop push before weakening authorization or inventory | Mobile owner |
 | R-13 | Real-data privacy (location retention, deletion requests, provider data egress) is unresolved | High if used with real data / High | Use synthetic data only; say so in the demo; settle retention before any pilot | Whole team |
-| R-14 | Plan was edited in many passes; residual contradictions between Sections 22/23 and earlier sections are possible | Medium / Medium | Treat Sections 22/23/24 as authoritative; fix any conflict found during SRS/SDD writing and bump the version | Whole team |
-| R-15 | The original brief PDF `docs/Cuu_tro_thien_tai.pdf` is deleted in the working tree | Medium / Medium | Keep a copy outside the repository before committing | Whole team |
+| R-14 | Plan was edited in many passes; residual contradictions between Sections 22/23 and earlier sections are possible | Medium / Medium | Treat Sections 16/25/26 as current scope and Sections 22/23 as applicable correctness safeguards; fix any conflict found during SRS/SDD writing and bump the version | Whole team |
+| R-15 | The original source brief is not available at the previously referenced PDF path | Medium / Medium | Use the consolidated project context and identify the original source before claiming a fresh source review; do not describe absence as a current Git deletion | Whole team |
 | R-16 | Rescue teams in the field lose mission-progress actions while Identity introspection is down (fail-closed trade-off of R-09) | Medium / High | Accepted for the demo and stated openly; the Mobile client keeps the pending action on the device with its idempotency key and shows 'chưa gửi được' until it is acknowledged (FR-OFF-01 covers mission actions; if it is cut, the UI must still show an explicit 'not sent' error and never report the action as done); if k6 or the outage test shows it is unacceptable, add a short documented revocation-window cache for mission-progress commands only | Backend owner / Mobile owner |
 | R-17 | A guest closes the browser and loses the SOS tracking secret | Medium / Medium | Confirmation screen offers explicit save/copy of code and secret; sign-in claim; coordinator-assisted audited re-binding through the reporter's contact phone | Web owner |
-| R-18 | One backend owner carries three services plus the Section 25 donation vertical; the schedule is the largest delivery risk | High / High | Follow the weekly integration table and cut order in Section 16; re-estimate after the R-04 spike; decide cuts at the end of weeks 5 and 7, not at the end | Whole team |
+| R-18 | One backend owner carries three services, proxy verification, balanced team suggestions and minimal donations; the schedule is the largest delivery risk | High / High | Follow the weekly integration table and cut order in Section 16; re-estimate after the R-04 spike; decide cuts at the end of weeks 5 and 7, not at the end | Whole team |
 
 ### 24.2 Prepared answers for likely defense questions
 
@@ -1602,180 +2085,220 @@ Slice gates in Section 22.5 additionally require TC-BE-20 for Identity, TC-BE-17
 | Is it scalable? | Demonstrated only to the Section 23.6 workload on one host; the stateless services can be replicated, which is a design path and not a measured result. |
 | What is verified? | State precisely at the time of the defense which TC cases were executed, on which commit and hardware. Anything else is planned. |
 
-## 25. In-kind donations, reconciliation, and accountable distribution
+## 25. Reduced in-kind donations and accountable delivery
 
-**Decision date: 2026-10-04.** User-authorized extension; core donation and distribution controls are Must scope. This section extends Sections 6–16 and 22–24 and governs extended intake, adjustment and distribution where earlier descriptions are less specific. Existing service ownership, fulfillment locks, resolution seals and Vietnamese-language policy remain mandatory. This is a design, not implemented functionality or proof that software eliminates corruption.
+**Revised 2026-10-06 under user instructions.** Replaces the expanded 2026-10-04 warehouse extension. In-kind only, no money or payments. Preserve independent count/review, discrepancy history, exactly-once stock posting and delivery accountability; defer warehouse ERP depth. Existing [research](research/in-kind-donation-reconciliation-patterns.md) is historical evidence for patterns, not current scope authority or proof against corruption.
 
-### 25.1 Research and scope
+### 25.1 Scope and ownership
 
-The [primary-source research note](research/in-kind-donation-reconciliation-patterns.md) records dated evidence and limits.
+Response owns campaigns/SOS/teams/missions. Logistics owns public donation drives, donor declarations, item/type/unit catalog, receipts, basic stock, needs/commitments and distributions. A drive may link to a Response campaign through an opaque ID and names an intake site; an emergency report does not depend on a campaign. Campaign/operations managers publish and manage appeals. Warehouse staff count/receive and execute approved issue; they do not own rescue policy or campaign management merely because they handle goods.
 
-| Source | Pattern adapted | Boundary |
-|---|---|---|
-| Sahana Eden historical inventory/deployment documentation | Needed-item lists, partial contributions, original-versus-received quantities, receipts/waybills | Legacy blueprint mixes implemented/proposed features; guest access is a C48 decision |
-| Logistics Cluster / WFP guide | Physical count/inspection, goods received note, documented discrepancy, authorized release and receiving evidence | Adapt workflow, not a claim of certification |
-| IFRC Green Logistics Guide | Need-based acceptance, quality/expiry criteria, damaged/expired donation visibility | Do not maximize donation totals by accepting unusable goods |
-| Odoo lot documentation | Source-batch tracing from receipt to outgoing movement | No Odoo dependency or per-piece serialization |
-
-Supplies only: cash, payments and tax receipts are outside scope. Logistics owns donation drives, declarations, intake, provenance, reconciliation and distribution. Response continues to own rescue campaigns/requests; references are opaque IDs, not cross-service foreign keys. Identity supplies scoped staff grants. Guest creation/tracking does not call Identity. No fourth service, Python runtime, broker or blockchain is needed.
-
-### 25.2 Vocabulary and workflow
-
-Keep these distinct: DonationDrive (public warehouse collection drive, not Response Campaign), DonationPledge (future intention), DonationDelivery (one physical handover), donor-declared handed-over quantity, staff physical count, independently approved accepted stock, warehouse dispatch, relief-point receipt, and final beneficiary handout. One pledge may have many partial deliveries. A pledge never credits stock.
+### 25.2 Minimum workflow
 
 ```text
-Manager opens drive -> citizen optionally pledges -> donor declares actual handover
--> staff count/inspect -> compare declaration/count/condition -> independent review
--> accepted stock posted once -> source allocation -> approved dispatch + waybill
--> independent receiving confirmation -> beneficiary handout -> reconciliation.
+Campaign/operations manager publishes needed items and intake place/time
+-> guest or signed-in donor leaves name/phone and actual handover quantities
+-> intake staff independently count/inspect and record discrepancies
+-> distinct reviewer approves exact receipt version
+-> accepted goods posted once into basic stock
+-> coordinator defines need; manager approves allocation/dispatch
+-> receiving party confirms direct household handoff, or point then household
+-> reports show accepted, held, issued, delivered and outstanding separately.
 ```
 
-Walk-in donations without pledges are supported. Staff-created walk-in records cannot fabricate donor agreement: missing donor confirmation stays UNCONFIRMED. Delivering less than pledged is an unfulfilled promise, not automatically a warehouse discrepancy. Guest access does not establish verified identity. Anonymous public recognition is supported; citizen registration/phone verification is not mandatory.
+No mandatory donor registration, address, national ID or beneficiary photo. Names/phones are private; they are not proof of identity or credentials. A donation declaration does not increase stock. Matching counts do not eliminate the independent review. Silence is not donor agreement. A walk-in staff-created declaration records missing donor confirmation honestly.
 
-### 25.3 Authority and drive lifecycle
+### 25.3 Authority and drive states
 
-| Action | Grant / guard |
+| Action | Grant and guard |
 |---|---|
-| Create/open/pause/close drive | Warehouse-scoped `DONATION_DRIVE_MANAGE`, normally warehouse manager |
-| Declare/view own donation/dispute | Owning citizen or donation-specific guest capability; no inventory authority |
-| Count/inspect receipt | Warehouse-scoped `DONATION_INTAKE` |
-| Review receipt/discrepancy | Scoped `DONATION_REVIEW`; reviewer differs from every intake-count author |
+| Publish/open/pause/close appeal | Campaign/operations manager with `DONATION_DRIVE_MANAGE` and appropriate organization/campaign/intake scope |
+| Declare, track, dispute | Owner account or donation-specific capability; no stock authority |
+| Count/inspect | Intake-site-scoped `DONATION_INTAKE` |
+| Review/post approved receipt | `DONATION_REVIEW`; reviewer differs from every count author |
 | Prepare / approve distribution | `DISTRIBUTION_PREPARE` / `DISTRIBUTION_REVIEW`; distinct users |
-| Confirm custody handoff | Authorized receiving custodian, different from dispatch actor |
-| Approve stocktake correction | `STOCK_ADJUSTMENT_REVIEW`; distinct from count/preparation authors |
+| Confirm receipt/handout | Scoped receiver/field recorder; cannot self-confirm dispatch |
+| Review correction or loss | Explicit operations-review grant; different from preparer |
 
-Operations managers can hold review grants. Holding multiple roles never permits self-approval; admin role management grants no implicit business approval. Seed at least two staff accounts. Reviewer absence creates pending work/escalation, not a silent bypass.
+States: DRAFT → OPEN; OPEN ↔ PAUSED; DRAFT/OPEN/PAUSED → CLOSED, with version/reason. Only OPEN accepts new handovers. Close leaves existing intake/review/dispute/return work visible. Independent review absence creates pending work, not a bypass. Seed at least two staff users. Holding several roles never permits self-approval.
 
-`DRAFT -> OPEN <-> PAUSED -> CLOSED`, also `OPEN -> CLOSED`. Only OPEN allows new pledges/new drop-offs. Closing stops solicitation but permits completion of recorded handovers, reviews, disputes and returns. Require reason/version; outstanding receipts remain visible and closing is not reconciliation. Publish canonical items/units, target amounts, intake location/time, quality/expiry acceptance criteria. Targets are guidance; accepting excess requires manager reason. Response campaign pause still has the documented cross-service race boundary; donation drives do not change campaign lifecycle.
+### 25.4 Guest access and Vietnamese flows
 
-### 25.4 Guest security and Vietnamese user flows
+Public sanitized campaign/drive pages show needs/types/units, dates, permitted collection location and aggregate accepted/distributed progress. Guest form requires name/phone plus item/quantity/unit, without a login redirect. Before submission the client generates/persists a random 32-byte donation secret and idempotency key; server stores only a purpose-bound hash. Same key/body/secret returns the original record after a lost response; altered payload conflicts. This secret is separate from SOS tracking and session tokens. Guest creation/tracking does not depend on Identity.
 
-Public pages expose sanitized drive needs/dates/intake location and aggregate progress. Signed-in donors use account ownership. Before creation a guest client generates a cryptographically random 32-byte secret and independent idempotency key, submits over TLS and saves both for retries. Logistics validates secret format/length, stores only its purpose-bound hash, and scopes replay lookup to that capability. Same key/body/secret yields one record; a changed body conflicts. A lost creation response must not lose access or generate a duplicate donation.
+Private tracking/disputes/uploads authorize using the capability header or account ownership; receipt ID/QR/name/phone alone grant nothing. Never expose secrets in URLs/logs/public exports. Web memory/session storage with explicit private save, Mobile SecureStore; audited staff-assisted recovery revokes old access. Claiming requires login plus valid capability, binds the account and revokes the capability. Throttling, Origin/CSRF, object scope and private file limits still apply.
 
-Guest tracking uses an authorization header, never query strings, logs, analytics or public receipt QR. Receipt numbers are identifiers, not credentials. Web uses session storage/memory and offers explicit private recovery-code download; Mobile uses SecureStore. Explain recovery in Vietnamese. Lost secrets require audited staff-assisted ownership proof and revocation/reissue; phone/name alone is insufficient and failed recovery reveals nothing. Claiming a guest donation requires both authenticated citizen and valid capability; atomic claim binds ownership and revokes guest access. SOS and donation secrets cannot be interchanged.
+Vietnamese labels include “Quyên góp hiện vật”, “Họ và tên”, “Số điện thoại”, “Số lượng đã bàn giao”, “Đã tiếp nhận”, “Đang chờ đối chiếu”, “Đã giao đến điểm cứu trợ”, “Đã phát cho người nhận”. No checkout/cart/payment screens. No public donor contact list or household identities.
 
-Apply throttling, payload limits, scoped pagination and browser origin/CSRF controls from Section 23.1. Guest uploads require an existing capability; Logistics owns private evidence metadata and enforces Section 6.3/23.5 limits. No public donor list or beneficiary identity. Guest claims never grant staff permissions.
+### 25.5 Count, approval and stock posting
 
-Citizen Web/Mobile: browse drives, optional pledge, actual handover form, private receipt, discrepancy/dispute and sanitized source progress. Staff Web: intake queue, count comparison/evidence, independent review, source stock, dispatch/receiving/handout and reconciliation queues. Use distinct Vietnamese labels: “Dự kiến đóng góp”, “Số lượng đã bàn giao”, “Kho kiểm đếm”, “Đã tiếp nhận”, “Đang chờ đối chiếu”, “Đã giao đến điểm cứu trợ”, “Đã phát cho người nhận”. Offline draft is not received before server ACK. Preserve entered names/content; all validation, notifications and exports follow the existing Vietnamese policy.
+Use canonical ITEM/ITEM_TYPE/UNIT. Quantity is `numeric(18,3)` and API decimal strings, with item-specific scale (pieces integer). Reject unit mismatch; no automatic box-to-piece conversion in core. Each line preserves declared, counted, accepted, held and rejected quantities; `counted = accepted + held + rejected`, and count difference is separate from quality rejection. Record condition/expiry where relevant; held/unsafe goods are unavailable.
 
-### 25.5 Comparison, review and stock posting
+Declaration and count revisions are immutable. A changed count/declaration invalidates approval; reviewer checks exact versions and cannot be a count author. Discrepancy disposition requires reason/evidence, private donor notice and an open dispute history. A reasoned review may approve usable quantity while disagreement remains visible; software does not prove physical truth.
 
-Canonical quantities use PostgreSQL `numeric(18,3)`, serialized as decimal strings; reject fractions beyond item scale (pieces require integer quantities). No floating-point comparison. Pack conversions are item-specific, approved, versioned and snapshotted; never automatically equate boxes and pieces or unknown item names.
+One local transaction posts accepted lines once: approved revision + stock balance + RECEIPT movements + audit + notice. Unique receipt-line initial-post reference and operation idempotency prevent duplicate credit; subsequent revisions cannot repost the original accepted total. Later acceptance from held quantity posts only the independently approved increment with a distinct operation reference. No external calls under locks. Corrections use independently reviewed compensating movements, never overwrite old counts or ledger. Preserve nonnegative/reserved constraints. Receipt links remain auditable; do not promise identification of a donor's physical goods after pooling.
 
-Per delivery/item: pledge quantity if any, donor-declared handed-over quantity nullable, physical count, accepted, held and rejected. Require `counted = accepted + held + rejected`. When declaration exists, `count_delta = counted - donor_declared`. Quality rejection is separate even when count matches. Record condition/expiry, canonical unit, actors/times, immutable donor/count revisions, reason/evidence. Compare each partial handover, not repeated pledge totals.
+### 25.6 Minimum model and accounting
 
-Changes before review create immutable revisions and invalidate pending approval. Reviewer checks explicit expected versions. Every receipt needs independent review, including matching counts. A discrepancy needs documented disposition and donor notice. Silence is never donor agreement. A reviewer may approve an evidenced usable quantity despite donor disagreement with a reasoned override; complaint remains OPEN and visible for operations review. Undetermined/unsafe goods stay held and unavailable. Later acceptance of held goods requires reviewed disposition; rejected goods need return/disposal custody evidence.
+Use the Logistics ERDs in Sections 6.1.3–6.1.4. Basic totals are per item/unit and warehouse/intake site. Reservations are a subset of on-hand, not extra goods; issued goods are in transit until confirmed delivered/returned/lost. Record receipt references on intake and distribution references on issue. Full source batches, movement-allocation splits, automated FEFO and stocktake windows are deferred (FR-DON-06 / FR-REC-02), with no dependency from the core receipt-posting transaction.
 
-Post accepted quantities once in one short Logistics transaction: approved exact receipt revision, source batch/balance, RECEIPT movement, aggregate balance, audit and notice. Unique receipt-line/revision posting constraints and idempotency prevent double credit. No external calls under locks. After posting, corrections use independently approved compensating movements referencing originals, never overwrite/delete ledger history. Corrections cannot reduce on-hand below reserved; first release/reallocate reservations under cycle guards or reject with conflict. Donor return uses a source-linked authorized stock-out and handover evidence, not an aid ISSUE.
+### 25.7 Minimal distribution and custody
 
-### 25.6 Logical model and source accounting
+Distribution: DRAFT → APPROVED → DISPATCHED → RECONCILED, cancellation before dispatch only. Independent approval covers exact version; changes invalidate it. Issue rechecks stock/scope/cycle/version and decrements stock once. Request-linked distributions reference issued commitments and never issue twice. Direct campaign distributions reserve/issue atomically locally.
 
-Extend the Section 6.1 ERD with these Logistics-owned entities; reuse existing Item, Warehouse, StockMovement and Distribution.
+Core allows direct household handoff or one relief point followed by final handouts. Record actual recorder/receiver/time, quantity and confirmation basis with private evidence. Point receipt is not final household delivery. Partial handouts leave visible point-held balance; no multi-leg forwarding UI. Per dispatch: `issued = received + verified_returned + approved_lost + still_in_transit`. At the point: `received = handed_out + verified_returned_from_point + approved_point_loss + still_held`. A verified return credits warehouse only after physical receipt; loss has distinct reasoned approval.
 
-```mermaid
-erDiagram
-  DONATION_DRIVE ||--o{ DONATION_DRIVE_ITEM : requests
-  DONATION_DRIVE ||--o{ DONATION_PLEDGE : attracts
-  DONATION_DRIVE ||--o{ DONATION_DELIVERY : receives
-  DONATION_PLEDGE |o--o{ DONATION_DELIVERY : partially_fulfills
-  DONATION_DELIVERY ||--o{ DONOR_DECLARATION_REVISION : preserves
-  DONATION_DELIVERY ||--o{ DONATION_RECEIPT : inspected_by
-  DONATION_RECEIPT ||--o{ DONATION_RECEIPT_LINE : counts
-  DONATION_RECEIPT ||--o{ RECEIPT_REVIEW : reviewed_by
-  DONATION_RECEIPT ||--o{ RECONCILIATION_CASE : investigates
-  DONATION_RECEIPT_LINE ||--o{ STOCK_SOURCE_BATCH : originates
-  STOCK_SOURCE_BATCH ||--o{ SOURCE_BALANCE : located_at
-  STOCK_SOURCE_BATCH ||--o{ MOVEMENT_ALLOCATION : traces
-  STOCK_MOVEMENT ||--o{ MOVEMENT_ALLOCATION : allocates
-  DISTRIBUTION ||--o{ CUSTODY_HANDOFF : records
-  CUSTODY_HANDOFF ||--o{ HANDOUT_LINE : distributes
-  STOCKTAKE ||--o{ STOCKTAKE_LINE : compares
-```
+Need `delivery_target_kind` is fixed once any commitment exists: request-linked default FINAL_RECIPIENT; RELIEF_POINT requires named active point, coordinator grant and reason. Campaign point replenishment may target RELIEF_POINT. The resolution seal checks that target and actual settlements; never infer final household aid from point receipt. Point stock stays separate from warehouse available stock.
 
-Minimum fields: warehouse/organization scope, donor opaque user ID nullable, guest capability hash, canonical quantities/units, immutable declaration/count versions, reviewer IDs, references and private evidence. Exact schema constraints/indexes are implementation gates. Each accepted receipt line creates a source batch; ordinary receipts/opening stock also get an explicit source root. SourceBalance stores usable on-hand/reserved by warehouse/item/source with eligibility/expiry. Allocation totals equal movement quantities; summed source balances equal aggregate warehouse/item balances.
+### 25.8 Basic reports and deferred operations
 
-Reserve/release, issue, transfer, return, correction and settlement retain source allocations. Transfers preserve receipt roots; physically verified returns preserve source and need condition inspection. Select eligible earliest expiry first, then intake time/source ID; overrides require reason. Held/expired goods cannot issue. For mixed supplies, donor progress reports accounting allocations, not identifiable physical objects. Baseline donation terms disclose pooling within drive purpose; hard donor earmarks/cross-purpose diversion are outside scope and must not be promised.
+Private donor receipt shows declared/count/accepted/rejected/held, dispute status and sanitized campaign progress. Public item totals show accepted and final distributed totals with generated_at; no contacts/evidence/household locations. Staff reports reconcile stock and direct/point deliveries with explicit outstanding and held quantities. Receipt traceability is retained, but source allocation through pooled transfers is not claimed.
 
-Extend lock order: current FulfillmentCycle first for request-linked commands, then need/commitment or distribution header, receipt/stocktake header where needed, then sorted warehouse/item aggregate balances, then sorted source balances. Receipt approval locks its header before stock. Never acquire cycle locks after stock locks. Unique keys handle new source rows; aggregate/source constraints, approval versions and idempotency commit together. No distributed transaction.
+Formal stocktakes, multi-warehouse transfers, source-level conservation, forwarding, automated expiry allocation and future pledges are deferred. Add them only after an actual operation requires them and amend contracts/schema/test scope first. Reuse published historical patterns as references; do not restore the earlier expanded Must scope automatically.
 
-Every balance-changing/reservation command checks the durable count-window flag while holding the same warehouse/item balance lock used to start a stocktake, preventing a check-then-write race. Starting a count window never acquires a cycle lock after a stock lock. A correction that must release request reservations is staged outside the count approval transaction through the ordinary cycle-first commands, then the count is refreshed; never reverse the lock order to force an adjustment. Pending physical custody and administrative review may continue without altering frozen usable balances.
+### 25.9 API and use cases
 
-### 25.7 Distribution and physical custody
+Exact paths must be frozen in OpenAPI with the `/api/v1/logistics` prefix. Mutations use idempotency and expected versions; human-readable responses are Vietnamese.
 
-DistributionPlan contains purpose, need/request or campaign reference, warehouse, point/destination, custodian/team, quantities and vehicle where relevant. `DRAFT -> APPROVED -> DISPATCHED -> RECONCILED`; cancellation only before dispatch. A different reviewer approves exact version; material changes invalidate approval. Approval does not deduct stock. Dispatch rechecks scope/version, source availability/expiry and cycle guards; creates waybill plus one ISSUE atomically.
-
-Preserve Section 8.3's two stock-out paths: request-linked Distribution references an issued commitment and never issues again; direct point/campaign distribution reserves/issues once locally. Each unit leaves warehouse stock through one ISSUE only. Store actual actors/times, quantities and receiving custodian, not only a planned driver.
-
-Receiving confirms actual point quantities, discrepancies and remaining transit by source, independently from sender. Point receipt settles that custody leg, not beneficiary delivery. Point stock is Logistics custody, not warehouse available stock. Final direct-recipient delivery can skip the point stage; explicitly identify handoff type.
-
-Handouts record date, broad location, item/source quantities, recipient household count or pseudonymous acknowledgment and independent confirmation. Do not require national IDs, beneficiary photos or public names. Partial handouts leave point-held remainder. Per leg: `dispatched = confirmed_received + verified_returned + approved_lost + remaining_in_transit`. At a point: `received = final_handouts + forwarded + returned_from_point + point_loss + still_held`. Refused/held arrivals remain unresolved custody until disposition. Forwarding opens a linked leg, not another warehouse ISSUE. No duplicate handoff; returns credit stock only after physical return/inspection; loss requires independent reasoned approval.
-
-Need delivery semantics remain explicit: an existing designated-point need may settle at confirmed point receipt, while a final-household need only fulfills at final handout. Add immutable `delivery_target_kind` (`RELIEF_POINT` or `FINAL_RECIPIENT`) when creating a need; freeze it once committed. **Selection rule (no free choice at fulfillment time):** a need linked to a Response request defaults to `FINAL_RECIPIENT`; `RELIEF_POINT` is allowed only when the coordinator names a designated active point and records a reason, and it is shown on the board and the request timeline. A need created for a campaign or point stock replenishment defaults to `RELIEF_POINT`. The kind cannot be changed after any commitment exists, and only a scoped coordinator with the need-management grant can set it; fulfillment staff cannot choose or alter it. A RELIEF_POINT need that is fulfilled at point receipt is labelled 'Đã giao đến điểm cứu trợ' on the board and a request cannot be RESOLVED on that basis unless the coordinator's resolution record acknowledges that no final household handout is expected for it. Existing described point workflows default to RELIEF_POINT in future migrations. Request seal guards the chosen need target and cannot infer final aid from intermediate receipt. Point-held balances remain separately reported after request closure.
-
-### 25.8 Reports and stocktakes
-
-Donor views preserve declaration/count/acceptance differences, disposition, complaints and sanitized source progress. Public totals show items and broad destinations with generated_at; no contacts, capabilities, private evidence or beneficiary identities. Scoped operations views show unmatched handovers, held goods, stale approvals, open complaints and overdue custody. These are investigation signals, not accusations of theft/bribery.
-
-Separate cumulative events from current positions. Per source, reconcile accepted/opening inflows and reviewed corrections against current warehouse stock (reserved is a subset), unresolved transit, point custody, final handouts, approved losses, donor returns and disposal. Transfers/return journeys move positions, not new donations. Rejected intake is outside usable stock; held intake has its own physical custody register. Never sum unlike units or count a returned/transferred unit twice. Reports trace receipt -> source movement -> dispatch -> receipt -> handout references. Application append-only history is not tamper-proof against host/database administrators; existing restricted access and separate backups remain necessary.
-
-Stocktake: scoped preparer starts a durable count window for selected warehouse/items -> block stock mutations for those balances -> snapshot book quantities/versions -> count -> distinct reviewer approves source-linked correction -> close window. Do not hold DB transactions while physically counting. Incoming physical deliveries can enter pending custody but cannot post into frozen balances; unaffected stock continues. After failure, resume/cancel explicitly with audit, never silently expire the window. Unexpected snapshot changes invalidate approval and require recount. Negative/reserved constraints still apply; condition/expiry changes may need quarantine plus reservation release rather than arithmetic adjustment.
-
-### 25.9 APIs and use cases
-
-All paths are Logistics `/api/v1`; mutations use idempotency and expected versions. Stable error codes remain English, human-readable responses Vietnamese.
-
-| Resource / command family | Access |
+| Family | Access |
 |---|---|
-| `GET /donation-drives`, `GET /donation-drives/:id` | Public sanitized open drives; separate scoped staff history |
-| `POST /donation-drives`, `POST /donation-drives/:id/{open,pause,resume,close}` | Scoped warehouse manager |
-| `POST /donation-drives/:id/pledges`, `POST /donation-drives/:id/deliveries` | Citizen or guest; referenced pledge must share owner/drive |
-| `GET /donations/:id`, `POST /donations/:id/{declarations,disputes,claim}` | Owner/capability; claim also requires account |
-| `POST /donation-receipts`, `POST /donation-receipts/:id/{counts,review,post}` | Intake/reviewer separation; approved exact revision posts once |
-| `POST /distributions/:id/{approve,dispatch,receive,handouts,return,settle-loss}` | Scoped per-stage staff; independent handoffs |
-| `POST /stocktakes`, `POST /stocktakes/:id/{start,counts,approve,cancel}` | Scoped preparer/reviewer; durable count window |
-| `GET /reconciliation`, `GET /donation-reports/:id` | Scoped operations or sanitized owner report |
+| `GET /donation-drives`, `/donation-drives/:id` | Sanitized public list/detail; separate scoped history |
+| `POST /donation-drives`, `/donation-drives/:id/{open,pause,resume,close}` | Authorized campaign/operations manager |
+| `POST /donation-drives/:id/deliveries` | Guest name/phone/capability or citizen owner; no login required for guest |
+| `GET /donations/:id`, `POST /donations/:id/{declarations,disputes,claim}` | Owner/capability; claim requires both account and capability |
+| `POST /donation-receipts`, `/donation-receipts/:id/{counts,review,post}` | Scoped independent intake/review |
+| `POST /distributions/:id/{approve,dispatch,receive,handouts,return,settle-loss}` | Scoped distinct actors and per-stage guards |
+| `GET /reconciliation`, `/donation-reports/:id` | Basic staff reconciliation or private sanitized donor view |
 
-UC-10 — Manage donation drives: publish needs/open; enforce scope/state; closing leaves outstanding reviews visible. UC-11 — Donate as citizen/guest: optional pledge, actual handover declaration, private tracking, partial delivery and safe retries. UC-12 — Verify receipt: independent count/review/post; preserve donor disagreement and corrections. UC-13 — Distribute relief: independently approved issue, receiving confirmation, final handout and partial return/loss. UC-14 — Reconcile stocktake: durable snapshot/count/review and compensating adjustment. These extend Section 9; produce exact OpenAPI schemas and migration constraints before implementing each slice.
+UC-10: manager publishes/manages appeal. UC-11: guest/citizen declares actual handover and privately tracks/disputes. UC-12: staff count, distinct reviewer approves and posts once. UC-13: approved issue and direct/one-point handoff. UC-14 stocktakes is reserved for a deferred extension; future pledge/source/transfer endpoints are absent from core contracts.
 
-### 25.10 AI only where justified
+### 25.10 Optional AI
 
-**Core reconciliation and distribution require no AI.** Exact unit comparison, SQL conservation, FEFO, scope/actor checks and overdue-custody rules are reproducible. Matching arithmetic does not prove counts truthful; physical evidence and independent review provide the control.
+Core intake/count/unit comparison/reports need no AI. FR-AI-07 remains Optional: reviewed Vietnamese document extraction only after manual flow and an independently measured correction-time/critical-error benefit. Use existing Logistics ownership and no Python/new domain service. It cannot approve, mutate stock, accuse donors/staff, decide eligibility or dispatch. Provider/privacy/schema/evaluation gates still apply; AI off leaves the whole core workflow usable.
 
-FR-AI-07 optionally prefills item/unit/quantity from a photographed note after the manual workflow works. Evaluate representative Vietnamese documents on a held-out set against manual entry: field accuracy, critical quantity/unit errors and correction time. Activate only with measured time benefit and mandatory review of every critical field; until then remain manual. QR/barcode identifier capture is ordinary software, not AI.
+### 25.11 Planned acceptance and status
 
-If justified, use Logistics-owned immutable jobs/worker and the bounded freshness/failure pattern of Section 12; no access to Response-owned AI tables, new service or Python. Documents are untrusted; minimize/redact PII, validate output schema, link suggestions to evidence, invalidate stale suggestions and require human confirmation. Provider remains unselected; no automatic external upload. Output is Vietnamese. AI cannot approve, modify stock, decide eligibility, allocate/dispatch aid or accuse anyone. Learned fraud scoring/forecasting is excluded without suitable data/evaluation. Provider outage leaves all core workflows usable.
+These cases are specifications, **not executed tests**. IDs from the previous extension remain preserved.
 
-### 25.11 Planned acceptance and delivery order
-
-These are planned cases, not executed product tests.
-
-| Test | Requirements | Expected evidence |
+| Test | Status / links | Expected evidence |
 |---|---|---|
-| TC-DON-01 | FR-DON-01 | Scoped manager opens/closes; denied cross-warehouse action; pending reviews remain visible |
-| TC-DON-02 | FR-DON-02 | Citizen/guest/walk-in/partial donations; lost-response retry creates one record without Identity dependency |
-| TC-DON-03 | FR-DON-03 | Pledge 100, handover 60, count 58, accepted 55/rejected 3: pledge gap 40, count delta -2, rejection 3 shown separately |
-| TC-DON-04 | FR-DON-04 | All count authors denied self-review; accepted stock posts once; held stock unavailable |
-| TC-DON-05 | FR-DON-03/04 | Changed declaration/count invalidates approval; competing approval/post retries yield one stock credit |
-| TC-DON-06 | FR-DON-05 | Donor disagreement stays visible after reasoned review override; silence never becomes agreement |
-| TC-DON-07 | FR-DON-02/05 | Receipt QR/other donor/SOS secret denied; claim revokes guest capability; recovery reveals no private record |
-| TC-DON-08 | FR-DON-06 | Partial transfer/return retains receipt source; movement allocations equal source/aggregate balances |
-| TC-DON-09 | FR-DON-03/06 | Invalid units/precision/conversion, expired/held batches and insufficient source rejected |
-| TC-DIST-01 | FR-LOG-06 | Independent versioned approval; edits invalidate; both stock-out paths ISSUE exactly once |
-| TC-DIST-02 | FR-LOG-06/07 | Dispatch 55, point receipt 50/loss 5, handout 35/held 15; no duplicate stock debit or false final delivery |
-| TC-DIST-03 | FR-LOG-07 | Refusal/forwarding/return/loss conserve custody; no self-confirmed receipt or fabricated warehouse return |
-| TC-DIST-04 | FR-LOG-06/07 | Concurrent issue respects request seal; FINAL_RECIPIENT need cannot fulfill at point receipt; request-linked need defaults to FINAL_RECIPIENT; RELIEF_POINT needs a named point and reason; staff without the need-management grant cannot set or change the kind; kind is frozen after the first commitment |
-| TC-REC-01 | FR-REC-01 | Fixed dataset reconciles all stages without double-counting transfers/reservations/returns |
-| TC-REC-02 | FR-REC-02 | Count window blocks selected mutations; durable recovery/cancel; stale snapshot requires recount |
-| TC-REC-03 | FR-REC-02 | Independent correction preserves history and nonnegative/reserved invariants |
-| TC-AI-DON-01 | FR-AI-07 | Disabled/unavailable AI never blocks core workflows |
-| TC-AI-DON-02 | FR-AI-07 | Wrong OCR unit/quantity, stale input or injection cannot approve/post; human confirmation required |
-| TC-AI-DON-03 | FR-AI-07 | Held-out Vietnamese accuracy/time comparison recorded before activation |
+| TC-DON-01 | Core / FR-DON-01 | Campaign/operations manager opens/closes; intake-only user denied publishing; pending review survives close |
+| TC-DON-02 | Core / FR-DON-02 | Guest name/phone and citizen handover work; no login dependency; lost-response retry stores once; future pledge path deferred |
+| TC-DON-03 | Core / FR-DON-03 | Declare 60, count 58, accept 55/reject 3; count difference -2 distinct from rejected 3; earlier pledge-100 subcase deferred |
+| TC-DON-04 | Core / FR-DON-04 | Count author cannot approve; accepted stock posts once; held stock unavailable |
+| TC-DON-05 | Core / FR-DON-03/04 | Changed count/declaration invalidates approval; concurrent post returns one credit |
+| TC-DON-06 | Core / FR-DON-05 | Disagreement retained; silence does not confirm receipt |
+| TC-DON-07 | Core / FR-DON-02/05 | Receipt ID/name/phone/other donor/SOS secret denied; audited recovery and claim revoke old capability |
+| TC-DON-08 | Deferred / FR-DON-06 | Source allocation through transfers/returns only when extension enabled |
+| TC-DON-09 | Core item checks; source subcase deferred / FR-DON-03/06 | Reject wrong unit/scale and held/unsafe stock; no required automated conversion/FEFO/source selection |
+| TC-DIST-01 | Core / FR-LOG-06 | Distinct exact-version approval; ISSUE once in either stock-out path |
+| TC-DIST-02 | Core / FR-LOG-06/07 | Issue 55, point receipt 50/loss 5, handout 35/held 15; no second debit or false final delivery |
+| TC-DIST-03 | Core return/loss; forwarding deferred / FR-LOG-07 | Bounded handoffs and verified returns; no self-confirmed dispatch/receipt |
+| TC-DIST-04 | Core / FR-LOG-06/07 | Cycle seal honored; target kind frozen and set only by authorized coordinator |
+| TC-REC-01 | Core / FR-REC-01 | Fixed item/unit totals reconcile intake, stock, transit and final handoffs without double counting |
+| TC-REC-02/03 | Deferred / FR-REC-02 | Stocktake window and source-level corrections only with extension |
+| TC-AI-DON-01..03 | Optional / FR-AI-07 | AI off/unavailable leaves core usable; critical fields human-reviewed; measured evaluation before activation |
 
-Extend TC-L10N-01..03 and private-file/export checks across guest donation, discrepancies, complaints, handoffs and optional OCR. SRS/SDD/test cases/user guide must preserve these IDs.
+Extend TC-L10N-01..03 across public guest forms, counts, conflicts, denied permissions, notices and handoffs. Delivery sequence is public appeal/actual handover → independent receipt/post → basic allocation/dispatch/handoff → reconciliation/privacy. Do not expose receipt acceptance before independent posting works. No test result, production fraud detection or fundraising compliance is established by this design.
 
-Delivery order: contracts/grants/units -> public drive and declarations -> independent intake/posting -> source allocations for every existing stock mutation -> approved distribution/custody/handouts -> stocktakes/reports -> optional evaluated extraction. Do not expose public donation intake before verified posting/source accounting works. Demo matching and 100/60/58/55 discrepant donations, denied self-approval, retry without duplicate credit, partial point handout and reconciled totals; AI is not required.
+## 26. Supervisor feedback, operational rules and model review
 
-Remaining implementation gates: exact schemas/constraints, item-specific quality/expiry criteria, staffed grants, reviewed Vietnamese copy and authorized execution evidence. Synthetic demo defaults use open-ended complaint visibility and audited manual access recovery. Real operating/legal policy, response deadlines and production anti-fraud effectiveness are not established by this capstone plan. Routine design decisions have been delegated; do not reopen settled architecture.
+### 26.1 Feedback interpretation and remaining questions
+
+| Note / clarification | Adopted meaning and source |
+|---|---|
+| Conceptual / overview ERD | Separate business-level concepts from logical service-owned entities; Section 6. Physical migrations remain future work. Exact terminology used by the supervisor still needs confirmation. |
+| Architecture central, square layout | Put response workflow at center; simple rectangular groups/orthogonal connectors, aligned spacing; overview plus container architecture, not one giant diagram. |
+| SOS, remote relative, alternate contact | Signed-in PROXY report; separate affected location and reporter contact; power outage does not require victim login/phone; strict provenance and human verification. |
+| State/military/volunteer rescue teams | User clarification: all are team affiliations under the same mission permissions. No official government integration or privileged role merely from affiliation. |
+| Nearby teams and unequal workload | User clarification: avoid overloading nearest team; compare similarly nearby eligible teams using recent mission burden, not distance alone. Section 26.3. |
+| Item type | Controlled item type and canonical unit, distinct from SOS incident category. |
+| Less warehouse responsibility | Campaign managers publish appeals/approve allocations; intake staff count/receive/issue; independent review remains. Advanced warehouse scope deferred. |
+| Donation without login | User request: name/phone and goods suffice, private capability secures tracking. No mandatory donor account. |
+| Commerce / transfer notes | User explicitly answered in-kind only, no money. Do not implement payments or reinterpret this as sales. |
+| Grouping | Proposed region/time/category/status saved views and canonical duplicate links; not automatic household merging, not one mission spanning several SOS. Clarify if supervisor intended dispatch batching. |
+| Prior report reference | Existing weeks 1–3 Markdown reports contain only headings. Read the text of [weeks 1–2 slides](reports/Tuan-01-02.pptx), especially slides 5, 10 and 11, plus the separate weeks 1/2 decks: preserve their three-service ownership, five baseline actor groups and conceptual/logical distinction; add omitted proxy/donor/intake relationships. Those slides are plans, not completed SRS/SDD or a detailed ERD template. Public prior PTIT-HCM capstones were subsequently researched at the user's request; findings and limits are in Section 26.8. |
+| Fragmented/repeated chat notes | Treat as incomplete meeting notes, not a diagnosis, product feature or stakeholder identity. No unsupported requirement is inferred. |
+
+### 26.2 Provenance and false-report controls
+
+PROXY records relationship, last-known situation/time, source and contactability. Coordinator sees “Báo hộ — chưa xác minh” until a documented decision. Record alternative contact attempts separately; offline/unreachable is not false. Use bounded DTOs/media, idempotency, existing never-drop SOS soft quotas and scoped review queues. Require independent corroboration/evidence or two distinct scoped coordinators for PROXY; the same account/phone/IP does not constitute independent corroboration. A new photo or login alone never verifies. Conflicting or stale information prompts clarification and preserves both revisions.
+
+Do not classify people as fraudulent from a heuristic or AI score. Coordinator rejection/duplicate decisions require reason/evidence; preserve original requests. Reports grouped on a map remain individually identifiable internally; distinct households stay separate. No public reporter phone/name, alternate contact or exact affected location. Scoped assigned leaders see necessary contacts; general dashboards/AI do not.
+
+### 26.3 Nearby eligible teams with workload balance
+
+Team affiliation: VOLUNTEER, MILITARY, GOVERNMENT or OTHER; linked organization and staff-verified affiliation. Every team obeys the same scope, mandatory skills, availability and capacity-one demo guard. These labels do not assert participation by an actual authority. Seed demo teams under one coordinating organization, recording affiliation as metadata; affiliation never bypasses the existing organization scope. A real multi-agency deployment needs explicit cross-organization participation/grants before offering missions across organizations.
+
+1. Filter by active membership/leader, mandatory skills, compatible organization/region, AVAILABLE and no reserved active slot. OFFERED/ACCEPTED/EN_ROUTE/ON_SCENE all occupy the one active slot; atomic offer checks prevent two coordinators booking it twice.
+2. Use a manually confirmed/foreground team position, source/accuracy/time. No background tracking. Proposed synthetic-demo freshness is 30 minutes; stale/unknown positions are shown separately as “Chưa đủ dữ liệu vị trí”, never labelled nearest. A coordinator can refresh/confirm a position with audit. Required position fields are on TEAM_POSITION (Section 6).
+3. Query eligible nearby teams with PostGIS geography radius/distance. Proposed demo search radius 10 km; explicitly expand it if none are suitable. Show geodesic distance in meters/kilometers, not road distance/ETA. [PostGIS ST_DWithin](https://postgis.net/docs/ST_DWithin.html), [ST_Distance](https://postgis.net/docs/ST_Distance.html) checked 2026-10-06.
+4. Define a comparable nearby band: candidates within `nearest_eligible_distance + distance_tolerance`; proposed demo tolerance 2 km, configurable and visible in the comparison. Within that band suggest ascending recent mission burden, then distance, then team ID for deterministic ties. Other radius candidates remain visible by distance. Recent burden counts distinct non-DECLINED/non-CANCELLED missions with an offer or active/terminal work in the preceding 24 hours; count one mission once, not each transition. Also show any current active work even if older. This simple count cannot measure actual fatigue; display it as “Số nhiệm vụ gần đây”, not a readiness guarantee. Parameters are team proposals pending field review.
+5. Show distance, position age/accuracy, recent counts, availability, skills and affiliation together. Example: team A 1 km/5 completed recent missions; team B 1.5 km/1 recent mission, both free and capable: suggest B. An incapable or busy B never wins because of lower count. A 9 km team with no work does not displace a 1 km team merely because count is lower outside the comparable band.
+6. Coordinator selects and records why, especially a choice outside the suggested band. Offer transaction rechecks current scope, availability, capacity and request version; stale candidate data causes conflict/reload. Suggestions never create a mission, change request urgency or dispatch automatically. Declined/failed mission reassignment is human.
+
+No weighted optimization, AI dispatch, route engine or global multi-SOS scheduling is introduced. If field validation finds mission duration/fatigue matters more than counts, revise this stated limitation and policy before operational use.
+
+### 26.4 Heatmap and grouping semantics
+
+Heatmap means density of **confirmed requests**, not hazard forecast or severity. Scope-filter first, then aggregate by a seeded demo grid (proposed 1 km cells) in a documented meter-based local projection; never treat WGS84 degrees as kilometers. Choose projection with the demo-region seed. Return cell geometry/center, canonical request count, time window/status filters and generated_at, without contacts/exact household pins. Default counts verified nonterminal canonical requests; DUPLICATE/REJECTED/CANCELLED are excluded. CLOSED/historical views require an explicit filter. A reopened request counts once in its current cycle.
+
+Unverified reports remain in the intake queue and an optional clearly labelled staff-only layer; never mix them into confirmed totals. Counts are not estimates of affected persons; reported headcounts may overlap and must not be added blindly. Legend, time window, filter scope, sample size and empty/stale states are visible in Vietnamese. Small cells are still sensitive: operational heatmap is authenticated/scoped, not public. No heat-based priority or automatic allocation.
+
+Grouping is a saved/filterable view (region/category/time/status or canonical request), not loss of report history. Multiple rescue teams use separate missions under one SOS; the MVP still has one request per mission. Cross-request convoy/group dispatch requires a separately approved model.
+
+### 26.5 Diagram delivery and review conventions
+
+Six fixed-layout SVG figures with editable `.drawio` sources accompany this plan: system overview, container architecture, conceptual ERD, response actors/use cases, donation/support actors/use cases and campaign/allocation/administration actors/use cases. Use crisp flat shapes, aligned rectangles and right-angle paths; conceptual relationships show min/max cardinality, UML uses external actors/ellipses and solid associations. Technical labels are English; these are report figures, not product UI. Service-owned logical ERDs are editable Mermaid in Section 6 and cover account/grant, subject/provenance, team/skills/position, item/type/unit, receipt/review and delivery relationships.
+
+Review diagram-to-text consistency before using in SDD: no required donor login; no account for victim; SELF vs PROXY; volunteer/military same scoped authority; no automatic assignment; mission/priority/fulfillment distinct; no cross-service FK; warehouse staff not campaign owner; deferred entities absent from core diagrams. The diagrams show proposed design, not implemented behavior.
+
+### 26.6 New planned acceptance and traceability
+
+| ID | Links | Scenario and required outcome |
+|---|---|---|
+| TC-REV-01 | UR-01, FR-REQ-11, UC-15 | Reporter in city A pins family in region B; stored/routed subject is B; reporter GPS/contact cannot overwrite it; victim phone/account not required |
+| TC-REV-02 | FR-REQ-11, FR-IAM-02, UC-15 | Missing/expired/revoked login cannot create PROXY; citizen cannot choose organization/role or read another proxy report; Identity outage shows pending/error, never silent SELF fallback |
+| TC-REV-03 | FR-REQ-03/11, FR-REQ-10, UC-15 | Retry remote report gives one row; login does not verify; failed victim calls preserve VERIFYING; alternate-source details/time remain private/history |
+| TC-REV-04 | FR-REQ-04/10/11, UC-02/15 | Reporter-only claim or reused account/phone as corroboration insufficient; independent evidence or distinct coordinator concurrence recorded; nearby different households not auto-merged |
+| TC-REV-05 | FR-MSN-01/05, UC-03 | Nearby busy/incapable/stale-position team not suggested as nearest; mixed affiliations have identical object/action scope; affiliation cannot self-grant permissions |
+| TC-REV-06 | FR-MSN-02/05, UC-03 | Free A at 1 km with 5 recent missions vs free B at 1.5 km with 1: B suggested; both remain visible; team at 9 km does not win solely on low workload; count/tie/window rules reproducible |
+| TC-REV-07 | FR-MSN-02/05, UC-03 | Two coordinators offer one capacity-one team concurrently: one winner; stale candidate reload; recommendation never dispatches; override has actor/time/reason |
+| TC-REV-08 | FR-MAP-01, FR-REQ-06/08, UC-16 | Dataset with canonical verified, duplicate, unverified and out-of-scope reports: correct authorized counts/filter/time; no PII; grouping does not merge; empty/stopped API labelled |
+| TC-REV-09 | FR-DON-01/02/05, UC-10/11 | Guest name/phone handover without login; intake-only user denied publishing; accepted/type/unit totals correct; receipt ID or phone alone cannot access private donation |
+| TC-REV-10 | NFR-L10N-01, FR-REQ-11, FR-MSN-05, FR-MAP-01 | Vietnamese proxy forms, contactability, candidate distance/workload, heatmap legends, success/errors/notices; machine codes stable; original entered names/content preserved |
+
+All above are planned. Do not record them as passing from a documentation edit. Existing TC-BE and donation/custody/language checks continue within the revised core scope.
+
+### 26.7 Diagram review findings
+
+The review follows each actor action through its use case, service owner, logical relationship and state transition. UML notation follows the [OMG UML 2.5.1 specification](https://www.omg.org/spec/UML/2.5.1); ERD line/cardinality notation follows the [Mermaid ER diagram reference](https://mermaid.js.org/syntax/entityRelationshipDiagram.html). Diagram associations show participation, not permission to execute every step of a multi-actor use case; backend grants and command guards remain authoritative.
+
+| Reviewed area | Correction incorporated | Remaining design limit |
+|---|---|---|
+| Conceptual ERD | Distinguish donor, reporter and affected household; show optional accounts without inventing mandatory victim registration. | Participant roles are mapped to per-report/per-donation snapshots, not global person registries. Distribution/handoff details are expanded in the logical fulfillment view. |
+| Logical ERDs | Define every referenced entity, draw missing local FK relationships, distinguish identifying lines, add receipt/donation-line uniqueness and preserve opaque cross-service references. | These are logical views; physical indexes, nullable/check constraints and migration-level enforcement require the SDD and implementation. |
+| Response actors | One UC-03 ellipse for coordinator/leader actions; UC-17 for member read access, inherited by the leader. Coordinator and granted operations manager participate in UC-16. | Association with UC-03 does not let a leader allocate another team or confirm request resolution. |
+| Donation/management actors | Guest UC-11 has no login dependency; count, independent review, campaign ownership and administration remain distinct. | Receiving-party contact is not proof of authenticated confirmation; UC-13 must use its documented evidence/independence guards. |
+| Architecture | Operations management connects to relief work; human verification handles authority referrals. Response/Logistics REST exchanges are bidirectional; stores remain separately owned. | Container arrows summarize dependencies; per-command request/response sequences belong in the SDD. |
+| State and quantity semantics | RESOLVED reopening creates a new work cycle. Point custody is distinguished from final household aid; later receipt corrections cannot credit the full accepted amount again. | Reopen, resolution seal and compensating movements require the planned concurrency/acceptance checks. |
+
+Export logical ERDs individually at readable scale in the report; do not compress the Response or intake view into an unreadable page thumbnail. Keep editable originals and reconcile the diagrams with the data dictionary and migrations whenever implementation changes.
+
+### 26.8 Lessons from public PTIT-HCM capstones
+
+Research on 2026-10-06 found one attributable full prior graduation report and a second student-attributed project with narrower public design/demo material. The [research note](research/ptit-hcm-capstone-design-lessons.md) records provenance, inspected pages, source links and limitations. No grades or university endorsement were established.
+
+- **Nguyễn Thành Phong, N18DCCN147:** the [Android patient-registration capstone report](https://raw.githubusercontent.com/Phong-Kaster/PTIT-Do-An-Tot-Nghiep/main/api/document/CP_147_NguyenThanhPhong.pdf) connects business workflow, use-case scenarios, database design and Web/API/Android interfaces. Its architecture, use cases, ERD and dashboard were inspected at printed pages 10, 12, 68 and 74 (PDF pages 23, 25, 81 and 87). Adopt that traceability and explain dashboard quantities/time windows. Avoid its mixed architecture levels, unclear system boundary and diagram/dictionary discrepancies. The [student-hosted report outline](https://github.com/Phong-Kaster/PTIT-Do-An-Tot-Nghiep/blob/main/api/document/Noi%20dung%20quyen%20bao%20cao%20do%20an.txt) is a historical reference, not a verified current submission template.
+- **NutriAI / Lucfin, Phúc–Linh team:** the public [Lucfin design documentation](https://github.com/Phuc75nguyen/LucfinChatbot) and [NutriAI interface documentation](https://github.com/Phuc75nguyen/NutriAI) offer a presentation lesson: keep source evidence, time and generated interpretation visible together. A full thesis and reported metrics were not verified. For C48, show uncertainty and human review; retain the selected stack and the prohibition on automatic AI verification/dispatch.
+
+Apply the lessons through one concrete SDD walkthrough first: **UC-15 → Vietnamese Web/Mobile form → Response OpenAPI operation → request/subject/contact-attempt/verification data → TC-REV-01..04**. Follow with UC-02/03 and UC-11/12. Each walkthrough includes main/exception steps, a numbered sequence, data constraints and expected outcomes. Mark planned and implemented artifacts separately. This improves documentation without expanding warehouse or payment scope.
+
+### 26.9 Revision status and next task
+
+This revision changes the English plan, supporting diagrams and a research note only. Documentation checks cover local Markdown links, fenced blocks, diagram XML IDs/edge references, entity definitions, core use-case coverage and whitespace. All nine Mermaid diagrams rendered successfully with a temporary CLI/Chromium outside the repository, including the four logical ERDs; PNG rendering was used to inspect text and relationships. The six fixed-layout SVG figures were also rendered and visually inspected. These checks do not establish application behavior: no application tests, deployment or runtime/dependency compatibility checks were executed.
+
+Next task: review the revised core workflows and model cardinalities with the supervisor, clarify whether grouping means queue filters or combined dispatch, and confirm the current report template. During week 3, Sang revisits system design after supervisor feedback and starts Backend work; Trí and Sơn design Web/Mobile UI/UX and Frontend screens; ERD and use-case review is shared by all three. Before implementing each slice, review its OpenAPI/migrations/grants and planned acceptance cases. Keep donations in-kind and warehouse scope reduced.
 
 ## Appendix A. AI implementation and research handoff
 
@@ -1802,7 +2325,7 @@ Use the recorded baseline for implementation. Revisit it when new evidence mater
 - Enforce scope in querysets and object actions, including files, exports, and notifications.
 - Commit each service's business change, audit history, and in-app notice atomically; make retryable commands idempotent.
 - Preserve stock constraints, append-only movements, short transactions, deterministic locking, and idempotent commands.
-- Apply Section 25: declarations never credit stock; independent reviewers approve counts; source allocations conserve quantities; point receipt is not final handout.
+- Apply Section 25: declarations never credit stock; independent reviewers approve counts; basic stock and handoff quantities reconcile; full source allocation is deferred; point receipt is not final handout.
 - Preserve coordinate order, location source, accuracy, capture time, and server receive time.
 - Never label an offline draft as received before server ACK.
 - Never let AI or reporting projections become authoritative dispatch/priority decisions.
@@ -1810,7 +2333,7 @@ Use the recorded baseline for implementation. Revisit it when new evidence mater
 
 ### A.3 Decision baseline and remaining slice gates
 
-Sections 22 and 23 supersede the earlier architecture draft: three-service ownership, REST integration, multi-mission aggregation, single-team missions, campaign optionality/resume, mutually exclusive verification, partial fulfillment, stock accounting, revocation, and notification uniqueness. Do not reintroduce broker workflows without evidence meeting Section 4.4.
+Section 26 records the latest feedback and Section 16/25 the reduced scope. Sections 22 and 23 retain the applicable safeguards from the earlier architecture review: three-service ownership, REST integration, multi-mission aggregation, single-team missions, campaign optionality/resume, mutually exclusive verification, partial fulfillment, stock accounting, revocation, and notification uniqueness. Do not reintroduce broker workflows without evidence meeting Section 4.4.
 
 Before implementing a slice, finish its OpenAPI schemas, database migration constraints/indexes, authorization cases, and executable acceptance cases. These concrete artifacts are not yet present in this documentation-only repository. Priority definitions, external providers, real-data retention, and operational SLA remain subject to domain review before real use. Ordinary reversible implementation choices may proceed under the documented demo defaults.
 

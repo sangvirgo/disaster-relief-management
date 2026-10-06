@@ -1,0 +1,150 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net" type="device" version="24.7.17">
+  <diagram id="c48-container-architecture" name="C48 | Container architecture — Response at the center">
+    <mxGraphModel dx="1200" dy="1110" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1110">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="C48 | Container architecture — Response at the center" style="text;html=0;fontSize=23;fontStyle=1;align=left;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="40" y="8" width="1120" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="apps" value="Three application services" style="rounded=0;whiteSpace=wrap;html=0;verticalAlign=top;align=left;spacingLeft=18;spacingTop=12;fontStyle=1;fontSize=17;fillColor=#f8fafc;strokeColor=#64748b;" vertex="1" parent="1">
+          <mxGeometry x="70" y="410" width="1060" height="270" as="geometry" />
+        </mxCell>
+        <mxCell id="edge0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.5;exitY=1.0;exitPerimeter=0;entryX=0.275;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="web" target="proxy">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="365" y="225" />
+              <mxPoint x="510" y="225" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.5;exitY=1.0;exitPerimeter=0;entryX=0.725;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="mobile" target="proxy">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="835" y="225" />
+              <mxPoint x="690" y="225" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.25;exitY=1.0;exitPerimeter=0;entryX=0.5087719298245614;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="proxy" target="identity">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="500" y="375" />
+              <mxPoint x="410" y="375" />
+              <mxPoint x="410" y="465" />
+              <mxPoint x="250" y="465" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.5;exitY=1.0;exitPerimeter=0;entryX=0.5;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="proxy" target="response">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.75;exitY=1.0;exitPerimeter=0;entryX=0.5087719298245614;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="proxy" target="logistics">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="375" />
+              <mxPoint x="955" y="375" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.0;exitY=0.5;exitPerimeter=0;entryX=1.0;entryY=0.5;entryPerimeter=0;" edge="1" parent="1" source="response" target="identity">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=classic;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.0;exitY=0.5;exitPerimeter=0;entryX=1.0;entryY=0.5;entryPerimeter=0;" edge="1" parent="1" source="logistics" target="response">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.5087719298245614;exitY=1.0;exitPerimeter=0;entryX=0.8245614035087719;entryY=1.0;entryPerimeter=0;" edge="1" parent="1" source="logistics" target="identity">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="955" y="645" />
+              <mxPoint x="340" y="645" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.5087719298245614;exitY=1.0;exitPerimeter=0;entryX=0.5087719298245614;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="identity" target="idb">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.5;exitY=1.0;exitPerimeter=0;entryX=0.5;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="response" target="rdb">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.5087719298245614;exitY=1.0;exitPerimeter=0;entryX=0.5087719298245614;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="logistics" target="ldb">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.8103448275862069;exitY=1.0;exitPerimeter=0;entryX=0.4326923076923077;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="response" target="files">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="690" y="720" />
+              <mxPoint x="775" y="720" />
+              <mxPoint x="775" y="940" />
+              <mxPoint x="650" y="940" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;startFill=1;endArrow=classic;endFill=1;strokeColor=#475569;fontSize=12;exitX=0.8070175438596491;exitY=1.0;exitPerimeter=0;entryX=0.8173076923076923;entryY=0.0;entryPerimeter=0;" edge="1" parent="1" source="logistics" target="files">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1145" y="600" />
+              <mxPoint x="1145" y="920" />
+              <mxPoint x="850" y="920" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="web" value="Web client&#10;React + Vite" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ffffff;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="220" y="90" width="290" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="mobile" value="Mobile client&#10;React Native + Expo" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ffffff;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="690" y="90" width="290" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="proxy" value="Nginx reverse proxy&#10;HTTPS / public API boundary" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ffffff;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="400" y="255" width="400" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="identity" value="Identity API&#10;Accounts / sessions / scoped grants" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ffffff;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="105" y="490" width="285" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="response" value="Response API&#10;SOS / verification / teams / missions" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#e0f2fe;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="455" y="490" width="290" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="logistics" value="Logistics API&#10;In-kind receipts / stock / delivery" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ecfdf5;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="810" y="490" width="285" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="idb" value="Identity database&#10;Own credentials / migrations" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ffffff;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="105" y="770" width="285" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="rdb" value="Response database + PostGIS&#10;Own credentials / migrations" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ffffff;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="455" y="770" width="290" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ldb" value="Logistics database&#10;Own credentials / migrations" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ffffff;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="810" y="770" width="285" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="files" value="Private MinIO AIStor Free&#10;Separate Response / Logistics access" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ffffff;strokeColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="425" y="965" width="520" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="note0" value="One demo host; separate service databases. No cross-service SQL or foreign keys." style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=#ffffff;align=center;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="470" y="1076" width="260" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="note1" value="grants" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=#ffffff;align=center;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="292" y="518" width="260" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="note2" value="REST" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=#ffffff;align=center;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="648" y="518" width="260" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="note3" value="current-session grants" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=#ffffff;align=center;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="470" y="620" width="260" height="24" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

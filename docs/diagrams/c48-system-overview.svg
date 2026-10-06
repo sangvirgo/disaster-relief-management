@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1060" viewBox="0 0 1200 1060" role="img" aria-labelledby="title desc"><title id="title">C48 | System overview — SOS at the center</title><desc id="desc">Proposed C48 design. Aligned shapes and orthogonal connectors. Editable diagrams.net source accompanies this SVG.</desc>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#334155"/></marker><marker id="generalization" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M1,1 L13,7 L1,13 Z" fill="white" stroke="#334155" stroke-width="1.5"/></marker></defs>
+<rect width="1200" height="1060" fill="white"/>
+<text x="40" y="38" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#0f172a">C48 | System overview — SOS at the center</text>
+<rect x="260" y="180" width="680" height="690" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+<text x="278" y="208" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#0f172a">Emergency Response and Disaster Relief System</text>
+<path d="M151,329 L300,329" fill="none" stroke="#475569" stroke-width="1.5"/>
+<path d="M151,689 L240,689 L240,590 L300,590" fill="none" stroke="#475569" stroke-width="1.5"/>
+<path d="M1047,324 L970,324 L970,330 L900,330" fill="none" stroke="#475569" stroke-width="1.5"/>
+<path d="M1047,664 L970,664 L970,590 L900,590" fill="none" stroke="#475569" stroke-width="1.5"/>
+<path d="M520,145 L520,160 L230,160 L230,510 L440,510 L440,530" fill="none" stroke="#475569" stroke-width="1.5"/>
+<path d="M580,330 L620,330" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M760,390 L760,530" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M680,390 L680,460 L500,460 L500,530" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M620,590 L580,590" fill="none" stroke="#475569" stroke-width="1.5"/>
+<path d="M900,365 L925,365 L925,900 L720,900 L720,930" fill="none" stroke="#475569" stroke-width="1.5"/>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="127.5" cy="304" r="11"/><path d="M127.5,315 V349 M104.5,329 H150.5 M127.5,349 L105.5,375 M127.5,349 L149.5,375"/></g>
+<text x="127.5" y="395" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Citizen / remote reporter</text>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="127.5" cy="664" r="11"/><path d="M127.5,675 V709 M104.5,689 H150.5 M127.5,709 L105.5,735 M127.5,709 L149.5,735"/></g>
+<text x="127.5" y="755" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Guest / signed-in donor</text>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="1070.0" cy="299" r="11"/><path d="M1070.0,310 V344 M1047.0,324 H1093.0 M1070.0,344 L1048.0,370 M1070.0,344 L1092.0,370"/></g>
+<text x="1070.0" y="390" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Coordinator</text>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="1070.0" cy="639" r="11"/><path d="M1070.0,650 V684 M1047.0,664 H1093.0 M1070.0,684 L1048.0,710 M1070.0,684 L1092.0,710"/></g>
+<text x="1070.0" y="730" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Volunteer / military /</text>
+<text x="1070.0" y="750" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">government team leader</text>
+<rect x="450" y="80" width="300" height="65" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="600.0" y="117.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Campaign / operations manager</text>
+<rect x="420" y="930" width="360" height="70" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="600.0" y="960.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">External local authority</text>
+<text x="600.0" y="980.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Manual contact / referral</text>
+<rect x="300" y="270" width="280" height="120" fill="#e0f2fe" stroke="#334155" stroke-width="1.5"/>
+<text x="440.0" y="325.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">SOS intake</text>
+<text x="440.0" y="345.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">SELF / signed-in PROXY</text>
+<rect x="620" y="270" width="280" height="120" fill="#e0f2fe" stroke="#334155" stroke-width="1.5"/>
+<text x="760.0" y="325.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Verify and coordinate</text>
+<text x="760.0" y="345.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Priority / balanced team offers</text>
+<rect x="300" y="530" width="280" height="120" fill="#ecfdf5" stroke="#334155" stroke-width="1.5"/>
+<text x="440.0" y="585.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">In-kind donation and relief</text>
+<text x="440.0" y="605.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Count / review / partial delivery</text>
+<rect x="620" y="530" width="280" height="120" fill="#e0f2fe" stroke="#334155" stroke-width="1.5"/>
+<text x="760.0" y="585.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Rescue missions</text>
+<text x="760.0" y="605.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Leader progress / human outcome</text>
+<rect x="330" y="740" width="540" height="80" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="600.0" y="775.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Scoped accounts • audit • private evidence</text>
+<text x="600.0" y="795.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Filtered heatmap • timestamped reports</text>
+<text x="600" y="1030" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#334155" stroke="white" stroke-width="5" paint-order="stroke">System boundary contains software capabilities, not an official emergency authority.</text>
+<text x="760" y="455" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#334155" stroke="white" stroke-width="5" paint-order="stroke">human assignment</text>
+<text x="545" y="445" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#334155" stroke="white" stroke-width="5" paint-order="stroke">confirmed needs</text>
+<text x="835" y="890" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#334155" stroke="white" stroke-width="5" paint-order="stroke">manual referral record</text>
+</svg>

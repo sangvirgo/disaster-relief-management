@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1110" viewBox="0 0 1200 1110" role="img" aria-labelledby="title desc"><title id="title">C48 | Container architecture — Response at the center</title><desc id="desc">Proposed C48 design. Aligned shapes and orthogonal connectors. Editable diagrams.net source accompanies this SVG.</desc>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#334155"/></marker><marker id="generalization" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M1,1 L13,7 L1,13 Z" fill="white" stroke="#334155" stroke-width="1.5"/></marker></defs>
+<rect width="1200" height="1110" fill="white"/>
+<text x="40" y="38" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#0f172a">C48 | Container architecture — Response at the center</text>
+<rect x="70" y="410" width="1060" height="270" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+<text x="88" y="438" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#0f172a">Three application services</text>
+<path d="M365,175 L365,225 L510,225 L510,255" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M835,175 L835,225 L690,225 L690,255" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M500,340 L500,375 L410,375 L410,465 L250,465 L250,490" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M600,340 L600,490" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M700,340 L700,375 L955,375 L955,490" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M455,545 L390,545" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M810,545 L745,545" fill="none" stroke="#475569" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+<path d="M955,600 L955,645 L340,645 L340,600" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M250,600 L250,770" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M600,600 L600,770" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M955,600 L955,770" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M690,600 L690,720 L775,720 L775,940 L650,940 L650,965" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M1040,600 L1145,600 L1145,920 L850,920 L850,965" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="220" y="90" width="290" height="85" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="365.0" y="127.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Web client</text>
+<text x="365.0" y="147.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">React + Vite</text>
+<rect x="690" y="90" width="290" height="85" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="835.0" y="127.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Mobile client</text>
+<text x="835.0" y="147.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">React Native + Expo</text>
+<rect x="400" y="255" width="400" height="85" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="600.0" y="292.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Nginx reverse proxy</text>
+<text x="600.0" y="312.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">HTTPS / public API boundary</text>
+<rect x="105" y="490" width="285" height="110" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="247.5" y="540.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Identity API</text>
+<text x="247.5" y="560.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Accounts / sessions / scoped grants</text>
+<rect x="455" y="490" width="290" height="110" fill="#e0f2fe" stroke="#334155" stroke-width="1.5"/>
+<text x="600.0" y="540.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Response API</text>
+<text x="600.0" y="560.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">SOS / verification / teams / missions</text>
+<rect x="810" y="490" width="285" height="110" fill="#ecfdf5" stroke="#334155" stroke-width="1.5"/>
+<text x="952.5" y="540.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Logistics API</text>
+<text x="952.5" y="560.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">In-kind receipts / stock / delivery</text>
+<rect x="105" y="770" width="285" height="100" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="247.5" y="815.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Identity database</text>
+<text x="247.5" y="835.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Own credentials / migrations</text>
+<rect x="455" y="770" width="290" height="100" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="600.0" y="815.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Response database + PostGIS</text>
+<text x="600.0" y="835.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Own credentials / migrations</text>
+<rect x="810" y="770" width="285" height="100" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="952.5" y="815.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Logistics database</text>
+<text x="952.5" y="835.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Own credentials / migrations</text>
+<rect x="425" y="965" width="520" height="80" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="685.0" y="1000.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Private MinIO AIStor Free</text>
+<text x="685.0" y="1020.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Separate Response / Logistics access</text>
+<text x="600" y="1090" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#334155" stroke="white" stroke-width="5" paint-order="stroke">One demo host; separate service databases. No cross-service SQL or foreign keys.</text>
+<text x="422" y="532" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#334155" stroke="white" stroke-width="5" paint-order="stroke">grants</text>
+<text x="778" y="532" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#334155" stroke="white" stroke-width="5" paint-order="stroke">REST</text>
+<text x="600" y="634" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#334155" stroke="white" stroke-width="5" paint-order="stroke">current-session grants</text>
+</svg>
