@@ -271,6 +271,8 @@ This is the main workflow adaptation from Sahana ShaRe's partial commitments and
 
 ### 6.1 Conceptual ERD and modeling levels
 
+> **Physical schema (2026-10-07):** the implementation contract for columns, keys, constraints and indexes is [docs/backend/](backend/README.md) (`schema/*.sql`, reviewed in [01-schema-review.md](backend/01-schema-review.md)). Where a column list in the Mermaid diagrams below differs (for example no `RESCUE_TEAM.capacity`, `unit.scale` instead of `ITEM.quantity_scale`, revision header tables for declarations/counts, signed stock-movement deltas), the physical schema wins; business rules remain governed by this plan.
+
 ![Conceptual ERD](diagrams/c48-conceptual-erd.svg)
 
 [Editable conceptual ERD](diagrams/c48-conceptual-erd.drawio). This model shows business concepts and cardinalities, without database keys or service prefixes. The SOS/Assistance Request is central. A Reporter is distinct from the Affected Household; a Donor need not have an account. A Campaign may exist without SOS reports and an SOS may exist without a campaign. A Donation Drive is a collection appeal, not a rescue mission or a sales order. The v3.2 diagram also shows Incident category, Skill, Region, Vehicle, Relief point, Distribution and Handoff record, so the brief's vehicles, relief points and final handoff appear at business level.
