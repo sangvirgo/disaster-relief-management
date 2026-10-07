@@ -42,7 +42,7 @@ Scope: the logical ERDs in plan §6.1.1–6.1.4 (v3.2) were reviewed against nor
 
 Rules used: (1) every foreign key used in a join or parent delete has a leading index (PostgreSQL does not create one); (2) partial indexes for "open work" queues so they stay small as history grows; (3) GiST only on columns used by `ST_DWithin`/`ST_Covers` with enough rows to matter (request subject, region boundary) — none on warehouse/relief-point locations and none on `team_position` (hundreds of rows scan faster than a hot-updated GiST is maintained); (4) no index "just in case"; (5) put the equality columns first, the sort column last.
 
-Measured on 200,000 requests after the §6 index rework (PostgreSQL 17 + PostGIS 3.5, data cached; cold or 1 M-row times will be higher):
+Measured on 200,000 requests after the §6 index rework (PostgreSQL 17 + PostGIS 3.5, data cached; cold or 1 M-row times will be higher). **Caveat found in round 3 (§7):** that dataset had a large share of open requests; with 1 M rows and ~9 % open the same FIFO queue filtered by status took 201 ms, so the 0.05 ms figures below hold only while open requests are dense:
 
 | Query | Before (round 1 schema) | After (§6 schema) |
 |---|---|---|
@@ -135,3 +135,38 @@ Introspection single-flight + circuit breaker and no synchronous call cycles (00
 | Quantities as integers in the smallest unit (A) | **Rejected.** `numeric(18,3)` plus the scale trigger is simpler to read in reports and in the API. |
 | Heatmap materialisation (B) | **Deferred.** Limits + 30 s cache first; add a generated cell column if profiling shows > 500 ms. |
 | Contracts for `GET /campaigns/{id}/summary`, staff edit of a request, team self-leave, CSV, AI, push (C) | **Out of the core scope**, consistent with plan §16 cuts; add contracts when scheduled. |
+
+## 7. Round 3 — required schema changes (2026-10-07) — **specified, NOT yet applied to `schema/*.sql`**
+
+Found by reading the backend pack against plan v3.3 and measuring on PostgreSQL 17 + PostGIS 3.5 (synthetic: 1 M requests, 300 k distributions, 300 k deliveries). Plan §27 holds the rules; this section is the exact change list for the agent that owns task **T0-S** (06). Apply to `schema/response.sql` / `schema/logistics.sql`, add the tests named here to `schema/test-*.sql`, and re-run **all** existing assertions (96) plus the new ones. Do not change anything else in the same commit.
+
+### 7.1 `response.sql`
+
+| # | Change | Evidence / why |
+|---|---|---|
+| R1 | Add `CREATE INDEX request_open_org_fifo_idx ON assistance_request (organization_id, received_at, id) WHERE status IN ('SUBMITTED','VERIFYING','VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING');` and `request_open_org_region_fifo_idx ON assistance_request (organization_id, region_code, received_at, id) WHERE <same predicate>;`. Keep the two full indexes for history views. | Queue with `status IN (open subset)` + region, 1 M rows, 9 % open: 201 ms (165,531 rows filtered) → 0.05 ms. The planner proves an `IN` subset implies the partial predicate (confirmed). |
+| R2 | Keep `request_campaign_idx`, `request_unassigned_idx`, `request_review_lane_idx`, `request_verifying_idx` unchanged. Document in the 03 §2 queue row that a mixed REGION+CAMPAIGN grant list is built as one query per grant kind merged by `(received_at,id)` (plan §27.2 item 4). | A single `OR` walked the whole organization range. |
+| R3 | Rare-value filters (`priority='P1'`, `category`, `declared_danger`) stay as filters on the open partial index; do not add per-filter indexes. Record the measurement (≈19 ms, 65 k rows scanned, 1 M rows) as an accepted limit in §3. | Avoid index sprawl; demo volume is far lower. |
+
+### 7.2 `logistics.sql`
+
+| # | Change | Evidence / why |
+|---|---|---|
+| L1 | Replace `distribution_scope_idx (organization_id,status,created_at,id)` with `(organization_id, created_at, id)` and add partial `distribution_open_idx (organization_id, created_at, id) WHERE status IN ('DRAFT','APPROVED','DISPATCHED')`. | No-status and multi-status lists used Seq Scan + Sort, 26–27 ms at 300 k. |
+| L2 | Replace `drive_scope_idx` with `(organization_id, created_at DESC, id DESC)`. | Same order mismatch. |
+| L3 | Add `donation_delivery.organization_id uuid NOT NULL`; add `UNIQUE (id, organization_id)` on `donation_drive`; FK `(drive_id, organization_id) → donation_drive(id, organization_id)`; replace `delivery_work_idx` with `(organization_id, created_at, id) WHERE status IN ('DECLARED','COUNTING','PENDING_REVIEW','APPROVED')`. Add `UNIQUE (id, organization_id)` on `donation_delivery`. | Staff work queue joined through the drive: Parallel Seq Scan, 23 ms at 300 k. |
+| L4 | Add `donation_receipt.organization_id uuid NOT NULL` with FKs `(warehouse_id, organization_id) → warehouse(id, organization_id)` and `(delivery_id, organization_id) → donation_delivery(id, organization_id)`. | A receipt could be booked into another organization's warehouse (no constraint existed). |
+| L5 | Add `relief_need.target_reason text`; CHECK `designated_point_id IS NULL OR coalesce(btrim(target_reason),'') <> ''`. Add trigger `BEFORE UPDATE OF designated_point_id ON relief_need` that raises `check_violation` when the value changes and a `commitment` exists for that need. | Plan §25.7 (target fixed once a commitment exists; point target needs a reason) was code-only; `delivery_target_kind` was dropped. |
+| L6 | Extend `check_settlement_kind`: join `commitment → relief_need` and `handoff_record → distribution`. `DELIVERED` with `POINT_RECEIPT` requires `need.designated_point_id IS NOT NULL AND = distribution.relief_point_id`; `DELIVERED` with `DIRECT_HOUSEHOLD`/`HOUSEHOLD_HANDOUT` requires `need.designated_point_id IS NULL`. | Plan §25.7 / 04 §6: a point receipt never satisfies a final-recipient need, a household handout never settles a point-targeted need. |
+| L7 | New `BEFORE INSERT` trigger on `stock_movement` for `movement_type IN ('RECEIPT','RECEIPT_HELD_RELEASE')`: (a) `SELECT … FROM donation_receipt WHERE id = NEW.receipt_id FOR UPDATE`; (b) require the balance's `warehouse_id` = receipt `warehouse_id`; (c) find the latest APPROVE `receipt_review` (max `count_revision`) — none ⇒ `check_violation`; (d) require balance `item_id` to have a `receipt_count_line` in that revision; (e) `already_posted + NEW.delta_on_hand ≤ accepted_quantity`, where `already_posted` sums `delta_on_hand` of both types for the same receipt and balance. | Rule 01 §4 had no row for it: nothing stopped posting more than approved or into the wrong warehouse/item; two concurrent posts serialize on the receipt row. |
+
+### 7.3 New SQL assertions (must be written with the changes; all PASS)
+
+R1: `EXPLAIN (FORMAT JSON)` of the open-queue query on a ≥ 200 k-row fixture with ≤ 2 % open uses `request_open_org_region_fifo_idx` and removes no more than 20 × `LIMIT` rows. L1–L3: the distribution list (no status), the drive list and the delivery work queue use an `Index Scan` (no `Sort`) on the fixture. L3/L4: a delivery whose organization differs from its drive, and a receipt whose warehouse belongs to another organization, are refused. L5: point target without reason refused; changing `designated_point_id` after a commitment refused. L6: four combinations (point receipt on a final-recipient need; household handout on a point need; point receipt at a different point; the two valid cases). L7: no approval, over-posting, wrong warehouse, wrong item, replay with a new key, and a two-session race (second post waits, then fails the cap).
+
+### 7.4 Rules the database still cannot express (add to §4)
+
+9. **Cross-service reads are batched** (plan §27.3); a per-request loop over another service is a defect.
+10. **List endpoints respect a query budget** (00 §3.4) — verified by TC-BE-30, not by SQL.
+11. Quantity posted for a receipt equals approved accepted quantity **over time** (cap is enforced by L7; the equality at the end of the receipt lifecycle is a reconciliation check in T17).
+

@@ -102,6 +102,11 @@ Every error the API can return has one row here. The implementation loads this t
 | **Logistics — distribution** | | | |
 | `SELF_APPROVAL_FORBIDDEN` | 403 | Logistics | Người lập phiếu không được tự duyệt. |
 | `APPROVAL_STALE` | 409 | Logistics | Phiếu đã thay đổi sau khi duyệt. Cần duyệt lại. |
+| `NEED_TARGET_LOCKED` | 409 | Logistics | Không thể đổi điểm nhận khi nhu cầu đã có cam kết. |
+| `TARGET_REASON_REQUIRED` | 400 | Logistics | Cần nêu lý do khi chọn điểm cứu trợ làm nơi nhận. |
+| `SETTLEMENT_TARGET_MISMATCH` | 409 | Logistics | Nơi giao không khớp với nơi nhận đã chọn cho nhu cầu này. |
+| `POST_EXCEEDS_APPROVED` | 409 | Logistics | Số lượng nhập kho vượt quá số lượng đã được duyệt. |
+| `WAREHOUSE_ORG_MISMATCH` | 409 | Logistics | Kho nhận không thuộc tổ chức của đợt quyên góp. |
 | `ALREADY_DISPATCHED` | 409 | Logistics | Phiếu đã xuất kho. |
 | `LINE_ITEM_MISMATCH` | 400 | Logistics | Mặt hàng không khớp với cam kết. |
 | `HANDOFF_KIND_INVALID` | 409 | Logistics | Hình thức bàn giao không phù hợp với phiếu phân phối. |

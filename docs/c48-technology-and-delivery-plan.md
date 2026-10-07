@@ -4,8 +4,8 @@
 |---|---|
 | Project | Emergency Response and Disaster Relief Management System |
 | Project code | C48 |
-| Version | 3.2 — gap review: coordinator-recorded progress for app-less teams, priority-aware workload balancing, PROXY abuse controls, team-profile/position use case, UC-10..13 flows, mission history/stock-reference/attachment entities, drive–campaign linkage; retains v3.1 scope |
-| Initial research / plan revision | 2026-09-29 / 2026-10-06 |
+| Version | 3.3 — round-3 review (Section 27: query/N+1 rules, scale-test gate, cross-service batch reads, target/posting invariants, scope-cut ladder); 3.2 — gap review: coordinator-recorded progress for app-less teams, priority-aware workload balancing, PROXY abuse controls, team-profile/position use case, UC-10..13 flows, mission history/stock-reference/attachment entities, drive–campaign linkage; retains v3.1 scope |
+| Initial research / plan revision | 2026-09-29 / 2026-10-07 |
 | Team context | Three members in the project brief; backend owned by one member |
 | Document role | Single technical plan for implementation and further research |
 
@@ -971,7 +971,7 @@ The brief specifies no numeric thresholds. Section 23.6 adopts the numeric synth
 | NFR-SEC-04 | Security | Web hardening per Section 14: strict CSP, nosniff, no-referrer, no-store on sensitive responses, escaped rendering of all user-entered text, secrets only in authorization headers, dependency audit recorded before the demo. Tested by TC-BE-27. |
 | NFR-PRV-01 | Privacy | Exact locations are accessible only to the subject, scoped coordinators, and assigned teams; reports aggregate by default. Retention needs confirmation. |
 | NFR-REL-01 | Reliability | Nonnegative inventory, valid states, idempotent API retries, visible cross-service errors, and backup restoration checks.  Bounded database lock/statement timeouts and connection pools per service (Section 22.4); a timeout surfaces as a retryable Vietnamese error, never a hang or partial write. |
-| NFR-PERF-01 | Performance | Adopted synthetic-demo target: 10,000 stored assistance requests; 20 concurrent k6 virtual users; common read API p95 ≤ 2 seconds and SOS creation p95 ≤ 3 seconds excluding upload; unexpected HTTP failure rate < 1% during a 10-minute measured steady interval after a 2-minute warm-up. Include Identity introspection. Record hardware and workload mix as Section 23.6 specifies. |
+| NFR-PERF-01 | Performance | Adopted synthetic-demo target: 10,000 stored assistance requests; 20 concurrent k6 virtual users; common read API p95 ≤ 2 seconds and SOS creation p95 ≤ 3 seconds excluding upload; unexpected HTTP failure rate < 1% during a 10-minute measured steady interval after a 2-minute warm-up. Include Identity introspection. Record hardware and workload mix as Section 23.6 specifies. Section 27.2 adds a scale gate (TC-PERF-02: 1 M stored requests, ≤ 1 % open) because a 10,000-row dataset hides history-dependent query degradation. |
 | NFR-PERF-02 | Performance | Spatial indexes/bbox/result limits for maps; each dashboard panel shows its source timestamp instead of an unqualified real-time claim. |
 | NFR-UX-01 | Usability | Few SOS steps, usable controls, clear submission status, manual pin, understandable GPS errors. |
 | NFR-OFF-01 | Weak connectivity | If an offline queue is implemented, retries are idempotent; no continuous background location synchronization. |
@@ -2188,7 +2188,7 @@ Slice gates in Section 22.5 additionally require TC-BE-20 for Identity, TC-BE-17
 | R-15 | The original source brief is not available at the previously referenced PDF path | Medium / Medium | Use the consolidated project context and identify the original source before claiming a fresh source review; do not describe absence as a current Git deletion | Whole team |
 | R-16 | Rescue teams in the field lose mission-progress actions while Identity introspection is down (fail-closed trade-off of R-09) | Medium / High | Accepted for the demo and stated openly; the Mobile client keeps the pending action on the device with its idempotency key and shows 'chưa gửi được' until it is acknowledged (FR-OFF-01 covers mission actions; if it is cut, the UI must still show an explicit 'not sent' error and never report the action as done); if k6 or the outage test shows it is unacceptable, add a short documented revocation-window cache for mission-progress commands only | Backend owner / Mobile owner |
 | R-17 | A guest closes the browser and loses the SOS tracking secret | Medium / Medium | Confirmation screen offers explicit save/copy of code and secret; sign-in claim; coordinator-assisted audited re-binding through the reporter's contact phone | Web owner |
-| R-18 | One backend owner carries three services, proxy verification, balanced team suggestions and minimal donations; the schedule is the largest delivery risk | High / High | Follow the weekly integration table and cut order in Section 16; re-estimate after the R-04 spike; decide cuts at the end of weeks 5 and 7, not at the end | Whole team |
+| R-18 | One backend owner carries three services, proxy verification, balanced team suggestions and minimal donations; the schedule is the largest delivery risk | High / High | Follow the weekly integration table and cut order in Section 16; re-estimate after the R-04 spike; decide cuts at the end of weeks 5 and 7, not at the end; Section 27.1 supplies the cut ladder and the measurable gate for each decision | Whole team |
 
 ### 24.2 Prepared answers for likely defense questions
 
@@ -2433,7 +2433,63 @@ Apply the lessons through one concrete SDD walkthrough first: **UC-15 → Vietna
 
 This revision changes the English plan, supporting diagrams and a research note only. Documentation checks cover local Markdown links, fenced blocks, diagram XML IDs/edge references, entity definitions, core use-case coverage and whitespace. All nine Mermaid diagrams rendered successfully with a temporary CLI/Chromium outside the repository, including the four logical ERDs; PNG rendering was used to inspect text and relationships. The six fixed-layout SVG figures were also rendered and visually inspected. These checks do not establish application behavior: no application tests, deployment or runtime/dependency compatibility checks were executed.
 
+**v3.3 (2026-10-07):** Section 27 records the round-3 review (backend pack read against this plan, hot queries measured on PostgreSQL 17 + PostGIS 3.5). It changes documents only; the schema/API changes it requires are specified in `backend/01-schema-review.md` §7 and are **not yet applied** to `backend/schema/*.sql`.
+
 Next task: review the revised core workflows and model cardinalities with the supervisor, clarify whether grouping means queue filters or combined dispatch, and confirm the current report template. During week 3, Sang revisits system design after supervisor feedback and starts Backend work; Trí and Sơn design Web/Mobile UI/UX and Frontend screens; ERD and use-case review is shared by all three. Before implementing each slice, review its OpenAPI/migrations/grants and planned acceptance cases. Keep donations in-kind and warehouse scope reduced.
+
+## 27. Round-3 review decisions — 2026-10-07
+
+**Authority:** the user asked for the plan to be corrected so an implementing AI agent can code from it. These are design decisions for the synthetic demo; they add rules and acceptance cases, not application code. Where Section 27 conflicts with an earlier section, Section 27 governs. Measurements quoted here were taken on PostgreSQL 17 + PostGIS 3.5 in Docker with synthetic rows (1 M `assistance_request`, 300 k `distribution`/`donation_delivery`) and are evidence for the specific query shapes, not a performance claim for the product.
+
+### 27.1 Scope capacity and cut ladder (R-18)
+
+The backend pack now specifies about 61 tables, 130 endpoints and 20 tasks (T0–T19) for one backend owner in weeks 3–8. Treat this as over-subscribed. The following ladder is a **proposal pending team confirmation**; it fixes the order and the trigger, not the answer.
+
+| Rung | Cut candidate (all isolated, listed in `backend/01-schema-review.md` §5) | Requirement consequence if cut |
+|---|---|---|
+| 1 | `HOUSEHOLD_HANDOUT` / `POINT_RECEIPT` custody stage (keep `DIRECT_HOUSEHOLD`) | FR-LOG-07 reduced to direct handoff + return/loss; TC-DIST-02 point subcase becomes deferred |
+| 2 | Two-person approval of direct campaign distributions (keep it for request-linked aid) | FR-LOG-06 narrowed; TC-DIST-01 one path only |
+| 3 | `donation_dispute` workflow (keep `receipt_review` REQUEST_RECOUNT/REJECT and the private receipt) | FR-DON-05 reduced to "disagreement visible on the receipt"; TC-DON-06/07 amended |
+| 4 | `team-candidates` workload band (keep distance + eligibility filter) | FR-MSN-05 reduced; TC-REV-06/13 deferred |
+
+Gate: at the end of week 5, if T0–T10 are not all accepted, apply rung 1–2; at the end of week 7, if T11–T16 are not accepted, apply rung 3–4. Each cut amends the affected FR/TC rows, the backend contract and the demo script in one commit. The seal protocol (T16), independent receipt review, once-only posting, nonnegative stock, human verification and Vietnamese content are never cut (Section 16).
+
+### 27.2 Query, index and scale rules (supersede any shorter statement)
+
+1. **Open-work queues use partial indexes whose predicate is the open-status set.** An index that merely walks `(organization_id, received_at, id)` and filters `status` degrades with history because the FIFO order starts at the oldest (closed) rows. Measured at 1 M requests with 9 % open: `status IN (open)` + region, FIFO `LIMIT 50` took 201 ms (165 k rows filtered); a partial index `(organization_id, region_code, received_at, id) WHERE status IN (<open set>)` took 0.05 ms. The open set is `SUBMITTED, VERIFYING, VERIFIED, TRIAGED, DISPATCHED, IN_PROGRESS, RESOLVING`. Full-history indexes remain for history views.
+2. **An index must end in the list's sort key and id, and any filter that is not a leading equality must be in a partial predicate or accepted as a filter.** Keys of the form `(org, status, created_at, id)` cannot serve "all statuses" or "several statuses" ordered by `created_at` (measured: sequential scan + sort, 26 ms at 300 k and growing). Use `(org, created_at, id)` plus a partial index for the open statuses.
+3. **Scope filters must be indexable.** Every list that can be scope-filtered by organization must have `organization_id` on the row it paginates; do not paginate a child through a join to its parent for scope (measured: `donation_delivery` joined to `donation_drive`, 23 ms at 300 k). Denormalize the owner with a composite FK so it cannot disagree.
+4. **A grant list that mixes REGION and CAMPAIGN scopes is compiled as one query per grant kind merged by `(sort_key, id)`** (or `UNION ALL … ORDER BY … LIMIT`), never as a single `OR`, so each branch can use its own index.
+5. **N+1 is forbidden.** Every list endpoint has a *query budget*: a fixed number of SQL statements independent of page size (default ≤ 4 for a page of 50: the page, plus one batched query per child collection or aggregate). Children are loaded with `WHERE parent_id = ANY($ids)` or one `GROUP BY parent_id`; ORM `eager: true` and lazy relations are not used; `take/skip` is not combined with a one-to-many join. Per-row calls to another service are forbidden: use a batch endpoint (27.3).
+6. **Public aggregates sum only the current approved revision**: `receipt_count_line` rows of the receipt's approved `count_revision`, for deliveries in `POSTED`, never every revision. A page of N drives gets its totals from one grouped query.
+7. **Monitoring.** Enable `pg_stat_statements` and `log_min_duration_statement = 200ms` in the Compose test profile; the CI query-count test (27.5) and the scale gate read them.
+8. **Scale gate (TC-PERF-02):** load 1 M synthetic requests with ≤ 1 % non-terminal (and 300 k distributions/deliveries), run `EXPLAIN (ANALYZE, BUFFERS)` for the queue (open, per region, per campaign grant, keyset page 2), unassigned queue, distribution list, delivery work queue, candidate query, heatmap and one public drive list. Pass: every list ≤ 5 ms and no query's `Rows Removed by Filter` exceeds 20 × the page size, except the heatmap (≤ 500 ms) and a documented rare-filter case. Record results; this gate precedes T18.
+
+### 27.3 Cross-service batch reads
+
+Logistics and the coordinator board must not call a service once per request. Add: Response `POST /internal/requests:batch` (`{ ids ≤ 100 }` → status, work_cycle, organization, region, campaign, version, and the on-behalf-of scope result per id) and Logistics `POST /internal/fulfillment:summary` (`{ request_ids ≤ 100, work_cycle? }` → requested/committed/issued/delivered/outstanding per request). Identity `users:lookup` (≤ 100 ids) already exists and is the only way to resolve actor names; callers collect ids for the whole page first. The 5 s Logistics cache of request status remains a pre-validation aid only.
+
+### 27.4 Invariants the schema must enforce (not code-only)
+
+- **Need target.** `designated_point_id` (RELIEF_POINT target) requires a recorded reason (`target_reason`) and cannot change once any commitment exists for the need. A `DELIVERED` settlement is valid only at the need's target: `POINT_RECEIPT` only when the need targets that exact relief point (and the distribution's point equals it); `DIRECT_HOUSEHOLD` / `HOUSEHOLD_HANDOUT` only when the need has no designated point (a point receipt never satisfies a final-recipient need).
+- **Posting cap.** Stock posted for a receipt and item (`RECEIPT` + `RECEIPT_HELD_RELEASE` deltas) never exceeds `accepted_quantity` of the latest APPROVED count revision of that receipt, the balance's item/warehouse equal the receipt line's item/receipt warehouse, and posting serializes on the `donation_receipt` row.
+- **Warehouse ownership.** A receipt's warehouse belongs to the same organization as the delivery's drive (composite FKs), and a delivery carries its drive's `organization_id`.
+
+### 27.5 Added acceptance cases (planned, not executed)
+
+| ID | Links | Assertions |
+|---|---|---|
+| TC-PERF-02 | NFR-PERF-01/02, Section 27.2 | The scale gate of 27.2 item 8 passes on the pinned PostgreSQL/PostGIS image; the result file lists plan text, rows removed and timing per query |
+| TC-BE-30 | NFR-PERF-02, 27.2 item 5 | For each list endpoint the number of SQL statements for a page of 5 equals that for a page of 50 (counted per request); no cross-service call inside a loop; fails the build on regression |
+| TC-BE-31 | FR-LOG-03/05/07, 27.4 | Changing a need's designated point after a commitment is refused; a point receipt does not settle a final-recipient need; a household handout does not settle a point-targeted need; reason required for a point target |
+| TC-BE-32 | FR-DON-04, 27.4 | Posting more than the approved accepted quantity, from an unapproved revision, or into another warehouse/item is refused; two concurrent posts credit at most the accepted quantity |
+| TC-BE-33 | 27.3 | Batch endpoints return scoped results for up to 100 ids in one call; ids outside the caller's scope are omitted without disclosure; 101 ids ⇒ `400 VALIDATION_FAILED` |
+
+### 27.6 Decisions closed in this round
+
+- **Heatmap projection:** use EPSG:3405 (VN-2000 / UTM zone 48N) as the single demo projection so the grid is continuous; Task T0 must verify cell-size error on the demo region (expected well under 1 % for the seeded regions) and record it in `VERSIONS.md`. Revisit only if a seeded region lies far east of 108° E.
+- **Version/readiness:** after the schema and contract edits in `backend/01-schema-review.md` §7 are applied and the 96 existing SQL assertions plus the new ones pass, the backend pack is the implementation contract for T0 onward.
+- The AI-agent entry point is `docs/backend/README.md` → `docs/backend/06-implementation-tasks.md` ("Agent start here").
 
 ## Appendix A. AI implementation and research handoff
 
@@ -2443,7 +2499,7 @@ Next task: review the revised core workflows and model cardinalities with the su
 
 1. Read root AGENTS.md and any applicable directory instructions.
 2. Read [project context](c48-project-context.md) for the assigned scope and deliverables.
-3. Read this English plan, including the framework evaluation, expanded AI design in Section 12, storage decision in Section 6.3, open decisions, and this appendix.
+3. Read this English plan, including Section 27 (round-3 rules that override older text), the framework evaluation, expanded AI design in Section 12, storage decision in Section 6.3, open decisions, and this appendix.
 4. Inspect the actual repository, existing contracts/migrations, and latest user instructions before writing code. Do not assume planned services or tests already exist.
 
 The current technical baseline is NestJS/TypeScript, three services (Identity, Response, Logistics), REST/JSON, TypeORM, PostgreSQL/PostGIS, React/Vite, and React Native/Expo. Section 4 records the selection rationale and alternatives. The project brief defines scope; technology choices are design decisions, not requirements imposed by the brief.

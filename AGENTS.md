@@ -9,7 +9,7 @@ Before analysis, design, implementation, or further research, read:
 1. [Project context](docs/c48-project-context.md): the assigned scope and deliverables consolidated from the project brief and DOCX outline.
 2. [Technology and delivery plan](docs/c48-technology-and-delivery-plan.md): the primary English technical baseline, including framework/database comparisons, requirements, architecture, and delivery plan.
 3. Appendix A of the plan: implementation invariants, unresolved design issues, research protocol, and session handoff instructions.
-4. For backend implementation, read `docs/backend/README.md` and follow its task order; its schema and API contracts take precedence over the plan's Mermaid column lists.
+4. For backend implementation, read plan Section 27 (round-3 query/N+1/scale rules), then `docs/backend/README.md` and follow `docs/backend/06-implementation-tasks.md` ("Agent start here": task **T0-S** first, then T0); its schema and API contracts take precedence over the plan's Mermaid column lists.
 5. For file storage or AI work, read Sections 6.3 and 12 of the plan, including the MinIO AIStor Free decision and its implementation limits.
 
 ## Main scope

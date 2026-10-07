@@ -1,6 +1,6 @@
 # C48 backend implementation pack
 
-Turns the [technology and delivery plan](../c48-technology-and-delivery-plan.md) into something an engineer or AI agent can implement without guessing. Status: **design artifacts only — no application code, migrations or product tests exist yet.** The SQL was executed against PostgreSQL 17 + PostGIS 3.5 (96 constraint assertions pass; hot queries measured at 200k rows; six race conditions reproduced by a reviewer and fixed in the design); nothing else has been run.
+Turns the [technology and delivery plan](../c48-technology-and-delivery-plan.md) into something an engineer or AI agent can implement without guessing. Status (2026-10-07, plan v3.3): **round-3 changes in 01 §7 are specified but not yet applied to `schema/*.sql` — task T0-S does that first.** Design artifacts only — no application code, migrations or product tests exist yet.** The SQL was executed against PostgreSQL 17 + PostGIS 3.5 (96 constraint assertions pass; hot queries measured at 200k rows; six race conditions reproduced by a reviewer and fixed in the design); nothing else has been run.
 
 | File | Purpose |
 |---|---|
