@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" role="img"><title>UC-13 Approve, dispatch and hand off a distribution</title>
+<defs><marker id="open" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,1 L9,5 L0,9" fill="none" stroke="#334155" stroke-width="1.3"/></marker><marker id="gen" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M1,1 L13,7 L1,13 Z" fill="white" stroke="#334155" stroke-width="1.5"/></marker></defs>
+<rect width="1400" height="800" fill="white"/>
+<text x="40" y="38" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#0f172a">UC-13 | Approve, dispatch and hand off a distribution</text>
+<rect x="250" y="80" width="900" height="520" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+<text x="268" y="106" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#0f172a">C48 system</text>
+<ellipse cx="370" cy="175" rx="100" ry="40" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="370" y="179" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">Prepare distribution</text>
+<ellipse cx="370" cy="545" rx="100" ry="40" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="370" y="549" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">Approve exact version</text>
+<ellipse cx="590" cy="175" rx="100" ry="40" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="590" y="179" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">Dispatch and issue once</text>
+<ellipse cx="590" cy="545" rx="100" ry="40" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="590" y="541" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">Record point receipt /</text>
+<text x="590" y="557" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">household handout</text>
+<ellipse cx="810" cy="175" rx="100" ry="40" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="810" y="171" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">Record verified return</text>
+<text x="810" y="187" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">or loss</text>
+<ellipse cx="810" cy="545" rx="100" ry="40" fill="#f1f5f9" stroke="#334155" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="810" y="533" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0f172a">UC-04</text>
+<text x="810" y="549" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0f172a">Commit and fulfill</text>
+<text x="810" y="565" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0f172a">need</text>
+<ellipse cx="1030" cy="175" rx="100" ry="40" fill="#f1f5f9" stroke="#334155" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="1030" y="163" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0f172a">UC-09</text>
+<text x="1030" y="179" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0f172a">Vehicles and relief</text>
+<text x="1030" y="195" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0f172a">points</text>
+<ellipse cx="1030" cy="545" rx="100" ry="40" fill="#f1f5f9" stroke="#334155" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="1030" y="533" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0f172a">UC-12</text>
+<text x="1030" y="549" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0f172a">Count, review, post</text>
+<text x="1030" y="565" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0f172a">receipt</text>
+<ellipse cx="700" cy="360" rx="175" ry="62" fill="#fef3c7" stroke="#334155" stroke-width="1.5"/>
+<text x="700" y="348" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a">UC-13</text>
+<text x="700" y="364" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#0f172a">Approve, dispatch and hand</text>
+<text x="700" y="380" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#0f172a">off a distribution</text>
+<line x1="607" y1="308" x2="428" y2="208" stroke="#475569" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<rect x="484" y="249" width="67" height="16" fill="#f8fafc"/><text x="517" y="262" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-style="italic" fill="#334155">«include»</text>
+<line x1="607" y1="412" x2="428" y2="512" stroke="#475569" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<rect x="484" y="453" width="67" height="16" fill="#f8fafc"/><text x="517" y="466" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-style="italic" fill="#334155">«include»</text>
+<line x1="664" y1="299" x2="613" y2="214" stroke="#475569" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<rect x="605" y="248" width="67" height="16" fill="#f8fafc"/><text x="639" y="261" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-style="italic" fill="#334155">«include»</text>
+<line x1="664" y1="421" x2="613" y2="506" stroke="#475569" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<rect x="605" y="454" width="67" height="16" fill="#f8fafc"/><text x="639" y="467" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-style="italic" fill="#334155">«include»</text>
+<line x1="787" y1="214" x2="736" y2="299" stroke="#475569" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<rect x="731" y="248" width="61" height="16" fill="#f8fafc"/><text x="761" y="261" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-style="italic" fill="#334155">«extend»</text>
+<line x1="736" y1="421" x2="787" y2="506" stroke="#475569" stroke-width="1.4" stroke-dasharray="6 4"/>
+<rect x="698" y="454" width="127" height="16" fill="#f8fafc"/><text x="761" y="467" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-style="italic" fill="#334155">request-linked aid</text>
+<line x1="793" y1="308" x2="972" y2="208" stroke="#475569" stroke-width="1.4" stroke-dasharray="6 4"/>
+<rect x="829" y="249" width="107" height="16" fill="#f8fafc"/><text x="883" y="262" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-style="italic" fill="#334155">point / vehicle</text>
+<line x1="793" y1="412" x2="972" y2="512" stroke="#475569" stroke-width="1.4" stroke-dasharray="6 4"/>
+<rect x="846" y="453" width="74" height="16" fill="#f8fafc"/><text x="883" y="466" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-style="italic" fill="#334155">stock from</text>
+<circle cx="110" cy="247" r="11" fill="white" stroke="#334155" stroke-width="1.5"/><path d="M110,258 L110,287 M90,269 L130,269 M110,287 L92,311 M110,287 L128,311" stroke="#334155" stroke-width="1.5" fill="none"/>
+<text x="110" y="329" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">Distribution preparer</text>
+<line x1="128" y1="270" x2="537" y2="337" stroke="#475569" stroke-width="1.5"/>
+<circle cx="110" cy="412" r="11" fill="white" stroke="#334155" stroke-width="1.5"/><path d="M110,423 L110,452 M90,434 L130,434 M110,452 L92,476 M110,452 L128,476" stroke="#334155" stroke-width="1.5" fill="none"/>
+<text x="110" y="494" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">Dispatching staff</text>
+<line x1="128" y1="434" x2="537" y2="383" stroke="#475569" stroke-width="1.5"/>
+<circle cx="1290" cy="247" r="11" fill="white" stroke="#334155" stroke-width="1.5"/><path d="M1290,258 L1290,287 M1270,269 L1310,269 M1290,287 L1272,311 M1290,287 L1308,311" stroke="#334155" stroke-width="1.5" fill="none"/>
+<text x="1290" y="329" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">Independent approver</text>
+<line x1="1272" y1="270" x2="863" y2="337" stroke="#475569" stroke-width="1.5"/>
+<circle cx="1290" cy="412" r="11" fill="white" stroke="#334155" stroke-width="1.5"/><path d="M1290,423 L1290,452 M1270,434 L1310,434 M1290,452 L1272,476 M1290,452 L1308,476" stroke="#334155" stroke-width="1.5" fill="none"/>
+<text x="1290" y="494" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">Receiving party / field</text>
+<text x="1290" y="509" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">recorder</text>
+<line x1="1272" y1="434" x2="863" y2="383" stroke="#475569" stroke-width="1.5"/>
+<text x="40" y="638" font-family="Arial, sans-serif" font-size="13" fill="#334155">Preparer and approver are distinct; edits after approval invalidate it.</text>
+<text x="40" y="662" font-family="Arial, sans-serif" font-size="13" fill="#334155">Point receipt is not final household delivery; each unit is ISSUED exactly once.</text>
+<text x="40" y="686" font-family="Arial, sans-serif" font-size="13" fill="#334155">issued = received + returned + lost + still in transit.</text>
+<text x="40" y="710" font-family="Arial, sans-serif" font-size="13" fill="#334155">Links: UR-10, FR-LOG-06/07, TC-DIST-01..04</text>
+<text x="40" y="772" font-family="Arial, sans-serif" font-size="12" fill="#64748b">Dashed ellipses are neighbouring use cases. Proposed design, not implemented behaviour. Associations show participation; backend grants decide permission.</text>
+</svg>

@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1110" viewBox="0 0 1200 1110" role="img" aria-labelledby="title desc"><title id="title">C48 | Response actors and use cases</title><desc id="desc">Proposed C48 design. Aligned shapes and orthogonal connectors. Editable diagrams.net source accompanies this SVG.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1130" viewBox="0 0 1200 1130" role="img" aria-labelledby="title desc"><title id="title">C48 | Response actors and use cases</title><desc id="desc">Proposed C48 design. Aligned shapes and orthogonal connectors. Editable diagrams.net source accompanies this SVG.</desc>
 <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#334155"/></marker><marker id="generalization" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M1,1 L13,7 L1,13 Z" fill="white" stroke="#334155" stroke-width="1.5"/></marker></defs>
-<rect width="1200" height="1110" fill="white"/>
+<rect width="1200" height="1130" fill="white"/>
 <text x="40" y="38" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#0f172a">C48 | Response actors and use cases</text>
 <rect x="240" y="100" width="720" height="875" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
 <text x="258" y="128" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#0f172a">C48 response workflow</text>
@@ -49,7 +49,13 @@
 <ellipse cx="775.0" cy="645.0" rx="125.0" ry="45.0" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
 <text x="775.0" y="640.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">UC-17</text>
 <text x="775.0" y="660.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">View assigned missions</text>
+<path d="M1010,850 L900,850" fill="none" stroke="#475569" stroke-width="1.5"/>
+<path d="M1067,229 L970,229 L970,872 L880,872" fill="none" stroke="#475569" stroke-width="1.5"/>
+<ellipse cx="775.0" cy="845.0" rx="125.0" ry="45.0" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="775.0" y="840.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">UC-18</text>
+<text x="775.0" y="860.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Manage team / position</text>
 <text x="600" y="1010" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#334155" stroke="white" stroke-width="5" paint-order="stroke">UC-01 is common SOS intake; UC-15 adds the signed-in remote-report workflow.</text>
+<text x="600" y="1100" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#334155" stroke="white" stroke-width="5" paint-order="stroke">UC-18: a leader maintains the own team; a coordinator may record progress/position for an app-less team (audited).</text>
 <text x="600" y="1040" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#334155" stroke="white" stroke-width="5" paint-order="stroke">UC-17 permits reading only. UC-03 mutations require coordinator or active leader.</text>
 <text x="600" y="1070" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#334155" stroke="white" stroke-width="5" paint-order="stroke">Volunteer, military and government affiliation does not change mission permissions.</text>
 </svg>

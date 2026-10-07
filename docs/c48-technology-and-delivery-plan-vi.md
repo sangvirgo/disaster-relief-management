@@ -1,3 +1,5 @@
+> **LƯU Ý — BẢN LỖI THỜI (v2.8):** tài liệu này chưa phản ánh PROXY, cân bằng tải đội, bản đồ nhiệt, quyên góp rút gọn và các sửa đổi v3.x. Bản tiếng Anh `c48-technology-and-delivery-plan.md` là bản chuẩn.
+
 # Kế hoạch Công nghệ và Triển khai C48
 
 | Thuộc tính | Giá trị |

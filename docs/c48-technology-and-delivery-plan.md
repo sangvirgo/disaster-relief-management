@@ -4,7 +4,7 @@
 |---|---|
 | Project | Emergency Response and Disaster Relief Management System |
 | Project code | C48 |
-| Version | 3.1 — diagram semantics review: complete local relationships/keys, actor permissions and state consistency; retains v3.0 supervisor-feedback scope |
+| Version | 3.2 — gap review: coordinator-recorded progress for app-less teams, priority-aware workload balancing, PROXY abuse controls, team-profile/position use case, UC-10..13 flows, mission history/stock-reference/attachment entities, drive–campaign linkage; retains v3.1 scope |
 | Initial research / plan revision | 2026-09-29 / 2026-10-06 |
 | Team context | Three members in the project brief; backend owned by one member |
 | Document role | Single technical plan for implementation and further research |
@@ -273,7 +273,7 @@ This is the main workflow adaptation from Sahana ShaRe's partial commitments and
 
 ![Conceptual ERD](diagrams/c48-conceptual-erd.svg)
 
-[Editable conceptual ERD](diagrams/c48-conceptual-erd.drawio). This model shows business concepts and cardinalities, without database keys or service prefixes. The SOS/Assistance Request is central. A Reporter is distinct from the Affected Household; a Donor need not have an account. A Campaign may exist without SOS reports and an SOS may exist without a campaign. A Donation Drive is a collection appeal, not a rescue mission or a sales order.
+[Editable conceptual ERD](diagrams/c48-conceptual-erd.drawio). This model shows business concepts and cardinalities, without database keys or service prefixes. The SOS/Assistance Request is central. A Reporter is distinct from the Affected Household; a Donor need not have an account. A Campaign may exist without SOS reports and an SOS may exist without a campaign. A Donation Drive is a collection appeal, not a rescue mission or a sales order. The v3.2 diagram also shows Incident category, Skill, Region, Vehicle, Relief point, Distribution and Handoff record, so the brief's vehicles, relief points and final handoff appear at business level.
 
 | Level | Purpose | Included here |
 |---|---|---|
@@ -281,7 +281,7 @@ This is the main workflow adaptation from Sahana ShaRe's partial commitments and
 | Logical | Define entities, keys, cardinalities and ownership | Separate ERDs below; association tables and local foreign keys; explicit opaque-reference register |
 | Physical | Implement storage constraints, indexes and migrations | Future per-slice artifacts; not claimed as a completed schema by this plan |
 
-Conceptual Reporter and Donor represent participant roles: one person may make several reports/handover declarations. Implementation stores their contact snapshots on each report/donation rather than maintaining global person registries. The Affected Household is a request-scoped subject snapshot, with exactly one subject per SOS; similar snapshots are not presumed to identify the same household. A household may be reported repeatedly, but identity is not deduced from phone/location. Detailed audit, upload, notification and idempotency columns follow Sections 6.3, 10 and 22; they are omitted from overview pictures to keep them legible.
+Conceptual Reporter and Donor represent participant roles: one person may make several reports/handover declarations. Implementation stores their contact snapshots on each report/donation rather than maintaining global person registries. The Affected Household is a request-scoped subject snapshot, with exactly one subject per SOS; similar snapshots are not presumed to identify the same household. A household may be reported repeatedly, but identity is not deduced from phone/location. Detailed audit-log, notice, device and idempotency tables (FR-AUD-01, FR-NOT-01, Section 22.4) are cross-cutting per-service tables, intentionally omitted from the logical pictures and defined in the SDD data dictionary; mission history is shown because workload and overdue rules read it. Detailed audit, upload, notification and idempotency columns follow Sections 6.3, 10 and 22; they are omitted from overview pictures to keep them legible.
 
 #### 6.1.1 Identity — local relationships
 
@@ -370,6 +370,7 @@ erDiagram
   SKILL ||--o{ TEAM_SKILL : qualifies
   RESCUE_TEAM ||--o| TEAM_POSITION : reports
   RESCUE_TEAM ||..o{ MISSION : executes
+  MISSION ||--o{ MISSION_EVENT : records
   ASSISTANCE_REQUEST {
     uuid id PK
     uuid campaign_id FK
@@ -431,6 +432,8 @@ erDiagram
     string name
     string availability
     string team_kind
+    boolean affiliation_verified
+    uuid affiliation_verified_by
     int capacity
   }
   TEAM_MEMBER {
@@ -445,6 +448,7 @@ erDiagram
     decimal accuracy_m
     datetime captured_at
     string source
+    uuid set_by_user_id
   }
   MISSION {
     uuid id PK
@@ -453,7 +457,21 @@ erDiagram
     int work_cycle
     string status
     uuid coordinator_user_id
+    datetime offered_at
+    datetime accepted_at
+    datetime completed_at
     int version
+  }
+  MISSION_EVENT {
+    uuid id PK
+    uuid mission_id FK
+    uuid actor_user_id
+    uuid on_behalf_of_team_id
+    string from_status
+    string to_status
+    string recorded_basis
+    string reason
+    datetime occurred_at
   }
   CAMPAIGN {
     uuid id PK
@@ -548,6 +566,12 @@ erDiagram
   ITEM ||..o{ STOCK_BALANCE : balances
   STOCK_BALANCE ||..o{ STOCK_MOVEMENT : changes
   RECEIPT_LINE |o..o{ STOCK_MOVEMENT : receipt_source
+  COMMITMENT |o..o{ STOCK_MOVEMENT : issue_source
+  DISTRIBUTION_LINE |o..o{ STOCK_MOVEMENT : issue_source
+  STOCK_MOVEMENT |o..o| STOCK_MOVEMENT : compensates
+  DONATION_DELIVERY ||..o{ LOGISTICS_ATTACHMENT : evidence
+  DONATION_DISPUTE |o..o{ LOGISTICS_ATTACHMENT : evidence
+  HANDOFF_RECORD |o..o{ LOGISTICS_ATTACHMENT : evidence
   DONATION_DRIVE {
     uuid id PK
     uuid campaign_id
@@ -606,6 +630,10 @@ erDiagram
     uuid balance_id FK
     uuid receipt_line_id FK
     string movement_type
+    uuid commitment_id FK
+    uuid distribution_line_id FK
+    uuid compensates_movement_id FK
+    string operation_ref UK
     decimal quantity
     uuid actor_user_id
     datetime occurred_at
@@ -650,6 +678,19 @@ erDiagram
     string reason
     datetime reviewed_at
   }
+  LOGISTICS_ATTACHMENT {
+    uuid id PK
+    uuid delivery_id FK
+    uuid dispute_id FK
+    uuid handoff_id FK
+    string object_key UK
+    string state
+    string detected_mime
+    bigint size_bytes
+    string checksum
+    string uploader_kind
+    datetime created_at
+  }
   DONATION_DISPUTE {
     uuid id PK
     uuid delivery_id FK
@@ -660,7 +701,7 @@ erDiagram
   }
 ```
 
-ITEM_TYPE and UNIT have unique codes and Vietnamese display labels (e.g. food/water/medical/shelter/hygiene; kg/litre/piece). They classify goods, not incident severity or donation/payment kinds. DRIVE_ITEM is unique on `(drive_id, item_id)` with target quantity. One delivery has one current receipt aggregate, count/declaration revisions are immutable history, and receipt reviews reference exact revisions. A receipt line references a donation line from the same delivery and canonical item; Initial posting is unique per receipt line, not merely per revision. After posting, any changed count/acceptance uses a separately authorized compensating movement; replaying a newer revision cannot credit the full quantity again. Held goods accepted later post only the reviewed additional quantity with a unique operation reference. Non-donation opening balances have explicit opening records rather than fabricated donor receipts. Independent receipt review and exactly-once posting are core; source-batch allocation after pooling is deferred.
+ITEM_TYPE and UNIT have unique codes and Vietnamese display labels (e.g. food/water/medical/shelter/hygiene; kg/litre/piece). They classify goods, not incident severity or donation/payment kinds. DRIVE_ITEM is unique on `(drive_id, item_id)` with target quantity. One delivery has one current receipt aggregate, count/declaration revisions are immutable history, and receipt reviews reference exact revisions. A receipt line references a donation line from the same delivery and canonical item; LOGISTICS_ATTACHMENT links to exactly one of delivery, dispute or handoff (XOR constraint, like EVIDENCE_METADATA); its uploader is an account or a donation capability, and it uses the Logistics bucket and Section 23.5 limits. Every ISSUE movement references exactly one commitment or one distribution line (never both), every compensating movement references the movement it corrects, and `operation_ref` is unique so replays cannot post twice. Initial posting is unique per receipt line, not merely per revision. After posting, any changed count/acceptance uses a separately authorized compensating movement; replaying a newer revision cannot credit the full quantity again. Held goods accepted later post only the reviewed additional quantity with a unique operation reference. Non-donation opening balances have explicit opening records rather than fabricated donor receipts. Independent receipt review and exactly-once posting are core; source-batch allocation after pooling is deferred.
 
 #### 6.1.4 Logistics — minimal fulfillment and handoff
 
@@ -903,6 +944,8 @@ For FR priorities, **M** means required for the core demo, **S** means should ha
 | FR-REQ-10 | M | Minimum verification evidence and unreachable-reporter handling: contact-attempt log, verification basis, overdue escalation, authority-referral record, reporter-declared danger flag kept separate from status and priority | NO_ANSWER alone never verifies or rejects; rejection for unreachability needs the demo minimum attempts and a reason; TWO_COORDINATOR_JUDGMENT needs a distinct second coordinator; overdue and declared-danger requests are visible to other scoped coordinators; no automatic ranking, triage or dispatch |
 | FR-REQ-11 | M | Authenticated PROXY reports for an affected household, with relationship, last-known information and optional alternate contact | Subject pin is not reporter GPS; current login checked for PROXY; neither login nor relationship verifies the report; private access remains reporter/scoped staff/assigned team only |
 | FR-MSN-05 | M | Candidate teams from volunteer, military and government organizations, filtered by capability, scope, availability and capacity, then nearby distance and recent workload | Section 26.3 shows comparison factors and stale-position exclusion; a slightly farther, less-burdened eligible team can be suggested; coordinator decides and offer transaction rechecks capacity |
+| FR-MSN-06 | M | Audited coordinator-recorded mission progress on behalf of a team that cannot use the app (radio/phone), with basis and reporter | Same transition table/capacity release; both actors stored; leader conflict returns 409; no skipped states or inferred progress |
+| FR-TEAM-01 | M | Team leader or scoped coordinator creates/maintains a team profile (members, skills, affiliation, availability) and confirms or sets the team position (foreground/manual, with source, accuracy, time and audit) | Position freshness drives Section 26.3; coordinator-set position is labelled and audited; no background tracking; inactive/unavailable teams cannot be offered missions |
 | FR-MAP-01 | M | Scoped operational heatmap with explicit time/status filters and canonical-report counts | Verified canonical requests only by default; unverified queue separate; duplicate reports never inflate confirmed totals; no PII or exact households in aggregate response; no automatic dispatch |
 | FR-NOT-01 | M | In-app notices in the service that owns the changed request, mission, or stock task; push/email are extensions | Notice write is local to the business transaction; recipient scope is enforced |
 | FR-NOT-02 | S | Push alert for new mission offers and request status changes to registered devices (Expo push), sent from the owning service after commit via a small outbox row; guests rely on the secret-based tracking page | Push failure never rolls back or blocks the business change; payload carries only a Vietnamese generic text and notice ID, no exact location or contact data; retry is idempotent per notice and device |
@@ -1020,7 +1063,8 @@ stateDiagram-v2
 - DECLINED, FAILED, CANCELLED, and COMPLETED terminate a mission; reassignment creates a new mission/assignment.
 - Mission state is independent of stock commitment and delivery state. A team can accept/progress a mission while a separate Logistics contribution is being fulfilled; the coordinator sees both on the request board.
 - Team members view assigned missions; only the active leader accepts/declines, advances and submits results/evidence. Scoped coordinators oversee missions and may cancel/fail with reason.
-- Store transition actor/time, reason, note, and evidence references. Location updates are optional, without background tracking.
+- **Coordinator-recorded progress (teams without the app):** military, government or volunteer teams may report by radio/phone. A scoped coordinator may record ACCEPT, EN_ROUTE, ON_SCENE, COMPLETED or FAILED on the team's behalf with a mandatory `recorded_basis` (`RADIO`, `PHONE`, `IN_PERSON`, `OTHER`), the name/role of the person who reported, and a reason. The mission event stores both the recording coordinator and `on_behalf_of_team`; it follows the same transition table and capacity release, never skips states, and is displayed as "Điều phối viên ghi thay" so it is not mistaken for a leader's own action. A leader's later conflicting action returns a version conflict. This is an audited human record, not automatic assignment or inferred progress (FR-MSN-06, TC-REV-11).
+- Store transition actor/time, reason, note, and evidence references in a `MISSION_EVENT` history row (Section 6.1.2). Location updates are optional, without background tracking.
 - Multiple missions can serve one request; a coordinator confirms the overall outcome before resolution.
 - An OFFERED mission past the overdue threshold (Section 22.3) is flagged for human follow-up; the system never reassigns automatically.
 
@@ -1062,7 +1106,7 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 ![Response use cases](diagrams/c48-response-use-cases.svg)
 
-[Editable response UML](diagrams/c48-response-use-cases.drawio). Actors are outside the system boundary, use cases are ellipses, associations are solid lines. UC-01 describes common SOS intake; UC-15 specializes it for remote PROXY and requires a signed-in citizen. It is not a mandatory substep of every SOS. Verification (UC-02) is a prerequisite for assignment, not a diagram arrow claiming automatic execution. Team leader specializes the team-member actor and inherits UC-17 read access. UC-03 has one ellipse associated only with coordinator/active leader; membership alone cannot accept or advance missions.
+[Editable response UML](diagrams/c48-response-use-cases.drawio). Actors are outside the system boundary, use cases are ellipses, associations are solid lines. UC-01 describes common SOS intake; UC-15 specializes it for remote PROXY and requires a signed-in citizen. It is not a mandatory substep of every SOS. Verification (UC-02) is a prerequisite for assignment, not a diagram arrow claiming automatic execution. Team leader specializes the team-member actor and inherits UC-17 read access; UC-18 (team profile, availability, position) is associated with the leader and, for app-less teams, the coordinator. UC-03 has one ellipse associated only with coordinator/active leader; membership alone cannot accept or advance missions.
 
 ![Donation and support use cases](diagrams/c48-donation-use-cases.svg)
 
@@ -1072,6 +1116,33 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 ![Management use cases](diagrams/c48-management-use-cases.svg)
 
 [Editable management UML](diagrams/c48-management-use-cases.drawio). Completes core actor coverage for UC-04, UC-08 and UC-09, with UC-05/06 support. Supply staff execute scoped approved actions; campaign ownership and account administration remain distinct. All core use-case IDs are represented across the three actor views; optional UC-07 and deferred UC-14 remain in text only.
+
+#### Per-use-case diagrams
+
+Each use case has its own UML diagram (actors outside the boundary, «include»/«extend» sub-flows, neighbouring use cases dashed, key rules below) with an editable `.drawio` source in `diagrams/use-cases/`:
+
+| Use case | Diagram | Editable |
+|---|---|---|
+| UC-01 — Submit SOS | ![UC-01](diagrams/use-cases/UC-01.svg) | [UC-01.drawio](diagrams/use-cases/UC-01.drawio) |
+| UC-02 — Verify and triage | ![UC-02](diagrams/use-cases/UC-02.svg) | [UC-02.drawio](diagrams/use-cases/UC-02.drawio) |
+| UC-03 — Assign and accept mission | ![UC-03](diagrams/use-cases/UC-03.svg) | [UC-03.drawio](diagrams/use-cases/UC-03.drawio) |
+| UC-04 — Commit and partially fulfill need | ![UC-04](diagrams/use-cases/UC-04.svg) | [UC-04.drawio](diagrams/use-cases/UC-04.drawio) |
+| UC-05 — Dashboard and reports | ![UC-05](diagrams/use-cases/UC-05.svg) | [UC-05.drawio](diagrams/use-cases/UC-05.drawio) |
+| UC-06 — Accounts and permissions | ![UC-06](diagrams/use-cases/UC-06.svg) | [UC-06.drawio](diagrams/use-cases/UC-06.drawio) |
+| UC-07 — AI priority suggestion (optional) | ![UC-07](diagrams/use-cases/UC-07.svg) | [UC-07.drawio](diagrams/use-cases/UC-07.drawio) |
+| UC-08 — Relief campaign | ![UC-08](diagrams/use-cases/UC-08.svg) | [UC-08.drawio](diagrams/use-cases/UC-08.drawio) |
+| UC-09 — Vehicles and relief points | ![UC-09](diagrams/use-cases/UC-09.svg) | [UC-09.drawio](diagrams/use-cases/UC-09.drawio) |
+| UC-10 — Donation drive | ![UC-10](diagrams/use-cases/UC-10.svg) | [UC-10.drawio](diagrams/use-cases/UC-10.drawio) |
+| UC-11 — Declare handover and track | ![UC-11](diagrams/use-cases/UC-11.svg) | [UC-11.drawio](diagrams/use-cases/UC-11.drawio) |
+| UC-12 — Count, review and post receipt | ![UC-12](diagrams/use-cases/UC-12.svg) | [UC-12.drawio](diagrams/use-cases/UC-12.drawio) |
+| UC-13 — Distribution and handoff | ![UC-13](diagrams/use-cases/UC-13.svg) | [UC-13.drawio](diagrams/use-cases/UC-13.drawio) |
+| UC-14 — Stocktake (deferred) | ![UC-14](diagrams/use-cases/UC-14.svg) | [UC-14.drawio](diagrams/use-cases/UC-14.drawio) |
+| UC-15 — Report household remotely | ![UC-15](diagrams/use-cases/UC-15.svg) | [UC-15.drawio](diagrams/use-cases/UC-15.drawio) |
+| UC-16 — Heatmap and grouped queue | ![UC-16](diagrams/use-cases/UC-16.svg) | [UC-16.drawio](diagrams/use-cases/UC-16.drawio) |
+| UC-17 — View assigned missions | ![UC-17](diagrams/use-cases/UC-17.svg) | [UC-17.drawio](diagrams/use-cases/UC-17.drawio) |
+| UC-18 — Team profile and position | ![UC-18](diagrams/use-cases/UC-18.svg) | [UC-18.drawio](diagrams/use-cases/UC-18.drawio) |
+
+Sub-flows shown as «include»/«extend» ellipses are explanatory steps of the main flow in the text below, not additional requirement IDs. UC-07 is optional and UC-14 deferred.
 
 ### UC-01 — Submit an SOS/assistance request
 
@@ -1107,7 +1178,7 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 **Main flow:** Compare eligible nearby teams by skills/scope/availability, fresh position and recent workload (Section 26.3) → record chosen team and reason if overriding the suggestion → offer assignment → active team leader accepts → EN_ROUTE → ON_SCENE → results/evidence → coordinator confirms mission outcome. The team assignment proceeds independently of Logistics fulfillment; both statuses appear on the request board.
 
-**Exceptions:** Select another team if declined/unavailable. Concurrent assignments use version/transaction checks and conflicting commands reload. PAUSED campaigns block offers/acceptance; already accepted missions may continue under the campaign rules.
+**Exceptions:** Select another team if declined/unavailable. A team that reports only by radio/phone is handled by the coordinator-recorded progress rule in Section 8.2 (FR-MSN-06). Concurrent assignments use version/transaction checks and conflicting commands reload. PAUSED campaigns block offers/acceptance; already accepted missions may continue under the campaign rules.
 
 **Postconditions:** Consistent mission/request history; only a coordinator confirms resolution.
 
@@ -1134,6 +1205,18 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 **Exceptions:** Inactive/unrelated members cannot read missions; exact contacts/coordinates follow assigned-team scope and leader-only contact rules. Leader mutations remain UC-03.
 
 **Postconditions:** Read-only access; no mission state or team-capacity change. Links: UR-04, FR-IAM-02, FR-MSN-01, TC-07, TC-BE-04.
+
+### UC-18 — Manage team profile, availability and position
+
+**Actors:** Active team leader (own team); scoped coordinator (on behalf of an app-less team).
+
+**Preconditions:** Team exists under an organization with a staff-verified affiliation (VOLUNTEER, MILITARY, GOVERNMENT or OTHER); member accounts are created/granted through UC-06. Volunteers do not self-grant staff roles.
+
+**Main flow:** Leader or coordinator opens the team → edits members, skills, capacity and availability (AVAILABLE/UNAVAILABLE with reason) → confirms the current position (foreground GPS or manual pin, source/accuracy/time) or, for a coordinator, enters a position reported by radio/phone → system stores TEAM_POSITION with `set_by_user_id` and audit → team appears in or leaves the Section 26.3 candidate list.
+
+**Exceptions:** A team with an active mission cannot be made UNAVAILABLE without an explicit coordinator decision on that mission; members cannot edit another team; stale positions remain visible but flagged; no background tracking.
+
+**Postconditions:** Profile/position history audited; availability never changes mission or request state by itself. Links: UR-04, FR-MSN-01, FR-TEAM-01, TC-REV-05, TC-REV-11.
 
 ### UC-16 — Inspect operational heatmap and grouped queue
 
@@ -1209,6 +1292,40 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 **Postconditions:** Asset catalog and operational history remain consistent. FR-LOG-01/04 and TC-BE-21 define acceptance.
 
+### UC-10 — Publish and manage a donation drive
+
+**Actor:** Campaign/operations manager with `DONATION_DRIVE_MANAGE`.
+
+**Main flow:** Create draft with title, intake site, open/close time, optional campaign, needed items/types/units and acceptance criteria → open → pause/resume/close with reason and version check. Public pages show only sanitized fields (Section 25.4).
+
+**Exceptions:** Intake-only staff cannot publish; a drive linked to a PAUSED campaign cannot be newly opened and shows a warning; if the linked campaign becomes CLOSED, new handovers stop (the drive is closed by the same command) while existing counts, reviews, disputes and returns stay open; if Response is unavailable, public pages show the last sanitized Logistics copy with its timestamp and no new campaign attachment is allowed.
+
+**Postconditions:** One authoritative drive state; no stock change. Links: UR-05, FR-DON-01, TC-DON-01, TC-REV-14.
+
+### UC-11 — Declare a handover and track it privately
+
+**Actor:** Guest (name/phone) or signed-in donor.
+
+**Main flow:** Open an OPEN drive → enter name, phone, item/quantity/unit actually handed over → client generates donation secret and idempotency key before submitting → server stores one declaration with a capability hash → donor tracks receipt, differences and disputes with the secret (or account).
+
+**Exceptions:** No login redirect; closed/paused drive rejects; wrong unit/scale rejected; lost response retries return the same record; phone alone grants nothing; hard throttle may reject (not the life-safety path). **Postconditions:** Declaration never credits stock. Links: UR-08, FR-DON-02/05, TC-DON-02/06/07, TC-REV-09.
+
+### UC-12 — Count, review and post a receipt
+
+**Actors:** Intake staff (count) and a distinct reviewer.
+
+**Main flow:** Intake staff count/inspect against the declaration and record accepted/held/rejected quantities with condition → submit immutable count revision → reviewer (not a count author) approves the exact declaration and count revisions → one transaction posts accepted lines to stock, RECEIPT movements, audit and notice → donor sees the private receipt.
+
+**Exceptions:** Changed count/declaration invalidates approval; replay cannot credit twice; held goods stay unavailable; disagreement remains visible. **Postconditions:** Stock changes exactly once. Links: UR-09, FR-DON-03/04, TC-DON-03..06/09.
+
+### UC-13 — Approve, dispatch and hand off a distribution
+
+**Actors:** Distribution preparer, distinct approver, dispatching staff, receiving party/field recorder.
+
+**Main flow:** Prepare distribution (warehouse, optional vehicle/point, lines, purpose) → distinct approver approves the exact version → dispatch issues stock once (or references already issued commitments) → receiving party/recorder confirms either household handoff or point receipt followed by household handouts → return/loss recorded with reason → reconciliation shows issued = received + returned + lost + remaining.
+
+**Exceptions:** Self-approval/self-confirmation denied; edit after approval invalidates it; inactive point/vehicle rejected; a household without account or phone is recorded by the field recorder with `confirmation_basis` and private evidence; point receipt is not final delivery. **Postconditions:** One ISSUE per unit; final delivery counted only at the stated target. Links: UR-10, FR-LOG-06/07, TC-DIST-01..04.
+
 ## 10. API and authentication
 
 Donation use cases UC-10..14, donation APIs, UI details and their acceptance cases are specified in Section 25. They extend the existing logistics slice and do not create another service.
@@ -1268,7 +1385,7 @@ Public campaign summaries contain approved title/objective/broad region/time and
 | Guest (no account) | Create an SOS; with the SOS tracking secret, view its status/timeline and supplement it. View sanitized campaign summaries and open donation drives; create an actual delivery declaration (future pledges deferred) and, with the donation-scoped capability secret, track, dispute and attach evidence to that donation only (Section 25.4). SOS and donation secrets are not interchangeable. No access to anything else. |
 | Citizen | Create SELF/PROXY reports, view and supplement owned requests (including claimed guest requests); optional account-linked donations. No household identity or staff authority follows from reporting a relative. |
 | Volunteer | View assigned team missions and maintain own profile/availability. Only the active team leader accepts/declines, advances missions and submits results/evidence. |
-| Coordinator | Scoped queue/map; verify, duplicate-link, triage, assign, cancel/reopen, confirm outcomes. |
+| Coordinator | Scoped queue/map; verify, duplicate-link, triage, assign, cancel/reopen, confirm outcomes; record mission progress and team position on a team's behalf with basis (audited). |
 | Campaign / Operations Manager | Scoped campaign/drive management, allocation/distribution approval and operational reports; independent receipt review only with an explicit grant. |
 | Warehouse / Intake Staff | Scoped receipt counts and approved stock issue; cannot publish campaigns, prioritize SOS or dispatch rescue teams. Cannot review own count. |
 | Government / military team | Same scoped team-member/leader permissions as volunteer teams; affiliation is verified staff-maintained organization metadata, not a privilege escalation. |
@@ -1286,6 +1403,7 @@ Do not encode all policy in JWTs: Response checks its own team/region/request re
 
 ### Web
 
+- **Public / citizen:** guest SOS form (SELF), signed-in PROXY form, private tracking page (secret held in memory with explicit save/copy), public drive list/detail, guest donation form and private donation tracking.
 - **Coordinator:** saved views for awaiting verification, verified-but-unassigned, active missions, and partially fulfilled needs; map and scoped filters; request details, team availability, mission board, and audit timeline.
 - **Campaign/operations manager:** campaigns, public collection appeals, item/type/unit needs, receipt review, basic allocations/deliveries and reports.
 - **Intake staff:** receiving/count queue and approved issue actions; separate from campaign ownership and SOS dispatch. Advanced warehouse screens are deferred.
@@ -1295,6 +1413,8 @@ Do not encode all policy in JWTs: Response checks its own team/region/request re
 
 ### Mobile
 
+- **Donor:** browse open drives, guest/signed-in handover declaration and private tracking with SecureStore capability.
+- **Team leader:** profile/availability, position confirmation (UC-18) and mission actions.
 - **Citizen:** SELF SOS and signed-in PROXY mode; separately labelled reporter and household location/contact; manual pin, optional evidence, server confirmation and private timeline.
 - **Map:** canonical verified-request density with visible legend/time/filter/source timestamp; unverified layer separate; team candidates show distance, recent workload and position age.
 - **Volunteer:** assigned missions, necessary details, accept/decline, state actions, outcome photos/video.
@@ -1621,7 +1741,7 @@ These are **planned test cases, not execution results**. Test records must inclu
 | UR-01 | FR-REQ-01..03/11, FR-FILE-01, FR-OFF-01 | UC-01, UC-15 | TC-01..05, TC-24..25, TC-BE-24/27, TC-REV-01..04 |
 | UR-02 | FR-REQ-04, FR-REQ-07, FR-NOT-01 | UC-01, UC-02 | TC-06, TC-09..11, TC-22 |
 | UR-03 | FR-REQ-04..06/09..11, FR-MSN-01..03/05, FR-MAP-01, FR-LOG-03 | UC-02/03/04/15/16 | TC-06/08..14/31, TC-BE-17/18/25, TC-REV-04..08 |
-| UR-04 | FR-MSN-01..05 | UC-03, UC-17 | TC-07/14/24, TC-BE-04/10, TC-REV-05..07 |
+| UR-04 | FR-MSN-01..06, FR-TEAM-01 | UC-03, UC-17, UC-18 | TC-07/14/24, TC-BE-04/10, TC-REV-05..07/11/13 |
 | UR-05 | FR-CAM-01, FR-LOG-01..05 | UC-04, UC-08, UC-09 | TC-15/16/18/19/30/31, TC-BE-19/21/23; TC-17 transfers deferred |
 | UR-06 | FR-IAM-01..03, FR-RPT-01..02, FR-AUD-01 | UC-05, UC-06 | TC-06..08, TC-23, TC-28, TC-BE-01, TC-BE-20, TC-BE-29 |
 | UR-07 | FR-LOG-05, NFR-OBS-01, NFR-OPS-01 | UC-01..05 | TC-20..23, TC-29, TC-31 |
@@ -1647,7 +1767,10 @@ Supplementary traceability for quality and optional requirements:
 | FR-AI-01..06 | TC-26, TC-27, TC-AI-01..22 |
 | FR-AI-07 | TC-AI-DON-01..03 |
 | FR-REQ-11 / UR-01 / UC-15 | TC-REV-01..04, TC-REV-10 |
-| FR-MSN-05 / UR-03..04 / UC-03 | TC-REV-05..07, TC-REV-10 |
+| FR-MSN-05 / UR-03..04 / UC-03 | TC-REV-05..07, TC-REV-10, TC-REV-13 |
+| FR-MSN-06, FR-TEAM-01 / UR-04 / UC-18 | TC-REV-11 |
+| FR-REQ-11 abuse controls | TC-REV-12 |
+| FR-DON-01 campaign/drive linkage | TC-REV-14 |
 | FR-MAP-01 / UR-03 / UC-16 | TC-REV-08, TC-REV-10 |
 
 ### 13.4 Additional language and storage checks
@@ -2170,7 +2293,7 @@ Exact paths must be frozen in OpenAPI with the `/api/v1/logistics` prefix. Mutat
 | `POST /distributions/:id/{approve,dispatch,receive,handouts,return,settle-loss}` | Scoped distinct actors and per-stage guards |
 | `GET /reconciliation`, `/donation-reports/:id` | Basic staff reconciliation or private sanitized donor view |
 
-UC-10: manager publishes/manages appeal. UC-11: guest/citizen declares actual handover and privately tracks/disputes. UC-12: staff count, distinct reviewer approves and posts once. UC-13: approved issue and direct/one-point handoff. UC-14 stocktakes is reserved for a deferred extension; future pledge/source/transfer endpoints are absent from core contracts.
+UC-10: manager publishes/manages appeal. UC-11: guest/citizen declares actual handover and privately tracks/disputes. UC-12: staff count, distinct reviewer approves and posts once. UC-13: approved issue and direct/one-point handoff. Flows for UC-10..13 are in Section 9. UC-14 stocktakes is reserved for a deferred extension; future pledge/source/transfer endpoints are absent from core contracts.
 
 ### 25.10 Optional AI
 
@@ -2224,17 +2347,20 @@ Extend TC-L10N-01..03 across public guest forms, counts, conflicts, denied permi
 
 PROXY records relationship, last-known situation/time, source and contactability. Coordinator sees “Báo hộ — chưa xác minh” until a documented decision. Record alternative contact attempts separately; offline/unreachable is not false. Use bounded DTOs/media, idempotency, existing never-drop SOS soft quotas and scoped review queues. Require independent corroboration/evidence or two distinct scoped coordinators for PROXY; the same account/phone/IP does not constitute independent corroboration. A new photo or login alone never verifies. Conflicting or stale information prompts clarification and preserves both revisions.
 
+**Per-account PROXY controls.** Free self-registration without phone/email verification means login is not an anti-abuse control. Add: (a) a cap on simultaneously open (non-terminal, unverified) PROXY reports per account (demo default 3); a further report is still stored but tagged `PROXY_QUOTA_REVIEW` and shown in the separate review lane, never dropped (same never-drop principle as Section 14); (b) a per-account daily soft threshold with the same handling; (c) a staff-only informational flag when one account/phone reports several distinct locations in a short window or when earlier reports by the same reporter were rejected, shown with counts and links so a coordinator can inspect, never as an automatic fraud label or score; (d) Nginx/application throttling on registration. Genuine multi-household reporters (for example a community volunteer) are cleared by a coordinator, not blocked. Tested by TC-REV-12.
+
 Do not classify people as fraudulent from a heuristic or AI score. Coordinator rejection/duplicate decisions require reason/evidence; preserve original requests. Reports grouped on a map remain individually identifiable internally; distinct households stay separate. No public reporter phone/name, alternate contact or exact affected location. Scoped assigned leaders see necessary contacts; general dashboards/AI do not.
 
 ### 26.3 Nearby eligible teams with workload balance
 
 Team affiliation: VOLUNTEER, MILITARY, GOVERNMENT or OTHER; linked organization and staff-verified affiliation. Every team obeys the same scope, mandatory skills, availability and capacity-one demo guard. These labels do not assert participation by an actual authority. Seed demo teams under one coordinating organization, recording affiliation as metadata; affiliation never bypasses the existing organization scope. A real multi-agency deployment needs explicit cross-organization participation/grants before offering missions across organizations.
 
+0. **Priority-aware balancing.** Workload balancing applies fully only to P3/P4 requests. For P1 (and P2) the comparable band shrinks to `distance_tolerance_p1 = 0` (P2: 500 m, configurable): the nearest eligible fresh-position team is suggested first, and lighter workload only breaks exact ties. A coordinator may still choose otherwise with a recorded reason. Rationale: a detour matters most when life is at risk; spreading load is a fairness aid for less urgent work, and both values are team proposals pending field review.
 1. Filter by active membership/leader, mandatory skills, compatible organization/region, AVAILABLE and no reserved active slot. OFFERED/ACCEPTED/EN_ROUTE/ON_SCENE all occupy the one active slot; atomic offer checks prevent two coordinators booking it twice.
-2. Use a manually confirmed/foreground team position, source/accuracy/time. No background tracking. Proposed synthetic-demo freshness is 30 minutes; stale/unknown positions are shown separately as “Chưa đủ dữ liệu vị trí”, never labelled nearest. A coordinator can refresh/confirm a position with audit. Required position fields are on TEAM_POSITION (Section 6).
+2. Use a manually confirmed/foreground team position, source/accuracy/time. No background tracking. Proposed synthetic-demo freshness is 30 minutes; stale/unknown positions are shown separately as “Chưa đủ dữ liệu vị trí”, never labelled nearest, but remain selectable by the coordinator with a visible warning and a recorded reason (otherwise an app-less team would never appear). A team leader confirms position in the app (UC-18); a coordinator can set/refresh it by radio/phone report with `source = COORDINATOR_REPORTED` and audit. Required position fields are on TEAM_POSITION (Section 6).
 3. Query eligible nearby teams with PostGIS geography radius/distance. Proposed demo search radius 10 km; explicitly expand it if none are suitable. Show geodesic distance in meters/kilometers, not road distance/ETA. [PostGIS ST_DWithin](https://postgis.net/docs/ST_DWithin.html), [ST_Distance](https://postgis.net/docs/ST_Distance.html) checked 2026-10-06.
 4. Define a comparable nearby band: candidates within `nearest_eligible_distance + distance_tolerance`; proposed demo tolerance 2 km, configurable and visible in the comparison. Within that band suggest ascending recent mission burden, then distance, then team ID for deterministic ties. Other radius candidates remain visible by distance. Recent burden counts distinct non-DECLINED/non-CANCELLED missions with an offer or active/terminal work in the preceding 24 hours; count one mission once, not each transition. Also show any current active work even if older. This simple count cannot measure actual fatigue; display it as “Số nhiệm vụ gần đây”, not a readiness guarantee. Parameters are team proposals pending field review.
-5. Show distance, position age/accuracy, recent counts, availability, skills and affiliation together. Example: team A 1 km/5 completed recent missions; team B 1.5 km/1 recent mission, both free and capable: suggest B. An incapable or busy B never wins because of lower count. A 9 km team with no work does not displace a 1 km team merely because count is lower outside the comparable band.
+5. Show distance, position age/accuracy, recent counts, availability, skills and affiliation together. Example (P3/P4): team A 1 km/5 completed recent missions; team B 1.5 km/1 recent mission, both free and capable: suggest B. For a P1 request the same pair suggests A (step 0). An incapable or busy B never wins because of lower count. A 9 km team with no work does not displace a 1 km team merely because count is lower outside the comparable band.
 6. Coordinator selects and records why, especially a choice outside the suggested band. Offer transaction rechecks current scope, availability, capacity and request version; stale candidate data causes conflict/reload. Suggestions never create a mission, change request urgency or dispatch automatically. Declined/failed mission reassignment is human.
 
 No weighted optimization, AI dispatch, route engine or global multi-SOS scheduling is introduced. If field validation finds mission duration/fatigue matters more than counts, revise this stated limitation and policy before operational use.
@@ -2268,6 +2394,11 @@ Review diagram-to-text consistency before using in SDD: no required donor login;
 | TC-REV-09 | FR-DON-01/02/05, UC-10/11 | Guest name/phone handover without login; intake-only user denied publishing; accepted/type/unit totals correct; receipt ID or phone alone cannot access private donation |
 | TC-REV-10 | NFR-L10N-01, FR-REQ-11, FR-MSN-05, FR-MAP-01 | Vietnamese proxy forms, contactability, candidate distance/workload, heatmap legends, success/errors/notices; machine codes stable; original entered names/content preserved |
 
+| TC-REV-11 | FR-MSN-06, UC-03, UC-18 | Coordinator records ACCEPT→EN_ROUTE→ON_SCENE→COMPLETED for an app-less team with basis/reporter/reason; both actors stored; invalid skip rejected; capacity released once; leader's stale action conflicts; team position set by coordinator is labelled COORDINATOR_REPORTED and stale position stays selectable only with warning and reason |
+| TC-REV-12 | FR-REQ-11, NFR-SEC-01 | Fourth open PROXY report from one account is stored with `PROXY_QUOTA_REVIEW`, visible in the review lane, never dropped; same account reporting distant locations shows an informational flag without changing status/priority; a cleared reporter is not blocked |
+| TC-REV-13 | FR-MSN-05, UC-03 | Same teams as TC-REV-06: for a P3 request B (1.5 km, lighter load) is suggested; for a P1 request A (1 km) is suggested; override requires a reason; workload only breaks exact distance ties for P1 |
+| TC-REV-14 | FR-DON-01, UC-10 | Pausing/closing a campaign shows a warning on linked drives; a closed campaign cannot receive new drive attachments; an OPEN drive linked to a closed campaign stops accepting handovers while existing intake/review continue; Response outage leaves public drive pages served from the last sanitized Logistics projection with a timestamp, never a false "open" state |
+
 All above are planned. Do not record them as passing from a documentation edit. Existing TC-BE and donation/custody/language checks continue within the revised core scope.
 
 ### 26.7 Diagram review findings
@@ -2295,6 +2426,8 @@ Research on 2026-10-06 found one attributable full prior graduation report and a
 Apply the lessons through one concrete SDD walkthrough first: **UC-15 → Vietnamese Web/Mobile form → Response OpenAPI operation → request/subject/contact-attempt/verification data → TC-REV-01..04**. Follow with UC-02/03 and UC-11/12. Each walkthrough includes main/exception steps, a numbered sequence, data constraints and expected outcomes. Mark planned and implemented artifacts separately. This improves documentation without expanding warehouse or payment scope.
 
 ### 26.9 Revision status and next task
+
+**v3.2 (2026-10-07):** applied the gap review — FR-MSN-06, FR-TEAM-01, UC-10..13 and UC-18, TC-REV-11..14, priority-aware balancing (26.3 step 0), per-account PROXY controls (26.2), MISSION_EVENT/LOGISTICS_ATTACHMENT/stock-movement references in the logical ERDs, and conceptual ERD/use-case diagram updates. Not yet decided: whether to cut further warehouse depth (dispute workflow, two-person approval of direct campaign distributions, optional relief-point custody) — see R-18. The Vietnamese plan is a stale v2.8 copy and does not govern.
 
 This revision changes the English plan, supporting diagrams and a research note only. Documentation checks cover local Markdown links, fenced blocks, diagram XML IDs/edge references, entity definitions, core use-case coverage and whitespace. All nine Mermaid diagrams rendered successfully with a temporary CLI/Chromium outside the repository, including the four logical ERDs; PNG rendering was used to inspect text and relationships. The six fixed-layout SVG figures were also rendered and visually inspected. These checks do not establish application behavior: no application tests, deployment or runtime/dependency compatibility checks were executed.
 

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" role="img"><title>UC-01 Submit an SOS / assistance request</title>
+<defs><marker id="open" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,1 L9,5 L0,9" fill="none" stroke="#334155" stroke-width="1.3"/></marker><marker id="gen" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M1,1 L13,7 L1,13 Z" fill="white" stroke="#334155" stroke-width="1.5"/></marker></defs>
+<rect width="1400" height="800" fill="white"/>
+<text x="40" y="38" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#0f172a">UC-01 | Submit an SOS / assistance request</text>
+<rect x="250" y="80" width="900" height="520" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+<text x="268" y="106" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#0f172a">C48 system</text>
+<ellipse cx="370" cy="175" rx="100" ry="40" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="370" y="179" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">Attach photo / video</text>
+<ellipse cx="370" cy="545" rx="100" ry="40" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="370" y="541" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">Track status and</text>
+<text x="370" y="557" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">supplement</text>
+<ellipse cx="590" cy="175" rx="100" ry="40" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<text x="590" y="171" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">Confirm location (GPS or</text>
+<text x="590" y="187" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">manual pin)</text>
+<ellipse cx="590" cy="545" rx="100" ry="40" fill="#f1f5f9" stroke="#334155" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="590" y="533" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0f172a">UC-15</text>
+<text x="590" y="549" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0f172a">Report household</text>
+<text x="590" y="565" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0f172a">remotely</text>
+<ellipse cx="810" cy="175" rx="100" ry="40" fill="#f1f5f9" stroke="#334155" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="810" y="171" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0f172a">UC-02</text>
+<text x="810" y="187" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0f172a">Verify and triage</text>
+<ellipse cx="700" cy="360" rx="175" ry="62" fill="#fef3c7" stroke="#334155" stroke-width="1.5"/>
+<text x="700" y="348" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a">UC-01</text>
+<text x="700" y="364" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#0f172a">Submit an SOS / assistance</text>
+<text x="700" y="380" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#0f172a">request</text>
+<line x1="428" y1="208" x2="607" y2="308" stroke="#475569" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<rect x="487" y="249" width="61" height="16" fill="#f8fafc"/><text x="517" y="262" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-style="italic" fill="#334155">«extend»</text>
+<line x1="428" y1="512" x2="607" y2="412" stroke="#475569" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<rect x="487" y="453" width="61" height="16" fill="#f8fafc"/><text x="517" y="466" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-style="italic" fill="#334155">«extend»</text>
+<line x1="664" y1="299" x2="613" y2="214" stroke="#475569" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#open)"/>
+<rect x="605" y="248" width="67" height="16" fill="#f8fafc"/><text x="639" y="261" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-style="italic" fill="#334155">«include»</text>
+<line x1="613" y1="506" x2="664" y2="421" stroke="#475569" stroke-width="1.4" marker-end="url(#gen)"/>
+<line x1="736" y1="299" x2="787" y2="214" stroke="#475569" stroke-width="1.4" stroke-dasharray="6 4"/>
+<rect x="705" y="248" width="114" height="16" fill="#f8fafc"/><text x="761" y="261" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-style="italic" fill="#334155">then verified by</text>
+<circle cx="110" cy="330" r="11" fill="white" stroke="#334155" stroke-width="1.5"/><path d="M110,341 L110,370 M90,352 L130,352 M110,370 L92,394 M110,370 L128,394" stroke="#334155" stroke-width="1.5" fill="none"/>
+<text x="110" y="412" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">Citizen / guest reporter</text>
+<line x1="128" y1="352" x2="525" y2="360" stroke="#475569" stroke-width="1.5"/>
+<circle cx="1290" cy="330" r="11" fill="white" stroke="#334155" stroke-width="1.5"/><path d="M1290,341 L1290,370 M1270,352 L1310,352 M1290,370 L1272,394 M1290,370 L1308,394" stroke="#334155" stroke-width="1.5" fill="none"/>
+<text x="1290" y="412" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">Scoped coordinator</text>
+<text x="1290" y="427" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#0f172a">(screens the report)</text>
+<line x1="1272" y1="352" x2="875" y2="360" stroke="#475569" stroke-width="1.5"/>
+<text x="40" y="638" font-family="Arial, sans-serif" font-size="13" fill="#334155">Guest allowed: client generates tracking secret + idempotency key before sending.</text>
+<text x="40" y="662" font-family="Arial, sans-serif" font-size="13" fill="#334155">Report is &quot;received&quot; only after server ACK; offline drafts stay QUEUED_ON_DEVICE.</text>
+<text x="40" y="686" font-family="Arial, sans-serif" font-size="13" fill="#334155">Soft rate limit stores the report as RATE_LIMITED_REVIEW; never dropped.</text>
+<text x="40" y="710" font-family="Arial, sans-serif" font-size="13" fill="#334155">Links: UR-01/02, FR-REQ-01..03, FR-FILE-01, TC-01..05, TC-BE-24</text>
+<text x="40" y="772" font-family="Arial, sans-serif" font-size="12" fill="#64748b">Dashed ellipses are neighbouring use cases. Proposed design, not implemented behaviour. Associations show participation; backend grants decide permission.</text>
+</svg>
