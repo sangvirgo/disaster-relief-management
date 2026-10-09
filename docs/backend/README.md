@@ -1,21 +1,17 @@
-# C48 backend implementation pack
+# C48 backend: implementation entry point
 
-Turns the [technology and delivery plan](../c48-technology-and-delivery-plan.md) into something an engineer or AI agent can implement without guessing. Status (2026-10-07, plan v3.3): **round-3 changes in 01 §7 are specified but not yet applied to `schema/*.sql` — task T0-S does that first.** Design artifacts only — no application code, migrations or product tests exist yet.** The SQL was executed against PostgreSQL 17 + PostGIS 3.5 (96 constraint assertions pass; hot queries measured at 200k rows; six race conditions reproduced by a reviewer and fixed in the design); nothing else has been run.
+**Version 4.0 · 2026-10-09 · documentation baseline.** Read [project context](../c48-project-context.md), [main plan/Appendix A](../c48-technology-and-delivery-plan.md) and root AGENTS first.
 
-| File | Purpose |
+| Read in order | Purpose |
 |---|---|
-| [00-setup.md](00-setup.md) | Repo layout, API conventions, shared error codes (Vietnamese), env vars, testing rules, Definition of Done, rules for AI agents |
-| [01-schema-review.md](01-schema-review.md) | Senior review of the data model: round 1 (17 findings) and round 2 by four independent agents (races reproduced, integrity gaps fixed), index policy with measured results, rules the DB cannot enforce, deferred/rejected items |
-| [schema/](schema/) | Physical DDL per service (`identity.sql`, `response.sql`, `logistics.sql`) and executable constraint tests (`test-*.sql`) |
-| [02-identity-api.md](02-identity-api.md) · [03-response-api.md](03-response-api.md) · [04-logistics-api.md](04-logistics-api.md) | Endpoint contracts: auth, permissions, request/response shapes, rules, error codes |
-| [07-error-catalog.md](07-error-catalog.md) | Every error code with HTTP status and Vietnamese message |
-| [05-permissions.md](05-permissions.md) | Role → permission map, scope matching, object rules, PII inventory, public surface |
-| [06-implementation-tasks.md](06-implementation-tasks.md) | Ordered tasks T0–T19 with dependencies and exit evidence |
+| [01-design.md](01-design.md) | Business states, service ownership, permissions, target database changes, field/index purpose and transaction rules. |
+| [02-api-contracts.md](02-api-contracts.md) | Complete core endpoint/DTO/authorization contracts and Vietnamese error catalog. |
+| [03-implementation.md](03-implementation.md) | T0-S/T0–T19, dependencies, concrete acceptance cases and execution evidence gates. |
 
-**Precedence:** business rules → the plan; column lists and endpoint shapes → this folder. If they conflict, stop and report.
+**Authority:** the main plan fixes scope; design fixes business/data rules; API fixes transport; implementation plan fixes order/evidence. Resolve contradictions in these files before implementing the affected slice. No archive document overrides this pack.
 
-**Re-run the SQL checks** (needs Docker):
-```bash
-docker run -d --name c48pg -e POSTGRES_PASSWORD=x -p 127.0.0.1:55432:5432 postgis/postgis:17-3.5
-# for each service: create database, load <service>.sql, then run test-<service>.sql with psql -v ON_ERROR_STOP=1
-```
+**First task: T0-S, then T0.** [schema/](schema/) contains the v3.3 SQL input and old assertions. It is intentionally unchanged in this documentation revision. Apply every target delta in 01, replace/update focused assertions, run PostgreSQL/PostGIS restricted-role and race checks, and record evidence before treating it as the implementation schema. No v4.0 SQL/runtime compatibility or application tests are claimed to have passed.
+
+The previous eight backend documents and cumulative main plan are [archived](../archive/v3.3/backend/README.md) for provenance; agents do not need to read them to implement the current core. Existing diagrams are historical until regenerated/checked against this baseline.
+
+The review/evidence ledger is in 03. Execution creates `VERSIONS.md` and `evidence/` only when exact versions and checks actually exist. Do not add competing plans, return ORM entities, introduce Python/brokers/payments or automate rescue decisions.

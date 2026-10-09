@@ -1,6 +1,8 @@
+> **Historical v3.3 source — not an implementation contract.** Read the [current backend pack](../../../backend/README.md) for v4.0 authority. Old section numbers, test claims and commands below describe their original revision.
+
 # 02 — Identity service: API contract
 
-Schema: [schema/identity.sql](schema/identity.sql). Conventions: [00](00-setup.md). Permissions: [05](05-permissions.md). Owns accounts, credentials, organizations, memberships, scoped grants, refresh sessions, region catalog, audit of those. Never stores phones, locations or request data.
+Schema: [schema/identity.sql](../../../backend/schema/identity.sql). Conventions: [00](00-setup.md). Permissions: [05](05-permissions.md). Owns accounts, credentials, organizations, memberships, scoped grants, refresh sessions, region catalog, audit of those. Never stores phones, locations or request data.
 
 ## 1. Auth model (implement exactly)
 

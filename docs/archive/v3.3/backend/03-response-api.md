@@ -1,6 +1,8 @@
+> **Historical v3.3 source — not an implementation contract.** Read the [current backend pack](../../../backend/README.md) for v4.0 authority. Old section numbers, test claims and commands below describe their original revision.
+
 # 03 — Response service: API contract
 
-Schema: [schema/response.sql](schema/response.sql). Conventions: [00](00-setup.md). Permissions: [05](05-permissions.md). State rules: plan §8.1–8.2, §22, §23.2, §26. "Idem" = `Idempotency-Key` required. "Ver" = `expected_version` in body required. Authenticated = session + Identity introspection. Every command writes (same local transaction): state change, `request_event`/`mission_event`/`audit_log`, and notices.
+Schema: [schema/response.sql](../../../backend/schema/response.sql). Conventions: [00](00-setup.md). Permissions: [05](05-permissions.md). State rules: plan §8.1–8.2, §22, §23.2, §26. "Idem" = `Idempotency-Key` required. "Ver" = `expected_version` in body required. Authenticated = session + Identity introspection. Every command writes (same local transaction): state change, `request_event`/`mission_event`/`audit_log`, and notices.
 
 ## 1. Request intake and tracking
 

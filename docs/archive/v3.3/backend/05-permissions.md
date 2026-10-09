@@ -1,6 +1,8 @@
+> **Historical v3.3 source — not an implementation contract.** Read the [current backend pack](../../../backend/README.md) for v4.0 authority. Old section numbers, test claims and commands below describe their original revision.
+
 # 05 — Roles, permissions and scope rules
 
-Roles are a **code catalog** (`role_grant.role_code` CHECK in [identity.sql](schema/identity.sql)); the role → permission map below is a TypeScript constant shared by the three services through `packages/technical` (data only, no logic). Identity introspection returns the user's live grants; each service evaluates `permission ∧ scope ∧ object relationship`. Hidden UI is never a control.
+Roles are a **code catalog** (`role_grant.role_code` CHECK in [identity.sql](../../../backend/schema/identity.sql)); the role → permission map below is a TypeScript constant shared by the three services through `packages/technical` (data only, no logic). Identity introspection returns the user's live grants; each service evaluates `permission ∧ scope ∧ object relationship`. Hidden UI is never a control.
 
 ## 1. Role → permission map
 

@@ -1,6 +1,8 @@
+> **Historical v3.3 source — not an implementation contract.** Read the [current backend pack](../../../backend/README.md) for v4.0 authority. Old section numbers, test claims and commands below describe their original revision.
+
 # 01 — Senior review of the C48 data model
 
-Scope: the logical ERDs in plan §6.1.1–6.1.4 (v3.2) were reviewed against normalization, integrity, query patterns and PostgreSQL practice, then turned into the physical schemas in [`schema/`](schema/). **The physical schemas supersede the column lists in the plan's Mermaid ERDs**; the plan keeps the business meaning, this folder is the implementation contract.
+Scope: the logical ERDs in plan §6.1.1–6.1.4 (v3.2) were reviewed against normalization, integrity, query patterns and PostgreSQL practice, then turned into the physical schemas in [`schema/`](../../../backend/schema). **The physical schemas supersede the column lists in the plan's Mermaid ERDs**; the plan keeps the business meaning, this folder is the implementation contract.
 
 **What was actually run** (not just read): all three DDL files loaded into PostgreSQL 17 + PostGIS 3.5 in Docker with `ON_ERROR_STOP`; **96 constraint assertions** in `schema/test-*.sql` (identity 16, response 31, logistics 49 — all PASS) plus a PostGIS proximity smoke test; 200,000 synthetic requests with `EXPLAIN (ANALYZE)` on the hot queries; an automated scan for foreign keys without a leading index; and — in §6 — four independent review agents, one of which reproduced six race conditions with parallel `psql` sessions. **Not run:** TypeORM migrations, multi-service crash injection, k6 load tests. Re-run the SQL tests after every schema change. §6 supersedes any statement in §1–5 that it contradicts.
 

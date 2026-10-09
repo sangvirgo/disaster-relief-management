@@ -1,3 +1,5 @@
+> **Historical v3.3 source — not an implementation contract.** Read the [current backend pack](../../../backend/README.md) for v4.0 authority. Old section numbers, test claims and commands below describe their original revision.
+
 # 06 — Ordered implementation tasks
 
 ## Agent start here

@@ -1,6 +1,8 @@
+> **Historical v3.3 source — not an implementation contract.** Read the [current backend pack](../../../backend/README.md) for v4.0 authority. Old section numbers, test claims and commands below describe their original revision.
+
 # 00 — Backend setup, conventions and rules for implementing agents
 
-Read first: `/AGENTS.md`, [project context](../c48-project-context.md), the [plan](../c48-technology-and-delivery-plan.md) (Sections 8, 22, 23, 25, 26 are binding), then this folder in numeric order. **Where this folder and the plan's Mermaid ERDs differ on columns, this folder wins** (see [01](01-schema-review.md)). Where they differ on business rules, the plan wins — stop and report the conflict instead of choosing silently.
+Read first: `/AGENTS.md`, [project context](../../../c48-project-context.md), the [plan](../c48-technology-and-delivery-plan.md) (Sections 8, 22, 23, 25, 26 are binding), then this folder in numeric order. **Where this folder and the plan's Mermaid ERDs differ on columns, this folder wins** (see [01](01-schema-review.md)). Where they differ on business rules, the plan wins — stop and report the conflict instead of choosing silently.
 
 ## 1. Repository layout (create only what the current task needs)
 

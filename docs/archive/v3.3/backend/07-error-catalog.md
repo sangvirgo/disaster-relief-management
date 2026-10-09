@@ -1,3 +1,5 @@
+> **Historical v3.3 source — not an implementation contract.** Read the [current backend pack](../../../backend/README.md) for v4.0 authority. Old section numbers, test claims and commands below describe their original revision.
+
 # 07 — Error code catalog (single source for the Vietnamese messages)
 
 Every error the API can return has one row here. The implementation loads this table into each service's message catalog; **a CI test fails if a thrown `code` is missing from the catalog, or a catalog `message` is empty/English** (00 §5). `field_errors` codes (e.g. `PHONE_INVALID`) are listed with HTTP `400` and appear under `VALIDATION_FAILED`. Messages never contain PII, identifiers or internal terms. Owner = the service that raises the code (shared codes exist in all three).
