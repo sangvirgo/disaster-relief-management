@@ -9,8 +9,8 @@ Before analysis, design, implementation, or further research, read:
 1. [Project context](docs/c48-project-context.md): the assigned scope and deliverables consolidated from the project brief and DOCX outline.
 2. [Technology and delivery plan](docs/c48-technology-and-delivery-plan.md): the primary English technical baseline, including framework/database comparisons, requirements, architecture, and delivery plan.
 3. Appendix A of the plan: implementation invariants, unresolved design issues, research protocol, and session handoff instructions.
-4. For backend implementation, read `docs/backend/README.md` and follow its task order; its schema and API contracts take precedence over the plan's Mermaid column lists.
-5. For file storage or AI work, read Sections 6.3 and 12 of the plan, including the MinIO AIStor Free decision and its implementation limits.
+4. For backend work, read `docs/backend/README.md`, then `01-design.md`, `02-api-contracts.md` and `03-implementation.md` in that folder. Start **T0-S**, then T0. The design lists the exact changes required to the legacy `schema/*.sql`; those SQL files are not the v4.0 target until T0-S evidence exists. Archived plans do not govern implementation.
+5. For storage or AI work, read current plan Sections 3 and 5 and the backend design. MinIO AIStor Free remains the selected lab store, subject to verified current terms; AI remains disabled without its own reviewed contract/evaluation/privacy gates.
 
 ## Main scope
 

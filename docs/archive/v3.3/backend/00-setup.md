@@ -1,6 +1,8 @@
+> **Historical v3.3 source — not an implementation contract.** Read the [current backend pack](../../../backend/README.md) for v4.0 authority. Old section numbers, test claims and commands below describe their original revision.
+
 # 00 — Backend setup, conventions and rules for implementing agents
 
-Read first: `/AGENTS.md`, [project context](../c48-project-context.md), the [plan](../c48-technology-and-delivery-plan.md) (Sections 8, 22, 23, 25, 26 are binding), then this folder in numeric order. **Where this folder and the plan's Mermaid ERDs differ on columns, this folder wins** (see [01](01-schema-review.md)). Where they differ on business rules, the plan wins — stop and report the conflict instead of choosing silently.
+Read first: `/AGENTS.md`, [project context](../../../c48-project-context.md), the [plan](../c48-technology-and-delivery-plan.md) (Sections 8, 22, 23, 25, 26 are binding), then this folder in numeric order. **Where this folder and the plan's Mermaid ERDs differ on columns, this folder wins** (see [01](01-schema-review.md)). Where they differ on business rules, the plan wins — stop and report the conflict instead of choosing silently.
 
 ## 1. Repository layout (create only what the current task needs)
 
@@ -78,6 +80,17 @@ Node 24 LTS, NestJS (Express adapter), TypeScript strict, TypeORM + PostgreSQL 1
 8. **Central SQLSTATE mapping:** `23505` unique → the command's specific conflict code, `23514` check → a `409` domain code (e.g. `INSUFFICIENT_STOCK`), `40P01` deadlock / `55P03` lock timeout → bounded retry (≤ 2, jittered) then `503 LOCK_TIMEOUT`. A raw 500 for any of these is a bug. Use savepoints / `ON CONFLICT` instead of retrying inside an aborted transaction (tracking-code collision).
 9. **Check-then-insert caps** (SOS soft throttle, `PROXY_OPEN_CAP`) may overshoot under parallel requests; accepted — the overshoot only lands in the review lane. Do not add locks for them.
 10. **Time and cursors:** `now()` is the transaction *start* time, so a long transaction can commit a row "in the past" of a cursor already served. Ledger/audit/notice lists accept this (readers see a consistent `generated_at`); anything that must be exact (reconciliation) uses SUM, not a cursor.
+
+## 3.4 Query rules, query budgets and N+1 (plan §27.2) — binding for every list/read endpoint
+
+1. **Query budget.** Each list endpoint declares a maximum number of SQL statements per request, independent of page size (default ≤ 4 for a page of 50: the page + one batched query per child collection/aggregate). The budget is written in the endpoint's contract row and enforced by TC-BE-30 (statements for a page of 5 must equal those for a page of 50).
+2. **Batch children, never loop.** Children: `WHERE parent_id = ANY($ids)` (ids come from the page just read). Aggregates per row (counts, sums, `recent_missions_24h`, `has_active_work`, accepted totals): one `GROUP BY parent_id` query for the whole page. Actor names: collect all `*_user_id` of the page and call Identity `users:lookup` once (≤ 100). Request status/scope of many requests from Logistics: Response `POST /internal/requests:batch` (03 §5); fulfillment of many requests from the Response board: Logistics `POST /internal/fulfillment:summary` (04 §5). A call to another service inside a loop is a defect.
+3. **TypeORM.** `eager: true` and lazy relations are forbidden (lint rule/PR check); use QueryBuilder with explicit `select`, or raw parameterized SQL for hot lists. Never combine `take/skip` with a one-to-many join (TypeORM paginates in memory); paginate the parent with keyset first, then load children by ids. Entities are never returned directly (DTO mapping already required).
+4. **Open-work lists** (coordinator queue, distribution board, delivery work queue, adjustments, overdue scans) use the *partial* open-status indexes of 01 §7; history lists use the full indexes. A new list endpoint must name the index that serves it in its contract row and show `EXPLAIN (ANALYZE, BUFFERS)` in the PR when it touches a table that can exceed 100 k rows.
+5. **Scope compile.** Grants of different kinds (ORGANIZATION / REGION / CAMPAIGN) are compiled into one query per kind merged by `(sort_key, id)` (or `UNION ALL … ORDER BY … LIMIT`); a single `OR` across kinds is not allowed on tables above 100 k rows.
+6. **Aggregates over history** read only the current approved revision (`count_revision` of the latest APPROVE review) and statuses that count (e.g. `POSTED`), never every revision.
+7. **Observability in the test/demo profile:** `shared_preload_libraries = pg_stat_statements`, `log_min_duration_statement = 200ms`, `auto_explain.log_min_duration = 500ms`; T18 records the top statements by total time.
+8. **Scale gate:** TC-PERF-02 (plan §27.2 item 8) runs on a 1 M-row seed with ≤ 1 % open requests before T18 can close.
 
 ## 3.2 Background jobs, pools, timeouts
 

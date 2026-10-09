@@ -1,3 +1,5 @@
+> Historical research/review against v2.2; not an implementation contract. The [current plan](c48-technology-and-delivery-plan.md) and [backend pack](backend/README.md) govern implementation.
+
 # C48 Business and AI Blueprint Review
 
 Research date: 2026-09-30. Baseline: `c48-technology-and-delivery-plan.md` v2.2 and `c48-project-context.md`. External proposal: `Cuu_tro_thien_tai.pdf`, 73 pages. The C48 plan remains authoritative; the PDF supplies candidate research ideas, not replacement architecture or approved operational policy. This review does not establish executed product tests or real-world rescue suitability.
