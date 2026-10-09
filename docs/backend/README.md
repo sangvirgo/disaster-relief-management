@@ -19,3 +19,5 @@ Turns the [technology and delivery plan](../c48-technology-and-delivery-plan.md)
 docker run -d --name c48pg -e POSTGRES_PASSWORD=x -p 127.0.0.1:55432:5432 postgis/postgis:17-3.5
 # for each service: create database, load <service>.sql, then run test-<service>.sql with psql -v ON_ERROR_STOP=1
 ```
+
+**Focused logic update (2026-10-09):** the full main plan and all diagrams are retained. Read plan Section27 and01-schema-review Section7 before starting T0-S, then T0. SQL files are the existing baseline; new logic deltas have not yet been applied/tested.

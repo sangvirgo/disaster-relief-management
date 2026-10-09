@@ -109,3 +109,9 @@ Every error the API can return has one row here. The implementation loads this t
 | `SETTLEMENT_EXCEEDS_ISSUED` | 409 | Logistics | Số lượng xác nhận vượt quá số lượng đã xuất. |
 
 Notes: `REQUEST_STATE_INVALID` and `IDEMPOTENCY_IN_PROGRESS` from earlier drafts are **removed** (use `STATE_TRANSITION_INVALID`; in-flight duplicates simply wait for the first command, see 00 §3). A revoked or expired session is always `SESSION_EXPIRED`; a missing credential is `UNAUTHENTICATED`.
+
+## Focused logic-review code
+
+| code | HTTP | Owner | Vietnamese message |
+|---|---|---|---|
+| `ATTRIBUTION_LOCKED` | 409 | Response | Phạm vi xử lý đã được cố định cho chu kỳ này. |

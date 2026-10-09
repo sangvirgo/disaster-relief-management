@@ -1,10 +1,13 @@
 # 06 — Ordered implementation tasks
 
+**Start with T0-S, then T0.** Read plan §27 and01 §7; existing SQL still requires these target deltas. No application code starts before schema alignment evidence.
+
 One task per branch/PR. A task is done only when its **exit evidence** exists (commands + results recorded) and the Definition of Done in [00](00-setup.md) §6 holds. Order follows plan §16 slices; do not start a task before its dependencies. Cut order if time runs out (plan §16): optional AI → push → full offline queue → CSV → advanced warehouse depth (see [01](01-schema-review.md) §5) — never the seal protocol, independent review, once-only posting, nonnegative stock, human verification, privacy, Vietnamese messages or truthful ACK.
 
 | # | Task | Depends | Deliverables | Exit evidence |
 |---|---|---|---|---|
-| T0 | **Spike + workspace** | — | Monorepo skeleton, three Nest apps booting, Compose (3 DBs, PostGIS image digest pinned, MinIO AIStor Free, Nginx), `VERSIONS.md`; load `schema/*.sql` through TypeORM migrations; race test on `mission_team_one_active_uq`; `ST_DWithin` + `FOR UPDATE` demo | Migrated schema dump equals `schema/*.sql`; `schema/test-*.sql` pass; parallel-transaction test output; decision recorded if TypeORM is replaced |
+| T0-S | **Focused target schema alignment** | — | Verify supported PostgreSQL/PostGIS and pin image first; apply01 §7 to schema/migrations and focused assertions; complete every-column/index inventory | Real restricted-role assertions, controlled two-session races, exact SQLSTATE/constraint checks and measured EXPLAIN evidence recorded; no inherited PASS claim for new deltas |
+| T0 | **Spike + workspace** | T0-S | Monorepo skeleton, three Nest apps booting, Compose (3 DBs, PostGIS image digest pinned, MinIO AIStor Free, Nginx), `VERSIONS.md`; load `schema/*.sql` through TypeORM migrations; race test on `mission_team_one_active_uq`; `ST_DWithin` + `FOR UPDATE` demo | Migrated schema dump equals `schema/*.sql`; `schema/test-*.sql` pass; parallel-transaction test output; decision recorded if TypeORM is replaced |
 | T1 | **Technical package** | T0 | Error envelope + exception filter loading [07-error-catalog.md](07-error-catalog.md), **central SQLSTATE mapper (23505/23514/40P01/55P03)**, idempotency interceptor (insert-first protocol, 00 §3), purpose-bound secret hashing with versioned pepper, scope evaluator + role→permission constant ([05](05-permissions.md)), correlation id, **keyset helper with `(sort, id)` cursor + filter hash**, env validation, **pino redaction paths**, **job runner (advisory lock + SKIP LOCKED + jitter)**, **cross-service client (keep-alive, timeout, circuit breaker, single-flight)**, `UPDATE … WHERE version` helper | Unit tests; TC-L10N-01 skeleton (no English framework text leaks); idempotency replay/conflict/in-progress tests on real DB |
 | T2 | **Identity auth** | T1 | register/login/refresh/logout/change-password/me/csrf; Argon2id; family rotation + reuse detection; Web cookie vs Native transports | TC-BE-01 (partial), TC-BE-20, TC-BE-28; parallel-refresh test (loser gets `REFRESH_RACE`, family survives); disable-vs-rotation race leaves no live token |
 | T3 | **Identity admin + internal** | T2 | users, orgs, memberships, grants, regions, audit, `/internal/token|introspect|users:lookup`, seeds | Grant change revokes sessions; last-admin guard; introspection p95 under k6 smoke; TC-BE-12 identity half |
@@ -20,10 +23,10 @@ One task per branch/PR. A task is done only when its **exit evidence** exists (c
 | T13 | **Logistics: count, review, post** | T12 | receipts, count revisions, review, post (exactly once), release-held, dispute resolve | TC-DON-03/04/05/09; concurrent post and replay-with-new-key ⇒ one credit; self-review denied |
 | T14 | **Logistics: needs, commitments, fulfillment** | T11,T9 | cycle, needs, reduce/cancel/confirm, commitments, release, fulfillment board, internal read | TC-15, TC-18, TC-19, TC-31, TC-BE-05/09/15/19/23/26; race: two commitments on one need |
 | T15 | **Logistics: distribution and handoff** | T14 | prepare/approve/dispatch/cancel, handoffs with arithmetic, settlements, return/loss, reconcile | TC-16, TC-DIST-01..04; race: two dispatches on one stock; approval voided by edit |
-| T16 | **Resolution/cancellation seal** | T9,T14 | Response intents, recovery task, Logistics freeze/seal/unseal, resolve/abort/close/reopen/cancel endpoints | TC-BE-17/18, TC-BE-07, TC-REV (resolve path), crash-recovery test (kill between seal and commit) — do this **early**, it is the riskiest part (plan R-03) |
+| T16 | **Resolution/cancellation seal** | T9,T14,T15 | Response intents, recovery task, Logistics freeze/seal/unseal, resolve/abort/close/reopen/cancel endpoints | TC-BE-17/18, TC-BE-07, TC-REV (resolve path), crash-recovery test (kill between seal and commit) — do this **early**, it is the riskiest part (plan R-03) |
 | T17 | **Reports and reconciliation** | T13,T15 | stock/fulfillment/donation reports, public summary, reconciliation flags | TC-REC-01, TC-BE-14 (full), TC-23 |
-| T18 | **Hardening + evidence** | all | security headers/CSP, throttling configs, log redaction, backup/restore runbook executed, k6 scenario, accessibility of API error copy | TC-BE-27/28/29, TC-29, TC-PERF-01 with hardware recorded |
-| T19 | **Contracts + handoff** | all | exported OpenAPI per service committed, traceability matrix updated, SRS/SDD derivations, user-guide inputs, session handoff note | OpenAPI diff clean; matrix lists executed vs planned |
+| T18 | **Hardening + evidence** | T2–T17 | security headers/CSP, throttling configs, log redaction, backup/restore runbook executed, k6 scenario, accessibility of API error copy | TC-BE-27/28/29, TC-29, TC-PERF-01 with hardware recorded |
+| T19 | **Contracts + handoff** | T18 | exported OpenAPI per service committed, traceability matrix updated, SRS/SDD derivations, user-guide inputs, session handoff note | OpenAPI diff clean; matrix lists executed vs planned |
 
 **Parallel work for Web/Mobile:** after each task export `openapi.json`; frontends mock from it. Contracts change only through a documented edit to 02–04 first.
 
@@ -36,9 +39,22 @@ One task per branch/PR. A task is done only when its **exit evidence** exists (c
 | T2/T3 | Disable user while a refresh rotation is in flight ⇒ no live refresh token afterwards; `authz_version` mismatch ⇒ introspection inactive |
 | T4/T5 | Same idempotency key sent twice in parallel ⇒ one request row, duplicate replays; retry of a lost response with the same secret returns the original, never `TRACKING_SECRET_IN_USE` |
 | T7 | Duplicate A→B vs B→C; verify with a stale `CONCURRENCE` (supplement in between) ⇒ rejected |
-| T8/T9 | Offer vs availability PATCH (team never UNAVAILABLE with an OFFERED mission); leader transfer vs member removal (always one active leader); offer vs campaign close; mission transition vs `resolve` (RESOLVING barrier holds even for a no-op recompute) |
+| T8/T9 | Offer vs availability PATCH (team never UNAVAILABLE with an OFFERED mission); leader transfer vs member removal (APP always has one active leader; COORDINATOR may have zero accounts); offer vs campaign close; mission transition vs `resolve` (RESOLVING barrier holds even for a no-op recompute) |
 | T11 | Two reviewers approve one adjustment with different keys ⇒ one movement; `TRUNCATE` on append-only tables refused |
 | T13 | Two posts of items (A,B)/(B,A) to the same warehouse with no balance rows ⇒ no deadlock; post replayed under a new key ⇒ one credit |
 | T15 | Handoff over-balance with two parallel handoffs; approval, then line edit, then dispatch ⇒ `APPROVAL_STALE` |
 | T16 | Delayed `seal` after `abort` ⇒ refused; delayed `unseal` of an old intent ⇒ refused; delayed `POST /needs` after cancel ⇒ `CYCLE_FROZEN`; finalizer vs abort ⇒ exactly one wins |
 | T10/T17/T18 | `EXPLAIN` on the queue, unassigned, candidate, heatmap and report queries at 200k requests (budgets: queue < 5 ms, heatmap < 500 ms); keyset page 2/50 uses `Index Cond` |
+
+## Focused logic acceptance ownership (plan §27)
+
+| Tasks | Required addition |
+|---|---|
+| T4/T5/T7 | TC-LOGIC-01/04/10/14: optional intake/unknown facts, guest tracking version, recovery, scoped sources/concurrence, immutable approved snapshots and explicit supplement review; pending danger alerts immediately. |
+| T8/T9 | TC-LOGIC-02/03/12: accountless external team, field outcome without media, active-cancel readiness, first-offer attribution stamp and offer-versus-attribution race. |
+| T11/T0-S | TC-LOGIC-09/13: hardened stock writer under restricted role, lexical decimals/finite values, useful columns/index inventory and EXPLAIN. |
+| T13/T17 | TC-LOGIC-07/08: held revision independently reviewed before incremental post; POSTED history preserved; accepted by drive and distributed by campaign/warehouse separately. |
+| T14/T15 | TC-LOGIC-06/12/13: admission stamp, reasoned increase retaining original, same-org contributions, quantity-matched unique settlement and post-target custody after seal; pending loss independent approval before accounting. |
+| T0/T16 | TC-LOGIC-05/11: prototype delayed-seal-after-abort durable local fence early at T0; full resolution/failure-review/adopt/abort and zero-mission branch at T16; original202 replay preserved. |
+
+Client, AI research, SRS/SDD, schedule and demo deliverables remain in the full plan. This backend task update does not delete or replace them. No SQL/runtime checks were executed for this documentation review.

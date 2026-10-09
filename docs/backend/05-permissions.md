@@ -16,6 +16,7 @@ Roles are a **code catalog** (`role_grant.role_code` CHECK in [identity.sql](sch
 | `REQUEST_UNASSIGNED_QUEUE` (org-wide scope only) |  |  | ● |  |  |  |  |  |  |
 | `MISSION_ASSIGN`, `MISSION_RECORD_ON_BEHALF`, `TEAM_MANAGE_ANY`, `TEAM_POSITION_SET_ANY` |  |  | ● |  |  |  |  |  |  |
 | `MAP_READ` (heatmap, grouped queue) |  |  | ● |  | ● |  |  |  |  |
+| `CAMPAIGN_READ` (also granted independently to managers) |  |  | ● | ● | ● |  |  |  |  |
 | `CAMPAIGN_MANAGE` |  |  | ● | ● | ● |  |  |  |  |
 | `REPORT_READ` (Response/Logistics aggregates) |  |  | ● | ● | ● |  |  |  | ● |
 | `CATALOG_MANAGE`, `ASSET_MANAGE` (items, warehouses, vehicles, points) |  |  |  |  | ● |  |  |  |  |
@@ -54,7 +55,7 @@ A grant is `(role, scope_type, organization, region?, campaign?)`.
 | Team | Edit own team: active leader. `TEAM_MANAGE_ANY`: scoped coordinator. |
 | Evidence | Download requires current authorization on the owning request/mission/donation/handoff; signed URL TTL 60 s. |
 | Donation | Account owner or valid donation secret; staff via drive/intake-site scope. Receipt number/name/phone alone grants nothing. |
-| Distribution | Preparer ≠ approver ≠ dispatcher (DB CHECK + service). Recorder of a handoff ≠ its receiver. LOSS approver ≠ recorder. |
+| Distribution | Approver differs from preparer and dispatcher; preparer may dispatch (DB CHECK + service). Recorder of a handoff ≠ its receiver. LOSS approver ≠ recorder. |
 | Receipt | Reviewer ≠ every count author (service rule + test). |
 | Notices | Only the recipient. |
 
@@ -65,3 +66,5 @@ A grant is `(role, scope_type, organization, region?, campaign?)`.
 ## 5. Guest and public surface (the only unauthenticated routes)
 
 `POST /identity/auth/register|login|refresh` · `POST /response/requests` (SELF) · `GET /response/requests/track` · `POST /response/requests/{id}/supplements` · `POST /response/requests/{id}/evidence` (guest, secret) · `GET /response/public/campaigns` · `GET /logistics/public/donation-drives[/{id}]` · `POST /logistics/public/donation-drives/{id}/deliveries` · `GET|POST /logistics/public/donations/{id}…` (capability). Everything else requires a session.
+
+Focused logic: COORDINATOR teams need no account/leader; scoped coordinator records sourced progress. APP direct actions retain active-leader guards. Ready cannot bypass the active-cancel latch. RETURN warehouse recorder may use DONATION_INTAKE or DISTRIBUTION_DISPATCH + receiving-site scope, distinct from dispatcher. LOSS_APPROVE is exercised through authenticated independent review, never a supplied actor id. Public request-category catalog contains no victim data; recovery redemption requires a live session plus purpose-bound code.
