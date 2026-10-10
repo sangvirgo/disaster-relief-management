@@ -26,6 +26,7 @@
     "migration:down:identity": "node dist/apps/identity/src/database/migrate.js down",
     "migration:down:response": "node dist/apps/response/src/database/migrate.js down",
     "migration:down:logistics": "node dist/apps/logistics/src/database/migrate.js down",
+    "check:compose-env": "node scripts/check-compose-env.mjs",
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand && node --test scripts/*.test.mjs"
   },
   "dependencies": {

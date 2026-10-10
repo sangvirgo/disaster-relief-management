@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
+import type { NextFunction, Request, Response } from 'express';
 import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, loadErrorCatalog, PinoNestLogger, validateEnvironment } from '../../../packages/technical/src';
 import { AppModule } from './app.module';
 import { loadIdentityAuthConfig } from './auth/auth-security';
@@ -10,6 +11,10 @@ async function bootstrap(): Promise<void> {
   const logger = new PinoNestLogger(createPinoLogger('identity', config.logLevel));
   const app = await NestFactory.create(AppModule, { logger });
   app.use(correlationMiddleware());
+  app.use('/api/v1/identity', (_request: Request, response: Response, next: NextFunction) => {
+    response.setHeader('Cache-Control', 'no-store');
+    next();
+  });
   app.useGlobalFilters(new ApiExceptionFilter(loadErrorCatalog(), 'identity'));
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   app.enableCors({

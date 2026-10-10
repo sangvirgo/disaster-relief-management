@@ -8,6 +8,10 @@ export interface GrantScopeInput {
   campaign_id?: string | null;
 }
 
+export function isSelfGrant(actorId: string, userId: string): boolean {
+  return actorId.toLowerCase() === userId.toLowerCase();
+}
+
 export function grantScopeIsValid(grant: GrantScopeInput): boolean {
   const organization = grant.organization_id ?? null;
   const region = grant.region_code ?? null;

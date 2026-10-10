@@ -105,11 +105,12 @@ export class UsersService {
   async create(dto: CreateUserDto, actor: AdminRequest): Promise<{ status: number; value: Record<string, unknown>; replay: boolean }> {
     const actorId = actor.auth!.userId;
     const passwordHash = await this.authService.hashTemporaryPassword(dto.temporary_password, dto.username);
+    const { temporary_password: _temporaryPassword, ...requestPayload } = dto;
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `user:${actorId}`,
       command: 'identity.users.create',
       key: actor.idempotencyKey!,
-      requestHash: canonicalRequestHash(dto),
+      requestHash: canonicalRequestHash({ ...requestPayload, temporary_password_binding: this.authService.hashTemporaryPasswordBinding(dto.temporary_password) }),
       databaseErrorMappings: { unique: { app_user_username_key: 'USERNAME_TAKEN' } },
       execute: async (manager) => {
         if (dto.organization_id) {
@@ -179,9 +180,10 @@ export class UsersService {
     const current = await this.dataSource.query('SELECT username FROM app_user WHERE id = $1', [id]) as Array<{ username: string }>;
     if (!current[0]) throw new AppError('NOT_FOUND', { status: 404 });
     const passwordHash = await this.authService.hashTemporaryPassword(dto.temporary_password, current[0].username);
+    const { temporary_password: _temporaryPassword, ...requestPayload } = dto;
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `user:${actorId}`, command: 'identity.users.reset-password', key: actor.idempotencyKey!,
-      requestHash: canonicalRequestHash({ id, ...dto }),
+      requestHash: canonicalRequestHash({ id: id.toLowerCase(), ...requestPayload, temporary_password_binding: this.authService.hashTemporaryPasswordBinding(dto.temporary_password) }),
       execute: async (manager) => {
         const before = await this.support.getUser(manager, id, true);
         if (Number(before.version) !== dto.expected_version) throw new AppError('VERSION_CONFLICT', { status: 409 });

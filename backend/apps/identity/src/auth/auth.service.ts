@@ -289,6 +289,10 @@ export class AuthService implements OnModuleInit {
     return this.hashPassword(password);
   }
 
+  hashTemporaryPasswordBinding(password: string): string {
+    return hashPurposeBoundSecret(password, 'identity-admin-temporary-password-idempotency', this.config.refreshPeppers, this.config.currentRefreshPepperVersion);
+  }
+
   private async readRegisteredUser(manager: EntityManager, resource: ResourceRef | null): Promise<{ id: string; username: string; display_name: string }> {
     if (!resource || resource.type !== 'app_user') throw new AppError('INTERNAL_ERROR', { status: 500 });
     const rows = await manager.query('SELECT id, username, display_name FROM app_user WHERE id = $1', [resource.id]) as Array<{ id: string; username: string; display_name: string }>;

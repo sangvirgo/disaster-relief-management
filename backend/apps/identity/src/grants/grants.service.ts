@@ -6,7 +6,7 @@ import { canonicalRequestHash, IdempotencyService, ResourceRef } from '../../../
 import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/keyset';
 import { AdminRequest, IdentityAdminSupport } from '../admin/admin-security';
 import { CreateGrantDto, GrantListQueryDto, RevokeGrantDto } from './grants.dto';
-import { grantScopeIsValid } from './grant-scope';
+import { grantScopeIsValid, isSelfGrant } from './grant-scope';
 import { CampaignScopeService } from './campaign-scope.service';
 
 interface GrantRow {
@@ -81,7 +81,7 @@ export class GrantsService {
 
   async create(userId: string, dto: CreateGrantDto, actor: AdminRequest) {
     const actorId = actor.auth!.userId;
-    if (actorId === userId) throw new AppError('FORBIDDEN', { status: 403 });
+    if (isSelfGrant(actorId, userId)) throw new AppError('FORBIDDEN', { status: 403 });
     if (!grantScopeIsValid(dto)) throw new AppError('SCOPE_INVALID', { status: 400 });
     if (dto.scope_type === 'CAMPAIGN') await this.campaigns.assertActiveCampaign(dto.campaign_id!, dto.organization_id!);
     return this.idempotency.execute(this.dataSource, {

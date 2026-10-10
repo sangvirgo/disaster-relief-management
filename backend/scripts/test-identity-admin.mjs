@@ -117,6 +117,13 @@ try {
   userIds.push(userId);
   assert.equal(createdUser.body.must_change_password, true);
   assert.ok(!JSON.stringify(createdUser.body).includes(temporaryPassword));
+  const unprivilegedLogin = await call('/auth/login', {
+    method: 'POST', body: { username: userPayload.username, password: temporaryPassword, client_kind: 'NATIVE' },
+    headers: { 'X-Forwarded-For': nextIp() },
+  });
+  assert.equal(unprivilegedLogin.status, 200, JSON.stringify(unprivilegedLogin.body));
+  familyIds.push(jwtClaims(unprivilegedLogin.body.access_token).sid);
+  expectError(await call('/users?limit=1', { token: unprivilegedLogin.body.access_token }), 403, 'FORBIDDEN');
   const createReplay = await call('/users', {
     method: 'POST', token: adminToken, body: userPayload, headers: { 'Idempotency-Key': createUserKey },
   });
@@ -134,6 +141,12 @@ try {
     headers: { 'Idempotency-Key': idem() },
   });
   expectError(selfGrant, 403, 'FORBIDDEN');
+  const uppercaseSelfGrant = await call(`/users/${adminId.toUpperCase()}/grants`, {
+    method: 'POST', token: adminToken,
+    body: { role_code: 'VOLUNTEER', scope_type: 'ORGANIZATION', organization_id: organizationId, reason: 'Không được tự cấp quyền' },
+    headers: { 'Idempotency-Key': idem() },
+  });
+  expectError(uppercaseSelfGrant, 403, 'FORBIDDEN');
 
   const grantPayload = { role_code: 'VOLUNTEER', scope_type: 'ORGANIZATION', organization_id: organizationId, reason: 'Thử nghiệm quyền' };
   const grant = await call(`/users/${userId}/grants`, {
@@ -215,6 +228,14 @@ try {
   });
   assert.equal(removeMembership.status, 204, JSON.stringify(removeMembership.body));
   expectError(await call('/me', { token: membershipLogin.body.access_token }), 401, 'SESSION_EXPIRED');
+  const organizationGrantAudits = await database.query(
+    `SELECT g.revoked_at, a.after_state->>'revoked_at' AS audit_revoked_at
+       FROM role_grant g JOIN audit_log a ON a.entity_type = 'role_grant' AND a.entity_id = g.id::text AND a.action = 'GRANT_REVOKED'
+      WHERE g.user_id = $1 AND g.organization_id = $2 AND g.revoked_at IS NOT NULL`,
+    [userId, organizationId],
+  );
+  assert.ok(organizationGrantAudits.rows.length > 0);
+  for (const row of organizationGrantAudits.rows) assert.equal(new Date(row.revoked_at).toISOString(), row.audit_revoked_at);
   const liveOrganizationGrants = await database.query(
     "SELECT count(*)::int AS count FROM role_grant WHERE user_id = $1 AND organization_id = $2 AND revoked_at IS NULL",
     [userId, organizationId],
@@ -265,10 +286,12 @@ try {
 
   const users = await call('/users?limit=1', { token: adminToken });
   assert.equal(users.status, 200, JSON.stringify(users.body));
+  assert.equal(users.headers.get('cache-control'), 'no-store');
   assert.equal(users.body.items.length, 1);
   assert.ok(users.body.next_cursor);
   const audit = await call(`/audit-logs?entity_type=app_user&entity_id=${userId}&limit=100`, { token: adminToken });
   assert.equal(audit.status, 200, JSON.stringify(audit.body));
+  assert.equal(audit.headers.get('cache-control'), 'no-store');
   assert.ok(audit.body.items.some((item) => item.action === 'USER_CREATED'));
   assert.ok(!JSON.stringify(audit.body).includes(temporaryPassword));
   const grantAudit = await call(`/audit-logs?entity_type=role_grant&entity_id=${grant.body.id}&limit=100`, { token: adminToken });
@@ -277,6 +300,7 @@ try {
   const internalOrganization = await call(`/internal/organizations/${organizationId}`, { token: serviceToken.body.access_token });
   assert.equal(internalOrganization.status, 200, JSON.stringify(internalOrganization.body));
   assert.equal(internalOrganization.body.status, 'INACTIVE');
+  expectError(await call('/internal/organizations/not-a-uuid', { token: serviceToken.body.access_token }), 400, 'VALIDATION_FAILED');
 
   const beforeDisable = await call(`/users/${userId}`, { token: adminToken });
   const disabled = await call(`/users/${userId}/disable`, {
@@ -322,6 +346,7 @@ try {
   assert.equal(resetLogin.status, 200, JSON.stringify(resetLogin.body));
   familyIds.push(jwtClaims(resetLogin.body.access_token).sid);
 
+  // Identity authenticates the caller; the consuming service must filter its own records before using this lookup.
   const lookedUp = await call('/internal/users:lookup', {
     method: 'POST', token: serviceToken.body.access_token, body: { ids: [userId, randomUUID()] },
   });

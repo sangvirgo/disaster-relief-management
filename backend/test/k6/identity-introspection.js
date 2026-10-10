@@ -10,6 +10,7 @@ export const options = {
   thresholds: {
     http_req_duration: ['p(95)<100'],
     http_req_failed: ['rate<0.01'],
+    checks: ['rate == 1.00'],
   },
 };
 
@@ -26,8 +27,8 @@ export function setup() {
   if (login.status !== 200) throw new Error('Identity k6 login failed');
 
   const service = http.post(`${baseUrl}/internal/token`, JSON.stringify({
-    client_id: __ENV.SERVICE_CLIENT_ID,
-    client_secret: __ENV.SERVICE_CLIENT_SECRET,
+    client_id: __ENV.RESPONSE_SERVICE_CLIENT_ID,
+    client_secret: __ENV.RESPONSE_SERVICE_CLIENT_SECRET,
     audience: 'identity',
   }), { headers: { 'Content-Type': 'application/json' } });
   check(service, { 'service token created': (response) => response.status === 200 });

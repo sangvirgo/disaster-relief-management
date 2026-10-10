@@ -159,10 +159,16 @@ export class OrganizationsService {
              FROM role_grant WHERE user_id = $1 AND organization_id = $2 AND revoked_at IS NULL FOR UPDATE`,
           [userId, organizationId],
         ) as Array<Record<string, unknown>>;
-        await manager.query('UPDATE role_grant SET revoked_at = now() WHERE user_id = $1 AND organization_id = $2 AND revoked_at IS NULL', [userId, organizationId]);
+        const [revokedGrants] = await manager.query(
+          'UPDATE role_grant SET revoked_at = now() WHERE user_id = $1 AND organization_id = $2 AND revoked_at IS NULL RETURNING id, revoked_at',
+          [userId, organizationId],
+        ) as [Array<{ id: string; revoked_at: Date }>, number];
+        const revokedAtById = new Map(revokedGrants.map((grant) => [String(grant.id), new Date(grant.revoked_at).toISOString()]));
         for (const grant of grants) {
+          const revokedAt = revokedAtById.get(String(grant.id));
+          if (!revokedAt) throw new AppError('INTERNAL_ERROR', { status: 500 });
           await this.support.audit(manager, actorId, 'GRANT_REVOKED', 'role_grant', String(grant.id), grant,
-            { ...grant, revoked_at: new Date().toISOString() }, 'Tư cách thành viên tổ chức đã bị gỡ.');
+            { ...grant, revoked_at: revokedAt }, 'Tư cách thành viên tổ chức đã bị gỡ.');
         }
         await manager.query("UPDATE membership SET status = 'INACTIVE' WHERE user_id = $1 AND organization_id = $2", [userId, organizationId]);
         await this.support.audit(manager, actorId, 'MEMBERSHIP_REMOVED', 'membership', `${organizationId}:${userId}`,

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { InternalService } from './internal.service';
 import { IntrospectDto, LookupUsersDto, ServiceTokenDto } from './internal.dto';
@@ -37,7 +37,7 @@ export class InternalController {
 
   @Get('organizations/:id')
   @UseGuards(IdentityServiceGuard)
-  async organization(@Param('id') id: string, @Res({ passthrough: true }) response: Response): Promise<Record<string, unknown>> {
+  async organization(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Res({ passthrough: true }) response: Response): Promise<Record<string, unknown>> {
     noStore(response);
     return this.internalService.organization(id);
   }

@@ -35,7 +35,7 @@ Throttling (Nginx + app): login 5 / minute per IP+username, 30 / minute per IP; 
 | Method & path | Request → Response | Rules / errors |
 |---|---|---|
 | `POST /users` (Idem) | `{ username, display_name, temporary_password, organization_id? }` → `201 user` | Creates an account with `must_change_password=true`; optional membership. `USERNAME_TAKEN` |
-| `GET /users?query=&status=&cursor=&limit=` | → paged `{ id, username, display_name, status, created_at }`, order `(created_at DESC, id DESC)` | No credential fields. `query` is a case-insensitive **prefix** match on username or display name (served by `app_user_*_prefix_idx`); substring search is deliberately not offered |
+| `GET /users?query=&status=&cursor=&limit=` | → paged `{ id, username, display_name, status, must_change_password, version, created_at }`, order `(created_at DESC, id DESC)` | No credential fields. `query` is a case-insensitive **prefix** match on username or display name (served by `app_user_*_prefix_idx`); substring search is deliberately not offered |
 | `GET /users/{id}` | → user + memberships + live grants | |
 | `POST /users/{id}/disable` / `/enable` (Idem) | `{ expected_version, reason }` → `200 user` | Disable revokes all families. `LAST_ADMIN` 409 if it removes the last active ADMIN |
 | `POST /users/{id}/reset-password` (Idem) | `{ expected_version, temporary_password, reason }` → `204` | Revokes all families, sets `must_change_password` |
@@ -58,8 +58,10 @@ Campaign-scoped grants call the Response internal campaign lookup before the Ide
 |---|---|---|
 | `POST /internal/token` | Response, Logistics | client-credentials → `{ access_token, expires_in }` (aud-restricted) |
 | `POST /internal/introspect` | Response, Logistics | `{ sid, sub }` (from an already signature-verified JWT) → `200 { active, user_id, display_name, status, authz_version, grants: [...] }`; `active=false` if the family is revoked/expired, the user is disabled, or `authz_version` is stale. Dedicated pool (max 4), `statement_timeout` 500 ms, p95 ≤ 100 ms. The local 10-VU/15-second smoke measured p95 4.09 ms; callers coalesce identical concurrent calls and use a circuit breaker (00 §3.2) |
-| `POST /internal/users:lookup` | Response, Logistics | `{ ids: [uuid ≤ 100] }` → `{ items: [ { id, display_name } ] }` for showing actor names; unknown ids omitted; only ids already present in the caller's own data (calls are logged by count) |
+| `POST /internal/users:lookup` | Response, Logistics | `{ ids: [uuid ≤ 100] }` → `{ items: [ { id, display_name } ] }` for showing actor names; unknown ids omitted; callers must derive IDs from records in their own database and enforce that ownership before calling. Identity cannot verify relationships held only by another service; lookup calls are logged by count. Each service's integration must test this boundary before using lookup. |
 | `GET /internal/organizations/{id}` | Response, Logistics | existence/kind/status check |
+
+All Identity API responses include `Cache-Control: no-store`. Internal lookups authenticate the service caller; cross-service record ownership remains the caller service's responsibility and must be enforced in that service's query and integration tests.
 
 ## 5. Identity error codes
 
