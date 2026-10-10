@@ -1,14 +1,25 @@
 import { NestFactory } from '@nestjs/core';
-import { RequestMethod } from '@nestjs/common';
+import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, loadErrorCatalog, PinoNestLogger, validateEnvironment } from '../../../packages/technical/src';
 import { AppModule } from './app.module';
+import { loadIdentityAuthConfig } from './auth/auth-security';
 
 async function bootstrap(): Promise<void> {
   const config = validateEnvironment(process.env, 'identity');
+  const authConfig = loadIdentityAuthConfig(process.env);
   const logger = new PinoNestLogger(createPinoLogger('identity', config.logLevel));
   const app = await NestFactory.create(AppModule, { logger });
   app.use(correlationMiddleware());
   app.useGlobalFilters(new ApiExceptionFilter(loadErrorCatalog(), 'identity'));
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+  app.enableCors({
+    origin: [...authConfig.webOrigins],
+    credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Correlation-Id', 'X-CSRF-Token'],
+    exposedHeaders: ['Idempotent-Replay', 'Retry-After', 'X-Correlation-Id', 'X-CSRF-Token'],
+  });
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.setGlobalPrefix('api/v1/identity', {
     exclude: [
       { path: 'health/live', method: RequestMethod.GET },

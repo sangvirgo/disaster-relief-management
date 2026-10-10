@@ -102,6 +102,7 @@ describe('T1 technical package', () => {
     expect(mapPostgresError({ code: '23514', constraint: 'stock_balance_check' }, {
       check: { stock_balance_check: 'INSUFFICIENT_STOCK' },
     })).toMatchObject({ code: 'INSUFFICIENT_STOCK', status: 409 });
+    expect(mapPostgresError({ code: '57014' })).toMatchObject({ code: 'LOCK_TIMEOUT', status: 503 });
 
     const sleep = jest.fn().mockResolvedValue(undefined);
     const operation = jest.fn().mockRejectedValueOnce({ code: '40P01' }).mockRejectedValueOnce({ code: '55P03' }).mockResolvedValue('ok');
@@ -228,7 +229,7 @@ describe('T1 technical package', () => {
   });
 
   it('updates versioned rows with an optimistic version predicate', async () => {
-    const manager = { queryRunner: { isTransactionActive: true }, query: jest.fn().mockResolvedValue([{ id: 'req-1', status: 'TRIAGED', version: 3 }]) };
+    const manager = { queryRunner: { isTransactionActive: true }, query: jest.fn().mockResolvedValue([[{ id: 'req-1', status: 'TRIAGED', version: 3 }], 1]) };
     await expect(updateWhereVersion(manager as never, {
       table: 'assistance_request', idColumn: 'id', id: 'req-1', expectedVersion: 2, changes: { status: 'TRIAGED' },
     })).resolves.toEqual({ id: 'req-1', status: 'TRIAGED', version: 3 });
@@ -236,7 +237,7 @@ describe('T1 technical package', () => {
       'UPDATE "assistance_request" SET "status" = $1, "version" = "version" + 1 WHERE "id" = $2 AND "version" = $3 RETURNING *',
       ['TRIAGED', 'req-1', 2],
     );
-    manager.query.mockResolvedValueOnce([]);
+    manager.query.mockResolvedValueOnce([[], 0]);
     await expect(updateWhereVersion(manager as never, {
       table: 'assistance_request', idColumn: 'id', id: 'req-1', expectedVersion: 2, changes: { status: 'TRIAGED' },
     })).rejects.toMatchObject({ code: 'VERSION_CONFLICT' });

@@ -21,7 +21,7 @@ export function mapPostgresError(error: unknown, mappings: ConstraintErrorMappin
   if (code === '23514') {
     return new AppError(mappings.check?.[constraint] ?? 'STATE_TRANSITION_INVALID', { status: 409, cause: error });
   }
-  if (code === '40P01' || code === '55P03') {
+  if (code === '40P01' || code === '55P03' || code === '57014') {
     return new AppError('LOCK_TIMEOUT', { status: 503, retryAfterSeconds: 1, cause: error });
   }
   return undefined;

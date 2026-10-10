@@ -1,0 +1,130 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "C48 Identity API",
+    "version": "1.0.0",
+    "description": "T2 authentication endpoints. Browser writes require an allowed Origin and the CSRF header; Native requests use bearer/JSON tokens and must not send cookies or Origin."
+  },
+  "servers": [{ "url": "/api/v1/identity" }],
+  "paths": {
+    "/auth/csrf": {
+      "get": {
+        "operationId": "getAuthCsrf",
+        "summary": "Issue browser pre-session and CSRF cookies",
+        "responses": {
+          "200": {
+            "description": "CSRF token; Set-Cookie issues c48_pre (HttpOnly) and c48_csrf (readable), both Secure, SameSite=Strict, host-only.",
+            "headers": { "X-CSRF-Token": { "$ref": "#/components/headers/CsrfToken" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CsrfResponse" } } }
+          },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "registerCitizen",
+        "summary": "Register a citizen account",
+        "description": "Creates only a CITIZEN/SYSTEM grant. Browser transport requires Cookie, allowed Origin and X-CSRF-Token; Native transport sends no cookies or Origin. Idempotency replays return the same user response.",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterRequest" } } } },
+        "responses": {
+          "201": { "description": "Citizen account created or replayed.", "headers": { "Idempotent-Replay": { "$ref": "#/components/headers/IdempotentReplay" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterResponse" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Create a Web or Native session",
+        "description": "WEB requires allowed Origin, pre-session cookies and X-CSRF-Token, returns HttpOnly Secure SameSite=Strict cookies (c48_access Path=/api/v1; c48_refresh Path=/api/v1/identity/auth), and rotates CSRF. NATIVE requires no cookies or Origin and returns tokens in JSON without Set-Cookie.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } } },
+        "responses": {
+          "200": { "description": "New session.", "headers": { "X-CSRF-Token": { "$ref": "#/components/headers/CsrfToken" } }, "content": { "application/json": { "schema": { "oneOf": [{ "$ref": "#/components/schemas/WebLoginResponse" }, { "$ref": "#/components/schemas/NativeLoginResponse" }] } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "refreshSession",
+        "summary": "Rotate a refresh token",
+        "description": "Web sends c48_refresh cookie and CSRF headers. Native sends refresh_token in JSON with no cookies or Origin. Rotation races return REFRESH_RACE; reuse after the ten-second grace window revokes the family.",
+        "requestBody": { "required": false, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshRequest" } } } },
+        "responses": {
+          "200": { "description": "Rotated session; Web gets new cookies and CSRF token, Native gets JSON tokens.", "headers": { "X-CSRF-Token": { "$ref": "#/components/headers/CsrfToken" } }, "content": { "application/json": { "schema": { "oneOf": [{ "$ref": "#/components/schemas/WebRefreshResponse" }, { "$ref": "#/components/schemas/NativeRefreshResponse" }] } } } },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "summary": "Revoke the current session family",
+        "description": "Web requires allowed Origin and CSRF; Native uses bearer auth and no cookies or Origin. Web cookies are cleared.",
+        "security": [{ "WebAccessCookie": [] }, { "NativeBearer": [] }],
+        "responses": { "204": { "description": "Session family revoked." }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/auth/change-password": {
+      "post": {
+        "operationId": "changePassword",
+        "summary": "Change the authenticated user's password",
+        "description": "Web requires allowed Origin and CSRF; Native uses bearer auth and no cookies or Origin. Other session families are revoked; the current family remains active.",
+        "security": [{ "WebAccessCookie": [] }, { "NativeBearer": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChangePasswordRequest" } } } },
+        "responses": { "204": { "description": "Password changed or idempotency replayed." }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/me": {
+      "get": {
+        "operationId": "getCurrentUser",
+        "summary": "Get the current user and live grants",
+        "security": [{ "WebAccessCookie": [] }, { "NativeBearer": [] }],
+        "responses": { "200": { "description": "Current user; credential fields are omitted.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MeResponse" } } } }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "WebAccessCookie": { "type": "apiKey", "in": "cookie", "name": "c48_access" },
+      "NativeBearer": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "parameters": {
+      "IdempotencyKey": { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } }
+    },
+    "headers": {
+      "CsrfToken": { "description": "Rotating HMAC-bound CSRF token.", "schema": { "type": "string" } },
+      "IdempotentReplay": { "description": "Present as true when the response is an idempotent replay.", "schema": { "type": "string", "enum": ["true"] } }
+    },
+    "responses": {
+      "Error": { "description": "Vietnamese error message; clients branch on the stable code.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } }
+    },
+    "schemas": {
+      "ErrorEnvelope": { "type": "object", "required": ["code", "message", "correlation_id"], "properties": { "code": { "type": "string" }, "message": { "type": "string", "description": "Vietnamese human-readable message." }, "field_errors": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } }, "details": { "type": "object", "additionalProperties": true }, "correlation_id": { "type": "string", "format": "uuid" } } },
+      "RegisterRequest": { "type": "object", "additionalProperties": false, "required": ["username", "password", "display_name"], "properties": { "username": { "type": "string", "minLength": 3, "maxLength": 64, "pattern": "^[A-Za-z0-9._-]+$" }, "password": { "type": "string", "minLength": 1, "maxLength": 256, "description": "At least ten characters and not a common password or the username." }, "display_name": { "type": "string", "minLength": 1, "maxLength": 200 } } },
+      "LoginRequest": { "type": "object", "additionalProperties": false, "required": ["username", "password", "client_kind"], "properties": { "username": { "type": "string", "minLength": 1, "maxLength": 64 }, "password": { "type": "string", "minLength": 1, "maxLength": 256 }, "client_kind": { "type": "string", "enum": ["WEB", "NATIVE"] } } },
+      "RefreshRequest": { "type": "object", "additionalProperties": false, "properties": { "refresh_token": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" } } },
+      "ChangePasswordRequest": { "type": "object", "additionalProperties": false, "required": ["current_password", "new_password"], "properties": { "current_password": { "type": "string", "minLength": 1, "maxLength": 256 }, "new_password": { "type": "string", "minLength": 1, "maxLength": 256, "description": "At least ten characters and not a common password or the username." } } },
+      "AuthUser": { "type": "object", "required": ["id", "username", "display_name"], "properties": { "id": { "type": "string", "format": "uuid" }, "username": { "type": "string" }, "display_name": { "type": "string" } } },
+      "RegisterResponse": { "type": "object", "required": ["user"], "properties": { "user": { "$ref": "#/components/schemas/AuthUser" } } },
+      "WebLoginResponse": { "type": "object", "required": ["user", "session", "must_change_password"], "properties": { "user": { "$ref": "#/components/schemas/AuthUser" }, "session": { "type": "object", "required": ["expires_at"], "properties": { "expires_at": { "type": "string", "format": "date-time" } } }, "must_change_password": { "type": "boolean" } } },
+      "NativeLoginResponse": { "type": "object", "required": ["user", "access_token", "refresh_token", "expires_in", "must_change_password"], "properties": { "user": { "$ref": "#/components/schemas/AuthUser" }, "access_token": { "type": "string" }, "refresh_token": { "type": "string" }, "expires_in": { "type": "integer", "minimum": 0, "maximum": 600 }, "must_change_password": { "type": "boolean" } } },
+      "WebRefreshResponse": { "type": "object", "required": ["session", "must_change_password"], "properties": { "session": { "type": "object", "required": ["expires_at"], "properties": { "expires_at": { "type": "string", "format": "date-time" } } }, "must_change_password": { "type": "boolean" } } },
+      "NativeRefreshResponse": { "type": "object", "required": ["access_token", "refresh_token", "expires_in", "must_change_password"], "properties": { "access_token": { "type": "string" }, "refresh_token": { "type": "string" }, "expires_in": { "type": "integer", "minimum": 0, "maximum": 600 }, "must_change_password": { "type": "boolean" } } },
+      "MeGrant": { "type": "object", "required": ["id", "role_code", "scope_type"], "properties": { "id": { "type": "string", "format": "uuid" }, "role_code": { "type": "string" }, "scope_type": { "type": "string" }, "organization_id": { "type": ["string", "null"], "format": "uuid" }, "region_code": { "type": ["string", "null"] }, "campaign_id": { "type": ["string", "null"], "format": "uuid" } } },
+      "MeResponse": { "type": "object", "required": ["id", "username", "display_name", "must_change_password", "grants"], "properties": { "id": { "type": "string", "format": "uuid" }, "username": { "type": "string" }, "display_name": { "type": "string" }, "must_change_password": { "type": "boolean" }, "grants": { "type": "array", "items": { "$ref": "#/components/schemas/MeGrant" } } } },
+      "CsrfResponse": { "type": "object", "required": ["csrf_token"], "properties": { "csrf_token": { "type": "string" } } }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # C48 backend implementation pack
 
-Turns the [technology and delivery plan](../c48-technology-and-delivery-plan.md) into something an engineer or AI agent can implement without guessing. Status: **T0 workspace and T1 technical package are implemented; business API tasks T2–T19 remain.** The SQL was executed against PostgreSQL 17 + PostGIS 3.5. Original baseline: 96 assertions. After the 2026-10-10 cleanup and hardening (01 §9, status in §9.5): identity 37, response 95, logistics 133 assertions pass; restricted application roles, the SECURITY DEFINER stock writer, nine two-session races and the key query plans at 200k rows were executed.
+Turns the [technology and delivery plan](../c48-technology-and-delivery-plan.md) into something an engineer or AI agent can implement without guessing. Status: **T0 workspace, T1 technical package, and T2 Identity authentication are implemented; T3–T19 remain.** The SQL was executed against PostgreSQL 17 + PostGIS 3.5. Original baseline: 96 assertions. After the 2026-10-10 cleanup and hardening (01 §9, status in §9.5): identity 37, response 95, logistics 133 assertions pass; restricted application roles, the SECURITY DEFINER stock writer, nine two-session races and the key query plans at 200k rows were executed.
 
 | File | Purpose |
 |---|---|
@@ -22,4 +22,6 @@ docker run -d --name c48pg -e POSTGRES_PASSWORD=x -p 127.0.0.1:55432:5432 postgi
 
 **Focused logic update (2026-10-09, SQL aligned 2026-10-10):** the full main plan and all diagrams are retained. Read plan Sections 27–28 and 01-schema-review §7–§9. The SQL files in `schema/` implement those deltas (status in 01 §9.5), and T0 TypeORM migrations load the same files without diverging.
 
-**Round-2 update (2026-10-09):** read plan Section 28 and 01 §8 after §27/§7. They govern automation, resolution outcomes, headers, loss review, recovery codes, attribution-lock release, delivery carrier and the column/index cleanup. The SQL files implement 01 §9 and the T0-S gate is met for the SQL layer (01 §9.5); the next implementation task is T2 Identity auth after T1.
+**Round-2 update (2026-10-09):** read plan Section 28 and 01 §8 after §27/§7. They govern automation, resolution outcomes, headers, loss review, recovery codes, attribution-lock release, delivery carrier and the column/index cleanup. The SQL files implement 01 §9 and the T0-S gate is met for the SQL layer (01 §9.5); the next implementation task after T1 was T2 Identity auth.
+
+**T2 update (2026-10-10):** Identity now implements registration, Web/Native login and refresh, logout, password change, current-user grants, CSRF, Argon2id, RS256 access tokens, refresh-family rotation/reuse detection, and disable/authz-version barriers. The tested T2 surface and transport shapes are captured in [identity OpenAPI](../../contracts/openapi/identity.json); the next task is T3 Identity admin and internal endpoints.

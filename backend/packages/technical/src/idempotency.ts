@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { DataSource, EntityManager } from 'typeorm';
 import { AppError } from './errors';
-import { withDatabaseRetry } from './postgres-errors';
+import { ConstraintErrorMappings, withDatabaseRetry } from './postgres-errors';
 
 export interface ResourceRef {
   type: string;
@@ -19,6 +19,7 @@ export interface IdempotentCommand<T> {
   command: string;
   key: string;
   requestHash: string;
+  databaseErrorMappings?: ConstraintErrorMappings;
   execute(manager: EntityManager): Promise<IdempotentOutcome<T>>;
   replay(manager: EntityManager, resource: ResourceRef | null, status: number): Promise<T>;
 }
@@ -93,6 +94,6 @@ export class IdempotencyService {
       }
       const resource = row.resource_type && row.resource_id ? { type: row.resource_type, id: row.resource_id } : null;
       return { status: row.response_status, value: await command.replay(manager, resource, row.response_status), replay: true };
-    }));
+    }), command.databaseErrorMappings ? { mappings: command.databaseErrorMappings } : {});
   }
 }

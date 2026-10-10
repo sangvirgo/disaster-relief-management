@@ -45,6 +45,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
       ...(appError?.fieldErrors ? { field_errors: appError.fieldErrors } : {}),
       ...(appError?.details ? { details: appError.details } : {}),
     };
+    response.setHeader?.('Cache-Control', 'no-store');
     if (appError?.retryAfterSeconds) response.setHeader?.('Retry-After', String(appError.retryAfterSeconds));
     response.status(safeEntry.status).json(envelope);
   }

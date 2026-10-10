@@ -33,10 +33,10 @@ export async function updateWhereVersion<T extends object>(
   const set = entries.map(([key], index) => `${quote(key)} = $${index + 1}`);
   set.push('"version" = "version" + 1');
   values.push(update.id, update.expectedVersion);
-  const rows = await manager.query(
+  const [rows] = await manager.query(
     `UPDATE ${table.map(quote).join('.')} SET ${set.join(', ')} WHERE ${quote(update.idColumn)} = $${values.length - 1} AND "version" = $${values.length} RETURNING *`,
     values,
-  ) as T[];
+  ) as [T[], number];
   if (rows.length !== 1) throw new AppError('VERSION_CONFLICT', { status: 409 });
   return rows[0]!;
 }

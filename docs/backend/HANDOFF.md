@@ -4,7 +4,7 @@ Read `/AGENTS.md`, the [project context](../c48-project-context.md), plan Sectio
 
 ## Objective and scope
 
-T0 and T1 from [06-implementation-tasks](06-implementation-tasks.md) are implemented in `backend/` on the user’s `/home/soang/c48` checkout as separate phase commits. T0 is `15dee22`; T1 is complete and the next task is T2.
+T0, T1, and T2 from [06-implementation-tasks](06-implementation-tasks.md) are implemented in `backend/` on the user’s `/home/soang/c48` checkout as separate phase commits. T0 is `15dee22`, T1 is `9d20cca`. The next task is T3 Identity admin and internal endpoints.
 
 ## What is implemented
 
@@ -16,6 +16,7 @@ T0 and T1 from [06-implementation-tasks](06-implementation-tasks.md) are impleme
 - `up`, `migrate`, `seed`, `reset-demo`, `test-db`, and `gen-keys` commands exist. Seed hashes `SEED_PASSWORD` with Argon2id and refuses production mode and unexpected database contents. `reset-demo` checks both the caller’s `NODE_ENV` and backend `.env` before deleting its volume. Root `.dockerignore` keeps local dependencies and `.env` out of build contexts.
 - Exact direct dependency and image versions plus source links are recorded in [VERSIONS.md](VERSIONS.md).
 - T1 provides the Vietnamese error catalog/filter, centralized PostgreSQL error mapping and retry, insert-first idempotency, purpose-bound peppered secret hashes, permission/scope evaluation, correlation IDs, filter-bound keyset cursors, validated PostgreSQL/runtime settings, Pino redaction, advisory-lock/SKIP-LOCKED job helpers, optimistic version updates, and a keep-alive cross-service client with timeout, circuit breaking, and credential-bound single-flight.
+- T2 provides Identity registration, Web-cookie and Native-bearer login/refresh/logout/password-change, current-user/live-grant reads, Argon2id password hashing, short-lived RS256 access tokens, CSRF protection, peppered refresh-token storage, refresh-family rotation/reuse detection, idempotent registration/password changes, rate limits, and disable/authz-version refresh barriers. The API snapshot is [contracts/openapi/identity.json](../../contracts/openapi/identity.json).
 
 ## Verification actually run
 
@@ -25,6 +26,7 @@ T0 and T1 from [06-implementation-tasks](06-implementation-tasks.md) are impleme
 - On a clean disposable PostGIS 17/3.5 stack, all three TypeORM migrations applied and their schema dumps matched the authoritative SQL. All three SQL assertion suites passed; the existing Response and Logistics race suites passed; the migrated capacity-one race returned SQLSTATE `23505`; and the delayed-seal-after-abort fence passed. Each service migration also passed cloned-database up/down/up checks. Those checks exposed and fixed TypeORM tracking-object cleanup and test-clone ownership defects.
 - All three freshly compiled service entry points started on the isolated Compose network and passed `/health/ready` against their databases. Existing test images for Identity and Response were stale and lacked entrypoints; direct Node 24 runtime checks passed. Fresh Docker image builds remain unverified.
 - The T1 database integration script passed on PostgreSQL for insert-first idempotency wait/replay, changed-payload conflict, transaction advisory-lock exclusion, and `SKIP LOCKED` job claiming. All three freshly compiled APIs also passed readiness and Vietnamese 404-envelope/correlation-ID HTTP checks. The T1 Compose configuration, shell/Node script syntax, and `git diff --check` passed; its disposable containers, network, and database volume were removed afterward.
+- T2 `npm run build` and `npm test` passed (three Jest suites, 19 tests, and one key-generation test); script syntax and Compose config passed. The auth HTTP/PostgreSQL integration passed on PostgreSQL 17 under Node 24.15.0, covering Vietnamese errors, registration/replay, cookie flags and CSRF, Native separation, password-change replay, parallel refresh/reuse, disable-vs-rotation locking, unknown/disabled login equivalence, and database retry/idempotency. The integration exercised the restricted app role and cleaned the disposable stack afterward.
 - `bash backend/scripts/test-db` did **not** complete because Docker BuildKit could not reach npm (`ECONNRESET`, then `ETIMEDOUT` on retry). Its equivalent schema, migration, race, fence, and readiness checks were run individually on the disposable stack and passed. The stack was cleaned up after verification.
 - AIStor was not started because the external license file is not supplied. Its current license/tier conditions are documented in [VERSIONS.md](VERSIONS.md).
 
@@ -38,9 +40,9 @@ T0 and T1 from [06-implementation-tasks](06-implementation-tasks.md) are impleme
 
 ## Remaining work and next task
 
-1. Continue with T2 Identity authentication in [06-implementation-tasks](06-implementation-tasks.md); do not skip ahead in the task order.
+1. Continue with T3 Identity admin and internal endpoints in [06-implementation-tasks](06-implementation-tasks.md); do not skip ahead in the task order.
 2. Once registry access is available, rerun `bash backend/scripts/test-db` as a single-command integration gate and verify fresh Docker image builds.
-3. Before relying on Nginx rate limits, address the known limits: hourly registration/tracking quotas are approximated with minute-based limits, keys use exact client IP rather than IPv4 `/24`/IPv6 `/56`, and upload-byte quota and login-per-IP-plus-username limiting are not implemented. Syntax passed; request behavior and these quotas were not tested.
+3. Before relying on distributed rate limits, address the known limits: registration and login windows are process-local; Nginx hourly tracking quotas are approximated with minute-based limits; keys use exact client IP rather than IPv4 `/24`/IPv6 `/56`; upload-byte quota remains unimplemented.
 4. Implement and verify `scripts/backup` and `scripts/restore` in T18. Backups must include the three PostgreSQL databases plus object bytes and a key/size/checksum manifest; restore must target an empty isolated stack and verify scoped access (plan §§6.3 and 23.6).
 
 No real credentials or license files were copied into the repository. The temporary `.env` used for Compose validation was excluded when moving files into the user’s checkout.
