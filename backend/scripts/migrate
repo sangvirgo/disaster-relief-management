@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname -- "$0")/lib.sh"
+require_env_file
+main_compose build identity-migrate response-migrate logistics-migrate
+main_compose up -d --wait postgres
+main_compose up -d db-init
+for service in identity response logistics; do
+  main_compose run --rm "$service-migrate"
+done

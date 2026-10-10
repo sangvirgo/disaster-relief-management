@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "apps/identity/src",
+  "monorepo": true,
+  "root": "apps/identity",
+  "compilerOptions": {
+    "webpack": false,
+    "deleteOutDir": false
+  },
+  "projects": {
+    "identity": {
+      "type": "application",
+      "root": "apps/identity",
+      "entryFile": "main",
+      "sourceRoot": "apps/identity/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/identity/tsconfig.app.json"
+      }
+    },
+    "response": {
+      "type": "application",
+      "root": "apps/response",
+      "entryFile": "main",
+      "sourceRoot": "apps/response/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/response/tsconfig.app.json"
+      }
+    },
+    "logistics": {
+      "type": "application",
+      "root": "apps/logistics",
+      "entryFile": "main",
+      "sourceRoot": "apps/logistics/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/logistics/tsconfig.app.json"
+      }
+    }
+  }
+}

@@ -1,0 +1,258 @@
+name: c48
+
+services:
+  postgres:
+    image: postgis/postgis:17-3.5@sha256:01a6a70e41e6c4467c8f55f6063555ed72db2d6662cd0d571040d42eadaeb6f6
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in backend/.env}'
+    command: ["postgres", "-c", "max_connections=${POSTGRES_MAX_CONNECTIONS:-140}", "-c", "shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [c48-internal]
+
+  db-init:
+    image: postgis/postgis:17-3.5@sha256:01a6a70e41e6c4467c8f55f6063555ed72db2d6662cd0d571040d42eadaeb6f6
+    entrypoint: ["/bin/bash", "/init.sh"]
+    env_file: [../.env]
+    volumes:
+      - ./db-init/init.sh:/init.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks: [c48-internal]
+
+  identity-migrate:
+    image: c48/identity:local
+    build:
+      context: ../..
+      dockerfile: backend/apps/identity/Dockerfile
+    env_file: [../.env]
+    environment:
+      DATABASE_URL: 'postgresql://identity_migrator:${IDENTITY_MIGRATOR_PASSWORD}@postgres:5432/c48_identity'
+      DB_POOL_MAX: "2"
+      C48_SCHEMA_DIR: /workspace/backend/schema
+    command: ["node", "dist/apps/identity/src/database/migrate.js"]
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    restart: "no"
+    networks: [c48-internal]
+
+  response-migrate:
+    image: c48/response:local
+    build:
+      context: ../..
+      dockerfile: backend/apps/response/Dockerfile
+    env_file: [../.env]
+    environment:
+      DATABASE_URL: 'postgresql://response_migrator:${RESPONSE_MIGRATOR_PASSWORD}@postgres:5432/c48_response'
+      DB_POOL_MAX: "2"
+      C48_SCHEMA_DIR: /workspace/backend/schema
+    command: ["node", "dist/apps/response/src/database/migrate.js"]
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    restart: "no"
+    networks: [c48-internal]
+
+  logistics-migrate:
+    image: c48/logistics:local
+    build:
+      context: ../..
+      dockerfile: backend/apps/logistics/Dockerfile
+    env_file: [../.env]
+    environment:
+      DATABASE_URL: 'postgresql://logistics_migrator:${LOGISTICS_MIGRATOR_PASSWORD}@postgres:5432/c48_logistics'
+      DB_POOL_MAX: "2"
+      C48_SCHEMA_DIR: /workspace/backend/schema
+    command: ["node", "dist/apps/logistics/src/database/migrate.js"]
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    restart: "no"
+    networks: [c48-internal]
+
+  identity-api:
+    image: c48/identity:local
+    build:
+      context: ../..
+      dockerfile: backend/apps/identity/Dockerfile
+    env_file: [../.env]
+    environment:
+      NODE_ENV: '${NODE_ENV:-development}'
+      PORT: "3001"
+      DATABASE_URL: 'postgresql://identity_app_login:${IDENTITY_APP_PASSWORD}@postgres:5432/c48_identity'
+      DB_POOL_MAX: '${IDENTITY_DB_POOL_MAX:-20}'
+      C48_SCHEMA_DIR: /workspace/backend/schema
+    depends_on:
+      identity-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks: [c48-internal]
+
+  response-api:
+    image: c48/response:local
+    build:
+      context: ../..
+      dockerfile: backend/apps/response/Dockerfile
+    env_file: [../.env]
+    environment:
+      NODE_ENV: '${NODE_ENV:-development}'
+      PORT: "3002"
+      DATABASE_URL: 'postgresql://response_app_login:${RESPONSE_APP_PASSWORD}@postgres:5432/c48_response'
+      DB_POOL_MAX: '${RESPONSE_DB_POOL_MAX:-30}'
+      C48_SCHEMA_DIR: /workspace/backend/schema
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: c48-response-evidence
+    depends_on:
+      response-migrate:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+        required: false
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks: [c48-internal]
+
+  logistics-api:
+    image: c48/logistics:local
+    build:
+      context: ../..
+      dockerfile: backend/apps/logistics/Dockerfile
+    env_file: [../.env]
+    environment:
+      NODE_ENV: '${NODE_ENV:-development}'
+      PORT: "3003"
+      DATABASE_URL: 'postgresql://logistics_app_login:${LOGISTICS_APP_PASSWORD}@postgres:5432/c48_logistics'
+      DB_POOL_MAX: '${LOGISTICS_DB_POOL_MAX:-20}'
+      C48_SCHEMA_DIR: /workspace/backend/schema
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: c48-logistics-evidence
+    depends_on:
+      logistics-migrate:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+        required: false
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3003/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks: [c48-internal]
+
+  nginx:
+    image: nginx:1.30.5
+    ports:
+      - '${PUBLIC_PORT:-8080}:80'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/proxy-common.conf:/etc/nginx/proxy-common.conf:ro
+    depends_on:
+      identity-api:
+        condition: service_healthy
+      response-api:
+        condition: service_healthy
+      logistics-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks: [c48-internal]
+
+  minio:
+    image: quay.io/minio/aistor/minio:RELEASE.2026-09-19T17-05-25Z
+    profiles: [storage]
+    command: ["minio", "server", "/mnt/data", "--console-address", ":9001", "--license", "/minio.license"]
+    environment:
+      MINIO_ROOT_USER: '${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in backend/.env}'
+      MINIO_ROOT_PASSWORD: '${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in backend/.env}'
+    volumes:
+      - minio-data:/mnt/data
+      - type: bind
+        source: '${AISTOR_LICENSE_PATH:-/absolute/path/to/minio.license}'
+        target: /minio.license
+        read_only: true
+        bind:
+          create_host_path: false
+    ports:
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/ready >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [c48-internal]
+
+  minio-init:
+    image: quay.io/minio/aistor/mc:RELEASE.2026-09-19T15-24-59Z
+    profiles: [storage]
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1 && mc ready local >/dev/null 2>&1; do sleep 2; done
+        mc mb --ignore-existing local/c48-response-evidence
+        mc mb --ignore-existing local/c48-logistics-evidence
+        mc admin user info local "$$S3_RESPONSE_ACCESS_KEY" >/dev/null 2>&1 || mc admin user add local "$$S3_RESPONSE_ACCESS_KEY" "$$S3_RESPONSE_SECRET_KEY"
+        mc admin user info local "$$S3_LOGISTICS_ACCESS_KEY" >/dev/null 2>&1 || mc admin user add local "$$S3_LOGISTICS_ACCESS_KEY" "$$S3_LOGISTICS_SECRET_KEY"
+        mc admin policy info local c48-response-evidence >/dev/null 2>&1 || mc admin policy create local c48-response-evidence /policies/response-policy.json
+        mc admin policy info local c48-logistics-evidence >/dev/null 2>&1 || mc admin policy create local c48-logistics-evidence /policies/logistics-policy.json
+        mc admin policy attach local c48-response-evidence --user "$$S3_RESPONSE_ACCESS_KEY"
+        mc admin policy attach local c48-logistics-evidence --user "$$S3_LOGISTICS_ACCESS_KEY"
+    env_file: [../.env]
+    volumes:
+      - ./minio/response-policy.json:/policies/response-policy.json:ro
+      - ./minio/logistics-policy.json:/policies/logistics-policy.json:ro
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks: [c48-internal]
+
+  seed:
+    image: c48/identity:local
+    build:
+      context: ../..
+      dockerfile: backend/apps/identity/Dockerfile
+    profiles: [seed]
+    env_file: [../.env]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+    command: ["node", "scripts/seed.mjs"]
+    depends_on:
+      identity-migrate:
+        condition: service_completed_successfully
+      response-migrate:
+        condition: service_completed_successfully
+      logistics-migrate:
+        condition: service_completed_successfully
+    networks: [c48-internal]
+
+volumes:
+  pgdata:
+  minio-data:
+
+networks:
+  c48-internal:
+    name: c48-internal
+    driver: bridge

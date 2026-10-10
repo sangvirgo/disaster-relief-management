@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source "$(dirname -- "$0")/lib.sh"
+C48_TEST_PROJECT="${C48_TEST_PROJECT:-c48-test}"
+export C48_TEST_PROJECT
+dc() { test_compose "$@"; }
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+for service in identity response logistics; do
+  case "$service" in
+    identity) migrator=identity_migrator; extension=citext ;;
+    response) migrator=response_migrator; extension=postgis ;;
+    logistics) migrator=logistics_migrator; extension=postgis ;;
+  esac
+
+  dc exec -T postgres createdb -U postgres -O "$migrator" "baseline_$service"
+  dc exec -T postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d "baseline_$service" -c "CREATE EXTENSION IF NOT EXISTS $extension"
+  dc exec -T -e PGUSER="$migrator" -e PGPASSWORD=test-only postgres \
+    psql -X -v ON_ERROR_STOP=1 -d "baseline_$service" -f "/schema/$service.sql"
+
+  dc exec -T postgres pg_dump -U postgres --schema-only --no-owner \
+    --exclude-table=public.typeorm_migrations \
+    --exclude-table=public.typeorm_migrations_id_seq "c48_$service" > "$tmp/$service.migrated.sql"
+  dc exec -T postgres pg_dump -U postgres --schema-only --no-owner \
+    "baseline_$service" > "$tmp/$service.baseline.sql"
+
+  if diff -u "$tmp/$service.baseline.sql" "$tmp/$service.migrated.sql"; then
+    printf 'PASS %s migration dump matches schema/%s.sql\n' "$service" "$service"
+  else
+    printf 'FAIL %s migration dump differs from schema/%s.sql\n' "$service" "$service" >&2
+    exit 1
+  fi
+done

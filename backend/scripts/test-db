@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname -- "$0")/lib.sh"
+C48_TEST_PROJECT="c48-test-$$"
+export C48_TEST_PROJECT
+cleanup() {
+  test_compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+test_compose up -d --wait --wait-timeout 90 postgres
+test_compose up -d db-init
+test_compose build identity-migrate response-migrate logistics-migrate
+for service in identity response logistics; do
+  test_compose run --rm --no-deps "$service-migrate"
+done
+
+C48_TEST_PROJECT="$C48_TEST_PROJECT" "$ROOT/backend/scripts/check-schema-dump"
+C48_TEST_PROJECT="$C48_TEST_PROJECT" "$ROOT/backend/scripts/check-migration-down"
+test_compose exec -T postgres bash /test/scripts/prove-migrated-race.sh
+test_compose exec -T postgres bash /test/scripts/prove-cycle-fence.sh
+
+for service in identity response logistics; do
+  test_compose exec -T -w /schema postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d "c48_$service" \
+    -f "/schema/test-$service.sql"
+done
+
+test_compose exec -T -e PGPORT=5432 -e PGPASSWORD=test-only postgres bash /schema/race-tests-response.sh
+test_compose exec -T -e PGPORT=5432 -e PGPASSWORD=test-only postgres bash /schema/race-tests-logistics.sh
+test_compose up -d --wait --wait-timeout 60 identity-api response-api logistics-api
+echo "T0 database checks passed."

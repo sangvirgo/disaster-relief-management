@@ -1,0 +1,64 @@
+{
+  "name": "@c48/backend",
+  "private": true,
+  "engines": {
+    "node": ">=24.15.0 <25",
+    "npm": ">=10 <13"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "node scripts/clean-dist.mjs && npm run build:identity && npm run build:response && npm run build:logistics && node scripts/check-build-output.mjs",
+    "build:identity": "nest build identity",
+    "build:response": "nest build response",
+    "build:logistics": "nest build logistics",
+    "start:dev:identity": "nest start identity --watch",
+    "start:dev:response": "nest start response --watch",
+    "start:dev:logistics": "nest start logistics --watch",
+    "start:identity": "node dist/apps/identity/src/main.js",
+    "start:response": "node dist/apps/response/src/main.js",
+    "start:logistics": "node dist/apps/logistics/src/main.js",
+    "migration:up:identity": "node dist/apps/identity/src/database/migrate.js",
+    "migration:up:response": "node dist/apps/response/src/database/migrate.js",
+    "migration:up:logistics": "node dist/apps/logistics/src/database/migrate.js",
+    "migration:down:identity": "node dist/apps/identity/src/database/migrate.js down",
+    "migration:down:response": "node dist/apps/response/src/database/migrate.js down",
+    "migration:down:logistics": "node dist/apps/logistics/src/database/migrate.js down",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand && node --test scripts/*.test.mjs"
+  },
+  "dependencies": {
+    "@nestjs/common": "12.1.2",
+    "@nestjs/core": "12.1.2",
+    "@nestjs/platform-express": "12.1.2",
+    "@nestjs/swagger": "12.0.2",
+    "@nestjs/typeorm": "12.0.2",
+    "argon2": "0.45.1",
+    "class-transformer": "0.5.1",
+    "class-validator": "0.15.1",
+    "dotenv": "18.0.7",
+    "pg": "8.23.1",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "typeorm": "1.1.2"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "12.0.8",
+    "@nestjs/schematics": "12.0.6",
+    "@nestjs/testing": "12.1.2",
+    "@types/express": "5.0.6",
+    "@types/jest": "30.0.0",
+    "@types/node": "24.19.2",
+    "@types/supertest": "7.2.1",
+    "jest": "30.5.2",
+    "supertest": "7.3.1",
+    "ts-jest": "29.4.14",
+    "typescript": "6.0.3"
+  },
+  "allowScripts": {
+    "argon2": true,
+    "unrs-resolver": true,
+    "@parcel/watcher": true
+  }
+}

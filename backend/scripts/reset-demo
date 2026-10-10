@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname -- "$0")/lib.sh"
+require_env_file
+if [[ "${NODE_ENV:-}" == "production" ]] || awk -F= '
+  $1 ~ /^[[:space:]]*NODE_ENV[[:space:]]*$/ {
+    value = $2
+    sub(/[[:space:]]*#.*/, "", value)
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+    gsub(/"/, "", value)
+    gsub(sprintf("%c", 39), "", value)
+    if (tolower(value) == "production") found = 1
+  }
+  END { exit !found }
+' "$ROOT/backend/.env"; then
+  echo "Refusing to reset a production environment." >&2
+  exit 1
+fi
+read -r -p "This deletes the C48 demo database volume. Type c48-reset to continue: " answer
+[[ "$answer" == "c48-reset" ]] || { echo "Reset cancelled."; exit 1; }
+main_compose down --volumes --remove-orphans
+"$ROOT/backend/scripts/up"
+"$ROOT/backend/scripts/migrate"
+"$ROOT/backend/scripts/seed"
