@@ -1,6 +1,6 @@
 # C48 backend implementation pack
 
-Turns the [technology and delivery plan](../c48-technology-and-delivery-plan.md) into something an engineer or AI agent can implement without guessing. Status: **design artifacts only — no application code, migrations or product tests exist yet.** The SQL was executed against PostgreSQL 17 + PostGIS 3.5. Original baseline: 96 assertions. After the 2026-10-10 cleanup and hardening (01 §9, status in §9.5): identity 37, response 95, logistics 133 assertions pass; restricted application roles, the SECURITY DEFINER stock writer, nine two-session races and the key query plans at 200k rows were executed.
+Turns the [technology and delivery plan](../c48-technology-and-delivery-plan.md) into something an engineer or AI agent can implement without guessing. Status: **T0 workspace and T1 technical package are implemented; business API tasks T2–T19 remain.** The SQL was executed against PostgreSQL 17 + PostGIS 3.5. Original baseline: 96 assertions. After the 2026-10-10 cleanup and hardening (01 §9, status in §9.5): identity 37, response 95, logistics 133 assertions pass; restricted application roles, the SECURITY DEFINER stock writer, nine two-session races and the key query plans at 200k rows were executed.
 
 | File | Purpose |
 |---|---|
@@ -20,6 +20,6 @@ docker run -d --name c48pg -e POSTGRES_PASSWORD=x -p 127.0.0.1:55432:5432 postgi
 # for each service: create database, load <service>.sql, then run test-<service>.sql with psql -v ON_ERROR_STOP=1
 ```
 
-**Focused logic update (2026-10-09, SQL aligned 2026-10-10):** the full main plan and all diagrams are retained. Read plan Sections 27–28 and 01-schema-review §7–§9. The SQL files in `schema/` implement those deltas (status in 01 §9.5); there are still no migrations or application code.
+**Focused logic update (2026-10-09, SQL aligned 2026-10-10):** the full main plan and all diagrams are retained. Read plan Sections 27–28 and 01-schema-review §7–§9. The SQL files in `schema/` implement those deltas (status in 01 §9.5), and T0 TypeORM migrations load the same files without diverging.
 
-**Round-2 update (2026-10-09):** read plan Section 28 and 01 §8 after §27/§7. They govern automation, resolution outcomes, headers, loss review, recovery codes, attribution-lock release, delivery carrier and the column/index cleanup. The SQL files implement 01 §9 and the T0-S gate is met for the SQL layer (01 §9.5); what remains is T0 (migrations equal to these files) and service-level rules.
+**Round-2 update (2026-10-09):** read plan Section 28 and 01 §8 after §27/§7. They govern automation, resolution outcomes, headers, loss review, recovery codes, attribution-lock release, delivery carrier and the column/index cleanup. The SQL files implement 01 §9 and the T0-S gate is met for the SQL layer (01 §9.5); the next implementation task is T2 Identity auth after T1.

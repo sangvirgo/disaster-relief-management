@@ -1,16 +1,21 @@
 import { NestFactory } from '@nestjs/core';
 import { RequestMethod } from '@nestjs/common';
+import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, loadErrorCatalog, PinoNestLogger, validateEnvironment } from '../../../packages/technical/src';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const config = validateEnvironment(process.env, 'response');
+  const logger = new PinoNestLogger(createPinoLogger('response', config.logLevel));
+  const app = await NestFactory.create(AppModule, { logger });
+  app.use(correlationMiddleware());
+  app.useGlobalFilters(new ApiExceptionFilter(loadErrorCatalog(), 'response'));
   app.setGlobalPrefix('api/v1/response', {
     exclude: [
       { path: 'health/live', method: RequestMethod.GET },
       { path: 'health/ready', method: RequestMethod.GET },
     ],
   });
-  await app.listen(Number(process.env.PORT ?? 3002), '0.0.0.0');
+  await app.listen(config.port, '0.0.0.0');
   const server = app.getHttpServer();
   server.requestTimeout = 15_000;
   server.headersTimeout = 10_000;

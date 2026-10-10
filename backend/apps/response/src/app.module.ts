@@ -5,7 +5,7 @@ import { InitialResponse1710000000000 } from './database/migrations/InitialRespo
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot(postgresOptions([InitialResponse1710000000000])),
+    TypeOrmModule.forRoot(postgresOptions([InitialResponse1710000000000], 'response')),
     HealthModule,
   ],
 })

@@ -16,6 +16,7 @@ for service in identity response logistics; do
 done
 
 C48_TEST_PROJECT="$C48_TEST_PROJECT" "$ROOT/backend/scripts/check-schema-dump"
+test_compose run --rm --no-deps idempotency-test
 C48_TEST_PROJECT="$C48_TEST_PROJECT" "$ROOT/backend/scripts/check-migration-down"
 test_compose exec -T postgres bash /test/scripts/prove-migrated-race.sh
 test_compose exec -T postgres bash /test/scripts/prove-cycle-fence.sh

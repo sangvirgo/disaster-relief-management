@@ -5,7 +5,7 @@ import { InitialLogistics1710000000000 } from './database/migrations/InitialLogi
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot(postgresOptions([InitialLogistics1710000000000])),
+    TypeOrmModule.forRoot(postgresOptions([InitialLogistics1710000000000], 'logistics')),
     HealthModule,
   ],
 })

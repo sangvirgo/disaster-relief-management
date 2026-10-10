@@ -1,14 +1,14 @@
+import dotenv from 'dotenv';
 import { DataSourceOptions } from 'typeorm';
+import { BackendService, validateEnvironment } from './environment';
 
-export function postgresOptions(migrations: Function[]): DataSourceOptions {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error('DATABASE_URL is required');
-  }
+dotenv.config({ quiet: true });
 
+export function postgresOptions(migrations: Function[], service: BackendService): DataSourceOptions {
+  const config = validateEnvironment(process.env, service);
   return {
     type: 'postgres',
-    url,
+    url: config.databaseUrl,
     synchronize: false,
     migrationsRun: false,
     migrationsTableName: 'typeorm_migrations',
@@ -16,7 +16,9 @@ export function postgresOptions(migrations: Function[]): DataSourceOptions {
     migrations,
     extra: {
       connectionTimeoutMillis: 5000,
-      max: Number(process.env.DB_POOL_MAX ?? 20),
+      max: config.dbPoolMax,
+      application_name: `c48_${service}`,
+      options: `-c lock_timeout=${config.dbLockTimeoutMs} -c statement_timeout=${config.dbStatementTimeoutMs}`,
     },
   };
 }

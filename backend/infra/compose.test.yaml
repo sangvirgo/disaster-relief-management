@@ -146,6 +146,14 @@ services:
     profiles: [test]
     networks: [c48-test]
 
+  idempotency-test:
+    image: c48-test/identity:local
+    environment:
+      DATABASE_URL: postgresql://identity_app_login:test-only@postgres:5432/c48_identity
+    command: ["node", "scripts/test-idempotency.mjs"]
+    profiles: [test]
+    networks: [c48-test]
+
 networks:
   c48-test:
     driver: bridge

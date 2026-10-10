@@ -6,6 +6,7 @@ COPY backend/packages ./backend/packages
 COPY backend/scripts ./backend/scripts
 COPY backend/nest-cli.json backend/tsconfig.json backend/tsconfig.test.json backend/jest.config.cjs ./backend/
 COPY docs/backend/schema ./backend/schema
+COPY docs/backend/07-error-catalog.md ./backend/docs/backend/07-error-catalog.md
 COPY docs/backend/seed ./backend/seed
 WORKDIR /workspace/backend
 RUN npm ci --no-audit --no-fund && npm run build && npm prune --omit=dev
@@ -19,6 +20,7 @@ COPY --from=build --chown=node:node /workspace/backend/apps ./apps
 COPY --from=build --chown=node:node /workspace/backend/packages ./packages
 COPY --from=build --chown=node:node /workspace/backend/dist ./dist
 COPY --from=build --chown=node:node /workspace/backend/schema ./schema
+COPY --from=build --chown=node:node /workspace/backend/docs/backend/07-error-catalog.md ./docs/backend/07-error-catalog.md
 COPY --from=build --chown=node:node /workspace/backend/seed ./seed
 COPY --from=build --chown=node:node /workspace/backend/scripts ./scripts
 USER node

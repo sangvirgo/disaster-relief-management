@@ -5,7 +5,7 @@ import { InitialIdentity1710000000000 } from './database/migrations/InitialIdent
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot(postgresOptions([InitialIdentity1710000000000])),
+    TypeOrmModule.forRoot(postgresOptions([InitialIdentity1710000000000], 'identity')),
     HealthModule,
   ],
 })
