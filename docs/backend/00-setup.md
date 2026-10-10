@@ -13,6 +13,22 @@ backend/
 
 Module names: Identity `auth sessions grants users orgs`; Response `requests tracking verification teams missions campaigns evidence notices`; Logistics `catalog drives receipts stock needs commitments distributions reports`. One `*.module.ts`, `*.controller.ts`, `*.service.ts`, `dto/`, `entities/` per module. Controllers contain no SQL or state logic.
 
+## 1.1 Top-level workspace layout (Web, Mobile, AI and contracts have a fixed place)
+
+```text
+/                         # repository root
+  AGENTS.md  docs/        # plan, backend pack, research, diagrams (already present)
+  backend/                # section 1 above: three NestJS services, infra, scripts, seed wiring
+  contracts/openapi/      # exported openapi.json per service, committed after every backend task (06 "Parallel work")
+  web/                    # React + Vite (Admin, Coordinator, Manager, public SOS/donation pages) — frontend owner
+  mobile/                 # React Native + Expo (Citizen, Volunteer/team leader, donor) — mobile owner
+```
+
+- **Web and Mobile** consume only `contracts/openapi/*.json` and the public `/api/v1/...` routes through Nginx; they never import backend code. Mock servers are generated from the OpenAPI files until a service is live. Each has its own package manager workspace, lint/format config and Vietnamese string resources (backend messages are never shown as UI copy; clients branch on `code` and render their own Vietnamese text — AGENTS.md language policy). The T0 Compose file serves the Web build through Nginx when `web/dist` exists.
+- **AI is not a folder or a service.** Plan §12 and `AGENTS.md` fix it as an optional, disabled-by-default module inside Response (`backend/apps/response/src/modules/advisor`, same NestJS runtime, no Python). Research notes stay in `docs/`; evaluation data and prompts, if ever added, go under `backend/apps/response/src/modules/advisor/` and `docs/research/`. It cannot prioritise or dispatch.
+- **Ownership** (plan §26.9): backend owner builds `backend/` and `contracts/`; Web and Mobile owners build `web/` and `mobile/` and may only change contracts through the documented edit to `02–04` first.
+- A `web/` or `mobile/` folder is created only by the task that needs it (plan §22.1 "create only what the current slice needs"); until then the placement above is the contract.
+
 ## 2. Pinned decisions and the spike that must precede code
 
 Node 24 LTS, NestJS (Express adapter), TypeScript strict, TypeORM + PostgreSQL 17+ with PostGIS 3.5+ (image digest pinned), Jest + Supertest, `@nestjs/swagger`, Passport-JWT, AWS SDK v3 S3 client, class-validator DTOs. **Task T0** (one day): prove on the pinned image — geometry/geography migration, `ST_DWithin`, `SELECT … FOR UPDATE` with deterministic order, partial/expression unique indexes from `schema/*.sql` through TypeORM migrations, two parallel transactions racing the capacity-one index. Record exact versions in `docs/backend/VERSIONS.md`; never use `latest`. If TypeORM cannot express an index, write it as raw SQL inside the migration — the SQL files are the existing baseline; target deltas in01 §7/plan §27 must be applied at T0-S first.
