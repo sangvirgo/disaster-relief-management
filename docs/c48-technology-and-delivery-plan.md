@@ -1815,7 +1815,7 @@ Browser / Mobile
     -> Prometheus/Grafana (optional profile)
 ```
 
-- Provide development/test Compose configuration, healthchecks, volumes, .env.example, migrations, demo seed commands, and backup/restore procedures.
+- Provide development/test Compose configuration, healthchecks, volumes, .env.example, migrations, demo seed commands, and backup/restore procedures. The concrete services, ports, Nginx rules, database/role initialisation, commands and demo seed contract are in `backend/00-setup.md` §8–§9; the seed SQL is in `backend/seed/`.
 - Do not commit .env files/secrets; create demo accounts/passwords through local seeding.
 - Nginx handles baseline routing/rate limits; services still authenticate and authorize.
 - Disable optional metrics dashboards if RAM is constrained. Keep the Response job worker in the same application/service boundary; run a second worker process only if the optional job queue is enabled.

@@ -6,6 +6,7 @@ Template: plan Appendix A.6. Read `/AGENTS.md`, the [project context](../c48-pro
 Prepare the C48 backend for implementation: review the plan and backend pack for logic errors, apply the owner's decisions, align and verify the physical schema. **No application code, migrations or OpenAPI exist yet.**
 
 ## What is done
+- Infrastructure specification (00 §8) and demo seed data (`seed/seed-{identity,response,logistics}.sql`, 00 §9): seeds load cleanly on fresh databases and their end-of-file assertions pass; cross-service ids were cross-checked. Seeds use the placeholder psql variable `seed_password_hash` that the seeder must fill with an Argon2id hash of `SEED_PASSWORD`.
 - Plan Section 28 and 01 §8–§9 record the round-2 decisions (resolution outcomes, one credential header scheme, loss review table, recovery table, attribution-lock release, skip Logistics for requests never admitted, supplement gating, automation matrix, optional delivery-carrier slice, column/index cleanup).
 - `docs/backend/schema/{identity,response,logistics}.sql` and `test-*.sql` implement them and were executed on `postgis/postgis:17-3.5`: identity 37, response 95, logistics 133 assertions pass; restricted application roles, the SECURITY DEFINER stock writer, nine two-session races (`race-tests-*.sh`) and query plans at 200k rows (`explain-*.sql`) ran. Details and numbers: 01 §9.5.
 

@@ -134,3 +134,72 @@ Node 24 LTS, NestJS (Express adapter), TypeScript strict, TypeORM + PostgreSQL 1
 Plan §27 and01 §7 supply the target deltas; earlier benchmark/assertion reports do not prove these new rules. T0-S verifies/pins PostgreSQL/PostGIS first and aligns DDL/assertions before T0. Every target column names writer, reader/integrity use, null/default and PII treatment; every index names exact query/constraint, overlap and measured plan. Check app privileges and races on actual restricted credentials/connections. No application code or SQL is changed in this documentation review.
 
 Stock balance writer uses SECURITY DEFINER with dedicated NOLOGIN owner, fixed trusted search_path and qualified references; app cannot own/replace it, directly alter balances or mutate/truncate ledger. Controlled zero-balance creation/movement insertion remains usable under app-role privileges. Validate exact decimal lexical scale before numeric(18,3) casting, plus finite stored values. Native dual authentication keeps Bearer in Authorization and capability in X-Tracking-Secret/X-Donation-Secret; X-Recovery-Code is separate. Redact all of these headers. Recovery issuance alone replays metadata without plaintext; other replay preserves original body/status, including202.
+
+## 8. Docker and infrastructure specification (T0 builds exactly this; no application code in this section)
+
+One host, one Compose project `c48`. Only Nginx publishes a port. Names below are the container/service names; the images, ports and volumes are the defaults the T0 agent must implement and record in `VERSIONS.md`.
+
+### 8.1 Services
+
+| Service | Image / build | Internal port | Published | Depends on (healthy) | Purpose |
+|---|---|---|---|---|---|
+| `postgres` | PostGIS image, **digest pinned** (`postgis/postgis:17-3.5` at 2026-10-10: `sha256:01a6a70e41e6c4467c8f55f6063555ed72db2d6662cd0d571040d42eadaeb6f6`) | 5432 | none (test profile: `127.0.0.1:55432`) | — | One server, three databases `c48_identity`, `c48_response`, `c48_logistics`; volume `pgdata` |
+| `db-init` | same image, one-shot | — | — | postgres | Creates databases, roles, extensions and per-role timeouts (8.2); exits 0 |
+| `identity-migrate`, `response-migrate`, `logistics-migrate` | service image, one-shot | — | — | db-init | Run TypeORM migrations as the service migrator role; the migrated schema dump must equal `schema/<svc>.sql` |
+| `identity-api`, `response-api`, `logistics-api` | `backend/apps/<svc>/Dockerfile` (multi-stage, non-root, Node 24 LTS pinned patch) | 3001 / 3002 / 3003 | none | its migrate job, `minio` for response/logistics | NestJS HTTP; `GET /health/live`, `/health/ready` (not routed by Nginx) |
+| `minio` | MinIO AIStor Free, version pinned (licence recorded in `VERSIONS.md`) | 9000 (S3); 9001 console | none (dev profile only: `127.0.0.1:9001`) | — | Private buckets `c48-response-evidence`, `c48-logistics-evidence`; volume `minio-data` |
+| `minio-init` | `mc` one-shot | — | — | minio | Creates the two buckets, one access key per service limited to its bucket, no public policy |
+| `nginx` | `nginx:stable`, version pinned | 80 | `${PUBLIC_PORT:-8080}:80` | the three APIs | Routing, rate limits, body limits, header hygiene (8.3) |
+| `seed` (profile `seed`) | `backend` image, one-shot | — | — | all migrate jobs | Demo data (section 9); refuses `NODE_ENV=production` |
+| `prometheus`, `grafana` (profile `metrics`) | pinned | — | `127.0.0.1` only | APIs | Optional; off by default |
+| `k6` (profile `perf`) | pinned | — | — | nginx | Load scenario of plan §23.6 |
+
+Networks: single bridge `c48-internal`; APIs reach each other by service name (`http://response-api:3002`) for `/internal/` calls; PostgreSQL and MinIO are not reachable from outside Compose. Startup order is expressed with `depends_on: condition: service_healthy` (postgres has a `pg_isready` healthcheck; APIs use `/health/ready`).
+
+### 8.2 Database initialisation (`infra/db-init/`)
+
+- Databases: `c48_identity` (extension `citext`), `c48_response` and `c48_logistics` (extension `postgis`); created by the superuser in `db-init` because PostGIS is not a trusted extension.
+- Per service two login roles: `<svc>_migrator` (owns the database objects, used only by migrate jobs) and `<svc>_app_login` (member of the NOLOGIN role defined in the SQL: `c48_identity_app`, `c48_response_app`, `c48_logistics_app`). Logistics additionally keeps the NOLOGIN `c48_logistics_owner` that owns the SECURITY DEFINER stock writer. The application login never owns tables or functions.
+- Role defaults (`ALTER ROLE … SET`): `lock_timeout=3s`, `statement_timeout=8s`, `idle_in_transaction_session_timeout=10s` (00 §3.2); introspection pool uses its own role setting `statement_timeout=500ms`.
+- `max_connections` ≥ Σ(pools) + 20 (00 §3.2). `shared_buffers` and memory are set for the demo host and recorded.
+- Passwords come from `.env` (never committed). `.env.example` lists every variable of §4 plus `POSTGRES_PASSWORD`, `*_MIGRATOR_PASSWORD`, `*_APP_PASSWORD`, `S3_*`, `JWT_*`, `PUBLIC_PORT`, `SEED_PASSWORD`.
+
+### 8.3 Nginx (`infra/nginx/`)
+
+- Routes: `/api/v1/identity/` → `identity-api:3001`, `/api/v1/response/` → `response-api:3002`, `/api/v1/logistics/` → `logistics-api:3003`; everything else → static web build when present, else 404. HTTP keep-alive to upstreams (`keepalive 64`).
+- `location ~ /internal/ { return 404; }` for every service prefix and for `/health`; `Server` and upstream version headers hidden; caller-supplied `X-Internal-*` and identity headers stripped; `X-Forwarded-For` set by Nginx only.
+- Rate limits (00 §3.3): `limit_req_zone` per IPv4 /24 and IPv6 /56 for SOS soft and hard ceilings (hard returns 429 with the 113/114/115 body), login 5/min per IP+username and 30/min per IP, register 3/h per IP, tracking 10/min and 60/h per IP, guest uploads 2 concurrent and 200 MiB/h per IP.
+- Body limits: `client_max_body_size 1m` default; `55m` only on `…/evidence` locations; `client_body_timeout 30s`; require `Content-Length` on uploads (`411`).
+- Logging: access log format without `$args`, `Authorization`, `Cookie`, `X-Tracking-*`, `X-Donation-Secret`, `X-Recovery-Code`.
+- Security headers on all responses: `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, CSP `default-src 'self'; frame-ancestors 'none'`; `Cache-Control: no-store` is set by the APIs on authenticated, tracking and donation responses.
+
+### 8.4 Commands the repository must provide (`scripts/`)
+
+| Command | Effect |
+|---|---|
+| `scripts/up` | `docker compose up -d --build` core profile; waits for healthy |
+| `scripts/migrate` | runs the three migrate jobs |
+| `scripts/seed` | runs profile `seed` (section 9); idempotent on an empty database, refuses non-empty without `--reset` |
+| `scripts/reset-demo` | `down -v`, then `up`, `migrate`, `seed` (destroys data; demo only) |
+| `scripts/test-db` | starts `compose.test.yaml` (tmpfs PostgreSQL), loads `schema/*.sql`, runs `test-*.sql` and the two `race-tests-*.sh` |
+| `scripts/gen-keys` | generates the JWT key pair and service client secrets into `.env`/untracked files |
+| `scripts/backup`, `scripts/restore` | `pg_dump` of the three databases and `mc mirror` of the buckets; restore verified on an empty stack (plan §23.6, T18) |
+
+### 8.5 Test compose (`infra/compose.test.yaml`)
+Ephemeral PostgreSQL/PostGIS on tmpfs, no Nginx; used by migration tests, `schema/test-*.sql`, race and EXPLAIN scripts, and API integration tests. CI never reuses a developer database.
+
+## 9. Demo seed data (`docs/backend/seed/`, executed by `scripts/seed`)
+
+**Rules.** Synthetic only; Vietnamese labels with diacritics; fake phones `0900000xxx`; no real coordinates of private addresses. Passwords are **not** in the files: the seeder reads `SEED_PASSWORD`, hashes it with the production Argon2id settings and substitutes it for the psql variable `seed_password_hash`; every seeded user has `must_change_password = true`. Ids are fixed (prefix `00000000-0000-4000-8000-`) so the three services reference each other as opaque ids. Order: identity → response → logistics. The seeder runs under the migrator role (not the application role) and each file ends with assertions that abort on mismatch.
+
+| File | Content |
+|---|---|
+| `seed/seed-identity.sql` | regions `DEMO_A`, `DEMO_B`; organizations (coordination, volunteer); 16 demo accounts covering every role including a region-scoped coordinator, two intake staff, two reviewers, two distribution staff; memberships; grants |
+| `seed/seed-response.sql` | categories (incl. `UNKNOWN` "Chưa rõ"), skills and category→skill map; boundary polygons for both regions and one deliberately uncovered coordinate; campaigns; teams of every kind (APP volunteer with leader, GOVERNMENT and MILITARY teams in COORDINATOR mode without accounts, a stale-position team, a readiness-latched team); thirteen requests covering every lane and status the demo needs (anonymous no-phone SOS, PROXY with alternate contact, duplicate pair, unassigned region, rate-limited and proxy-quota lanes, declared danger overdue, TRIAGED without mission, DISPATCHED with an offer to an accountless team, IN_PROGRESS aid request with a failed-then-accepted mission pair, rejected, resolved rescue-only without Logistics); notices. Request ids `…0000f1`–`…0000fd` are mapped in the file header |
+| `seed/seed-logistics.sql` | units with scales, item types, items; two warehouses, relief points (one inactive), vehicles; opening stock; an OPEN and a DRAFT drive; donations in every review state (declared only; declared 60 → counted 58 → accepted 55 / rejected 3 posted once with an open dispute; held 5 released after an independent re-count; pending review); the 12-of-20 then 8 fulfillment of the aid request; point receipt 50 + loss pending + handout 35 / 15 held; pending stock adjustment |
+
+**Shared ids** (prefix `00000000-0000-4000-8000-`): organizations `…000000000001/2`, campaigns `…0000c1` (ACTIVE) and `…0000c2` (DRAFT), the aid request `…0000f5` that Logistics needs link to, users `…000000000101`–`…000000000111` (admin, coordinators, campaign/ops managers, intake, reviewers, distribution, volunteers, citizens). Seed files are validated against the schema files on a fresh database and cross-checked: every user id used by Response/Logistics exists in Identity; the Logistics cycle matches the Response request's organization, campaign and region.
+
+**Demo scripts the seed must support** (plan §17): guest SOS retry; PROXY report with separate reporter and household locations; verification and priority; nearby-team comparison (fresh vs stale vs accountless teams); heatmap of confirmed requests; donation 60/58/55/3; 12-of-20 then 8; denied cross-scope and self-review attempts.
+
+**Seed acceptance.** After `scripts/reset-demo`: the stock ledger sums equal every balance; `commitment_counter_mismatch` and `check_cycle_state_matches_intent()` return no rows; no mission breaks the capacity-one index; the seed files load again only after `--reset`. These checks are the last statements of each seed file and are run in CI on the test compose.
