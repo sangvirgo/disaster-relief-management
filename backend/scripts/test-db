@@ -29,5 +29,6 @@ done
 test_compose exec -T -e PGPORT=5432 -e PGPASSWORD=test-only postgres bash /schema/race-tests-response.sh
 test_compose exec -T -e PGPORT=5432 -e PGPASSWORD=test-only postgres bash /schema/race-tests-logistics.sh
 test_compose run --rm auth-test
+test_compose run --rm identity-admin-test
 test_compose up -d --wait --wait-timeout 60 identity-api response-api logistics-api
 echo "Backend database checks passed."

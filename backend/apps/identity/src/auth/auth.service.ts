@@ -284,6 +284,11 @@ export class AuthService implements OnModuleInit {
     return { ...user, grants };
   }
 
+  async hashTemporaryPassword(password: string, username: string): Promise<string> {
+    assertStrongPassword(password, username);
+    return this.hashPassword(password);
+  }
+
   private async readRegisteredUser(manager: EntityManager, resource: ResourceRef | null): Promise<{ id: string; username: string; display_name: string }> {
     if (!resource || resource.type !== 'app_user') throw new AppError('INTERNAL_ERROR', { status: 500 });
     const rows = await manager.query('SELECT id, username, display_name FROM app_user WHERE id = $1', [resource.id]) as Array<{ id: string; username: string; display_name: string }>;

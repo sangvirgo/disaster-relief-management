@@ -44,18 +44,20 @@ Throttling (Nginx + app): login 5 / minute per IP+username, 30 / minute per IP; 
 | `GET /users/{id}/grants?include_revoked=&cursor=` | → paged grants (live first) | |
 | `POST /organizations` (Idem) | `{ name, organization_kind }` → `201` | `ORGANIZATION_NAME_TAKEN` |
 | `GET /organizations?cursor=` · `POST /organizations/{id}/deactivate` | | Deactivation blocked while ACTIVE grants/memberships exist: `ORGANIZATION_IN_USE` 409 |
-| `POST /organizations/{id}/members` (Idem) | `{ user_id }` → `201` · `POST /organizations/{id}/members/{user_id}/remove` → `204` | |
+| `POST /organizations/{id}/members` (Idem) | `{ user_id }` → `201` · `POST /organizations/{id}/members/{user_id}/remove` → `204` | Removing a member revokes the member's live grants scoped to this organization and all session families in the same transaction; each grant revocation and membership change is audited. |
 | `POST /regions` (Idem) · `POST /regions/{code}/deactivate` | `{ code, name }` | `SYSTEM`-scope admin |
-| `GET /audit-logs?entity_type=&entity_id=&cursor=` | → paged audit rows | `AUDIT_READ`; no password/token/secret ever stored |
+| `GET /audit-logs?entity_type=&entity_id=&cursor=` | → paged audit rows | `entity_type` is required; `AUDIT_READ`; no password/token/secret ever stored |
 
 Every admin write inserts an `audit_log` row (actor, action, entity, before/after, reason, correlation id) in the same transaction.
+
+Campaign-scoped grants call the Response internal campaign lookup before the Identity transaction. The Identity client is implemented; until Response implements `GET /internal/campaigns/{id}` in T10, campaign grants fail closed with `RESPONSE_UNAVAILABLE`.
 
 ## 4. Internal endpoints (Compose network only; Nginx returns 404)
 
 | Method & path | Caller | Purpose |
 |---|---|---|
 | `POST /internal/token` | Response, Logistics | client-credentials → `{ access_token, expires_in }` (aud-restricted) |
-| `POST /internal/introspect` | Response, Logistics | `{ sid, sub }` (from an already signature-verified JWT) → `200 { active, user_id, display_name, status, authz_version, grants: [...] }`; `active=false` if the family is revoked/expired, the user is disabled, or `authz_version` is stale. Two indexed lookups (`session_family` PK + `role_grant_live_uq`), dedicated small pool, `statement_timeout` 500 ms, p95 ≤ 100 ms. Callers coalesce identical concurrent calls and use a circuit breaker (00 §3.2) |
+| `POST /internal/introspect` | Response, Logistics | `{ sid, sub }` (from an already signature-verified JWT) → `200 { active, user_id, display_name, status, authz_version, grants: [...] }`; `active=false` if the family is revoked/expired, the user is disabled, or `authz_version` is stale. Dedicated pool (max 4), `statement_timeout` 500 ms, p95 ≤ 100 ms. The local 10-VU/15-second smoke measured p95 4.09 ms; callers coalesce identical concurrent calls and use a circuit breaker (00 §3.2) |
 | `POST /internal/users:lookup` | Response, Logistics | `{ ids: [uuid ≤ 100] }` → `{ items: [ { id, display_name } ] }` for showing actor names; unknown ids omitted; only ids already present in the caller's own data (calls are logged by count) |
 | `GET /internal/organizations/{id}` | Response, Logistics | existence/kind/status check |
 

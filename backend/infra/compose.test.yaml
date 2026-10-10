@@ -168,6 +168,20 @@ services:
     profiles: [test]
     networks: [c48-test]
 
+  identity-admin-test:
+    image: c48-test/identity:local
+    environment:
+      TEST_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_identity
+      TEST_SERVICE_CLIENT_ID: c48-response-test
+      TEST_SERVICE_CLIENT_SECRET: c48-test-response-secret-not-for-deployment-0001
+      IDENTITY_ADMIN_TEST_BASE_URL: http://identity-api:3001/api/v1/identity
+    command: ["node", "scripts/test-identity-admin.mjs"]
+    depends_on:
+      identity-api:
+        condition: service_healthy
+    profiles: [test]
+    networks: [c48-test]
+
 networks:
   c48-test:
     driver: bridge

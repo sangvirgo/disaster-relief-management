@@ -1,6 +1,6 @@
 # C48 backend implementation pack
 
-Turns the [technology and delivery plan](../c48-technology-and-delivery-plan.md) into something an engineer or AI agent can implement without guessing. Status: **T0 workspace, T1 technical package, and T2 Identity authentication are implemented; T3–T19 remain.** The SQL was executed against PostgreSQL 17 + PostGIS 3.5. Original baseline: 96 assertions. After the 2026-10-10 cleanup and hardening (01 §9, status in §9.5): identity 37, response 95, logistics 133 assertions pass; restricted application roles, the SECURITY DEFINER stock writer, nine two-session races and the key query plans at 200k rows were executed.
+Turns the [technology and delivery plan](../c48-technology-and-delivery-plan.md) into something an engineer or AI agent can implement without guessing. Status: **T0 workspace, T1 technical package, T2 Identity authentication, and T3 Identity administration/internal APIs are implemented; T4–T19 remain.** The SQL was executed against PostgreSQL 17 + PostGIS 3.5. Original baseline: 96 assertions. After the 2026-10-10 cleanup and hardening (01 §9, status in §9.5): identity 37, response 95, logistics 133 assertions pass; restricted application roles, the SECURITY DEFINER stock writer, nine two-session races and the key query plans at 200k rows were executed.
 
 | File | Purpose |
 |---|---|
@@ -24,4 +24,6 @@ docker run -d --name c48pg -e POSTGRES_PASSWORD=x -p 127.0.0.1:55432:5432 postgi
 
 **Round-2 update (2026-10-09):** read plan Section 28 and 01 §8 after §27/§7. They govern automation, resolution outcomes, headers, loss review, recovery codes, attribution-lock release, delivery carrier and the column/index cleanup. The SQL files implement 01 §9 and the T0-S gate is met for the SQL layer (01 §9.5); the next implementation task after T1 was T2 Identity auth.
 
-**T2 update (2026-10-10):** Identity now implements registration, Web/Native login and refresh, logout, password change, current-user grants, CSRF, Argon2id, RS256 access tokens, refresh-family rotation/reuse detection, and disable/authz-version barriers. The tested T2 surface and transport shapes are captured in [identity OpenAPI](../../contracts/openapi/identity.json); the next task is T3 Identity admin and internal endpoints.
+**T2 update (2026-10-10):** Identity implements registration, Web/Native login and refresh, logout, password change, current-user grants, CSRF, Argon2id, RS256 access tokens, refresh-family rotation/reuse detection, and disable/authz-version barriers. The tested T2 surface and transport shapes are captured in [identity OpenAPI](../../contracts/openapi/identity.json).
+
+**T3 update (2026-10-10):** Identity now implements user, organization, membership, grant, region, audit, and service-token/introspection endpoints. Admin writes are idempotent and audited transactionally; grant, membership removal, disable, and password-reset changes revoke affected sessions. The same OpenAPI snapshot includes T3. PostgreSQL admin/auth integration and the 10-VU introspection k6 smoke passed; see [HANDOFF](HANDOFF.md) for exact evidence and the campaign-validation dependency on T10.
