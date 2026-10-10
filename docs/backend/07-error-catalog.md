@@ -115,3 +115,16 @@ Notes: `REQUEST_STATE_INVALID` and `IDEMPOTENCY_IN_PROGRESS` from earlier drafts
 | code | HTTP | Owner | Vietnamese message |
 |---|---|---|---|
 | `ATTRIBUTION_LOCKED` | 409 | Response | Phạm vi xử lý đã được cố định cho chu kỳ này. |
+
+## Round-2 codes (plan §28)
+
+| code | HTTP | Owner | Vietnamese message |
+|---|---|---|---|
+| `REGION_REQUIRED` | 409 | Response | Cần xác định khu vực của yêu cầu trước khi giao nhiệm vụ. |
+| `ATTRIBUTION_LOCK_IN_USE` | 409 | Response | Chưa thể gỡ khóa vì chu kỳ đã có nhiệm vụ hoặc nhu cầu vật tư. |
+| `PENDING_SUPPLEMENT_REVIEW` | 409 | Response | Còn thông tin bổ sung chưa được xem xét. |
+| `RESOLUTION_BASIS_INVALID` | 409 | Response | Cơ sở xác nhận hoàn tất không phù hợp với tình trạng hiện tại. |
+| `DELIVERY_ALREADY_CLAIMED` | 409 | Response / Logistics | Đợt giao hàng này đã có đội nhận. |
+| `NOT_CARRIER` | 403 | Logistics | Bạn không phải đội được giao vận chuyển phiếu này. |
+| `LOSS_REVIEW_REQUIRED` | 409 | Logistics | Khoản mất mát cần được duyệt độc lập trước khi ghi nhận. |
+| `DRIVE_WINDOW_CLOSED` | 409 | Logistics | Đợt quyên góp chưa mở hoặc đã hết thời gian nhận hàng. |

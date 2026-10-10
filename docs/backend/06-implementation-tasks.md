@@ -1,12 +1,12 @@
 # 06 — Ordered implementation tasks
 
-**Start with T0-S, then T0.** Read plan §27 and01 §7; existing SQL still requires these target deltas. No application code starts before schema alignment evidence.
+**T0-S is done for the SQL layer (01 §9.5); start with T0.** Read plan §27, §28 and 01 §7–§9. The SQL files in `schema/` implement the target deltas; application code must match them through migrations.
 
 One task per branch/PR. A task is done only when its **exit evidence** exists (commands + results recorded) and the Definition of Done in [00](00-setup.md) §6 holds. Order follows plan §16 slices; do not start a task before its dependencies. Cut order if time runs out (plan §16): optional AI → push → full offline queue → CSV → advanced warehouse depth (see [01](01-schema-review.md) §5) — never the seal protocol, independent review, once-only posting, nonnegative stock, human verification, privacy, Vietnamese messages or truthful ACK.
 
 | # | Task | Depends | Deliverables | Exit evidence |
 |---|---|---|---|---|
-| T0-S | **Focused target schema alignment** | — | Verify supported PostgreSQL/PostGIS and pin image first; apply01 §7 to schema/migrations and focused assertions; complete every-column/index inventory | Real restricted-role assertions, controlled two-session races, exact SQLSTATE/constraint checks and measured EXPLAIN evidence recorded; no inherited PASS claim for new deltas |
+| T0-S | **Focused target schema alignment** — DONE for the SQL layer 2026-10-10 (evidence in 01 §9.5: restricted roles, SECURITY DEFINER writer, races, EXPLAIN) | — | Verify supported PostgreSQL/PostGIS and pin image first; apply01 §7 to schema/migrations and focused assertions; complete every-column/index inventory | Real restricted-role assertions, controlled two-session races, exact SQLSTATE/constraint checks and measured EXPLAIN evidence recorded; no inherited PASS claim for new deltas |
 | T0 | **Spike + workspace** | T0-S | Monorepo skeleton, three Nest apps booting, Compose (3 DBs, PostGIS image digest pinned, MinIO AIStor Free, Nginx), `VERSIONS.md`; load `schema/*.sql` through TypeORM migrations; race test on `mission_team_one_active_uq`; `ST_DWithin` + `FOR UPDATE` demo | Migrated schema dump equals `schema/*.sql`; `schema/test-*.sql` pass; parallel-transaction test output; decision recorded if TypeORM is replaced |
 | T1 | **Technical package** | T0 | Error envelope + exception filter loading [07-error-catalog.md](07-error-catalog.md), **central SQLSTATE mapper (23505/23514/40P01/55P03)**, idempotency interceptor (insert-first protocol, 00 §3), purpose-bound secret hashing with versioned pepper, scope evaluator + role→permission constant ([05](05-permissions.md)), correlation id, **keyset helper with `(sort, id)` cursor + filter hash**, env validation, **pino redaction paths**, **job runner (advisory lock + SKIP LOCKED + jitter)**, **cross-service client (keep-alive, timeout, circuit breaker, single-flight)**, `UPDATE … WHERE version` helper | Unit tests; TC-L10N-01 skeleton (no English framework text leaks); idempotency replay/conflict/in-progress tests on real DB |
 | T2 | **Identity auth** | T1 | register/login/refresh/logout/change-password/me/csrf; Argon2id; family rotation + reuse detection; Web cookie vs Native transports | TC-BE-01 (partial), TC-BE-20, TC-BE-28; parallel-refresh test (loser gets `REFRESH_RACE`, family survives); disable-vs-rotation race leaves no live token |
@@ -54,7 +54,24 @@ One task per branch/PR. A task is done only when its **exit evidence** exists (c
 | T8/T9 | TC-LOGIC-02/03/12: accountless external team, field outcome without media, active-cancel readiness, first-offer attribution stamp and offer-versus-attribution race. |
 | T11/T0-S | TC-LOGIC-09/13: hardened stock writer under restricted role, lexical decimals/finite values, useful columns/index inventory and EXPLAIN. |
 | T13/T17 | TC-LOGIC-07/08: held revision independently reviewed before incremental post; POSTED history preserved; accepted by drive and distributed by campaign/warehouse separately. |
-| T14/T15 | TC-LOGIC-06/12/13: admission stamp, reasoned increase retaining original, same-org contributions, quantity-matched unique settlement and post-target custody after seal; pending loss independent approval before accounting. |
+| T14/T15 | Need auto FULFILLED, "prepare from commitments" with human approval only, auto reconcile, loss review table, settlement slimming (TC-AUTO-03/04, TC-AUTO-02, TC-R2-07) |
 | T0/T16 | TC-LOGIC-05/11: prototype delayed-seal-after-abort durable local fence early at T0; full resolution/failure-review/adopt/abort and zero-mission branch at T16; original202 replay preserved. |
 
 Client, AI research, SRS/SDD, schedule and demo deliverables remain in the full plan. This backend task update does not delete or replace them. No SQL/runtime checks were executed for this documentation review.
+
+## Round-2 additions (plan §28)
+
+| Tasks | Required addition |
+|---|---|
+| T0-S | Apply 01 §8 deltas and the column/index audit; remove columns without writer and reader; TC-R2-02/03/07 schema assertions |
+| T4/T5/T6 | `UNKNOWN` category seed; header scheme (`X-Tracking-Secret`); TC-R2-06 |
+| T7 | Duplicate cascade (TC-AUTO-05), concurrence by material fact event (TC-R2-05), supplement gating (TC-R2-04), corroboration candidates |
+| T8/T9 | GOVERNMENT COORDINATOR teams, DECLINE on behalf, region-null offers refused, attribution-lock release (TC-R2-08, TC-R2-03) |
+| T13 | Receipt derived flags and highlight only; independent human review stays mandatory (TC-AUTO-01) |
+| T14/T15 | Need auto FULFILLED, "prepare from commitments" with human approval only, auto reconcile, loss review table, settlement slimming (TC-AUTO-02/03/04, TC-R2-07) |
+| T16 | `outcome_basis` resolution, skip Logistics when `logistics_admitted_at` is null (TC-R2-01/02) |
+| After T15 (optional) | Delivery-carrier slice, plan §28.3 (TC-DEL-01) |
+
+Automatic steps must write a SYSTEM event naming the rule; they never replace human verification, priority, rescue dispatch or the resolve command.
+
+T0-S additionally follows 01 §9 (column and index cleanup, receipt-independence trigger, review-uniqueness indexes); its exit gate is §9.4.

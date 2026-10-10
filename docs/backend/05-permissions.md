@@ -61,10 +61,12 @@ A grant is `(role, scope_type, organization, region?, campaign?)`.
 
 ## 4. PII inventory (never in logs, maps, heatmap cells, dashboards, AI input, signed-URL names)
 
-`assistance_request.reporter_name/reporter_contact_phone`, `request_subject.*contact*`, `alternate_contact_*`, `location` (exact), `contact_attempt.note`, `donation_delivery.donor_name/donor_phone`, `handoff_record.receiver_label`, free-text descriptions. Public endpoints expose none of these.
+`assistance_request.reporter_name/reporter_contact_phone`, `request_subject.*contact*`, `alternate_contact_*`, `location` (exact), `contact_attempt.note`, `donation_delivery.donor_name/donor_phone`, `handoff_record.receiver_label`, `rescue_team.external_contact_note` (commander/unit phone; never in list rows), free-text descriptions. Public endpoints expose none of these.
 
 ## 5. Guest and public surface (the only unauthenticated routes)
 
 `POST /identity/auth/register|login|refresh` · `POST /response/requests` (SELF) · `GET /response/requests/track` · `POST /response/requests/{id}/supplements` · `POST /response/requests/{id}/evidence` (guest, secret) · `GET /response/public/campaigns` · `GET /logistics/public/donation-drives[/{id}]` · `POST /logistics/public/donation-drives/{id}/deliveries` · `GET|POST /logistics/public/donations/{id}…` (capability). Everything else requires a session.
 
 Focused logic: COORDINATOR teams need no account/leader; scoped coordinator records sourced progress. APP direct actions retain active-leader guards. Ready cannot bypass the active-cancel latch. RETURN warehouse recorder may use DONATION_INTAKE or DISTRIBUTION_DISPATCH + receiving-site scope, distinct from dispatcher. LOSS_APPROVE is exercised through authenticated independent review, never a supplied actor id. Public request-category catalog contains no victim data; recovery redemption requires a live session plus purpose-bound code.
+
+Round-2 (plan §28): `MISSION_CLAIM_DELIVERY` is an object relationship (active leader of an eligible APP team), not a role grant. Coordinator `record-on-behalf` also covers DECLINE and delivery handoffs through Response; the carrier needs no Logistics grant (Response calls Logistics with the signed actor). System actor `SYSTEM` appears only in automatic events (cascades only) and holds no login.

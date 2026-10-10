@@ -11,7 +11,7 @@
 
 This document provides the proposed technical baseline for the SRS, SDD, database/API design, test cases, and user guide. The three-service architecture and adapted workflows below are C48 design proposals, not requirements imposed by the department or approved rescue policy.
 
-**For implementation and further research:** this is the full technical plan. Section27 records focused logic corrections and their schema/API acceptance gates while preserving all earlier sections and diagram assets. Appendix A adds execution guidance and remaining slice-specific contract gates. Sections 22 and 23 define the backend structure, business invariants, and resolved architecture-review decisions; Section 25 defines the reduced in-kind donation and delivery scope. Section 26 records supervisor feedback, unresolved interpretations and new acceptance cases; it governs scope where older detailed examples differ. Section 12 specifies the optional AI decision-support extension; Section 6.3 records the object-storage choice. This plan does not claim implementation benchmarks or executed product tests.
+**For implementation and further research:** this is the full technical plan. **Section 28 (round-2 review, 2026-10-09) governs wherever it differs from older text.** Section27 records focused logic corrections and their schema/API acceptance gates while preserving all earlier sections and diagram assets. Appendix A adds execution guidance and remaining slice-specific contract gates. Sections 22 and 23 define the backend structure, business invariants, and resolved architecture-review decisions; Section 25 defines the reduced in-kind donation and delivery scope. Section 26 records supervisor feedback, unresolved interpretations and new acceptance cases; it governs scope where older detailed examples differ. Section 12 specifies the optional AI decision-support extension; Section 6.3 records the object-storage choice. This plan does not claim implementation benchmarks or executed product tests.
 
 ## 1. Reading guide and confidence levels
 
@@ -2492,6 +2492,101 @@ This review preserves Sections 1–26, technology comparisons, architecture, dia
 | TC-LOGIC-14 | Material supplement preserves mission snapshot until review; stale concurrence/version rejected; FR-REQ-07 |
 
 Cases are planned, not executed. Backend contracts/tasks must carry these corrections; no implementation claim follows from this review.
+
+## 28. Round-2 logic review, automation and delivery-carrier decisions — 2026-10-09
+
+**Authority.** This section records the owner's answers in the review session: (1) police and military units are `GOVERNMENT`/`MILITARY` team kinds, shown with a Vietnamese label only, no new enum; (2) the system should automate checks, comparisons, warnings and bookkeeping so people do not repeat work; (3) the delivery team may be the rescue team and takes the destination itself; (4) existing platforms are used as references. **Where this section differs from earlier text it governs**; earlier sections are kept for history and traceability. Nothing here is implemented or tested; it adds planned cases (28.6) and schema/contract deltas that T0-S must apply before application code.
+
+**What automation may and may not do.** The system may compute, compare, warn, notify, propose, and execute reversible bookkeeping steps. It never decides verification, priority, rescue dispatch, or final resolution of a request (AGENTS.md and Section 8 stay in force), never hides a discrepancy, and every automatic step writes an event with `actor = SYSTEM` and the rule that fired.
+
+### 28.1 Automation matrix
+
+| Step | Before | Now (automatic) | Still a person |
+|---|---|---|---|
+| Donation count check | Staff compare by eye | System derives per line `MATCH`, `SHORT`, `OVER`, `UNEXPECTED_ITEM`, `UNIT_OR_SCALE_ERROR`, `EXPIRING_SOON`, `QUALITY_REJECT`; warning shown to staff, donor notified automatically; derived on read, no stored flag column | Staff enter the physical count |
+| Receipt approval | Always a distinct human reviewer | **Unchanged by owner decision (2026-10-10): independent human review is kept for every receipt.** The system only prepares the review: derived flags, exact-match highlight, donor notice. No automatic approval and no `AUTO_MATCH`. | Every receipt reviewed by someone other than every count author |
+| Need fulfilment label | Coordinator confirms FULFILLED | Becomes FULFILLED automatically when `delivered = requested` after a valid settlement | Request resolution stays a human click |
+| Distribution approval | Always a second person | **Unchanged by owner decision (2026-10-10): every distribution is approved by a real person who differs from the preparer.** No auto approval. The system prepares: "prepare from commitments" fills lines and shows which commitment each line matches. | Approver (≠ preparer; dispatcher ≠ approver) |
+| Distribution lines | Typed by hand | "Prepare from commitments" fills lines; vehicle capacity vs summed same-unit quantity is a warning, never a block | Choose warehouse, vehicle, carrier |
+| Distribution reconcile | Human `reconcile` | RECONCILED automatically when every line has `in_transit = 0`, `at_point = 0` and no pending loss | Loss approval |
+| Duplicate cascade | Undefined after canonical A is rejected/cancelled | Children (DUPLICATE) of A return to VERIFYING with a `DUPLICATE_ORPHANED` event and coordinator notice; link kept in history, `canonical_request_id` cleared | Re-decide each child |
+| Verification help | Coordinator searches | System lists corroboration candidates (same category, nearby, close in time, different account/phone/IP) and independent evidence; coordinator confirms with one action | The verification decision |
+| Resolution help | Coordinator reads many panels | System computes a readiness checklist and notifies when all needs are settled and no mission is active | The resolve command |
+| Drives | Dates informational | `opens_at/closes_at` are checked when a declaration arrives; item whose posted accepted total reaches target shows "Đã đủ" and warns donor/staff (no hard block) | Open/pause/close |
+| Alerts | Mixed | Overdue SUBMITTED/VERIFYING, declared danger, overdue offers, stale team positions, orphaned duplicates, expiring goods: scans create one notice per source/version/recipient | Reaction |
+
+Receipt posting never bypasses the distinct reviewer; the owner removed the proposed exact-match auto approval.
+
+### 28.2 Resolved logic findings (each replaces the conflicting earlier wording)
+
+1. **Request resolution outcomes.** `resolve` takes `outcome_basis`: `RESCUE_COMPLETED` (at least one COMPLETED current-cycle mission with `outcome_note` or media), `SUPPLY_ONLY` (no mission completed, at least one need with `delivered > 0` and every need terminal and settled, plus reason), or `NO_ACTION_REQUIRED` (reason; allowed only when no need has delivered or reserved quantity). Every FAILED mission still needs its failure review. Missions that were only DECLINED/CANCELLED never block resolution. "Evidence" means `outcome_note` or media.
+2. **Canonical request leaving the pool.** Rejection or cancellation of a canonical request with inbound duplicates is allowed and triggers the cascade in 28.1 inside the same Response transaction (rows locked in sorted id order). Linking to a request that is already REJECTED/CANCELLED stays forbidden.
+3. **One credential header scheme.** `Authorization` carries only a Bearer token (native). Browser sessions use cookies. Guest and owner capabilities always travel in `X-Tracking-Secret` / `X-Donation-Secret`, tracking code in `X-Tracking-Code`, recovery in `X-Recovery-Code`. The earlier `Authorization: C48-Tracking` / `C48-Donation` scheme is withdrawn everywhere.
+4. **Loss approval.** `handoff_record` stays append-only and immutable (no `state`, no `version`). A LOSS handoff is accounted only when an `APPROVE` row exists in a new append-only `handoff_loss_review(id, handoff_id, reviewer_user_id, decision, reason, reviewed_at)`; reviewer differs from recorder; at most one final review per handoff. Pending/rejected losses are excluded from custody arithmetic.
+5. **Recovery codes.** Replace the paired hash/expiry columns on request/delivery by one small table per service, `capability_recovery(id, object_type, object_id, code_hash UNIQUE, expires_at, issued_by_user_id, basis, source_note, consumed_at, consumed_by_user_id, created_at)`. Its `id` is the API's `issuance_id`; plaintext is never stored; issuing a new code marks older unconsumed ones consumed. This keeps the hot request row narrow.
+6. **Idempotency storage.** `idempotency_record` keeps `response_status` and a `resource_ref` (type + id); `response_body` is removed. Replay re-reads the resource, so no PII and no recovery plaintext is stored. Issuance replay returns safe metadata only.
+7. **Teams without the app.** Police and military units are `GOVERNMENT`/`MILITARY` teams in `COORDINATOR` mode. Create one team per deployable squad because the demo slot is one active rescue mission per team. A team has one `operating_region_code`; a unit working in several regions gets one team per region. `external_contact_note` is PII (commander phone): add it to the PII inventory, never in list rows. Record-on-behalf also supports `DECLINE` (to DECLINED, requires basis, reporter and reason), which is not the same as the coordinator's CANCEL.
+8. **Region and offers.** A mission offer requires a non-null `region_code`; unassigned requests are corrected first. After the first offer or admission the attribution lock applies.
+9. **Releasing the attribution lock.** `attribution_locked_at` is set by the first offer or by Logistics admission. New `logistics_admitted_at` is set only by admission. A coordinator may release the lock (`POST /requests/{id}/attribution-lock/release`, audited) only when the cycle has no mission and Response's read of Logistics confirms no cycle with needs. A failed Logistics creation therefore no longer freezes the request forever.
+10. **Closing requests that never touched Logistics.** If `logistics_admitted_at IS NULL` at the barrier (admission is blocked while CANCELLING/RESOLVING), cancel skips the freeze and resolve skips the seal; `resolution_seal_id` may then be NULL. Cancelling or resolving a spam or rescue-only request no longer depends on Logistics being up.
+11. **Supplements.** A pending material supplement shows an alert and blocks only `verify` of an unverified request and the final `resolve`. It does not block priority change or mission offers, because missions use the approved snapshot and a life-safety offer must not wait for review.
+12. **Two-coordinator concurrence.** It stays valid until a material fact event (location, headcount, declared danger) is added after it; note-only supplements and system version bumps do not invalidate it. Implementation: concurrence stores the id of the latest material fact event it saw (from `request_event`); verify compares it to the current latest. No new column on the request row.
+13. **Category "Chưa rõ".** Seed `UNKNOWN` (Vietnamese "Chưa rõ") as a selectable incident category with no required skills, so a person who cannot classify the situation is never forced to pick a wrong one.
+14. **Timeline order.** Reporter timeline returns the newest 50 entries (descending), with `more` and a cursor to older ones; the index serves both directions.
+15. **Quantities typed by citizens.** None. Needs are created by staff after intake; citizens only add notes, headcount and contact.
+
+### 28.3 Delivery carrier = rescue team (optional slice, after core)
+
+Goal: a team that already works on the request can carry and hand over the aid, takes the destination from the system, and the coordinator relays nothing when the team uses the app.
+
+- Response `mission.kind` becomes `RESCUE` or `DELIVERY`; `DELIVERY` missions carry `distribution_id` (opaque Logistics id, required for DELIVERY, null for RESCUE). The same state machine, view rules, evidence, record-on-behalf and DECLINE apply. The capacity-one index applies per kind (one active RESCUE and one active DELIVERY per team), because a team on scene must be able to deliver supplies.
+- **Self-claim:** an active leader of an eligible team (APP mode) may claim a request's approved, unclaimed `REQUEST_AID` distribution. Response validates the claim with Logistics (internal call outside any transaction), inserts the DELIVERY mission as ACCEPTED, and Logistics records `distribution.carrier_mission_id` (nullable, unique among non-cancelled) idempotently. Coordinators can still offer a DELIVERY mission normally; COORDINATOR-mode teams are offered by the coordinator and progress via record-on-behalf.
+- **Destination:** the delivery brief shows the request's approved location and the handover instructions to the carrier team only (same exposure as the mission view); relief-point targets read the point from Logistics at view time. Logistics stores no household location. DISTRIBUTION_STAFF who ship from the warehouse without a mission are unaffected.
+- **Handoff recording by the carrier:** the carrier does not need a Logistics grant. Response authorizes the leader (or the coordinator on behalf, with basis and reporter), then calls Logistics `POST /internal/distributions/{id}/handoffs` with the service token, the signed actor, `carrier_mission_id` and the payload. Logistics keeps every rule: recorder differs from the dispatcher and from the account receiver, same arithmetic, same settlement guards.
+- Completing a DELIVERY mission never settles stock; only recorded handoffs do. Dispatch in Logistics stays a staff command.
+- Not in the core demo; build only after T15. If cut, the baseline remains: staff or the coordinator relay the destination.
+
+### 28.4 Column and index discipline (applies to every migration)
+
+- A column exists only if the task table in 01 names its writer (endpoint, job, seed or trigger) and its reader (endpoint, report, integrity check or audit). Removed or reworked in this round: `request_subject.location_source = 'GEOCODED'` (no geocoding exists), `idempotency_record.response_body`, `fulfillment_cycle.intent_id` (replaced by `cycle_intent`), `handoff_record.state/version` (replaced by `handoff_loss_review`), recovery hash/expiry pairs (replaced by `capability_recovery`). `vehicle.capacity` is read by the capacity warning; `donation_drive.opens_at/closes_at` by the declaration check; `campaign.starts_at/ends_at` are display only and must not drive state; `request_subject.contactability` is a reporter-declared intake fact and is not updated by contact attempts.
+- Indexes: one per proven query or constraint. `assistance_request` merges the review-lane, SUBMITTED-alert and overdue-VERIFYING scans into one partial `(organization_id, received_at, id) WHERE status IN ('SUBMITTED','VERIFYING')` and keeps at most: org FIFO, org+region FIFO, unassigned, attention, reporter, phone (partial `WHERE reporter_contact_phone IS NOT NULL`), canonical, campaign. Drop the foreign-key-only indexes on `item_id`/`warehouse_id`/`capacity_unit` columns (`need_item_idx`, `donation_line_item_idx`, `receipt_count_line_item_idx`, `distribution_line_item_idx`, `drive_item_item_idx`, `stock_balance_item_idx`, `item_unit_idx`, `vehicle_unit_idx`, `drive_warehouse_idx`, `commitment_warehouse_idx`, `distribution_warehouse_idx`, `receipt_warehouse_idx`) unless a measured query needs them. Region-filtered fulfillment reports need `(region_code, created_at)` on the cycle; donation phone throttling is done at Nginx or by a bounded time-window index, not a table scan. Every status-first list index is rewritten with the organization and time first.
+
+### 28.5 Platform references for these choices
+
+Reference material is the dated research in `research/` (Sahana Eden commitments and returns, Ushahidi review gates and saved queues, KoboToolbox offline capture, Logistics Cluster goods-received notes and discrepancy records, IFRC quality-based acceptance). They support: a human gate before a report becomes actionable but with system-prepared candidates; commitment-backed allocation; goods-received notes with recorded discrepancy; returns from distribution points. Tolerance-based automatic matching of a received quantity against an expected quantity is common ERP practice, but this session did not verify a primary source for it; the exact-match rule above is a C48 proposal with the safeguards listed. These references are not re-verified for current versions.
+
+### 28.6 New planned acceptance cases (not executed)
+
+| ID | Expected result |
+|---|---|
+| TC-AUTO-01 | Declared 60, counted 60: flags show MATCH but the receipt still waits for a distinct human reviewer; declared 60, counted 58: SHORT warning and donor notice; no path posts stock without that review |
+| TC-AUTO-02 | A distribution whose lines equal its commitments still waits for a human approver who differs from the preparer; the preparer cannot approve; an edit voids the approval |
+| TC-AUTO-03 | Need becomes FULFILLED automatically at `delivered = requested`; request is not resolved until the human command |
+| TC-AUTO-04 | Distribution reconciles itself when custody counters reach zero and no loss is pending; stays open with a pending loss |
+| TC-AUTO-05 | Canonical A rejected: its duplicate B returns to VERIFYING with an event and notice; concurrent B→A link versus A rejection ends in one valid state |
+| TC-R2-01 | Only declined/cancelled missions plus delivered supplies resolve with `SUPPLY_ONLY`; failed mission without review blocks |
+| TC-R2-02 | Cancel and resolve of a request with `logistics_admitted_at` NULL succeed with Logistics stopped |
+| TC-R2-03 | Failed admission leaves the lock; the release command succeeds only when Logistics confirms no cycle needs |
+| TC-R2-04 | Supplement pending review does not block a mission offer or priority change but blocks verify and resolve |
+| TC-R2-05 | Note-only supplement keeps a two-coordinator concurrence valid; a location change invalidates it |
+| TC-R2-06 | Native signed-in user tracks a guest-created SOS with Bearer in `Authorization` and the secret in `X-Tracking-Secret` |
+| TC-R2-07 | LOSS accounted only after an independent `handoff_loss_review` APPROVE; `handoff_record` stays immutable |
+| TC-R2-08 | Government COORDINATOR team: offer, DECLINE on behalf and a later offer to another team; slot released |
+| TC-DEL-01 | Leader self-claims an approved distribution, sees the destination, records handoff through Response; non-carrier cannot; second claim conflicts |
+
+### 28.7 Column and index cleanup decisions (from the three-agent audit, 2026-10-10)
+
+Decided by the owner or by best practice under the owner's delegation; they replace the matching rows of 01 §7–§8 and the old SQL. Rule of thumb applied: a column stays only if something writes it and something reads it or a constraint depends on it; deliberate duplicates stay only when a composite foreign key or a lock-time CHECK needs them, and each carries a one-line reason. Full per-service list: 01-schema-review §9.
+
+- **Independence is enforced in the database too.** A `RECEIPT` or `RECEIPT_HELD_RELEASE` stock movement is refused unless an `APPROVE` review exists for the exact current count and declaration revisions and the poster is not a count author. Distribution approval keeps the existing CHECKs (approver ≠ preparer, dispatcher ≠ approver); there is no system approver, so `approval_kind` is not added.
+- **Single-writer review facts.** Partial unique expression indexes on `request_event` allow one review per material supplement event and one failure review per failed mission.
+- **Nullable intake facts.** Reporter phone and headcount become nullable; `contactability` is set only for PROXY reports.
+- **Guest donors** receive no notice rows; their updates are the events shown on the tracking view. Signed-in donors get notices. Dispute evidence is owned by the dispute, not the delivery.
+- **Audit logs** in Response and Logistics get a read endpoint (`GET /audit-logs?entity_type=&entity_id=`, filter mandatory) for the coordinator or operations roles in scope, so the audit columns have a reader.
+- **Deferred with the delivery-carrier slice:** `mission.kind`, `mission.distribution_id`, `distribution.carrier_mission_id`.
+- **Not added:** `receipt_review.review_kind`, `distribution.approval_kind`, `relief_need.target_reason` (reason lives in the request and audit), `donation_receipt.organization_id`, `verification_decision.concurrence_event_id`, `resolution_intent.mission_not_required`, request/delivery recovery hash pairs.
+
+**Status:** the schema files and constraint tests were rewritten to 28.7 and hardened, and run on PostGIS 17-3.5 on 2026-10-10: identity 37, response 95, logistics 133 assertions pass; restricted-role privilege tests, the SECURITY DEFINER stock writer, nine two-session race tests and key query plans at 200k rows were executed (01-schema-review §9.5). The service layer, TypeORM migrations and all application code do not exist yet. Section 27, the backend pack and the diagrams are kept; the SQL files remain the unmodified baseline until T0-S.
 
 ## Appendix A. AI implementation and research handoff
 

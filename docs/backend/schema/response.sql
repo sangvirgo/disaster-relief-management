@@ -10,19 +10,24 @@ CREATE DOMAIN mission_status AS text CHECK (VALUE IN ('OFFERED','ACCEPTED','EN_R
 -- ---------- catalogs (natural text keys; labels are Vietnamese) ----------
 CREATE TABLE incident_category (
   code text PRIMARY KEY CHECK (code ~ '^[A-Z0-9_]{2,40}$'),
-  display_name text NOT NULL CHECK (is_clean_text(display_name)),
-  status text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','INACTIVE'))
-);
+  display_name text NOT NULL CHECK (is_clean_text(display_name))
+);   -- seed (data, not DDL): UNKNOWN / 'Chưa rõ' with no required skills, so a reporter is never forced to pick a wrong category
 CREATE TABLE skill (
   code text PRIMARY KEY CHECK (code ~ '^[A-Z0-9_]{2,40}$'),
   display_name text NOT NULL CHECK (is_clean_text(display_name))
 );
+-- required skills of a category: read by the candidate/offer all-required-skills check. The composite PK already serves lookup by category.
+CREATE TABLE incident_category_skill (
+  category_code text NOT NULL REFERENCES incident_category(code),
+  skill_code    text NOT NULL REFERENCES skill(code),
+  PRIMARY KEY (category_code, skill_code)
+);
 -- region codes are owned by Identity; Response owns the geometry used to derive a request's region
 CREATE TABLE region_boundary (
   region_code text PRIMARY KEY,
-  geom        geometry(MultiPolygon, 4326) NOT NULL CHECK (ST_IsValid(geom)),   -- overlap between regions is checked by the seed test
-  source_note text NOT NULL                                  -- dataset/version/licence of the seed
+  geom        geometry(MultiPolygon, 4326) NOT NULL CHECK (ST_IsValid(geom))   -- overlap between regions is checked by the seed test
 );
+COMMENT ON TABLE region_boundary IS 'Seed dataset, version and licence are recorded in the seed README, not per row.';
 CREATE INDEX region_boundary_geom_gix ON region_boundary USING gist (geom);
 
 CREATE TABLE campaign (
@@ -36,12 +41,9 @@ CREATE TABLE campaign (
   ends_at         timestamptz,
   created_by_user_id uuid NOT NULL,
   created_at      timestamptz NOT NULL DEFAULT now(),
-  updated_at      timestamptz NOT NULL DEFAULT now(),
   version         int NOT NULL DEFAULT 1,
   CHECK (ends_at IS NULL OR starts_at IS NULL OR ends_at > starts_at)
 );
-CREATE INDEX campaign_scope_idx ON campaign (organization_id, status);
-CREATE INDEX campaign_public_idx ON campaign (starts_at) WHERE status IN ('ACTIVE','PAUSED');   -- public summaries
 
 -- ---------- requests ----------
 CREATE TABLE assistance_request (
@@ -54,7 +56,7 @@ CREATE TABLE assistance_request (
   report_mode             text NOT NULL CHECK (report_mode IN ('SELF','PROXY')),
   reporter_user_id        uuid,                                  -- opaque Identity id; NULL for guest SELF
   reporter_name           text CHECK (reporter_name IS NULL OR is_clean_text(reporter_name)),
-  reporter_contact_phone  text NOT NULL CHECK (reporter_contact_phone ~ '^\+?[0-9]{8,15}$'),   -- service normalises first
+  reporter_contact_phone  text CHECK (reporter_contact_phone ~ '^\+?[0-9]{8,15}$'),   -- optional (NULL = not supplied); service normalises first
   source_ip_hash          text,                                  -- salted hash, for abuse analysis only
   description             text CHECK (char_length(description) <= 2000),
   organization_id         uuid NOT NULL,                         -- server-assigned intake organization
@@ -67,19 +69,23 @@ CREATE TABLE assistance_request (
   reporter_declared_danger boolean NOT NULL DEFAULT false,
   work_cycle              int NOT NULL DEFAULT 1 CHECK (work_cycle >= 1),
   resolved_at             timestamptz,
-  resolution_seal_id      uuid,                                  -- opaque Logistics seal id
+  resolution_seal_id      uuid,                                  -- opaque Logistics seal id (= sealing cycle_intent id); NULL allowed only while logistics_admitted_at IS NULL
+  attribution_locked_at   timestamptz,                           -- set by first offer or Logistics admission; released by the coordinator release command / atomic reopen
+  logistics_admitted_at   timestamptz,                           -- set only by Logistics admission; NULL => cancel skips the freeze and resolve skips the seal
+  verification_revision   uuid,                                  -- approved snapshot event (same request); NULL until verified
   received_at             timestamptz NOT NULL DEFAULT now(),    -- server receive time
-  updated_at              timestamptz NOT NULL DEFAULT now(),
   version                 int NOT NULL DEFAULT 1,
   CONSTRAINT proxy_needs_account CHECK (report_mode <> 'PROXY' OR reporter_user_id IS NOT NULL),
   CONSTRAINT duplicate_has_canonical CHECK ((status = 'DUPLICATE') = (canonical_request_id IS NOT NULL)),
   CONSTRAINT no_self_canonical CHECK (canonical_request_id IS NULL OR canonical_request_id <> id),
-  CONSTRAINT resolved_pair CHECK ((resolved_at IS NULL) = (resolution_seal_id IS NULL)),
+  CONSTRAINT resolved_pair CHECK (
+    (resolution_seal_id IS NULL OR resolved_at IS NOT NULL) AND                                    -- a seal implies resolved_at
+    (resolved_at IS NULL OR resolution_seal_id IS NOT NULL OR logistics_admitted_at IS NULL)),     -- NULL seal only when Logistics never admitted the request
+  CONSTRAINT admitted_implies_locked CHECK (logistics_admitted_at IS NULL OR attribution_locked_at IS NOT NULL),
   CONSTRAINT resolved_status CHECK (status NOT IN ('RESOLVED','CLOSED') OR resolved_at IS NOT NULL),       -- reopen must clear both columns
   CONSTRAINT priority_pair CHECK ((priority IS NULL) = (priority_basis IS NULL)),
   CONSTRAINT triaged_has_priority CHECK (status NOT IN ('TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING','RESOLVED','CLOSED') OR priority IS NOT NULL),
-  CONSTRAINT verifying_since_set CHECK (status <> 'VERIFYING' OR verifying_since IS NOT NULL),
-  UNIQUE (id, report_mode)
+  CONSTRAINT verifying_since_set CHECK (status <> 'VERIFYING' OR verifying_since IS NOT NULL)
 ) WITH (fillfactor = 85);
 CREATE UNIQUE INDEX request_seal_uq ON assistance_request (resolution_seal_id) WHERE resolution_seal_id IS NOT NULL;
 -- guest secret hash must be bound to at most one request
@@ -89,36 +95,49 @@ CREATE UNIQUE INDEX request_secret_uq ON assistance_request (tracking_secret_has
 CREATE INDEX request_org_fifo_idx ON assistance_request (organization_id, received_at, id);
 CREATE INDEX request_org_region_fifo_idx ON assistance_request (organization_id, region_code, received_at, id);
 CREATE INDEX request_unassigned_idx ON assistance_request (organization_id, received_at, id) WHERE region_code IS NULL AND status NOT IN ('REJECTED','DUPLICATE','CANCELLED','CLOSED');
-CREATE INDEX request_review_lane_idx ON assistance_request (organization_id, received_at, id) WHERE review_lane <> 'NORMAL' AND status IN ('SUBMITTED','VERIFYING');
+-- Attention list: SUBMITTED/VERIFYING (alert + overdue scans, all lanes) plus open reports whose reporter declared danger. Predicate must equal the query.
+CREATE INDEX request_attention_idx ON assistance_request (organization_id, received_at, id)
+  WHERE status IN ('SUBMITTED','VERIFYING')
+     OR (reporter_declared_danger AND status IN ('VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING'));
 CREATE INDEX request_reporter_idx ON assistance_request (reporter_user_id, received_at DESC, id DESC) WHERE reporter_user_id IS NOT NULL;   -- "my requests" + PROXY open-cap count
-CREATE INDEX request_phone_idx ON assistance_request (reporter_contact_phone, received_at DESC);                                          -- soft-throttle counting (index-only)
+CREATE INDEX request_phone_idx ON assistance_request (reporter_contact_phone, received_at DESC) WHERE reporter_contact_phone IS NOT NULL;                                          -- soft-throttle counting (index-only)
 CREATE INDEX request_canonical_idx ON assistance_request (canonical_request_id) WHERE canonical_request_id IS NOT NULL;                    -- inbound-link guard
 CREATE INDEX request_campaign_idx ON assistance_request (campaign_id, received_at, id) WHERE campaign_id IS NOT NULL;                     -- campaign-scoped grants
-CREATE INDEX request_verifying_idx ON assistance_request (organization_id, verifying_since) WHERE status = 'VERIFYING';                   -- overdue badge scan (age and declared-danger)
 
 CREATE TABLE request_subject (
   request_id               uuid PRIMARY KEY,
-  report_mode              text NOT NULL,                                  -- copy of the request's mode so PROXY rules can be a CHECK
-  people_affected          int NOT NULL CHECK (people_affected BETWEEN 1 AND 10000),
+  people_affected          int CHECK (people_affected BETWEEN 1 AND 10000),
   location                 geography(Point, 4326) NOT NULL,
-  location_source          text NOT NULL CHECK (location_source IN ('GPS','MANUAL_PIN','GEOCODED')),
+  location_source          text NOT NULL CHECK (location_source IN ('GPS','MANUAL_PIN')),
   location_accuracy_m      numeric(8,1) CHECK (location_accuracy_m >= 0),   -- NULL for manual pin (never fabricated)
   location_captured_at     timestamptz,
-  reporter_relationship    text,                                          -- required for PROXY (service rule)
+  reporter_relationship    text,                                          -- required for PROXY (trigger below)
   beneficiary_contact_phone text,
   alternate_contact_name   text,
   alternate_contact_phone  text,
   information_source       text,
   last_known_situation_at  timestamptz,
-  contactability           text NOT NULL DEFAULT 'UNKNOWN' CHECK (contactability IN ('REACHABLE','UNREACHABLE','UNKNOWN')),
+  contactability           text CHECK (contactability IN ('REACHABLE','UNREACHABLE','UNKNOWN')),
   household_reference_note text,
-  FOREIGN KEY (request_id, report_mode) REFERENCES assistance_request(id, report_mode),
+  FOREIGN KEY (request_id) REFERENCES assistance_request(id),
   CONSTRAINT location_source_shape CHECK (
     (location_source = 'GPS' AND location_accuracy_m IS NOT NULL AND location_captured_at IS NOT NULL) OR
-    (location_source = 'MANUAL_PIN' AND location_accuracy_m IS NULL) OR
-    location_source = 'GEOCODED'),
-  CONSTRAINT proxy_has_relationship CHECK (report_mode <> 'PROXY' OR coalesce(btrim(reporter_relationship), '') <> '')
+    (location_source = 'MANUAL_PIN' AND location_accuracy_m IS NULL))
 );
+-- PROXY reports need a relationship and a declared contactability; SELF reports may leave both NULL. report_mode lives only on assistance_request.
+CREATE FUNCTION request_subject_proxy_rules() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF (SELECT report_mode FROM assistance_request WHERE id = NEW.request_id) = 'PROXY' THEN
+    IF coalesce(btrim(NEW.reporter_relationship), '') = '' THEN
+      RAISE EXCEPTION 'PROXY request needs reporter_relationship' USING ERRCODE = 'check_violation', CONSTRAINT = 'proxy_has_relationship';
+    END IF;
+    IF NEW.contactability IS NULL THEN
+      RAISE EXCEPTION 'PROXY request needs contactability' USING ERRCODE = 'check_violation', CONSTRAINT = 'proxy_has_contactability';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER request_subject_proxy_rules BEFORE INSERT OR UPDATE ON request_subject FOR EACH ROW EXECUTE FUNCTION request_subject_proxy_rules();
 CREATE INDEX request_subject_loc_gix ON request_subject USING gist (location);
 
 CREATE TABLE contact_attempt (
@@ -159,19 +178,16 @@ CREATE TABLE request_event (
   to_status     request_status,
   reason        text,
   payload       jsonb,
-  occurred_at   timestamptz NOT NULL DEFAULT now()
+  occurred_at   timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (id, request_id)                     -- target of the same-request snapshot FKs (verification_revision on request and mission)
 );
 CREATE INDEX request_event_req_idx ON request_event (request_id, occurred_at, id);
-
-CREATE TABLE authority_referral (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  request_id    uuid NOT NULL REFERENCES assistance_request(id),
-  actor_user_id uuid NOT NULL,
-  referred_body text NOT NULL,
-  note          text,
-  referred_at   timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX authority_referral_req_idx ON authority_referral (request_id);
+-- single-writer review facts: one review per material supplement event, one failure review per failed mission
+CREATE UNIQUE INDEX request_event_supplement_review_uq ON request_event ((payload->>'reviewed_event_id')) WHERE event_type = 'SUPPLEMENT_REVIEW';
+CREATE UNIQUE INDEX request_event_failure_review_uq ON request_event ((payload->>'mission_id')) WHERE event_type = 'MISSION_FAILURE_REVIEW';
+-- authority referral is a request_event of type AUTHORITY_REFERRED (no separate table)
+ALTER TABLE assistance_request ADD CONSTRAINT request_verification_revision_fk
+  FOREIGN KEY (verification_revision, id) REFERENCES request_event(id, request_id);
 
 CREATE TABLE resolution_intent (
   id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -182,8 +198,10 @@ CREATE TABLE resolution_intent (
   actor_user_id           uuid NOT NULL,
   expected_request_version int NOT NULL,
   previous_status         request_status NOT NULL,
+  reason                  text CHECK (reason IS NULL OR btrim(reason) <> ''),
+  version                 int NOT NULL DEFAULT 1 CHECK (version >= 1),
   created_at              timestamptz NOT NULL DEFAULT now(),
-  updated_at              timestamptz NOT NULL DEFAULT now()
+  updated_at              timestamptz NOT NULL DEFAULT now()        -- the only table that keeps updated_at (state machine progress)
 );
 CREATE UNIQUE INDEX resolution_intent_one_open_uq ON resolution_intent (request_id) WHERE state IN ('PENDING','ABORTING');
 
@@ -194,29 +212,28 @@ CREATE TABLE rescue_team (
   operating_region_code    text NOT NULL REFERENCES region_boundary(region_code),
   name                     text NOT NULL CHECK (is_clean_text(name)),
   team_kind                text NOT NULL CHECK (team_kind IN ('VOLUNTEER','MILITARY','GOVERNMENT','OTHER')),
+  reporting_mode           text NOT NULL DEFAULT 'APP' CHECK (reporting_mode IN ('APP','COORDINATOR')),
+  external_contact_note    text CHECK (external_contact_note IS NULL OR btrim(external_contact_note) <> ''),   -- PII (commander phone); never in list rows
+  readiness_required       boolean NOT NULL DEFAULT false,         -- latch: generic PATCH cannot bypass readiness
   affiliation_verified_at  timestamptz,
   affiliation_verified_by  uuid,
   availability             text NOT NULL DEFAULT 'AVAILABLE' CHECK (availability IN ('AVAILABLE','UNAVAILABLE')),
   status                   text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','INACTIVE')),
   created_at               timestamptz NOT NULL DEFAULT now(),
-  updated_at               timestamptz NOT NULL DEFAULT now(),
   version                  int NOT NULL DEFAULT 1,
-  CHECK ((affiliation_verified_at IS NULL) = (affiliation_verified_by IS NULL))
+  CHECK ((affiliation_verified_at IS NULL) = (affiliation_verified_by IS NULL)),
+  CONSTRAINT coordinator_needs_contact CHECK (reporting_mode <> 'COORDINATOR' OR coalesce(btrim(external_contact_note), '') <> '')   -- coalesce: a SQL NULL must not pass
 ) WITH (fillfactor = 85);
-CREATE INDEX rescue_team_scope_idx ON rescue_team (organization_id, operating_region_code) WHERE status = 'ACTIVE';
 
 CREATE TABLE team_member (
   team_id     uuid NOT NULL REFERENCES rescue_team(id),
   user_id     uuid NOT NULL,
   member_role text NOT NULL CHECK (member_role IN ('LEADER','MEMBER')),
-  status      text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','INACTIVE')),
-  joined_at   timestamptz NOT NULL DEFAULT now(),
-  left_at     timestamptz,                                  -- re-joining reactivates the same row; history is kept in audit_log
-  PRIMARY KEY (team_id, user_id),
-  CHECK ((status = 'INACTIVE') = (left_at IS NOT NULL))
+  left_at     timestamptz,                                  -- membership = left_at IS NULL; re-joining clears it on the same row, history is kept in audit_log
+  PRIMARY KEY (team_id, user_id)
 );
-CREATE UNIQUE INDEX team_one_leader_uq ON team_member (team_id) WHERE member_role = 'LEADER' AND status = 'ACTIVE';
-CREATE UNIQUE INDEX team_member_one_team_uq ON team_member (user_id) WHERE status = 'ACTIVE';
+CREATE UNIQUE INDEX team_one_leader_uq ON team_member (team_id) WHERE member_role = 'LEADER' AND left_at IS NULL;
+CREATE UNIQUE INDEX team_member_one_team_uq ON team_member (user_id) WHERE left_at IS NULL;
 CREATE TABLE team_skill (
   team_id    uuid NOT NULL REFERENCES rescue_team(id),
   skill_code text NOT NULL REFERENCES skill(code),
@@ -228,8 +245,7 @@ CREATE TABLE team_position (
   accuracy_m     numeric(8,1) CHECK (accuracy_m >= 0),
   captured_at    timestamptz NOT NULL,
   source         text NOT NULL CHECK (source IN ('GPS','MANUAL_PIN','COORDINATOR_REPORTED')),
-  set_by_user_id uuid NOT NULL,
-  note           text
+  set_by_user_id uuid NOT NULL
 );   -- no GiST: ~hundreds of teams are scanned faster than a hot-updated GiST is maintained; add one beyond ~10k positions
 
 CREATE TABLE mission (
@@ -241,21 +257,16 @@ CREATE TABLE mission (
   coordinator_user_id uuid NOT NULL,
   suggested_team_id  uuid,                                  -- what the candidate list suggested at offer time
   override_reason    text CHECK (override_reason IS NULL OR btrim(override_reason) <> ''),
-  created_at         timestamptz NOT NULL DEFAULT now(),   -- = time offered
-  accepted_at        timestamptz,
-  ended_at           timestamptz,
-  updated_at         timestamptz NOT NULL DEFAULT now(),
+  verification_revision uuid NOT NULL,                      -- approved snapshot (request_event of this request) fixed at offer time
+  created_at         timestamptz NOT NULL DEFAULT now(),   -- = time offered; accept/end times live in mission_event
   version            int NOT NULL DEFAULT 1,
-  CONSTRAINT ended_iff_terminal CHECK ((ended_at IS NOT NULL) = (status IN ('COMPLETED','FAILED','DECLINED','CANCELLED'))),
-  CONSTRAINT ended_after_created CHECK (ended_at IS NULL OR ended_at >= created_at),
-  CONSTRAINT accepted_at_matches CHECK ((status NOT IN ('ACCEPTED','EN_ROUTE','ON_SCENE','COMPLETED') OR accepted_at IS NOT NULL) AND (status <> 'DECLINED' OR accepted_at IS NULL)),
+  FOREIGN KEY (verification_revision, request_id) REFERENCES request_event(id, request_id),
   CONSTRAINT override_needs_reason CHECK (suggested_team_id IS NULL OR suggested_team_id = team_id OR override_reason IS NOT NULL)
 ) WITH (fillfactor = 85);
 -- DB-level capacity-one guard (capacity is not configurable in the demo, so no capacity column)
 CREATE UNIQUE INDEX mission_team_one_active_uq ON mission (team_id) WHERE status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE');
 CREATE INDEX mission_request_idx ON mission (request_id, status);
 CREATE INDEX mission_team_recent_idx ON mission (team_id, created_at DESC);                         -- 24 h workload count
-CREATE INDEX mission_offer_overdue_idx ON mission (created_at) WHERE status = 'OFFERED';            -- overdue-offer scan
 
 CREATE TABLE mission_event (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -266,8 +277,9 @@ CREATE TABLE mission_event (
   recorded_basis text CHECK (recorded_basis IN ('RADIO','PHONE','IN_PERSON','OTHER')),  -- NOT NULL => coordinator recorded on the team's behalf
   reported_by    text,                                                                    -- who reported (required when recorded_basis is set)
   reason         text,
-  note           text,
-  occurred_at    timestamptz NOT NULL DEFAULT now(),
+  outcome_note   text CHECK (outcome_note IS NULL OR btrim(outcome_note) <> ''),         -- human outcome of a completion (media is the alternative evidence)
+  occurred_at    timestamptz NOT NULL DEFAULT now(),                                      -- reported time of the fact
+  recorded_at    timestamptz NOT NULL DEFAULT now(),                                      -- server time the row was written (differs when recorded on behalf)
   CHECK ((recorded_basis IS NULL) = (reported_by IS NULL)),
   CHECK (recorded_basis IS NULL OR reason IS NOT NULL)
 );
@@ -277,7 +289,7 @@ CREATE TABLE evidence_metadata (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   request_id       uuid REFERENCES assistance_request(id),
   mission_id       uuid REFERENCES mission(id),
-  object_key       text NOT NULL UNIQUE,
+  object_key       text NOT NULL,
   state            text NOT NULL DEFAULT 'PENDING' CHECK (state IN ('PENDING','READY','FAILED')),
   declared_bytes   bigint NOT NULL CHECK (declared_bytes > 0),   -- quota reservation taken before upload
   size_bytes       bigint CHECK (size_bytes > 0),
@@ -285,10 +297,8 @@ CREATE TABLE evidence_metadata (
   checksum         text,
   uploader_user_id uuid,                                         -- NULL for guest
   created_at       timestamptz NOT NULL DEFAULT now(),
-  ready_at         timestamptz,
   CONSTRAINT exactly_one_owner CHECK ((request_id IS NULL) <> (mission_id IS NULL)),
   CONSTRAINT ready_complete CHECK (state <> 'READY' OR (size_bytes IS NOT NULL AND detected_mime IS NOT NULL AND checksum IS NOT NULL)),
-  CONSTRAINT ready_at_matches CHECK ((state = 'READY') = (ready_at IS NOT NULL)),
   CONSTRAINT size_within_declared CHECK (size_bytes IS NULL OR size_bytes <= declared_bytes)
 );
 CREATE INDEX evidence_request_idx ON evidence_metadata (request_id) WHERE request_id IS NOT NULL;
@@ -299,7 +309,6 @@ CREATE INDEX evidence_pending_idx ON evidence_metadata (created_at) WHERE state 
 CREATE TABLE notice (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   recipient_user_id uuid NOT NULL,
-  source_type      text NOT NULL,
   source_id        uuid NOT NULL,
   source_version   int NOT NULL,
   notice_type      text NOT NULL,
@@ -308,7 +317,6 @@ CREATE TABLE notice (
   read_at          timestamptz,
   UNIQUE (source_id, source_version, recipient_user_id, notice_type)
 ) WITH (fillfactor = 85);
-CREATE INDEX notice_unread_idx ON notice (recipient_user_id, created_at DESC, id DESC) WHERE read_at IS NULL;
 CREATE INDEX notice_recipient_idx ON notice (recipient_user_id, created_at DESC, id DESC);
 
 CREATE TABLE audit_log (
@@ -320,15 +328,53 @@ CREATE TABLE audit_log (
 CREATE INDEX audit_log_entity_idx ON audit_log (entity_type, entity_id, created_at DESC, id DESC);
 CREATE TABLE idempotency_record (
   scope_key text NOT NULL, command text NOT NULL, idempotency_key uuid NOT NULL, request_hash text NOT NULL,
-  response_status int, response_body jsonb, created_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (scope_key, command, idempotency_key)
+  response_status int, resource_type text, resource_id uuid, created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (scope_key, command, idempotency_key),
+  CHECK ((resource_type IS NULL) = (resource_id IS NULL))      -- replay re-reads the resource; no response body is stored
 ) WITH (fillfactor = 70, autovacuum_vacuum_scale_factor = 0.02);
 CREATE INDEX idempotency_record_created_idx ON idempotency_record (created_at);
 CREATE FUNCTION forbid_mutation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'table % is append-only', TG_TABLE_NAME; END $$;
 -- append-only tables: block row changes AND TRUNCATE (also REVOKE UPDATE, DELETE, TRUNCATE from the application role in the migration)
 DO $$ DECLARE t text; BEGIN
-  FOREACH t IN ARRAY ARRAY['audit_log','request_event','mission_event','verification_decision','contact_attempt','authority_referral'] LOOP
+  FOREACH t IN ARRAY ARRAY['audit_log','request_event','mission_event','verification_decision','contact_attempt'] LOOP
     EXECUTE format('CREATE TRIGGER %I BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION forbid_mutation()', t||'_append_only', t);
     EXECUTE format('CREATE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION forbid_mutation()', t||'_no_truncate', t);
   END LOOP;
 END $$;
+
+-- one-time recovery of a request capability. id is the API issuance_id; plaintext is never stored; issuing a new code marks older unconsumed ones consumed.
+CREATE TABLE capability_recovery (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id          uuid NOT NULL REFERENCES assistance_request(id),
+  code_hash           text NOT NULL UNIQUE,
+  expires_at          timestamptz NOT NULL,
+  issued_by_user_id   uuid NOT NULL,
+  basis               text NOT NULL,
+  source_note         text,
+  consumed_at         timestamptz,
+  consumed_by_user_id uuid,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT consumed_pair CHECK ((consumed_at IS NULL) = (consumed_by_user_id IS NULL)),
+  CONSTRAINT expires_after_created CHECK (expires_at > created_at)
+);
+CREATE INDEX capability_recovery_open_idx ON capability_recovery (request_id) WHERE consumed_at IS NULL;   -- supersede older unconsumed codes on issuance
+
+-- ---------- restricted application role (T0-S exit gate) ----------
+-- NOLOGIN group role; a deployment creates the login user and runs: GRANT c48_response_app TO <login_user>;
+-- The migration/owner role stays a separate, privileged role. The service connects only as the login user that is a member of this role.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'c48_response_app') THEN CREATE ROLE c48_response_app NOLOGIN; END IF;
+END $$;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+REVOKE CREATE ON SCHEMA public FROM c48_response_app;
+GRANT USAGE ON SCHEMA public TO c48_response_app;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO c48_response_app;
+-- mutable tables: INSERT + UPDATE (catalogs and region_boundary are seed data owned by the migration role: SELECT only)
+GRANT INSERT, UPDATE ON campaign, assistance_request, request_subject, resolution_intent, rescue_team, team_member, team_skill, team_position,
+  mission, evidence_metadata, notice, idempotency_record, capability_recovery TO c48_response_app;
+-- append-only tables (same list as the trigger block above): INSERT only, no UPDATE, DELETE or TRUNCATE
+GRANT INSERT ON audit_log, request_event, mission_event, verification_decision, contact_attempt TO c48_response_app;
+-- cleanup tables: retention purge (idempotency_record, notice) and reconciler removal of FAILED/PENDING evidence rows
+GRANT DELETE ON idempotency_record, notice, evidence_metadata TO c48_response_app;
+GRANT DELETE ON team_skill TO c48_response_app;                     -- 'replace a team's skills as a set'
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO c48_response_app;       -- audit_log identity
