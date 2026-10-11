@@ -7,6 +7,7 @@ import { RequestOperationsOverdueSchedulerService } from './request-operations.o
 import { RequestOperationsPersistenceService } from './request-operations.persistence.service';
 import { RequestOperationsQueriesService } from './request-operations.queries.service';
 import { RequestOperationsCommandRunner } from './request-operations.command-runner.service';
+import { RequestOperationsTriageService } from './request-operations.triage.service';
 
 @Module({
   imports: [RequestIntakeModule],
@@ -18,6 +19,7 @@ import { RequestOperationsCommandRunner } from './request-operations.command-run
     RequestOperationsPersistenceService,
     RequestOperationsQueriesService,
     RequestOperationsCommandRunner,
+    RequestOperationsTriageService,
   ],
   exports: [RequestOperationsService],
 })
