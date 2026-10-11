@@ -343,7 +343,8 @@ try {
   });
   assert.equal(corroborated.status, 200, JSON.stringify(corroborated.value));
 
-  const concurrenceRequest = await createRequest(proxyReporter, 'PROXY', proxyBody([105.2, 15.25]));
+  const concurrenceReporter = await registerAndLogin('concurproxy');
+  const concurrenceRequest = await createRequest(concurrenceReporter, 'PROXY', proxyBody([105.2, 15.25]));
   const concurrenceStart = await command(`requests/${concurrenceRequest.id}/start-verification`, coordinator, { expected_version: 1 });
   assert.equal(concurrenceStart.status, 200, JSON.stringify(concurrenceStart.value));
   const concurrence = await command(`requests/${concurrenceRequest.id}/concur`, secondCoordinator, { expected_version: 2, note: 'Đã rà soát độc lập.' });
@@ -351,7 +352,7 @@ try {
   const noteSupplement = await call(responseUrl, `requests/${concurrenceRequest.id}/supplements`, {
     method: 'POST', body: { expected_version: 3, description: 'Bổ sung ghi chú không làm thay đổi dữ kiện.' },
     headers: {
-      Authorization: `Bearer ${proxyReporter.token}`, 'X-Tracking-Code': concurrenceRequest.tracking_code,
+      Authorization: `Bearer ${concurrenceReporter.token}`, 'X-Tracking-Code': concurrenceRequest.tracking_code,
       'Idempotency-Key': key(),
     },
   });
