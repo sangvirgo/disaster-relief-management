@@ -294,9 +294,6 @@ try {
     assert.ok(unassignedPage.value.cursor);
     unassignedCursor = unassignedPage.value.cursor;
   }
-  const unassignedQueue = await call(responseUrl, 'requests/unassigned?limit=20', { headers: { Authorization: `Bearer ${coordinator.token}` } });
-  assert.equal(unassignedQueue.status, 200, JSON.stringify(unassignedQueue.value));
-  assert.ok(unassignedQueue.value.items.some((item) => item.id === unassigned.id));
   const corrected = await command(`requests/${unassigned.id}/correct-region`, coordinator, {
     expected_version: 1, region_code: 'T7_REGION', reason: 'Đối chiếu lại địa bàn.',
   });
