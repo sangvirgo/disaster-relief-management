@@ -11,7 +11,7 @@ import { ReporterSession, ReporterSessionService } from '../requests/reporter-se
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from '../requests/request-intake.service';
 import { ReporterAccessService, ReporterRequestRow, trackingCodeMatches } from './reporter-access.service';
 import { RecoveryIssueDto, RequestEventsQueryDto, SupplementRequestDto } from './tracking.dto';
-import { RequestOperationsService } from '../operations/operations.service';
+import { RequestOperationsService } from '../operations/request-operations.service';
 
 const terminalStatuses = new Set(['REJECTED', 'DUPLICATE', 'RESOLVED', 'CLOSED', 'CANCELLED']);
 const preVerificationStatuses = new Set(['SUBMITTED', 'VERIFYING']);

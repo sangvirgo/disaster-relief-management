@@ -7,7 +7,7 @@ import { AddEvidenceUploadIpQuota1710000000002 } from './database/migrations/Add
 import { RequestIntakeModule } from './requests/request-intake.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { EvidenceModule } from './evidence/evidence.module';
-import { RequestOperationsModule } from './operations/operations.module';
+import { RequestOperationsModule } from './operations/request-operations.module';
 
 @Module({
   imports: [

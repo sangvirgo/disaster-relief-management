@@ -8,8 +8,8 @@ import {
   AuthorityReferralDto, ContactAttemptDto, ConcurRequestDto, CorrectRegionDto, DuplicateRequestDto,
   RejectRequestDto, RequestQueueQueryDto, RequestOperationPageDto, RequestVersionDto,
   SupplementReviewDto, TriageRequestDto, VerifyRequestDto,
-} from './operations.dto';
-import { RequestOperationsService } from './operations.service';
+} from './request-operations.dto';
+import { RequestOperationsService } from './request-operations.service';
 
 type OperationRequest = Request & { idempotencyKey?: string };
 

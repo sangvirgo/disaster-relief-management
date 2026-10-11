@@ -12,7 +12,7 @@ import {
   AuthorityReferralDto, ContactAttemptDto, ConcurRequestDto, CorrectRegionDto, DuplicateRequestDto,
   RejectRequestDto, RequestQueueQueryDto, RequestOperationPageDto, RequestVersionDto,
   SupplementReviewDto, TriageRequestDto, VerifyRequestDto,
-} from './operations.dto';
+} from './request-operations.dto';
 import { asObject, blockedCanonicalStatuses, checkVersion, cleanText, filtersHash, grantCovers, hasOrganizationPermission, loadOperationsConfig, openDangerStatuses, parseBbox, relatedRequestIds, restrictEventPayload, scopeSql, terminalStatuses, toIso, unverifiedStatuses, uuidPattern } from './request-operations.helpers';
 import type { OperationRequestRow, QueueRow, RequestEventRow, RequestOperationsConfig, ValidatedSourceRefs } from './request-operations.types';
 export type { RequestOperationsConfig } from './request-operations.types';
