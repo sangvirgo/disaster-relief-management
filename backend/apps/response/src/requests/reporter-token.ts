@@ -91,7 +91,7 @@ function validDoubleSubmitCsrf(request: Request, config: ReporterTokenConfig, va
   return expected.length === received.length && timingSafeEqual(expected, received);
 }
 
-export function reporterUserId(request: Request, config: ReporterTokenConfig): string | null {
+function requestAccessToken(request: Request, config: ReporterTokenConfig): string | null {
   const authorization = headerValue(request.headers.authorization);
   const cookieHeader = headerValue(request.headers.cookie);
   if (authorization && cookieHeader) throw new AppError('FORBIDDEN', { status: 403 });
@@ -100,12 +100,31 @@ export function reporterUserId(request: Request, config: ReporterTokenConfig): s
     if (headerValue(request.headers.origin)) throw new AppError('FORBIDDEN', { status: 403 });
     const bearer = authorization.match(/^Bearer ([A-Za-z0-9_.-]+)$/i)?.[1];
     if (!bearer) throw new AppError('UNAUTHENTICATED', { status: 401 });
-    return verifyReporterAccessToken(bearer, config).sub;
+    return bearer;
   }
 
   if (!cookieHeader) return null;
   const values = cookies(cookieHeader);
-  if (!validDoubleSubmitCsrf(request, config, values)) throw new AppError('CSRF_INVALID', { status: 403 });
-  const token = values.get('c48_access');
-  return token ? verifyReporterAccessToken(token, config).sub : null;
+  const origin = headerValue(request.headers.origin);
+  const safeMethod = ['GET', 'HEAD', 'OPTIONS'].includes(request.method);
+  if (safeMethod && origin && !config.webOrigins.has(origin)) throw new AppError('FORBIDDEN', { status: 403 });
+  if (!safeMethod && !validDoubleSubmitCsrf(request, config, values)) {
+    throw new AppError('CSRF_INVALID', { status: 403 });
+  }
+  return values.get('c48_access') ?? null;
+}
+
+export function reporterAccessClaims(request: Request, config: ReporterTokenConfig): ReporterAccessTokenClaims | null {
+  const token = requestAccessToken(request, config);
+  return token ? verifyReporterAccessToken(token, config) : null;
+}
+
+export function requiredReporterAccessClaims(request: Request, config: ReporterTokenConfig): ReporterAccessTokenClaims {
+  const claims = reporterAccessClaims(request, config);
+  if (!claims) throw new AppError('UNAUTHENTICATED', { status: 401 });
+  return claims;
+}
+
+export function reporterUserId(request: Request, config: ReporterTokenConfig): string | null {
+  return reporterAccessClaims(request, config)?.sub ?? null;
 }

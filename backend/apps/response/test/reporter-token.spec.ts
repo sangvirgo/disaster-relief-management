@@ -1,5 +1,7 @@
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { loadReporterTokenConfig, verifyReporterAccessToken } from '../src/requests/reporter-token';
+import type { Request } from 'express';
+import { AppError } from '../../../packages/technical/src/errors';
+import { loadReporterTokenConfig, reporterAccessClaims, verifyReporterAccessToken } from '../src/requests/reporter-token';
 
 const pair = generateKeyPairSync('rsa', { modulusLength: 3072 });
 const config = loadReporterTokenConfig({
@@ -29,6 +31,50 @@ function accessToken(overrides: Record<string, unknown> = {}): string {
 describe('Response optional reporter token verification', () => {
   it('validates a signed Identity access token without querying a session store', () => {
     expect(verifyReporterAccessToken(accessToken(), config).sub).toBe('00000000-0000-4000-8000-000000000001');
+  });
+
+  it('accepts cookie-authenticated safe reads without a CSRF token', () => {
+    const request = { method: 'GET', headers: { cookie: `c48_access=${accessToken()}` } } as Request;
+    expect(reporterAccessClaims(request, config)?.sub).toBe('00000000-0000-4000-8000-000000000001');
+  });
+
+  it('rejects a disallowed Origin on cookie reads', () => {
+    const request = {
+      method: 'GET',
+      headers: { cookie: `c48_access=${accessToken()}`, origin: 'https://attacker.test' },
+    } as Request;
+    try {
+      reporterAccessClaims(request, config);
+      throw new Error('expected Origin rejection');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe('FORBIDDEN');
+    }
+  });
+
+  it('still requires an allowed Origin and matching CSRF token for cookie writes', () => {
+    const token = accessToken();
+    const request = {
+      method: 'POST',
+      headers: { cookie: `c48_access=${token}`, origin: 'https://c48.test' },
+    } as Request;
+    try {
+      reporterAccessClaims(request, config);
+      throw new Error('expected CSRF rejection');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe('CSRF_INVALID');
+    }
+    const csrf = 'csrf-proof';
+    const validRequest = {
+      method: 'POST',
+      headers: {
+        cookie: `c48_access=${token}; c48_pre=pre-session; c48_csrf=${csrf}`,
+        origin: 'https://c48.test',
+        'x-csrf-token': csrf,
+      },
+    } as Request;
+    expect(reporterAccessClaims(validRequest, config)?.sub).toBe('00000000-0000-4000-8000-000000000001');
   });
 
   it('rejects expired and wrong-audience tokens', () => {

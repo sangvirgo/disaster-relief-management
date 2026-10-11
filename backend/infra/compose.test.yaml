@@ -96,6 +96,12 @@ services:
       PORT: "3001"
       DATABASE_URL: postgresql://identity_app_login:test-only@postgres:5432/c48_identity
       DB_POOL_MAX: "2"
+      JWT_ISSUER: https://c48.test
+      JWT_AUDIENCE: c48-test
+      JWT_PRIVATE_KEY: ${RESPONSE_TEST_JWT_PRIVATE_KEY:-}
+      WEB_ALLOWED_ORIGINS: http://localhost,https://c48.test
+      RESPONSE_SERVICE_CLIENT_ID: c48-response-test
+      RESPONSE_SERVICE_CLIENT_SECRET: c48-test-response-secret-not-for-deployment-0001
     command: ["node", "dist/apps/identity/src/main.js"]
     depends_on:
       postgres:
@@ -110,7 +116,7 @@ services:
 
   response-api:
     image: c48-test/response:local
-    environment:
+    environment: &response-test-environment
       NODE_ENV: test
       PORT: "3002"
       DATABASE_URL: postgresql://response_app_login:test-only@postgres:5432/c48_response
@@ -120,6 +126,17 @@ services:
       JWT_PUBLIC_KEY_FILE: /run/secrets/response-test-public.pem
       WEB_ALLOWED_ORIGINS: https://c48.test
       SECRET_HASH_PEPPER_SOS: c48-test-sos-pepper-not-for-deployment-0001
+      RESPONSE_SERVICE_CLIENT_ID: c48-response-test
+      RESPONSE_SERVICE_CLIENT_SECRET: c48-test-response-secret-not-for-deployment-0001
+      IDENTITY_BASE_URL: http://identity-api:3001
+      INTROSPECT_TIMEOUT_MS: "500"
+      S3_ENDPOINT: http://memory-storage.test
+      S3_PUBLIC_ENDPOINT: http://memory-storage.test
+      S3_BUCKET: c48-response-evidence
+      S3_ACCESS_KEY: test-access-key
+      S3_SECRET_KEY: test-secret-key-not-for-deployment
+      SIGNED_URL_TTL_S: "60"
+      SCHEDULER_ENABLED: "false"
       DEMO_INTAKE_ORGANIZATION_ID: 40000000-0000-4000-8000-000000000004
       SOS_SOFT_LIMIT_PER_IP: "2"
       SOS_GLOBAL_PER_MIN: "4"
@@ -131,6 +148,49 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    profiles: [test]
+    networks: [c48-test]
+
+  response-t5-api:
+    image: c48-test/response:local
+    environment:
+      <<: *response-test-environment
+      PORT: "3005"
+      SOS_SOFT_LIMIT_PER_IP: "1000"
+      SOS_GLOBAL_PER_MIN: "1000"
+      SCHEDULER_ENABLED: "true"
+    command: ["node", "dist/apps/response/src/main.js"]
+    volumes:
+      - ../test/fixtures/response-test-public.pem:/run/secrets/response-test-public.pem:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3005/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    profiles: [test]
+    networks: [c48-test]
+
+  response-storage-down-api:
+    image: c48-test/response:local
+    environment:
+      <<: *response-test-environment
+      PORT: "3004"
+      TEST_S3_FAIL: "true"
+      IDENTITY_BASE_URL: http://127.0.0.1:1
+    command: ["node", "dist/apps/response/src/main.js"]
+    volumes:
+      - ../test/fixtures/response-test-public.pem:/run/secrets/response-test-public.pem:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3004/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 2s
       timeout: 2s
       retries: 20
@@ -231,6 +291,25 @@ services:
     command: ["node", "scripts/test-response-intake.mjs"]
     depends_on:
       nginx:
+        condition: service_healthy
+    profiles: [test]
+    networks: [c48-test]
+
+  response-t5-test:
+    image: c48-test/response:local
+    environment:
+      TEST_RESPONSE_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_response
+      TEST_IDENTITY_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_identity
+      TEST_RESPONSE_BASE_URL: http://response-t5-api:3005/api/v1/response
+      TEST_RESPONSE_FAIL_BASE_URL: http://response-storage-down-api:3004/api/v1/response
+      TEST_IDENTITY_BASE_URL: http://identity-api:3001/api/v1/identity
+    command: ["node", "scripts/test-response-t5.mjs"]
+    depends_on:
+      response-t5-api:
+        condition: service_healthy
+      response-storage-down-api:
+        condition: service_healthy
+      identity-api:
         condition: service_healthy
     profiles: [test]
     networks: [c48-test]

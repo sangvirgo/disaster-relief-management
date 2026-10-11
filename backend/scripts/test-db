@@ -3,6 +3,8 @@ set -euo pipefail
 source "$(dirname -- "$0")/lib.sh"
 C48_TEST_PROJECT="c48-test-$$"
 export C48_TEST_PROJECT
+RESPONSE_TEST_JWT_PRIVATE_KEY="$(base64 -w0 "$ROOT/backend/test/fixtures/response-test-private.pem")"
+export RESPONSE_TEST_JWT_PRIVATE_KEY
 cleanup() {
   test_compose down --volumes --remove-orphans >/dev/null 2>&1 || true
 }
@@ -33,4 +35,7 @@ test_compose run --rm identity-admin-test
 test_compose up -d --wait --wait-timeout 60 identity-api response-api logistics-api nginx
 test_compose stop identity-api
 test_compose run --rm --no-deps response-intake-test
+test_compose up -d --wait --wait-timeout 60 identity-api
+test_compose up -d --wait --wait-timeout 60 response-t5-api response-storage-down-api
+test_compose run --rm --no-deps response-t5-test
 echo "Backend database checks passed."

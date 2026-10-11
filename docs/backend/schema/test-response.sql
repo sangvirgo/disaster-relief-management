@@ -15,6 +15,12 @@ BEGIN
     RAISE NOTICE 'PASS % [% %]', label, st, cn;
   END;
 END $$;
+SELECT assert_that('guest upload quota hash/index exist',
+  EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='evidence_metadata' AND column_name='upload_source_ip_hash') AND
+  to_regclass('public.evidence_upload_ip_created_idx') IS NOT NULL);
+SELECT assert_that('failed evidence cleanup is retryable',
+  EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='evidence_metadata' AND column_name='cleanup_completed_at') AND
+  to_regclass('public.evidence_cleanup_pending_idx') IS NOT NULL);
 
 INSERT INTO region_boundary VALUES ('R1', ST_Multi(ST_GeomFromText('POLYGON((106 10,107 10,107 11,106 11,106 10))',4326)));
 SELECT expect_fail('invalid (bowtie) region polygon', $$INSERT INTO region_boundary VALUES ('BAD', ST_Multi(ST_GeomFromText('POLYGON((0 0,1 1,1 0,0 1,0 0))',4326)))$$);

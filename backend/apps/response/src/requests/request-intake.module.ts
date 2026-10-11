@@ -10,5 +10,6 @@ import { loadRequestIntakeConfig, REQUEST_INTAKE_CONFIG, RequestIntakeService } 
     IdempotencyService,
     RequestIntakeService,
   ],
+  exports: [REQUEST_INTAKE_CONFIG, IdempotencyService],
 })
 export class RequestIntakeModule {}

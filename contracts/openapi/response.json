@@ -53,6 +53,237 @@
           "500": { "$ref": "#/components/responses/Error" }
         }
       }
+    },
+    "/requests/track": {
+      "get": {
+        "operationId": "trackSelfRequest",
+        "summary": "Read the reporter-visible request projection",
+        "security": [{}, { "NativeBearer": [] }, { "WebAccessCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/TrackingCodeHeader" },
+          { "$ref": "#/components/parameters/TrackingSecret" }
+        ],
+        "responses": {
+          "200": { "description": "Request status and newest reporter-visible events.", "headers": { "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReporterTracking" } } } },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "500": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/requests/{id}/events": {
+      "get": {
+        "operationId": "listReporterEvents",
+        "summary": "List reporter-visible request events",
+        "security": [{}, { "NativeBearer": [] }, { "WebAccessCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/RequestId" },
+          { "$ref": "#/components/parameters/TrackingCodeHeader" },
+          { "$ref": "#/components/parameters/TrackingSecret" },
+          { "$ref": "#/components/parameters/Cursor" },
+          { "$ref": "#/components/parameters/PageLimit" }
+        ],
+        "responses": {
+          "200": { "description": "Newest events first; cursor is bound to this request.", "headers": { "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReporterEventPage" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "500": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/requests/mine": {
+      "get": {
+        "operationId": "listMyRequests",
+        "summary": "List requests owned by the active reporter account",
+        "security": [{ "NativeBearer": [] }, { "WebAccessCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Cursor" },
+          { "$ref": "#/components/parameters/PageLimit" }
+        ],
+        "responses": {
+          "200": { "description": "The caller's own requests, newest first.", "headers": { "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MyRequestPage" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "500": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/requests/{id}/supplements": {
+      "post": {
+        "operationId": "supplementSelfRequest",
+        "summary": "Append reporter-supplied facts",
+        "security": [{}, { "NativeBearer": [] }, { "WebAccessCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/RequestId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" },
+          { "$ref": "#/components/parameters/TrackingCodeHeader" },
+          { "$ref": "#/components/parameters/TrackingSecret" },
+          { "$ref": "#/components/parameters/CsrfToken" }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RequestSupplement" } } } },
+        "responses": {
+          "201": { "description": "Supplement accepted; verified facts remain unchanged pending scoped review.", "headers": { "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" }, "Idempotent-Replay": { "$ref": "#/components/headers/IdempotentReplay" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReporterMutationResult" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "500": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/requests/claim": {
+      "post": {
+        "operationId": "claimSelfRequest",
+        "summary": "Bind a guest request to the active reporter account",
+        "security": [{ "NativeBearer": [] }, { "WebAccessCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" },
+          { "$ref": "#/components/parameters/RequiredTrackingSecret" },
+          { "$ref": "#/components/parameters/CsrfToken" }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TrackingCodeBody" } } } },
+        "responses": {
+          "200": { "description": "Request linked once; its guest capability is cleared.", "headers": { "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" }, "Idempotent-Replay": { "$ref": "#/components/headers/IdempotentReplay" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReporterMutationResult" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "500": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/requests/{id}/tracking-secret/revoke": {
+      "post": {
+        "operationId": "revokeRequestTrackingSecret",
+        "summary": "Revoke the guest tracking capability",
+        "security": [{ "NativeBearer": [] }, { "WebAccessCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/RequestId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" },
+          { "$ref": "#/components/parameters/CsrfToken" }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExpectedVersion" } } } },
+        "responses": {
+          "200": { "description": "The capability was revoked; proof is still required for claim or recovery.", "headers": { "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" }, "Idempotent-Replay": { "$ref": "#/components/headers/IdempotentReplay" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SecretRevoked" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "500": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/requests/{id}/recovery": {
+      "post": {
+        "operationId": "issueRequestRecoveryCode",
+        "summary": "Issue a one-time reporter recovery code",
+        "description": "Requires REQUEST_VERIFY in scope and an independently recorded successful reporter contact. The plaintext code is returned once; an idempotent replay returns issuance metadata only.",
+        "security": [{ "NativeBearer": [] }, { "WebAccessCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/RequestId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" },
+          { "$ref": "#/components/parameters/CsrfToken" }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecoveryIssue" } } } },
+        "responses": {
+          "201": { "description": "One-time plaintext recovery code and expiry.", "headers": { "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" }, "Idempotent-Replay": { "$ref": "#/components/headers/IdempotentReplay" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecoveryIssued" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "500": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/requests/recover": {
+      "post": {
+        "operationId": "redeemRequestRecoveryCode",
+        "summary": "Redeem a one-time recovery code",
+        "security": [{ "NativeBearer": [] }, { "WebAccessCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" },
+          { "$ref": "#/components/parameters/RecoveryCode" },
+          { "$ref": "#/components/parameters/CsrfToken" }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TrackingCodeBody" } } } },
+        "responses": {
+          "200": { "description": "Request linked to the active reporter; the recovery code and old capability are consumed.", "headers": { "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" }, "Idempotent-Replay": { "$ref": "#/components/headers/IdempotentReplay" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReporterMutationResult" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "500": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/requests/{id}/evidence": {
+      "post": {
+        "operationId": "uploadRequestEvidence",
+        "summary": "Attach one validated evidence file to a request",
+        "description": "Requires Content-Length. Accepts JPEG/PNG up to 10 MiB or an MP4 container up to 50 MiB. Storage failure leaves the request unchanged.",
+        "security": [{}, { "NativeBearer": [] }, { "WebAccessCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/RequestId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" },
+          { "$ref": "#/components/parameters/TrackingCodeHeader" },
+          { "$ref": "#/components/parameters/TrackingSecret" },
+          { "$ref": "#/components/parameters/ContentLength" },
+          { "$ref": "#/components/parameters/CsrfToken" }
+        ],
+        "requestBody": { "required": true, "content": { "multipart/form-data": { "schema": { "type": "object", "required": ["file"], "properties": { "file": { "type": "string", "format": "binary" } }, "additionalProperties": false } } } },
+        "responses": {
+          "201": { "description": "Evidence stored and ready.", "headers": { "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" }, "Idempotent-Replay": { "$ref": "#/components/headers/IdempotentReplay" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Evidence" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "411": { "$ref": "#/components/responses/Error" },
+          "413": { "$ref": "#/components/responses/Error" },
+          "415": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/Error" },
+          "500": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/evidence/{id}/download": {
+      "get": {
+        "operationId": "getRequestEvidenceDownloadUrl",
+        "summary": "Get a short-lived evidence download URL",
+        "security": [{}, { "NativeBearer": [] }, { "WebAccessCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/EvidenceId" },
+          { "$ref": "#/components/parameters/TrackingCodeHeader" },
+          { "$ref": "#/components/parameters/TrackingSecret" }
+        ],
+        "responses": {
+          "200": { "description": "Signed URL expires within 60 seconds; bucket stays private.", "headers": { "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EvidenceDownload" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "500": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
     }
   },
   "components": {
@@ -73,6 +304,57 @@
         "required": false,
         "description": "Required for a guest. It is purpose-bound hashed at rest and never returned.",
         "schema": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" }
+      },
+      "RequiredTrackingSecret": {
+        "name": "X-Tracking-Secret",
+        "in": "header",
+        "required": true,
+        "description": "Required proof for claiming a guest request; never sent as Authorization.",
+        "schema": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" }
+      },
+      "TrackingCodeHeader": {
+        "name": "X-Tracking-Code",
+        "in": "header",
+        "required": true,
+        "description": "Never place the tracking code in a URL.",
+        "schema": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{10,16}$" }
+      },
+      "RecoveryCode": {
+        "name": "X-Recovery-Code",
+        "in": "header",
+        "required": true,
+        "description": "Purpose-bound, one-time recovery proof; never logged or returned after issuance.",
+        "schema": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" }
+      },
+      "ContentLength": {
+        "name": "Content-Length",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "integer", "minimum": 1, "maximum": 57671680 }
+      },
+      "RequestId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "EvidenceId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "maxLength": 2000 }
+      },
+      "PageLimit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
       },
       "CsrfToken": {
         "name": "X-CSRF-Token",
@@ -173,6 +455,137 @@
           "received_at": { "type": "string", "format": "date-time" },
           "review_lane": { "type": "string", "enum": ["NORMAL", "RATE_LIMITED_REVIEW"] }
         },
+        "additionalProperties": false
+      },
+      "TrackingCodeBody": {
+        "type": "object",
+        "required": ["tracking_code"],
+        "properties": { "tracking_code": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{10,16}$" } },
+        "additionalProperties": false
+      },
+      "ExpectedVersion": {
+        "type": "object",
+        "required": ["expected_version"],
+        "properties": { "expected_version": { "type": "integer", "minimum": 1 } },
+        "additionalProperties": false
+      },
+      "RequestSupplement": {
+        "type": "object",
+        "required": ["expected_version"],
+        "properties": {
+          "expected_version": { "type": "integer", "minimum": 1 },
+          "description": { "type": "string", "maxLength": 2000 },
+          "household_reference_note": { "type": "string", "maxLength": 500 },
+          "people_affected": { "type": ["integer", "null"], "minimum": 1, "maximum": 10000 },
+          "location": { "$ref": "#/components/schemas/RequestLocation" },
+          "reporter_declared_danger": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "ReporterEvent": {
+        "type": "object",
+        "required": ["event_type", "occurred_at", "public_text_code"],
+        "properties": {
+          "event_type": { "type": "string" },
+          "occurred_at": { "type": "string", "format": "date-time" },
+          "public_text_code": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      "ReporterTracking": {
+        "type": "object",
+        "required": ["id", "tracking_code", "status", "version", "priority_visible", "received_at", "timeline", "more", "can_supplement"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "tracking_code": { "type": "string" },
+          "status": { "type": "string" },
+          "version": { "type": "integer" },
+          "priority_visible": { "const": false },
+          "received_at": { "type": "string", "format": "date-time" },
+          "timeline": { "type": "array", "items": { "$ref": "#/components/schemas/ReporterEvent" } },
+          "more": { "type": "boolean" },
+          "cursor": { "type": "string" },
+          "rejection_reason": { "type": "string" },
+          "duplicate_of_code": { "type": "string" },
+          "can_supplement": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "ReporterEventPage": {
+        "type": "object",
+        "required": ["items", "more"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/ReporterEvent" } },
+          "more": { "type": "boolean" },
+          "cursor": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      "MyRequestPage": {
+        "type": "object",
+        "required": ["items", "more"],
+        "properties": {
+          "items": { "type": "array", "items": { "type": "object", "required": ["id", "tracking_code", "status", "received_at"], "properties": { "id": { "type": "string", "format": "uuid" }, "tracking_code": { "type": "string" }, "status": { "type": "string" }, "received_at": { "type": "string", "format": "date-time" } }, "additionalProperties": false } },
+          "more": { "type": "boolean" },
+          "cursor": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      "ReporterMutationResult": {
+        "type": "object",
+        "required": ["id", "tracking_code"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "tracking_code": { "type": "string" },
+          "status": { "type": "string" },
+          "version": { "type": "integer" }
+        },
+        "additionalProperties": false
+      },
+      "SecretRevoked": {
+        "type": "object",
+        "required": ["id", "tracking_secret_revoked"],
+        "properties": { "id": { "type": "string", "format": "uuid" }, "tracking_secret_revoked": { "const": true } },
+        "additionalProperties": false
+      },
+      "RecoveryIssue": {
+        "type": "object",
+        "required": ["expected_version", "reason", "contact_attempt_id"],
+        "properties": {
+          "expected_version": { "type": "integer", "minimum": 1 },
+          "reason": { "type": "string", "maxLength": 1000 },
+          "contact_attempt_id": { "type": "string", "format": "uuid" },
+          "source_note": { "type": "string", "maxLength": 1000 }
+        },
+        "additionalProperties": false
+      },
+      "RecoveryIssued": {
+        "type": "object",
+        "required": ["issuance_id", "expires_at"],
+        "properties": {
+          "issuance_id": { "type": "string", "format": "uuid" },
+          "recovery_code": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$", "description": "Only present in the original issuance response; omitted by replay." },
+          "expires_at": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
+      "Evidence": {
+        "type": "object",
+        "required": ["id", "state", "size_bytes", "detected_mime", "checksum", "created_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "state": { "const": "READY" },
+          "size_bytes": { "type": "integer", "minimum": 1 },
+          "detected_mime": { "type": "string", "enum": ["image/jpeg", "image/png", "video/mp4"] },
+          "checksum": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "created_at": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
+      "EvidenceDownload": {
+        "type": "object",
+        "required": ["url", "expires_in"],
+        "properties": { "url": { "type": "string", "format": "uri" }, "expires_in": { "const": 60 } },
         "additionalProperties": false
       },
       "ErrorEnvelope": {

@@ -298,6 +298,8 @@ CREATE TABLE evidence_metadata (
   checksum         text,
   uploader_user_id uuid,                                         -- NULL for guest
   created_at       timestamptz NOT NULL DEFAULT now(),
+  upload_source_ip_hash text,                                     -- purpose-bound guest-upload IP hash for hourly byte quota; never raw IP
+  cleanup_completed_at timestamptz,                               -- set only after deleting an object for a FAILED upload
   CONSTRAINT exactly_one_owner CHECK ((request_id IS NULL) <> (mission_id IS NULL)),
   CONSTRAINT ready_complete CHECK (state <> 'READY' OR (size_bytes IS NOT NULL AND detected_mime IS NOT NULL AND checksum IS NOT NULL)),
   CONSTRAINT size_within_declared CHECK (size_bytes IS NULL OR size_bytes <= declared_bytes)
@@ -305,6 +307,8 @@ CREATE TABLE evidence_metadata (
 CREATE INDEX evidence_request_idx ON evidence_metadata (request_id) WHERE request_id IS NOT NULL;
 CREATE INDEX evidence_mission_idx ON evidence_metadata (mission_id) WHERE mission_id IS NOT NULL;
 CREATE INDEX evidence_pending_idx ON evidence_metadata (created_at) WHERE state = 'PENDING';        -- orphan reconciliation
+CREATE INDEX evidence_upload_ip_created_idx ON evidence_metadata (upload_source_ip_hash, created_at) WHERE upload_source_ip_hash IS NOT NULL;
+CREATE INDEX evidence_cleanup_pending_idx ON evidence_metadata (created_at) WHERE state='FAILED' AND cleanup_completed_at IS NULL;
 
 -- ---------- cross-cutting ----------
 CREATE TABLE notice (

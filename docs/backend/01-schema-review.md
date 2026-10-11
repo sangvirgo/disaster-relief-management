@@ -236,6 +236,10 @@ No migration merges unless: the removals above are applied or a written reason k
 | Phone throttle count | 200k | 0.02 ms | Index Only Scan `request_phone_idx` |
 | Keyset page 2 open queue | 200k | 0.04 ms | `request_org_fifo_idx` row comparison as Index Cond |
 | Candidate teams (10 km, available, skills) | 3k teams, 2.9k positions | 4.5 ms | Seq Scan `rescue_team` anti-join active missions, ST_DWithin as filter (no GiST by design) |
+
+### 9.6 T5 evidence-upload quota delta (2026-10-11)
+
+`evidence_metadata.upload_source_ip_hash` stores a purpose-bound HMAC of the current guest upload caller IP (`sos-evidence-source-ip`), never the raw address. `evidence_upload_ip_created_idx (upload_source_ip_hash, created_at)` supports the 200 MiB/hour guest byte budget; accepted media uploads count their declared bytes, including failed object-store writes, so storage retries cannot erase usage. Invalid media rejected during local staging is not charged. Authenticated uploaders leave the field NULL. T5's forward migration adds this column/index; its down migration removes only this T5 delta and preserves the frozen initial schema plus earlier migrations.
 | Heatmap 1 km, 30 days, one region | 10k verified+ requests | 23.7 ms | Bitmap Scan `request_org_region_fifo_idx` + grid aggregate (budget 500 ms) |
 | Duplicate candidates | 200k | 0.16 ms | `request_subject_loc_gix` |
 | Timeline newest 50 | 617 events on one request | 0.03 ms | Index Scan Backward `request_event_req_idx` |

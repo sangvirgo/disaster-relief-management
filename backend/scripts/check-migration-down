@@ -9,7 +9,7 @@ for service in identity response logistics; do
     logistics) user=logistics_migrator ;;
   esac
   down_runs=1
-  [[ "$service" == response ]] && down_runs=2
+  [[ "$service" == response ]] && down_runs=3
   database="c48_"$service"_down"
   test_compose exec -T postgres createdb -U postgres -O "$user" -T "c48_$service" "$database"
   url="postgresql://${user}:test-only@postgres:5432/$database"
@@ -17,6 +17,19 @@ for service in identity response logistics; do
     test_compose run --rm --no-deps -e DATABASE_URL="$url" "$service-migrate" \
       node "dist/apps/$service/src/database/migrate.js" down
     if [[ "$service" == response && "$run" == 0 ]]; then
+      index_count="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
+        -c "SELECT count(*) FROM pg_class WHERE relname='evidence_upload_ip_created_idx'")"
+      column_count="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
+        -c "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='evidence_metadata' AND column_name='upload_source_ip_hash'")"
+      cleanup_index_count="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
+        -c "SELECT count(*) FROM pg_class WHERE relname='evidence_cleanup_pending_idx'")"
+      cleanup_column_count="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
+        -c "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='evidence_metadata' AND column_name='cleanup_completed_at'")"
+      source_count="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
+        -c "SELECT count(*) FROM pg_class WHERE relname='request_source_ip_idx'")"
+      [[ "$index_count" == "0" && "$column_count" == "0" && "$cleanup_index_count" == "0" && "$cleanup_column_count" == "0" && "$source_count" == "1" ]] || { echo "FAIL T5 rollback did not remove only its evidence storage delta" >&2; exit 1; }
+    fi
+    if [[ "$service" == response && "$run" == 1 ]]; then
       index_count="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
         -c "SELECT count(*) FROM pg_class WHERE relname='request_source_ip_idx'")"
       [[ "$index_count" == "0" ]] || { echo "FAIL T4 rollback left request_source_ip_idx in the T3 schema" >&2; exit 1; }
@@ -32,7 +45,7 @@ for service in identity response logistics; do
   applied="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
     -c "SELECT count(*) FROM public.typeorm_migrations")"
   expected=1
-  [[ "$service" == response ]] && expected=2
+  [[ "$service" == response ]] && expected=3
   [[ "$applied" == "$expected" ]] || { echo "FAIL $service expected $expected applied migrations, got $applied" >&2; exit 1; }
   test_compose exec -T postgres dropdb -U postgres "$database"
   echo "PASS $service migration up/down/up"

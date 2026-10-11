@@ -163,6 +163,7 @@ services:
       LOGISTICS_BASE_URL: http://logistics-api:3003
       SECRET_HASH_PEPPER_SOS: '${SECRET_HASH_PEPPER_SOS:?Set SECRET_HASH_PEPPER_SOS in backend/.env}'
       S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: '${S3_PUBLIC_ENDPOINT:?Set S3_PUBLIC_ENDPOINT in backend/.env}'
       S3_BUCKET: c48-response-evidence
       S3_ACCESS_KEY: '${S3_RESPONSE_ACCESS_KEY:?Set S3_RESPONSE_ACCESS_KEY in backend/.env}'
       S3_SECRET_KEY: '${S3_RESPONSE_SECRET_KEY:?Set S3_RESPONSE_SECRET_KEY in backend/.env}'
