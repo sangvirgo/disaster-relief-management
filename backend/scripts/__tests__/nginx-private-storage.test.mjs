@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const nginx = readFileSync(new URL('../infra/nginx/nginx.conf', import.meta.url), 'utf8');
+const nginx = readFileSync(new URL('../../infra/nginx/nginx.conf', import.meta.url), 'utf8');
 const storageProxy = nginx.match(/location ~ \^\/c48-\(response\|logistics\)-evidence\/ \{([\s\S]*?)\n    \}/u)?.[1];
 
 test('presigned object downloads forward only the headers MinIO needs', () => {

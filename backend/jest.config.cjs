@@ -1,4 +1,5 @@
 module.exports = {
+  roots: ['<rootDir>/apps', '<rootDir>/packages'],
   testEnvironment: 'node',
   testRegex: '.*\\.spec\\.ts$',
   extensionsToTreatAsEsm: ['.ts'],
