@@ -368,7 +368,7 @@ try {
   assert.equal(decision.rows[0].reviewer_user_id, coordinator.id);
   assert.equal(decision.rows[0].concurring_user_id, secondCoordinator.id);
 
-  const materialConcurrenceRequest = await createRequest(proxyReporter, 'PROXY', proxyBody([105.3, 15.3]));
+  const materialConcurrenceRequest = await createRequest(concurrenceReporter, 'PROXY', proxyBody([105.3, 15.3]));
   const materialStart = await command(`requests/${materialConcurrenceRequest.id}/start-verification`, coordinator, { expected_version: 1 });
   assert.equal(materialStart.status, 200, JSON.stringify(materialStart.value));
   const materialConcurrence = await command(`requests/${materialConcurrenceRequest.id}/concur`, secondCoordinator, { expected_version: 2, note: 'Đã đối chiếu dữ kiện ban đầu.' });
@@ -376,7 +376,7 @@ try {
   const materialSupplement = await call(responseUrl, `requests/${materialConcurrenceRequest.id}/supplements`, {
     method: 'POST', body: { expected_version: 3, people_affected: 4 },
     headers: {
-      Authorization: `Bearer ${proxyReporter.token}`, 'X-Tracking-Code': materialConcurrenceRequest.tracking_code,
+      Authorization: `Bearer ${concurrenceReporter.token}`, 'X-Tracking-Code': materialConcurrenceRequest.tracking_code,
       'Idempotency-Key': key(),
     },
   });
