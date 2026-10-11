@@ -273,16 +273,23 @@ try {
 
   const unassigned = await createRequest(reporter, 'SELF', selfBody([150, 50]));
   const secondUnassigned = await createRequest(reporter, 'SELF', selfBody([151, 51]));
-  const firstUnassignedPage = await call(responseUrl, 'requests/unassigned?limit=1', { headers: { Authorization: `Bearer ${coordinator.token}` } });
-  assert.equal(firstUnassignedPage.status, 200, JSON.stringify(firstUnassignedPage.value));
-  assert.equal(firstUnassignedPage.value.more, true);
-  const secondUnassignedPage = await call(responseUrl, `requests/unassigned?limit=1&cursor=${encodeURIComponent(firstUnassignedPage.value.cursor)}`, {
-    headers: { Authorization: `Bearer ${coordinator.token}` },
-  });
-  assert.equal(secondUnassignedPage.status, 200, JSON.stringify(secondUnassignedPage.value));
-  assert.notEqual(secondUnassignedPage.value.items[0]?.id, firstUnassignedPage.value.items[0]?.id, 'unassigned cursor advances to a different request');
-  assert.ok([unassigned.id, secondUnassigned.id].includes(firstUnassignedPage.value.items[0]?.id));
-  assert.ok([unassigned.id, secondUnassigned.id].includes(secondUnassignedPage.value.items[0]?.id));
+  const seenUnassignedIds = new Set();
+  let unassignedCursor;
+  while (!seenUnassignedIds.has(unassigned.id) || !seenUnassignedIds.has(secondUnassigned.id)) {
+    const cursorParam = unassignedCursor ? `&cursor=${encodeURIComponent(unassignedCursor)}` : '';
+    const unassignedPage = await call(responseUrl, `requests/unassigned?limit=1${cursorParam}`, {
+      headers: { Authorization: `Bearer ${coordinator.token}` },
+    });
+    assert.equal(unassignedPage.status, 200, JSON.stringify(unassignedPage.value));
+    const id = unassignedPage.value.items[0]?.id;
+    assert.ok(id);
+    assert.ok(!seenUnassignedIds.has(id), 'unassigned cursor advances to a different request');
+    seenUnassignedIds.add(id);
+    if (seenUnassignedIds.has(unassigned.id) && seenUnassignedIds.has(secondUnassigned.id)) break;
+    assert.equal(unassignedPage.value.more, true, 'both T7 fixtures appear before the unassigned queue ends');
+    assert.ok(unassignedPage.value.cursor);
+    unassignedCursor = unassignedPage.value.cursor;
+  }
   const unassignedQueue = await call(responseUrl, 'requests/unassigned?limit=20', { headers: { Authorization: `Bearer ${coordinator.token}` } });
   assert.equal(unassignedQueue.status, 200, JSON.stringify(unassignedQueue.value));
   assert.ok(unassignedQueue.value.items.some((item) => item.id === unassigned.id));
