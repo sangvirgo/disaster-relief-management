@@ -140,6 +140,8 @@ services:
       DEMO_INTAKE_ORGANIZATION_ID: 40000000-0000-4000-8000-000000000004
       SOS_SOFT_LIMIT_PER_IP: "2"
       SOS_GLOBAL_PER_MIN: "4"
+      PROXY_OPEN_CAP: "3"
+      PROXY_DAILY_SOFT_LIMIT: "10"
     command: ["node", "dist/apps/response/src/main.js"]
     volumes:
       - ../test/fixtures/response-test-public.pem:/run/secrets/response-test-public.pem:ro
@@ -161,6 +163,8 @@ services:
       PORT: "3005"
       SOS_SOFT_LIMIT_PER_IP: "1000"
       SOS_GLOBAL_PER_MIN: "1000"
+      PROXY_OPEN_CAP: "3"
+      PROXY_DAILY_SOFT_LIMIT: "10"
       SCHEDULER_ENABLED: "true"
     command: ["node", "dist/apps/response/src/main.js"]
     volumes:
@@ -308,6 +312,22 @@ services:
       response-t5-api:
         condition: service_healthy
       response-storage-down-api:
+        condition: service_healthy
+      identity-api:
+        condition: service_healthy
+    profiles: [test]
+    networks: [c48-test]
+
+  response-t6-test:
+    image: c48-test/response:local
+    environment:
+      TEST_RESPONSE_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_response
+      TEST_IDENTITY_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_identity
+      TEST_RESPONSE_BASE_URL: http://response-t5-api:3005/api/v1/response
+      TEST_IDENTITY_BASE_URL: http://identity-api:3001/api/v1/identity
+    command: ["node", "scripts/test-response-t6.mjs"]
+    depends_on:
+      response-t5-api:
         condition: service_healthy
       identity-api:
         condition: service_healthy

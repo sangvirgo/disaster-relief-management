@@ -18,6 +18,8 @@ const intakeConfig: RequestIntakeConfig = {
   peppers: { v1: 'test-pepper-not-for-deployment-0001' },
   globalLimitPerMinute: 300,
   softLimitPerMinute: 30,
+  proxyOpenCap: 3,
+  proxyDailySoftLimit: 10,
 };
 
 function accessToken(): string {

@@ -3,7 +3,7 @@
   "info": {
     "title": "C48 Response API",
     "version": "1.0.0",
-    "description": "Public emergency request intake. Human-readable messages are Vietnamese; clients branch on stable error codes. SELF requests accept guests and optionally authenticated Web or Native callers."
+    "description": "Public emergency request intake. Human-readable messages are Vietnamese; clients branch on stable error codes. SELF requests accept guests and optionally authenticated Web or Native callers; PROXY requests require an active Identity session."
   },
   "servers": [
     { "url": "/api/v1/response" }
@@ -51,6 +51,50 @@
           "409": { "$ref": "#/components/responses/Error" },
           "429": { "$ref": "#/components/responses/SosRateCeiling" },
           "500": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/requests/proxy": {
+      "post": {
+        "operationId": "createProxyRequest",
+        "summary": "Create a PROXY assistance request",
+        "description": "Requires a live Identity session and stores the affected household's location and provenance. The affected person needs no account or phone. Open-cap and daily soft-limit excesses are stored in PROXY_QUOTA_REVIEW; staff activity flags are informational only.",
+        "security": [
+          { "NativeBearer": [] },
+          { "WebAccessCookie": [] }
+        ],
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" },
+          { "$ref": "#/components/parameters/CsrfToken" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateProxyRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Proxy report stored. Replays return the original creation representation.",
+            "headers": {
+              "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" },
+              "Idempotent-Replay": { "$ref": "#/components/headers/IdempotentReplay" }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CreatedSelfRequest" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/SosRateCeiling" },
+          "500": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
         }
       }
     },
@@ -445,6 +489,34 @@
         },
         "additionalProperties": false
       },
+      "CreateProxyRequest": {
+        "type": "object",
+        "required": ["incident_category_code", "location", "relationship", "information_source", "last_known_situation_at", "contactability"],
+        "properties": {
+          "incident_category_code": { "type": "string", "pattern": "^[A-Z0-9_]{2,40}$" },
+          "description": { "type": ["string", "null"], "maxLength": 2000 },
+          "people_affected": { "type": ["integer", "null"], "minimum": 1, "maximum": 10000 },
+          "reporter_name": { "type": ["string", "null"], "maxLength": 200 },
+          "reporter_contact_phone": { "type": ["string", "null"], "maxLength": 32 },
+          "reporter_declared_danger": { "type": "boolean", "default": false },
+          "location": { "$ref": "#/components/schemas/RequestLocation" },
+          "relationship": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "beneficiary_contact_phone": { "type": ["string", "null"], "maxLength": 32 },
+          "alternate_contact": {
+            "type": ["object", "null"],
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "phone": { "type": ["string", "null"], "maxLength": 32 }
+            },
+            "additionalProperties": false
+          },
+          "information_source": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "last_known_situation_at": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$", "example": "2026-10-11T08:30:00Z" },
+          "contactability": { "type": "string", "enum": ["REACHABLE", "UNREACHABLE", "UNKNOWN"] }
+        },
+        "additionalProperties": false
+      },
       "CreatedSelfRequest": {
         "type": "object",
         "required": ["id", "tracking_code", "status", "received_at", "review_lane"],
@@ -453,7 +525,7 @@
           "tracking_code": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{10}$" },
           "status": { "const": "SUBMITTED" },
           "received_at": { "type": "string", "format": "date-time" },
-          "review_lane": { "type": "string", "enum": ["NORMAL", "RATE_LIMITED_REVIEW"] }
+          "review_lane": { "type": "string", "enum": ["NORMAL", "RATE_LIMITED_REVIEW", "PROXY_QUOTA_REVIEW"] }
         },
         "additionalProperties": false
       },

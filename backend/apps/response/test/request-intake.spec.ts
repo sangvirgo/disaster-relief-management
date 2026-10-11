@@ -1,7 +1,8 @@
 import { AppError } from '../../../packages/technical/src/errors';
 import { plainToInstance } from 'class-transformer';
-import { RequestLocationDto } from '../src/requests/request-intake.dto';
-import { generateTrackingCode, normalizeReporterPhone, validatePoint } from '../src/requests/request-intake.service';
+import { validate } from 'class-validator';
+import { CreateProxyRequestDto, RequestLocationDto } from '../src/requests/request-intake.dto';
+import { generateTrackingCode, normalizeReporterPhone, validatePoint, validateProxyRequest } from '../src/requests/request-intake.service';
 
 describe('Response SELF intake validation helpers', () => {
   it('generates public Crockford codes with at least 40 random bits', () => {
@@ -31,5 +32,38 @@ describe('Response SELF intake validation helpers', () => {
     const location = { type: 'Point', coordinates: [108, 12], source: 'MANUAL_PIN' };
     expect(Object.hasOwn(plainToInstance(RequestLocationDto, location), 'accuracy_m')).toBe(false);
     expect(Object.hasOwn(plainToInstance(RequestLocationDto, { ...location, accuracy_m: null }), 'accuracy_m')).toBe(true);
+  });
+
+  it('requires proxy provenance while leaving the affected person accountless and contact optional', async () => {
+    const value = {
+      incident_category_code: 'FLOOD',
+      location: { type: 'Point', coordinates: [108, 12], source: 'MANUAL_PIN' },
+      relationship: 'Hàng xóm',
+      information_source: 'Người dân báo tin',
+      last_known_situation_at: '2026-10-11T08:30:00Z',
+      contactability: 'UNKNOWN',
+    };
+    const dto = plainToInstance(CreateProxyRequestDto, value);
+    expect(await validate(dto)).toHaveLength(0);
+    expect(() => validateProxyRequest(dto)).not.toThrow();
+
+    const missing = plainToInstance(CreateProxyRequestDto, { ...value, relationship: undefined, contactability: undefined });
+    const fields = (await validate(missing)).map((error) => error.property);
+    expect(fields).toContain('relationship');
+    expect(fields).toContain('contactability');
+
+    const timezoneMissing = plainToInstance(CreateProxyRequestDto, {
+      ...value,
+      last_known_situation_at: '2026-10-11T08:30:00',
+    });
+    expect((await validate(timezoneMissing)).map((error) => error.property)).toContain('last_known_situation_at');
+    expect(() => validateProxyRequest(timezoneMissing)).toThrow(AppError);
+
+    const impossibleDate = plainToInstance(CreateProxyRequestDto, {
+      ...value,
+      last_known_situation_at: '2026-02-30T08:30:00Z',
+    });
+    expect((await validate(impossibleDate)).map((error) => error.property)).toContain('last_known_situation_at');
+    expect(() => validateProxyRequest(impossibleDate)).toThrow(AppError);
   });
 });

@@ -40,3 +40,31 @@ export class CreateSelfRequestDto {
   @IsObject() @ValidateNested() @Type(() => RequestLocationDto)
   location!: RequestLocationDto;
 }
+
+export class AlternateContactDto {
+  @IsString() @MaxLength(200) @Matches(/\S/u)
+  name!: string;
+
+  @IsOptional() @IsString() @MaxLength(32) @Matches(/^[+0-9 ()-]+$/)
+  phone?: string | null;
+}
+
+export class CreateProxyRequestDto extends CreateSelfRequestDto {
+  @IsString() @MaxLength(100) @Matches(/\S/u)
+  relationship!: string;
+
+  @IsOptional() @IsString() @MaxLength(32) @Matches(/^[+0-9 ()-]+$/)
+  beneficiary_contact_phone?: string | null;
+
+  @IsOptional() @IsObject() @ValidateNested() @Type(() => AlternateContactDto)
+  alternate_contact?: AlternateContactDto | null;
+
+  @IsString() @MaxLength(500) @Matches(/\S/u)
+  information_source!: string;
+
+  @IsDateString({ strict: true, strictSeparator: true }) @Matches(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/)
+  last_known_situation_at!: string;
+
+  @IsString() @IsIn(['REACHABLE', 'UNREACHABLE', 'UNKNOWN'])
+  contactability!: 'REACHABLE' | 'UNREACHABLE' | 'UNKNOWN';
+}

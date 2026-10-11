@@ -38,4 +38,5 @@ test_compose run --rm --no-deps response-intake-test
 test_compose up -d --wait --wait-timeout 60 identity-api
 test_compose up -d --wait --wait-timeout 60 response-t5-api response-storage-down-api
 test_compose run --rm --no-deps response-t5-test
+test_compose run --rm --no-deps response-t6-test
 echo "Backend database checks passed."

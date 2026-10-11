@@ -46,6 +46,17 @@ function body(overrides = {}) {
   };
 }
 
+function proxyBody(overrides = {}) {
+  return {
+    ...body(),
+    relationship: 'Người thân',
+    information_source: 'Người dân báo tin',
+    last_known_situation_at: new Date().toISOString(),
+    contactability: 'UNKNOWN',
+    ...overrides,
+  };
+}
+
 async function post(base, { payload, idempotencyKey = key(), trackingSecret, token, cookie, origin, csrf, forwardedIp, path = 'requests' }) {
   const headers = { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey };
   if (trackingSecret) headers['X-Tracking-Secret'] = trackingSecret;
@@ -75,6 +86,14 @@ async function assertNoIdempotency(idempotencyKey) {
     [idempotencyKey],
   );
   assert.equal(result.rowCount, 0, `unexpected idempotency record for ${idempotencyKey}`);
+}
+
+async function assertNoProxyIdempotency(idempotencyKey) {
+  const result = await db.query(
+    `SELECT 1 FROM idempotency_record WHERE command = 'response.requests.create-proxy' AND idempotency_key = $1`,
+    [idempotencyKey],
+  );
+  assert.equal(result.rowCount, 0, `unexpected proxy idempotency record for ${idempotencyKey}`);
 }
 
 async function main() {
@@ -218,6 +237,20 @@ async function main() {
   assert.equal(third.value.review_lane, 'RATE_LIMITED_REVIEW');
 
   const bearer = accessToken();
+  const unauthenticatedProxyKey = key();
+  const unauthenticatedProxy = await post(baseUrl, {
+    payload: proxyBody(), idempotencyKey: unauthenticatedProxyKey, path: 'requests/proxy',
+  });
+  assertVietnameseError(unauthenticatedProxy, 401, 'UNAUTHENTICATED');
+  await assertNoProxyIdempotency(unauthenticatedProxyKey);
+
+  const identityDownProxyKey = key();
+  const identityDownProxy = await post(baseUrl, {
+    payload: proxyBody(), idempotencyKey: identityDownProxyKey, token: bearer, path: 'requests/proxy',
+  });
+  assertVietnameseError(identityDownProxy, 503, 'IDENTITY_UNAVAILABLE');
+  await assertNoProxyIdempotency(identityDownProxyKey);
+
   const manualBody = body({
     reporter_contact_phone: null,
     location: { type: 'Point', coordinates: [108, 12], source: 'MANUAL_PIN' },
@@ -340,6 +373,17 @@ async function main() {
     assertVietnameseError(alias, 429, 'SOS_RATE_CEILING');
     await assertNoIdempotency(alias.idempotencyKey);
   }
+  let proxyCeiling;
+  for (let attempt = 0; attempt < 8 && !proxyCeiling; attempt++) {
+    const response = await post(proxyBaseUrl, {
+      payload: proxyBody(), path: 'requests/proxy',
+    });
+    if (response.status === 429) proxyCeiling = response;
+    else assertVietnameseError(response, 401, 'UNAUTHENTICATED');
+  }
+  assert.ok(proxyCeiling, 'the PROXY intake path must use the SOS hard per-IP ceiling');
+  assertVietnameseError(proxyCeiling, 429, 'SOS_RATE_CEILING');
+  await assertNoProxyIdempotency(proxyCeiling.idempotencyKey);
   const proxyKeys = await db.query(
     `SELECT count(*)::int AS count FROM idempotency_record WHERE scope_key='response.requests.self'
       AND command='response.requests.create-self' AND created_at >= now() - interval '2 minutes'`,
