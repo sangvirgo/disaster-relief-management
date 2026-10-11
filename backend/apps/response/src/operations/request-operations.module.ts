@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { RequestIntakeModule } from '../requests/request-intake.module';
 import { RequestOperationsController } from './request-operations.controller';
 import { RequestOperationsService, REQUEST_OPERATIONS_CONFIG } from './request-operations.service';
+import { RequestOperationsOverdueSchedulerService } from './request-operations.overdue-scheduler.service';
 
 @Module({
   imports: [RequestIntakeModule],
@@ -9,6 +10,7 @@ import { RequestOperationsService, REQUEST_OPERATIONS_CONFIG } from './request-o
   providers: [
     { provide: REQUEST_OPERATIONS_CONFIG, useFactory: () => RequestOperationsService.config() },
     RequestOperationsService,
+    RequestOperationsOverdueSchedulerService,
   ],
   exports: [RequestOperationsService],
 })
