@@ -78,6 +78,12 @@ async function createAppTeam(coordinatorToken, leaderUserId) {
   });
 }
 
+async function setPosition(teamId, token, body) {
+  return call(responseUrl, `teams/${teamId}/position`, {
+    method: 'PUT', body, headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 await Promise.all([responseDb.connect(), identityDb.connect()]);
 try {
   await identityDb.query(
@@ -203,6 +209,112 @@ try {
     `SELECT user_id,member_role,left_at FROM team_member WHERE team_id=$1`, [appTeam.value.id],
   );
   assert.deepEqual(appLeader.rows, [{ user_id: reporter.id, member_role: 'LEADER', left_at: null }]);
+
+  const leaderNote = 'Vị trí do trưởng đội gửi';
+  const leaderPositionBody = {
+    location: { type: 'Point', coordinates: [104.5, 14.5], source: 'GPS' },
+    accuracy_m: 6.5, captured_at: new Date().toISOString(), note: leaderNote,
+  };
+  const leaderPosition = await setPosition(appTeam.value.id, reporter.token, leaderPositionBody);
+  assert.equal(leaderPosition.status, 204, JSON.stringify(leaderPosition.value));
+  assert.equal(leaderPosition.headers.get('cache-control'), 'no-store');
+  const storedLeaderPosition = await responseDb.query(
+    `SELECT ST_X(location::geometry) AS longitude,ST_Y(location::geometry) AS latitude,
+            accuracy_m,source,captured_at,set_by_user_id
+       FROM team_position WHERE team_id=$1`, [appTeam.value.id],
+  );
+  assert.equal(storedLeaderPosition.rows.length, 1);
+  assert.equal(Number(storedLeaderPosition.rows[0].longitude), 104.5);
+  assert.equal(Number(storedLeaderPosition.rows[0].latitude), 14.5);
+  assert.equal(Number(storedLeaderPosition.rows[0].accuracy_m), 6.5);
+  assert.equal(storedLeaderPosition.rows[0].source, 'GPS');
+  assert.equal(storedLeaderPosition.rows[0].set_by_user_id, reporter.id);
+  const leaderPositionAudit = await responseDb.query(
+    `SELECT after_state FROM audit_log
+      WHERE entity_type='rescue_team' AND entity_id=$1 AND action='TEAM_POSITION_SET'`, [appTeam.value.id],
+  );
+  assert.equal(leaderPositionAudit.rows.length, 1);
+  assert.equal(leaderPositionAudit.rows[0].after_state.note, leaderNote);
+
+  const leaderCannotReportForCoordinator = await setPosition(appTeam.value.id, reporter.token, {
+    ...leaderPositionBody,
+    location: { ...leaderPositionBody.location, source: 'COORDINATOR_REPORTED' },
+  });
+  assertVietnameseError(leaderCannotReportForCoordinator, 403, 'FORBIDDEN');
+
+  const beforeSuppressedPosition = storedLeaderPosition.rows[0];
+  const suppressedPosition = await setPosition(appTeam.value.id, reporter.token, {
+    location: { type: 'Point', coordinates: [104.5, 14.5], source: 'MANUAL_PIN' },
+    captured_at: new Date().toISOString(), note: 'Không ghi lần cập nhật quá gần',
+  });
+  assert.equal(suppressedPosition.status, 204, JSON.stringify(suppressedPosition.value));
+  const afterSuppressedPosition = await responseDb.query(
+    `SELECT ST_X(location::geometry) AS longitude,ST_Y(location::geometry) AS latitude,
+            accuracy_m,source,captured_at,set_by_user_id
+       FROM team_position WHERE team_id=$1`, [appTeam.value.id],
+  );
+  assert.deepEqual(afterSuppressedPosition.rows[0], beforeSuppressedPosition, 'suppressed position must not write');
+  const auditAfterSuppression = await responseDb.query(
+    `SELECT count(*)::int AS count FROM audit_log
+      WHERE entity_type='rescue_team' AND entity_id=$1 AND action='TEAM_POSITION_SET'`, [appTeam.value.id],
+  );
+  assert.equal(auditAfterSuppression.rows[0].count, 1, 'suppressed position must not audit');
+
+  await responseDb.query(
+    `UPDATE team_position SET captured_at=clock_timestamp() - interval '16 seconds' WHERE team_id=$1`, [appTeam.value.id],
+  );
+  const movedPosition = await setPosition(appTeam.value.id, reporter.token, {
+    location: { type: 'Point', coordinates: [104.51, 14.5], source: 'MANUAL_PIN' },
+    captured_at: new Date().toISOString(), note: 'Trưởng đội cập nhật vị trí',
+  });
+  assert.equal(movedPosition.status, 204, JSON.stringify(movedPosition.value));
+  const storedMovedPosition = await responseDb.query(
+    `SELECT ST_X(location::geometry) AS longitude,ST_Y(location::geometry) AS latitude,
+            accuracy_m,source,set_by_user_id
+       FROM team_position WHERE team_id=$1`, [appTeam.value.id],
+  );
+  assert.equal(Number(storedMovedPosition.rows[0].longitude), 104.51);
+  assert.equal(Number(storedMovedPosition.rows[0].latitude), 14.5);
+  assert.equal(storedMovedPosition.rows[0].accuracy_m, null);
+  assert.equal(storedMovedPosition.rows[0].source, 'MANUAL_PIN');
+  assert.equal(storedMovedPosition.rows[0].set_by_user_id, reporter.id);
+  const leaderPositionAuditAfterMove = await responseDb.query(
+    `SELECT after_state FROM audit_log
+      WHERE entity_type='rescue_team' AND entity_id=$1 AND action='TEAM_POSITION_SET' ORDER BY id`, [appTeam.value.id],
+  );
+  assert.equal(leaderPositionAuditAfterMove.rows.length, 2, 'source change should audit');
+  assert.equal(leaderPositionAuditAfterMove.rows[1].after_state.note, 'Trưởng đội cập nhật vị trí');
+
+  const coordinatorPositionBody = {
+    location: { type: 'Point', coordinates: [105.5, 15.5], source: 'COORDINATOR_REPORTED' },
+    captured_at: new Date().toISOString(), note: 'Điều phối viên xác nhận vị trí',
+  };
+  assertVietnameseError(
+    await setPosition(created.value.id, otherRegionCoordinator.token, coordinatorPositionBody), 403, 'FORBIDDEN',
+  );
+  const coordinatorCannotSetGps = await setPosition(created.value.id, coordinator.token, {
+    ...coordinatorPositionBody,
+    location: { ...coordinatorPositionBody.location, source: 'GPS' },
+  });
+  assertVietnameseError(coordinatorCannotSetGps, 403, 'FORBIDDEN');
+  const coordinatorPosition = await setPosition(created.value.id, coordinator.token, coordinatorPositionBody);
+  assert.equal(coordinatorPosition.status, 204, JSON.stringify(coordinatorPosition.value));
+  const storedCoordinatorPosition = await responseDb.query(
+    `SELECT ST_X(location::geometry) AS longitude,ST_Y(location::geometry) AS latitude,
+            accuracy_m,source,set_by_user_id
+       FROM team_position WHERE team_id=$1`, [created.value.id],
+  );
+  assert.equal(Number(storedCoordinatorPosition.rows[0].longitude), 105.5);
+  assert.equal(Number(storedCoordinatorPosition.rows[0].latitude), 15.5);
+  assert.equal(storedCoordinatorPosition.rows[0].accuracy_m, null);
+  assert.equal(storedCoordinatorPosition.rows[0].source, 'COORDINATOR_REPORTED');
+  assert.equal(storedCoordinatorPosition.rows[0].set_by_user_id, coordinator.id);
+  const coordinatorPositionAudit = await responseDb.query(
+    `SELECT after_state FROM audit_log
+      WHERE entity_type='rescue_team' AND entity_id=$1 AND action='TEAM_POSITION_SET'`, [created.value.id],
+  );
+  assert.equal(coordinatorPositionAudit.rows.length, 1);
+  assert.equal(coordinatorPositionAudit.rows[0].after_state.note, coordinatorPositionBody.note);
 
   const systemVolunteer = await registerAndLogin('system-volunteer');
   await identityDb.query('INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)', [systemVolunteer.id, organizationId]);

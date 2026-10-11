@@ -1,10 +1,10 @@
 import {
-  Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UseInterceptors,
+  Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, Res, UseInterceptors,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
-import { CreateTeamDto, TeamPageQueryDto, UpdateTeamDto } from './teams.dto';
+import { CreateTeamDto, SetTeamPositionDto, TeamPageQueryDto, UpdateTeamDto } from './teams.dto';
 import { TeamsService } from './teams.service';
 
 type TeamRequest = Request & { idempotencyKey?: string };
@@ -67,5 +67,17 @@ export class TeamsController {
     const result = await this.teams.update(id, dto, key(request), request);
     replayHeader(response, result.replay);
     return result.value;
+  }
+
+  @Put('teams/:id/position')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async setPosition(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Body() dto: SetTeamPositionDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    noStore(response);
+    await this.teams.setPosition(id, dto, request);
   }
 }
