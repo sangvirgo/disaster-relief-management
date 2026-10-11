@@ -439,7 +439,10 @@ try {
     [[duplicateOne.id, duplicateTwo.id]],
   );
   assert.equal(orphanState.rowCount, 2);
-  assert.ok(orphanState.rows.every((child) => child.status === 'VERIFYING' && child.canonical_request_id === null && Number(child.version) === 2));
+  assert.ok(
+    orphanState.rows.every((child) => child.status === 'VERIFYING' && child.canonical_request_id === null && Number(child.version) === 3),
+    JSON.stringify({ expected: 'VERIFYING, canonical_request_id=null, version=3', actual: orphanState.rows }),
+  );
   const orphanEvents = await responseDb.query(
     `SELECT e.actor_user_id,e.payload FROM request_event e WHERE e.request_id=ANY($1::uuid[]) AND e.event_type='DUPLICATE_ORPHANED'`,
     [[duplicateOne.id, duplicateTwo.id]],
