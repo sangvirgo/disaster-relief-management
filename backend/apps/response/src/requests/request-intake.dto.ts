@@ -1,0 +1,42 @@
+import { Type } from 'class-transformer';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Matches, MaxLength, ValidateNested } from 'class-validator';
+
+export class RequestLocationDto {
+  @IsString() @IsIn(['Point'])
+  type!: 'Point';
+
+  @IsArray() @ArrayMinSize(2) @ArrayMaxSize(2) @IsNumber({}, { each: true })
+  coordinates!: [number, number];
+
+  @IsString() @IsIn(['GPS', 'MANUAL_PIN'])
+  source!: 'GPS' | 'MANUAL_PIN';
+
+  @IsOptional() @IsNumber()
+  declare accuracy_m?: number | null;
+
+  @IsOptional() @IsDateString()
+  captured_at?: string | null;
+}
+
+export class CreateSelfRequestDto {
+  @IsString() @Matches(/^[A-Z0-9_]{2,40}$/)
+  incident_category_code!: string;
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  description?: string | null;
+
+  @IsOptional() @IsInt()
+  people_affected?: number | null;
+
+  @IsOptional() @IsString() @MaxLength(200) @Matches(/\S/u)
+  reporter_name?: string | null;
+
+  @IsOptional() @IsString() @MaxLength(32) @Matches(/^[+0-9 ()-]+$/)
+  reporter_contact_phone?: string | null;
+
+  @IsOptional() @IsBoolean()
+  reporter_declared_danger?: boolean;
+
+  @IsObject() @ValidateNested() @Type(() => RequestLocationDto)
+  location!: RequestLocationDto;
+}

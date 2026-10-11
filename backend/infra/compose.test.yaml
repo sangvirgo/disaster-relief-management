@@ -115,7 +115,17 @@ services:
       PORT: "3002"
       DATABASE_URL: postgresql://response_app_login:test-only@postgres:5432/c48_response
       DB_POOL_MAX: "2"
+      JWT_ISSUER: https://c48.test
+      JWT_AUDIENCE: c48-test
+      JWT_PUBLIC_KEY_FILE: /run/secrets/response-test-public.pem
+      WEB_ALLOWED_ORIGINS: https://c48.test
+      SECRET_HASH_PEPPER_SOS: c48-test-sos-pepper-not-for-deployment-0001
+      DEMO_INTAKE_ORGANIZATION_ID: 40000000-0000-4000-8000-000000000004
+      SOS_SOFT_LIMIT_PER_IP: "2"
+      SOS_GLOBAL_PER_MIN: "4"
     command: ["node", "dist/apps/response/src/main.js"]
+    volumes:
+      - ../test/fixtures/response-test-public.pem:/run/secrets/response-test-public.pem:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -143,6 +153,33 @@ services:
       interval: 2s
       timeout: 2s
       retries: 20
+    profiles: [test]
+    networks: [c48-test]
+
+  nginx:
+    image: nginx:1.30.5
+    environment:
+      SOS_SOFT_LIMIT_PER_IP: "2"
+      SOS_HARD_LIMIT_PER_IP: "5"
+      NGINX_ENVSUBST_FILTER: '^SOS_(SOFT_LIMIT_PER_IP|HARD_LIMIT_PER_IP|HARD_BURST_PER_IP)$'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/proxy-common.conf:/etc/nginx/proxy-common.conf:ro
+      - ./nginx/sos-limits-zone.conf.template:/etc/nginx/templates/sos-limits-zone.conf.template:ro
+      - ./nginx/sos-limits-location.conf.template:/etc/nginx/templates/sos-limits-location.conf.template:ro
+      - ./nginx/15-sos-burst.envsh:/docker-entrypoint.d/15-sos-burst.envsh:ro
+    depends_on:
+      identity-api:
+        condition: service_healthy
+      response-api:
+        condition: service_healthy
+      logistics-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
     profiles: [test]
     networks: [c48-test]
 
@@ -178,6 +215,22 @@ services:
     command: ["node", "scripts/test-identity-admin.mjs"]
     depends_on:
       identity-api:
+        condition: service_healthy
+    profiles: [test]
+    networks: [c48-test]
+
+  response-intake-test:
+    image: c48-test/response:local
+    environment:
+      TEST_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_response
+      TEST_RESPONSE_BASE_URL: http://response-api:3002/api/v1/response
+      TEST_RESPONSE_PROXY_BASE_URL: http://nginx/api/v1/response
+      RESPONSE_TEST_PRIVATE_KEY_FILE: /test-fixtures/response-test-private.pem
+    volumes:
+      - ../test/fixtures/response-test-private.pem:/test-fixtures/response-test-private.pem:ro
+    command: ["node", "scripts/test-response-intake.mjs"]
+    depends_on:
+      nginx:
         condition: service_healthy
     profiles: [test]
     networks: [c48-test]

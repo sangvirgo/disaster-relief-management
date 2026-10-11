@@ -8,11 +8,20 @@ for service in identity response logistics; do
     response) user=response_migrator ;;
     logistics) user=logistics_migrator ;;
   esac
+  down_runs=1
+  [[ "$service" == response ]] && down_runs=2
   database="c48_"$service"_down"
   test_compose exec -T postgres createdb -U postgres -O "$user" -T "c48_$service" "$database"
   url="postgresql://${user}:test-only@postgres:5432/$database"
-  test_compose run --rm --no-deps -e DATABASE_URL="$url" "$service-migrate" \
-    node "dist/apps/$service/src/database/migrate.js" down
+  for ((run = 0; run < down_runs; run++)); do
+    test_compose run --rm --no-deps -e DATABASE_URL="$url" "$service-migrate" \
+      node "dist/apps/$service/src/database/migrate.js" down
+    if [[ "$service" == response && "$run" == 0 ]]; then
+      index_count="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
+        -c "SELECT count(*) FROM pg_class WHERE relname='request_source_ip_idx'")"
+      [[ "$index_count" == "0" ]] || { echo "FAIL T4 rollback left request_source_ip_idx in the T3 schema" >&2; exit 1; }
+    fi
+  done
 
   remaining="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
     -c "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','f','S') AND c.relname NOT IN ('typeorm_migrations', 'typeorm_migrations_id_seq') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid='pg_class'::regclass AND d.objid=c.oid AND d.deptype='e')")"
@@ -22,7 +31,9 @@ for service in identity response logistics; do
     node "dist/apps/$service/src/database/migrate.js"
   applied="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
     -c "SELECT count(*) FROM public.typeorm_migrations")"
-  [[ "$applied" == "1" ]] || { echo "FAIL $service migration did not reapply" >&2; exit 1; }
+  expected=1
+  [[ "$service" == response ]] && expected=2
+  [[ "$applied" == "$expected" ]] || { echo "FAIL $service expected $expected applied migrations, got $applied" >&2; exit 1; }
   test_compose exec -T postgres dropdb -U postgres "$database"
   echo "PASS $service migration up/down/up"
 done

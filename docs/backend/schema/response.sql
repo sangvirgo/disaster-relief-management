@@ -101,6 +101,7 @@ CREATE INDEX request_attention_idx ON assistance_request (organization_id, recei
      OR (reporter_declared_danger AND status IN ('VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING'));
 CREATE INDEX request_reporter_idx ON assistance_request (reporter_user_id, received_at DESC, id DESC) WHERE reporter_user_id IS NOT NULL;   -- "my requests" + PROXY open-cap count
 CREATE INDEX request_phone_idx ON assistance_request (reporter_contact_phone, received_at DESC) WHERE reporter_contact_phone IS NOT NULL;                                          -- soft-throttle counting (index-only)
+CREATE INDEX request_source_ip_idx ON assistance_request (source_ip_hash, received_at DESC) WHERE source_ip_hash IS NOT NULL;                  -- per-IP soft-throttle counting
 CREATE INDEX request_canonical_idx ON assistance_request (canonical_request_id) WHERE canonical_request_id IS NOT NULL;                    -- inbound-link guard
 CREATE INDEX request_campaign_idx ON assistance_request (campaign_id, received_at, id) WHERE campaign_id IS NOT NULL;                     -- campaign-scoped grants
 

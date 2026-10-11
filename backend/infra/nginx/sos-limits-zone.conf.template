@@ -1,0 +1,6 @@
+map "$request_method:$uri" $sos_ip_key {
+  default "";
+  ~*^POST:/api/v1/response/requests/?$ $binary_remote_addr;
+}
+
+limit_req_zone $sos_ip_key zone=sos_per_ip:10m rate=${SOS_SOFT_LIMIT_PER_IP}r/m;

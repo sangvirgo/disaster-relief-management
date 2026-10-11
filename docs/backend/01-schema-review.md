@@ -125,7 +125,7 @@ Introspection single-flight + circuit breaker and no synchronous call cycles (00
 |---|---|
 | Introspection cache of 5 s (C) | **Deferred.** It contradicts plan §10.3 ("no positive cache", immediate revocation). Single-flight + breaker adopted; add the cache only if k6 shows Identity as the bottleneck and amend plan R-09 and the revocation SLA together. |
 | Move the reporter phone off the hot request row (A) | **Rejected.** The row is a few hundred bytes wider at most; the throttle index needs the phone there. |
-| `throttle_hit` counter table (C) | **Rejected.** Per-IP limits live in Nginx; per-phone uses `request_phone_idx` (index-only, 0.3 ms); a table adds write load on the flood path. |
+| `throttle_hit` counter table (C) | **Rejected.** Soft per-IP/per-phone counts use `request_source_ip_idx` and `request_phone_idx`; Nginx enforces the hard per-IP ceiling. A counter table adds write load on the flood path. |
 | Partition `idempotency_record` / `audit_log` now (B) | **Deferred** until ~1 M rows/day (idempotency) or a retention policy exists (audit). Primary keys would then include `created_at`. |
 | DB trigger "team must keep an active leader" (D) | **Rejected.** Row lock on `rescue_team` plus demote-then-promote and a race test cover it without a deferred trigger. |
 | `CHECK` on lat/lng of `geography` (A) | **Rejected.** PostGIS coerces out-of-range values before a CHECK sees them; validated in the API and by TC-02. |
@@ -190,7 +190,7 @@ Apply with §7 in T0-S. Each row names writer → reader/integrity purpose; a co
 | `fulfillment_cycle.intent_id` removed; `cycle_intent` is the only fence | Seal/freeze/unseal → race fence |
 | Concurrence stores latest material fact event id in the event payload | Concur/verify → staleness check without a version column |
 
-**Index plan (replaces the §7 index paragraph where it differs):** `assistance_request` merges `request_review_lane_idx`, `request_verifying_idx` and the planned SUBMITTED-alert index into one partial index on `(organization_id, received_at, id) WHERE status IN ('SUBMITTED','VERIFYING')`; `request_phone_idx` becomes partial on non-null phone; the foreign-key-only indexes listed in plan §28.4 are dropped; add `(region_code, created_at)` on `fulfillment_cycle` for region reports; delivery work list gets organization first. Each retained index keeps a one-line query justification and an EXPLAIN (ANALYZE, BUFFERS) result with a fixed seed. An index that no endpoint or constraint uses is removed in the same migration.
+**Index plan (replaces the §7 index paragraph where it differs):** `assistance_request` merges `request_review_lane_idx`, `request_verifying_idx` and the planned SUBMITTED-alert index into one partial index on `(organization_id, received_at, id) WHERE status IN ('SUBMITTED','VERIFYING')`; `request_phone_idx` and `request_source_ip_idx` support soft-throttle counts on non-null values; the foreign-key-only indexes listed in plan §28.4 are dropped; add `(region_code, created_at)` on `fulfillment_cycle` for region reports; delivery work list gets organization first. Each retained index keeps a one-line query justification and an EXPLAIN (ANALYZE, BUFFERS) result with a fixed seed. An index that no endpoint or constraint uses is removed in the same migration.
 
 **Column audit order:** produce the table.column → writer → reader → null/default → PII list for all three schemas first; it is the T0-S exit gate together with restricted-role privilege tests and two-session race tests.
 

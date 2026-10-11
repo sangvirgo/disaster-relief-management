@@ -28,6 +28,7 @@ const sessionCookieOptions = {
   sameSite: 'strict' as const,
   path: authPath,
 };
+const csrfCookieOptions = { ...sessionCookieOptions, path: accessPath };
 
 function cachePrivate(response: Response): void {
   response.setHeader('Cache-Control', 'no-store');
@@ -36,8 +37,8 @@ function cachePrivate(response: Response): void {
 function setCsrfCookies(response: Response, config: IdentityAuthConfig): void {
   const preSessionId = randomBytes(32).toString('base64url');
   const token = createCsrfToken(config, preSessionId);
-  response.cookie('c48_pre', preSessionId, { ...sessionCookieOptions, httpOnly: true, maxAge: csrfMaxAgeMs });
-  response.cookie('c48_csrf', token, { ...sessionCookieOptions, httpOnly: false, maxAge: csrfMaxAgeMs });
+  response.cookie('c48_pre', preSessionId, { ...csrfCookieOptions, httpOnly: true, maxAge: csrfMaxAgeMs });
+  response.cookie('c48_csrf', token, { ...csrfCookieOptions, httpOnly: false, maxAge: csrfMaxAgeMs });
   response.setHeader('X-CSRF-Token', token);
 }
 
@@ -59,8 +60,8 @@ function setSessionCookies(response: Response, config: IdentityAuthConfig, acces
 function clearSessionCookies(response: Response): void {
   response.clearCookie('c48_access', { ...sessionCookieOptions, path: accessPath, httpOnly: true });
   response.clearCookie('c48_refresh', { ...sessionCookieOptions, httpOnly: true });
-  response.clearCookie('c48_pre', { ...sessionCookieOptions, httpOnly: true });
-  response.clearCookie('c48_csrf', { ...sessionCookieOptions, httpOnly: false });
+  response.clearCookie('c48_pre', { ...csrfCookieOptions, httpOnly: true });
+  response.clearCookie('c48_csrf', { ...csrfCookieOptions, httpOnly: false });
 }
 
 function requestIp(request: Request): string {

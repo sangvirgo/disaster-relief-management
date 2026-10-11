@@ -100,7 +100,7 @@ try {
   assert.ok(browserCookies.has('c48_pre') && browserCookies.has('c48_csrf'));
   for (const name of ['c48_pre', 'c48_csrf']) {
     const cookie = csrf.setCookies.find((value) => value.startsWith(name + '='));
-    assert.ok(cookie?.includes('Secure') && cookie.includes('SameSite=Strict') && cookie.includes('Path=/api/v1/identity/auth'));
+    assert.ok(cookie?.includes('Secure') && cookie.includes('SameSite=Strict') && cookie.includes('Path=/api/v1'));
   }
   assert.ok(csrf.setCookies.find((value) => value.startsWith('c48_pre='))?.includes('HttpOnly'));
   assert.ok(!csrf.setCookies.find((value) => value.startsWith('c48_csrf='))?.includes('HttpOnly'));

@@ -27,13 +27,14 @@ FROM generate_series(1,200000) i;
 CREATE TEMP TABLE camp AS SELECT id, row_number() OVER (ORDER BY id) AS n FROM campaign;
 
 INSERT INTO assistance_request (id,tracking_code,campaign_id,incident_category_code,report_mode,reporter_user_id,reporter_contact_phone,
-    organization_id,region_code,status,verifying_since,priority,priority_basis,reporter_declared_danger,resolved_at,received_at)
+    source_ip_hash,organization_id,region_code,status,verifying_since,priority,priority_basis,reporter_declared_danger,resolved_at,received_at)
 SELECT s.id, upper(substr(md5(s.i::text),1,12)),
        CASE WHEN s.ucamp < 0.3 THEN (SELECT id FROM camp WHERE n = 1 + (s.i % 20)) END,
        CASE WHEN s.ucat < 0.4 THEN 'FLOOD' WHEN s.ucat < 0.6 THEN 'FIRE' WHEN s.ucat < 0.8 THEN 'MEDICAL' ELSE 'UNKNOWN' END,
        'SELF',
        CASE WHEN s.uuser < 0.5 THEN ('00000000-0000-0000-0000-'||lpad((1 + (s.i % 2000))::text,12,'0'))::uuid END,
        CASE WHEN s.uc < 0.86 THEN '09'||lpad((s.i % 100000000)::text,8,'0') END,
+       CASE WHEN s.i % 100 = 0 THEN 'v1:'||repeat('a',64) END,
        CASE WHEN s.uorg < 0.9 THEN '00000000-0000-0000-0000-0000000000d1'::uuid ELSE '00000000-0000-0000-0000-0000000000d2'::uuid END,
        CASE WHEN s.lon < 106 THEN 'R3' WHEN s.lon < 107 THEN 'R1' WHEN s.lon < 108 THEN 'R2' END,
        st, CASE WHEN st = 'VERIFYING' THEN now() - s.ut*interval '2 days' END,
@@ -41,7 +42,7 @@ SELECT s.id, upper(substr(md5(s.i::text),1,12)),
        CASE WHEN st IN ('TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING','CLOSED') THEN 'COMPLETE' END,
        s.u < 0.02,
        CASE WHEN st = 'CLOSED' THEN now() - s.ut*interval '60 days' END,
-       now() - s.ut*interval '90 days'
+       CASE WHEN s.i % 100 = 0 THEN now() - random()*interval '30 seconds' ELSE now() - s.ut*interval '90 days' END
 FROM seed s
 CROSS JOIN LATERAL (SELECT CASE
    WHEN s.u < 0.10 THEN 'SUBMITTED' WHEN s.u < 0.20 THEN 'VERIFYING'
@@ -105,7 +106,7 @@ SELECT count(*) AS events_on_timeline_request FROM request_event WHERE request_i
 
 -- ---------- queries: stored as text with @token@ placeholders, substituted with quoted literals (so the planner sees constants) ----------
 CREATE TEMP TABLE params (k text PRIMARY KEY, v text);
-INSERT INTO params VALUES ('rid',:'rid'),('oid',:'oid'),('rloc',:'rloc'),('rts',:'rts'),('rcat',:'rcat'),('cid',:'cid'),('uid',:'uid'),('tid',:'tid'),('kts',:'kts'),('kid',:'kid');
+INSERT INTO params VALUES ('rid',:'rid'),('oid',:'oid'),('rloc',:'rloc'),('rts',:'rts'),('rcat',:'rcat'),('cid',:'cid'),('uid',:'uid'),('tid',:'tid'),('kts',:'kts'),('kid',:'kid'),('sourcehash','v1:'||repeat('a',64));
 CREATE TEMP TABLE q (n int PRIMARY KEY, label text, sql text);
 INSERT INTO q VALUES
 (1, 'i   candidate teams (10 km, fresh, AVAILABLE, no active mission, skills superset, band order)', $q$
@@ -152,7 +153,10 @@ SELECT id, received_at FROM assistance_request
 (7, 'vii campaign-scoped queue (open), FIFO 50', $q$
 SELECT id, received_at FROM assistance_request
  WHERE campaign_id = @cid@ AND status NOT IN ('REJECTED','DUPLICATE','CANCELLED','CLOSED')
- ORDER BY received_at, id LIMIT 50 $q$);
+ ORDER BY received_at, id LIMIT 50 $q$),
+(8, 'viii per-IP soft-throttle count by purpose-bound source hash', $q$
+SELECT count(*) FROM assistance_request
+ WHERE source_ip_hash = @sourcehash@ AND received_at >= now() - interval '1 minute' $q$);
 
 CREATE FUNCTION run_explain(do_print boolean) RETURNS SETOF text LANGUAGE plpgsql AS $$
 DECLARE r record; stmt text; p record; line text;

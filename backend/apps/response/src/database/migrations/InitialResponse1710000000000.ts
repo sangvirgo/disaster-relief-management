@@ -3,7 +3,7 @@ import { applySchema, dropSchema } from '../../../../../packages/technical/src';
 
 export class InitialResponse1710000000000 implements MigrationInterface {
   async up(queryRunner: QueryRunner): Promise<void> {
-    await applySchema(queryRunner, 'response');
+    await applySchema(queryRunner, 'response', 'response-initial.sql');
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {

@@ -1,0 +1,201 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "C48 Response API",
+    "version": "1.0.0",
+    "description": "Public emergency request intake. Human-readable messages are Vietnamese; clients branch on stable error codes. SELF requests accept guests and optionally authenticated Web or Native callers."
+  },
+  "servers": [
+    { "url": "/api/v1/response" }
+  ],
+  "paths": {
+    "/requests": {
+      "post": {
+        "operationId": "createSelfRequest",
+        "summary": "Create a SELF assistance request",
+        "description": "A guest must provide X-Tracking-Secret. Cookie-authenticated writes require an allowed Origin and X-CSRF-Token. Soft rate limits retain the report for review; the hard per-IP Nginx ceiling rejects it before persistence.",
+        "security": [
+          {},
+          { "NativeBearer": [] },
+          { "WebAccessCookie": [] }
+        ],
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" },
+          { "$ref": "#/components/parameters/TrackingSecret" },
+          { "$ref": "#/components/parameters/CsrfToken" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateSelfRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Request accepted. Replays return the original creation representation even after its current status changes.",
+            "headers": {
+              "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" },
+              "Idempotent-Replay": { "$ref": "#/components/headers/IdempotentReplay" }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CreatedSelfRequest" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/SosRateCeiling" },
+          "500": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "WebAccessCookie": { "type": "apiKey", "in": "cookie", "name": "c48_access" },
+      "NativeBearer": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "TrackingSecret": {
+        "name": "X-Tracking-Secret",
+        "in": "header",
+        "required": false,
+        "description": "Required for a guest. It is purpose-bound hashed at rest and never returned.",
+        "schema": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" }
+      },
+      "CsrfToken": {
+        "name": "X-CSRF-Token",
+        "in": "header",
+        "required": false,
+        "description": "Required for cookie-authenticated writes.",
+        "schema": { "type": "string" }
+      }
+    },
+    "headers": {
+      "IdempotentReplay": {
+        "description": "Present as true when this response replays the original command result.",
+        "schema": { "type": "string", "enum": ["true"] }
+      },
+      "CacheControlNoStore": {
+        "description": "Prevents storage of the Response API result.",
+        "schema": { "type": "string", "enum": ["no-store"] }
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Vietnamese error message; clients branch on the stable code.",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+        },
+        "headers": {
+          "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" }
+        }
+      },
+      "SosRateCeiling": {
+        "description": "The hard per-IP limit rejected the request before it was persisted.",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/SosRateCeilingError" } }
+        },
+        "headers": {
+          "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" },
+          "Retry-After": { "schema": { "type": "integer", "example": 60 } }
+        }
+      }
+    },
+    "schemas": {
+      "RequestLocation": {
+        "type": "object",
+        "required": ["type", "coordinates", "source"],
+        "properties": {
+          "type": { "const": "Point" },
+          "coordinates": {
+            "type": "array",
+            "prefixItems": [
+              { "type": "number", "minimum": -180, "maximum": 180 },
+              { "type": "number", "minimum": -90, "maximum": 90 }
+            ],
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "source": { "type": "string", "enum": ["GPS", "MANUAL_PIN"] },
+          "accuracy_m": { "type": ["number", "null"], "minimum": 0, "description": "Required with captured_at for GPS; must be omitted for MANUAL_PIN." },
+          "captured_at": { "type": ["string", "null"], "format": "date-time", "description": "Required with accuracy_m for GPS." }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "source": { "const": "GPS" } }, "required": ["source"] },
+            "then": {
+              "required": ["accuracy_m", "captured_at"],
+              "properties": {
+                "accuracy_m": { "type": "number" },
+                "captured_at": { "type": "string", "format": "date-time" }
+              }
+            }
+          },
+          {
+            "if": { "properties": { "source": { "const": "MANUAL_PIN" } }, "required": ["source"] },
+            "then": { "not": { "required": ["accuracy_m"] } }
+          }
+        ]
+      },
+      "CreateSelfRequest": {
+        "type": "object",
+        "required": ["incident_category_code", "location"],
+        "properties": {
+          "incident_category_code": { "type": "string", "pattern": "^[A-Z0-9_]{2,40}$" },
+          "description": { "type": ["string", "null"], "maxLength": 2000 },
+          "people_affected": { "type": ["integer", "null"], "minimum": 1, "maximum": 10000 },
+          "reporter_name": { "type": ["string", "null"], "maxLength": 200 },
+          "reporter_contact_phone": { "type": ["string", "null"], "maxLength": 32 },
+          "reporter_declared_danger": { "type": "boolean", "default": false },
+          "location": { "$ref": "#/components/schemas/RequestLocation" }
+        },
+        "additionalProperties": false
+      },
+      "CreatedSelfRequest": {
+        "type": "object",
+        "required": ["id", "tracking_code", "status", "received_at", "review_lane"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "tracking_code": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{10}$" },
+          "status": { "const": "SUBMITTED" },
+          "received_at": { "type": "string", "format": "date-time" },
+          "review_lane": { "type": "string", "enum": ["NORMAL", "RATE_LIMITED_REVIEW"] }
+        },
+        "additionalProperties": false
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": ["code", "message", "correlation_id"],
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string", "description": "Vietnamese human-readable message." },
+          "correlation_id": { "type": "string" },
+          "field_errors": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+          "details": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": false
+      },
+      "SosRateCeilingError": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ErrorEnvelope" },
+          {
+            "type": "object",
+            "properties": { "code": { "const": "SOS_RATE_CEILING" } }
+          }
+        ]
+      }
+    }
+  }
+}

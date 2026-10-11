@@ -156,6 +156,7 @@ services:
       JWT_ISSUER: '${JWT_ISSUER:?Set JWT_ISSUER in backend/.env}'
       JWT_AUDIENCE: '${JWT_AUDIENCE:?Set JWT_AUDIENCE in backend/.env}'
       JWT_PUBLIC_KEY: '${JWT_PUBLIC_KEY:?Set JWT_PUBLIC_KEY in backend/.env}'
+      WEB_ALLOWED_ORIGINS: '${WEB_ALLOWED_ORIGINS:?Set WEB_ALLOWED_ORIGINS in backend/.env}'
       RESPONSE_SERVICE_CLIENT_ID: '${RESPONSE_SERVICE_CLIENT_ID:?Set RESPONSE_SERVICE_CLIENT_ID in backend/.env}'
       RESPONSE_SERVICE_CLIENT_SECRET: '${RESPONSE_SERVICE_CLIENT_SECRET:?Set RESPONSE_SERVICE_CLIENT_SECRET in backend/.env}'
       IDENTITY_BASE_URL: http://identity-api:3001
@@ -238,11 +239,18 @@ services:
 
   nginx:
     image: nginx:1.30.5
+    environment:
+      SOS_SOFT_LIMIT_PER_IP: '${SOS_SOFT_LIMIT_PER_IP:-30}'
+      SOS_HARD_LIMIT_PER_IP: '${SOS_HARD_LIMIT_PER_IP:-300}'
+      NGINX_ENVSUBST_FILTER: '^SOS_(SOFT_LIMIT_PER_IP|HARD_LIMIT_PER_IP|HARD_BURST_PER_IP)$'
     ports:
       - '${PUBLIC_PORT:-8080}:80'
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/proxy-common.conf:/etc/nginx/proxy-common.conf:ro
+      - ./nginx/sos-limits-zone.conf.template:/etc/nginx/templates/sos-limits-zone.conf.template:ro
+      - ./nginx/sos-limits-location.conf.template:/etc/nginx/templates/sos-limits-location.conf.template:ro
+      - ./nginx/15-sos-burst.envsh:/docker-entrypoint.d/15-sos-burst.envsh:ro
     depends_on:
       identity-api:
         condition: service_healthy

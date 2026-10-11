@@ -4,15 +4,15 @@ import { QueryRunner } from 'typeorm';
 
 export type SchemaService = 'identity' | 'response' | 'logistics';
 
-export async function applySchema(queryRunner: QueryRunner, service: SchemaService): Promise<void> {
+export async function applySchema(queryRunner: QueryRunner, service: SchemaService, filename = service + '.sql'): Promise<void> {
   const candidates = [
     ...(process.env.C48_SCHEMA_DIR ? [resolve(process.env.C48_SCHEMA_DIR)] : []),
     resolve(process.cwd(), 'schema'),
     resolve(process.cwd(), '../docs/backend/schema'),
   ];
-  const path = candidates.map((dir) => join(dir, service + '.sql')).find(existsSync);
+  const path = candidates.map((dir) => join(dir, filename)).find(existsSync);
   if (!path) {
-    throw new Error('Schema SQL for ' + service + ' was not found');
+    throw new Error('Schema SQL file ' + filename + ' was not found');
   }
   await queryRunner.query(readFileSync(path, 'utf8'));
 }

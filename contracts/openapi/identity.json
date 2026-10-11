@@ -17,7 +17,7 @@
         "summary": "Issue browser pre-session and CSRF cookies",
         "responses": {
           "200": {
-            "description": "CSRF token; Set-Cookie issues c48_pre (HttpOnly) and c48_csrf (readable), both Secure, SameSite=Strict, host-only.",
+            "description": "CSRF token; Set-Cookie issues c48_pre (HttpOnly) and c48_csrf (readable), both Secure, SameSite=Strict, host-only, Path=/api/v1 for Web state changes across services.",
             "headers": {
               "X-CSRF-Token": {
                 "$ref": "#/components/headers/CsrfToken"
@@ -98,7 +98,7 @@
       "post": {
         "operationId": "login",
         "summary": "Create a Web or Native session",
-        "description": "WEB requires allowed Origin, pre-session cookies and X-CSRF-Token, returns HttpOnly Secure SameSite=Strict cookies (c48_access Path=/api/v1; c48_refresh Path=/api/v1/identity/auth), and rotates CSRF. NATIVE requires no cookies or Origin and returns tokens in JSON without Set-Cookie.",
+        "description": "WEB requires allowed Origin, pre-session cookies and X-CSRF-Token, returns HttpOnly Secure SameSite=Strict cookies (c48_access, c48_pre and c48_csrf Path=/api/v1; c48_refresh Path=/api/v1/identity/auth), and rotates CSRF. NATIVE requires no cookies or Origin and returns tokens in JSON without Set-Cookie.",
         "requestBody": {
           "required": true,
           "content": {

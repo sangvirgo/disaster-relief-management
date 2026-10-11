@@ -40,7 +40,7 @@ Every error the API can return has one row here. The implementation loads this t
 | `ORGANIZATION_IN_USE` | 409 | Identity | Tổ chức đang được sử dụng nên chưa thể ngừng hoạt động. |
 | **Response — intake / tracking** | | | |
 | `COORDINATES_OUT_OF_RANGE` | 400 | Response | Tọa độ không hợp lệ. |
-| `ACCURACY_REQUIRED` | 400 | Response | Vị trí GPS cần có độ chính xác. |
+| `ACCURACY_REQUIRED` | 400 | Response | Vị trí GPS cần có độ chính xác và thời điểm ghi nhận. |
 | `PEOPLE_AFFECTED_OUT_OF_RANGE` | 400 | Response | Số người cần hỗ trợ không hợp lệ. |
 | `PHONE_INVALID` | 400 | Response | Số điện thoại không hợp lệ. |
 | `CATEGORY_UNKNOWN` | 400 | Response | Loại sự cố không hợp lệ. |

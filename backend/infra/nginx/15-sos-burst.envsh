@@ -1,0 +1,10 @@
+case ${SOS_SOFT_LIMIT_PER_IP:-} in ''|*[!0-9]*) echo 'SOS_SOFT_LIMIT_PER_IP must be a positive integer.' >&2; exit 1 ;; esac
+case ${SOS_HARD_LIMIT_PER_IP:-} in ''|*[!0-9]*) echo 'SOS_HARD_LIMIT_PER_IP must be a positive integer.' >&2; exit 1 ;; esac
+
+if [ "$SOS_SOFT_LIMIT_PER_IP" -lt 1 ] || [ "$SOS_HARD_LIMIT_PER_IP" -le "$SOS_SOFT_LIMIT_PER_IP" ] || [ "$SOS_HARD_LIMIT_PER_IP" -gt 1000000 ]; then
+  echo 'SOS_HARD_LIMIT_PER_IP must be greater than SOS_SOFT_LIMIT_PER_IP and at most 1000000.' >&2
+  exit 1
+fi
+
+SOS_HARD_BURST_PER_IP=$((SOS_HARD_LIMIT_PER_IP - SOS_SOFT_LIMIT_PER_IP))
+export SOS_HARD_BURST_PER_IP

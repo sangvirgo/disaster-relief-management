@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { RequestMethod } from '@nestjs/common';
+import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, loadErrorCatalog, PinoNestLogger, validateEnvironment } from '../../../packages/technical/src';
 import { AppModule } from './app.module';
 
@@ -7,7 +7,9 @@ async function bootstrap(): Promise<void> {
   const config = validateEnvironment(process.env, 'response');
   const logger = new PinoNestLogger(createPinoLogger('response', config.logLevel));
   const app = await NestFactory.create(AppModule, { logger });
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.use(correlationMiddleware());
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   app.useGlobalFilters(new ApiExceptionFilter(loadErrorCatalog(), 'response'));
   app.setGlobalPrefix('api/v1/response', {
     exclude: [

@@ -1,0 +1,1 @@
+limit_req zone=sos_per_ip burst=${SOS_HARD_BURST_PER_IP} nodelay;
