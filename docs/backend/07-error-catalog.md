@@ -58,6 +58,7 @@ Every error the API can return has one row here. The implementation loads this t
 | `REQUEST_NOT_VERIFIED` | 409 | Response | Yêu cầu chưa được xác minh. |
 | `CANONICAL_INVALID` | 409 | Response | Yêu cầu gốc được chọn không hợp lệ. |
 | `CANONICAL_HAS_DUPLICATES` | 409 | Response | Yêu cầu này đang là yêu cầu gốc của các yêu cầu trùng khác. |
+| `DUPLICATE_SET_CHANGED` | 409 | Response | Danh sách yêu cầu trùng đã thay đổi. Vui lòng thử lại. |
 | `RESOLUTION_BLOCKED` | 409 | Response | Chưa thể xác nhận hoàn tất. Vui lòng xử lý các mục còn tồn đọng. |
 | **Response — teams / missions / campaigns** | | | |
 | `TEAM_BUSY` | 409 | Response | Đội đang có nhiệm vụ khác. |

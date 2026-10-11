@@ -94,6 +94,18 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
     return { items };
   }
 
+  async requestCoordinators(organizationId: string): Promise<{ items: Array<Record<string, unknown>> }> {
+    const items = await this.introspectionDataSource.query(
+      `SELECT g.user_id,g.role_code,g.scope_type,g.organization_id,g.region_code,g.campaign_id
+         FROM role_grant g JOIN app_user u ON u.id=g.user_id
+        WHERE g.organization_id=$1 AND g.revoked_at IS NULL AND u.status='ACTIVE'
+          AND (g.role_code='COORDINATOR' OR (g.role_code='OPERATIONS_MANAGER' AND g.scope_type='ORGANIZATION'))
+        ORDER BY g.user_id,g.role_code,g.scope_type,g.region_code,g.campaign_id`,
+      [organizationId],
+    ) as Array<Record<string, unknown>>;
+    return { items };
+  }
+
   async organization(id: string): Promise<{ id: string; organization_kind: string; status: string }> {
     const rows = await this.introspectionDataSource.query(
       'SELECT id, organization_kind, status FROM organization WHERE id = $1', [id],

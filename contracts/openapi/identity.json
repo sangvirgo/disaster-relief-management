@@ -1555,6 +1555,60 @@
         }
       }
     },
+    "/internal/request-coordinators": {
+      "post": {
+        "operationId": "listRequestCoordinatorGrants",
+        "summary": "Resolve active coordinator grants for Response notices and concurrence",
+        "description": "Restricted to a valid Response service token. Returns active users with current COORDINATOR grants and organization-scoped OPERATIONS_MANAGER grants for the supplied organization. Other service clients are forbidden. Response has Cache-Control: no-store.",
+        "tags": [
+          "Internal"
+        ],
+        "security": [
+          {
+            "IdentityServiceBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestCoordinatorQuery"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current active staff grants.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestCoordinatorGrantPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/internal/organizations/{id}": {
       "get": {
         "operationId": "getInternalIdentityOrganization",
@@ -2843,6 +2897,82 @@
             ]
           }
         }
+      },
+      "RequestCoordinatorQuery": {
+        "type": "object",
+        "required": [
+          "organization_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "RequestCoordinatorGrant": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "role_code",
+          "scope_type",
+          "organization_id"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role_code": {
+            "type": "string",
+            "enum": [
+              "COORDINATOR",
+              "OPERATIONS_MANAGER"
+            ]
+          },
+          "scope_type": {
+            "type": "string",
+            "enum": [
+              "ORGANIZATION",
+              "REGION",
+              "CAMPAIGN"
+            ]
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "region_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "campaign_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RequestCoordinatorGrantPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequestCoordinatorGrant"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "CsrfResponse": {
         "type": "object",

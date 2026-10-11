@@ -10,6 +10,145 @@
   ],
   "paths": {
     "/requests": {
+      "get": {
+        "operationId": "listRequestQueue",
+        "summary": "List scoped coordinator requests",
+        "description": "Defaults to the NORMAL lane, except overdue=true without an explicit review_lane includes all lanes. Queue coordinates are rounded to about 100 m and phone numbers are masked.",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "region_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "review_lane",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bbox",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "declared_danger",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "overdue",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List scoped coordinator requests",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestQueuePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
       "post": {
         "operationId": "createSelfRequest",
         "summary": "Create a SELF assistance request",
@@ -51,6 +190,1204 @@
           "409": { "$ref": "#/components/responses/Error" },
           "429": { "$ref": "#/components/responses/SosRateCeiling" },
           "500": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/requests/unassigned": {
+      "get": {
+        "operationId": "listUnassignedRequests",
+        "summary": "List organization-wide requests without a region",
+        "description": "",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List organization-wide requests without a region",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnassignedRequestPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}": {
+      "get": {
+        "operationId": "getStaffRequestDetail",
+        "summary": "Get scoped staff request detail",
+        "description": "Exact coordinates and contacts are returned only after live scoped staff authorization.",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get scoped staff request detail",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffRequestDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}/contact-attempts": {
+      "get": {
+        "operationId": "listRequestContactAttempts",
+        "summary": "List scoped staff contact attempts",
+        "description": "",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List scoped staff contact attempts",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericStaffPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "recordRequestContactAttempt",
+        "summary": "Record a staff contact attempt",
+        "description": "Human staff decision; all messages are Vietnamese. The response is no-store.",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactAttemptRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Record a staff contact attempt",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}/duplicates": {
+      "get": {
+        "operationId": "listRequestDuplicates",
+        "summary": "List scoped child duplicate reports",
+        "description": "",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List scoped child duplicate reports",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericStaffPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}/missions": {
+      "get": {
+        "operationId": "listRequestMissions",
+        "summary": "List active missions for a request",
+        "description": "",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List active missions for a request",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericStaffPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}/duplicate-candidates": {
+      "get": {
+        "operationId": "listDuplicateCandidates",
+        "summary": "Suggest nearby duplicate reports",
+        "description": "Same-category requests within 1 km and 24 hours; suggestions never create links.",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Suggest nearby duplicate reports",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidatePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}/verification-candidates": {
+      "get": {
+        "operationId": "listVerificationCandidates",
+        "summary": "Suggest independent corroborating reports",
+        "description": "Same-category requests within 1 km and 24 hours, independently sourced and in coordinator scope.",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Suggest independent corroborating reports",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidatePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}/start-verification": {
+      "post": {
+        "operationId": "startRequestVerification",
+        "summary": "Start request verification",
+        "description": "Human staff decision; all messages are Vietnamese. The response is no-store.",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestVersion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Start request verification",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}/verify": {
+      "post": {
+        "operationId": "verifyRequest",
+        "summary": "Record a human verification decision",
+        "description": "Human staff decision; all messages are Vietnamese. The response is no-store.",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Record a human verification decision",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}/concur": {
+      "post": {
+        "operationId": "concurRequestVerification",
+        "summary": "Record second-coordinator concurrence",
+        "description": "Human staff decision; all messages are Vietnamese. The response is no-store.",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConcurRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Record second-coordinator concurrence",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}/reject": {
+      "post": {
+        "operationId": "rejectRequest",
+        "summary": "Reject an unverified request",
+        "description": "Human staff decision; all messages are Vietnamese. The response is no-store.",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reject an unverified request",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}/duplicate": {
+      "post": {
+        "operationId": "markRequestDuplicate",
+        "summary": "Link a request to its canonical report",
+        "description": "Human staff decision; all messages are Vietnamese. The response is no-store.",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DuplicateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Link a request to its canonical report",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}/triage": {
+      "post": {
+        "operationId": "triageRequest",
+        "summary": "Set human priority and triage state",
+        "description": "Human staff decision; all messages are Vietnamese. The response is no-store.",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Set human priority and triage state",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}/authority-referrals": {
+      "post": {
+        "operationId": "recordAuthorityReferral",
+        "summary": "Record an authority referral",
+        "description": "Human staff decision; all messages are Vietnamese. The response is no-store.",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthorityReferralRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Record an authority referral",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}/correct-region": {
+      "post": {
+        "operationId": "correctRequestRegion",
+        "summary": "Correct an unassigned request region",
+        "description": "Human staff decision; all messages are Vietnamese. The response is no-store.",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectRegionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Correct an unassigned request region",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests/{id}/supplements/{eventId}/review": {
+      "post": {
+        "operationId": "reviewRequestSupplement",
+        "summary": "Accept or reject reporter-supplemented facts",
+        "description": "A human coordinator records an immutable review snapshot. Acceptance updates approved facts; rejection leaves them unchanged. Both outcomes increment the request version and notify the reporter.",
+        "tags": [
+          "Request operations"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/SupplementEventId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplementReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Review result and snapshot event ID.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -120,24 +1457,76 @@
     "/requests/{id}/events": {
       "get": {
         "operationId": "listReporterEvents",
-        "summary": "List reporter-visible request events",
-        "security": [{}, { "NativeBearer": [] }, { "WebAccessCookie": [] }],
+        "summary": "List reporter or scoped staff request events",
+        "security": [
+          {},
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
         "parameters": [
-          { "$ref": "#/components/parameters/RequestId" },
-          { "$ref": "#/components/parameters/TrackingCodeHeader" },
-          { "$ref": "#/components/parameters/TrackingSecret" },
-          { "$ref": "#/components/parameters/Cursor" },
-          { "$ref": "#/components/parameters/PageLimit" }
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/TrackingCodeHeader"
+          },
+          {
+            "$ref": "#/components/parameters/TrackingSecret"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
         ],
         "responses": {
-          "200": { "description": "Newest events first; cursor is bound to this request.", "headers": { "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReporterEventPage" } } } },
-          "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" },
-          "500": { "$ref": "#/components/responses/Error" },
-          "503": { "$ref": "#/components/responses/Error" }
-        }
+          "200": {
+            "description": "Newest events first; cursor is bound to this request.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ReporterEventPage"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StaffEventPage"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "A valid tracking capability receives only reporter-visible events without Identity; an authenticated staff caller with REQUEST_DETAIL_READ receives the paginated staff timeline. Related request IDs are scope-filtered."
       }
     },
     "/requests/mine": {
@@ -375,6 +1764,15 @@
         "in": "header",
         "required": true,
         "schema": { "type": "integer", "minimum": 1, "maximum": 57671680 }
+      },
+      "SupplementEventId": {
+        "name": "eventId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
       },
       "RequestId": {
         "name": "id",
@@ -658,6 +2056,785 @@
         "type": "object",
         "required": ["url", "expires_in"],
         "properties": { "url": { "type": "string", "format": "uri" }, "expires_in": { "const": 60 } },
+        "additionalProperties": false
+      },
+      "RequestVersion": {
+        "type": "object",
+        "required": [
+          "expected_version"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "RequestQueueItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "tracking_code",
+          "status",
+          "review_lane",
+          "category",
+          "received_at",
+          "declared_danger",
+          "overdue",
+          "approx_location",
+          "staff_flags"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tracking_code": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "priority": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "P1",
+              "P2",
+              "P3",
+              "P4",
+              null
+            ]
+          },
+          "review_lane": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "RATE_LIMITED_REVIEW",
+              "PROXY_QUOTA_REVIEW"
+            ]
+          },
+          "category": {
+            "type": "string"
+          },
+          "people_affected": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "region_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "declared_danger": {
+            "type": "boolean"
+          },
+          "overdue": {
+            "type": "boolean"
+          },
+          "reporter_contact_phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Masked phone only."
+          },
+          "approx_location": {
+            "type": "object",
+            "required": [
+              "longitude",
+              "latitude"
+            ],
+            "properties": {
+              "longitude": {
+                "type": "number"
+              },
+              "latitude": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          },
+          "staff_flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "RequestQueuePage": {
+        "type": "object",
+        "required": [
+          "items",
+          "more",
+          "generated_at"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequestQueueItem"
+            }
+          },
+          "more": {
+            "type": "boolean"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UnassignedRequestPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "more"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "tracking_code",
+                "status",
+                "review_lane",
+                "category",
+                "received_at"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "tracking_code": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "review_lane": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "people_affected": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "received_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "more": {
+            "type": "boolean"
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffRequestDetail": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "version",
+          "reporter",
+          "subject",
+          "timeline",
+          "contact_attempts",
+          "proxy_activity_flags"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "work_cycle": {
+            "type": "integer"
+          },
+          "reporter": {
+            "type": "object",
+            "properties": {
+              "user_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "contact_phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": true
+          },
+          "subject": {
+            "type": "object",
+            "description": "Scoped staff-only exact location and contact details.",
+            "additionalProperties": true
+          },
+          "timeline": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "contact_attempts": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "verification_decision": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          },
+          "proxy_activity_flags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "active_missions": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "canonical": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          },
+          "duplicates": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "StaffEventPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "more"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "event_type",
+                "visibility",
+                "occurred_at"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "event_type": {
+                  "type": "string"
+                },
+                "visibility": {
+                  "const": "STAFF"
+                },
+                "from_status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to_status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "payload": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "additionalProperties": true
+                },
+                "actor_user_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "occurred_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "more": {
+            "type": "boolean"
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ContactAttemptRequest": {
+        "type": "object",
+        "required": [
+          "contact_target",
+          "outcome"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "contact_target": {
+            "type": "string",
+            "enum": [
+              "REPORTER",
+              "BENEFICIARY",
+              "ALTERNATE",
+              "AUTHORITY"
+            ]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "REACHED",
+              "NO_ANSWER",
+              "WRONG_NUMBER",
+              "OTHER"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "VerifyRequest": {
+        "type": "object",
+        "required": [
+          "expected_version",
+          "basis"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "CONTACT_CONFIRMED",
+              "CORROBORATED",
+              "EVIDENCE_REVIEWED",
+              "TWO_COORDINATOR_JUDGMENT"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "source_note": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "concurrence_event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_refs": {
+            "type": "object",
+            "properties": {
+              "contact_attempt_ids": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "evidence_ids": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "request_ids": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "RejectRequest": {
+        "type": "object",
+        "required": [
+          "expected_version",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "reason_kind": {
+            "type": "string",
+            "enum": [
+              "CLEARLY_INVALID",
+              "UNREACHABLE",
+              "OTHER"
+            ]
+          }
+        }
+      },
+      "DuplicateRequest": {
+        "type": "object",
+        "required": [
+          "expected_version",
+          "canonical_request_id",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "canonical_request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "TriageRequest": {
+        "type": "object",
+        "required": [
+          "expected_version",
+          "priority",
+          "priority_basis"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "P1",
+              "P2",
+              "P3",
+              "P4"
+            ]
+          },
+          "priority_basis": {
+            "type": "string",
+            "enum": [
+              "COMPLETE",
+              "INCOMPLETE_INFO"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "ConcurRequest": {
+        "type": "object",
+        "required": [
+          "expected_version",
+          "note"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "AuthorityReferralRequest": {
+        "type": "object",
+        "required": [
+          "referred_body",
+          "note"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "referred_body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "CorrectRegionRequest": {
+        "type": "object",
+        "required": [
+          "expected_version",
+          "region_code",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "region_code": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_]{2,32}$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "SupplementReviewRequest": {
+        "type": "object",
+        "required": [
+          "expected_version",
+          "decision",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "ACCEPT",
+              "REJECT"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "source_note": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "source_refs": {
+            "type": "object",
+            "properties": {
+              "contact_attempt_ids": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "evidence_ids": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "request_ids": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "OperationResult": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": true
+      },
+      "CandidatePage": {
+        "type": "object",
+        "required": [
+          "items",
+          "more"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "category",
+                "received_at",
+                "distance_m"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "tracking_code": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "review_lane": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "received_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "distance_m": {
+                  "type": "number"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "more": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "GenericStaffPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "more"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "more": {
+            "type": "boolean"
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
         "additionalProperties": false
       },
       "ErrorEnvelope": {

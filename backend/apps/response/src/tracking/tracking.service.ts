@@ -5,12 +5,13 @@ import { DataSource, EntityManager } from 'typeorm';
 import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '../../../../packages/technical/src/idempotency';
 import { AppError } from '../../../../packages/technical/src/errors';
 import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/keyset';
-import { hasPermission } from '../../../../packages/technical/src/permissions';
+import { hasPermission, ROLE_PERMISSIONS } from '../../../../packages/technical/src/permissions';
 import { hashPurposeBoundSecret } from '../../../../packages/technical/src/secret-hash';
 import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from '../requests/request-intake.service';
 import { ReporterAccessService, ReporterRequestRow, trackingCodeMatches } from './reporter-access.service';
 import { RecoveryIssueDto, RequestEventsQueryDto, SupplementRequestDto } from './tracking.dto';
+import { RequestOperationsService } from '../operations/operations.service';
 
 const terminalStatuses = new Set(['REJECTED', 'DUPLICATE', 'RESOLVED', 'CLOSED', 'CANCELLED']);
 const preVerificationStatuses = new Set(['SUBMITTED', 'VERIFYING']);
@@ -104,6 +105,7 @@ export class TrackingService {
     private readonly access: ReporterAccessService,
     private readonly sessions: ReporterSessionService,
     @Inject(REQUEST_INTAKE_CONFIG) private readonly config: RequestIntakeConfig,
+    private readonly operations: RequestOperationsService,
   ) {}
 
   async track(
@@ -123,8 +125,24 @@ export class TrackingService {
     query: RequestEventsQueryDto,
     request: import('express').Request,
   ): Promise<{ items: ReporterEventView[]; more: boolean; cursor?: string }> {
-    const session = await this.sessions.optional(request, this.access.validTrackingSecret(trackingSecret));
-    const row = await this.access.forRequest(requestId, trackingCode, trackingSecret, session);
+    if (this.access.validTrackingSecret(trackingSecret)) {
+      const row = await this.access.forRequest(requestId, trackingCode, trackingSecret, null);
+      return this.readEvents(this.dataSource, row.id, query.cursor, query.limit ?? 50);
+    }
+    const session = await this.sessions.optional(request);
+    if (session) {
+      try {
+        const row = await this.access.forRequest(requestId, trackingCode, trackingSecret, session);
+        return this.readEvents(this.dataSource, row.id, query.cursor, query.limit ?? 50);
+      } catch (error) {
+        if (!(error instanceof AppError) || error.code !== 'NOT_FOUND') throw error;
+      }
+      if (!session.grants.some((grant) => (ROLE_PERMISSIONS[grant.role_code] as readonly string[]).includes('REQUEST_DETAIL_READ'))) {
+        throw new AppError('NOT_FOUND', { status: 404 });
+      }
+      return this.operations.events(requestId, query, request, session) as Promise<{ items: ReporterEventView[]; more: boolean; cursor?: string }>;
+    }
+    const row = await this.access.forRequest(requestId, trackingCode, trackingSecret, null);
     return this.readEvents(this.dataSource, row.id, query.cursor, query.limit ?? 50);
   }
 

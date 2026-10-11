@@ -24,7 +24,7 @@ describe('reporter location corrections', () => {
       }),
     };
     const idempotency = { execute: async (_dataSource: unknown, command: { execute: (manager: typeof manager) => Promise<unknown> }) => command.execute(manager) };
-    const service = new TrackingService({} as never, idempotency as never, access as never, { optional: async () => undefined } as never, {} as never);
+    const service = new TrackingService({} as never, idempotency as never, access as never, { optional: async () => undefined } as never, {} as never, {} as never);
 
     await service.supplement(
       '00000000-0000-4000-8000-000000000001',

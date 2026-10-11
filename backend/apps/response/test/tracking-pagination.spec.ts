@@ -17,7 +17,7 @@ function makeService(rows: unknown[]) {
     forRequest: jest.fn().mockResolvedValue({ id: requestId }),
   };
   return {
-    service: new TrackingService(dataSource as never, {} as never, access as never, sessions as never, {} as never),
+    service: new TrackingService(dataSource as never, {} as never, access as never, sessions as never, {} as never, {} as never),
     dataSource,
   };
 }

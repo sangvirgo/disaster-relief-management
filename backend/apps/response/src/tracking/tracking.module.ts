@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { RequestIntakeModule } from '../requests/request-intake.module';
+import { RequestOperationsModule } from '../operations/operations.module';
 import { ReporterAccessService } from './reporter-access.service';
 import { TrackingController } from './tracking.controller';
 import { TrackingService } from './tracking.service';
 
 @Module({
-  imports: [RequestIntakeModule],
+  imports: [RequestIntakeModule, RequestOperationsModule],
   controllers: [TrackingController],
   providers: [
     ReporterAccessService,

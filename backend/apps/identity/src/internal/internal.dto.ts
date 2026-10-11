@@ -31,3 +31,8 @@ export class LookupUsersDto {
   @IsUUID('all', { each: true })
   ids!: string[];
 }
+
+export class RequestCoordinatorQueryDto {
+  @IsUUID('all')
+  organization_id!: string;
+}

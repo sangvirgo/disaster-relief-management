@@ -39,4 +39,9 @@ test_compose up -d --wait --wait-timeout 60 identity-api
 test_compose up -d --wait --wait-timeout 60 response-t5-api response-storage-down-api
 test_compose run --rm --no-deps response-t5-test
 test_compose run --rm --no-deps response-t6-test
+if ! test_compose run --rm --no-deps response-t7-test; then
+  printf 'Response T7 failed; recent API logs follow:\n' >&2
+  test_compose logs --no-color --tail=100 response-t5-api >&2
+  exit 1
+fi
 echo "Backend database checks passed."

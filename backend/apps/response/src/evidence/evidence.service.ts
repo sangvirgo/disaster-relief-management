@@ -121,7 +121,8 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
     let scopeKey = '';
     try {
       staged = await stageEvidenceMultipart(request, declaredBytes);
-      const sourceIpHash = session ? null : hashPurposeBoundSecret(requestIp(request), 'sos-evidence-source-ip', this.intakeConfig.peppers, 'v1');
+      const sourceIpHash = hashPurposeBoundSecret(requestIp(request), 'sos-source-ip', this.intakeConfig.peppers, 'v1');
+      const quotaIpHash = session ? null : sourceIpHash;
       const capabilityHash = hasTrackingCapability ? this.access.trackingSecretHash(trackingSecret!) : undefined;
       scopeKey = `response.evidence.request:${requestId}:${session?.userId ?? 'guest'}`;
       const requestHash = canonicalRequestHash({
@@ -134,10 +135,10 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
         key: idempotencyKey,
         requestHash,
         execute: async (manager) => {
-          if (sourceIpHash) await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [sourceIpHash]);
+          if (quotaIpHash) await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [quotaIpHash]);
           const lockedOwner = await this.access.forRequest(requestId, trackingCode, trackingSecret, session, manager, true);
           if (!uploadEligible(lockedOwner)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
-          await this.reserveQuota(manager, requestId, sourceIpHash, declaredBytes);
+          await this.reserveQuota(manager, requestId, quotaIpHash, declaredBytes);
           evidenceId = randomUUID();
           objectKey = evidenceKey(requestId, evidenceId);
           await manager.query(

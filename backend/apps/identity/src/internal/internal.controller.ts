@@ -1,7 +1,8 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Res, UseGuards } from '@nestjs/common';
-import type { Response } from 'express';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, Res, UseGuards } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { AppError } from '../../../../packages/technical/src/errors';
 import { InternalService } from './internal.service';
-import { IntrospectDto, LookupUsersDto, ServiceTokenDto } from './internal.dto';
+import { IntrospectDto, LookupUsersDto, RequestCoordinatorQueryDto, ServiceTokenDto } from './internal.dto';
 import { AdminRequest, IdentityServiceGuard } from '../admin/admin-security';
 
 function noStore(response: Response): void {
@@ -33,6 +34,19 @@ export class InternalController {
   async lookupUsers(@Body() dto: LookupUsersDto, @Res({ passthrough: true }) response: Response): Promise<Record<string, unknown>> {
     noStore(response);
     return this.internalService.lookupUsers(dto.ids);
+  }
+
+  @Post('request-coordinators')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(IdentityServiceGuard)
+  async requestCoordinators(
+    @Body() dto: RequestCoordinatorQueryDto,
+    @Req() request: Request & { serviceCaller?: string },
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<Record<string, unknown>> {
+    noStore(response);
+    if (request.serviceCaller !== 'response') throw new AppError('FORBIDDEN', { status: 403 });
+    return this.internalService.requestCoordinators(dto.organization_id);
   }
 
   @Get('organizations/:id')
