@@ -67,6 +67,17 @@ async function registerAndLogin(label, regionCode) {
   return { id: userId, token: login.value.access_token };
 }
 
+async function createAppTeam(coordinatorToken, leaderUserId) {
+  return call(responseUrl, 'teams', {
+    method: 'POST',
+    body: {
+      name: `Đội ứng dụng ${randomBytes(4).toString('hex')}`, organization_id: organizationId, operating_region_code: 'T8_REGION',
+      team_kind: 'VOLUNTEER', reporting_mode: 'APP', leader_user_id: leaderUserId, skill_codes: ['T8_A'],
+    },
+    headers: { Authorization: `Bearer ${coordinatorToken}`, 'Idempotency-Key': key() },
+  });
+}
+
 await Promise.all([responseDb.connect(), identityDb.connect()]);
 try {
   await identityDb.query(
@@ -89,6 +100,11 @@ try {
   const reporter = await registerAndLogin('reporter');
   const coordinator = await registerAndLogin('coordinator');
   const otherRegionCoordinator = await registerAndLogin('other', 'T8_OTHER');
+  await identityDb.query(
+    `INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)
+     ON CONFLICT (user_id,organization_id) DO UPDATE SET status='ACTIVE'`,
+    [reporter.id, organizationId],
+  );
   await identityDb.query(
     `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
      VALUES ($1,'VOLUNTEER','ORGANIZATION',$2)`,
@@ -181,31 +197,42 @@ try {
   });
   assertVietnameseError(staleUpdate, 409, 'VERSION_CONFLICT');
 
-  const appTeam = await call(responseUrl, 'teams', {
-    method: 'POST',
-    body: {
-      name: 'Đội tình nguyện có ứng dụng', organization_id: organizationId, operating_region_code: 'T8_REGION',
-      team_kind: 'VOLUNTEER', reporting_mode: 'APP', leader_user_id: reporter.id, skill_codes: ['T8_A'],
-    },
-    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
-  });
+  const appTeam = await createAppTeam(coordinator.token, reporter.id);
   assert.equal(appTeam.status, 201, JSON.stringify(appTeam.value));
   const appLeader = await responseDb.query(
     `SELECT user_id,member_role,left_at FROM team_member WHERE team_id=$1`, [appTeam.value.id],
   );
   assert.deepEqual(appLeader.rows, [{ user_id: reporter.id, member_role: 'LEADER', left_at: null }]);
 
+  const systemVolunteer = await registerAndLogin('system-volunteer');
+  await identityDb.query('INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)', [systemVolunteer.id, organizationId]);
+  await identityDb.query("INSERT INTO role_grant (user_id,role_code,scope_type) VALUES ($1,'VOLUNTEER','SYSTEM')", [systemVolunteer.id]);
+  const systemScopeTeam = await createAppTeam(coordinator.token, systemVolunteer.id);
+  assert.equal(systemScopeTeam.status, 201, JSON.stringify(systemScopeTeam.value));
+
+  const activeNonmember = await registerAndLogin('active-nonmember');
+  await identityDb.query(
+    `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
+     VALUES ($1,'VOLUNTEER','ORGANIZATION',$2)`,
+    [activeNonmember.id, organizationId],
+  );
+  assertVietnameseError(await createAppTeam(coordinator.token, activeNonmember.id), 409, 'LEADER_REQUIRED');
+
   const disabledUser = await registerAndLogin('disabled');
+  await identityDb.query('INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)', [disabledUser.id, organizationId]);
+  await identityDb.query(
+    `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
+     VALUES ($1,'VOLUNTEER','ORGANIZATION',$2)`,
+    [disabledUser.id, organizationId],
+  );
   await identityDb.query("UPDATE app_user SET status='DISABLED' WHERE id=$1", [disabledUser.id]);
-  const disabledLeader = await call(responseUrl, 'teams', {
-    method: 'POST',
-    body: {
-      name: 'Đội không đủ điều kiện', organization_id: organizationId, operating_region_code: 'T8_REGION',
-      team_kind: 'VOLUNTEER', reporting_mode: 'APP', leader_user_id: disabledUser.id, skill_codes: [],
-    },
-    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
-  });
+  const disabledLeader = await createAppTeam(coordinator.token, disabledUser.id);
   assertVietnameseError(disabledLeader, 409, 'TEAM_NOT_ELIGIBLE');
+  assert.equal(disabledLeader.value.details?.reason, 'INACTIVE');
+
+  const activeNonvolunteer = await registerAndLogin('active-nonvolunteer');
+  await identityDb.query('INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)', [activeNonvolunteer.id, organizationId]);
+  assertVietnameseError(await createAppTeam(coordinator.token, activeNonvolunteer.id), 409, 'LEADER_REQUIRED');
 
   const outOfScope = await call(responseUrl, 'teams?region_code=T8_REGION&limit=10', {
     headers: { Authorization: `Bearer ${otherRegionCoordinator.token}` },

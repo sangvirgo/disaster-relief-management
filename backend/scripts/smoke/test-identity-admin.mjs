@@ -310,6 +310,11 @@ try {
   });
   assert.equal(disabled.status, 200, JSON.stringify(disabled.body));
   assert.equal(disabled.body.status, 'DISABLED');
+  const disabledLookup = await call('/internal/users:lookup', {
+    method: 'POST', token: serviceToken.body.access_token, body: { ids: [userId, randomUUID()] },
+  });
+  assert.equal(disabledLookup.status, 200, JSON.stringify(disabledLookup.body));
+  assert.deepEqual(disabledLookup.body.items, [{ id: userId, display_name: 'Nhân viên cứu trợ' }]);
   expectError(await call('/auth/login', {
     method: 'POST', body: { username: userPayload.username, password: temporaryPassword, client_kind: 'NATIVE' },
     headers: { 'X-Forwarded-For': nextIp() },
@@ -352,7 +357,7 @@ try {
   });
   assert.equal(lookedUp.status, 200, JSON.stringify(lookedUp.body));
   assert.deepEqual(lookedUp.body.items, [{
-    id: userId, display_name: 'Nhân viên cứu trợ', status: 'ACTIVE', active_volunteer: false,
+    id: userId, display_name: 'Nhân viên cứu trợ',
   }]);
 
   console.log('PASS Identity admin grants/revocation, last-admin guard, audit, keyset users, and service-only introspection/lookup on PostgreSQL');

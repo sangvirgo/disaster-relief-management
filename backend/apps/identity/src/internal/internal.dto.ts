@@ -32,6 +32,14 @@ export class LookupUsersDto {
   ids!: string[];
 }
 
+export class TeamLeaderEligibilityDto {
+  @IsUUID('all')
+  user_id!: string;
+
+  @IsUUID('all')
+  organization_id!: string;
+}
+
 export class RequestCoordinatorQueryDto {
   @IsUUID('all')
   organization_id!: string;

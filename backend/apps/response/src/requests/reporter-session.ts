@@ -29,11 +29,11 @@ export interface RequestCoordinatorGrant {
   campaign_id: string | null;
 }
 
-export interface IdentityUserLookup {
-  id: string;
-  status: 'ACTIVE' | 'DISABLED';
-  active_volunteer: boolean;
-}
+export type TeamLeaderEligibilityReason = 'USER_NOT_FOUND' | 'USER_INACTIVE' | 'MEMBERSHIP_REQUIRED' | 'VOLUNTEER_GRANT_REQUIRED';
+
+export type TeamLeaderEligibility =
+  | { eligible: true }
+  | { eligible: false; reason: TeamLeaderEligibilityReason };
 
 interface IdentityServiceToken {
   access_token: string;
@@ -128,29 +128,31 @@ export class ReporterSessionService implements OnModuleDestroy {
     return items as RequestCoordinatorGrant[];
   }
 
-  async lookupUsers(ids: string[]): Promise<IdentityUserLookup[]> {
+  async teamLeaderEligibility(userId: string, organizationId: string): Promise<TeamLeaderEligibility> {
     const token = await this.getServiceToken();
     let result;
     try {
-      result = await this.client.post<unknown>('/api/v1/identity/internal/users:lookup', { ids }, {
+      result = await this.client.post<unknown>('/api/v1/identity/internal/team-leader-eligibility', {
+        user_id: userId,
+        organization_id: organizationId,
+      }, {
         headers: { authorization: `Bearer ${token}` },
       });
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw unavailable();
     }
-    if (result.status !== 200 || !result.body || typeof result.body !== 'object' || !Array.isArray((result.body as Record<string, unknown>).items)) {
+    if (result.status !== 200 || !result.body || typeof result.body !== 'object') {
       throw unavailable();
     }
-    const items = (result.body as { items: unknown[] }).items;
-    const valid = items.every((item) => {
-      if (!item || typeof item !== 'object') return false;
-      const value = item as Record<string, unknown>;
-      return typeof value.id === 'string' && uuidPattern.test(value.id) &&
-        (value.status === 'ACTIVE' || value.status === 'DISABLED') && typeof value.active_volunteer === 'boolean';
-    });
-    if (!valid) throw unavailable();
-    return items as IdentityUserLookup[];
+    const value = result.body as Record<string, unknown>;
+    const keys = Object.keys(value).sort().join(',');
+    if (value.eligible === true && keys === 'eligible') return { eligible: true };
+    const reasons: TeamLeaderEligibilityReason[] = ['USER_NOT_FOUND', 'USER_INACTIVE', 'MEMBERSHIP_REQUIRED', 'VOLUNTEER_GRANT_REQUIRED'];
+    if (value.eligible === false && keys === 'eligible,reason' && reasons.includes(value.reason as TeamLeaderEligibilityReason)) {
+      return { eligible: false, reason: value.reason as TeamLeaderEligibilityReason };
+    }
+    throw unavailable();
   }
 
   onModuleDestroy(): void {

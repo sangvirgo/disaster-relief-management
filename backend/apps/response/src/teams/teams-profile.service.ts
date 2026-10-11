@@ -64,7 +64,7 @@ export class TeamsProfileService {
     await this.assertRegion(dto.operating_region_code);
     const skillCodes = [...dto.skill_codes].sort();
     await this.assertSkills(skillCodes);
-    if (dto.leader_user_id) await this.assertEligibleVolunteer(dto.leader_user_id);
+    if (dto.leader_user_id) await this.assertEligibleLeader(dto.leader_user_id, dto.organization_id);
 
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `response.team:create:${session.userId}`,
@@ -167,12 +167,14 @@ export class TeamsProfileService {
     if (rows.length !== codes.length) throw new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: { skill_codes: ['Mã kỹ năng không hợp lệ hoặc không tồn tại.'] } });
   }
 
-  private async assertEligibleVolunteer(userId: string): Promise<void> {
-    const users = await this.sessions.lookupUsers([userId]);
-    const user = users.find((item) => item.id === userId);
-    if (!user) throw new AppError('NOT_FOUND', { status: 404 });
-    if (user.status !== 'ACTIVE') throw new AppError('TEAM_NOT_ELIGIBLE', { status: 409, details: { reason: 'INACTIVE' } });
-    if (!user.active_volunteer) throw new AppError('LEADER_REQUIRED', { status: 409 });
+  private async assertEligibleLeader(userId: string, organizationId: string): Promise<void> {
+    const result = await this.sessions.teamLeaderEligibility(userId, organizationId);
+    if (result.eligible) return;
+    if (result.reason === 'USER_NOT_FOUND') throw new AppError('NOT_FOUND', { status: 404 });
+    if (result.reason === 'USER_INACTIVE') {
+      throw new AppError('TEAM_NOT_ELIGIBLE', { status: 409, details: { reason: 'INACTIVE' } });
+    }
+    throw new AppError('LEADER_REQUIRED', { status: 409 });
   }
 
   private async assertCanManage(team: TeamRow, session: ReporterSession, queryable: Pick<DataSource | EntityManager, 'query'> = this.dataSource): Promise<void> {
