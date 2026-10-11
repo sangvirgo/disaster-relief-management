@@ -37,7 +37,7 @@ services:
     networks: [c48-internal]
 
   identity-migrate:
-    image: c48/identity:local
+    image: c48/identity-api:local
     build:
       context: ../..
       dockerfile: backend/apps/identity/Dockerfile
@@ -57,7 +57,7 @@ services:
     networks: [c48-internal]
 
   response-migrate:
-    image: c48/response:local
+    image: c48/response-api:local
     build:
       context: ../..
       dockerfile: backend/apps/response/Dockerfile
@@ -77,7 +77,7 @@ services:
     networks: [c48-internal]
 
   logistics-migrate:
-    image: c48/logistics:local
+    image: c48/logistics-api:local
     build:
       context: ../..
       dockerfile: backend/apps/logistics/Dockerfile
@@ -97,7 +97,7 @@ services:
     networks: [c48-internal]
 
   identity-api:
-    image: c48/identity:local
+    image: c48/identity-api:local
     build:
       context: ../..
       dockerfile: backend/apps/identity/Dockerfile
@@ -140,7 +140,7 @@ services:
     networks: [c48-internal]
 
   response-api:
-    image: c48/response:local
+    image: c48/response-api:local
     build:
       context: ../..
       dockerfile: backend/apps/response/Dockerfile
@@ -198,7 +198,7 @@ services:
     networks: [c48-internal]
 
   logistics-api:
-    image: c48/logistics:local
+    image: c48/logistics-api:local
     build:
       context: ../..
       dockerfile: backend/apps/logistics/Dockerfile
@@ -322,7 +322,7 @@ services:
     networks: [c48-internal]
 
   seed:
-    image: c48/identity:local
+    image: c48/identity-api:local
     build:
       context: ../..
       dockerfile: backend/apps/identity/Dockerfile

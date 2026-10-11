@@ -42,7 +42,7 @@ services:
     networks: [c48-test]
 
   identity-migrate:
-    image: c48-test/identity:local
+    image: c48/identity-api:test
     build:
       context: ../..
       dockerfile: backend/apps/identity/Dockerfile
@@ -58,7 +58,7 @@ services:
     networks: [c48-test]
 
   response-migrate:
-    image: c48-test/response:local
+    image: c48/response-api:test
     build:
       context: ../..
       dockerfile: backend/apps/response/Dockerfile
@@ -74,7 +74,7 @@ services:
     networks: [c48-test]
 
   logistics-migrate:
-    image: c48-test/logistics:local
+    image: c48/logistics-api:test
     build:
       context: ../..
       dockerfile: backend/apps/logistics/Dockerfile
@@ -90,7 +90,7 @@ services:
     networks: [c48-test]
 
   identity-api:
-    image: c48-test/identity:local
+    image: c48/identity-api:test
     environment:
       NODE_ENV: test
       PORT: "3001"
@@ -115,7 +115,7 @@ services:
     networks: [c48-test]
 
   response-api:
-    image: c48-test/response:local
+    image: c48/response-api:test
     environment: &response-test-environment
       NODE_ENV: test
       PORT: "3002"
@@ -157,7 +157,7 @@ services:
     networks: [c48-test]
 
   response-t5-api:
-    image: c48-test/response:local
+    image: c48/response-api:test
     environment:
       <<: *response-test-environment
       LOG_LEVEL: error
@@ -182,7 +182,7 @@ services:
     networks: [c48-test]
 
   response-storage-down-api:
-    image: c48-test/response:local
+    image: c48/response-api:test
     environment:
       <<: *response-test-environment
       PORT: "3004"
@@ -203,7 +203,7 @@ services:
     networks: [c48-test]
 
   logistics-api:
-    image: c48-test/logistics:local
+    image: c48/logistics-api:test
     environment:
       NODE_ENV: test
       PORT: "3003"
@@ -249,7 +249,7 @@ services:
     networks: [c48-test]
 
   idempotency-test:
-    image: c48-test/identity:local
+    image: c48/identity-api:test
     environment:
       DATABASE_URL: postgresql://identity_app_login:test-only@postgres:5432/c48_identity
     command: ["node", "scripts/smoke/test-idempotency.mjs"]
@@ -257,7 +257,7 @@ services:
     networks: [c48-test]
 
   auth-test:
-    image: c48-test/identity:local
+    image: c48/identity-api:test
     environment:
       NODE_ENV: test
       TEST_DATABASE_URL: postgresql://identity_migrator:test-only@postgres:5432/c48_identity
@@ -271,7 +271,7 @@ services:
     networks: [c48-test]
 
   identity-admin-test:
-    image: c48-test/identity:local
+    image: c48/identity-api:test
     environment:
       TEST_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_identity
       TEST_SERVICE_CLIENT_ID: c48-response-test
@@ -285,7 +285,7 @@ services:
     networks: [c48-test]
 
   response-intake-test:
-    image: c48-test/response:local
+    image: c48/response-api:test
     environment:
       TEST_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_response
       TEST_RESPONSE_BASE_URL: http://response-api:3002/api/v1/response
@@ -301,7 +301,7 @@ services:
     networks: [c48-test]
 
   response-t5-test:
-    image: c48-test/response:local
+    image: c48/response-api:test
     environment:
       TEST_RESPONSE_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_response
       TEST_IDENTITY_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_identity
@@ -320,7 +320,7 @@ services:
     networks: [c48-test]
 
   response-t6-test:
-    image: c48-test/response:local
+    image: c48/response-api:test
     environment:
       TEST_RESPONSE_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_response
       TEST_IDENTITY_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_identity
@@ -336,7 +336,7 @@ services:
     networks: [c48-test]
 
   response-t7-test:
-    image: c48-test/response:local
+    image: c48/response-api:test
     environment:
       TEST_RESPONSE_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_response
       TEST_IDENTITY_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_identity
