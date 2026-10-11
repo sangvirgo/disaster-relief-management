@@ -215,6 +215,13 @@ try {
     location: { type: 'Point', coordinates: [104.5, 14.5], source: 'GPS' },
     accuracy_m: 6.5, captured_at: new Date().toISOString(), note: leaderNote,
   };
+  const outOfRangePosition = await setPosition(appTeam.value.id, reporter.token, {
+    ...leaderPositionBody,
+    location: { ...leaderPositionBody.location, coordinates: [181, 14.5] },
+  });
+  assertVietnameseError(outOfRangePosition, 400, 'VALIDATION_FAILED');
+  assert.equal(outOfRangePosition.value.field_errors['location.coordinates'][0], 'COORDINATES_OUT_OF_RANGE');
+
   const leaderPosition = await setPosition(appTeam.value.id, reporter.token, leaderPositionBody);
   assert.equal(leaderPosition.status, 204, JSON.stringify(leaderPosition.value));
   assert.equal(leaderPosition.headers.get('cache-control'), 'no-store');
