@@ -9,6 +9,8 @@ import { RequestOperationsQueriesService } from './request-operations.queries.se
 import { RequestOperationsCommandRunner } from './request-operations.command-runner.service';
 import { RequestOperationsTriageService } from './request-operations.triage.service';
 import { RequestOperationsDedupReferralService } from './request-operations.dedup-referral.service';
+import { RequestOperationsVerificationService } from './request-operations.verification.service';
+import { RequestOperationsSupplementReviewService } from './request-operations.supplement-review.service';
 
 @Module({
   imports: [RequestIntakeModule],
@@ -22,6 +24,8 @@ import { RequestOperationsDedupReferralService } from './request-operations.dedu
     RequestOperationsCommandRunner,
     RequestOperationsTriageService,
     RequestOperationsDedupReferralService,
+    RequestOperationsVerificationService,
+    RequestOperationsSupplementReviewService,
   ],
   exports: [RequestOperationsService],
 })
