@@ -4,7 +4,7 @@ Read [AGENTS.md](../../AGENTS.md), [project context](../c48-project-context.md),
 
 ## Objective
 
-Continue implementing only the backend microservices in `/home/soang/c48`. T0–T7 implementation phases have separate commits on `main`; the T5 selected-provider acceptance gate is still open pending the AIStor lab artifact, private-access, and restore checks. T7 has a reproduced database-suite failure recorded below; resolve it before proceeding with T8–T19 in dependency order. Commit each completed task separately. AI agent/service work is outside this scope. The API contracts and SQL in `docs/backend/` take precedence for shapes; the main plan governs business behavior.
+Continue implementing only the backend microservices in `/home/soang/c48`. T0–T7 implementation phases have separate commits on `main`; T7 acceptance now passes. The T5 selected-provider acceptance gate remains open pending the AIStor lab artifact, private-access, and restore checks. Proceed with T8–T19 in dependency order and commit each completed task separately. AI agent/service work is outside this scope. The API contracts and SQL in `docs/backend/` take precedence for shapes; the main plan governs business behavior.
 
 ## T3 completed
 
@@ -36,6 +36,14 @@ Response writes quota-excess reports with `PROXY_QUOTA_REVIEW` and adds a staff-
 
 T6 exit evidence: `npm test` passed 18 suites / 56 tests plus 2 Node checks; `npm run build` passed for all three services; `npm run check:compose-env` passed all 12 service allow-lists; `docker compose --profile test -f backend/infra/compose.test.yaml config --quiet` passed; `bash backend/scripts/db/test-db` passed the full schema/migration/race/auth suite and T4/T5/T6 HTTP integration. T6 HTTP checks cover the Nginx hard ceiling on `/requests/proxy`, Identity-down 503, missing/revoked session, source/household region and contact persistence, idempotent replay, fourth open request, eleventh daily request, prior-rejection/multiple-location staff flags, and no status/priority change. The database test stack was removed by its cleanup trap.
 
+## T7 completed: verification, duplicates, priority
+
+T7 acceptance is unblocked. Response operations cover verification start/contact attempts, verification and rejection, duplicate linking and canonical-rejection orphaning, concurrence tied to the latest material fact, corroboration candidates, triage, authority referral, region correction, overdue scanning/notices, and supplement-review gating. T7 keeps human staff responsible for verification, priority, and dispatch.
+
+Two PostgreSQL `42P08` failures came from reusing an untyped UUID parameter inside polymorphic `jsonb_build_object` expressions. The reporter notice and duplicate-orphan coordinator notice now cast only the JSON `request_id` occurrence to `uuid`; SQL bindings, schema, API contracts, and Vietnamese messages are unchanged. Smoke fixtures now page through older FIFO unassigned requests, give the corroboration candidate a distinct test IP, and use a fresh proxy reporter for concurrence supplements so the normal review lane remains available. The duplicate cascade assertion expects version 3 after the child advances from 1 to 2 when linked as DUPLICATE and from 2 to 3 when returned to VERIFYING.
+
+T7 exit evidence: `npx tsc --noEmit` passed; `npm test` passed 18 suites / 56 tests plus 2 Node checks; `npm run build` passed and found all three service entry points and migrations; `bash scripts/db/test-db` passed the full database, migration, race, Identity, Response intake, T5, T6, and T7 suites. T7 reported: “verification, queue, detail, supplement review, rejection threshold, duplicate, priority, and overdue notice integration passed.” PostgreSQL query logging confirmed the two `42P08` statements before the UUID casts. The final T7 orphan rows were `VERIFYING`, had `canonical_request_id = null`, and version 3. No migration, schema, OpenAPI, error-copy, or NestJS module-wiring changes were made.
+
 ## Verification actually run
 
 - T3 verification: `npm run build` passed for Identity, Response, and Logistics; `npm test` passed with 7 suites / 27 tests plus the key-generator test. T3 HTTP coverage includes permission denial, uppercase UUID self-grant rejection, session invalidation, last-admin protection, audit privacy/timestamps, idempotency, keyset reads, membership removal, service-token audience checks, lookup, no-store, and malformed organization UUID validation.
@@ -63,10 +71,10 @@ T6 exit evidence: `npm test` passed 18 suites / 56 tests plus 2 Node checks; `np
 - **E:** `backend/.gitignore` already ignores `dist/`; build artifacts were not committed.
 - **Commits:** A — `51b4f03`, `13d4909`, `fa6a83c`, `18a4c7c`, `3dfb8b0`, `bf4d76b`, `9c1ad73`, `a5900a3`; B — `81a3642`; C — `b3f5975`; D — `70c524a`. The T7 implementation commit is `4613bec`.
 - **Checks:** baseline and final `npm run build` passed; baseline and final `npm test` passed with 18 suites / 56 tests plus 2 Node tests; `npx tsc --noEmit` passed after each structural checkpoint. OpenAPI JSON diff from `4613bec` is empty. Compose environment checks and test Compose validation passed after B.
-- **Known T7 acceptance failure:** `bash backend/scripts/db/test-db` reaches `test-response-t7.mjs` and fails at `start-verification` with SQLSTATE `DATABASE_42P08`. Running the same suite against `4613bec` reproduced the same failure. Keep diagnosis/fix in a separate T7 bugfix; it is outside this structure-only refactor.
+- **T7 acceptance follow-up (resolved):** The original `start-verification` `DATABASE_42P08` failure reproduced on `4613bec`; it was fixed in a separate behavior/test follow-up. Full T7 database acceptance now passes. See the T7 section above.
 - **Docker cleanup:** removed 180 images labeled by `c48-test-*` Compose projects after confirming no C48 test containers remained. Existing `simmes-v3-local` images and containers were left untouched.
 - The user-added `/home/soang/c48/.codegraph/` index remains untracked and must not be staged or removed.
 
-## Next task: resolve T7 acceptance, then T8
+## Next task: T8
 
-Diagnose and fix the reproduced T7 `DATABASE_42P08` failure in a separate bugfix, rerun `bash backend/scripts/db/test-db`, and confirm T7 exit evidence. Then proceed with T8 in [06](06-implementation-tasks.md), following the documented dependency order. Do not mix the T7 behavior fix into the structural-refactor commits.
+Proceed with T8 in [06](06-implementation-tasks.md), following the documented dependency order. Keep the T5 selected-provider acceptance gate tracked separately; its AIStor artifact, private-access, and restore checks remain outstanding.
