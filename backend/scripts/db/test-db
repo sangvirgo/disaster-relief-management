@@ -44,4 +44,5 @@ if ! test_compose run --rm --no-deps response-t7-test; then
   test_compose logs --no-color --tail=100 response-t5-api >&2
   exit 1
 fi
+test_compose run --rm --no-deps response-t8-test
 echo "Backend database checks passed."

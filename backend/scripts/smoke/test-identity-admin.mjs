@@ -351,7 +351,9 @@ try {
     method: 'POST', token: serviceToken.body.access_token, body: { ids: [userId, randomUUID()] },
   });
   assert.equal(lookedUp.status, 200, JSON.stringify(lookedUp.body));
-  assert.deepEqual(lookedUp.body.items, [{ id: userId, display_name: 'Nhân viên cứu trợ' }]);
+  assert.deepEqual(lookedUp.body.items, [{
+    id: userId, display_name: 'Nhân viên cứu trợ', status: 'ACTIVE', active_volunteer: false,
+  }]);
 
   console.log('PASS Identity admin grants/revocation, last-admin guard, audit, keyset users, and service-only introspection/lookup on PostgreSQL');
 } finally {

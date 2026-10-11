@@ -351,6 +351,22 @@ services:
     profiles: [test]
     networks: [c48-test]
 
+  response-t8-test:
+    image: c48/response-api:test
+    environment:
+      TEST_RESPONSE_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_response
+      TEST_IDENTITY_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_identity
+      TEST_RESPONSE_BASE_URL: http://response-t5-api:3005/api/v1/response
+      TEST_IDENTITY_BASE_URL: http://identity-api:3001/api/v1/identity
+    command: ["node", "scripts/smoke/test-response-t8.mjs"]
+    depends_on:
+      response-t5-api:
+        condition: service_healthy
+      identity-api:
+        condition: service_healthy
+    profiles: [test]
+    networks: [c48-test]
+
 networks:
   c48-test:
     driver: bridge

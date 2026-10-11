@@ -29,6 +29,12 @@ export interface RequestCoordinatorGrant {
   campaign_id: string | null;
 }
 
+export interface IdentityUserLookup {
+  id: string;
+  status: 'ACTIVE' | 'DISABLED';
+  active_volunteer: boolean;
+}
+
 interface IdentityServiceToken {
   access_token: string;
   expires_in: number;
@@ -120,6 +126,31 @@ export class ReporterSessionService implements OnModuleDestroy {
     });
     if (!valid) throw unavailable();
     return items as RequestCoordinatorGrant[];
+  }
+
+  async lookupUsers(ids: string[]): Promise<IdentityUserLookup[]> {
+    const token = await this.getServiceToken();
+    let result;
+    try {
+      result = await this.client.post<unknown>('/api/v1/identity/internal/users:lookup', { ids }, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw unavailable();
+    }
+    if (result.status !== 200 || !result.body || typeof result.body !== 'object' || !Array.isArray((result.body as Record<string, unknown>).items)) {
+      throw unavailable();
+    }
+    const items = (result.body as { items: unknown[] }).items;
+    const valid = items.every((item) => {
+      if (!item || typeof item !== 'object') return false;
+      const value = item as Record<string, unknown>;
+      return typeof value.id === 'string' && uuidPattern.test(value.id) &&
+        (value.status === 'ACTIVE' || value.status === 'DISABLED') && typeof value.active_volunteer === 'boolean';
+    });
+    if (!valid) throw unavailable();
+    return items as IdentityUserLookup[];
   }
 
   onModuleDestroy(): void {

@@ -85,12 +85,14 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async lookupUsers(ids: string[]): Promise<{ items: Array<{ id: string; display_name: string }> }> {
+  async lookupUsers(ids: string[]): Promise<{ items: Array<{ id: string; display_name: string; status: 'ACTIVE' | 'DISABLED'; active_volunteer: boolean }> }> {
     this.logger.log(`IDENTITY_USERS_LOOKUP count=${ids.length}`);
     const items = await this.introspectionDataSource.query(
-      'SELECT id, display_name FROM app_user WHERE id = ANY($1::uuid[]) ORDER BY id',
+      `SELECT u.id, u.display_name, u.status,
+              EXISTS (SELECT 1 FROM role_grant g WHERE g.user_id=u.id AND g.role_code='VOLUNTEER' AND g.revoked_at IS NULL) AS active_volunteer
+         FROM app_user u WHERE u.id = ANY($1::uuid[]) ORDER BY u.id`,
       [ids],
-    ) as Array<{ id: string; display_name: string }>;
+    ) as Array<{ id: string; display_name: string; status: 'ACTIVE' | 'DISABLED'; active_volunteer: boolean }>;
     return { items };
   }
 
