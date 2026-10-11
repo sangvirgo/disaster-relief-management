@@ -18,6 +18,8 @@ export type { RequestOperationsConfig } from './request-operations.types';
 
 import { REQUEST_OPERATIONS_CONFIG } from './request-operations.config';
 export { REQUEST_OPERATIONS_CONFIG } from './request-operations.config';
+import { RequestOperationsPersistenceService } from './request-operations.persistence.service';
+import { RequestOperationsQueriesService } from './request-operations.queries.service';
 
 @Injectable()
 export class RequestOperationsService {
@@ -28,242 +30,57 @@ export class RequestOperationsService {
     private readonly idempotency: IdempotencyService,
     private readonly sessions: ReporterSessionService,
     @Inject(REQUEST_OPERATIONS_CONFIG) private readonly config: RequestOperationsConfig,
+    private readonly queries: RequestOperationsQueriesService,
+    private readonly persistence: RequestOperationsPersistenceService,
   ) {}
 
   static config(): RequestOperationsConfig { return loadOperationsConfig(); }
 
   async queue(query: RequestQueueQueryDto, request: Request): Promise<Record<string, unknown>> {
-    const session = await this.sessions.require(request);
-    const limit = query.limit ?? 50;
-    const filters = filtersHash(session.grants, session.userId, query, 'requests');
-    const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
-    const values: unknown[] = [];
-    const scope = scopeSql(session.grants, 'REQUEST_QUEUE_READ', values);
-    const conditions = [scope];
-    const add = (clause: (index: number) => string, value: unknown) => { values.push(value); conditions.push(clause(values.length)); };
-    if (!(query.overdue === 'true' && query.review_lane === undefined)) add((index) => `r.review_lane=$${index}`, query.review_lane ?? 'NORMAL');
-    if (query.status) add((index) => `r.status=$${index}`, query.status);
-    if (query.region_code) add((index) => `r.region_code=$${index}`, query.region_code);
-    if (query.priority) add((index) => `r.priority=$${index}`, query.priority);
-    if (query.category) add((index) => `r.incident_category_code=$${index}`, query.category);
-    if (query.from) add((index) => `r.received_at >= $${index}::timestamptz`, query.from);
-    if (query.to) add((index) => `r.received_at <= $${index}::timestamptz`, query.to);
-    if (query.declared_danger) add((index) => `r.reporter_declared_danger=$${index}`, query.declared_danger === 'true');
-    const bbox = parseBbox(query.bbox);
-    if (bbox) {
-      values.push(...bbox);
-      conditions.push(`ST_Intersects(s.location,ST_MakeEnvelope($${values.length - 3},$${values.length - 2},$${values.length - 1},$${values.length},4326)::geography)`);
-    }
-    const overdue = `((r.status='SUBMITTED' AND r.received_at < clock_timestamp()-($${values.length + 1} * interval '1 minute')) OR (r.status='VERIFYING' AND r.verifying_since < clock_timestamp()-($${values.length + 1} * interval '1 minute')) OR (r.reporter_declared_danger AND r.status IN (${openDangerStatuses})))`;
-    values.push(this.config.overdueMinutes);
-    if (query.overdue === 'true') conditions.push(overdue);
-    if (query.overdue === 'false') conditions.push(`NOT ${overdue}`);
-    values.push(cursor?.sort[0] ?? null, cursor?.id ?? null);
-    conditions.push(`($${values.length - 1}::timestamptz IS NULL OR (r.received_at,r.id)>($${values.length - 1}::timestamptz,$${values.length}::uuid))`);
-    values.push(limit + 1);
-    const rows = await this.dataSource.query(
-      `SELECT r.id,r.tracking_code,r.status,r.priority,r.review_lane,r.incident_category_code AS category,
-              s.people_affected,r.region_code,r.received_at,
-              to_char(r.received_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_received_at,
-              r.reporter_declared_danger AS declared_danger,${overdue} AS overdue,
-              CASE WHEN r.reporter_contact_phone IS NULL THEN NULL ELSE '******'||right(r.reporter_contact_phone,4) END AS reporter_contact_phone,
-              round(ST_X(s.location::geometry)::numeric,3)::float8 AS longitude,
-              round(ST_Y(s.location::geometry)::numeric,3)::float8 AS latitude,
-              coalesce((SELECT e.payload->'flags' FROM request_event e WHERE e.request_id=r.id AND e.event_type='PROXY_ACTIVITY_FLAG' ORDER BY e.occurred_at DESC,e.id DESC LIMIT 1),'[]'::jsonb) AS proxy_activity_flags
-         FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
-        WHERE ${conditions.join(' AND ')}
-        ORDER BY r.received_at ASC,r.id ASC LIMIT $${values.length}`,
-      values,
-    ) as QueueRow[];
-    const more = rows.length > limit;
-    const page = rows.slice(0, limit);
-    const items = page.map((row) => ({
-      id: row.id, tracking_code: row.tracking_code, status: row.status, priority: row.priority,
-      review_lane: row.review_lane, category: row.category, people_affected: row.people_affected,
-      region_code: row.region_code, received_at: toIso(row.received_at), declared_danger: row.declared_danger,
-      overdue: row.overdue, reporter_contact_phone: row.reporter_contact_phone,
-      approx_location: { longitude: Number(row.longitude), latitude: Number(row.latitude) },
-      staff_flags: row.proxy_activity_flags ?? [],
-    }));
-    const next = more && page.length ? page[page.length - 1]! : undefined;
-    return {
-      items, more,
-      ...(next ? { cursor: encodeKeysetCursor([next.cursor_received_at], next.id, filters) } : {}),
-      generated_at: new Date().toISOString(),
-    };
+    return this.queries.queue(query, request);
   }
 
   async unassigned(query: RequestOperationPageDto, request: Request): Promise<Record<string, unknown>> {
-    const session = await this.sessions.require(request);
-    const filters = filtersHash(session.grants, session.userId, query, 'unassigned');
-    const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
-    const values: unknown[] = [];
-    const scope = scopeSql(session.grants, 'REQUEST_UNASSIGNED_QUEUE', values, 'r', true);
-    values.push(cursor?.sort[0] ?? null, cursor?.id ?? null, (query.limit ?? 50) + 1);
-    const rows = await this.dataSource.query(
-      `SELECT r.id,r.tracking_code,r.status,r.review_lane,r.incident_category_code AS category,
-              s.people_affected,r.received_at,to_char(r.received_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_received_at
-         FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
-        WHERE ${scope} AND r.region_code IS NULL AND r.status NOT IN ('REJECTED','DUPLICATE','CANCELLED','CLOSED')
-          AND ($${values.length - 2}::timestamptz IS NULL OR (r.received_at,r.id)>($${values.length - 2}::timestamptz,$${values.length - 1}::uuid))
-        ORDER BY r.received_at,r.id LIMIT $${values.length}`,
-      values,
-    ) as Array<QueueRow>;
-    const limit = query.limit ?? 50;
-    const more = rows.length > limit;
-    const page = rows.slice(0, limit);
-    const next = more && page.length ? page[page.length - 1]! : undefined;
-    return {
-      items: page.map((row) => ({ id: row.id, tracking_code: row.tracking_code, status: row.status, review_lane: row.review_lane, category: row.category, people_affected: row.people_affected, received_at: toIso(row.received_at) })),
-      more, ...(next ? { cursor: encodeKeysetCursor([next.cursor_received_at], next.id, filters) } : {}),
-    };
+    return this.queries.unassigned(query, request);
   }
 
   async detail(requestId: string, request: Request): Promise<Record<string, unknown>> {
-    const session = await this.sessions.require(request);
-    const row = await this.staffRequest(this.dataSource, requestId, session, 'REQUEST_DETAIL_READ');
-    const [subjectRows, eventPage, attempts, decisionRows, missionRows, evidenceRows, canonicalRows, duplicateRows] = await Promise.all([
-      this.dataSource.query(
-        `SELECT people_affected,location_source,location_accuracy_m,location_captured_at,
-                ST_X(location::geometry) AS longitude,ST_Y(location::geometry) AS latitude,
-                reporter_relationship,beneficiary_contact_phone,alternate_contact_name,alternate_contact_phone,
-                information_source,last_known_situation_at,contactability,household_reference_note
-           FROM request_subject WHERE request_id=$1`, [row.id],
-      ) as Promise<Array<Record<string, unknown>>>,
-      this.staffEvents(this.dataSource, row.id, undefined, 50, session),
-      this.contactAttemptsPage(this.dataSource, row.id, undefined, 20),
-      this.dataSource.query(
-        `SELECT outcome,basis,reviewer_user_id,concurring_user_id,reason,reason_kind,decided_at
-           FROM verification_decision WHERE request_id=$1 ORDER BY decided_at DESC,id DESC LIMIT 1`, [row.id],
-      ) as Promise<Array<Record<string, unknown>>>,
-      this.dataSource.query(
-        `SELECT id,status,created_at,team_id FROM mission WHERE request_id=$1 AND status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE') ORDER BY created_at,id LIMIT 6`, [row.id],
-      ) as Promise<Array<Record<string, unknown>>>,
-      this.dataSource.query(
-        `SELECT id,state,size_bytes,detected_mime,checksum,created_at FROM evidence_metadata WHERE request_id=$1 AND state='READY' ORDER BY created_at DESC,id DESC LIMIT 6`, [row.id],
-      ) as Promise<Array<Record<string, unknown>>>,
-      row.canonical_request_id ? this.scopedRequestSummary(row.canonical_request_id, session) : Promise.resolve([]),
-      this.duplicatesPage(this.dataSource, row.id, undefined, 20, session),
-    ]);
-    const subject = subjectRows[0];
-    if (!subject) throw new AppError('INTERNAL_ERROR', { status: 500 });
-    const safeEvents = await this.restrictEvents(eventPage.items, session);
-    const flagViews = safeEvents.filter((event) => event.event_type === 'PROXY_ACTIVITY_FLAG').map((event) => ({
-      event_id: event.id, occurred_at: event.occurred_at,
-      flags: Array.isArray(asObject(event.payload).flags) ? asObject(event.payload).flags : [],
-      distinct_locations_approx_100m: asObject(event.payload).distinct_locations_approx_100m ?? 0,
-      rejected_count: asObject(event.payload).rejected_count ?? 0,
-      recent_request_ids: asObject(event.payload).recent_request_ids ?? [],
-      rejected_request_ids: asObject(event.payload).rejected_request_ids ?? [],
-    }));
-    return {
-      id: row.id, tracking_code: row.tracking_code, report_mode: row.report_mode,
-      status: row.status, version: Number(row.version), work_cycle: Number(row.work_cycle),
-      priority: row.priority, priority_basis: row.priority_basis, review_lane: row.review_lane,
-      category: row.incident_category_code, description: row.description,
-      region_code: row.region_code, campaign_id: row.campaign_id, received_at: toIso(row.received_at),
-      declared_danger: row.reporter_declared_danger,
-      reporter: { user_id: row.reporter_user_id, name: row.reporter_name, contact_phone: row.reporter_contact_phone },
-      subject: {
-        people_affected: subject.people_affected,
-        location: { type: 'Point', coordinates: [Number(subject.longitude), Number(subject.latitude)], source: subject.location_source, accuracy_m: subject.location_accuracy_m, captured_at: subject.location_captured_at == null ? null : toIso(subject.location_captured_at as Date | string) },
-        reporter_relationship: subject.reporter_relationship, beneficiary_contact_phone: subject.beneficiary_contact_phone,
-        alternate_contact: { name: subject.alternate_contact_name, phone: subject.alternate_contact_phone },
-        information_source: subject.information_source,
-        last_known_situation_at: subject.last_known_situation_at == null ? null : toIso(subject.last_known_situation_at as Date | string),
-        contactability: subject.contactability, household_reference_note: subject.household_reference_note,
-      },
-      proxy_activity_flags: flagViews,
-      timeline: { items: safeEvents.map((event) => this.eventView(event)), more: eventPage.more },
-      contact_attempts: { items: attempts.items, more: attempts.more },
-      verification_decision: decisionRows[0] ? this.decisionView(decisionRows[0]) : null,
-      active_missions: { items: missionRows.slice(0, 5).map((mission) => ({ ...mission, created_at: toIso(mission.created_at as Date | string) })), more: missionRows.length > 5 },
-      evidence: { items: evidenceRows.slice(0, 5).map((evidence) => ({ ...evidence, created_at: toIso(evidence.created_at as Date | string) })), more: evidenceRows.length > 5 },
-      canonical: canonicalRows[0] ?? null,
-      duplicates: { items: duplicateRows.items, more: duplicateRows.more },
-    };
+    return this.queries.detail(requestId, request);
   }
 
   async events(requestId: string, query: RequestOperationPageDto, request: Request, sessionOverride?: ReporterSession): Promise<Record<string, unknown>> {
-    const session = sessionOverride ?? await this.sessions.require(request);
-    await this.staffRequest(this.dataSource, requestId, session, 'REQUEST_DETAIL_READ');
-    const page = await this.staffEvents(this.dataSource, requestId, query.cursor, query.limit ?? 50, session);
-    const items = await this.restrictEvents(page.items, session);
-    return { items: items.map((event) => this.eventView(event)), more: page.more, ...(page.cursor ? { cursor: page.cursor } : {}) };
+    return this.queries.events(requestId, query, request, sessionOverride);
   }
 
   async contactAttempts(requestId: string, query: RequestOperationPageDto, request: Request): Promise<Record<string, unknown>> {
-    const session = await this.sessions.require(request);
-    await this.staffRequest(this.dataSource, requestId, session, 'REQUEST_DETAIL_READ');
-    return this.contactAttemptsPage(this.dataSource, requestId, query.cursor, query.limit ?? 50);
+    return this.queries.contactAttempts(requestId, query, request);
   }
 
   async duplicates(requestId: string, query: RequestOperationPageDto, request: Request): Promise<Record<string, unknown>> {
-    const session = await this.sessions.require(request);
-    await this.staffRequest(this.dataSource, requestId, session, 'REQUEST_DETAIL_READ');
-    return this.duplicatesPage(this.dataSource, requestId, query.cursor, query.limit ?? 50, session);
+    return this.queries.duplicates(requestId, query, request);
   }
 
   async evidence(requestId: string, query: RequestOperationPageDto, request: Request): Promise<Record<string, unknown>> {
-    const session = await this.sessions.require(request);
-    await this.staffRequest(this.dataSource, requestId, session, 'REQUEST_DETAIL_READ');
-    const filters = { request_id: requestId, state: 'READY' };
-    const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
-    const limit = query.limit ?? 50;
-    const rows = await this.dataSource.query(
-      `SELECT id,state,size_bytes,detected_mime,checksum,created_at,
-              to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
-         FROM evidence_metadata WHERE request_id=$1 AND state='READY'
-          AND ($2::timestamptz IS NULL OR (created_at,id)<($2::timestamptz,$3::uuid))
-        ORDER BY created_at DESC,id DESC LIMIT $4`,
-      [requestId, cursor?.sort[0] ?? null, cursor?.id ?? null, limit + 1],
-    ) as Array<Record<string, unknown> & { id: string; created_at: Date | string; cursor_created_at: string }>;
-    const more = rows.length > limit;
-    const page = rows.slice(0, limit);
-    const next = more ? page.at(-1) : undefined;
-    return {
-      items: page.map((row) => ({ id: row.id, state: row.state, size_bytes: Number(row.size_bytes), detected_mime: row.detected_mime, checksum: row.checksum, created_at: toIso(row.created_at) })),
-      more, ...(next ? { cursor: encodeKeysetCursor([next.cursor_created_at], next.id, filters) } : {}),
-    };
+    return this.queries.evidence(requestId, query, request);
   }
 
   async missions(requestId: string, query: RequestOperationPageDto, request: Request): Promise<Record<string, unknown>> {
-    const session = await this.sessions.require(request);
-    await this.staffRequest(this.dataSource, requestId, session, 'REQUEST_DETAIL_READ');
-    const filters = { request_id: requestId, active: true };
-    const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
-    const limit = query.limit ?? 50;
-    const rows = await this.dataSource.query(
-      `SELECT id,status,team_id,created_at,to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
-         FROM mission WHERE request_id=$1 AND status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE')
-          AND ($2::timestamptz IS NULL OR (created_at,id)>($2::timestamptz,$3::uuid))
-        ORDER BY created_at,id LIMIT $4`,
-      [requestId, cursor?.sort[0] ?? null, cursor?.id ?? null, limit + 1],
-    ) as Array<Record<string, unknown> & { id: string; created_at: Date | string; cursor_created_at: string }>;
-    const more = rows.length > limit;
-    const page = rows.slice(0, limit);
-    const next = more ? page.at(-1) : undefined;
-    return { items: page.map((row) => ({ id: row.id, status: row.status, team_id: row.team_id, created_at: toIso(row.created_at) })), more,
-      ...(next ? { cursor: encodeKeysetCursor([next.cursor_created_at], next.id, filters) } : {}) };
+    return this.queries.missions(requestId, query, request);
   }
 
   async duplicateCandidates(requestId: string, request: Request): Promise<Record<string, unknown>> {
-    const session = await this.sessions.require(request);
-    const source = await this.staffRequest(this.dataSource, requestId, session, 'REQUEST_VERIFY');
-    return this.findCandidates(source, session, false);
+    return this.queries.duplicateCandidates(requestId, request);
   }
 
   async verificationCandidates(requestId: string, request: Request): Promise<Record<string, unknown>> {
-    const session = await this.sessions.require(request);
-    const source = await this.staffRequest(this.dataSource, requestId, session, 'REQUEST_VERIFY');
-    return this.findCandidates(source, session, true);
+    return this.queries.verificationCandidates(requestId, request);
   }
 
   async startVerification(requestId: string, dto: RequestVersionDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
     return this.runCommand(requestId, session, key, 'response.requests.start-verification', dto,
       async (manager) => {
-        const row = await this.staffRequest(manager, requestId, session, 'REQUEST_VERIFY', true);
+        const row = await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY', true);
         checkVersion(Number(row.version), dto.expected_version);
         if (row.status !== 'SUBMITTED') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         const [updated] = await manager.query(
@@ -286,7 +103,7 @@ export class RequestOperationsService {
     const note = cleanText(dto.note ?? undefined);
     return this.runCommand(requestId, session, key, 'response.requests.contact-attempt', dto,
       async (manager) => {
-        const row = await this.staffRequest(manager, requestId, session, 'REQUEST_VERIFY', true);
+        const row = await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY', true);
         if (row.status !== 'VERIFYING') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         const attemptRows = await manager.query(
           `INSERT INTO contact_attempt (request_id,actor_user_id,contact_target,outcome,note)
@@ -308,7 +125,7 @@ export class RequestOperationsService {
         };
       },
       async (manager, resource) => {
-        await this.staffRequest(manager, requestId, session, 'REQUEST_VERIFY');
+        await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY');
         const rows = await manager.query('SELECT id,contact_target,outcome,note,actor_user_id,attempted_at FROM contact_attempt WHERE id=$1 AND request_id=$2', [resource?.id, requestId]) as Array<Record<string, unknown> & { id: string; attempted_at: Date | string }>;
         const attempt = rows[0];
         if (!attempt) throw new AppError('NOT_FOUND', { status: 404 });
@@ -323,11 +140,11 @@ export class RequestOperationsService {
     const reason = cleanText(dto.reason ?? undefined);
     const sourceNote = cleanText(dto.source_note ?? undefined);
     const currentCoordinators = dto.basis === 'TWO_COORDINATOR_JUDGMENT'
-      ? await this.sessions.requestCoordinatorGrants((await this.staffRequest(this.dataSource, requestId, session, 'REQUEST_VERIFY')).organization_id)
+      ? await this.sessions.requestCoordinatorGrants((await this.persistence.staffRequest(this.dataSource, requestId, session, 'REQUEST_VERIFY')).organization_id)
       : undefined;
     return this.runCommand(requestId, session, key, 'response.requests.verify', dto,
       async (manager) => {
-        const row = await this.staffRequest(manager, requestId, session, 'REQUEST_VERIFY', true);
+        const row = await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY', true);
         checkVersion(Number(row.version), dto.expected_version);
         if (row.status !== 'VERIFYING') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         if (await this.hasPendingSupplement(manager, row.id)) throw new AppError('PENDING_SUPPLEMENT_REVIEW', { status: 409 });
@@ -373,7 +190,7 @@ export class RequestOperationsService {
         return { status: 200, value: { id: row.id, status: updated[0]!.status, version: Number(updated[0]!.version), verification_revision: updated[0]!.verification_revision, decision_id: decision.id }, resource: { type: 'verification_decision', id: decision.id } };
       },
       async (manager, resource) => {
-        await this.staffRequest(manager, requestId, session, 'REQUEST_VERIFY');
+        await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY');
         const rows = await manager.query('SELECT id FROM verification_decision WHERE id=$1 AND request_id=$2', [resource?.id, requestId]) as Array<{ id: string }>;
         if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
         const current = await this.currentRequestValue(manager, requestId);
@@ -387,7 +204,7 @@ export class RequestOperationsService {
     const note = cleanText(dto.note, true);
     return this.runCommand(requestId, session, key, 'response.requests.concur', dto,
       async (manager) => {
-        const row = await this.staffRequest(manager, requestId, session, 'REQUEST_VERIFY', true);
+        const row = await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY', true);
         checkVersion(Number(row.version), dto.expected_version);
         if (row.status !== 'VERIFYING') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         const startedBy = await manager.query(
@@ -404,7 +221,7 @@ export class RequestOperationsService {
         return { status: 200, value: { id: row.id, status: row.status, version: Number(updated[0]!.version), event_id: eventId }, resource: { type: 'request_event', id: eventId } };
       },
       async (manager, resource) => {
-        await this.staffRequest(manager, requestId, session, 'REQUEST_VERIFY');
+        await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY');
         const rows = await manager.query('SELECT id FROM request_event WHERE id=$1 AND request_id=$2 AND event_type=\'CONCURRENCE\'', [resource?.id, requestId]) as Array<{ id: string }>;
         if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
         const current = await this.currentRequestValue(manager, requestId);
@@ -417,7 +234,7 @@ export class RequestOperationsService {
     const session = await this.sessions.require(request);
     const reason = cleanText(dto.reason, true)!;
     const reasonKind = dto.reason_kind ?? 'OTHER';
-    await this.staffRequest(this.dataSource, requestId, session, 'REQUEST_VERIFY');
+    await this.persistence.staffRequest(this.dataSource, requestId, session, 'REQUEST_VERIFY');
     const knownChildren = await this.dataSource.query(
       'SELECT id,organization_id FROM assistance_request WHERE canonical_request_id=$1 ORDER BY id', [requestId],
     ) as Array<{ id: string; organization_id: string }>;
@@ -506,7 +323,7 @@ export class RequestOperationsService {
           event_id: eventId, orphaned_duplicates: { items: orphaned.slice(0, 20), more: orphaned.length > 20 } }, resource: { type: 'verification_decision', id: decision.id } };
       },
       async (manager, resource) => {
-        await this.staffRequest(manager, requestId, session, 'REQUEST_VERIFY');
+        await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY');
         const rows = await manager.query('SELECT id FROM verification_decision WHERE id=$1 AND request_id=$2 AND outcome=\'REJECTED\'', [resource?.id, requestId]) as Array<{ id: string }>;
         if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
         const current = await this.currentRequestValue(manager, requestId);
@@ -573,7 +390,7 @@ export class RequestOperationsService {
         return { status: 200, value: { id: source.id, status: updated[0]!.status, version: Number(updated[0]!.version), canonical_request_id: updated[0]!.canonical_request_id, decision_id: decision.id }, resource: { type: 'verification_decision', id: decision.id } };
       },
       async (manager, resource) => {
-        await this.staffRequest(manager, requestId, session, 'REQUEST_VERIFY');
+        await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY');
         const rows = await manager.query('SELECT id FROM verification_decision WHERE id=$1 AND request_id=$2 AND outcome=\'DUPLICATE\'', [resource?.id, requestId]) as Array<{ id: string }>;
         if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
         return this.currentRequestValue(manager, requestId);
@@ -586,7 +403,7 @@ export class RequestOperationsService {
     const reason = cleanText(dto.reason ?? undefined);
     return this.runCommand(requestId, session, key, 'response.requests.triage', dto,
       async (manager) => {
-        const row = await this.staffRequest(manager, requestId, session, 'REQUEST_TRIAGE', true);
+        const row = await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_TRIAGE', true);
         checkVersion(Number(row.version), dto.expected_version);
         if (!['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(row.status)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         const oldRank = row.priority ? Number(row.priority.slice(1)) : null;
@@ -620,14 +437,14 @@ export class RequestOperationsService {
     const note = cleanText(dto.note, true)!;
     return this.runCommand(requestId, session, key, 'response.requests.authority-referral', dto,
       async (manager) => {
-        const row = await this.staffRequest(manager, requestId, session, 'REQUEST_VERIFY', true);
+        const row = await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY', true);
         if (terminalStatuses.has(row.status) || row.status === 'RESOLVING') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         const [updated] = await manager.query('UPDATE assistance_request SET version=version+1 WHERE id=$1 RETURNING version', [row.id]) as [Array<{ version: number }>, number];
         const eventId = await this.insertEvent(manager, row.id, session.userId, 'AUTHORITY_REFERRED', 'STAFF', row.status, row.status, note, { referred_body: referredBody });
         return { status: 201, value: { id: row.id, status: row.status, version: Number(updated[0]?.version), event_id: eventId }, resource: { type: 'request_event', id: eventId } };
       },
       async (manager, resource) => {
-        await this.staffRequest(manager, requestId, session, 'REQUEST_VERIFY');
+        await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY');
         const rows = await manager.query('SELECT id FROM request_event WHERE id=$1 AND request_id=$2 AND event_type=\'AUTHORITY_REFERRED\'', [resource?.id, requestId]) as Array<{ id: string }>;
         if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
         return { ...(await this.currentRequestValue(manager, requestId)), event_id: rows[0].id };
@@ -640,7 +457,7 @@ export class RequestOperationsService {
     const reason = cleanText(dto.reason, true)!;
     return this.runCommand(requestId, session, key, 'response.requests.correct-region', dto,
       async (manager) => {
-        const row = await this.staffRequest(manager, requestId, session, 'REQUEST_UNASSIGNED_QUEUE', true);
+        const row = await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_UNASSIGNED_QUEUE', true);
         if (!hasOrganizationPermission(session, 'REQUEST_UNASSIGNED_QUEUE', row.organization_id)) throw new AppError('FORBIDDEN', { status: 403 });
         checkVersion(Number(row.version), dto.expected_version);
         if (row.attribution_locked_at) throw new AppError('ATTRIBUTION_LOCKED', { status: 409 });
@@ -667,7 +484,7 @@ export class RequestOperationsService {
     const sourceNote = cleanText(dto.source_note ?? undefined);
     return this.runCommand(requestId, session, key, 'response.requests.review-supplement', { event_id: eventId, ...dto },
       async (manager) => {
-        const row = await this.staffRequest(manager, requestId, session, 'REQUEST_VERIFY', true);
+        const row = await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY', true);
         checkVersion(Number(row.version), dto.expected_version);
         if (!['VERIFYING', 'VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(row.status)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         const supplementRows = await manager.query(
@@ -721,7 +538,7 @@ export class RequestOperationsService {
         return { status: 200, value: { id: row.id, status: updated[0]!.status, version: Number(updated[0]!.version), decision: dto.decision, event_id: reviewId, verification_revision: updated[0]!.verification_revision }, resource: { type: 'request_event', id: reviewId } };
       },
       async (manager, resource) => {
-        await this.staffRequest(manager, requestId, session, 'REQUEST_VERIFY');
+        await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY');
         const rows = await manager.query('SELECT id,payload FROM request_event WHERE id=$1 AND request_id=$2 AND event_type=\'SUPPLEMENT_REVIEW\'', [resource?.id, requestId]) as Array<{ id: string; payload: Record<string, unknown> }>;
         if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
         const current = await this.currentRequestValue(manager, requestId);
@@ -730,30 +547,7 @@ export class RequestOperationsService {
     );
   }
 
-  private async findCandidates(source: OperationRequestRow, session: ReporterSession, independentOnly: boolean): Promise<Record<string, unknown>> {
-    const values: unknown[] = [source.id, source.received_at];
-    const scope = scopeSql(session.grants, 'REQUEST_VERIFY', values, 'candidate');
-    const independence = independentOnly
-      ? `AND (target.reporter_user_id IS NULL OR candidate.reporter_user_id IS DISTINCT FROM target.reporter_user_id)
-         AND (target.reporter_contact_phone IS NULL OR candidate.reporter_contact_phone IS DISTINCT FROM target.reporter_contact_phone)
-         AND (target.source_ip_hash IS NULL OR candidate.source_ip_hash IS DISTINCT FROM target.source_ip_hash)`
-      : '';
-    const rows = await this.dataSource.query(
-      `SELECT candidate.id,candidate.tracking_code,candidate.status,candidate.review_lane,candidate.received_at,
-              candidate.incident_category_code AS category,
-              round(ST_Distance(subject.location,other.location)::numeric,1)::float8 AS distance_m
-         FROM assistance_request target JOIN request_subject subject ON subject.request_id=target.id
-         JOIN assistance_request candidate ON candidate.id<>target.id
-         JOIN request_subject other ON other.request_id=candidate.id
-        WHERE target.id=$1 AND candidate.status NOT IN ('DUPLICATE','REJECTED','CANCELLED')
-          AND candidate.incident_category_code=target.incident_category_code
-          AND candidate.received_at BETWEEN $2::timestamptz-interval '24 hours' AND $2::timestamptz+interval '24 hours'
-          AND ST_DWithin(subject.location,other.location,1000) AND ${scope} ${independence}
-        ORDER BY candidate.received_at,candidate.id LIMIT 21`,
-      values,
-    ) as Array<Record<string, unknown> & { received_at: Date | string }>;
-    return { items: rows.slice(0, 20).map((row) => ({ ...row, received_at: toIso(row.received_at) })), more: rows.length > 20 };
-  }
+
 
   private runCommand<T>(
     requestId: string,
@@ -977,120 +771,20 @@ export class RequestOperationsService {
     );
   }
 
-  private async staffRequest(
-    queryable: Pick<DataSource | EntityManager, 'query'>, requestId: string, session: ReporterSession,
-    permission: Permission, lock = false,
-  ): Promise<OperationRequestRow> {
-    const rows = await queryable.query(
-      `SELECT id,tracking_code,tracking_secret_hash,reporter_user_id,reporter_name,reporter_contact_phone,source_ip_hash,report_mode,
-              status,version,review_lane,received_at,verifying_since,organization_id,region_code,campaign_id,description,
-              reporter_declared_danger,priority,priority_basis,work_cycle,canonical_request_id,attribution_locked_at,incident_category_code
-         FROM assistance_request WHERE id=$1${lock ? ' FOR UPDATE' : ''}`,
-      [requestId],
-    ) as OperationRequestRow[];
-    const row = rows[0];
-    if (!row) throw new AppError('NOT_FOUND', { status: 404 });
-    if (!hasPermission(session.grants, permission, { organizationId: row.organization_id, regionCode: row.region_code, campaignId: row.campaign_id })) {
-      throw new AppError('FORBIDDEN', { status: 403 });
-    }
-    return row;
-  }
 
-  private async scopedRequestSummary(requestId: string, session: ReporterSession): Promise<Array<Record<string, unknown>>> {
-    const rows = await this.dataSource.query(
-      `SELECT id,tracking_code,status,region_code,campaign_id,organization_id FROM assistance_request WHERE id=$1`, [requestId],
-    ) as Array<Record<string, unknown> & { organization_id: string; region_code: string | null; campaign_id: string | null }>;
-    const row = rows[0];
-    if (!row) return [];
-    if (!hasPermission(session.grants, 'REQUEST_DETAIL_READ', { organizationId: row.organization_id, regionCode: row.region_code, campaignId: row.campaign_id })) return [];
-    return [{ id: row.id, tracking_code: row.tracking_code, status: row.status, region_code: row.region_code, campaign_id: row.campaign_id }];
-  }
 
-  private async staffEvents(
-    queryable: Pick<DataSource | EntityManager, 'query'>, requestId: string, rawCursor: string | undefined, limit: number,
-    session: ReporterSession,
-  ): Promise<{ items: RequestEventRow[]; more: boolean; cursor?: string }> {
-    const filters = { request_id: requestId, visibility: 'STAFF_TIMELINE', user_id: session.userId };
-    const cursor = rawCursor ? decodeKeysetCursor(rawCursor, filters) : undefined;
-    const rows = await queryable.query(
-      `SELECT id,event_type,visibility,from_status,to_status,reason,payload,occurred_at,actor_user_id,
-              to_char(occurred_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_occurred_at
-         FROM request_event WHERE request_id=$1
-          AND ($2::timestamptz IS NULL OR (occurred_at,id)<($2::timestamptz,$3::uuid))
-        ORDER BY occurred_at DESC,id DESC LIMIT $4`,
-      [requestId, cursor?.sort[0] ?? null, cursor?.id ?? null, limit + 1],
-    ) as RequestEventRow[];
-    const more = rows.length > limit;
-    const page = rows.slice(0, limit);
-    const next = more ? page.at(-1) : undefined;
-    return { items: page, more, ...(next ? { cursor: encodeKeysetCursor([next.cursor_occurred_at], next.id, filters) } : {}) };
-  }
 
-  private async contactAttemptsPage(
-    queryable: Pick<DataSource | EntityManager, 'query'>, requestId: string, rawCursor: string | undefined, limit: number,
-  ): Promise<{ items: Array<Record<string, unknown>>; more: boolean; cursor?: string }> {
-    const filters = { request_id: requestId, visibility: 'STAFF' };
-    const cursor = rawCursor ? decodeKeysetCursor(rawCursor, filters) : undefined;
-    const rows = await queryable.query(
-      `SELECT id,contact_target,outcome,note,actor_user_id,attempted_at,
-              to_char(attempted_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_attempted_at
-         FROM contact_attempt WHERE request_id=$1
-          AND ($2::timestamptz IS NULL OR (attempted_at,id)<($2::timestamptz,$3::uuid))
-        ORDER BY attempted_at DESC,id DESC LIMIT $4`,
-      [requestId, cursor?.sort[0] ?? null, cursor?.id ?? null, limit + 1],
-    ) as Array<Record<string, unknown> & { id: string; attempted_at: Date | string; cursor_attempted_at: string }>;
-    const more = rows.length > limit;
-    const page = rows.slice(0, limit);
-    const next = more ? page.at(-1) : undefined;
-    return { items: page.map((row) => ({ id: row.id, contact_target: row.contact_target, outcome: row.outcome, note: row.note, actor_user_id: row.actor_user_id, attempted_at: toIso(row.attempted_at) })),
-      more, ...(next ? { cursor: encodeKeysetCursor([next.cursor_attempted_at], next.id, filters) } : {}) };
-  }
 
-  private async duplicatesPage(
-    queryable: Pick<DataSource | EntityManager, 'query'>, requestId: string, rawCursor: string | undefined, limit: number,
-    session: ReporterSession,
-  ): Promise<{ items: Array<Record<string, unknown>>; more: boolean; cursor?: string }> {
-    const filters = filtersHash(session.grants, session.userId, { request_id: requestId }, 'duplicates');
-    const cursor = rawCursor ? decodeKeysetCursor(rawCursor, filters) : undefined;
-    const values: unknown[] = [requestId];
-    const scope = scopeSql(session.grants, 'REQUEST_DETAIL_READ', values, 'child');
-    const cursorTimeIndex = values.length + 1;
-    values.push(cursor?.sort[0] ?? null, cursor?.id ?? null, limit + 1);
-    const rows = await queryable.query(
-      `SELECT child.id,child.tracking_code,child.status,child.received_at,
-              to_char(child.received_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_received_at
-         FROM assistance_request child WHERE child.canonical_request_id=$1 AND ${scope}
-          AND ($${cursorTimeIndex}::timestamptz IS NULL OR (child.received_at,child.id)>($${cursorTimeIndex}::timestamptz,$${cursorTimeIndex + 1}::uuid))
-        ORDER BY child.received_at,child.id LIMIT $${values.length}`,
-      values,
-    ) as Array<Record<string, unknown> & { id: string; received_at: Date | string; cursor_received_at: string }>;
-    const more = rows.length > limit;
-    const page = rows.slice(0, limit);
-    const next = more ? page.at(-1) : undefined;
-    return { items: page.map((row) => ({ id: row.id, tracking_code: row.tracking_code, status: row.status, received_at: toIso(row.received_at) })),
-      more, ...(next ? { cursor: encodeKeysetCursor([next.cursor_received_at], next.id, filters) } : {}) };
-  }
 
-  private async restrictEvents(events: RequestEventRow[], session: ReporterSession): Promise<RequestEventRow[]> {
-    const ids = [...new Set(events.flatMap((event) => relatedRequestIds(asObject(event.payload))))];
-    if (!ids.length) return events;
-    const values: unknown[] = [ids];
-    const scope = scopeSql(session.grants, 'REQUEST_DETAIL_READ', values);
-    const rows = await this.dataSource.query(
-      `SELECT r.id FROM assistance_request r WHERE r.id=ANY($1::uuid[]) AND ${scope}`,
-      values,
-    ) as Array<{ id: string }>;
-    const allowed = new Set(rows.map((row) => row.id));
-    return events.map((event) => ({ ...event, payload: restrictEventPayload(event, allowed) }));
-  }
 
-  private eventView(event: RequestEventRow): Record<string, unknown> {
-    return { id: event.id, event_type: event.event_type, visibility: event.visibility, from_status: event.from_status,
-      to_status: event.to_status, reason: event.reason, payload: event.payload, actor_user_id: event.actor_user_id, occurred_at: toIso(event.occurred_at) };
-  }
 
-  private decisionView(row: Record<string, unknown>): Record<string, unknown> {
-    return { ...row, decided_at: toIso(row.decided_at as Date | string) };
-  }
+
+
+
+
+
+
+
+
 
 }
