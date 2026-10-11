@@ -15,8 +15,8 @@ process.env.DATABASE_URL = appDatabaseUrl;
 process.env.NODE_ENV = 'test';
 process.env.DB_POOL_MAX = process.env.DB_POOL_MAX ?? '4';
 const { DataSource } = require('typeorm');
-const { IdempotencyService, canonicalRequestHash } = require('../dist/packages/technical/src/idempotency.js');
-const { postgresOptions } = require('../dist/packages/technical/src/postgres-options.js');
+const { IdempotencyService, canonicalRequestHash } = require('../../dist/packages/technical/src/idempotency.js');
+const { postgresOptions } = require('../../dist/packages/technical/src/postgres-options.js');
 
 const database = new Client({ connectionString: databaseUrl });
 const appDatabase = new DataSource(postgresOptions([], 'identity'));

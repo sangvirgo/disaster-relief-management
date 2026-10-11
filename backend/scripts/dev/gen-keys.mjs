@@ -57,7 +57,7 @@ export function generateKeys(envPath) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    generateKeys(resolve(dirname(fileURLToPath(import.meta.url)), '../.env'));
+    generateKeys(resolve(dirname(fileURLToPath(import.meta.url)), '../../.env'));
     process.stdout.write('Generated an RS256 key pair and local secrets in backend/.env.\n');
   } catch (error) {
     process.stderr.write((error instanceof Error ? error.message : 'Key generation failed') + '\n');

@@ -193,18 +193,18 @@ Networks: single bridge `c48-internal`; APIs reach each other by service name (`
 
 | Command | Effect |
 |---|---|
-| `scripts/up` | `docker compose up -d --build` core profile; waits for healthy |
-| `scripts/migrate` | runs the three migrate jobs |
-| `scripts/seed` | runs profile `seed` (section 9); idempotent on an empty database, refuses non-empty without `--reset` |
-| `scripts/reset-demo` | `down -v`, then `up`, `migrate`, `seed` (destroys data; demo only) |
-| `scripts/test-db` | starts `compose.test.yaml` (tmpfs PostgreSQL), loads `schema/*.sql`, runs `test-*.sql` and the two `race-tests-*.sh` |
-| `scripts/gen-keys` | generates the JWT key pair and service client secrets into `.env`/untracked files |
+| `scripts/dev/up` | `docker compose up -d --build` core profile; waits for healthy |
+| `scripts/db/migrate` | runs the three migrate jobs |
+| `scripts/db/seed` | runs profile `seed` (section 9); idempotent on an empty database, refuses non-empty without `--reset` |
+| `scripts/db/reset-demo` | `down -v`, then `up`, `migrate`, `seed` (destroys data; demo only) |
+| `scripts/db/test-db` | starts `compose.test.yaml` (tmpfs PostgreSQL), loads `schema/*.sql`, runs `test-*.sql` and the two `race-tests-*.sh` |
+| `scripts/dev/gen-keys` | generates the JWT key pair and service client secrets into `.env`/untracked files |
 | `scripts/backup`, `scripts/restore` | `pg_dump` of the three databases and `mc mirror` of the buckets; restore verified on an empty stack (plan §23.6, T18) |
 
 ### 8.5 Test compose (`infra/compose.test.yaml`)
 Ephemeral PostgreSQL/PostGIS on tmpfs, no Nginx; used by migration tests, `schema/test-*.sql`, race and EXPLAIN scripts, and API integration tests. CI never reuses a developer database.
 
-## 9. Demo seed data (`docs/backend/seed/`, executed by `scripts/seed`)
+## 9. Demo seed data (`docs/backend/seed/`, executed by `scripts/db/seed`)
 
 **Rules.** Synthetic only; Vietnamese labels with diacritics; fake phones `0900000xxx`; no real coordinates of private addresses. Passwords are **not** in the files: the seeder reads `SEED_PASSWORD`, hashes it with the production Argon2id settings and substitutes it for the psql variable `seed_password_hash`; every seeded user has `must_change_password = true`. Ids are fixed (prefix `00000000-0000-4000-8000-`) so the three services reference each other as opaque ids. Order: identity → response → logistics. The seeder runs under the migrator role (not the application role) and each file ends with assertions that abort on mismatch.
 
@@ -218,4 +218,4 @@ Ephemeral PostgreSQL/PostGIS on tmpfs, no Nginx; used by migration tests, `schem
 
 **Demo scripts the seed must support** (plan §17): guest SOS retry; PROXY report with separate reporter and household locations; verification and priority; nearby-team comparison (fresh vs stale vs accountless teams); heatmap of confirmed requests; donation 60/58/55/3; 12-of-20 then 8; denied cross-scope and self-review attempts.
 
-**Seed acceptance.** After `scripts/reset-demo`: the stock ledger sums equal every balance; `commitment_counter_mismatch` and `check_cycle_state_matches_intent()` return no rows; no mission breaks the capacity-one index; the seed files load again only after `--reset`. These checks are the last statements of each seed file and are run in CI on the test compose.
+**Seed acceptance.** After `scripts/db/reset-demo`: the stock ledger sums equal every balance; `commitment_counter_mismatch` and `check_cycle_state_matches_intent()` return no rows; no mission breaks the capacity-one index; the seed files load again only after `--reset`. These checks are the last statements of each seed file and are run in CI on the test compose.

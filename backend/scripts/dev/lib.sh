@@ -1,4 +1,4 @@
-ROOT="$(cd -- "$(dirname -- "$0")/../.." && pwd)"
+ROOT="$(cd -- "$(dirname -- "$0")/../../.." && pwd)"
 MAIN_COMPOSE_FILE="$ROOT/backend/infra/compose.yaml"
 TEST_COMPOSE_FILE="$ROOT/backend/infra/compose.test.yaml"
 main_compose() {

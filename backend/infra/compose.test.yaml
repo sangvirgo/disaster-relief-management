@@ -252,7 +252,7 @@ services:
     image: c48-test/identity:local
     environment:
       DATABASE_URL: postgresql://identity_app_login:test-only@postgres:5432/c48_identity
-    command: ["node", "scripts/test-idempotency.mjs"]
+    command: ["node", "scripts/smoke/test-idempotency.mjs"]
     profiles: [test]
     networks: [c48-test]
 
@@ -263,7 +263,7 @@ services:
       TEST_DATABASE_URL: postgresql://identity_migrator:test-only@postgres:5432/c48_identity
       APP_TEST_DATABASE_URL: postgresql://identity_app_login:test-only@postgres:5432/c48_identity
       AUTH_TEST_BASE_URL: http://identity-api:3001/api/v1/identity
-    command: ["node", "scripts/test-auth.mjs"]
+    command: ["node", "scripts/smoke/test-auth.mjs"]
     depends_on:
       identity-api:
         condition: service_healthy
@@ -277,7 +277,7 @@ services:
       TEST_SERVICE_CLIENT_ID: c48-response-test
       TEST_SERVICE_CLIENT_SECRET: c48-test-response-secret-not-for-deployment-0001
       IDENTITY_ADMIN_TEST_BASE_URL: http://identity-api:3001/api/v1/identity
-    command: ["node", "scripts/test-identity-admin.mjs"]
+    command: ["node", "scripts/smoke/test-identity-admin.mjs"]
     depends_on:
       identity-api:
         condition: service_healthy
@@ -293,7 +293,7 @@ services:
       RESPONSE_TEST_PRIVATE_KEY_FILE: /test-fixtures/response-test-private.pem
     volumes:
       - ../test/fixtures/response-test-private.pem:/test-fixtures/response-test-private.pem:ro
-    command: ["node", "scripts/test-response-intake.mjs"]
+    command: ["node", "scripts/smoke/test-response-intake.mjs"]
     depends_on:
       nginx:
         condition: service_healthy
@@ -308,7 +308,7 @@ services:
       TEST_RESPONSE_BASE_URL: http://response-t5-api:3005/api/v1/response
       TEST_RESPONSE_FAIL_BASE_URL: http://response-storage-down-api:3004/api/v1/response
       TEST_IDENTITY_BASE_URL: http://identity-api:3001/api/v1/identity
-    command: ["node", "scripts/test-response-t5.mjs"]
+    command: ["node", "scripts/smoke/test-response-t5.mjs"]
     depends_on:
       response-t5-api:
         condition: service_healthy
@@ -326,7 +326,7 @@ services:
       TEST_IDENTITY_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_identity
       TEST_RESPONSE_BASE_URL: http://response-t5-api:3005/api/v1/response
       TEST_IDENTITY_BASE_URL: http://identity-api:3001/api/v1/identity
-    command: ["node", "scripts/test-response-t6.mjs"]
+    command: ["node", "scripts/smoke/test-response-t6.mjs"]
     depends_on:
       response-t5-api:
         condition: service_healthy
@@ -342,7 +342,7 @@ services:
       TEST_IDENTITY_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_identity
       TEST_RESPONSE_BASE_URL: http://response-t5-api:3005/api/v1/response
       TEST_IDENTITY_BASE_URL: http://identity-api:3001/api/v1/identity
-    command: ["node", "scripts/test-response-t7.mjs"]
+    command: ["node", "scripts/smoke/test-response-t7.mjs"]
     depends_on:
       response-t5-api:
         condition: service_healthy

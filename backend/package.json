@@ -10,7 +10,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "node scripts/clean-dist.mjs && npm run build:identity && npm run build:response && npm run build:logistics && node scripts/check-build-output.mjs",
+    "build": "node scripts/build/clean-dist.mjs && npm run build:identity && npm run build:response && npm run build:logistics && node scripts/build/check-build-output.mjs",
     "build:identity": "nest build identity",
     "build:response": "nest build response",
     "build:logistics": "nest build logistics",
@@ -26,7 +26,7 @@
     "migration:down:identity": "node dist/apps/identity/src/database/migrate.js down",
     "migration:down:response": "node dist/apps/response/src/database/migrate.js down",
     "migration:down:logistics": "node dist/apps/logistics/src/database/migrate.js down",
-    "check:compose-env": "node scripts/check-compose-env.mjs",
+    "check:compose-env": "node scripts/build/check-compose-env.mjs",
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand && node --test scripts/*.test.mjs"
   },
   "dependencies": {

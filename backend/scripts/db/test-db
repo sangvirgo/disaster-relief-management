@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-source "$(dirname -- "$0")/lib.sh"
+source "$(dirname -- "$0")/../dev/lib.sh"
 C48_TEST_PROJECT="c48-test-$$"
 export C48_TEST_PROJECT
 RESPONSE_TEST_JWT_PRIVATE_KEY="$(base64 -w0 "$ROOT/backend/test/fixtures/response-test-private.pem")"
@@ -17,11 +17,11 @@ for service in identity response logistics; do
   test_compose run --rm --no-deps "$service-migrate"
 done
 
-C48_TEST_PROJECT="$C48_TEST_PROJECT" "$ROOT/backend/scripts/check-schema-dump"
+C48_TEST_PROJECT="$C48_TEST_PROJECT" "$ROOT/backend/scripts/db/check-schema-dump"
 test_compose run --rm --no-deps idempotency-test
-C48_TEST_PROJECT="$C48_TEST_PROJECT" "$ROOT/backend/scripts/check-migration-down"
-test_compose exec -T postgres bash /test/scripts/prove-migrated-race.sh
-test_compose exec -T postgres bash /test/scripts/prove-cycle-fence.sh
+C48_TEST_PROJECT="$C48_TEST_PROJECT" "$ROOT/backend/scripts/db/check-migration-down"
+test_compose exec -T postgres bash /test/scripts/proofs/prove-migrated-race.sh
+test_compose exec -T postgres bash /test/scripts/proofs/prove-cycle-fence.sh
 
 for service in identity response logistics; do
   test_compose exec -T -w /schema postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d "c48_$service" \

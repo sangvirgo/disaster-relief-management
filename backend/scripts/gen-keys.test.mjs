@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createPrivateKey, createPublicKey, sign, verify } from 'node:crypto';
 import test from 'node:test';
-import { generateKeys } from './gen-keys.mjs';
+import { generateKeys } from './dev/gen-keys.mjs';
 
 const generatedNames = [
   'POSTGRES_PASSWORD',

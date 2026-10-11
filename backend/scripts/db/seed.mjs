@@ -79,7 +79,7 @@ for (const [service, user, passwordKey, database, markerTable] of services) {
   try {
     const result = await client.query('SELECT EXISTS (SELECT 1 FROM public.' + markerTable + ' LIMIT 1) AS has_data');
     if (result.rows[0].has_data) {
-      throw new Error(database + ' already contains demo data; run scripts/seed --reset.');
+      throw new Error(database + ' already contains demo data; run scripts/db/seed --reset.');
     }
     await client.query(prepareSql(service));
     process.stdout.write('Seeded synthetic ' + service + ' data.\n');
