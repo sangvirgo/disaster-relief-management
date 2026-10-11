@@ -1,10 +1,10 @@
 # Session handoff — C48 backend, 2026-10-11
 
-Read `/AGENTS.md`, [project context](../c48-project-context.md), plan Sections 27–28, then [README](README.md) → [00-setup](00-setup.md) → [01 §7–§9](01-schema-review.md). Follow the ordered task table in [06-implementation-tasks](06-implementation-tasks.md), one task at a time.
+Read [AGENTS.md](../../AGENTS.md), [project context](../c48-project-context.md), plan Sections 27–28, then [README](README.md) → [00-setup](00-setup.md) → [01 §7–§9](01-schema-review.md). Follow the ordered task table in [06-implementation-tasks](06-implementation-tasks.md), one task at a time.
 
 ## Objective
 
-Continue implementing only the backend microservices in `/home/soang/c48`. T0–T6 implementation phases have separate commits on `main`; the T5 selected-provider acceptance gate is still open pending the AIStor lab artifact, private-access, and restore checks. Proceed with T7–T19 in dependency order. Commit each completed task separately. AI agent/service work is outside this scope. The API contracts and SQL in `docs/backend/` take precedence for shapes; the main plan governs business behavior.
+Continue implementing only the backend microservices in `/home/soang/c48`. T0–T7 implementation phases have separate commits on `main`; the T5 selected-provider acceptance gate is still open pending the AIStor lab artifact, private-access, and restore checks. T7 has a reproduced database-suite failure recorded below; resolve it before proceeding with T8–T19 in dependency order. Commit each completed task separately. AI agent/service work is outside this scope. The API contracts and SQL in `docs/backend/` take precedence for shapes; the main plan governs business behavior.
 
 ## T3 completed
 
@@ -32,7 +32,7 @@ Response now supports reporter tracking and event history, account-owned request
 
 `POST /api/v1/response/requests/proxy` requires a live Identity session and stores the authenticated reporter separately from the affected household. It records relationship, source, last-known time, contactability and optional contacts; household coordinates alone determine the region. Missing/expired sessions fail, Identity outages return `503`, and the route never falls back to SELF. Idempotency replays the original result. `PROXY_OPEN_CAP` defaults to 3 simultaneous unverified reports; `PROXY_DAILY_SOFT_LIMIT` defaults to 10 in a rolling 24-hour window. Both are never-drop soft thresholds and may overshoot under parallel requests per 00 §3/§4; no account lock is used. Existing registration throttles cover new-account creation.
 
-Response writes quota-excess reports with `PROXY_QUOTA_REVIEW` and adds a staff-only `PROXY_ACTIVITY_FLAG` when the reporter account/phone has at least three distinct PROXY household locations (approximate 100 m cells) in 24 hours or any prior rejected report. The event contains counts, up to ten recent PROXY request IDs, and up to ten IDs of rejected requests (SELF or PROXY); it does not change status/priority, classify fraud, or block the reporter. The 10/day and three-location triggers are provisional demo thresholds that need field calibration. T7 must expose review lanes and staff flags in the coordinator queue/detail surface and complete the failed-contact-attempt portion of TC-REV-03.
+Response writes quota-excess reports with `PROXY_QUOTA_REVIEW` and adds a staff-only `PROXY_ACTIVITY_FLAG` when the reporter account/phone has at least three distinct PROXY household locations (approximate 100 m cells) in 24 hours or any prior rejected report. The event contains counts, up to ten recent PROXY request IDs, and up to ten IDs of rejected requests (SELF or PROXY); it does not change status/priority, classify fraud, or block the reporter. The 10/day and three-location triggers are provisional demo thresholds that need field calibration. T7 implements coordinator review lanes, flags, verification, duplicate handling, triage, referrals, and contact attempts.
 
 T6 exit evidence: `npm test` passed 18 suites / 56 tests plus 2 Node checks; `npm run build` passed for all three services; `npm run check:compose-env` passed all 12 service allow-lists; `docker compose --profile test -f backend/infra/compose.test.yaml config --quiet` passed; `bash backend/scripts/db/test-db` passed the full schema/migration/race/auth suite and T4/T5/T6 HTTP integration. T6 HTTP checks cover the Nginx hard ceiling on `/requests/proxy`, Identity-down 503, missing/revoked session, source/household region and contact persistence, idempotent replay, fourth open request, eleventh daily request, prior-rejection/multiple-location staff flags, and no status/priority change. The database test stack was removed by its cleanup trap.
 
@@ -54,6 +54,19 @@ T6 exit evidence: `npm test` passed 18 suites / 56 tests plus 2 Node checks; `np
 - MP4 validation checks the ISO-BMFF container signature but not its video/audio tracks; add a bounded `ffprobe` check before accepting untrusted production video. T18 still needs an executed backup/restore runbook covering all three PostgreSQL databases and object bytes with a key/size/checksum manifest. AIStor requires a separately supplied license file and was not integration-tested.
 - T6's `PROXY_DAILY_SOFT_LIMIT=10` and three-location flag threshold are provisional demo choices; validate them with field operators before real-world use. Soft limits intentionally have no serialization lock, so concurrent requests can briefly exceed the configured count.
 
-## Next task: T7
+## Refactor handoff — 2026-10-11
 
-Implement Response verification, duplicate/concurrence handling, priority, and coordinator review views, following [03-response-api §2](03-response-api.md) and T7 in [06](06-implementation-tasks.md). Expose `PROXY_QUOTA_REVIEW` and T6 staff activity flags only to scoped staff, and cover the remaining TC-REV-03 contact-attempt behavior. Continue on `main` in `/home/soang/c48`; make a separate phase commit after T7 exit evidence passes.
+- **A:** Split Response request operations into query, verification, triage, dedup/referral, persistence, and supplement-review services plus shared helpers. The facade retains its public signatures; operation source files are below 400 lines.
+- **B:** Grouped scripts under `db/`, `dev/`, `build/`, `smoke/`, and `proofs/`; updated package, Compose, proof, and documentation references. Kept both `gen-keys` entry points because the shell wrapper and tests reference `gen-keys.mjs`.
+- **C:** Moved Node tests to `scripts/__tests__/`, scoped Jest discovery to apps/packages, and retained the baseline count: 18 suites / 56 tests plus 2 Node tests.
+- **D:** Grouped technical utilities under `config/`, `errors/`, `http/`, `idempotency/`, `observability/`, `pagination/`, `persistence/`, and `security/`. `index.ts` keeps the same exported symbol set; all source, test, and smoke-build paths were updated.
+- **E:** `backend/.gitignore` already ignores `dist/`; build artifacts were not committed.
+- **Commits:** A — `51b4f03`, `13d4909`, `fa6a83c`, `18a4c7c`, `3dfb8b0`, `bf4d76b`, `9c1ad73`, `a5900a3`; B — `81a3642`; C — `b3f5975`; D — `70c524a`. The T7 implementation commit is `4613bec`.
+- **Checks:** baseline and final `npm run build` passed; baseline and final `npm test` passed with 18 suites / 56 tests plus 2 Node tests; `npx tsc --noEmit` passed after each structural checkpoint. OpenAPI JSON diff from `4613bec` is empty. Compose environment checks and test Compose validation passed after B.
+- **Known T7 acceptance failure:** `bash backend/scripts/db/test-db` reaches `test-response-t7.mjs` and fails at `start-verification` with SQLSTATE `DATABASE_42P08`. Running the same suite against `4613bec` reproduced the same failure. Keep diagnosis/fix in a separate T7 bugfix; it is outside this structure-only refactor.
+- **Docker cleanup:** removed 180 images labeled by `c48-test-*` Compose projects after confirming no C48 test containers remained. Existing `simmes-v3-local` images and containers were left untouched.
+- The user-added `/home/soang/c48/.codegraph/` index remains untracked and must not be staged or removed.
+
+## Next task: resolve T7 acceptance, then T8
+
+Diagnose and fix the reproduced T7 `DATABASE_42P08` failure in a separate bugfix, rerun `bash backend/scripts/db/test-db`, and confirm T7 exit evidence. Then proceed with T8 in [06](06-implementation-tasks.md), following the documented dependency order. Do not mix the T7 behavior fix into the structural-refactor commits.
