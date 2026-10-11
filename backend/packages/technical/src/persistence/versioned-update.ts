@@ -1,5 +1,5 @@
 import { EntityManager } from 'typeorm';
-import { AppError } from './errors';
+import { AppError } from '../errors/errors';
 
 export interface VersionedUpdate {
   table: string;

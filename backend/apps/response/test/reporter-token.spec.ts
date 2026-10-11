@@ -1,6 +1,6 @@
 import { generateKeyPairSync, sign } from 'node:crypto';
 import type { Request } from 'express';
-import { AppError } from '../../../packages/technical/src/errors';
+import { AppError } from '../../../packages/technical/src/errors/errors';
 import { loadReporterTokenConfig, reporterAccessClaims, verifyReporterAccessToken } from '../src/requests/reporter-token';
 
 const pair = generateKeyPairSync('rsa', { modulusLength: 3072 });

@@ -1,4 +1,4 @@
-import { Role, ScopeType } from '../../../../packages/technical/src/permissions';
+import { Role, ScopeType } from '../../../../packages/technical/src/security/permissions';
 
 export interface GrantScopeInput {
   role_code: Role;

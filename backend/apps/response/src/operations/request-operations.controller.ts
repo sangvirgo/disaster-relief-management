@@ -2,8 +2,8 @@ import {
   Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, Res, UseInterceptors,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency.interceptor';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
 import {
   AuthorityReferralDto, ContactAttemptDto, ConcurRequestDto, CorrectRegionDto, DuplicateRequestDto,
   RejectRequestDto, RequestQueueQueryDto, RequestOperationPageDto, RequestVersionDto,

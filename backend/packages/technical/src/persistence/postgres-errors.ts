@@ -1,4 +1,4 @@
-import { AppError } from './errors';
+import { AppError } from '../errors/errors';
 
 export interface ConstraintErrorMappings {
   unique?: Readonly<Record<string, string>>;

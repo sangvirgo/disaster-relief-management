@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { DataSourceOptions } from 'typeorm';
-import { BackendService, validateEnvironment } from './environment';
+import { BackendService, validateEnvironment } from '../config/environment';
 
 dotenv.config({ quiet: true });
 

@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { decodeKeysetCursor } from '../../../packages/technical/src/keyset';
+import { decodeKeysetCursor } from '../../../packages/technical/src/pagination/keyset';
 import { TrackingService } from '../src/tracking/tracking.service';
 
 const requestId = '00000000-0000-4000-8000-000000000001';

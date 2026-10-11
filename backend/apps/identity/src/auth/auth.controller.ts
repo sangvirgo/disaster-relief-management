@@ -13,8 +13,8 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { randomBytes } from 'node:crypto';
-import { AppError } from '../../../../packages/technical/src/errors';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency.interceptor';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
 import { ChangePasswordDto, LoginDto, RefreshDto, RegisterDto } from './auth.dto';
 import { AuthTransportGuard, IDENTITY_AUTH_CONFIG, IdentityRequest, IdentitySessionGuard } from './auth.guard';
 import { AuthService } from './auth.service';

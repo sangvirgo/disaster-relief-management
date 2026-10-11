@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException } from '@nestjs/common';
-import { ErrorCatalog } from './error-catalog';
-import { AppError, ErrorEnvelope } from './errors';
-import { getCorrelationId } from './correlation';
-import { BackendService } from './environment';
-import { mapPostgresError } from './postgres-errors';
+import { ErrorCatalog } from '../errors/error-catalog';
+import { AppError, ErrorEnvelope } from '../errors/errors';
+import { getCorrelationId } from '../observability/correlation';
+import { BackendService } from '../config/environment';
+import { mapPostgresError } from '../persistence/postgres-errors';
 
 function httpCode(status: number, service: BackendService): string {
   switch (status) {

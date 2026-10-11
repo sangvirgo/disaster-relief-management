@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthTransportGuard, IDENTITY_AUTH_CONFIG, IdentitySessionGuard } from './auth.guard';
 import { AuthService } from './auth.service';
-import { IdempotencyService } from '../../../../packages/technical/src/idempotency';
+import { IdempotencyService } from '../../../../packages/technical/src/idempotency/idempotency';
 import { loadIdentityAuthConfig } from './auth-security';
 import { IDENTITY_SERVICE_TOKEN_CONFIG, loadServiceTokenConfig } from './service-tokens';
 

@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors';
-import { postgresOptions } from '../../../../packages/technical/src/postgres-options';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { postgresOptions } from '../../../../packages/technical/src/persistence/postgres-options';
 import { IDENTITY_SERVICE_TOKEN_CONFIG, issueServiceToken, ServiceName, ServiceTokenConfig } from '../auth/service-tokens';
 
 interface IntrospectionRow {

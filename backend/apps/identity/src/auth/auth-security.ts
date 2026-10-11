@@ -12,8 +12,8 @@ import {
   verify,
 } from 'node:crypto';
 import { availableParallelism } from 'node:os';
-import { AppError } from '../../../../packages/technical/src/errors';
-import { PepperSet } from '../../../../packages/technical/src/secret-hash';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { PepperSet } from '../../../../packages/technical/src/security/secret-hash';
 
 export interface IdentityAuthConfig {
   issuer: string;

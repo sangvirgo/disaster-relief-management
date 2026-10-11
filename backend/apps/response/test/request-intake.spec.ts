@@ -1,4 +1,4 @@
-import { AppError } from '../../../packages/technical/src/errors';
+import { AppError } from '../../../packages/technical/src/errors/errors';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CreateProxyRequestDto, RequestLocationDto } from '../src/requests/request-intake.dto';

@@ -4,9 +4,9 @@ import { randomUUID } from 'node:crypto';
 
 const require = createRequire(import.meta.url);
 const { DataSource } = require('typeorm');
-const { AppError } = require('../../dist/packages/technical/src/errors.js');
-const { canonicalRequestHash, IdempotencyService } = require('../../dist/packages/technical/src/idempotency.js');
-const { JobRunner, claimBatch } = require('../../dist/packages/technical/src/jobs.js');
+const { AppError } = require('../../dist/packages/technical/src/errors/errors.js');
+const { canonicalRequestHash, IdempotencyService } = require('../../dist/packages/technical/src/idempotency/idempotency.js');
+const { JobRunner, claimBatch } = require('../../dist/packages/technical/src/persistence/jobs.js');
 
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
 const dataSource = new DataSource({ type: 'postgres', url: process.env.DATABASE_URL, extra: { max: 3 } });

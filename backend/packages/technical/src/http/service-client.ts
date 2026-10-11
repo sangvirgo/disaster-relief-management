@@ -1,8 +1,8 @@
 import { Agent as HttpAgent, request as httpRequest } from 'node:http';
 import { Agent as HttpsAgent, request as httpsRequest } from 'node:https';
 import { createHash } from 'node:crypto';
-import { AppError } from './errors';
-import { getCorrelationId } from './correlation';
+import { AppError } from '../errors/errors';
+import { getCorrelationId } from '../observability/correlation';
 
 export type UnavailableCode = 'IDENTITY_UNAVAILABLE' | 'RESPONSE_UNAVAILABLE' | 'LOGISTICS_UNAVAILABLE' | 'STORAGE_UNAVAILABLE';
 

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { InternalService } from './internal.service';
 import { IntrospectDto, LookupUsersDto, RequestCoordinatorQueryDto, ServiceTokenDto } from './internal.dto';
 import { AdminRequest, IdentityServiceGuard } from '../admin/admin-security';

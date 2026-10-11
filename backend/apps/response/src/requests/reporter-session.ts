@@ -1,8 +1,8 @@
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import type { Request } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors';
-import { CircuitBreakerClient } from '../../../../packages/technical/src/service-client';
-import type { Grant } from '../../../../packages/technical/src/permissions';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { CircuitBreakerClient } from '../../../../packages/technical/src/http/service-client';
+import type { Grant } from '../../../../packages/technical/src/security/permissions';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from './request-intake.service';
 import { reporterAccessClaims, ReporterAccessTokenClaims } from './reporter-token';
 

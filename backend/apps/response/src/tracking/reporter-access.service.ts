@@ -2,8 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { timingSafeEqual } from 'node:crypto';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors';
-import { hashPurposeBoundSecret, verifyPurposeBoundSecret } from '../../../../packages/technical/src/secret-hash';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { hashPurposeBoundSecret, verifyPurposeBoundSecret } from '../../../../packages/technical/src/security/secret-hash';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from '../requests/request-intake.service';
 import { ReporterSession } from '../requests/reporter-session';
 

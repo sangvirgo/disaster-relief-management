@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { AppError } from './errors';
+import { AppError } from '../errors/errors';
 
 function stableValue(value: unknown): unknown {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;

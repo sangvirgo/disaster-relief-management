@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors';
-import { canonicalRequestHash, IdempotencyService, IdempotentOutcome, IdempotentResult } from '../../../../packages/technical/src/idempotency';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { canonicalRequestHash, IdempotencyService, IdempotentOutcome, IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
 import type { ReporterSession } from '../requests/reporter-session';
 
 @Injectable()

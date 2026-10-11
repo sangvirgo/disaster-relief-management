@@ -2,9 +2,9 @@ import { randomBytes } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
-import { canonicalRequestHash, IdempotencyService } from '../../../../packages/technical/src/idempotency';
-import { AppError } from '../../../../packages/technical/src/errors';
-import { hashPurposeBoundSecret, PepperSet } from '../../../../packages/technical/src/secret-hash';
+import { canonicalRequestHash, IdempotencyService } from '../../../../packages/technical/src/idempotency/idempotency';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { hashPurposeBoundSecret, PepperSet } from '../../../../packages/technical/src/security/secret-hash';
 import { CreateProxyRequestDto, CreateSelfRequestDto } from './request-intake.dto';
 import { loadReporterTokenConfig, ReporterTokenConfig } from './reporter-token';
 

@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors';
-import { canonicalRequestHash, IdempotencyService, ResourceRef } from '../../../../packages/technical/src/idempotency';
-import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/keyset';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { canonicalRequestHash, IdempotencyService, ResourceRef } from '../../../../packages/technical/src/idempotency/idempotency';
+import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
 import { AdminRequest, IdentityAdminSupport } from '../admin/admin-security';
 import { CreateGrantDto, GrantListQueryDto, RevokeGrantDto } from './grants.dto';
 import { grantScopeIsValid, isSelfGrant } from './grant-scope';

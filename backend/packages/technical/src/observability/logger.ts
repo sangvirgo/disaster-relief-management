@@ -1,6 +1,6 @@
 import { LoggerService } from '@nestjs/common';
 import pino, { Logger, DestinationStream } from 'pino';
-import { BackendService, LogLevel } from './environment';
+import { BackendService, LogLevel } from '../config/environment';
 import { getCorrelationId } from './correlation';
 
 export const LOG_REDACT_PATHS = [

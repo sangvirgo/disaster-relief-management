@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Request } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors';
-import type { IdempotentResult } from '../../../../packages/technical/src/idempotency';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
+import type { IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
 import { ReporterSessionService } from '../requests/reporter-session';
 import { TriageRequestDto } from './request-operations.dto';
 import { RequestOperationsCommandRunner } from './request-operations.command-runner.service';

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
-import { HealthController } from '../src/health.controller';
+import { HealthController } from '../src/http/health.controller';
 
 describe('health endpoints', () => {
   const query = jest.fn<() => Promise<unknown>>();

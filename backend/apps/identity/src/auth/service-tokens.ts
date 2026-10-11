@@ -1,5 +1,5 @@
 import { KeyObject, randomUUID, sign, timingSafeEqual, verify } from 'node:crypto';
-import { AppError } from '../../../../packages/technical/src/errors';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
 
 export type ServiceName = 'identity' | 'response' | 'logistics';
 export const IDENTITY_SERVICE_TOKEN_CONFIG = Symbol('IDENTITY_SERVICE_TOKEN_CONFIG');

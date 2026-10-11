@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { DataSource, EntityManager } from 'typeorm';
-import { AppError } from './errors';
-import { ConstraintErrorMappings, withDatabaseRetry } from './postgres-errors';
+import { AppError } from '../errors/errors';
+import { ConstraintErrorMappings, withDatabaseRetry } from '../persistence/postgres-errors';
 
 export interface ResourceRef {
   type: string;

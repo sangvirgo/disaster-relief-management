@@ -1,7 +1,7 @@
 import { createPublicKey, KeyObject, timingSafeEqual, verify } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { Request } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
 
 export interface ReporterTokenConfig {
   issuer: string;

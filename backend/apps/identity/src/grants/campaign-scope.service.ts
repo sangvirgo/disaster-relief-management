@@ -1,6 +1,6 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
-import { CircuitBreakerClient } from '../../../../packages/technical/src/service-client';
-import { AppError } from '../../../../packages/technical/src/errors';
+import { CircuitBreakerClient } from '../../../../packages/technical/src/http/service-client';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { IDENTITY_SERVICE_TOKEN_CONFIG, issueServiceToken, ServiceTokenConfig } from '../auth/service-tokens';
 import { Inject } from '@nestjs/common';
 

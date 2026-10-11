@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, Inject, Injectable } from '@nestjs/commo
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import { DataSource } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { parseCookies, verifyAccessToken, verifyCsrfToken, IdentityAuthConfig } from './auth-security';
 
 export const IDENTITY_AUTH_CONFIG = Symbol('IDENTITY_AUTH_CONFIG');

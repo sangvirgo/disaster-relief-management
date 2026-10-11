@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors';
-import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/keyset';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
 import { AuditListQueryDto } from './audit.dto';
 
 interface AuditRow {

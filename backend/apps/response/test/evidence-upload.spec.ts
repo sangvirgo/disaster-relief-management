@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough, Readable } from 'node:stream';
 import type { Request } from 'express';
-import { AppError } from '../../../packages/technical/src/errors';
+import { AppError } from '../../../packages/technical/src/errors/errors';
 import { stageEvidenceMultipart } from '../src/evidence/evidence-upload';
 
 function multipart(file: Buffer, filename = 'photo.png', declaredType = 'application/octet-stream') {

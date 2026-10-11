@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { Request } from 'express';
 import type { EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors';
-import type { IdempotentResult } from '../../../../packages/technical/src/idempotency';
-import { hasPermission } from '../../../../packages/technical/src/permissions';
+import { AppError } from '../../../../packages/technical/src/errors/errors';
+import type { IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
+import { hasPermission } from '../../../../packages/technical/src/security/permissions';
 import { ReporterSessionService } from '../requests/reporter-session';
 import type { SupplementReviewDto } from './request-operations.dto';
 import { asObject, checkVersion, cleanText } from './request-operations.helpers';

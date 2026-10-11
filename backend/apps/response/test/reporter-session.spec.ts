@@ -1,6 +1,6 @@
 import { generateKeyPairSync, sign } from 'node:crypto';
 import type { Request } from 'express';
-import { AppError } from '../../../packages/technical/src/errors';
+import { AppError } from '../../../packages/technical/src/errors/errors';
 import { ReporterSessionService } from '../src/requests/reporter-session';
 import { loadReporterTokenConfig } from '../src/requests/reporter-token';
 import type { RequestIntakeConfig } from '../src/requests/request-intake.service';
