@@ -87,10 +87,14 @@ function proxyBody(coordinates) {
   };
 }
 
-async function createRequest(reporter, mode, body) {
+async function createRequest(reporter, mode, body, forwardedIp) {
   const result = await call(responseUrl, mode === 'PROXY' ? 'requests/proxy' : 'requests', {
     method: 'POST', body,
-    headers: { Authorization: `Bearer ${reporter.token}`, 'Idempotency-Key': key() },
+    headers: {
+      Authorization: `Bearer ${reporter.token}`,
+      'Idempotency-Key': key(),
+      ...(forwardedIp ? { 'X-Forwarded-For': forwardedIp } : {}),
+    },
   });
   assert.equal(result.status, 201, JSON.stringify(result.value));
   requestIds.push(result.value.id);
@@ -327,7 +331,7 @@ try {
   });
   assertVietnameseError(noIndependentSource, 409, 'SECOND_COORDINATOR_REQUIRED');
 
-  const candidate = await createRequest(reporter, 'SELF', selfBody([105.115, 15.1], '+84987654321'));
+  const candidate = await createRequest(reporter, 'SELF', selfBody([105.115, 15.1], '+84987654321'), '198.51.100.77');
   const candidates = await call(responseUrl, `requests/${proxyRequests[0].id}/verification-candidates`, {
     headers: { Authorization: `Bearer ${coordinator.token}` },
   });
