@@ -7,6 +7,7 @@ import { InitialLogistics1710000000000 } from './database/migrations/InitialLogi
 import { ReceiptsModule } from './receipts/receipts.module';
 import { StockModule } from './stock/stock.module';
 import { DrivesModule } from './drives/drives.module';
+import { NeedsModule } from './needs/needs.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { DrivesModule } from './drives/drives.module';
     AssetsModule,
     StockModule,
     DrivesModule,
+    NeedsModule,
     ReceiptsModule,
   ],
 })
