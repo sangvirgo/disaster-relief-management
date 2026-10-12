@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname -- "$0")/../dev/lib.sh"
+
+C48_TEST_PROJECT="c48-t8-explain-$$"
+export C48_TEST_PROJECT
+
+cleanup() {
+  test_compose exec -T postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres \
+    -c 'DROP DATABASE IF EXISTS c48_response_explain WITH (FORCE)' >/dev/null 2>&1 || true
+  test_compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+test_compose up -d --wait --wait-timeout 90 postgres
+test_compose exec -T postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres \
+  -c 'CREATE DATABASE c48_response_explain'
+test_compose exec -T -w /schema postgres psql -X -v ON_ERROR_STOP=1 -U postgres \
+  -d c48_response_explain -f explain-response.sql
