@@ -34,6 +34,14 @@ describe('ReportsService summary', () => {
     expect(query).not.toHaveBeenCalled();
   });
 
+  it('rejects report windows longer than 366 days', async () => {
+    const { service, query } = setup();
+
+    await expect(service.summary({ from, to: '2027-01-03T00:00:00Z', campaign_id: '00000000-0000-4000-8000-000000000003' }, {} as Request))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it('returns scoped counts, medians, and mission totals without request data', async () => {
     const { service, query } = setup();
 

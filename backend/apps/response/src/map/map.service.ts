@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource } from 'typeorm';
@@ -7,12 +7,13 @@ import { mapPostgresError } from '../../../../packages/technical/src/persistence
 import { scopeSql } from '../operations/request-operations.helpers';
 import { ReporterSessionService } from '../requests/reporter-session';
 import { analyticsCacheKey, AnalyticsCache, dateWindowFilters, optionalText } from '../analytics/analytics.helpers';
+import { MAP_CONFIG } from './map.config';
+import type { MapConfig } from './map.config';
 import { HeatmapQueryDto } from './map.dto';
 
 const confirmedStatuses = "'VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING'";
 const unverifiedStatuses = "'SUBMITTED','VERIFYING'";
 const supportedCellSizes = [250, 500, 1_000, 2_000, 5_000] as const;
-const projectionEpsg = 32648;
 const maxCells = 5_000;
 
 interface HeatmapRow {
@@ -28,6 +29,7 @@ export class MapService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly sessions: ReporterSessionService,
+    @Inject(MAP_CONFIG) private readonly config: MapConfig,
   ) {}
 
   async heatmap(query: HeatmapQueryDto, request: Request): Promise<Record<string, unknown>> {
@@ -61,7 +63,7 @@ export class MapService {
     if (cached) return cached;
 
     const sql = `WITH cells AS (
-      SELECT ST_SnapToGrid(ST_Transform(r.location::geometry, ${projectionEpsg}), $${cellSizeParameter}::float8) AS center,
+      SELECT ST_SnapToGrid(ST_Transform(r.location::geometry, ${this.config.projectionEpsg}), $${cellSizeParameter}::float8) AS center,
              COUNT(*)::int AS count
         FROM assistance_request r
        WHERE ${clauses.join('\n         AND ')}
@@ -73,7 +75,7 @@ export class MapService {
                                         ST_Y(center)-$${cellSizeParameter}::float8/2,
                                         ST_X(center)+$${cellSizeParameter}::float8/2,
                                         ST_Y(center)+$${cellSizeParameter}::float8/2,
-                                        ${projectionEpsg})) AS cell,
+                                        ${this.config.projectionEpsg})) AS cell,
            ST_AsGeoJSON(center) AS center, count
       FROM cells
      ORDER BY ST_X(center), ST_Y(center)`;

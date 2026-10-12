@@ -10,13 +10,14 @@ const from = '2026-01-01T00:00:00Z';
 const to = '2026-01-02T00:00:00Z';
 const coordinatorGrant: Grant = { role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId };
 
-function setup(rows: unknown[] = []) {
+function setup(rows: unknown[] = [], projectionEpsg = 32648) {
   const query = jest.fn(async () => rows);
   const dataSource = {
     transaction: jest.fn(async (operation: (manager: { query: typeof query }) => Promise<unknown>) => operation({ query })),
   } as unknown as DataSource;
   const sessions = { require: jest.fn(async () => ({ userId, grants: [coordinatorGrant] })) };
-  return { service: new MapService(dataSource, sessions as never), query, dataSource, sessions };
+  const service = new MapService(dataSource, sessions as never, { projectionEpsg });
+  return { service, query, dataSource, sessions };
 }
 
 describe('MapService heatmap', () => {
@@ -24,6 +25,18 @@ describe('MapService heatmap', () => {
     const { service, dataSource } = setup();
 
     await expect(service.heatmap({ from, to }, {} as Request)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { from: '2026-01-01T00:00:00+07:00', to },
+    { from: to, to: from },
+    { from, to: '2026-02-02T00:00:00Z' },
+  ])('rejects invalid, reversed, or overlong UTC windows', async (window) => {
+    const { service, dataSource } = setup();
+
+    await expect(service.heatmap({ ...window, region_code: 'VN01' }, {} as Request))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
     expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 
@@ -60,6 +73,15 @@ describe('MapService heatmap', () => {
     expect(sql).toContain('r.organization_id=$');
     expect(sql).toContain('r.region_code=$');
     expect(sql).not.toMatch(/\bSELECT\s+(?:r\.)?id\b|reporter_contact_phone|tracking_code/i);
+  });
+
+  it('uses the configured projection EPSG in its SQL', async () => {
+    const { service, query } = setup([], 3857);
+
+    await service.heatmap({ from, to, region_code: 'VN01' }, {} as Request);
+
+    expect(query.mock.calls[1]![0]).toContain('3857');
+    expect(query.mock.calls[1]![0]).not.toContain('32648');
   });
 
   it('fails instead of returning a partial map when the cell cap is exceeded', async () => {
