@@ -7,6 +7,7 @@ import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { hasPermission } from '../../../../packages/technical/src/security/permissions';
 import { requireWarehousePermission, hasWarehouseScope } from '../stock/stock.scope';
+import { decimalFromUnits } from '../common/quantity';
 import {
   CreateDonationReceiptDto, RecordReceiptCountDto, ReleaseHeldDonationDto, ResolveDonationDisputeDto,
   ReviewDonationReceiptDto, PostDonationReceiptDto, ReceiptCountLineDto,
@@ -558,12 +559,4 @@ export class DonationReceiptsService {
     return { ...dispute, opened_at: new Date(dispute.opened_at as Date | string).toISOString(),
       resolved_at: dispute.resolved_at ? new Date(dispute.resolved_at).toISOString() : null };
   }
-}
-
-function decimalFromUnits(units: bigint, scale: number): string {
-  if (scale === 0) return units.toString();
-  const divisor = 10n ** BigInt(scale);
-  const integer = units / divisor;
-  const fraction = (units % divisor).toString().padStart(scale, '0');
-  return `${integer}.${fraction}`;
 }

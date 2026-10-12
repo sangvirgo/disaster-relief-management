@@ -5,6 +5,7 @@ import request from 'supertest';
 import { ApiExceptionFilter, loadErrorCatalog } from '../../../packages/technical/src';
 import { LOGISTICS_IDENTITY_CLIENT, LOGISTICS_IDENTITY_CONFIG, LogisticsIdentityService } from '../src/auth/logistics-identity.service';
 import { LOGISTICS_AUTH_CONFIG, LogisticsSessionService } from '../src/auth/logistics-session.service';
+import { NeedCommandsService } from '../src/needs/need-commands.service';
 import { NeedsModule } from '../src/needs/needs.module';
 import { NeedsService } from '../src/needs/needs.service';
 import { ResponseAdmissionClient, RESPONSE_ADMISSION_CLIENT, RESPONSE_ADMISSION_CONFIG } from '../src/needs/response-admission.client';
@@ -23,10 +24,16 @@ describe('POST /needs HTTP', () => {
       replay: false,
     })),
   };
+  const commands = {
+    increase: jest.fn(async () => ({ status: 200, value: { id: needId, requested_quantity: '4' }, replay: true })),
+    reduce: jest.fn(async () => ({ status: 200, value: { id: needId, requested_quantity: '2' }, replay: false })),
+    cancel: jest.fn(async () => ({ status: 200, value: { id: needId, status: 'CANCELLED' }, replay: false })),
+  };
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({ imports: [NeedsModule] })
       .overrideProvider(NeedsService).useValue(needs)
+      .overrideProvider(NeedCommandsService).useValue(commands)
       .overrideProvider(ResponseAdmissionClient).useValue({})
       .overrideProvider(RESPONSE_ADMISSION_CONFIG).useValue({ baseUrl: 'http://127.0.0.1:1', timeoutMs: 2_000 })
       .overrideProvider(RESPONSE_ADMISSION_CLIENT).useValue({ close: () => undefined })
@@ -69,5 +76,18 @@ describe('POST /needs HTTP', () => {
     expect(result.body.code).toBe('VALIDATION_FAILED');
     expect(result.body.message).toMatch(/[Ă-ưẠ-ỹ]/u);
     expect(needs.create).not.toHaveBeenCalled();
+  });
+
+  it('routes versioned need changes through the command service and marks replay responses', async () => {
+    const result = await request(app.getHttpServer())
+      .post(`/api/v1/logistics/needs/${needId}/increase`)
+      .set('Idempotency-Key', idempotencyKey)
+      .send({ expected_version: 1, quantity: '4', reason: 'Bổ sung nhu cầu.' })
+      .expect(200)
+      .expect('Cache-Control', 'no-store')
+      .expect('Idempotent-Replay', 'true');
+
+    expect(result.body).toEqual({ id: needId, requested_quantity: '4' });
+    expect(commands.increase).toHaveBeenCalledWith(needId, { expected_version: 1, quantity: '4', reason: 'Bổ sung nhu cầu.' }, expect.any(Object));
   });
 });

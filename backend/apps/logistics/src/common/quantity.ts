@@ -27,3 +27,13 @@ export function quantityUnits(value: string, scale: number): bigint {
   const units = BigInt(`${integer}${fraction.padEnd(scale, '0')}`);
   return negative ? -units : units;
 }
+
+export function decimalFromUnits(units: bigint, scale: number): string {
+  if (scale === 0) return units.toString();
+  const negative = units < 0n;
+  const absolute = negative ? -units : units;
+  const divisor = 10n ** BigInt(scale);
+  const integer = absolute / divisor;
+  const fraction = (absolute % divisor).toString().padStart(scale, '0');
+  return `${negative ? '-' : ''}${integer}.${fraction}`;
+}

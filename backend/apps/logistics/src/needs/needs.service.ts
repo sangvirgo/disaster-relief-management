@@ -1,18 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import type { Request } from 'express';
 import { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import {
   canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef,
 } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission, Grant } from '../../../../packages/technical/src/security/permissions';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { validateQuantity } from '../common/quantity';
 import { CreateNeedDto } from './needs.dto';
+import { NeedCommandRequest, needCommandKey, NeedRow, readNeed, requireNeedManage, writeNeedAudit } from './needs.helpers';
 import { ResponseAdmission, ResponseAdmissionClient } from './response-admission.client';
 
-export type NeedCommandRequest = Request & { idempotencyKey?: string };
+export type { NeedCommandRequest } from './needs.helpers';
 
 interface CycleRow extends Pick<ResponseAdmission, 'request_id' | 'work_cycle' | 'organization_id' | 'region_code' | 'campaign_id'> {
   id: string;
@@ -35,36 +34,6 @@ interface ReliefPointRow {
   status: 'ACTIVE' | 'INACTIVE';
 }
 
-interface NeedRow extends Record<string, unknown> {
-  id: string;
-  cycle_id: string;
-  request_id: string;
-  work_cycle: number;
-  organization_id: string;
-  region_code: string | null;
-  campaign_id: string | null;
-  item_id: string;
-  item_name: string;
-  unit_code: string;
-  unit_name: string;
-  unit_scale: number;
-  original_quantity: string;
-  requested_quantity: string;
-  cancelled_remaining: string | null;
-  designated_point_id: string | null;
-  status: 'OPEN' | 'PARTIALLY_FULFILLED' | 'FULFILLED' | 'CANCELLED';
-  version: number | string;
-  created_at: Date | string;
-}
-
-const idempotencyKeyPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-
-function key(request: NeedCommandRequest): string {
-  const value = request.idempotencyKey;
-  if (!value || !idempotencyKeyPattern.test(value)) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
-  return value;
-}
-
 function requestHash(dto: CreateNeedDto): string {
   return canonicalRequestHash({
     request_id: dto.request_id,
@@ -77,64 +46,10 @@ function requestHash(dto: CreateNeedDto): string {
   });
 }
 
-function hasNeedManage(grants: readonly Grant[], scope: Pick<ResponseAdmission, 'organization_id' | 'region_code' | 'campaign_id'>): boolean {
-  return hasPermission(grants, 'NEED_MANAGE', {
-    organizationId: scope.organization_id,
-    regionCode: scope.region_code,
-    campaignId: scope.campaign_id,
-  });
-}
-
-function requireNeedManage(grants: readonly Grant[], scope: Pick<ResponseAdmission, 'organization_id' | 'region_code' | 'campaign_id'>): void {
-  if (!hasNeedManage(grants, scope)) throw new AppError('FORBIDDEN', { status: 403 });
-}
-
 function sameAttribution(cycle: CycleRow, admission: ResponseAdmission): boolean {
   return cycle.request_id === admission.request_id && cycle.work_cycle === admission.work_cycle &&
     cycle.organization_id === admission.organization_id && cycle.region_code === admission.region_code &&
     cycle.campaign_id === admission.campaign_id;
-}
-
-function needValue(row: NeedRow): Record<string, unknown> {
-  const createdAt = row.created_at instanceof Date ? row.created_at : new Date(row.created_at);
-  return {
-    id: row.id,
-    cycle_id: row.cycle_id,
-    request_id: row.request_id,
-    work_cycle: Number(row.work_cycle),
-    organization_id: row.organization_id,
-    region_code: row.region_code,
-    campaign_id: row.campaign_id,
-    item_id: row.item_id,
-    item: {
-      id: row.item_id,
-      name: row.item_name,
-      unit: { code: row.unit_code, display_name: row.unit_name, scale: Number(row.unit_scale) },
-    },
-    original_quantity: row.original_quantity,
-    requested_quantity: row.requested_quantity,
-    cancelled_remaining: row.cancelled_remaining,
-    delivery_target_kind: row.designated_point_id === null ? 'FINAL_RECIPIENT' : 'RELIEF_POINT',
-    designated_point_id: row.designated_point_id,
-    status: row.status,
-    version: Number(row.version),
-    created_at: createdAt.toISOString(),
-  };
-}
-
-async function readNeed(manager: Pick<EntityManager, 'query'>, id: string): Promise<Record<string, unknown>> {
-  const rows = await manager.query(
-    `SELECT n.id,n.cycle_id,c.request_id,c.work_cycle,c.organization_id,c.region_code,c.campaign_id,
-            n.item_id,i.name AS item_name,u.code AS unit_code,u.display_name AS unit_name,u.scale AS unit_scale,
-            n.original_quantity::text,n.requested_quantity::text,n.cancelled_remaining::text,
-            n.designated_point_id,n.status,n.version,n.created_at
-       FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id
-       JOIN item i ON i.id=n.item_id JOIN unit u ON u.code=i.unit_code
-      WHERE n.id=$1`,
-    [id],
-  ) as NeedRow[];
-  if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
-  return needValue(rows[0]);
 }
 
 async function lockCycle(
@@ -182,20 +97,6 @@ async function loadReliefPoint(manager: Pick<EntityManager, 'query'>, id: string
   return point;
 }
 
-async function writeNeedAudit(
-  manager: Pick<EntityManager, 'query'>,
-  actorId: string,
-  needId: string,
-  after: Record<string, unknown>,
-  reason: string | null,
-): Promise<void> {
-  await manager.query(
-    `INSERT INTO audit_log (actor_user_id,action,entity_type,entity_id,before_state,after_state,reason)
-     VALUES ($1,'NEED_CREATED','relief_need',$2,NULL,$3::jsonb,$4)`,
-    [actorId, needId, JSON.stringify(after), reason],
-  );
-}
-
 @Injectable()
 export class NeedsService {
   constructor(
@@ -207,7 +108,7 @@ export class NeedsService {
 
   async create(dto: CreateNeedDto, request: NeedCommandRequest): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    const idempotencyKey = key(request);
+    const idempotencyKey = needCommandKey(request);
     if (dto.designated_point_id && (!dto.reason || !dto.reason.trim())) {
       throw new AppError('VALIDATION_FAILED', { status: 400 });
     }
@@ -249,7 +150,7 @@ export class NeedsService {
         const id = inserted[0]?.id;
         if (!id) throw new AppError('INTERNAL_ERROR', { status: 500 });
         const value = await readNeed(manager, id);
-        await writeNeedAudit(manager, session.userId, id, value, dto.reason ?? null);
+        await writeNeedAudit(manager, session.userId, 'NEED_CREATED', id, null, value, dto.reason ?? null);
         return { status: 201, value, resource: { type: 'relief_need', id } };
       },
       replay: async (manager, resource: ResourceRef | null) => {

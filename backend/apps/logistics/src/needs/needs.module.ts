@@ -4,6 +4,7 @@ import { IdempotencyService } from '../../../../packages/technical/src/idempoten
 import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
 import { LogisticsAuthModule } from '../auth/logistics-auth.module';
 import { NeedsController } from './needs.controller';
+import { NeedCommandsService } from './need-commands.service';
 import { NeedsService } from './needs.service';
 import {
   loadResponseAdmissionConfig, ResponseAdmissionClient, RESPONSE_ADMISSION_CLIENT,
@@ -15,6 +16,7 @@ import {
   controllers: [NeedsController],
   providers: [
     NeedsService,
+    NeedCommandsService,
     IdempotencyService,
     IdempotencyKeyInterceptor,
     ResponseAdmissionClient,
