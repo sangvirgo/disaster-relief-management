@@ -280,7 +280,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
   async reconcilePending(): Promise<number> {
     let objects: Array<{ id: string; object_key: string }> = [];
     const ran = await this.jobs.runOnce('response.evidence.reconcile.pending', async (manager) => {
-      const [rows] = await manager.query(
+      const rows = await manager.query(
         `WITH candidates AS (
            SELECT id,state FROM evidence_metadata
             WHERE created_at<clock_timestamp()-interval '15 minutes'
@@ -295,7 +295,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
          UNION ALL
          SELECT e.id,e.object_key FROM evidence_metadata e JOIN candidates c ON c.id=e.id
           WHERE c.state='FAILED' AND e.state='FAILED' AND e.cleanup_completed_at IS NULL`,
-      ) as [Array<{ id: string; object_key: string }>, number];
+      ) as Array<{ id: string; object_key: string }>;
       objects = rows;
       return rows.length;
     });
