@@ -17,6 +17,11 @@ export class RequestOperationPageDto {
   declare limit?: number;
 }
 
+export class TeamCandidatesQueryDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1)
+  declare radius_m?: number;
+}
+
 export class RequestQueueQueryDto extends RequestOperationPageDto {
   @IsOptional() @IsIn(statuses)
   declare status?: string;

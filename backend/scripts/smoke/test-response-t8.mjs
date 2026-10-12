@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { runTeamCandidatesSmoke } from './test-response-t8-team-candidates.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -8,7 +9,7 @@ const responseUrl = process.env.TEST_RESPONSE_BASE_URL;
 const identityUrl = process.env.TEST_IDENTITY_BASE_URL;
 const responseDb = new Client({ connectionString: process.env.TEST_RESPONSE_DATABASE_URL });
 const identityDb = new Client({ connectionString: process.env.TEST_IDENTITY_DATABASE_URL });
-const organizationId = '40000000-0000-4000-8000-000000000008';
+const organizationId = '40000000-0000-4000-8000-000000000004';
 let identityIpSequence = 1;
 
 function identityIp() { return `198.51.100.${identityIpSequence++}`; }
@@ -367,6 +368,7 @@ try {
   assert.equal(memberCount.rows[0].count, 0, 'COORDINATOR teams must not create fake user accounts or memberships');
   const storedContact = await responseDb.query('SELECT external_contact_note FROM rescue_team WHERE id=$1', [created.value.id]);
   assert.equal(storedContact.rows[0].external_contact_note, externalContact);
+  await runTeamCandidatesSmoke({ responseDb, responseUrl, reporter, coordinator, otherRegionCoordinator, organizationId, appTeam, call, key });
   assert.ok(reporter.id);
   console.log('T8 response team and skill catalog smoke checks passed.');
 } finally {

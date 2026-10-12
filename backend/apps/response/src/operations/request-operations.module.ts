@@ -11,6 +11,7 @@ import { RequestOperationsTriageService } from './request-operations.triage.serv
 import { RequestOperationsDedupReferralService } from './request-operations.dedup-referral.service';
 import { RequestOperationsVerificationService } from './request-operations.verification.service';
 import { RequestOperationsSupplementReviewService } from './request-operations.supplement-review.service';
+import { RequestOperationsTeamCandidatesService } from './request-operations.team-candidates.service';
 
 @Module({
   imports: [RequestIntakeModule],
@@ -26,6 +27,7 @@ import { RequestOperationsSupplementReviewService } from './request-operations.s
     RequestOperationsDedupReferralService,
     RequestOperationsVerificationService,
     RequestOperationsSupplementReviewService,
+    RequestOperationsTeamCandidatesService,
   ],
   exports: [RequestOperationsService],
 })
