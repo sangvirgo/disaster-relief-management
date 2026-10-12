@@ -12,10 +12,13 @@ import { RequestOperationsDedupReferralService } from './request-operations.dedu
 import { RequestOperationsVerificationService } from './request-operations.verification.service';
 import { RequestOperationsSupplementReviewService } from './request-operations.supplement-review.service';
 import { RequestOperationsTeamCandidatesService } from './request-operations.team-candidates.service';
+import { RequestAdmissionController } from './request-admission.controller';
+import { RequestAdmissionService } from './request-admission.service';
+import { ResponseServiceTokenGuard } from '../campaigns/service-token.guard';
 
 @Module({
   imports: [RequestIntakeModule],
-  controllers: [RequestOperationsController],
+  controllers: [RequestOperationsController, RequestAdmissionController],
   providers: [
     { provide: REQUEST_OPERATIONS_CONFIG, useFactory: () => RequestOperationsService.config() },
     RequestOperationsService,
@@ -28,6 +31,8 @@ import { RequestOperationsTeamCandidatesService } from './request-operations.tea
     RequestOperationsVerificationService,
     RequestOperationsSupplementReviewService,
     RequestOperationsTeamCandidatesService,
+    RequestAdmissionService,
+    ResponseServiceTokenGuard,
   ],
   exports: [RequestOperationsService],
 })
