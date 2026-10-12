@@ -69,4 +69,22 @@ if ! test_compose run --rm --no-deps logistics-t11-test; then
   test_compose logs --no-color --tail=200 postgres >&2
   exit 1
 fi
+if ! test_compose run --rm --no-deps logistics-t11-test node scripts/smoke/test-logistics-t12.mjs; then
+  printf 'Logistics T12 failed; recent API logs follow:\n' >&2
+  test_compose logs --no-color --tail=100 logistics-api >&2
+  printf 'Recent Identity API logs follow:\n' >&2
+  test_compose logs --no-color --tail=100 identity-api >&2
+  printf 'Recent PostgreSQL logs follow:\n' >&2
+  test_compose logs --no-color --tail=200 postgres >&2
+  exit 1
+fi
+test_compose stop identity-api
+if ! test_compose run --rm --no-deps logistics-t11-test node scripts/smoke/test-logistics-t12.mjs --identity-down; then
+  printf 'Logistics T12 guest-with-Identity-down check failed; recent API logs follow:\n' >&2
+  test_compose logs --no-color --tail=100 logistics-api >&2
+  printf 'Recent PostgreSQL logs follow:\n' >&2
+  test_compose logs --no-color --tail=200 postgres >&2
+  exit 1
+fi
+test_compose up -d --wait --wait-timeout 60 identity-api
 echo "Backend database checks passed."

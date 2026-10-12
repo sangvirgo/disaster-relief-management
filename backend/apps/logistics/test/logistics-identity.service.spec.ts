@@ -10,6 +10,21 @@ const config: LogisticsIdentityConfig = {
 };
 
 describe('Logistics Identity region lookup', () => {
+  it('caches service tokens independently by audience', async () => {
+    const post = jest.fn(async (_path: string, body: { audience: string }) => ({
+      status: 200,
+      body: { access_token: `${body.audience}-token`, expires_in: 300 },
+    }));
+    const identity = new LogisticsIdentityService({ post } as never, config);
+
+    await expect(identity.serviceToken('identity')).resolves.toBe('identity-token');
+    await expect(identity.serviceToken('response')).resolves.toBe('response-token');
+    await expect(identity.serviceToken('response')).resolves.toBe('response-token');
+
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(post.mock.calls.map(([, body]) => body.audience)).toEqual(['identity', 'response']);
+  });
+
   it('requires an active exact region and forwards the verified user transport', async () => {
     const client = { get: jest.fn().mockResolvedValue({
       status: 200,

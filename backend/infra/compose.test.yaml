@@ -217,6 +217,8 @@ services:
       LOGISTICS_SERVICE_CLIENT_ID: c48-logistics-test
       LOGISTICS_SERVICE_CLIENT_SECRET: c48-test-logistics-secret-not-for-deployment-0001
       INTROSPECT_TIMEOUT_MS: "500"
+      RESPONSE_BASE_URL: http://response-api:3002
+      SECRET_HASH_PEPPER_DONATION: c48-test-donation-secret-pepper-not-for-deployment-0001
     command: ["node", "dist/apps/logistics/src/main.js"]
     volumes:
       - ../test/fixtures/response-test-public.pem:/run/secrets/response-test-public.pem:ro
@@ -384,6 +386,8 @@ services:
       TEST_IDENTITY_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_identity
       TEST_LOGISTICS_BASE_URL: http://logistics-api:3003/api/v1/logistics
       TEST_IDENTITY_BASE_URL: http://identity-api:3001/api/v1/identity
+      TEST_RESPONSE_BASE_URL: http://response-api:3002/api/v1/response
+      TEST_RESPONSE_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_response
     command: ["node", "scripts/smoke/test-logistics-t11.mjs"]
     depends_on:
       logistics-api:
