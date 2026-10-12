@@ -98,6 +98,14 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
     return { items };
   }
 
+  async lookupRegions(codes: string[]): Promise<{ items: Array<{ code: string; name: string }> }> {
+    const items = await this.introspectionDataSource.query(
+      'SELECT code, name FROM region WHERE code = ANY($1::text[]) ORDER BY code',
+      [codes],
+    ) as Array<{ code: string; name: string }>;
+    return { items };
+  }
+
   async teamLeaderEligibility(userId: string, organizationId: string): Promise<TeamLeaderEligibility> {
     const rows = await this.introspectionDataSource.query(
       `SELECT CASE

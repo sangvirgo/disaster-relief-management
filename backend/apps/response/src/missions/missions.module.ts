@@ -16,5 +16,6 @@ import { MissionsQueriesService } from './missions-queries.service';
     MissionsQueriesService,
     MissionsOverdueService,
   ],
+  exports: [MISSIONS_CONFIG],
 })
 export class MissionsModule {}

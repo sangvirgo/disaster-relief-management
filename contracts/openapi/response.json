@@ -3316,6 +3316,7 @@
       "get": {
         "operationId": "getRequestHeatmap",
         "summary": "Aggregate requests into map cells",
+        "description": "Use strict UTC RFC 3339 timestamps ending in Z. The interval must be at most 31 days. At least one of region_code or campaign_id is required.",
         "tags": [
           "Map"
         ],
@@ -3334,7 +3335,8 @@
             "required": true,
             "schema": {
               "type": "string",
-              "format": "date-time"
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
             }
           },
           {
@@ -3343,7 +3345,8 @@
             "required": true,
             "schema": {
               "type": "string",
-              "format": "date-time"
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
             }
           },
           {
@@ -3405,7 +3408,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Aggregated cells without request identifiers or coordinates.",
+            "description": "Aggregated WGS 84 GeoJSON cells and centers without request identifiers or individual request locations.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControlNoStore"
@@ -3450,6 +3453,7 @@
       "get": {
         "operationId": "getReportSummary",
         "summary": "Get scoped request summary",
+        "description": "Use strict UTC RFC 3339 timestamps ending in Z. The interval must be at most 366 days. At least one of region_code or campaign_id is required.",
         "tags": [
           "Reports"
         ],
@@ -3468,7 +3472,8 @@
             "required": true,
             "schema": {
               "type": "string",
-              "format": "date-time"
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
             }
           },
           {
@@ -3477,7 +3482,8 @@
             "required": true,
             "schema": {
               "type": "string",
-              "format": "date-time"
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
             }
           },
           {
@@ -5745,8 +5751,9 @@
         },
         "additionalProperties": false
       },
-      "GeoJsonGeometry": {
+      "GeoJsonPoint": {
         "type": "object",
+        "description": "GeoJSON point with WGS 84 longitude and latitude coordinates.",
         "required": [
           "type",
           "coordinates"
@@ -5754,15 +5761,37 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": [
-              "Point",
-              "Polygon"
-            ]
+            "enum": ["Point"]
           },
           "coordinates": {
             "type": "array",
+            "items": { "type": "number" },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "additionalProperties": false
+      },
+      "GeoJsonPolygon": {
+        "type": "object",
+        "description": "GeoJSON polygon with WGS 84 longitude and latitude coordinates.",
+        "required": ["type", "coordinates"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["Polygon"]
+          },
+          "coordinates": {
+            "type": "array",
+            "minItems": 1,
             "items": {
-              "type": "array"
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": { "type": "number" },
+                "minItems": 2,
+                "maxItems": 2
+              }
             }
           }
         },
@@ -5777,10 +5806,10 @@
         ],
         "properties": {
           "cell": {
-            "$ref": "#/components/schemas/GeoJsonGeometry"
+            "$ref": "#/components/schemas/GeoJsonPolygon"
           },
           "center": {
-            "$ref": "#/components/schemas/GeoJsonGeometry"
+            "$ref": "#/components/schemas/GeoJsonPoint"
           },
           "count": {
             "type": "integer",

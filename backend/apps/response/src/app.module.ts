@@ -10,6 +10,10 @@ import { EvidenceModule } from './evidence/evidence.module';
 import { RequestOperationsModule } from './operations/request-operations.module';
 import { TeamsModule } from './teams/teams.module';
 import { MissionsModule } from './missions/missions.module';
+import { CampaignsModule } from './campaigns/campaigns.module';
+import { MapModule } from './map/map.module';
+import { ReportsModule } from './reports/reports.module';
+import { NoticesModule } from './notices/notices.module';
 
 @Module({
   imports: [
@@ -21,6 +25,10 @@ import { MissionsModule } from './missions/missions.module';
     RequestOperationsModule,
     TeamsModule,
     MissionsModule,
+    CampaignsModule,
+    MapModule,
+    ReportsModule,
+    NoticesModule,
   ],
 })
 export class AppModule {}

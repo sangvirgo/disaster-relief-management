@@ -165,6 +165,21 @@ try {
     headers: { 'Idempotency-Key': idem() },
   });
   assert.equal(region.status, 201, JSON.stringify(region.body));
+  const lookedUpRegion = await call('/internal/regions:lookup', {
+    method: 'POST', token: serviceToken.body.access_token, body: { codes: [regionCode, 'UNKNOWN_REGION'] },
+  });
+  assert.equal(lookedUpRegion.status, 200, JSON.stringify(lookedUpRegion.body));
+  assert.deepEqual(lookedUpRegion.body.items, [{ code: regionCode, name: 'Khu vực thử nghiệm' }]);
+  assert.equal(lookedUpRegion.headers.get('cache-control'), 'no-store');
+  const unauthenticatedRegionLookup = await call('/internal/regions:lookup', {
+    method: 'POST', body: { codes: [regionCode] },
+  });
+  expectError(unauthenticatedRegionLookup, 401, 'UNAUTHENTICATED');
+  const invalidRegionLookup = await call('/internal/regions:lookup', {
+    method: 'POST', token: serviceToken.body.access_token, body: { codes: ['x'.repeat(81)] },
+  });
+  expectError(invalidRegionLookup, 400, 'VALIDATION_FAILED');
+  assert.equal(invalidRegionLookup.headers.get('cache-control'), 'no-store');
   const regionList = await call('/regions?limit=100', { token: adminToken });
   assert.ok(regionList.body.items.some((item) => item.code === regionCode));
   const regionGrant = await call(`/users/${userId}/grants`, {
@@ -360,7 +375,7 @@ try {
     id: userId, display_name: 'Nhân viên cứu trợ',
   }]);
 
-  console.log('PASS Identity admin grants/revocation, last-admin guard, audit, keyset users, and service-only introspection/lookup on PostgreSQL');
+  console.log('PASS Identity admin, region/user service lookups, and authorization checks on PostgreSQL');
 } finally {
   if (familyIds.length) await database.query('DELETE FROM refresh_session WHERE family_id = ANY($1::uuid[])', [familyIds]).catch(() => undefined);
   if (userIds.length) {

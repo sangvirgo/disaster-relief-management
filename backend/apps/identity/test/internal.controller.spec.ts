@@ -1,8 +1,10 @@
 import { describe, expect, it, jest } from '@jest/globals';
+import { validate } from 'class-validator';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import type { Response } from 'express';
 import { AppError } from '../../../packages/technical/src/errors/errors';
 import { AdminRequest, IdentityServiceGuard } from '../src/admin/admin-security';
+import { RegionLookupDto } from '../src/internal/internal.dto';
 import { InternalController } from '../src/internal/internal.controller';
 import { InternalService } from '../src/internal/internal.service';
 
@@ -47,5 +49,63 @@ describe('Identity internal team leader eligibility endpoint', () => {
 
     expect(check).toHaveBeenCalledWith(dto.user_id, dto.organization_id);
     expect(response.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store');
+  });
+});
+
+describe('Identity internal region lookup endpoint', () => {
+  const dto = { codes: ['VN01', 'VN02'] };
+
+  function setup() {
+    const lookup = jest.fn(async (codes: string[]) => ({ items: codes.map((code) => ({ code, name: `Tên ${code}` })) }));
+    const service = { lookupRegions: lookup } as unknown as InternalService;
+    const controller = new InternalController(service);
+    const response = { setHeader: jest.fn() } as unknown as Response;
+    return { lookup, controller, response };
+  }
+
+  it.each(['logistics', undefined])('rejects caller %s', async (serviceCaller) => {
+    const { lookup, controller, response } = setup();
+    await expect(controller.lookupRegions(dto, { serviceCaller } as AdminRequest, response))
+      .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it('requires the service-token guard', () => {
+    expect(Reflect.getMetadata(GUARDS_METADATA, InternalController.prototype.lookupRegions)).toContain(IdentityServiceGuard);
+  });
+
+  it('returns names only to Response and disables caching', async () => {
+    const { lookup, controller, response } = setup();
+    const result = await controller.lookupRegions(dto, { serviceCaller: 'response' } as AdminRequest, response);
+
+    expect(result).toEqual({ items: [{ code: 'VN01', name: 'Tên VN01' }, { code: 'VN02', name: 'Tên VN02' }] });
+    expect(lookup).toHaveBeenCalledWith(dto.codes);
+    expect(response.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store');
+  });
+});
+
+describe('Identity internal region lookup DTO', () => {
+  async function errorsFor(codes: unknown): Promise<unknown[]> {
+    return validate(Object.assign(new RegionLookupDto(), { codes }));
+  }
+
+  it('accepts up to 100 nonblank string codes of at most 80 characters', async () => {
+    const errors = await errorsFor(['x'.repeat(80), ...Array.from({ length: 99 }, (_, index) => `R${index}`)]);
+    expect(errors).toHaveLength(0);
+    expect(await errorsFor(['VN01'])).toHaveLength(0);
+  });
+
+  it('rejects malformed region lookup codes', async () => {
+    for (const codes of [
+      'VN01',
+      [],
+      Array.from({ length: 101 }, (_, index) => `R${index}`),
+      [''],
+      ['   '],
+      ['x'.repeat(81)],
+      [42],
+    ]) {
+      expect(await errorsFor(codes)).not.toHaveLength(0);
+    }
   });
 });

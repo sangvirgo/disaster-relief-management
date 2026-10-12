@@ -44,7 +44,7 @@ describe('NoticesService', () => {
       .rejects.toMatchObject({ code: 'CURSOR_INVALID' });
 
     await service.list({ unread: 'true' }, {} as never);
-    expect(dataSource.query.mock.calls[0]?.[0]).toContain('read_at IS NULL');
+    expect(dataSource.query.mock.calls[0]?.[0]).toContain('recipient_user_id=$1 AND read_at IS NULL');
   });
 
   it('filters notices that have already been read', async () => {
@@ -52,7 +52,7 @@ describe('NoticesService', () => {
 
     await service.list({ unread: 'false' }, {} as never);
 
-    expect(dataSource.query.mock.calls[0]?.[0]).toContain('read_at IS NOT NULL');
+    expect(dataSource.query.mock.calls[0]?.[0]).toContain('recipient_user_id=$1 AND read_at IS NOT NULL');
   });
 
   it('rejects malformed cursor sort values before querying the database', async () => {
@@ -73,7 +73,7 @@ describe('NoticesService', () => {
 
   it('sets the first read time once and returns the owned notice read state', async () => {
     const readAt = '2026-10-11T12:35:00.000Z';
-    const { service, dataSource } = makeService([[{ id: noticeId, read_at: readAt }]]);
+    const { service, dataSource } = makeService([[[{ id: noticeId, read_at: readAt }], 1]]);
 
     await expect(service.markRead(noticeId, {} as never)).resolves.toEqual({ id: noticeId, read_at: readAt });
     expect(dataSource.query.mock.calls[0]?.[0]).toContain('COALESCE(read_at,clock_timestamp())');
@@ -82,7 +82,7 @@ describe('NoticesService', () => {
   });
 
   it('hides notices owned by other recipients', async () => {
-    const { service } = makeService([[]]);
+    const { service } = makeService([[[], 0]]);
 
     await expect(service.markRead(noticeId, {} as never)).rejects.toBeInstanceOf(AppError);
   });

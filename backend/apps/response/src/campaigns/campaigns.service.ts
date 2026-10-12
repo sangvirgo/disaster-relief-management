@@ -112,7 +112,7 @@ export class CampaignsService {
           dto.starts_at === undefined ? row.starts_at : dto.starts_at,
           dto.ends_at === undefined ? row.ends_at : dto.ends_at,
         );
-        const updated = await manager.query(
+        const [updated] = await manager.query(
           `UPDATE campaign SET
              name=CASE WHEN $3::boolean THEN $4::text ELSE name END,
              objective=CASE WHEN $5::boolean THEN $6::text ELSE objective END,
@@ -123,7 +123,7 @@ export class CampaignsService {
           [id, dto.expected_version, dto.name !== undefined, name ?? null, dto.objective !== undefined, dto.objective ?? null,
             dto.region_code !== undefined, dto.region_code ?? null, dto.starts_at !== undefined, dto.starts_at ?? null,
             dto.ends_at !== undefined, dto.ends_at ?? null],
-        ) as CampaignRow[];
+        ) as [CampaignRow[], number];
         const next = updated[0];
         if (!next) throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
         const before = campaignView(row);
@@ -166,11 +166,11 @@ export class CampaignsService {
           ) as unknown[];
           if (open.length) throw new AppError('CAMPAIGN_HAS_OPEN_REQUESTS', { status: 409 });
         }
-        const updated = await manager.query(
+        const [updated] = await manager.query(
           `UPDATE campaign SET status=$3,version=version+1
             WHERE id=$1 AND version=$2 RETURNING ${campaignColumns}`,
           [id, dto.expected_version, status],
-        ) as CampaignRow[];
+        ) as [CampaignRow[], number];
         const next = updated[0];
         if (!next) throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
         const before = campaignView(row);

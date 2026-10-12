@@ -168,6 +168,42 @@ describe('CampaignsService', () => {
     expect(managerQuery).toHaveBeenCalledTimes(2);
   });
 
+  it('reads the returned campaign row from TypeORM UPDATE results when transitioning status', async () => {
+    const { service, managerQuery } = fixture([{
+      role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationA,
+      region_code: null, campaign_id: null,
+    }]);
+    const campaign = {
+      id: campaignId, organization_id: organizationA, region_code: null, name: 'Cứu trợ', objective: null,
+      status: 'DRAFT', starts_at: null, ends_at: null, version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'),
+    };
+    const activated = { ...campaign, status: 'ACTIVE', version: 2 };
+    managerQuery.mockResolvedValueOnce([campaign]).mockResolvedValueOnce([[activated], 1]).mockResolvedValueOnce([]);
+
+    const result = await service.transition(campaignId, 'activate', { expected_version: 1 }, idemKey, request);
+
+    expect(result.value).toMatchObject({ id: campaignId, status: 'ACTIVE', version: 2 });
+    expect(managerQuery.mock.calls[1]?.[0]).toContain('UPDATE campaign');
+  });
+
+  it('reads the returned campaign row from TypeORM UPDATE results when patching a draft', async () => {
+    const { service, managerQuery } = fixture([{
+      role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationA,
+      region_code: null, campaign_id: null,
+    }]);
+    const campaign = {
+      id: campaignId, organization_id: organizationA, region_code: null, name: 'Cứu trợ', objective: null,
+      status: 'DRAFT', starts_at: null, ends_at: null, version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'),
+    };
+    const patched = { ...campaign, objective: 'Hỗ trợ người dân', version: 2 };
+    managerQuery.mockResolvedValueOnce([campaign]).mockResolvedValueOnce([[patched], 1]).mockResolvedValueOnce([]);
+
+    const result = await service.patch(campaignId, { expected_version: 1, objective: 'Hỗ trợ người dân' }, idemKey, request);
+
+    expect(result.value).toMatchObject({ id: campaignId, objective: 'Hỗ trợ người dân', version: 2 });
+    expect(managerQuery.mock.calls[1]?.[0]).toContain('UPDATE campaign');
+  });
+
   it('does not allow a region-scoped manager to move a draft campaign outside that region', async () => {
     const { service, managerQuery } = fixture([{
       role_code: 'COORDINATOR', scope_type: 'REGION', organization_id: organizationA,

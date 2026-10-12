@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource } from 'typeorm';
@@ -23,7 +23,7 @@ interface HeatmapRow {
 }
 
 @Injectable()
-export class MapService {
+export class MapService implements OnModuleInit {
   private readonly cache = new AnalyticsCache<Record<string, unknown>>();
 
   constructor(
@@ -31,6 +31,25 @@ export class MapService {
     private readonly sessions: ReporterSessionService,
     @Inject(MAP_CONFIG) private readonly config: MapConfig,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    const projections = await this.dataSource.query(
+      `SELECT srid FROM spatial_ref_sys
+        WHERE srid=$1
+          AND auth_name='EPSG'
+          AND auth_srid=srid
+          AND (
+            (srtext LIKE 'PROJCS[%'
+              AND srtext ~* ',UNIT\\["(metre|meter)",1(\\.0+)?(,|\\])')
+            OR (srtext LIKE 'PROJCRS[%'
+              AND substring(srtext FROM 'CS\\[Cartesian,2\\],(.*)$') ~* 'LENGTHUNIT\\["(metre|meter)",1(\\.0+)?\\]')
+          )`,
+      [this.config.projectionEpsg],
+    ) as unknown[];
+    if (projections.length === 0) {
+      throw new Error('Invalid Response configuration: MAP_PROJECTION_EPSG must be a projected EPSG CRS that uses metres');
+    }
+  }
 
   async heatmap(query: HeatmapQueryDto, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
@@ -62,21 +81,24 @@ export class MapService {
     const cached = this.cache.get(key);
     if (cached) return cached;
 
-    const sql = `WITH cells AS (
-      SELECT ST_SnapToGrid(ST_Transform(r.location::geometry, ${this.config.projectionEpsg}), $${cellSizeParameter}::float8) AS center,
-             COUNT(*)::int AS count
+    const sql = `WITH located AS (
+      SELECT ST_SnapToGrid(ST_Transform(s.location::geometry, ${this.config.projectionEpsg}), $${cellSizeParameter}::float8) AS center
         FROM assistance_request r
+        JOIN request_subject s ON s.request_id=r.id
        WHERE ${clauses.join('\n         AND ')}
+    ), cells AS (
+      SELECT center, COUNT(*)::int AS count
+        FROM located
        GROUP BY center
        ORDER BY ST_X(center), ST_Y(center)
        LIMIT 5001
     )
-    SELECT ST_AsGeoJSON(ST_MakeEnvelope(ST_X(center)-$${cellSizeParameter}::float8/2,
+    SELECT ST_AsGeoJSON(ST_ForcePolygonCCW(ST_Transform(ST_MakeEnvelope(ST_X(center)-$${cellSizeParameter}::float8/2,
                                         ST_Y(center)-$${cellSizeParameter}::float8/2,
                                         ST_X(center)+$${cellSizeParameter}::float8/2,
                                         ST_Y(center)+$${cellSizeParameter}::float8/2,
-                                        ${this.config.projectionEpsg})) AS cell,
-           ST_AsGeoJSON(center) AS center, count
+                                        ${this.config.projectionEpsg}), 4326))) AS cell,
+           ST_AsGeoJSON(ST_Transform(center, 4326)) AS center, count
       FROM cells
      ORDER BY ST_X(center), ST_Y(center)`;
 

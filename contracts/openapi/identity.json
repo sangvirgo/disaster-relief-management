@@ -1555,6 +1555,74 @@
         }
       }
     },
+    "/internal/regions:lookup": {
+      "post": {
+        "operationId": "lookupIdentityRegions",
+        "summary": "Resolve region display names for Response campaigns",
+        "description": "Restricted to a valid Response service token. Unknown codes are omitted. Response includes Cache-Control: no-store.",
+        "tags": [
+          "Internal"
+        ],
+        "security": [
+          {
+            "IdentityServiceBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "codes"
+                ],
+                "properties": {
+                  "codes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80,
+                      "pattern": "\\S"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Unknown region codes are omitted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegionLookupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/internal/request-coordinators": {
       "post": {
         "operationId": "listRequestCoordinatorGrants",
@@ -2867,6 +2935,32 @@
                   "format": "uuid"
                 },
                 "display_name": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "RegionLookupResponse": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "code",
+                "name"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "name": {
                   "type": "string"
                 }
               }

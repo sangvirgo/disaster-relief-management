@@ -46,7 +46,7 @@ export class NoticesService {
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
     if (cursor && !validCursor(cursor)) throw new AppError('CURSOR_INVALID', { status: 400 });
     const limit = query.limit ?? 50;
-    const unreadClause = query.unread === 'true' ? 'AND read_at IS NULL' : query.unread === 'false' ? 'AND read_at IS NOT NULL' : '';
+    const unreadClause = query.unread === 'true' ? ' AND read_at IS NULL' : query.unread === 'false' ? ' AND read_at IS NOT NULL' : '';
     const rows = await this.dataSource.query(
       `SELECT id,notice_type,payload,created_at,read_at,
               to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
@@ -75,11 +75,11 @@ export class NoticesService {
 
   async markRead(noticeId: string, request: Request): Promise<{ id: string; read_at: string }> {
     const session = await this.sessions.require(request);
-    const rows = await this.dataSource.query(
+    const [rows] = await this.dataSource.query(
       `UPDATE notice SET read_at=COALESCE(read_at,clock_timestamp())
         WHERE id=$1 AND recipient_user_id=$2 RETURNING id,read_at`,
       [noticeId, session.userId],
-    ) as Array<{ id: string; read_at: Date | string }>;
+    ) as [Array<{ id: string; read_at: Date | string }>, number];
     const row = rows[0];
     if (!row) throw new AppError('NOT_FOUND', { status: 404 });
     return { id: row.id, read_at: toIso(row.read_at) };

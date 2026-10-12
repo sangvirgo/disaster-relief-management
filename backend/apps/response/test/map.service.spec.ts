@@ -12,12 +12,14 @@ const coordinatorGrant: Grant = { role_code: 'COORDINATOR', scope_type: 'ORGANIZ
 
 function setup(rows: unknown[] = [], projectionEpsg = 32648) {
   const query = jest.fn(async () => rows);
+  const validateProjection = jest.fn(async () => [{ srid: projectionEpsg }]);
   const dataSource = {
+    query: validateProjection,
     transaction: jest.fn(async (operation: (manager: { query: typeof query }) => Promise<unknown>) => operation({ query })),
   } as unknown as DataSource;
   const sessions = { require: jest.fn(async () => ({ userId, grants: [coordinatorGrant] })) };
   const service = new MapService(dataSource, sessions as never, { projectionEpsg });
-  return { service, query, dataSource, sessions };
+  return { service, query, dataSource, sessions, validateProjection };
 }
 
 describe('MapService heatmap', () => {
@@ -69,6 +71,11 @@ describe('MapService heatmap', () => {
     expect(query.mock.calls[0]![0]).toBe("SET LOCAL statement_timeout = '5s'");
     const sql = query.mock.calls[1]![0] as string;
     expect(sql).toContain('ST_SnapToGrid');
+    expect(sql).toContain('JOIN request_subject s ON s.request_id=r.id');
+    expect(sql).toContain('ST_Transform(s.location::geometry, 32648)');
+    expect(sql).toContain('ST_Transform(ST_MakeEnvelope');
+    expect(sql).toContain('ST_ForcePolygonCCW');
+    expect(sql).toContain('ST_Transform(center, 4326)');
     expect(sql).toContain('LIMIT 5001');
     expect(sql).toContain('r.organization_id=$');
     expect(sql).toContain('r.region_code=$');
@@ -82,6 +89,28 @@ describe('MapService heatmap', () => {
 
     expect(query.mock.calls[1]![0]).toContain('3857');
     expect(query.mock.calls[1]![0]).not.toContain('32648');
+  });
+
+  it('accepts only matching EPSG projected coordinate systems with metre units', async () => {
+    const { service, validateProjection } = setup();
+
+    await expect(service.onModuleInit()).resolves.toBeUndefined();
+
+    const [sql, values] = validateProjection.mock.calls[0]! as unknown as [string, unknown[]];
+    expect(sql).toContain("auth_name='EPSG'");
+    expect(sql).toContain('auth_srid=srid');
+    expect(sql).toContain("srtext LIKE 'PROJCS[%'");
+    expect(sql).toContain("srtext LIKE 'PROJCRS[%'");
+    expect(sql).toContain('UNIT');
+    expect(sql).toContain('LENGTHUNIT');
+    expect(values).toEqual([32648]);
+  });
+
+  it('rejects projections that are missing or do not use metres', async () => {
+    const { service, validateProjection } = setup([], 4326);
+    validateProjection.mockResolvedValue([]);
+
+    await expect(service.onModuleInit()).rejects.toThrow('MAP_PROJECTION_EPSG');
   });
 
   it('fails instead of returning a partial map when the cell cap is exceeded', async () => {
