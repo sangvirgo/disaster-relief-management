@@ -8,6 +8,7 @@ const missionId = '00000000-0000-4000-8000-000000000003';
 const coordinatorId = '00000000-0000-4000-8000-000000000004';
 const organizationId = '00000000-0000-4000-8000-000000000005';
 const revisionId = '00000000-0000-4000-8000-000000000006';
+const campaignId = '00000000-0000-4000-8000-000000000007';
 
 type TestQueryable = { query: (sql: string, parameters?: unknown[]) => Promise<unknown> };
 
@@ -78,5 +79,40 @@ describe('MissionsCommandsService UPDATE RETURNING handling', () => {
       { query }, { id: requestId, version: 2, work_cycle: 1, status: 'DISPATCHED' }, coordinatorId, missionId,
     )).rejects.toMatchObject({ code: 'VERSION_CONFLICT', details: { current_version: 2 } });
     expect(query.mock.calls.some(([sql]) => sql.startsWith('INSERT INTO request_event'))).toBe(false);
+  });
+});
+
+describe('MissionsCommandsService campaign mission-offer eligibility', () => {
+  async function offerWithCampaignStatus(status: string) {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.startsWith('SELECT campaign_id FROM assistance_request')) return [{ campaign_id: campaignId }];
+      if (sql.startsWith('SELECT status FROM campaign')) return [{ status }];
+      return [];
+    });
+
+    await expect(service().offerInTransaction(
+      { query }, requestId, { expected_version: 1, team_id: teamId } as CreateMissionDto,
+      { userId: coordinatorId, grants: [] }, null,
+    )).rejects.toMatchObject({ code: status === 'PAUSED' ? 'CAMPAIGN_PAUSED' : 'CAMPAIGN_NOT_ACTIVE' });
+
+    return query;
+  }
+
+  it('keeps the paused campaign error and checks it before locking the request', async () => {
+    const query = await offerWithCampaignStatus('PAUSED');
+
+    expect(query.mock.calls.map(([sql]) => sql)).toEqual([
+      'SELECT campaign_id FROM assistance_request WHERE id=$1',
+      'SELECT status FROM campaign WHERE id=$1 FOR SHARE',
+    ]);
+  });
+
+  it.each(['DRAFT', 'CLOSED'])('rejects %s campaigns before request, team, or mission queries', async (status) => {
+    const query = await offerWithCampaignStatus(status);
+
+    expect(query.mock.calls.map(([sql]) => sql)).toEqual([
+      'SELECT campaign_id FROM assistance_request WHERE id=$1',
+      'SELECT status FROM campaign WHERE id=$1 FOR SHARE',
+    ]);
   });
 });

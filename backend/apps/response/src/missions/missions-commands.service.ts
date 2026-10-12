@@ -328,7 +328,9 @@ export class MissionsCommandsService {
     if (pointers[0].campaign_id) {
       const campaigns = await manager.query('SELECT status FROM campaign WHERE id=$1 FOR SHARE', [pointers[0].campaign_id]) as Array<{ status: string }>;
       if (!campaigns[0]) throw new AppError('NOT_FOUND', { status: 404 });
-      if (rejectPausedCampaign && campaigns[0].status === 'PAUSED') throw new AppError('CAMPAIGN_PAUSED', { status: 409 });
+      if (rejectPausedCampaign && campaigns[0].status !== 'ACTIVE') {
+        throw new AppError(campaigns[0].status === 'PAUSED' ? 'CAMPAIGN_PAUSED' : 'CAMPAIGN_NOT_ACTIVE', { status: 409 });
+      }
     }
     const rows = await manager.query(
       `SELECT id,status,version,organization_id,region_code,campaign_id,incident_category_code,priority,priority_basis,
