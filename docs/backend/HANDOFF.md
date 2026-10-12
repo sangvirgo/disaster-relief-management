@@ -75,6 +75,15 @@ T7 exit evidence: `npx tsc --noEmit` passed; `npm test` passed 18 suites / 56 te
 - **Docker cleanup:** removed 180 images labeled by `c48-test-*` Compose projects after confirming no C48 test containers remained. Existing `simmes-v3-local` images and containers were left untouched.
 - The user-added `/home/soang/c48/.codegraph/` index remains untracked and must not be staged or removed.
 
-## Next task: T8
+## T8 candidate suggestions delivered — 2026-10-12
 
-Proceed with T8 in [06](06-implementation-tasks.md), following the documented dependency order. Keep the T5 selected-provider acceptance gate tracked separately; its AIStor artifact, private-access, and restore checks remain outstanding.
+- Added read-only `GET /requests/{id}/team-candidates`, using the existing operations facade and a focused NestJS provider. The query scopes through `MISSION_ASSIGN`, filters eligibility and active missions, separates missing/stale/future positions, ranks fresh in-radius teams, and omits exact coordinates and coordinator contact details.
+- Per the user's API decisions, busy teams are absent from both lists; exactly one team is suggested when `items` is nonempty, and none is suggested when only `unknown_position` teams remain. Position source is carried in `location.source`.
+- Updated the Response OpenAPI snapshot by explicit user approval: added the documented position update route and the new candidate route. This is an intentional OpenAPI diff from the code commit; no generator was found. No migration or schema changed.
+- T8 verification: `npx tsc --noEmit` passed; `npm test` passed 20 suites / 67 Jest tests plus 2 Node checks (baseline was 18 / 56 plus 2); `npm run build` passed; `bash scripts/db/test-db` completed with the T8 smoke and backend database success markers. JSON parsing, local OpenAPI refs, operationId uniqueness, and `git diff --check` passed. The query-plan EXPLAIN was not captured because the test Compose cleanup removed the database container before it could be read.
+- Review: NestJS structure/DI and API behavior/OpenAPI reviews approved. Known limit: `radius_m` has no maximum, so unusually large values can increase query and response work.
+- Implementation commit: `131847c` (`feat(response): add team candidate suggestions`).
+
+## Next task: T9
+
+Proceed with T9 in [06](06-implementation-tasks.md), following the documented dependency order. Keep the T5 selected-provider acceptance gate tracked separately; its AIStor artifact, private-access, and restore checks remain outstanding.

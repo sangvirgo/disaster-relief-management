@@ -1717,6 +1717,63 @@
           "503": { "$ref": "#/components/responses/Error" }
         }
       }
+    },
+    "/requests/{id}/team-candidates": {
+      "get": {
+        "operationId": "listTeamCandidates",
+        "summary": "Suggest eligible teams for a request",
+        "description": "Read-only suggestions scoped by MISSION_ASSIGN. Active-mission teams are omitted. Fresh positions within radius are ranked by priority band, recent workload, distance, and team id; missing, stale, or future positions appear in unknown_position. Exactly one team is suggested when items is nonempty; no team is suggested when items is empty, even if unknown_position contains teams. Exact team coordinates and external contact details are never returned.",
+        "tags": ["Request operations"],
+        "security": [{ "NativeBearer": [] }, { "WebAccessCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/RequestId" },
+          {
+            "name": "radius_m",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 1, "default": 10000 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eligible team candidates and the parameters used for ranking.",
+            "headers": { "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TeamCandidatePage" } } }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "500": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/teams/{id}/position": {
+      "put": {
+        "operationId": "setTeamPosition",
+        "summary": "Set a team's reported position",
+        "description": "APP team leaders may report GPS or manual-pin positions for their own team. Scoped coordinators with TEAM_POSITION_SET_ANY may report COORDINATOR_REPORTED positions. Updates within 15 seconds or moving less than 25 meters are suppressed; writes return no content and are not idempotency-keyed.",
+        "tags": ["Teams"],
+        "security": [{ "NativeBearer": [] }, { "WebAccessCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/TeamId" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SetTeamPosition" } } }
+        },
+        "responses": {
+          "204": {
+            "description": "Position accepted or suppressed.",
+            "headers": { "Cache-Control": { "$ref": "#/components/headers/CacheControlNoStore" } }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "500": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
     }
   },
   "components": {
@@ -1781,6 +1838,12 @@
         "schema": { "type": "string", "format": "uuid" }
       },
       "EvidenceId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "TeamId": {
         "name": "id",
         "in": "path",
         "required": true,
@@ -2857,6 +2920,121 @@
             "properties": { "code": { "const": "SOS_RATE_CEILING" } }
           }
         ]
+      },
+      "TeamPositionLocation": {
+        "type": "object",
+        "required": ["type", "coordinates", "source"],
+        "properties": {
+          "type": { "const": "Point" },
+          "coordinates": {
+            "type": "array",
+            "prefixItems": [
+              { "type": "number", "minimum": -180, "maximum": 180 },
+              { "type": "number", "minimum": -90, "maximum": 90 }
+            ],
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "source": { "type": "string", "enum": ["GPS", "MANUAL_PIN", "COORDINATOR_REPORTED"] }
+        },
+        "additionalProperties": false
+      },
+      "SetTeamPosition": {
+        "type": "object",
+        "required": ["location", "captured_at"],
+        "properties": {
+          "location": { "$ref": "#/components/schemas/TeamPositionLocation" },
+          "accuracy_m": { "type": ["number", "null"], "minimum": 0, "maximum": 9999999.9 },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$"
+          },
+          "note": { "type": "string", "maxLength": 1000 }
+        },
+        "additionalProperties": false
+      },
+      "TeamPositionSummary": {
+        "type": "object",
+        "required": ["age_s", "accuracy_m", "source"],
+        "properties": {
+          "age_s": { "type": "integer" },
+          "accuracy_m": { "type": ["number", "null"] },
+          "source": { "type": "string", "enum": ["GPS", "MANUAL_PIN", "COORDINATOR_REPORTED"] }
+        },
+        "additionalProperties": false
+      },
+      "CandidateTeam": {
+        "type": "object",
+        "required": ["id", "name", "kind", "reporting_mode", "availability", "status", "skills", "position", "version"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "kind": { "type": "string", "enum": ["VOLUNTEER", "MILITARY", "GOVERNMENT", "OTHER"] },
+          "reporting_mode": { "type": "string", "enum": ["APP", "COORDINATOR"] },
+          "availability": { "type": "string", "enum": ["AVAILABLE", "UNAVAILABLE"] },
+          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+          "skills": { "type": "array", "items": { "type": "string" } },
+          "position": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/TeamPositionSummary" },
+              { "type": "null" }
+            ]
+          },
+          "version": { "type": "integer", "minimum": 1 }
+        },
+        "additionalProperties": false
+      },
+      "TeamCandidate": {
+        "type": "object",
+        "required": ["team", "distance_m", "position_age_s", "accuracy_m", "recent_missions_24h", "has_active_work", "in_band", "suggested"],
+        "properties": {
+          "team": { "$ref": "#/components/schemas/CandidateTeam" },
+          "distance_m": { "type": "number", "minimum": 0 },
+          "position_age_s": { "type": "integer", "minimum": 0, "maximum": 1800 },
+          "accuracy_m": { "type": ["number", "null"] },
+          "recent_missions_24h": { "type": "integer", "minimum": 0 },
+          "has_active_work": { "const": false },
+          "in_band": { "type": "boolean" },
+          "suggested": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "UnknownPositionTeamCandidate": {
+        "type": "object",
+        "required": ["team", "distance_m", "position_age_s", "accuracy_m", "recent_missions_24h", "has_active_work", "in_band", "suggested"],
+        "properties": {
+          "team": { "$ref": "#/components/schemas/CandidateTeam" },
+          "distance_m": { "type": "null" },
+          "position_age_s": { "type": ["integer", "null"] },
+          "accuracy_m": { "type": ["number", "null"] },
+          "recent_missions_24h": { "type": "integer", "minimum": 0 },
+          "has_active_work": { "const": false },
+          "in_band": { "const": false },
+          "suggested": { "const": false }
+        },
+        "additionalProperties": false
+      },
+      "TeamCandidateParameters": {
+        "type": "object",
+        "required": ["radius_m", "position_max_age_s", "priority", "distance_tolerance_m"],
+        "properties": {
+          "radius_m": { "type": "integer", "minimum": 1 },
+          "position_max_age_s": { "const": 1800 },
+          "priority": { "type": ["string", "null"], "enum": ["P1", "P2", "P3", "P4", null] },
+          "distance_tolerance_m": { "type": "integer", "enum": [0, 500, 2000] }
+        },
+        "additionalProperties": false
+      },
+      "TeamCandidatePage": {
+        "type": "object",
+        "required": ["parameters", "items", "unknown_position"],
+        "properties": {
+          "parameters": { "$ref": "#/components/schemas/TeamCandidateParameters" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/TeamCandidate" } },
+          "unknown_position": { "type": "array", "items": { "$ref": "#/components/schemas/UnknownPositionTeamCandidate" } }
+        },
+        "additionalProperties": false
       }
     }
   }
