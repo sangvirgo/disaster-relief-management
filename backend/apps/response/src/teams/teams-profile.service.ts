@@ -133,13 +133,13 @@ export class TeamsProfileService {
           if (active.length) throw new AppError('TEAM_BUSY', { status: 409 });
         }
         const before = auditState(row);
-        const updated = await manager.query(
+        const [updated] = await manager.query(
           `UPDATE rescue_team
               SET name=COALESCE($3,name),availability=COALESCE($4,availability),version=version+1
             WHERE id=$1 AND version=$2
             RETURNING id`,
           [teamId, dto.expected_version, name ?? null, dto.availability ?? null],
-        ) as Array<{ id: string }>;
+        ) as [Array<{ id: string }>, number];
         if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
         if (skillCodes) await this.replaceSkills(manager, teamId, skillCodes);
         const next = await this.queries.findTeam(manager, teamId);
