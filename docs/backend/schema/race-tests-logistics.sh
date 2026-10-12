@@ -106,6 +106,60 @@ NREV=$(q -c "SELECT count(*) FROM handoff_loss_review WHERE handoff_id='$HO'")
 ok=0; [ "$NREV" = 1 ] && [ "$R1" = 0 ] && [ "$R2" != 0 ] && [[ "$E2" == *23505* ]] && ok=1
 verdict "(d) two LOSS reviews on one handoff" $ok "loss_reviews=$NREV s1_rc=$R1 s2_rc=$R2 s2_error='${E2:0:90}'"
 
+# ---------- (e) concurrent adjustment review under distinct idempotency keys ----------
+BE=$(U 140); ADJE=$(U 141); REQUESTER=$(U 914); REVIEWER=$(U 915); KEY1=$(U 142); KEY2=$(U 143)
+q <<SQL
+INSERT INTO item (id,item_type_code,unit_code,name) VALUES ('$(U 6)','FOOD','PIECE','Gạo dự phòng');
+INSERT INTO stock_balance (id,warehouse_id,item_id) VALUES ('$BE','$WH','$(U 6)');
+$(mv_sql $BE OPENING 10 0 "" "" open-e "$(U 916)")
+INSERT INTO stock_adjustment (id,balance_id,delta_on_hand,reason,requested_by_user_id) VALUES ('$ADJE','$BE',3,'kiểm kê','$REQUESTER');
+CREATE FUNCTION race_test_review_stock_adjustment(p_adjustment_id uuid,p_reviewer_user_id uuid,p_idempotency_key uuid)
+RETURNS void LANGUAGE plpgsql AS \$function\$
+DECLARE adjustment stock_adjustment%ROWTYPE;
+BEGIN
+  INSERT INTO idempotency_record (scope_key,command,idempotency_key,request_hash)
+  VALUES ('user:'||p_reviewer_user_id::text,'logistics.stock.adjustments.review',p_idempotency_key,repeat('a',64))
+  ON CONFLICT (scope_key,command,idempotency_key) DO NOTHING;
+
+  SELECT * INTO adjustment FROM stock_adjustment WHERE id=p_adjustment_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'NOT_FOUND' USING ERRCODE='P0001'; END IF;
+  IF adjustment.status <> 'PENDING' THEN
+    RAISE EXCEPTION 'STATE_TRANSITION_INVALID' USING ERRCODE='P0001';
+  END IF;
+  IF adjustment.requested_by_user_id = p_reviewer_user_id THEN
+    RAISE EXCEPTION 'FORBIDDEN' USING ERRCODE='P0001';
+  END IF;
+
+  PERFORM 1 FROM stock_balance WHERE id=adjustment.balance_id FOR UPDATE;
+  UPDATE stock_adjustment
+     SET status='APPROVED',reviewed_by_user_id=p_reviewer_user_id,reviewed_at=now()
+   WHERE id=adjustment.id AND status='PENDING';
+  IF NOT FOUND THEN RAISE EXCEPTION 'STATE_TRANSITION_INVALID' USING ERRCODE='P0001'; END IF;
+
+  INSERT INTO stock_movement
+    (balance_id,movement_type,delta_on_hand,delta_reserved,adjustment_id,operation_ref,actor_user_id)
+  VALUES (adjustment.balance_id,'ADJUSTMENT',adjustment.delta_on_hand,0,adjustment.id,'ADJ:'||adjustment.id::text,p_reviewer_user_id);
+  INSERT INTO audit_log (actor_user_id,action,entity_type,entity_id,before_state,after_state)
+  VALUES (p_reviewer_user_id,'STOCK_ADJUSTMENT_REVIEWED','stock_adjustment',adjustment.id::text,
+          '{"status":"PENDING"}'::jsonb,'{"status":"APPROVED","decision":"APPROVE"}'::jsonb);
+  UPDATE idempotency_record
+     SET response_status=200,resource_type='stock_adjustment',resource_id=adjustment.id
+   WHERE scope_key='user:'||p_reviewer_user_id::text
+     AND command='logistics.stock.adjustments.review'
+     AND idempotency_key=p_idempotency_key;
+END
+\$function\$;
+SQL
+race e "SELECT race_test_review_stock_adjustment('$ADJE','$REVIEWER','$KEY1');" \
+       "SELECT race_test_review_stock_adjustment('$ADJE','$REVIEWER','$KEY2');"
+read -r ONH NMOV NREF NKEYS <<<"$(q -c "SELECT b.on_hand,
+  (SELECT count(*) FROM stock_movement WHERE adjustment_id='$ADJE' AND movement_type='ADJUSTMENT'),
+  (SELECT count(*) FROM stock_movement WHERE adjustment_id='$ADJE' AND operation_ref='ADJ:$ADJE'),
+  (SELECT count(*) FROM idempotency_record WHERE scope_key='user:$REVIEWER' AND command='logistics.stock.adjustments.review' AND idempotency_key IN ('$KEY1','$KEY2'))
+  FROM stock_balance b WHERE b.id='$BE'" | tr '|' ' ')"
+ok=0; [ "$KEY1" != "$KEY2" ] && [ "$ONH" = 13.000 ] && [ "$NMOV" = 1 ] && [ "$NREF" = 1 ] && [ "$NKEYS" = 1 ] && [ "$R1" = 0 ] && [ "$R2" != 0 ] && [[ "$E2" == *P0001*STATE_TRANSITION_INVALID* ]] && ok=1
+verdict "(e) concurrent review with distinct idempotency keys" $ok "on_hand=$ONH adjustment_movements=$NMOV exact_operation_refs=$NREF committed_keys=$NKEYS s1_rc=$R1 s2_rc=$R2 s2_error='${E2:0:90}'"
+
 echo
 if [ "$FAILS" -ne 0 ]; then echo "RESULT: $FAILS race(s) FAILED"; exit 1; fi
 echo "RESULT: all races PASS"

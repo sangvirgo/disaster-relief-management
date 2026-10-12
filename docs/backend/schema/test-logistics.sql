@@ -290,3 +290,23 @@ UPDATE cycle_intent SET state='ABORTED' WHERE state='FROZEN' AND intent_id='0000
 SELECT 'PASS app: cycle_intent UPDATE to ABORTED allowed (trigger limits it to that)';
 SELECT expect_sqlstate('app: cycle_intent cannot be revived (trigger)', $$UPDATE cycle_intent SET state='FROZEN'$$, '23514');
 RESET ROLE;
+
+DO $$
+DECLARE mismatch record;
+BEGIN
+  SELECT b.id,b.on_hand,b.reserved,
+         coalesce(sum(m.delta_on_hand),0) AS movement_on_hand,
+         coalesce(sum(m.delta_reserved),0) AS movement_reserved
+    INTO mismatch
+    FROM stock_balance b
+    LEFT JOIN stock_movement m ON m.balance_id=b.id
+   GROUP BY b.id,b.on_hand,b.reserved
+  HAVING b.on_hand <> coalesce(sum(m.delta_on_hand),0)
+      OR b.reserved <> coalesce(sum(m.delta_reserved),0)
+   LIMIT 1;
+  IF FOUND THEN
+    RAISE EXCEPTION 'FAIL stock_balance % does not match stock_movement sums (on_hand % vs %, reserved % vs %)',
+      mismatch.id,mismatch.on_hand,mismatch.movement_on_hand,mismatch.reserved,mismatch.movement_reserved;
+  END IF;
+  RAISE NOTICE 'PASS every stock_balance equals the sums of its stock_movement rows';
+END $$;
