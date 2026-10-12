@@ -4,6 +4,7 @@ import { HealthModule, postgresOptions } from '../../../packages/technical/src';
 import { AssetsModule } from './assets/assets.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { InitialLogistics1710000000000 } from './database/migrations/InitialLogistics1710000000000';
+import { ReceiptsModule } from './receipts/receipts.module';
 import { StockModule } from './stock/stock.module';
 import { DrivesModule } from './drives/drives.module';
 
@@ -15,6 +16,7 @@ import { DrivesModule } from './drives/drives.module';
     AssetsModule,
     StockModule,
     DrivesModule,
+    ReceiptsModule,
   ],
 })
 export class AppModule {}

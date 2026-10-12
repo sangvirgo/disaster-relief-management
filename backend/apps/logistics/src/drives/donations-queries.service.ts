@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { LogisticsSessionService, AuthenticatedLogisticsSession } from '../auth/logistics-session.service';
 import { DONATION_SECRET_CONFIG, DonationSecretConfig, verifyDonationCapability } from './donations.helpers';
+import { readReceiptLines } from '../receipts/donation-receipts.read';
 
 interface DeliveryAccessRow {
   id: string;
@@ -83,24 +84,24 @@ export class DonationsQueriesService {
 
   private async currentReceipt(id: string): Promise<Record<string, unknown> | null> {
     const rows = await this.dataSource.query(
-      `SELECT rc.revision AS count_revision,rc.note,rcl.item_id,i.name AS item_name,
-              rcl.counted_quantity::text AS counted_quantity,rcl.accepted_quantity::text AS accepted_quantity,
-              rcl.held_quantity::text AS held_quantity,rcl.rejected_quantity::text AS rejected_quantity,
-              rcl.condition_note,dl.declared_quantity::text AS declared_quantity
+      `SELECT r.id,rc.revision AS count_revision
          FROM donation_receipt r JOIN receipt_count rc ON rc.receipt_id=r.id
-         JOIN receipt_count_line rcl ON rcl.receipt_id=rc.receipt_id AND rcl.revision=rc.revision
-         JOIN item i ON i.id=rcl.item_id
-         LEFT JOIN LATERAL (
-           SELECT revision FROM receipt_count WHERE receipt_id=r.id ORDER BY revision DESC LIMIT 1
-         ) latest ON latest.revision=rc.revision
-         LEFT JOIN LATERAL (
-           SELECT declared_quantity FROM donation_line WHERE delivery_id=$1
-            AND item_id=rcl.item_id ORDER BY revision DESC LIMIT 1
-         ) dl ON true
-        WHERE r.delivery_id=$1 AND rc.revision=latest.revision ORDER BY rcl.item_id`,
+        WHERE r.delivery_id=$1 ORDER BY rc.revision DESC LIMIT 1`,
       [id],
-    ) as Array<Record<string, unknown> & { count_revision: number }>;
-    if (!rows.length) return null;
-    return { count_revision: Number(rows[0]!.count_revision), lines: rows };
+    ) as Array<{ id: string; count_revision: number }>;
+    const current = rows[0];
+    if (!current) return null;
+    return {
+      count_revision: Number(current.count_revision),
+      lines: (await readReceiptLines(this.dataSource, id, current.id, Number(current.count_revision))).map((line) => ({
+        item_id: line.item_id,
+        declared_quantity: line.declared_quantity,
+        counted_quantity: line.counted_quantity,
+        accepted_quantity: line.accepted_quantity,
+        held_quantity: line.held_quantity,
+        rejected_quantity: line.rejected_quantity,
+        condition_note: line.condition_note,
+      })),
+    };
   }
 }

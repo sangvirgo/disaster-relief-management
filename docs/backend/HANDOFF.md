@@ -1,10 +1,10 @@
-# Session handoff — C48 backend, 2026-10-11
+# Session handoff — C48 backend, 2026-10-12
 
 Read [AGENTS.md](../../AGENTS.md), [project context](../c48-project-context.md), plan Sections 27–28, then [README](README.md) → [00-setup](00-setup.md) → [01 §7–§9](01-schema-review.md). Follow the ordered task table in [06-implementation-tasks](06-implementation-tasks.md), one task at a time.
 
 ## Objective
 
-Continue implementing only the backend microservices in `/home/soang/c48`. T0–T7 implementation phases have separate commits on `main`; T7 acceptance now passes. The T5 selected-provider acceptance gate remains open pending the AIStor lab artifact, private-access, and restore checks. Proceed with T8–T19 in dependency order and commit each completed task separately. AI agent/service work is outside this scope. The API contracts and SQL in `docs/backend/` take precedence for shapes; the main plan governs business behavior.
+Continue implementing only the backend microservices in `/home/soang/c48`. T0–T13 implementation phases are committed separately on `codex/backend-t9-t19`; the T5 selected-provider acceptance gate remains open pending the AIStor lab artifact, private-access, and restore checks. Proceed with T14–T19 in dependency order and commit each completed task separately. AI agent/service work is outside this scope. The API contracts and SQL in `docs/backend/` take precedence for shapes; the main plan governs business behavior.
 
 ## T3 completed
 
@@ -92,6 +92,15 @@ T7 exit evidence: `npx tsc --noEmit` passed; `npm test` passed 18 suites / 56 te
 - Verification after this follow-up: `npm test` passed 21 Jest suites / 68 tests plus 2 Node tests; `npm run build` and `npx tsc --noEmit` passed; `bash scripts/db/test-db` passed through the T8 smoke and final backend database marker. OpenAPI snapshots and schema/migration files have no diff. `backend/dist/` remains ignored.
 - The candidate-query EXPLAIN gate is closed with `bash backend/scripts/db/check-t8-candidate-explain`. The isolated fixture seeded 200,000 requests, 3,000 teams, 2,900 positions, 5,091 skills, 20,000 missions, and 300,000 request events. Query 9 copied the current T8 eligibility SQL and used a verified request in organization `00000000-0000-0000-0000-0000000000d1`, region `R1`, radius 10,000 m. The latest `EXPLAIN (ANALYZE, BUFFERS, COSTS OFF)` returned 125 eligible rows in 8.330 ms with 1,269 shared buffer hits; PostgreSQL scanned the 3,000-row team and 2,900-row position tables, used the active-mission partial index, and used the request/subject primary keys. This is database execution time on the synthetic fixture, not an end-to-end latency guarantee; the measured SQL is copied into the fixture and can drift from the provider.
 
-## Next task: T9
+## T13 completed — 2026-10-12
 
-Proceed with T9 in [06](06-implementation-tasks.md), following the documented dependency order. Keep the T5 selected-provider acceptance gate tracked separately; its AIStor artifact, private-access, and restore checks remain outstanding.
+- Added the Logistics receipts feature module with dedicated controller, query service, command service, DTOs, shared read/mapper helpers, and helper tests. The existing donation-drive module now delegates receipt reads to the receipt query service.
+- Preserved all declared Vietnamese messages and existing API shapes; documented the dispute-resolution response. `EXPIRING_SOON` is derived using the user's selected 30-day window.
+- Corrected decimal normalization for database `numeric(18,3)` values while honoring each catalog item's quantity scale. Corrected handling of TypeORM PostgreSQL `UPDATE ... RETURNING` results (`[rows, rowCount]`) in dispute resolution.
+- Added unit and HTTP database smoke coverage for count/review revisions, exactly-once posting under concurrent requests, replay with a new key, held stock release, notification, and dispute resolution. No migration, schema, or OpenAPI snapshot changed.
+- Evidence: `npm run build` passed; `npm test` passed 51 suites / 195 Jest tests plus 2 Node tests; `npx tsc --noEmit` passed; `bash scripts/db/test-db` passed through the T13 receipt smoke and final `Backend database checks passed.` marker. `git diff --check` passed; `backend/dist/` is ignored.
+- Next: T14 needs, commitments, and fulfillment. Keep the T5 AIStor provider acceptance gate open and do not edit existing migrations/schema without an explicit task requirement.
+
+## Next task: T14
+
+Proceed with T14 in [06](06-implementation-tasks.md), following the documented dependency order. Keep the T5 selected-provider acceptance gate tracked separately; its AIStor artifact, private-access, and restore checks remain outstanding.
