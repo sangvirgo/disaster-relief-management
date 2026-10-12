@@ -84,6 +84,14 @@ T7 exit evidence: `npx tsc --noEmit` passed; `npm test` passed 18 suites / 56 te
 - Review: NestJS structure/DI and API behavior/OpenAPI reviews approved. Known limit: `radius_m` has no maximum, so unusually large values can increase query and response work.
 - Implementation commit: `131847c` (`feat(response): add team candidate suggestions`).
 
+## T8 test coverage follow-up — 2026-10-12
+
+- Added a Jest unit test for the no-region short circuit: it confirms the permission-scoped request lookup runs, candidate SQL is skipped, and both candidate lists are empty.
+- Extended the database smoke tests to cover position suppression for a move under 25 m after the 15-second window, with no position write or audit; candidate exclusion for wrong organization/region, unavailable, readiness-required, inactive, and APP teams without an active leader; and a nonexistent leader UUID returning `NOT_FOUND` without creating a team.
+- Review confirmed tests stay in the existing app test directory and database smoke layout. A blank-contact COORDINATOR fixture was rejected by the schema and removed; COORDINATOR contact presence is a database invariant rather than an insertable candidate-query fixture.
+- Verification after this follow-up: `npm test` passed 21 Jest suites / 68 tests plus 2 Node tests; `npm run build` and `npx tsc --noEmit` passed; `bash scripts/db/test-db` passed through the T8 smoke and final backend database marker. OpenAPI snapshots and schema/migration files have no diff. `backend/dist/` remains ignored.
+- The candidate-query EXPLAIN at representative scale is still open. The existing smoke fixture is small, while `schema/explain-response.sql` contains a candidate query that predates the T8 eligibility behavior; use the current query against the scale dataset before marking that gate closed.
+
 ## Next task: T9
 
 Proceed with T9 in [06](06-implementation-tasks.md), following the documented dependency order. Keep the T5 selected-provider acceptance gate tracked separately; its AIStor artifact, private-access, and restore checks remain outstanding.

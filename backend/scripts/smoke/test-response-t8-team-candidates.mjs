@@ -8,11 +8,17 @@ function assertVietnamese(result, status, code) {
   assert.equal(result.headers.get('cache-control'), 'no-store');
 }
 
-async function addCoordinatorTeam(responseDb, organizationId, coordinatorId, { id = randomUUID(), name, position, skills = ['T8_A', 'T8_C'] }) {
+async function addCandidateTeam(responseDb, organizationId, coordinatorId, {
+  id = randomUUID(), name, position, skills = ['T8_A', 'T8_C'], teamOrganizationId = organizationId,
+  regionCode = 'T8_REGION', reportingMode = 'COORDINATOR', availability = 'AVAILABLE', status = 'ACTIVE',
+  readinessRequired = false, externalContactNote = 'Liên hệ kiểm thử T8',
+}) {
   await responseDb.query(
-    `INSERT INTO rescue_team (id,organization_id,operating_region_code,name,team_kind,reporting_mode,external_contact_note)
-     VALUES ($1,$2,'T8_REGION',$3,'OTHER','COORDINATOR','Liên hệ kiểm thử T8')`,
-    [id, organizationId, `Đội ${name} ${id.slice(0, 8)}`],
+    `INSERT INTO rescue_team
+       (id,organization_id,operating_region_code,name,team_kind,reporting_mode,external_contact_note,availability,status,readiness_required)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [id, teamOrganizationId, regionCode, `Đội ${name} ${id.slice(0, 8)}`,
+      reportingMode === 'APP' ? 'VOLUNTEER' : 'OTHER', reportingMode, externalContactNote, availability, status, readinessRequired],
   );
   await responseDb.query('INSERT INTO team_skill (team_id,skill_code) SELECT $1,unnest($2::text[])', [id, skills]);
   if (position) {
@@ -61,19 +67,43 @@ export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter
   assert.match(invalidRadius.value?.message ?? '', /[\u0102-\u01b0\u1ea0-\u1ef9]/u, 'expected Vietnamese validation copy');
 
   await responseDb.query('INSERT INTO team_skill (team_id,skill_code) VALUES ($1,\'T8_C\') ON CONFLICT DO NOTHING', [appTeam.value.id]);
-  const staleTeam = await addCoordinatorTeam(responseDb, organizationId, coordinator.id, {
+  const staleTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
     name: 'vị trí cũ', position: { longitude: 104.5, latitude: 14.5, captured_at: new Date(Date.now() - 31 * 60_000) },
   });
-  const missingTeam = await addCoordinatorTeam(responseDb, organizationId, coordinator.id, { name: 'thiếu vị trí' });
-  const futureTeam = await addCoordinatorTeam(responseDb, organizationId, coordinator.id, {
+  const missingTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, { name: 'thiếu vị trí' });
+  const futureTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
     name: 'thời gian tương lai', position: { longitude: 104.5, latitude: 14.5, captured_at: new Date(Date.now() + 60_000) },
   });
-  const busyTeam = await addCoordinatorTeam(responseDb, organizationId, coordinator.id, { name: 'đang có nhiệm vụ' });
-  const farTeam = await addCoordinatorTeam(responseDb, organizationId, coordinator.id, {
+  const busyTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, { name: 'đang có nhiệm vụ' });
+  const farTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
     name: 'ngoài bán kính', position: { longitude: 104.9, latitude: 14.5, captured_at: new Date() },
   });
-  const missingSkillTeam = await addCoordinatorTeam(responseDb, organizationId, coordinator.id, {
+  const missingSkillTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
     name: 'thiếu kỹ năng', skills: ['T8_A'], position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
+  });
+  const wrongOrganizationTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+    name: 'sai tổ chức', teamOrganizationId: randomUUID(),
+    position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
+  });
+  const wrongRegionTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+    name: 'sai khu vực', regionCode: 'T8_OTHER',
+    position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
+  });
+  const unavailableTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+    name: 'không sẵn sàng', availability: 'UNAVAILABLE',
+    position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
+  });
+  const readinessRequiredTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+    name: 'cần kiểm tra sẵn sàng', readinessRequired: true,
+    position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
+  });
+  const inactiveTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+    name: 'đội ngừng hoạt động', status: 'INACTIVE',
+    position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
+  });
+  const appTeamWithoutLeader = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+    name: 'đội ứng dụng thiếu trưởng đội', reportingMode: 'APP',
+    position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
   });
 
   const event = await responseDb.query(
@@ -127,6 +157,14 @@ export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter
   assert.equal(candidates.value.items.some((item) => item.team.id === busyTeam), false, 'busy teams are not in items');
   assert.equal(candidates.value.items.some((item) => item.team.id === farTeam), false, 'fresh teams outside radius are omitted');
   assert.equal(candidates.value.items.some((item) => item.team.id === missingSkillTeam), false, 'missing required skills are excluded');
+  const eligibilityExcludedTeams = [
+    wrongOrganizationTeam, wrongRegionTeam, unavailableTeam, readinessRequiredTeam,
+    inactiveTeam, appTeamWithoutLeader,
+  ];
+  for (const teamId of eligibilityExcludedTeams) {
+    assert.equal(candidates.value.items.some((item) => item.team.id === teamId), false, `${teamId} must not be a candidate`);
+    assert.equal(unknownIds.includes(teamId), false, `${teamId} must not be an unknown-position candidate`);
+  }
 
   const noFresh = await call(responseUrl, `${endpoint}?radius_m=1`, { headers: { Authorization: `Bearer ${coordinator.token}` } });
   assert.equal(noFresh.status, 200, JSON.stringify(noFresh.value));
@@ -151,10 +189,10 @@ export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter
   const fartherTeamId = `0${randomUUID().slice(1)}`;
   const nearestTeamId = `f${randomUUID().slice(1)}`;
   assert.ok(fartherTeamId < nearestTeamId, 'farther team id sorts first to expose a rounded-distance tie');
-  await addCoordinatorTeam(responseDb, organizationId, coordinator.id, {
+  await addCandidateTeam(responseDb, organizationId, coordinator.id, {
     id: fartherTeamId, name: 'P1 xa hơn', position: { longitude: 105.2000012, latitude: 15.2, captured_at: new Date() },
   });
-  await addCoordinatorTeam(responseDb, organizationId, coordinator.id, {
+  await addCandidateTeam(responseDb, organizationId, coordinator.id, {
     id: nearestTeamId, name: 'P1 gần hơn', position: { longitude: 105.200001, latitude: 15.2, captured_at: new Date() },
   });
 

@@ -68,11 +68,11 @@ async function registerAndLogin(label, regionCode) {
   return { id: userId, token: login.value.access_token };
 }
 
-async function createAppTeam(coordinatorToken, leaderUserId) {
+async function createAppTeam(coordinatorToken, leaderUserId, name = `Đội ứng dụng ${randomBytes(4).toString('hex')}`) {
   return call(responseUrl, 'teams', {
     method: 'POST',
     body: {
-      name: `Đội ứng dụng ${randomBytes(4).toString('hex')}`, organization_id: organizationId, operating_region_code: 'T8_REGION',
+      name, organization_id: organizationId, operating_region_code: 'T8_REGION',
       team_kind: 'VOLUNTEER', reporting_mode: 'APP', leader_user_id: leaderUserId, skill_codes: ['T8_A'],
     },
     headers: { Authorization: `Bearer ${coordinatorToken}`, 'Idempotency-Key': key() },
@@ -271,6 +271,28 @@ try {
   await responseDb.query(
     `UPDATE team_position SET captured_at=clock_timestamp() - interval '16 seconds' WHERE team_id=$1`, [appTeam.value.id],
   );
+  const beforeDistanceSuppression = await responseDb.query(
+    `SELECT ST_X(location::geometry) AS longitude,ST_Y(location::geometry) AS latitude,
+            accuracy_m,source,captured_at,set_by_user_id
+       FROM team_position WHERE team_id=$1`, [appTeam.value.id],
+  );
+  const distanceSuppressedPosition = await setPosition(appTeam.value.id, reporter.token, {
+    location: { type: 'Point', coordinates: [104.5001, 14.5], source: 'MANUAL_PIN' },
+    captured_at: new Date().toISOString(), note: 'Không ghi lần cập nhật dưới 25 m',
+  });
+  assert.equal(distanceSuppressedPosition.status, 204, JSON.stringify(distanceSuppressedPosition.value));
+  const afterDistanceSuppression = await responseDb.query(
+    `SELECT ST_X(location::geometry) AS longitude,ST_Y(location::geometry) AS latitude,
+            accuracy_m,source,captured_at,set_by_user_id
+       FROM team_position WHERE team_id=$1`, [appTeam.value.id],
+  );
+  assert.deepEqual(afterDistanceSuppression.rows[0], beforeDistanceSuppression.rows[0], 'a move under 25 m must not write');
+  const auditAfterDistanceSuppression = await responseDb.query(
+    `SELECT count(*)::int AS count FROM audit_log
+      WHERE entity_type='rescue_team' AND entity_id=$1 AND action='TEAM_POSITION_SET'`, [appTeam.value.id],
+  );
+  assert.equal(auditAfterDistanceSuppression.rows[0].count, 1, 'a move under 25 m must not audit');
+
   const movedPosition = await setPosition(appTeam.value.id, reporter.token, {
     location: { type: 'Point', coordinates: [104.51, 14.5], source: 'MANUAL_PIN' },
     captured_at: new Date().toISOString(), note: 'Trưởng đội cập nhật vị trí',
@@ -353,6 +375,14 @@ try {
   const activeNonvolunteer = await registerAndLogin('active-nonvolunteer');
   await identityDb.query('INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)', [activeNonvolunteer.id, organizationId]);
   assertVietnameseError(await createAppTeam(coordinator.token, activeNonvolunteer.id), 409, 'LEADER_REQUIRED');
+
+  const nonexistentLeaderId = randomUUID();
+  const nonexistentLeaderName = `Đội thiếu người dùng ${randomBytes(4).toString('hex')}`;
+  assertVietnameseError(
+    await createAppTeam(coordinator.token, nonexistentLeaderId, nonexistentLeaderName), 404, 'NOT_FOUND',
+  );
+  const nonexistentLeaderTeam = await responseDb.query('SELECT id FROM rescue_team WHERE name=$1', [nonexistentLeaderName]);
+  assert.equal(nonexistentLeaderTeam.rowCount, 0, 'a nonexistent leader must not create a team');
 
   const outOfScope = await call(responseUrl, 'teams?region_code=T8_REGION&limit=10', {
     headers: { Authorization: `Bearer ${otherRegionCoordinator.token}` },
