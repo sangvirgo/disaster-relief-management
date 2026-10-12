@@ -1,5 +1,6 @@
 import { generateKeyPairSync, sign } from 'node:crypto';
 import type { Request } from 'express';
+import { jest } from '@jest/globals';
 import { AppError } from '../../../packages/technical/src/errors/errors';
 import { ReporterSessionService } from '../src/requests/reporter-session';
 import { loadReporterTokenConfig } from '../src/requests/reporter-token';
@@ -53,6 +54,77 @@ describe('Response optional reporter session', () => {
     expect(introspectionCalls).toBe(0);
     await expect(service.optional(request)).rejects.toMatchObject({ code: 'IDENTITY_UNAVAILABLE' });
     expect(introspectionCalls).toBe(1);
+    service.onModuleDestroy();
+  });
+
+  it('deduplicates region lookups and returns only names for requested codes', async () => {
+    const service = new ReporterSessionService({
+      identityBaseUrl: 'http://127.0.0.1:1', clientId: 'c48-response-test',
+      clientSecret: 'test-client-secret-not-for-deployment-0001', timeoutMs: 100,
+    }, intakeConfig);
+    const client = (service as unknown as { client: { post: jest.Mock } }).client;
+    client.post = jest.fn(async (path: string) => path.endsWith('/internal/token')
+      ? { status: 200, body: { access_token: 'identity-token', expires_in: 300 } }
+      : { status: 200, body: { items: [{ code: 'HCM', name: 'Thành phố Hồ Chí Minh' }] } });
+
+    await expect(service.lookupRegionNames(['HCM', 'HCM', 'UNKNOWN'])).resolves.toEqual(
+      new Map([['HCM', 'Thành phố Hồ Chí Minh']]),
+    );
+    expect(client.post).toHaveBeenNthCalledWith(1, '/api/v1/identity/internal/token', {
+      client_id: 'c48-response-test',
+      client_secret: 'test-client-secret-not-for-deployment-0001',
+      audience: 'identity',
+    });
+    expect(client.post).toHaveBeenNthCalledWith(2, '/api/v1/identity/internal/regions:lookup', {
+      codes: ['HCM', 'UNKNOWN'],
+    }, { headers: { authorization: 'Bearer identity-token' } });
+    service.onModuleDestroy();
+  });
+
+  it('does not call Identity for an empty region lookup', async () => {
+    const service = new ReporterSessionService({
+      identityBaseUrl: 'http://127.0.0.1:1', clientId: 'c48-response-test',
+      clientSecret: 'test-client-secret-not-for-deployment-0001', timeoutMs: 100,
+    }, intakeConfig);
+    const client = (service as unknown as { client: { post: jest.Mock } }).client;
+    client.post = jest.fn();
+
+    await expect(service.lookupRegionNames([])).resolves.toEqual(new Map());
+    expect(client.post).not.toHaveBeenCalled();
+    service.onModuleDestroy();
+  });
+
+  it.each([
+    ['missing items', {}],
+    ['malformed row', { items: [{ code: 'HCM', name: null }] }],
+    ['unrequested code', { items: [{ code: 'OTHER', name: 'Other' }] }],
+    ['duplicate code', { items: [{ code: 'HCM', name: 'One' }, { code: 'HCM', name: 'Two' }] }],
+  ])('fails closed when the region lookup response has %s', async (_caseName, body) => {
+    const service = new ReporterSessionService({
+      identityBaseUrl: 'http://127.0.0.1:1', clientId: 'c48-response-test',
+      clientSecret: 'test-client-secret-not-for-deployment-0001', timeoutMs: 100,
+    }, intakeConfig);
+    const client = (service as unknown as { client: { post: jest.Mock } }).client;
+    client.post = jest.fn(async (path: string) => path.endsWith('/internal/token')
+      ? { status: 200, body: { access_token: 'identity-token', expires_in: 300 } }
+      : { status: 200, body });
+
+    await expect(service.lookupRegionNames(['HCM'])).rejects.toMatchObject({ code: 'IDENTITY_UNAVAILABLE' });
+    service.onModuleDestroy();
+  });
+
+  it('maps Identity lookup outages to IDENTITY_UNAVAILABLE', async () => {
+    const service = new ReporterSessionService({
+      identityBaseUrl: 'http://127.0.0.1:1', clientId: 'c48-response-test',
+      clientSecret: 'test-client-secret-not-for-deployment-0001', timeoutMs: 100,
+    }, intakeConfig);
+    const client = (service as unknown as { client: { post: jest.Mock } }).client;
+    client.post = jest.fn(async (path: string) => {
+      if (path.endsWith('/internal/token')) return { status: 200, body: { access_token: 'identity-token', expires_in: 300 } };
+      throw new Error('Identity offline');
+    });
+
+    await expect(service.lookupRegionNames(['HCM'])).rejects.toMatchObject({ code: 'IDENTITY_UNAVAILABLE' });
     service.onModuleDestroy();
   });
 });
