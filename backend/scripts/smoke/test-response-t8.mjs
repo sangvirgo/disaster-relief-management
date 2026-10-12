@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { runTeamCandidatesSmoke } from './test-response-t8-team-candidates.mjs';
+import { runMissionSmoke } from './test-response-t9-missions.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -399,6 +400,10 @@ try {
   const storedContact = await responseDb.query('SELECT external_contact_note FROM rescue_team WHERE id=$1', [created.value.id]);
   assert.equal(storedContact.rows[0].external_contact_note, externalContact);
   await runTeamCandidatesSmoke({ responseDb, responseUrl, reporter, coordinator, otherRegionCoordinator, organizationId, appTeam, call, key });
+  await runMissionSmoke({
+    responseDb, responseUrl, reporter, coordinator, otherRegionCoordinator, appTeam,
+    coordinatorTeam: created, organizationId, call, key, assertVietnameseError,
+  });
   assert.ok(reporter.id);
   console.log('T8 response team and skill catalog smoke checks passed.');
 } finally {

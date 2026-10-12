@@ -36,6 +36,21 @@ export class EvidenceController {
     return result.value;
   }
 
+  @Post('missions/:id/evidence')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async uploadMission(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Req() request: EvidenceRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
+    const result = await this.evidence.uploadMission(id, request.idempotencyKey, request);
+    if (result.replay) response.setHeader('Idempotent-Replay', 'true');
+    return result.value;
+  }
+
   @Get('evidence/:id/download')
   async download(
     @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,

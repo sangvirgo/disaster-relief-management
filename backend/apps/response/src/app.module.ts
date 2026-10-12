@@ -9,6 +9,7 @@ import { TrackingModule } from './tracking/tracking.module';
 import { EvidenceModule } from './evidence/evidence.module';
 import { RequestOperationsModule } from './operations/request-operations.module';
 import { TeamsModule } from './teams/teams.module';
+import { MissionsModule } from './missions/missions.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { TeamsModule } from './teams/teams.module';
     EvidenceModule,
     RequestOperationsModule,
     TeamsModule,
+    MissionsModule,
   ],
 })
 export class AppModule {}

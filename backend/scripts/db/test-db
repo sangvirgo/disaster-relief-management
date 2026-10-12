@@ -44,5 +44,11 @@ if ! test_compose run --rm --no-deps response-t7-test; then
   test_compose logs --no-color --tail=100 response-t5-api >&2
   exit 1
 fi
-test_compose run --rm --no-deps response-t8-test
+if ! test_compose run --rm --no-deps response-t8-test; then
+  printf 'Response T8/T9 failed; recent API logs follow:\n' >&2
+  test_compose logs --no-color --tail=100 response-t5-api >&2
+  printf 'Recent PostgreSQL logs follow:\n' >&2
+  test_compose logs --no-color --tail=200 postgres >&2
+  exit 1
+fi
 echo "Backend database checks passed."

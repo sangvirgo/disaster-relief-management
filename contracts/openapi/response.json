@@ -577,6 +577,84 @@
             "$ref": "#/components/responses/Error"
           }
         }
+      },
+      "post": {
+        "operationId": "createMissionOffer",
+        "summary": "Offer a mission to an eligible team",
+        "description": "Requires MISSION_ASSIGN and the request scope. The selected team must be active, available, ready, in scope, and have capacity. Offers use the approved verification snapshot; a pending reporter supplement does not block an offer.",
+        "tags": [
+          "Missions"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMissionOffer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Mission offer created.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionCommand"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/requests/{id}/duplicate-candidates": {
@@ -1774,6 +1852,762 @@
           "503": { "$ref": "#/components/responses/Error" }
         }
       }
+    },
+    "/missions/mine": {
+      "get": {
+        "operationId": "listMyMissions",
+        "summary": "List missions for the active member teams",
+        "description": "Available to active team members. Reporter contacts are included for the assigned team leader only.",
+        "tags": [
+          "Missions"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Missions of the caller’s active teams.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/missions/overdue-offers": {
+      "get": {
+        "operationId": "listOverdueMissionOffers",
+        "summary": "List overdue mission offers",
+        "description": "Requires MISSION_OVERDUE_READ in request scope. An overdue offer is a flag for coordinators and is never automatically reassigned.",
+        "tags": [
+          "Missions"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scoped offers older than OFFER_OVERDUE_MINUTES.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverdueMissionPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/missions/{id}": {
+      "get": {
+        "operationId": "getMission",
+        "summary": "Get a mission and its timeline",
+        "description": "Available to active assigned-team members or a caller with scoped REQUEST_DETAIL_READ. Member views contain only this mission’s approved snapshot, timeline, and evidence; contacts are leader-only.",
+        "tags": [
+          "Missions"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MissionId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mission snapshot, timeline, and evidence.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/missions/{id}/accept": {
+      "post": {
+        "operationId": "acceptMission",
+        "summary": "Accept an offered mission",
+        "description": "Active APP team leader only.",
+        "tags": [
+          "Missions"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MissionId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Accept an offered mission",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionCommand"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/missions/{id}/decline": {
+      "post": {
+        "operationId": "declineMission",
+        "summary": "Decline an offered mission",
+        "description": "Active APP team leader only.",
+        "tags": [
+          "Missions"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MissionId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionReason"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Decline an offered mission",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionCommand"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/missions/{id}/transition": {
+      "post": {
+        "operationId": "transitionMission",
+        "summary": "Advance mission progress",
+        "description": "Active APP team leader only. Completion requires an outcome note or READY mission evidence and never resolves the request.",
+        "tags": [
+          "Missions"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MissionId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionTransition"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Advance mission progress",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionCommand"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/missions/{id}/record-on-behalf": {
+      "post": {
+        "operationId": "recordMissionOnBehalf",
+        "summary": "Record a mission update on behalf of a team",
+        "description": "Requires MISSION_RECORD_ON_BEHALF in the request scope. DECLINED is supported for accountless COORDINATOR teams.",
+        "tags": [
+          "Missions"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MissionId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordMissionOnBehalf"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Record a mission update on behalf of a team",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionCommand"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/missions/{id}/cancel": {
+      "post": {
+        "operationId": "cancelMission",
+        "summary": "Cancel a mission",
+        "description": "Requires MISSION_ASSIGN in the request scope. Canceling ACCEPTED, EN_ROUTE, or ON_SCENE marks the team UNAVAILABLE and requires fresh readiness; canceling OFFERED does not.",
+        "tags": [
+          "Missions"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MissionId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionReason"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cancel a mission",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionCommand"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/missions/{id}/fail": {
+      "post": {
+        "operationId": "failMission",
+        "summary": "Mark a mission failed",
+        "description": "Requires MISSION_ASSIGN in the request scope.",
+        "tags": [
+          "Missions"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MissionId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionReason"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mark a mission failed",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionCommand"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/missions/{id}/evidence": {
+      "post": {
+        "operationId": "uploadMissionEvidence",
+        "summary": "Attach evidence to a mission",
+        "description": "Requires an active assigned-team leader or scoped coordinator. Multipart accepts one file, requires Content-Length, and uses the owning request’s evidence quota.",
+        "tags": [
+          "Missions"
+        ],
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MissionId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/ContentLength"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Mission evidence stored and ready.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Evidence"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "411": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1867,6 +2701,15 @@
         "required": false,
         "description": "Required for cookie-authenticated writes.",
         "schema": { "type": "string" }
+      },
+      "MissionId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
       }
     },
     "headers": {
@@ -3035,6 +3878,471 @@
           "unknown_position": { "type": "array", "items": { "$ref": "#/components/schemas/UnknownPositionTeamCandidate" } }
         },
         "additionalProperties": false
+      },
+      "MissionStatus": {
+        "type": "string",
+        "enum": [
+          "OFFERED",
+          "ACCEPTED",
+          "EN_ROUTE",
+          "ON_SCENE",
+          "COMPLETED",
+          "FAILED",
+          "DECLINED",
+          "CANCELLED"
+        ]
+      },
+      "CreateMissionOffer": {
+        "type": "object",
+        "required": [
+          "expected_version",
+          "team_id"
+        ],
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "override_reason": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "additionalProperties": false
+      },
+      "MissionReason": {
+        "type": "object",
+        "required": [
+          "expected_version",
+          "reason"
+        ],
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "additionalProperties": false
+      },
+      "MissionTransition": {
+        "type": "object",
+        "required": [
+          "expected_version",
+          "to"
+        ],
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "to": {
+            "type": "string",
+            "enum": [
+              "EN_ROUTE",
+              "ON_SCENE",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "result": {
+            "type": "object",
+            "required": [
+              "outcome_note"
+            ],
+            "properties": {
+              "outcome_note": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecordMissionOnBehalf": {
+        "type": "object",
+        "required": [
+          "expected_version",
+          "to",
+          "recorded_basis",
+          "reported_by",
+          "reason",
+          "occurred_at"
+        ],
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "to": {
+            "type": "string",
+            "enum": [
+              "ACCEPTED",
+              "DECLINED",
+              "EN_ROUTE",
+              "ON_SCENE",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "recorded_basis": {
+            "type": "string",
+            "enum": [
+              "RADIO",
+              "PHONE",
+              "IN_PERSON",
+              "OTHER"
+            ]
+          },
+          "reported_by": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "result": {
+            "type": "object",
+            "required": [
+              "outcome_note"
+            ],
+            "properties": {
+              "outcome_note": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "MissionCommand": {
+        "type": "object",
+        "required": [
+          "id",
+          "request_id",
+          "team_id",
+          "status",
+          "version",
+          "work_cycle",
+          "created_at",
+          "suggested_team_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MissionStatus"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "work_cycle": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "suggested_team_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MissionPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "more"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MissionView"
+            }
+          },
+          "more": {
+            "type": "boolean"
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OverdueMissionPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "more"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "request_id",
+                "team",
+                "status",
+                "version",
+                "created_at",
+                "region_code"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "request_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "team": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "status": {
+                  "const": "OFFERED"
+                },
+                "version": {
+                  "type": "integer"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "region_code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "more": {
+            "type": "boolean"
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MissionView": {
+        "type": "object",
+        "required": [
+          "id",
+          "request_id",
+          "team",
+          "status",
+          "version",
+          "work_cycle",
+          "created_at",
+          "category",
+          "description",
+          "people_affected",
+          "location",
+          "declared_danger"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "team": {
+            "type": "object",
+            "required": [
+              "id",
+              "name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "status": {
+            "$ref": "#/components/schemas/MissionStatus"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "work_cycle": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "people_affected": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "location": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          },
+          "declared_danger": {
+            "type": "boolean"
+          },
+          "reporter_contact_phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Leader-only."
+          },
+          "beneficiary_contact_phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Leader-only."
+          },
+          "alternate_contact": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Leader-only."
+          }
+        },
+        "additionalProperties": false
+      },
+      "MissionDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MissionView"
+          },
+          {
+            "type": "object",
+            "required": [
+              "timeline",
+              "evidence"
+            ],
+            "properties": {
+              "timeline": {
+                "type": "object",
+                "required": [
+                  "items"
+                ],
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "evidence": {
+                "type": "object",
+                "required": [
+                  "items"
+                ],
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Evidence"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
       }
     }
   }
