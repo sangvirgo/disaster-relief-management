@@ -1,0 +1,96 @@
+# T19 traceability and acceptance evidence
+
+Status: implementation evidence recorded for 2026-10-13. This file connects the backend API snapshots to the plan's requirements and records the checks that ran. It is not a replacement for the complete SRS, SDD, or user guide.
+
+## Contract inventory
+
+| Service | Snapshot | Controller operations | `x-c48-contract-gap` operations |
+|---|---|---:|---:|
+| Identity | [identity.json](../../contracts/openapi/identity.json) | 32 | 0 |
+| Response | [response.json](../../contracts/openapi/response.json) | 74 | 0 |
+| Logistics | [logistics.json](../../contracts/openapi/logistics.json) | 79 | 0 |
+
+The exporter inventories NestJS controller decorators and records their paths, methods, declared success statuses, and source controller/handler for all 185 operations. Each operation has an explicit route-level security declaration and references a declared scheme where protected. Explicitly mapped error examples use statuses and exact Vietnamese messages from the error catalog; focused assertions cover selected codes and routes rather than exhaustively comparing every runtime error branch. Request/response detail maps come from the backend API specifications and verified DTO/source details in `backend/scripts/contracts/openapi-details.mjs`; existing hand-authored success schemas are preserved. No Swagger/OpenAPI runtime generator was present in the service packages; T19 adds no dependency and does not change runtime behavior.
+
+Gap counts are operation markers, not missing-request counts. The current snapshots have no `x-c48-contract-gap` operations: each of the 185 controller operations has a response schema or a documented no-content response. The 47 Logistics operations that previously had gaps now use source-defined projections for distributions/handoffs, drives, receipts, fulfillment cycles, catalog, needs/commitments, donations, assets, and stock. The focused suite checks those projections plus the corrected report, pagination, and route-error details. This does not claim every runtime error branch was exhaustively mapped. `contracts:check` verifies OpenAPI version/service metadata, controller route inventory, unique operation IDs, required path parameters, non-empty responses, local references, controller-source provenance, explicit security declarations and scheme references, and unique `(in,name)` parameters within each parameter list after resolving local component parameter refs. It also checks semantic snapshot equality with a fresh export. It does not perform general JSON Schema semantic validation.
+
+## Requirement derivation
+
+The requirement IDs below come from Section 7 of [the technology and delivery plan](../c48-technology-and-delivery-plan.md). The snapshots describe API surfaces that support those requirements; they do not claim that a user interface or end-to-end acceptance check passed.
+
+| User requirement | Source plan requirements | Backend contract derivation and scope | User-guide input |
+|---|---|---|---|
+| UR-01 — citizen or signed-in proxy reporter submits an SOS and receives confirmation | FR-IAM-01/02; FR-REQ-01/02/03/11; FR-FILE-01; FR-OFF-01 | Identity auth/session and Response SELF/PROXY intake, status, and evidence operations are inventoried. Offline draft/retry state in FR-OFF-01 is client behavior outside OpenAPI. | Citizen SOS entry, location and optional contact details; proxy reporter and affected-household details remain distinct; confirmation, guest tracking-secret handling, evidence upload, and clear queued-versus-submitted status |
+| UR-02 — citizen tracks progress and adds information | FR-REQ-02/07/09/10; FR-NOT-01 | Response tracking, event history, supplements, claim/recovery, and request-resolution statuses are inventoried. In-app notice timing and display are cross-service behavior, not fully specified by these snapshots. | Private tracking, permitted supplements, Vietnamese status/decision explanations, and notices for rejection, duplicate, closure, or recovery outcomes |
+| UR-03 — coordinator verifies, reviews duplicates, and assigns capable nearby teams | FR-REQ-04/05/06/08/09/10; FR-MSN-01/02/03/05/06; FR-MAP-01; FR-FILE-01; FR-AUD-01 | Response queues, verification/duplicate/resolution commands, priority, evidence, heatmap, team candidates/position, mission offers, multi-mission relationships, and recorded progress are represented where API specs define them. Human decision evidence and audit history remain governed by the API docs and audit contracts. | Coordinator review, evidence/contact attempts, manual priority, candidate comparison, and human assignment; suggestions never dispatch automatically |
+| UR-04 — volunteer/team acts on assigned missions | FR-MSN-01/02/03/04/06; FR-TEAM-01; FR-FILE-01; FR-OFF-01 | Response mission read, accept/decline, transition, evidence, team profile, and coordinator-recorded progress operations are inventoried. Offline queue display and retry behavior in FR-OFF-01 is outside backend OpenAPI. | Assigned-mission access, progress updates, team profile/availability, outcome/evidence capture, and clear unsent/offline status |
+| UR-05 — campaign and operations managers manage campaigns, drives, points, and supply workflows | FR-CAM-01; FR-LOG-01/02/03/04/05/06/07; FR-DON-01; FR-REC-01/02 | Response campaign APIs; Logistics catalog/assets, stock, needs, commitments, drives, receipts, distribution/handoff, adjustment, and reports. Advanced source-level donation allocations in FR-DON-06 and formal stocktakes under FR-REC-02 are deferred and not claimed by this snapshot. | Campaign/drive setup, stock and need status, partial fulfillment, distribution approval, point/household handoffs, returns/losses, and reconciliation |
+| UR-06 — administrator manages scoped permissions and views reports | FR-IAM-01/02/03; FR-RPT-01/02; FR-AUD-01 | Identity account, organization, membership, grant, and audit-search operations; Response and Logistics report APIs are inventoried. FR-RPT-02 CSV export and its masking/audit behavior have no corresponding route in this T19 inventory and remain outside the contract slice. | Account and permission administration; report filters/generated-time labels; if CSV export is added later, explain role-based masking and audit |
+| UR-07 — operations team sees queues, partial fulfillment, health, and recovery guidance | FR-REQ-06/09/10; FR-LOG-03/05/06/07; FR-REC-01; FR-RPT-01/02; FR-NOT-01; FR-AUD-01; NFR-OBS-01; NFR-OPS-01 | Response work queues/resolution; Logistics fulfillment, custody, reconciliation, and reports are inventoried. Health/readiness/metrics (NFR-OBS-01) and backup/recovery procedures (NFR-OPS-01) derive from operational tooling/runbooks, not OpenAPI. FR-RPT-02 CSV export is also outside this route inventory. | Queue status, outstanding/reserved/delivered distinctions, report timestamps, service health, and operator recovery guidance |
+| UR-08 — signed-in or guest donor finds drives, declares supplies, tracks receipts, and disputes differences | FR-DON-01/02/03/04/05; FR-NOT-01 | Logistics public drive, declaration, count/review, receipt posting, private tracking, claim, dispute, and receipt-notice operations are inventoried where API docs define them. | Public drive browsing; guest declaration/private tracking; verified receipt quantities, discrepancy notices, and dispute history |
+| UR-09 — intake staff counts and an independent reviewer approves receipts | FR-DON-01/02/03/04/05; FR-LOG-02; FR-NOT-01; FR-AUD-01 | Logistics receipt, count revision, independent review, post-once, held release, dispute, stock movement, and notice operations are inventoried. | Staff intake/counting; separate review; accepted/held/rejected quantities; donor discrepancy notifications and auditable decisions |
+| UR-10 — distribution staff and receiving parties record custody and reconcile | FR-LOG-04/06/07; FR-REC-01/02; FR-AUD-01 | Logistics distribution preparation/approval/dispatch, handoff/loss review, fulfillment, stock correction, and reconciliation operations are inventoried where specified. FR-REC-02 coverage is partial; formal stocktakes are deferred by the plan and outside this API slice. | Dispatch approval, point receipt versus household handout, return/loss review, and final reconciliation |
+
+## Document/source implementation gap
+
+`03-response-api.md` §3 documents team-member add/remove and leader-related behavior, including `USER_IN_OTHER_TEAM` and `LEADER_REQUIRED`. The current Response `TeamsController` has no corresponding member add/remove/leader route handlers. T19 exports the current controller inventory and does not invent these operations. This documentation/source mismatch is an outstanding API implementation gap for a separate phase; the snapshots do not claim those operations or attach their documented errors to unrelated routes. Reconcile the API implementation and route export before treating the team-member flows as available.
+
+## SRS and SDD derivations
+
+- **SRS derivation:** UR, FR, and relevant NFR IDs remain owned by Section 7 of the plan. The matrix lists the plan-linked requirements, then marks items outside the current OpenAPI slice (such as offline client state, CSV export, health metrics, recovery procedures, and formal stocktakes). Requirement priority, deferred scope, and acceptance criteria remain in the plan; T19 adds no new requirement or business rule.
+- **SDD derivation:** service ownership follows the existing Identity, Response, and Logistics boundaries. Route and success-status inventory comes from current controller decorators. Request shapes are taken from `docs/backend/02-identity-api.md`, `03-response-api.md`, and `04-logistics-api.md`, with DTO/source confirmation where the API specification intentionally omits a field shape. Authorization, Vietnamese messages, stable error codes, and storage/transaction rules remain governed by the backend API, permission, error-catalog, and schema documents.
+- **Evidence limit:** no standalone SRS, SDD, or user-guide artifact was found under `docs/`. This file records their traceability and derivation inputs; it does not mark those separate deliverables complete.
+
+## User-guide inputs
+
+The eventual Vietnamese user guide can draw on these documented flows:
+
+- Citizens: submit a self SOS, provide or pin the incident location, track privately, add permitted information, and understand status and decision reasons.
+- Proxy reporters: submit an affected household report with separate reporter/beneficiary information and understand that login or relationship does not verify the incident.
+- Coordinators: review queues, record contact and verification evidence, handle duplicates, set manual priority, review team suggestions, and make assignment decisions.
+- Volunteers and rescue teams: view only assigned missions, accept/decline, update allowed progress, and submit outcome details.
+- Donors: browse open drives, declare a handover as a guest or signed-in donor, track the private receipt, and dispute discrepancies.
+- Intake and review staff: record counts and condition, preserve revisions, complete independent review, post accepted quantities once, and review held items or disputes.
+- Distribution staff and receiving parties: approve and dispatch plans, record point receipt or household handout, and document return/loss and reconciliation.
+- Administrators and operations managers: manage accounts and scoped access, review campaign/stock/fulfillment reports, and follow recovery instructions.
+
+All eventual Web/Mobile labels, validation, statuses, notices, errors, and accessibility text must follow the Vietnamese-language policy in [AGENTS.md](../../AGENTS.md) and use the existing Vietnamese copy in [07-error-catalog.md](07-error-catalog.md). T19 reviewed no Web/Mobile screens and does not claim user-facing guide copy is complete.
+
+## Executed checks
+
+Checks below were run from `backend/` unless stated otherwise.
+
+| Check | Result |
+|---|---|
+| `node --check scripts/contracts/openapi.mjs` | PASS |
+| `node --check scripts/contracts/openapi-details.mjs` | PASS |
+| `node scripts/__tests__/openapi-export.test.mjs` | PASS, 27/27 tests; includes Path Item `$ref` handling, path-level dangling refs, duplicate normalized routes, export-write protection, and ref-aware parameter uniqueness, source-defined projections across the 47 Logistics routes, corrected report/list schemas, optional `FINAL_RECIPIENT` need request field, nullable receipt declaration quantities in receipt and public tracking views, cycle-operation and campaign error coverage, and reporter tracking-code security alternatives |
+| `npm run contracts:export` twice | PASS; Identity 32, Response 74, Logistics 79; SHA-256 hashes matched between runs: `identity 7f268e1e3a58…`, `response 17eddf881ee8…`, `logistics fe0ceeafd421…` |
+| `npm run contracts:check` | PASS; fresh-export parity and route/metadata validation for 32/74/79 operations, including duplicate parameter detection after local-ref resolution |
+| `node --check scripts/contracts/openapi.mjs` | PASS |
+| `node --check scripts/contracts/openapi-details.mjs` | PASS |
+| `npx tsc --noEmit`, `npx tsc --noEmit -p tsconfig.test.json`, `npm test`, `npm run build` | PASS after final T19 edits: 96 Jest suites / 404 tests and 48 Node tests; both TypeScript checks, contracts:check, and build passed. |
+| `git diff --check` | PASS after current documentation and snapshot updates |
+
+The exporter test covers route parsing and inventory validation, curated operation preservation, replacement of stale parameters/security/responses/source metadata, text-merge snapshot parity, exporter idempotence, reference-aware parameter deduplication and bounds, source provenance and security coverage, exact catalog-backed error examples (including need validation, cycle-operation, drive campaign, and distribution campaign errors), selected documented request/report fields, the optional `FINAL_RECIPIENT` request hint, receipt-line nullability/optional fields for staff and public tracking views, and snapshot-drift detection. The latest regressions also cover unsupported Path Item `$ref`s before route projection and dangling local refs on Path Items and path-level parameters, duplicate normalized controller routes, and preservation of the existing snapshot when an export fails validation. These focused assertions do not constitute general JSON Schema semantic validation or exhaustive runtime error-branch coverage.
+
+## Acceptance matrix
+
+| Check / gate | Status | Evidence or next action |
+|---|---|---|
+| T19 per-service snapshot export and route/metadata validation | **Executed** | Two exports produced identical snapshot hashes; `npm run contracts:check` verified controller inventory, operation IDs, required path parameters, local refs, unique dereferenced `(in,name)` parameters, source provenance, explicit route security/scheme refs, and fresh-export parity. It does not validate general JSON Schema semantics. |
+| T19 exporter regression tests | **Executed** | `node scripts/__tests__/openapi-export.test.mjs`, 27/27, including all 47 source-projected Logistics operations, the optional `FINAL_RECIPIENT` need request hint, selected need/cycle/drive/distribution error-code/status mappings, nullable receipt declaration quantities in staff and public tracking views, optional expiry date, and reporter capability security alternatives with the tracking code. |
+| T19 TypeScript checks, full test suite, and build | **Executed** | Both TypeScript checks passed; `npm test` passed 96 Jest suites / 404 tests and 48 Node tests; `npm run build` passed for all three services. |
+| T19 final diff check | **Executed** | `git diff --check` passes after current documentation and snapshot updates. |
+| T19 standalone SRS/SDD/user-guide deliverables | **Not produced by T19** | This matrix records derivations and guide inputs only; complete the separate project deliverables from the plan. |
+| T17 populated TC-REC-01 API comparison | **Pending external data condition** | The primary Logistics database has no stock rows. Use existing authorized operational data when available; do not reset or seed to manufacture evidence. |
+| T17 TC-BE-14/TC-23 dashboard/UI evidence | **Pending** | Capture Web/Mobile acceptance evidence; not exercised by the backend contract checks. |
+| T17 report EXPLAIN at 200k rows, keyset page 2 with `Index Cond` | **Pending** | Run and record at the planned representative dataset scale. |
+| T18 TC-BE-27 ingress, invalid-body validation, permission copy, and Web/Mobile inert rendering/accessibility | **Partially executed** | Direct anonymous Identity/Response 401, Vietnamese-message, and no-store checks passed in T18. Ingress port 8080 was occupied; validation POST, permission-denial account, and client evidence remain unrun. Details: [T18 evidence](t18-hardening.md). |
+| T18 TC-BE-28 timeout rollback, idempotent retry, and pool bounds | **Pending** | Execute database/request-lifecycle checks on the main stack when the planned acceptance window is available. |
+| T18 TC-BE-29 audit/access checks | **Pending** | Run the application-specific audit and access checks; dependency audit is not a substitute. |
+| T18 TC-29 backup/restore | **Pending external destination** | No artifact or restore was run. Obtain and verify an isolated recovery database/object-store target under the existing runbook. Never restore over primary data. |
+| T18 TC-PERF-01 / k6 | **Not run** | Requires an approved window, loopback target, pre-issued token, test point, cleanup/retention decision, and recorded hardware/dataset. The scenario writes persistent SOS records. |
+| T5 selected-provider gate | **Pending external provider evidence** | Obtain the AIStor lab artifact/license and complete private-access and restore checks; see the plan §6.3. |
+
+No database, Docker, Compose, reset, seed, k6, or backup/restore runtime operation was run for T19. The API snapshots are static artifacts validated against controller inventory and documented source contracts; their checks do not establish live endpoint behavior.
