@@ -22,7 +22,7 @@ describe('NeedsModule registration', () => {
   it('is part of the Logistics application and owns the needs controller', async () => {
     const previousDatabaseUrl = process.env.DATABASE_URL;
     const previousNodeEnv = process.env.NODE_ENV;
-    process.env.DATABASE_URL = 'postgres://test:test@127.0.0.1:5432/c48_test';
+    process.env.DATABASE_URL = 'postgres://logistics_app_login:unit-only@127.0.0.1:55432/c48_logistics';
     process.env.NODE_ENV = 'test';
     const { AppModule } = await import('../src/app.module');
     if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;

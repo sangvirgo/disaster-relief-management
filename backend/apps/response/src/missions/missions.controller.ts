@@ -4,6 +4,8 @@ import {
 import type { Request, Response } from 'express';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { FailureReviewDto } from '../resolution/request-resolution.dto';
+import { RequestFailureReviewService } from '../resolution/request-failure-review.service';
 import {
   CreateMissionDto, MissionPageQueryDto, MissionReasonDto, MissionTransitionDto, MissionVersionDto,
   RecordMissionOnBehalfDto,
@@ -28,7 +30,11 @@ function replay(response: Response, value: boolean): void {
 
 @Controller()
 export class MissionsController {
-  constructor(private readonly commands: MissionsCommandsService, private readonly queries: MissionsQueriesService) {}
+  constructor(
+    private readonly commands: MissionsCommandsService,
+    private readonly queries: MissionsQueriesService,
+    private readonly failureReviews: RequestFailureReviewService,
+  ) {}
 
   @Post('requests/:id/missions')
   @HttpCode(HttpStatus.CREATED)
@@ -153,6 +159,21 @@ export class MissionsController {
   ) {
     noStore(response);
     const result = await this.commands.fail(missionId, dto, key(request), request);
+    replay(response, result.replay);
+    return result.value;
+  }
+
+  @Post('missions/:id/review-failure')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async reviewFailure(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) missionId: string,
+    @Body() dto: FailureReviewDto,
+    @Req() request: MissionRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.failureReviews.review(missionId, dto, key(request), request);
     replay(response, result.replay);
     return result.value;
   }

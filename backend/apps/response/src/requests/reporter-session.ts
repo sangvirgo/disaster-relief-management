@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { CircuitBreakerClient } from '../../../../packages/technical/src/http/service-client';
 import type { Grant } from '../../../../packages/technical/src/security/permissions';
+import type { ServiceName } from '../../../../packages/technical/src/security/service-token';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from './request-intake.service';
 import { reporterAccessClaims, ReporterAccessTokenClaims } from './reporter-token';
 
@@ -76,8 +77,8 @@ export function loadReporterSessionConfig(env: Record<string, string | undefined
 @Injectable()
 export class ReporterSessionService implements OnModuleDestroy {
   private readonly client: CircuitBreakerClient;
-  private serviceToken?: { value: string; refreshAt: number };
-  private tokenRequest: Promise<string> | undefined;
+  private readonly serviceTokens = new Map<ServiceName, { value: string; refreshAt: number }>();
+  private readonly tokenRequests = new Map<ServiceName, Promise<string>>();
   private readonly inFlight = new Map<string, Promise<ReporterSession>>();
 
   constructor(
@@ -97,6 +98,10 @@ export class ReporterSessionService implements OnModuleDestroy {
     const session = await this.optional(request);
     if (!session) throw new AppError('UNAUTHENTICATED', { status: 401 });
     return session;
+  }
+
+  serviceToken(audience: ServiceName): Promise<string> {
+    return this.getServiceToken(audience);
   }
 
   async requestCoordinatorGrants(organizationId: string): Promise<RequestCoordinatorGrant[]> {
@@ -218,24 +223,26 @@ export class ReporterSessionService implements OnModuleDestroy {
     return { userId: claims.sub, grants: value.grants as Grant[] };
   }
 
-  private async getServiceToken(): Promise<string> {
-    if (this.serviceToken && this.serviceToken.refreshAt > Date.now()) return this.serviceToken.value;
-    if (this.tokenRequest) return this.tokenRequest;
+  private async getServiceToken(audience: ServiceName = 'identity'): Promise<string> {
+    const cached = this.serviceTokens.get(audience);
+    if (cached && cached.refreshAt > Date.now()) return cached.value;
+    const pending = this.tokenRequests.get(audience);
+    if (pending) return pending;
     const operation = this.client.post<unknown>('/api/v1/identity/internal/token', {
       client_id: this.config.clientId,
       client_secret: this.config.clientSecret,
-      audience: 'identity',
+      audience,
     }).then((result) => {
       if (result.status !== 200 || !result.body || typeof result.body !== 'object') throw unavailable();
       const value = result.body as Partial<IdentityServiceToken>;
       if (typeof value.access_token !== 'string' || !Number.isInteger(value.expires_in) || value.expires_in! < 1) throw unavailable();
-      this.serviceToken = { value: value.access_token, refreshAt: Date.now() + Math.max(1, value.expires_in! - 30) * 1_000 };
+      this.serviceTokens.set(audience, { value: value.access_token, refreshAt: Date.now() + Math.max(1, value.expires_in! - 30) * 1_000 });
       return value.access_token;
     }).catch((error: unknown) => {
       if (error instanceof AppError) throw error;
       throw unavailable();
-    }).finally(() => { this.tokenRequest = undefined; });
-    this.tokenRequest = operation;
+    }).finally(() => { this.tokenRequests.delete(audience); });
+    this.tokenRequests.set(audience, operation);
     return operation;
   }
 }

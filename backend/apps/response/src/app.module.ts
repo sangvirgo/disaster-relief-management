@@ -14,6 +14,7 @@ import { CampaignsModule } from './campaigns/campaigns.module';
 import { MapModule } from './map/map.module';
 import { ReportsModule } from './reports/reports.module';
 import { NoticesModule } from './notices/notices.module';
+import { RequestResolutionModule } from './resolution/request-resolution.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { NoticesModule } from './notices/notices.module';
     MapModule,
     ReportsModule,
     NoticesModule,
+    RequestResolutionModule,
   ],
 })
 export class AppModule {}

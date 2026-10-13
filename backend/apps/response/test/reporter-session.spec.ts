@@ -65,7 +65,7 @@ describe('Response optional reporter session', () => {
     const client = (service as unknown as { client: { post: jest.Mock } }).client;
     client.post = jest.fn(async (path: string) => path.endsWith('/internal/token')
       ? { status: 200, body: { access_token: 'identity-token', expires_in: 300 } }
-      : { status: 200, body: { items: [{ code: 'HCM', name: 'Thành phố Hồ Chí Minh' }] } });
+      : { status: 200, body: { items: [{ code: 'HCM', name: 'Thành phố Hồ Chí Minh' }] } }) as unknown as jest.Mock;
 
     await expect(service.lookupRegionNames(['HCM', 'HCM', 'UNKNOWN'])).resolves.toEqual(
       new Map([['HCM', 'Thành phố Hồ Chí Minh']]),
@@ -87,10 +87,41 @@ describe('Response optional reporter session', () => {
       clientSecret: 'test-client-secret-not-for-deployment-0001', timeoutMs: 100,
     }, intakeConfig);
     const client = (service as unknown as { client: { post: jest.Mock } }).client;
-    client.post = jest.fn();
+    client.post = jest.fn() as unknown as jest.Mock;
 
     await expect(service.lookupRegionNames([])).resolves.toEqual(new Map());
     expect(client.post).not.toHaveBeenCalled();
+    service.onModuleDestroy();
+  });
+
+  it('caches service tokens independently for each audience', async () => {
+    const service = new ReporterSessionService({
+      identityBaseUrl: 'http://127.0.0.1:1', clientId: 'c48-response-test',
+      clientSecret: 'test-client-secret-not-for-deployment-0001', timeoutMs: 100,
+    }, intakeConfig);
+    const client = (service as unknown as { client: { post: jest.Mock } }).client;
+    client.post = jest.fn(async (_path: string, body: { audience?: string }) => ({
+      status: 200,
+      body: { access_token: `${body.audience}-token`, expires_in: 300 },
+    })) as unknown as jest.Mock;
+    const serviceTokens = service as unknown as {
+      serviceToken(audience: 'identity' | 'logistics'): Promise<string>;
+    };
+
+    await expect(serviceTokens.serviceToken('logistics')).resolves.toBe('logistics-token');
+    await expect(serviceTokens.serviceToken('identity')).resolves.toBe('identity-token');
+    await expect(serviceTokens.serviceToken('logistics')).resolves.toBe('logistics-token');
+    expect(client.post).toHaveBeenCalledTimes(2);
+    expect(client.post).toHaveBeenNthCalledWith(1, '/api/v1/identity/internal/token', {
+      client_id: 'c48-response-test',
+      client_secret: 'test-client-secret-not-for-deployment-0001',
+      audience: 'logistics',
+    });
+    expect(client.post).toHaveBeenNthCalledWith(2, '/api/v1/identity/internal/token', {
+      client_id: 'c48-response-test',
+      client_secret: 'test-client-secret-not-for-deployment-0001',
+      audience: 'identity',
+    });
     service.onModuleDestroy();
   });
 
@@ -107,7 +138,7 @@ describe('Response optional reporter session', () => {
     const client = (service as unknown as { client: { post: jest.Mock } }).client;
     client.post = jest.fn(async (path: string) => path.endsWith('/internal/token')
       ? { status: 200, body: { access_token: 'identity-token', expires_in: 300 } }
-      : { status: 200, body });
+      : { status: 200, body }) as unknown as jest.Mock;
 
     await expect(service.lookupRegionNames(['HCM'])).rejects.toMatchObject({ code: 'IDENTITY_UNAVAILABLE' });
     service.onModuleDestroy();
@@ -122,7 +153,7 @@ describe('Response optional reporter session', () => {
     client.post = jest.fn(async (path: string) => {
       if (path.endsWith('/internal/token')) return { status: 200, body: { access_token: 'identity-token', expires_in: 300 } };
       throw new Error('Identity offline');
-    });
+    }) as unknown as jest.Mock;
 
     await expect(service.lookupRegionNames(['HCM'])).rejects.toMatchObject({ code: 'IDENTITY_UNAVAILABLE' });
     service.onModuleDestroy();
