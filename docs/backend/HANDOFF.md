@@ -6,7 +6,7 @@ Read [AGENTS.md](../../AGENTS.md), [project context](../c48-project-context.md),
 
 ## Objective
 
-Continue implementing only the backend microservices in `/home/soang/c48`. T0–T16 implementation phases are committed separately on `codex/backend-t9-t19`; the T5 selected-provider acceptance gate remains open pending the AIStor lab artifact, private-access, and restore checks. Proceed with T17–T19 in dependency order and commit each completed task separately. AI agent/service work is outside this scope. The API contracts and SQL in `docs/backend/` take precedence for shapes; the main plan governs business behavior.
+Continue implementing only the backend microservices in `/home/soang/c48`. T0–T16 implementation phases are committed separately on `codex/backend-t9-t19`; T17 implementation is under final review and will be committed separately. The T5 selected-provider acceptance gate remains open pending the AIStor lab artifact, private-access, and restore checks. Proceed with T18–T19 after the T17 commit and commit each task separately. AI agent/service work is outside this scope. The API contracts and SQL in `docs/backend/` take precedence for shapes; the main plan governs business behavior.
 
 ## T3 completed
 
@@ -134,6 +134,15 @@ T7 exit evidence: `npx tsc --noEmit` passed; `npm test` passed 18 suites / 56 te
 - No migration/schema or OpenAPI snapshot files changed. `contracts/openapi` diff is empty; T19 still owns exporting and validating the updated service snapshots. `backend/dist/` remains ignored. The user-added `.codegraph/` directory remains untracked and must not be staged.
 - NestJS structure and T16 test-scope reviews found no blockers. T17 reports/reconciliation, T18 hardening/evidence, T19 contracts/traceability, the T8 representative-scale EXPLAIN capture, and the T5 AIStor provider acceptance gate remain open.
 
-## Next task: T17
+## T17 reports and reconciliation — 2026-10-13
 
-Proceed with T17 in [06](06-implementation-tasks.md), following the documented dependency order. Keep the T5 selected-provider acceptance gate tracked separately; its AIStor artifact, private-access, and restore checks remain outstanding.
+- Added a feature-scoped `ReportsModule` with stock, fulfillment, public donation summary, and reconciliation endpoints. Services keep query logic and report responsibilities separate; the controller remains thin, and report access uses existing scoped grants and keyset pagination.
+- Added unit and module tests for DTO validation, scope SQL, response mapping, flags, public attribution, and module wiring. A read-only CTE fixture checks settlement and physical-handoff arithmetic; the primary-stack smoke checks Vietnamese authentication/permission errors and the empty reconciliation response.
+- The smoke includes a read-only oracle comparing every aggregate and both flags against existing primary-database rows. It explicitly skips populated comparison when no `stock_balance` rows exist; the current primary database has none. Do not reset or seed the primary database merely to close this evidence gap.
+- Verification on 2026-10-13: `npm test` passed 96 Jest suites / 399 tests and 6 Node tests; both TypeScript checks, `npm run build` for all three Nest apps, and the primary-stack T17 smoke passed. `git diff --check` passed before the final handoff edit; rerun it before commit. The smoke explicitly skipped populated API comparison because the primary Logistics database has no balance rows, then verified the empty response.
+- No migration/schema or OpenAPI snapshot changed. `.codegraph/` remains untracked and must not be staged; `backend/dist/` is ignored.
+- Remaining acceptance: populated TC-REC-01 API comparison, dashboard/UI evidence for TC-BE-14 and TC-23, and report EXPLAIN at 200k rows with the required page-2 `Index Cond`. T18 and T19 are not implemented yet; the T5 AIStor provider gate also remains open.
+
+## Next task: T18
+
+Proceed with T18 in [06](06-implementation-tasks.md), following the documented dependency order. Keep the open T17 evidence gates and the T5 selected-provider acceptance gate tracked separately.

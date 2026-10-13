@@ -10,6 +10,7 @@ import { DrivesModule } from './drives/drives.module';
 import { NeedsModule } from './needs/needs.module';
 import { DistributionsModule } from './distributions/distributions.module';
 import { FulfillmentCyclesModule } from './fulfillment-cycles/fulfillment-cycles.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { FulfillmentCyclesModule } from './fulfillment-cycles/fulfillment-cycles
     DistributionsModule,
     FulfillmentCyclesModule,
     ReceiptsModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}
