@@ -1,0 +1,608 @@
+import assert from 'node:assert/strict';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const { Client } = require('pg');
+const logisticsUrl = requiredEnv('TEST_LOGISTICS_BASE_URL').replace(/\/+$/u, '');
+const responseUrl = requiredEnv('TEST_RESPONSE_BASE_URL').replace(/\/+$/u, '');
+const identityUrl = requiredEnv('TEST_IDENTITY_BASE_URL').replace(/\/+$/u, '');
+const logisticsDb = new Client({ connectionString: requiredEnv('TEST_LOGISTICS_DATABASE_URL') });
+const responseDb = new Client({ connectionString: requiredEnv('TEST_RESPONSE_DATABASE_URL') });
+const identityDb = new Client({ connectionString: requiredEnv('TEST_IDENTITY_DATABASE_URL') });
+const organizationId = '40000000-0000-4000-8000-000000000004';
+const suffix = randomBytes(5).toString('hex').toUpperCase();
+const regionCode = `T15_${suffix}`;
+const categoryCode = `T15_FLOOD_${suffix}`;
+let identityIp = 20;
+let requestIp = 120;
+
+function requiredEnv(name) {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
+function key() { return randomUUID(); }
+
+async function waitForLockWait(queryFragment, label) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    await logisticsDb.query('SELECT pg_stat_clear_snapshot()');
+    const waiting = await logisticsDb.query(
+      `SELECT 1 FROM pg_stat_activity
+        WHERE datname=current_database() AND wait_event_type='Lock' AND query ILIKE $1 LIMIT 1`,
+      [`%${queryFragment}%`],
+    );
+    if (waiting.rowCount) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  assert.fail(`Timed out waiting for ${label} database lock`);
+}
+
+async function call(base, path, { method = 'GET', body, actor, idempotencyKey, headers: extraHeaders = {} } = {}) {
+  const headers = {
+    ...extraHeaders,
+    ...(actor ? { Authorization: `Bearer ${actor.token}` } : {}),
+    ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+    ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+  };
+  const response = await fetch(`${base}/${path}`, {
+    method,
+    headers,
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  const text = await response.text();
+  let value;
+  try { value = text ? JSON.parse(text) : undefined; } catch { value = text; }
+  return { status: response.status, headers: response.headers, value };
+}
+
+function command(base, path, actor, body, idempotencyKey = key(), method = 'POST') {
+  return call(base, path, { method, actor, body, idempotencyKey });
+}
+
+function expectSuccess(result, status = 200) {
+  assert.equal(result.status, status, JSON.stringify(result.value));
+  assert.equal(result.headers.get('cache-control'), 'no-store');
+}
+
+function expectVietnameseError(result, status, code) {
+  assert.equal(result.status, status, JSON.stringify(result.value));
+  assert.equal(result.value?.code, code, JSON.stringify(result.value));
+  assert.match(result.value?.message ?? '', /[\u0102-\u01b0\u1ea0-\u1ef9]/u, 'expected Vietnamese user-facing copy');
+  assert.equal(result.headers.get('cache-control'), 'no-store');
+}
+
+async function login(account) {
+  const result = await call(identityUrl, 'auth/login', {
+    method: 'POST',
+    body: { username: account.username, password: account.password, client_kind: 'NATIVE' },
+    headers: { 'X-Forwarded-For': account.sourceIp },
+  });
+  assert.equal(result.status, 200, JSON.stringify(result.value));
+  account.token = result.value.access_token;
+  return account;
+}
+
+async function registerAndLogin(label, roles = []) {
+  const accountSuffix = randomBytes(5).toString('hex');
+  const account = {
+    username: `t15${label}${accountSuffix}`,
+    password: `Logistics T15 test ${accountSuffix}!`,
+    sourceIp: `198.51.100.${identityIp++}`,
+  };
+  const registered = await call(identityUrl, 'auth/register', {
+    method: 'POST',
+    body: {
+      username: account.username,
+      display_name: `Người dùng kiểm thử T15 ${label} ${accountSuffix}`,
+      password: account.password,
+    },
+    idempotencyKey: key(),
+    headers: { 'X-Forwarded-For': account.sourceIp },
+  });
+  assert.equal(registered.status, 201, JSON.stringify(registered.value));
+  account.id = registered.value.user.id;
+  for (const role of roles) {
+    await identityDb.query(
+      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
+       VALUES ($1,$2,'ORGANIZATION',$3)`,
+      [account.id, role, organizationId],
+    );
+  }
+  return login(account);
+}
+
+async function cloneAndLogin(label, roles, template) {
+  const accountSuffix = randomBytes(5).toString('hex');
+  const account = {
+    username: `t15${label}${accountSuffix}`,
+    password: template.password,
+    sourceIp: `198.51.100.${identityIp++}`,
+  };
+  const templateRows = await identityDb.query('SELECT password_hash FROM app_user WHERE id=$1', [template.id]);
+  assert.equal(templateRows.rowCount, 1);
+  const inserted = await identityDb.query(
+    'INSERT INTO app_user (username,display_name,password_hash) VALUES ($1,$2,$3) RETURNING id',
+    [account.username, `Người dùng kiểm thử T15 ${label} ${accountSuffix}`, templateRows.rows[0].password_hash],
+  );
+  assert.equal(inserted.rowCount, 1);
+  account.id = inserted.rows[0].id;
+  await identityDb.query(
+    `INSERT INTO role_grant (user_id,role_code,scope_type) VALUES ($1,'CITIZEN','SYSTEM')`, [account.id],
+  );
+  for (const role of roles) {
+    await identityDb.query(
+      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
+       VALUES ($1,$2,'ORGANIZATION',$3)`,
+      [account.id, role, organizationId],
+    );
+  }
+  return login(account);
+}
+
+async function createRequest(reporter) {
+  const result = await command(responseUrl, 'requests', reporter, {
+    incident_category_code: categoryCode,
+    description: 'Nước dâng sát khu dân cư, cần kiểm tra điểm an toàn.',
+    people_affected: 2,
+    reporter_name: 'Nguyễn An T15',
+    reporter_contact_phone: '+84912345678',
+    reporter_declared_danger: false,
+    location: {
+      type: 'Point', coordinates: [-120, -20], source: 'GPS', accuracy_m: 8,
+      captured_at: new Date().toISOString(),
+    },
+  }, key(), 'POST');
+  assert.equal(result.status, 201, JSON.stringify(result.value));
+  return result.value;
+}
+
+async function verifyRequest(request, coordinator) {
+  const started = await command(responseUrl, `requests/${request.id}/start-verification`, coordinator, { expected_version: 1 });
+  assert.equal(started.status, 200, JSON.stringify(started.value));
+  const contact = await command(responseUrl, `requests/${request.id}/contact-attempts`, coordinator, {
+    contact_target: 'REPORTER', outcome: 'REACHED', note: 'Đã xác nhận thông tin và vị trí.',
+  });
+  assert.equal(contact.status, 201, JSON.stringify(contact.value));
+  const verified = await command(responseUrl, `requests/${request.id}/verify`, coordinator, {
+    expected_version: 3, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [contact.value.id] },
+  });
+  assert.equal(verified.status, 200, JSON.stringify(verified.value));
+}
+
+async function createDistribution(actor, warehouseId, itemId, quantity, reliefPointId = null, commitmentId = null) {
+  const body = {
+    warehouse_id: warehouseId,
+    ...(reliefPointId ? { relief_point_id: reliefPointId } : {}),
+    purpose: commitmentId ? 'REQUEST_AID' : 'POINT_REPLENISHMENT',
+    lines: [{ item_id: itemId, quantity, ...(commitmentId ? { commitment_id: commitmentId } : {}) }],
+  };
+  const result = await command(logisticsUrl, 'distributions', actor, body);
+  expectSuccess(result, 201);
+  return result.value;
+}
+
+async function approveAndDispatch(distribution, approver, dispatcher, version = 1) {
+  const approved = await command(logisticsUrl, `distributions/${distribution.id}/approve`, approver, { expected_version: version });
+  expectSuccess(approved);
+  const dispatched = await command(logisticsUrl, `distributions/${distribution.id}/dispatch`, dispatcher, { expected_version: version });
+  expectSuccess(dispatched);
+  return dispatched.value;
+}
+
+async function handoff(distributionId, actor, body, idempotencyKey = key()) {
+  const result = await command(logisticsUrl, `distributions/${distributionId}/handoffs`, actor, body, idempotencyKey);
+  return { result, idempotencyKey };
+}
+
+async function distributionDetail(id, actor) {
+  const result = await call(logisticsUrl, `distributions/${id}`, { actor });
+  expectSuccess(result);
+  return result.value;
+}
+
+await Promise.all([logisticsDb.connect(), responseDb.connect(), identityDb.connect()]);
+try {
+  await identityDb.query(
+    `INSERT INTO organization (id,name,organization_kind)
+     VALUES ($1,'T15 test organization','COORDINATION') ON CONFLICT (id) DO NOTHING`, [organizationId],
+  );
+  await identityDb.query('INSERT INTO region (code,name) VALUES ($1,$2)', [regionCode, 'Khu vực kiểm thử T15']);
+  await responseDb.query('INSERT INTO incident_category (code,display_name) VALUES ($1,$2)', [categoryCode, 'Lũ lụt']);
+  await responseDb.query(
+    `INSERT INTO region_boundary (region_code,geom) VALUES
+      ($1,ST_Multi(ST_GeomFromText('POLYGON((-121 -21,-119 -21,-119 -19,-121 -19,-121 -21))',4326)))`,
+    [regionCode],
+  );
+
+  const staff = await registerAndLogin('staff', ['COORDINATOR', 'OPERATIONS_MANAGER']);
+  const approver = await cloneAndLogin('approver', ['COORDINATOR', 'REVIEWER'], staff);
+  const dispatcher = await cloneAndLogin('dispatcher', ['DISTRIBUTION_STAFF'], staff);
+  const fieldRecorder = await cloneAndLogin('field', ['COORDINATOR', 'DISTRIBUTION_STAFF'], staff);
+  const secondRecorder = await cloneAndLogin('field2', ['DISTRIBUTION_STAFF'], staff);
+  const returner = await cloneAndLogin('returner', ['INTAKE_STAFF'], staff);
+  const secondReviewer = await cloneAndLogin('reviewer2', ['COORDINATOR', 'REVIEWER'], staff);
+  const reporter = await cloneAndLogin('reporter', [], staff);
+
+  const itemType = await command(logisticsUrl, 'item-types', staff, {
+    code: `T15_${suffix}`, display_name: 'Vật tư kiểm thử T15',
+  });
+  expectSuccess(itemType, 201);
+  const unit = await command(logisticsUrl, 'units', staff, {
+    code: `T15_U_${suffix}`, display_name: 'Thùng T15', scale: 2,
+  });
+  expectSuccess(unit, 201);
+  const item = await command(logisticsUrl, 'items', staff, {
+    item_type_code: itemType.value.code, unit_code: unit.value.code, name: `Vật tư phân phối T15 ${suffix}`,
+  });
+  expectSuccess(item, 201);
+  const warehouse = await command(logisticsUrl, 'warehouses', staff, {
+    organization_id: organizationId, region_code: regionCode, name: `Kho phân phối T15 ${suffix}`,
+  });
+  expectSuccess(warehouse, 201);
+  const opening = await command(logisticsUrl, 'stock/opening', staff, {
+    warehouse_id: warehouse.value.id,
+    lines: [{ item_id: item.value.id, quantity: '25.00' }],
+    note: 'Tồn đầu kỳ kiểm thử phân phối T15.',
+  });
+  expectSuccess(opening, 201);
+  const reliefPoint = await command(logisticsUrl, 'relief-points', staff, {
+    organization_id: organizationId,
+    region_code: regionCode,
+    name: `Điểm cứu trợ T15 ${suffix}`,
+    location: { type: 'Point', coordinates: [107.6, 16.0] },
+  });
+  expectSuccess(reliefPoint, 201);
+
+  const request = await createRequest(reporter);
+  await verifyRequest(request, staff);
+  const requestState = await responseDb.query('SELECT work_cycle FROM assistance_request WHERE id=$1', [request.id]);
+  assert.equal(requestState.rowCount, 1);
+  const needResult = await command(logisticsUrl, 'needs', staff, {
+    request_id: request.id,
+    work_cycle: Number(requestState.rows[0].work_cycle),
+    item_id: item.value.id,
+    quantity: '10.00',
+  });
+  expectSuccess(needResult, 201);
+  const need = needResult.value;
+  const commitmentResult = await command(logisticsUrl, `needs/${need.id}/commitments`, staff, {
+    warehouse_id: warehouse.value.id, quantity: '10.00',
+  });
+  expectSuccess(commitmentResult, 201);
+  const commitmentId = commitmentResult.value.id;
+
+  const frozenCandidate = await createDistribution(staff, warehouse.value.id, item.value.id, '5.00', null, commitmentId);
+  const frozenCandidateApproval = await command(logisticsUrl, `distributions/${frozenCandidate.id}/approve`, approver, { expected_version: 1 });
+  expectSuccess(frozenCandidateApproval);
+
+  const requestAid = await createDistribution(staff, warehouse.value.id, item.value.id, '1.00', null, commitmentId);
+  const prepared = await command(logisticsUrl, `distributions/${requestAid.id}/prepare-from-commitments`, staff, { expected_version: 1 });
+  expectSuccess(prepared);
+  assert.equal(prepared.value.lines.length, 1);
+  assert.equal(Number(prepared.value.lines[0].quantity), 10);
+  const reducedPreparation = await command(logisticsUrl, `distributions/${requestAid.id}/lines`, staff, {
+    expected_version: 2,
+    lines: [{ item_id: item.value.id, commitment_id: commitmentId, quantity: '5.00' }],
+  }, key(), 'PUT');
+  expectSuccess(reducedPreparation);
+  assert.equal(Number(reducedPreparation.value.lines[0].quantity), 5);
+  const issued = await approveAndDispatch(reducedPreparation.value, approver, dispatcher, 3);
+  const requestAidLineId = issued.lines[0].id;
+  const directHandoffBody = {
+    handoff_kind: 'DIRECT_HOUSEHOLD',
+    receiver_label: 'Hộ dân kiểm thử T15',
+    confirmation_basis: 'Người nhận xác nhận đã nhận đủ hàng.',
+    occurred_at: new Date().toISOString(),
+    lines: [{ distribution_line_id: requestAidLineId, quantity: '5.00' }],
+  };
+  const needCycle = await logisticsDb.query('SELECT cycle_id FROM relief_need WHERE id=$1', [need.id]);
+  assert.equal(needCycle.rowCount, 1);
+  await logisticsDb.query("UPDATE fulfillment_cycle SET state='FROZEN' WHERE id=$1", [needCycle.rows[0].cycle_id]);
+  const issueCountBeforeFreezeAttempt = await logisticsDb.query(
+    "SELECT count(*)::int AS count FROM stock_movement WHERE commitment_id=$1 AND movement_type='ISSUE'", [commitmentId],
+  );
+  const issuedBeforeFreezeAttempt = await logisticsDb.query(
+    'SELECT issued_quantity::text FROM commitment WHERE id=$1', [commitmentId],
+  );
+  const frozenDispatch = await command(
+    logisticsUrl, `distributions/${frozenCandidate.id}/dispatch`, dispatcher, { expected_version: 1 },
+  );
+  expectVietnameseError(frozenDispatch, 409, 'CYCLE_FROZEN');
+  const issueCountAfterFreezeAttempt = await logisticsDb.query(
+    "SELECT count(*)::int AS count FROM stock_movement WHERE commitment_id=$1 AND movement_type='ISSUE'", [commitmentId],
+  );
+  const issuedAfterFreezeAttempt = await logisticsDb.query(
+    'SELECT issued_quantity::text FROM commitment WHERE id=$1', [commitmentId],
+  );
+  assert.deepEqual(issueCountAfterFreezeAttempt.rows, issueCountBeforeFreezeAttempt.rows);
+  assert.deepEqual(issuedAfterFreezeAttempt.rows, issuedBeforeFreezeAttempt.rows);
+
+  const recorded = await handoff(requestAid.id, fieldRecorder, directHandoffBody);
+  expectSuccess(recorded.result, 201);
+  assert.equal(recorded.result.value.status, 'RECORDED');
+  const replay = await handoff(requestAid.id, fieldRecorder, directHandoffBody, recorded.idempotencyKey);
+  expectSuccess(replay.result, 201);
+  assert.equal(replay.result.headers.get('idempotent-replay'), 'true');
+
+  const revokedRecorderGrant = await identityDb.query(
+    `UPDATE role_grant SET revoked_at=now()
+      WHERE user_id=$1 AND role_code='DISTRIBUTION_STAFF' AND revoked_at IS NULL RETURNING id`, [fieldRecorder.id],
+  );
+  assert.equal(revokedRecorderGrant.rowCount, 1);
+  await identityDb.query('UPDATE app_user SET authz_version=authz_version+1 WHERE id=$1', [fieldRecorder.id]);
+  await login(fieldRecorder);
+  const revokedReplay = await handoff(requestAid.id, fieldRecorder, directHandoffBody, recorded.idempotencyKey);
+  expectVietnameseError(revokedReplay.result, 403, 'FORBIDDEN');
+
+  await logisticsDb.query("UPDATE fulfillment_cycle SET state='OPEN' WHERE id=$1", [needCycle.rows[0].cycle_id]);
+  const remainingDispatch = await command(
+    logisticsUrl, `distributions/${frozenCandidate.id}/dispatch`, dispatcher, { expected_version: 1 },
+  );
+  expectSuccess(remainingDispatch);
+  const finalHandoff = await handoff(frozenCandidate.id, secondRecorder, {
+    ...directHandoffBody,
+    lines: [{ distribution_line_id: remainingDispatch.value.lines[0].id, quantity: '5.00' }],
+  });
+  expectSuccess(finalHandoff.result, 201);
+
+  const fulfilledNeed = await logisticsDb.query(
+    `SELECT n.status,COALESCE(sum(cm.delivered_quantity),0)::text AS delivered_quantity
+       FROM relief_need n LEFT JOIN commitment cm ON cm.relief_need_id=n.id
+      WHERE n.id=$1 GROUP BY n.id,n.status`, [need.id],
+  );
+  assert.deepEqual(fulfilledNeed.rows, [{ status: 'FULFILLED', delivered_quantity: '10.000' }]);
+  const settlementMismatch = await logisticsDb.query(
+    'SELECT commitment_id FROM commitment_counter_mismatch WHERE commitment_id=$1', [commitmentId],
+  );
+  assert.equal(settlementMismatch.rowCount, 0);
+  const autoReconcileAudit = await logisticsDb.query(
+    `SELECT id FROM audit_log WHERE entity_type='distribution' AND entity_id=$1 AND action='DISTRIBUTION_AUTO_RECONCILED'`,
+    [requestAid.id],
+  );
+  assert.equal(autoReconcileAudit.rowCount, 1);
+
+  const pointDistribution = await createDistribution(staff, warehouse.value.id, item.value.id, '6.00', reliefPoint.value.id);
+  const pointIssued = await approveAndDispatch(pointDistribution, approver, dispatcher);
+  const pointLineId = pointIssued.lines[0].id;
+  const receiptBody = {
+    handoff_kind: 'POINT_RECEIPT',
+    receiver_label: 'Nhân viên điểm cứu trợ T15',
+    confirmation_basis: 'Điểm cứu trợ xác nhận số hàng thực nhận.',
+    occurred_at: new Date().toISOString(),
+    lines: [{ distribution_line_id: pointLineId, quantity: '4.00' }],
+  };
+  const receiptKeys = [key(), key()];
+  const receiptRace = await Promise.all(receiptKeys.map((idempotencyKey) =>
+    handoff(pointDistribution.id, secondRecorder, receiptBody, idempotencyKey)));
+  assert.equal(receiptRace.filter(({ result }) => result.status === 201).length, 1, JSON.stringify(receiptRace.map(({ result }) => result.value)));
+  const rejectedReceipt = receiptRace.find(({ result }) => result.status !== 201);
+  expectVietnameseError(rejectedReceipt.result, 409, 'HANDOFF_EXCEEDS_BALANCE');
+  let pointState = await distributionDetail(pointDistribution.id, staff);
+  assert.equal(Number(pointState.lines[0].in_transit), 2);
+  assert.equal(Number(pointState.lines[0].at_point), 4);
+
+  const overBalanceHandout = await handoff(pointDistribution.id, secondRecorder, {
+    handoff_kind: 'HOUSEHOLD_HANDOUT',
+    receiver_label: 'Hộ dân T15',
+    confirmation_basis: 'Kiểm thử số lượng vượt tồn tại điểm.',
+    occurred_at: new Date().toISOString(),
+    lines: [{ distribution_line_id: pointLineId, quantity: '5.00' }],
+  });
+  expectVietnameseError(overBalanceHandout.result, 409, 'HANDOFF_EXCEEDS_BALANCE');
+
+  const returnResult = await handoff(pointDistribution.id, returner, {
+    handoff_kind: 'RETURN',
+    source_stage: 'IN_TRANSIT',
+    receiver_label: `Kho ${suffix}`,
+    confirmation_basis: 'Kho đã nhận lại hàng và kiểm đếm.',
+    occurred_at: new Date().toISOString(),
+    lines: [{ distribution_line_id: pointLineId, quantity: '1.00' }],
+  });
+  expectSuccess(returnResult.result, 201);
+  const returnedLineId = returnResult.result.value.lines[0].id;
+  const returnMovements = await logisticsDb.query(
+    `SELECT movement_type,delta_on_hand::text FROM stock_movement WHERE handoff_line_id=$1`, [returnedLineId],
+  );
+  assert.deepEqual(returnMovements.rows, [{ movement_type: 'RETURN', delta_on_hand: '1.000' }]);
+
+  const finalReceipt = await handoff(pointDistribution.id, secondRecorder, {
+    ...receiptBody,
+    lines: [{ distribution_line_id: pointLineId, quantity: '1.00' }],
+  });
+  expectSuccess(finalReceipt.result, 201);
+  const handout = await handoff(pointDistribution.id, secondRecorder, {
+    handoff_kind: 'HOUSEHOLD_HANDOUT',
+    receiver_label: 'Hộ dân T15',
+    confirmation_basis: 'Hộ dân xác nhận đã nhận hàng tại điểm.',
+    occurred_at: new Date().toISOString(),
+    lines: [{ distribution_line_id: pointLineId, quantity: '5.00' }],
+  });
+  expectSuccess(handout.result, 201);
+  pointState = await distributionDetail(pointDistribution.id, staff);
+  assert.equal(pointState.status, 'RECONCILED');
+  assert.equal(Number(pointState.lines[0].in_transit), 0);
+  assert.equal(Number(pointState.lines[0].at_point), 0);
+  const manualReconcile = await command(logisticsUrl, `distributions/${pointDistribution.id}/reconcile`, approver, {
+    expected_version: pointState.version,
+  });
+  expectSuccess(manualReconcile);
+  assert.equal(manualReconcile.value.status, 'RECONCILED');
+
+  const staleDistribution = await createDistribution(staff, warehouse.value.id, item.value.id, '1.00', reliefPoint.value.id);
+  const staleApproval = await command(logisticsUrl, `distributions/${staleDistribution.id}/approve`, approver, { expected_version: 1 });
+  expectSuccess(staleApproval);
+  const edited = await command(logisticsUrl, `distributions/${staleDistribution.id}/lines`, staff, {
+    expected_version: 1,
+    lines: [{ item_id: item.value.id, quantity: '2.00' }],
+  }, key(), 'PUT');
+  expectSuccess(edited);
+  assert.equal(edited.value.status, 'DRAFT');
+  assert.equal(edited.value.version, 2);
+  const staleDispatch = await command(logisticsUrl, `distributions/${staleDistribution.id}/dispatch`, dispatcher, { expected_version: 2 });
+  expectVietnameseError(staleDispatch, 409, 'APPROVAL_STALE');
+
+  const competingDistributions = await Promise.all([
+    createDistribution(staff, warehouse.value.id, item.value.id, '7.00', reliefPoint.value.id),
+    createDistribution(staff, warehouse.value.id, item.value.id, '7.00', reliefPoint.value.id),
+  ]);
+  const competingApprovals = await Promise.all(competingDistributions.map((distribution) =>
+    command(logisticsUrl, `distributions/${distribution.id}/approve`, approver, { expected_version: 1 })));
+  competingApprovals.forEach((result) => expectSuccess(result));
+  const dispatchRace = await Promise.all(competingDistributions.map((distribution) =>
+    command(logisticsUrl, `distributions/${distribution.id}/dispatch`, dispatcher, { expected_version: 1 })));
+  assert.equal(dispatchRace.filter((result) => result.status === 200).length, 1, JSON.stringify(dispatchRace.map((result) => result.value)));
+  expectVietnameseError(dispatchRace.find((result) => result.status !== 200), 409, 'INSUFFICIENT_STOCK');
+  const stockAfterDispatchRace = await logisticsDb.query(
+    'SELECT on_hand::text,reserved::text FROM stock_balance WHERE warehouse_id=$1 AND item_id=$2',
+    [warehouse.value.id, item.value.id],
+  );
+  assert.deepEqual(stockAfterDispatchRace.rows, [{ on_hand: '3.000', reserved: '0.000' }]);
+
+  const lossDistribution = await createDistribution(staff, warehouse.value.id, item.value.id, '2.00', reliefPoint.value.id);
+  const lossIssued = await approveAndDispatch(lossDistribution, approver, dispatcher);
+  const lossLineId = lossIssued.lines[0].id;
+  const pendingLoss = await handoff(lossDistribution.id, secondRecorder, {
+    handoff_kind: 'LOSS',
+    source_stage: 'IN_TRANSIT',
+    confirmation_basis: 'Báo mất hàng, chờ người có thẩm quyền xem xét.',
+    occurred_at: new Date().toISOString(),
+    lines: [{ distribution_line_id: lossLineId, quantity: '2.00' }],
+  });
+  expectSuccess(pendingLoss.result, 201);
+  assert.equal(pendingLoss.result.value.status, 'PENDING_LOSS');
+  let lossState = await distributionDetail(lossDistribution.id, staff);
+  assert.equal(Number(lossState.lines[0].in_transit), 2);
+  assert.equal(Number(lossState.lines[0].lost), 0);
+  assert.equal(Number(lossState.lines[0].pending_loss_count), 1);
+  const blockedReconcile = await command(logisticsUrl, `distributions/${lossDistribution.id}/reconcile`, approver, {
+    expected_version: lossState.version,
+  });
+  expectVietnameseError(blockedReconcile, 409, 'LOSS_REVIEW_REQUIRED');
+
+  const reviewBody = { expected_version: 1, decision: 'APPROVE', reason: 'Đã xác minh mất hàng và vị trí phát sinh.' };
+  const reviewKeys = [key(), key()];
+  const reviews = await Promise.all([
+    command(logisticsUrl, `distributions/${lossDistribution.id}/handoffs/${pendingLoss.result.value.id}/review-loss`, approver, reviewBody, reviewKeys[0]),
+    command(logisticsUrl, `distributions/${lossDistribution.id}/handoffs/${pendingLoss.result.value.id}/review-loss`, secondReviewer, reviewBody, reviewKeys[1]),
+  ]);
+  assert.equal(reviews.filter((result) => result.status === 200).length, 1, JSON.stringify(reviews.map((result) => result.value)));
+  const reviewWinnerIndex = reviews.findIndex((result) => result.status === 200);
+  const reviewLoser = reviews[1 - reviewWinnerIndex];
+  expectVietnameseError(reviewLoser, 409, 'STATE_TRANSITION_INVALID');
+  const reviewWinner = reviewWinnerIndex === 0 ? approver : secondReviewer;
+  const reviewWinnerKey = reviewKeys[reviewWinnerIndex];
+  lossState = await distributionDetail(lossDistribution.id, staff);
+  assert.equal(lossState.status, 'RECONCILED');
+  assert.equal(Number(lossState.lines[0].in_transit), 0);
+  assert.equal(Number(lossState.lines[0].lost), 2);
+  const revokedReviewerGrant = await identityDb.query(
+    `UPDATE role_grant SET revoked_at=now()
+      WHERE user_id=$1 AND role_code='REVIEWER' AND revoked_at IS NULL RETURNING id`, [reviewWinner.id],
+  );
+  assert.equal(revokedReviewerGrant.rowCount, 1);
+  await identityDb.query('UPDATE app_user SET authz_version=authz_version+1 WHERE id=$1', [reviewWinner.id]);
+  await login(reviewWinner);
+  const revokedReviewReplay = await command(
+    logisticsUrl,
+    `distributions/${lossDistribution.id}/handoffs/${pendingLoss.result.value.id}/review-loss`,
+    reviewWinner,
+    reviewBody,
+    reviewWinnerKey,
+  );
+  expectVietnameseError(revokedReviewReplay, 403, 'FORBIDDEN');
+  await identityDb.query(
+    `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
+     VALUES ($1,'REVIEWER','ORGANIZATION',$2)`, [reviewWinner.id, organizationId],
+  );
+  await identityDb.query('UPDATE app_user SET authz_version=authz_version+1 WHERE id=$1', [reviewWinner.id]);
+  await login(reviewWinner);
+
+  const raceItem = await command(logisticsUrl, 'items', staff, {
+    item_type_code: itemType.value.code, unit_code: unit.value.code, name: `Vật tư đua ngừng hoạt động T15 ${suffix}`,
+  });
+  expectSuccess(raceItem, 201);
+  const raceOpening = await command(logisticsUrl, 'stock/opening', staff, {
+    warehouse_id: warehouse.value.id,
+    lines: [{ item_id: raceItem.value.id, quantity: '1.00' }],
+    note: 'Tồn đầu kỳ kiểm thử khóa vật tư T15.',
+  });
+  expectSuccess(raceOpening, 201);
+  const itemRaceDistribution = await createDistribution(staff, warehouse.value.id, raceItem.value.id, '1.00', reliefPoint.value.id);
+  const itemRaceApproval = await command(logisticsUrl, `distributions/${itemRaceDistribution.id}/approve`, approver, { expected_version: 1 });
+  expectSuccess(itemRaceApproval);
+  await logisticsDb.query('BEGIN');
+  let deactivateRace;
+  let itemDispatchRace;
+  try {
+    await logisticsDb.query('SELECT id FROM item WHERE id=$1 FOR UPDATE', [raceItem.value.id]);
+    deactivateRace = command(logisticsUrl, `items/${raceItem.value.id}/deactivate`, staff, { expected_version: 1 });
+    await waitForLockWait('FROM item WHERE id = $1 FOR UPDATE', 'item deactivation');
+    itemDispatchRace = command(
+      logisticsUrl,
+      `distributions/${itemRaceDistribution.id}/dispatch`,
+      dispatcher,
+      { expected_version: 1 },
+    );
+    await waitForLockWait('FOR SHARE OF i', 'catalog item');
+    await logisticsDb.query('COMMIT');
+    expectSuccess(await deactivateRace);
+    expectVietnameseError(await itemDispatchRace, 400, 'VALIDATION_FAILED');
+  } catch (error) {
+    await logisticsDb.query('ROLLBACK').catch(() => undefined);
+    await Promise.allSettled([deactivateRace, itemDispatchRace].filter(Boolean));
+    throw error;
+  }
+  const raceItemBalance = await logisticsDb.query(
+    'SELECT on_hand::text,reserved::text FROM stock_balance WHERE warehouse_id=$1 AND item_id=$2',
+    [warehouse.value.id, raceItem.value.id],
+  );
+  assert.deepEqual(raceItemBalance.rows, [{ on_hand: '1.000', reserved: '0.000' }]);
+  const raceItemMovements = await logisticsDb.query(
+    `SELECT count(*)::int AS count FROM stock_movement m JOIN stock_balance b ON b.id=m.balance_id
+      WHERE b.item_id=$1 AND m.movement_type='ISSUE'`, [raceItem.value.id],
+  );
+  assert.equal(raceItemMovements.rows[0].count, 0);
+
+  const assetRaceDistribution = await createDistribution(staff, warehouse.value.id, item.value.id, '1.00', reliefPoint.value.id);
+  const assetRaceApproval = await command(logisticsUrl, `distributions/${assetRaceDistribution.id}/approve`, approver, { expected_version: 1 });
+  expectSuccess(assetRaceApproval);
+  await logisticsDb.query('BEGIN');
+  let assetDispatchRace;
+  try {
+    const inactive = await logisticsDb.query("UPDATE relief_point SET status='INACTIVE' WHERE id=$1", [reliefPoint.value.id]);
+    assert.equal(inactive.rowCount, 1);
+    assetDispatchRace = command(
+      logisticsUrl,
+      `distributions/${assetRaceDistribution.id}/dispatch`,
+      dispatcher,
+      { expected_version: 1 },
+    );
+    await waitForLockWait('FROM relief_point WHERE id=$1 FOR SHARE', 'relief point');
+    await logisticsDb.query('COMMIT');
+    const rejectedDispatch = await assetDispatchRace;
+    expectVietnameseError(rejectedDispatch, 409, 'POINT_INACTIVE');
+  } catch (error) {
+    await logisticsDb.query('ROLLBACK').catch(() => undefined);
+    if (assetDispatchRace) await assetDispatchRace.catch(() => undefined);
+    throw error;
+  }
+  const remainingStock = await logisticsDb.query(
+    'SELECT on_hand::text,reserved::text FROM stock_balance WHERE warehouse_id=$1 AND item_id=$2',
+    [warehouse.value.id, item.value.id],
+  );
+  assert.deepEqual(remainingStock.rows, [{ on_hand: '1.000', reserved: '0.000' }]);
+
+  const distributionList = await call(logisticsUrl, 'distributions?status=RECONCILED&limit=10', { actor: dispatcher });
+  expectSuccess(distributionList);
+  assert.ok(distributionList.value.items.some((row) => row.id === requestAid.id));
+  const needAudit = await logisticsDb.query(
+    `SELECT id FROM audit_log WHERE entity_type='relief_need' AND entity_id=$1 AND action='NEED_AUTO_FULFILLED'`, [need.id],
+  );
+  assert.equal(needAudit.rowCount, 1);
+  console.log('Logistics T15 distribution and handoff database tests passed.');
+} finally {
+  await Promise.all([logisticsDb.end(), responseDb.end(), identityDb.end()]);
+}

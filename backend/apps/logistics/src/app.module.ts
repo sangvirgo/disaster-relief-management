@@ -8,6 +8,7 @@ import { ReceiptsModule } from './receipts/receipts.module';
 import { StockModule } from './stock/stock.module';
 import { DrivesModule } from './drives/drives.module';
 import { NeedsModule } from './needs/needs.module';
+import { DistributionsModule } from './distributions/distributions.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { NeedsModule } from './needs/needs.module';
     StockModule,
     DrivesModule,
     NeedsModule,
+    DistributionsModule,
     ReceiptsModule,
   ],
 })

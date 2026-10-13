@@ -111,6 +111,17 @@ T7 exit evidence: `npx tsc --noEmit` passed; `npm test` passed 18 suites / 56 te
 - T14 settlement-driven auto-`FULFILLED` is still pending because delivery settlement is implemented in T15; verify the need status changes when delivered reaches requested as part of T15 integration.
 - Next: T15 distribution and handoff. Keep the T5 AIStor provider acceptance gate open and do not edit existing migrations/schema without an explicit task requirement.
 
-## Next task: T15
+## T15 distribution and handoff — 2026-10-13
 
-Proceed with T15 in [06](06-implementation-tasks.md), following the documented dependency order. Add settlement-driven need auto-fulfillment coverage to the T15 settlement path. Keep the T5 selected-provider acceptance gate tracked separately; its AIStor artifact, private-access, and restore checks remain outstanding.
+- Added a feature-scoped `DistributionsModule` with a thin controller, separate distribution command/query and handoff command services, and shared read, permission, asset, stock, and settlement helpers. Logistics wires the module at the app boundary; campaign lookup remains behind the existing Response client.
+- Implemented distribution preparation, approval, dispatch, cancellation, handoff recording, LOSS review, settlement, and automatic reconciliation/need fulfillment. Cycle, need, commitment, item, distribution, and stock locking preserves the documented transaction boundaries and avoids nested service transactions.
+- Added unit coverage for command validation, lock order, read mappers, stock scale normalization, settlement, permissions, and replay behavior. Added real HTTP/PostgreSQL smoke coverage for T15 workflows, quantity races, cycle freeze, concurrent stock dispatch, approval invalidation, handoff over-balance races, loss review, and item/asset lock races.
+- Database integration exposed fixed-scale rows returned as `numeric(18,3)`; LOSS review now normalizes trailing database zeroes to the catalog unit scale before validation. The smoke lock observer clears PostgreSQL's cached statistics snapshot between polls while its transaction holds the test row lock.
+- Updated [04-logistics-api](04-logistics-api.md). No migrations, schema files, or OpenAPI snapshots changed.
+- Verification: `npm run build` passed all three Nest apps; `npm test` passed 74 Jest suites / 310 tests plus 2 Node tests; `npx tsc --noEmit` and `npx tsc --noEmit -p tsconfig.test.json` passed; `bash scripts/db/test-db` passed through the T15 distribution/handoff smoke and `Backend database checks passed.` `git diff --check` passed; `contracts/openapi` and migration/schema diffs are empty. `backend/dist/` is ignored and the test Compose stack was removed by its cleanup trap.
+- NestJS review found no service-boundary or DI blocker. The test Compose profile uses real PostgreSQL/PostGIS and API containers with isolated disposable state; it was already present before T15 and was not added by this phase.
+- Next: T16 resolution/cancellation seal and recovery, the plan's highest-risk remaining workflow. Keep the T5 AIStor provider acceptance gate open and do not edit existing migrations/schema without an explicit task requirement.
+
+## Next task: T16
+
+Proceed with T16 in [06](06-implementation-tasks.md), following the documented dependency order. Keep the T5 selected-provider acceptance gate tracked separately; its AIStor artifact, private-access, and restore checks remain outstanding.
