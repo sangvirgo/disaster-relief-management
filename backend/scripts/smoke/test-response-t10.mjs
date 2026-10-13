@@ -4,10 +4,10 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
-const responseUrl = requiredEnv('TEST_RESPONSE_BASE_URL').replace(/\/+$/u, '');
-const identityUrl = requiredEnv('TEST_IDENTITY_BASE_URL').replace(/\/+$/u, '');
-const responseDb = new Client({ connectionString: requiredEnv('TEST_RESPONSE_DATABASE_URL') });
-const identityDb = new Client({ connectionString: requiredEnv('TEST_IDENTITY_DATABASE_URL') });
+const responseUrl = requiredEnv('C48_RESPONSE_BASE_URL').replace(/\/+$/u, '');
+const identityUrl = requiredEnv('C48_IDENTITY_BASE_URL').replace(/\/+$/u, '');
+const responseDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
+const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
 const organizationId = randomUUID();
 const regionCode = `T10_${randomBytes(5).toString('hex').toUpperCase()}`;
 const users = [];
@@ -257,7 +257,7 @@ try {
   assert.deepEqual(Object.keys(publicCampaign).sort(), ['ends_at', 'id', 'objective', 'region_name', 'starts_at', 'status', 'title'].sort());
   assert.equal(publicCampaign.region_name, 'Khu vực kiểm thử T10');
 
-  const responseToken = await createServiceToken('c48-response-test', 'c48-test-response-secret-not-for-deployment-0001', 'identity');
+  const responseToken = await createServiceToken(requiredEnv('RESPONSE_SERVICE_CLIENT_ID'), requiredEnv('RESPONSE_SERVICE_CLIENT_SECRET'), 'identity');
   const unauthenticatedRegionLookup = await call(identityUrl, 'internal/regions:lookup', {
     method: 'POST', body: { codes: [regionCode] },
   });
@@ -270,7 +270,7 @@ try {
   expectSuccess(regionLookup);
   assert.deepEqual(regionLookup.value.items, [{ code: regionCode, name: 'Khu vực kiểm thử T10' }]);
 
-  const identityToken = await createServiceToken('c48-identity-test', 'c48-test-identity-secret-not-for-deployment-0001', 'response');
+  const identityToken = await createServiceToken(requiredEnv('IDENTITY_SERVICE_CLIENT_ID'), requiredEnv('IDENTITY_SERVICE_CLIENT_SECRET'), 'response');
   const internalCampaign = await call(responseUrl, `internal/campaigns/${campaignId}`, { headers: bearer(identityToken) });
   expectSuccess(internalCampaign);
   assert.deepEqual(Object.keys(internalCampaign.value).sort(), ['id', 'organization_id', 'region_code', 'status', 'version'].sort());

@@ -10,7 +10,7 @@ Read first: `/AGENTS.md`, [project context](../../../c48-project-context.md), th
 backend/
   apps/identity/  apps/response/  apps/logistics/      # each: main.ts, app.module.ts, config/, database/{data-source.ts,migrations/}, modules/<capability>/
   packages/technical/                                   # secret hashing, error envelope, idempotency helper, VN message-catalog loader. No business rules.
-  infra/{compose.yaml,compose.test.yaml,nginx/,db-init/} scripts/ test/{integration,k6}/
+  infra/{compose.yaml,nginx/,db-init/} scripts/ test/{integration,k6}/
 ```
 
 Module names: Identity `auth sessions grants users orgs`; Response `requests tracking verification teams missions campaigns evidence notices`; Logistics `catalog drives receipts stock needs commitments distributions reports`. One `*.module.ts`, `*.controller.ts`, `*.service.ts`, `dto/`, `entities/` per module. Controllers contain no SQL or state logic.

@@ -1,21 +1,17 @@
 #!/usr/bin/env bash
 # Two-session race tests for the Logistics schema (T0-S exit gate, 01-schema-review.md §9.4).
-# No arguments. Creates the fresh database hl_race, loads logistics.sql, builds its own fixtures and runs real
-# two-session races: session 1 holds its transaction open for ~1 s after its statement; session 2 starts ~0.3 s later
-# and must wait on the row lock / unique index. Prints PASS/FAIL per race and exits non-zero on any FAIL.
-# Connection comes from the standard PG* environment variables (PGHOST, PGPORT, PGUSER, PGPASSWORD); defaults below.
+# Run only after an explicit reset of the primary databases, from the existing PostgreSQL service:
+#   docker compose -f backend/infra/compose.yaml exec -T postgres bash /schema/race-tests-logistics.sh
+# Uses the already-migrated primary c48_logistics database and leaves fixtures for the caller to reset/reseed.
+# Two-session races hold the first transaction open for ~1 s; the second starts ~0.3 s later and must wait.
+# Prints PASS/FAIL per race and exits non-zero on any FAIL.
 set -u
-export PGHOST="${PGHOST:-127.0.0.1}" PGPORT="${PGPORT:-55432}" PGUSER="${PGUSER:-postgres}" PGPASSWORD="${PGPASSWORD:-x}"
-DB=hl_race
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PGHOST="${PGHOST:-127.0.0.1}" PGPORT="${PGPORT:-5432}" PGUSER="${PGUSER:-postgres}" PGPASSWORD="${PGPASSWORD:-x}"
+DB=c48_logistics
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 FAILS=0
 
-admin() { psql -X -q -v ON_ERROR_STOP=1 -d postgres "$@"; }
 q()     { psql -X -q -At -v ON_ERROR_STOP=1 -d "$DB" "$@"; }
-
-admin -c "DROP DATABASE IF EXISTS $DB" -c "CREATE DATABASE $DB" 2>&1 | grep -v NOTICE
-psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -f "$HERE/logistics.sql" >/dev/null || { echo "FAIL: logistics.sql did not load"; exit 2; }
 
 U() { printf '00000000-0000-0000-0000-%012x' "$1"; }   # deterministic uuids
 ORG=$(U 1); WH=$(U 2); ITEM=$(U 3)

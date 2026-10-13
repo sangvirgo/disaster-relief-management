@@ -8,7 +8,7 @@ Read first: `/AGENTS.md`, [project context](../c48-project-context.md), the [pla
 backend/
   apps/identity/  apps/response/  apps/logistics/      # each: main.ts, app.module.ts, config/, database/{data-source.ts,migrations/}, modules/<capability>/
   packages/technical/                                   # secret hashing, error envelope, idempotency helper, VN message-catalog loader. No business rules.
-  infra/{compose.yaml,compose.test.yaml,nginx/,db-init/} scripts/ test/{integration,k6}/
+infra/{compose.yaml,nginx/,db-init/} scripts/{db,dev,build,smoke,proofs,__tests__}/
 ```
 
 Module names: Identity `auth sessions grants users orgs`; Response `requests tracking verification teams missions campaigns evidence notices`; Logistics `catalog drives receipts stock needs commitments distributions reports`. One `*.module.ts`, `*.controller.ts`, `*.service.ts`, `dto/`, `entities/` per module. Controllers contain no SQL or state logic.
@@ -89,7 +89,7 @@ Node 24 LTS, NestJS (Express adapter), TypeScript strict, TypeORM + PostgreSQL 1
 3. **Logistics SUM checks are only safe under the right parent lock:** need/commitment totals under `relief_need … FOR UPDATE`; handoff arithmetic and dispatch under `distribution … FOR UPDATE` (handoffs carry no `expected_version`, so the lock is mandatory); also maintained as `distribution_line` counters with CHECKs.
 4. **Stock changes only by inserting a `stock_movement`**; the trigger updates `stock_balance`. Lock balances first, in `(warehouse_id, item_id)` order; **pre-insert missing balances** (`INSERT … ON CONFLICT DO NOTHING`, sorted) before any update — two receipts posting items (A,B) and (B,A) otherwise deadlock on balance creation (reproduced). Never write absolute values computed from a SELECT. At most 50 lines per command (`TOO_MANY_LINES`).
 5. **Approval-style commands lock their own row first:** stock-adjustment review = `SELECT stock_adjustment … FOR UPDATE`, check `PENDING`, `operation_ref = 'ADJ:' || adjustment_id` (never derived from the idempotency key; the DB also allows one movement per adjustment); receipt post/count/release-held lock `donation_receipt`, counts compute revision=current+1; release-held reads already independently approved revision without creating one; `UNIQUE` violations map to `STALE_REVISION`.
-6. **Resolution intents:** the finalizer's first statement is `UPDATE resolution_intent SET state='COMPLETED' WHERE id=$1 AND state='PENDING'` (rowcount 1 or stop); abort uses the same lock. Recovery never re-drives an `ABORTED` intent. Logistics `seal`/`freeze` first confirm with Response that the intent is `PENDING` (`GET /internal/operations/{id}`); `unseal` requires a live (non-ABORTED) `cycle_intent` row of the cycle whose `intent_id` equals the presented intent (there is no `intent_id`/`seal_id` column on the cycle); under the cycle lock every seal/freeze/unseal also checks durable local cycle_intent state; ABORTED is retained even for an empty/missing cycle and rejects late commands already remote-prevalidated. `freeze` also upserts the cycle (a delayed `POST /needs` on a cancelled request must find a FROZEN cycle, not create an OPEN one).
+6. **Resolution intents:** Response commits a PENDING intent and the request's RESOLVING barrier before calling Logistics; every cross-service call stays outside both services' database transactions. The finalizer transaction's first business statement is `UPDATE resolution_intent SET state='COMPLETED' WHERE id=$1 AND state='PENDING'` (one row or stop); cancellation mission/team/request work follows that CAS. Abort first changes PENDING→ABORTING, then calls Logistics `unseal` for that exact intent, then the local abort transaction's first business statement CASes ABORTING→ABORTED before restoring request progress. Recovery re-drives PENDING and ABORTING with the same intent id every 30 s under a PostgreSQL advisory lock; it never re-drives ABORTED. Skip Logistics freeze/seal/unseal when `logistics_admitted_at IS NULL`. Logistics `seal`/`freeze` first confirm through `GET /internal/operations/{id}` that the exact intent is still PENDING and matches request/cycle/kind; seal also binds the stored `outcome_basis`. `unseal` requires that exact intent to be ABORTING and the request not RESOLVED/CLOSED, and a live `cycle_intent` row must bind that id (there is no `intent_id`/`seal_id` column on `fulfillment_cycle`). Under the cycle lock, every seal/freeze/unseal checks durable local `cycle_intent` state; ABORTED is retained even for an empty/missing cycle and rejects late commands already remote-prevalidated. `freeze` upserts the cycle so a delayed `POST /needs` on a cancelled request finds FROZEN rather than creating OPEN.
 7. **Revoke-all vs refresh rotation (Identity):** every revoke-all first does `UPDATE app_user SET authz_version = authz_version + 1` (row lock), then revokes families; rotation takes `app_user … FOR SHARE`, requires `status='ACTIVE'` and `authz_version` = the family's, then rotates. Two parallel refreshes (two tabs) are **not** reuse: a token rotated < 10 s ago returns `409 REFRESH_RACE` (client retries with its newest token); older reuse revokes the family.
 8. **Central SQLSTATE mapping:** `23505` unique → the command's specific conflict code, `23514` check → a `409` domain code (e.g. `INSUFFICIENT_STOCK`), `40P01` deadlock / `55P03` lock timeout → bounded retry (≤ 2, jittered) then `503 LOCK_TIMEOUT`. A raw 500 for any of these is a bug. Use savepoints / `ON CONFLICT` instead of retrying inside an aborted transaction (tracking-code collision).
 9. **Check-then-insert caps** (SOS soft throttle, `PROXY_OPEN_CAP`, `PROXY_DAILY_SOFT_LIMIT`) may overshoot under parallel requests; accepted as soft limits. Do not add locks for them or reject/drop an SOS.
@@ -121,7 +121,7 @@ Node 24 LTS, NestJS (Express adapter), TypeScript strict, TypeORM + PostgreSQL 1
 ## 5. Testing rules
 
 - Unit: state machines, permission predicates, quantity arithmetic, DTO mapping (Jest).
-- Database: **real PostgreSQL/PostGIS** (Compose test profile); run `docs/backend/schema/test-*.sql` in CI against the migrated schema; add race tests with two parallel connections for every lock/unique-index claim.
+- Database: **real PostgreSQL/PostGIS** in the primary C48 stack; run `docs/backend/schema/test-*.sql` against its migrated databases and add race checks with two parallel connections for every lock/unique-index claim. There is no separate test database or Compose stack. Any primary-volume reset requires the explicit `--reset` flag and must not be run against demo data.
 - API: Supertest role × endpoint × scope matrix from [05](05-permissions.md); every command endpoint: success, validation, 401, 403, 404-not-leaking, 409 version, idempotent replay.
 - Vietnamese: every error code has a catalog entry; a test fails if any response `message` contains no Vietnamese diacritic-capable text or is an English framework default (class-validator, Nest, Postgres, S3 strings must never leak).
 - Record commands and results actually run; never mark a TC passed from a documentation edit.
@@ -153,24 +153,22 @@ Stock balance writer uses SECURITY DEFINER with dedicated NOLOGIN owner, fixed t
 
 ## 8. Docker and infrastructure specification (T0 builds exactly this; no application code in this section)
 
-One host, one Compose project `c48`. Only Nginx publishes a port. Names below are the container/service names; the images, ports and volumes are the defaults the T0 agent must implement and record in `VERSIONS.md`.
+One host, one Compose project `c48`. PostgreSQL, API, Nginx, and MinIO console ports bind only to loopback; Nginx is the public API entry point. Names below are the current service names; the images, ports and volumes are recorded in `VERSIONS.md`.
 
 ### 8.1 Services
 
 | Service | Image / build | Internal port | Published | Depends on (healthy) | Purpose |
 |---|---|---|---|---|---|
-| `postgres` | PostGIS image, **digest pinned** (`postgis/postgis:17-3.5` at 2026-10-10: `sha256:01a6a70e41e6c4467c8f55f6063555ed72db2d6662cd0d571040d42eadaeb6f6`) | 5432 | none (test profile: `127.0.0.1:55432`) | — | One server, three databases `c48_identity`, `c48_response`, `c48_logistics`; volume `pgdata` |
+| `postgres` | PostGIS image, **digest pinned** (`postgis/postgis:17-3.5` at 2026-10-10: `sha256:01a6a70e41e6c4467c8f55f6063555ed72db2d6662cd0d571040d42eadaeb6f6`) | 5432 | `127.0.0.1:55432` | — | One server, three primary databases `c48_identity`, `c48_response`, `c48_logistics`; volume `c48_pgdata` |
 | `db-init` | same image, one-shot | — | — | postgres | Creates databases, roles, extensions and per-role timeouts (8.2); exits 0 |
 | `identity-migrate`, `response-migrate`, `logistics-migrate` | service image, one-shot | — | — | db-init | Run TypeORM migrations as the service migrator role; the migrated schema dump must equal `schema/<svc>.sql` |
-| `identity-api`, `response-api`, `logistics-api` | `backend/apps/<svc>/Dockerfile` (multi-stage, non-root, Node 24 LTS pinned patch) | 3001 / 3002 / 3003 | none | its migrate job, `minio` for response/logistics | NestJS HTTP; `GET /health/live`, `/health/ready` (not routed by Nginx) |
-| `minio` | MinIO AIStor Free, version pinned (licence recorded in `VERSIONS.md`) | 9000 (S3); 9001 console | none (dev profile only: `127.0.0.1:9001`) | — | Private buckets `c48-response-evidence`, `c48-logistics-evidence`; volume `minio-data` |
+| `identity-api`, `response-api`, `logistics-api` | `backend/apps/<svc>/Dockerfile` (multi-stage, non-root, Node 24 LTS pinned patch) | 3001 / 3002 / 3003 | `127.0.0.1:3001` / `:3002` / `:3003` | its migrate job; MinIO is optional for Response and Logistics | NestJS HTTP; `GET /health/live`, `/health/ready` (not routed by Nginx) |
+| `minio` | MinIO AIStor Free, version pinned (licence recorded in `VERSIONS.md`), `storage` profile | 9000 (S3); 9001 console | console: `127.0.0.1:9001`; S3 stays internal | — | Private buckets `c48-response-evidence`, `c48-logistics-evidence`; volume `c48_minio-data` |
 | `minio-init` | `mc` one-shot | — | — | minio | Creates the two buckets, one access key per service limited to its bucket, no public policy |
-| `nginx` | `nginx:stable`, version pinned | 80 | `${PUBLIC_PORT:-8080}:80` | the three APIs | Routing, rate limits, body limits, header hygiene (8.3) |
-| `seed` (profile `seed`) | `backend` image, one-shot | — | — | all migrate jobs | Demo data (section 9); refuses `NODE_ENV=production` |
-| `prometheus`, `grafana` (profile `metrics`) | pinned | — | `127.0.0.1` only | APIs | Optional; off by default |
-| `k6` (profile `perf`) | pinned | — | — | nginx | Load scenario of plan §23.6 |
+| `nginx` | `nginx:1.30.5` | 80 | `127.0.0.1:${PUBLIC_PORT:-8080}:80` | the three APIs | Routing, rate limits, body limits, header hygiene (8.3) |
+| `seed` (profile `seed`) | `c48/identity-api:local`, one-shot | — | — | all migrate jobs | Demo data (section 9); refuses `NODE_ENV=production` |
 
-Networks: single bridge `c48-internal`; APIs reach each other by service name (`http://response-api:3002`) for `/internal/` calls; PostgreSQL and MinIO are not reachable from outside Compose. Startup order is expressed with `depends_on: condition: service_healthy` (postgres has a `pg_isready` healthcheck; APIs use `/health/ready`).
+Networks: single bridge `c48-internal`; APIs reach each other by service name (`http://response-api:3002`) for `/internal/` calls. PostgreSQL and published API/console ports bind to host loopback; service-to-service traffic stays on the internal network. Migration jobs wait for PostgreSQL, and APIs wait for their migration jobs; API-to-MinIO dependency is optional when the `storage` profile is off.
 
 ### 8.2 Database initialisation (`infra/db-init/`)
 
@@ -193,16 +191,16 @@ Networks: single bridge `c48-internal`; APIs reach each other by service name (`
 
 | Command | Effect |
 |---|---|
-| `scripts/dev/up` | `docker compose up -d --build` core profile; waits for healthy |
-| `scripts/db/migrate` | runs the three migrate jobs |
-| `scripts/db/seed` | runs profile `seed` (section 9); idempotent on an empty database, refuses non-empty without `--reset` |
-| `scripts/db/reset-demo` | `down -v`, then `up`, `migrate`, `seed` (destroys data; demo only) |
-| `scripts/db/test-db` | starts `compose.test.yaml` (tmpfs PostgreSQL), loads `schema/*.sql`, runs `test-*.sql` and the two `race-tests-*.sh` |
+| `scripts/dev/up` | Starts the main C48 APIs, PostgreSQL, Nginx, and the optional storage profile; waits for healthy |
+| `scripts/db/migrate` | Runs the three declared main-stack migration services |
+| `scripts/db/seed` | Runs the declared `seed` job service; idempotent on an empty database, refuses non-empty without `--reset` |
+| `bash scripts/db/reset-demo --reset` | Explicitly removes only the `c48_pgdata` volume, then migrates, seeds, and starts the main stack. Preserves `c48_minio-data` and all MinIO objects. |
+| `bash scripts/db/test-db --reset` | Requires explicit `--reset`; resets only `c48_pgdata`, then runs schema, migration, race, auth, and API smoke checks against the primary C48 databases and APIs. SQL proofs run through the existing PostgreSQL service; HTTP/database smoke scripts run from the host. It resets/reseeds the primary Postgres before API smoke and leaves smoke rows in the primary databases. |
 | `scripts/dev/gen-keys` | generates the JWT key pair and service client secrets into `.env`/untracked files |
 | `scripts/backup`, `scripts/restore` | `pg_dump` of the three databases and `mc mirror` of the buckets; restore verified on an empty stack (plan §23.6, T18) |
 
-### 8.5 Test compose (`infra/compose.test.yaml`)
-Ephemeral PostgreSQL/PostGIS on tmpfs, no Nginx; used by migration tests, `schema/test-*.sql`, race and EXPLAIN scripts, and API integration tests. CI never reuses a developer database.
+### 8.5 Compose-backed integration checks (`infra/compose.yaml`)
+`backend/infra/compose.yaml` is the only Compose file. Integration and smoke checks use the main `c48` project and the existing `postgres`, `identity-api`, `response-api`, `logistics-api`, and `nginx` services. Postgres and API ports bind to loopback (`55432`, `3001`–`3003`; Nginx uses `8080` by default). Host scripts use `C48_*_DATABASE_URL` and `C48_*_BASE_URL` values for the primary databases and APIs. There is no separate integration profile, database, schema, helper container, or API variant. Migration and seed jobs remain declared services in the main stack, and SQL proofs use `docker compose exec postgres` against the primary databases. Only `bash scripts/db/test-db --reset` and `bash scripts/db/reset-demo --reset` may remove `c48_pgdata`; they preserve `c48_minio-data` and all MinIO objects.
 
 ## 9. Demo seed data (`docs/backend/seed/`, executed by `scripts/db/seed`)
 
@@ -218,4 +216,4 @@ Ephemeral PostgreSQL/PostGIS on tmpfs, no Nginx; used by migration tests, `schem
 
 **Demo scripts the seed must support** (plan §17): guest SOS retry; PROXY report with separate reporter and household locations; verification and priority; nearby-team comparison (fresh vs stale vs accountless teams); heatmap of confirmed requests; donation 60/58/55/3; 12-of-20 then 8; denied cross-scope and self-review attempts.
 
-**Seed acceptance.** After `scripts/db/reset-demo`: the stock ledger sums equal every balance; `commitment_counter_mismatch` and `check_cycle_state_matches_intent()` return no rows; no mission breaks the capacity-one index; the seed files load again only after `--reset`. These checks are the last statements of each seed file and are run in CI on the test compose.
+**Seed acceptance.** After `scripts/db/reset-demo`: the stock ledger sums equal every balance; `commitment_counter_mismatch` and `check_cycle_state_matches_intent()` return no rows; no mission breaks the capacity-one index; the seed files load again only after `--reset`. These checks are the last statements of each seed file and run in CI against the main Compose stack.

@@ -4,12 +4,12 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
-const logisticsUrl = requiredEnv('TEST_LOGISTICS_BASE_URL').replace(/\/+$/u, '');
-const responseUrl = requiredEnv('TEST_RESPONSE_BASE_URL').replace(/\/+$/u, '');
-const identityUrl = requiredEnv('TEST_IDENTITY_BASE_URL').replace(/\/+$/u, '');
-const logisticsDb = new Client({ connectionString: requiredEnv('TEST_LOGISTICS_DATABASE_URL') });
-const responseDb = new Client({ connectionString: requiredEnv('TEST_RESPONSE_DATABASE_URL') });
-const identityDb = new Client({ connectionString: requiredEnv('TEST_IDENTITY_DATABASE_URL') });
+const logisticsUrl = requiredEnv('C48_LOGISTICS_BASE_URL').replace(/\/+$/u, '');
+const responseUrl = requiredEnv('C48_RESPONSE_BASE_URL').replace(/\/+$/u, '');
+const identityUrl = requiredEnv('C48_IDENTITY_BASE_URL').replace(/\/+$/u, '');
+const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DATABASE_URL') });
+const responseDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
+const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
 const organizationId = '40000000-0000-4000-8000-000000000004';
 const suffix = randomBytes(5).toString('hex').toUpperCase();
 const regionCode = `T15_${suffix}`;

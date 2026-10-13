@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Two-session race tests for response.sql (T0-S exit gate). Real concurrency: two backgrounded psql processes per race.
 # Session A: BEGIN; <stmt>; pg_sleep(1.0); COMMIT.  Session B starts ~0.3 s later and runs while A holds its locks.
-# Usage: PGHOST=127.0.0.1 PGPORT=55432 PGUSER=postgres PGPASSWORD=x ./race-tests-response.sh   (creates and drops database hr_race)
+# Run only after an explicit reset of the primary databases, from the existing PostgreSQL service:
+#   docker compose -f backend/infra/compose.yaml exec -T postgres bash /schema/race-tests-response.sh
+# This suite uses the migrated primary c48_response database and leaves its fixtures for the caller to reset/reseed.
 set -u
 cd "$(dirname "$0")"
-export PGPASSWORD="${PGPASSWORD:-x}" PGHOST="${PGHOST:-127.0.0.1}" PGPORT="${PGPORT:-55432}" PGUSER="${PGUSER:-postgres}"
-DB=hr_race
+export PGPASSWORD="${PGPASSWORD:-x}" PGHOST="${PGHOST:-127.0.0.1}" PGPORT="${PGPORT:-5432}" PGUSER="${PGUSER:-postgres}"
+DB=c48_response
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 FAILS=0
 
-psql -qX -d postgres -c "DROP DATABASE IF EXISTS $DB" -c "CREATE DATABASE $DB" >/dev/null || exit 2
 P() { psql -qXAt -v ON_ERROR_STOP=1 -d "$DB" "$@"; }
-P -f response.sql >/dev/null || { echo "response.sql failed to load"; exit 2; }
 
 # ---------- fixtures ----------
 P >/dev/null <<'SQL'
@@ -95,5 +95,4 @@ ok=0; [ "$SEEN" = RESOLVING ] && [ "$MISS" = 0 ] && [ "$FINAL" = RESOLVING ] && 
 verdict "(e) FOR UPDATE lock order: B waits and sees new status" $ok "B waited ${B_ELAPSED:0:4}s, saw status=$SEEN, guarded insert created $MISS missions, final=$FINAL"
 
 P -c "SELECT 1" >/dev/null
-psql -qXAt -d postgres -c "DROP DATABASE $DB" >/dev/null
 [ "$FAILS" = 0 ] && { echo "ALL RACES PASS"; exit 0; } || { echo "$FAILS RACE(S) FAILED"; exit 1; }

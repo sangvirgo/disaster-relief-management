@@ -8,8 +8,8 @@ const { AppError } = require('../../dist/packages/technical/src/errors/errors.js
 const { canonicalRequestHash, IdempotencyService } = require('../../dist/packages/technical/src/idempotency/idempotency.js');
 const { JobRunner, claimBatch } = require('../../dist/packages/technical/src/persistence/jobs.js');
 
-if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
-const dataSource = new DataSource({ type: 'postgres', url: process.env.DATABASE_URL, extra: { max: 3 } });
+if (!process.env.C48_IDENTITY_APP_DATABASE_URL) throw new Error('C48_IDENTITY_APP_DATABASE_URL must point at the primary C48 Identity database');
+const dataSource = new DataSource({ type: 'postgres', url: process.env.C48_IDENTITY_APP_DATABASE_URL, extra: { max: 3 } });
 const service = new IdempotencyService();
 const scopeKey = `technical-test:${randomUUID()}`;
 const commandName = 'technical.idempotency.test';

@@ -10,6 +10,9 @@ services:
     command: ["postgres", "-c", "max_connections=${POSTGRES_MAX_CONNECTIONS:-140}", "-c", "shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}"]
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ../../docs/backend/schema:/schema:ro
+    ports:
+      - '127.0.0.1:${POSTGRES_HOST_PORT:-55432}:5432'
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
@@ -128,6 +131,8 @@ services:
       LOGISTICS_SERVICE_CLIENT_ID: '${LOGISTICS_SERVICE_CLIENT_ID:?Set LOGISTICS_SERVICE_CLIENT_ID in backend/.env}'
       LOGISTICS_SERVICE_CLIENT_SECRET: '${LOGISTICS_SERVICE_CLIENT_SECRET:?Set LOGISTICS_SERVICE_CLIENT_SECRET in backend/.env}'
       RESPONSE_BASE_URL: http://response-api:3002
+    ports:
+      - '127.0.0.1:3001:3001'
     depends_on:
       identity-migrate:
         condition: service_completed_successfully
@@ -183,6 +188,8 @@ services:
       SCHEDULER_ENABLED: '${SCHEDULER_ENABLED:-false}'
       INTROSPECT_TIMEOUT_MS: '${INTROSPECT_TIMEOUT_MS:-500}'
       DEMO_INTAKE_ORGANIZATION_ID: '${DEMO_INTAKE_ORGANIZATION_ID:?Set DEMO_INTAKE_ORGANIZATION_ID in backend/.env}'
+    ports:
+      - '127.0.0.1:3002:3002'
     depends_on:
       response-migrate:
         condition: service_completed_successfully
@@ -214,6 +221,7 @@ services:
       JWT_ISSUER: '${JWT_ISSUER:?Set JWT_ISSUER in backend/.env}'
       JWT_AUDIENCE: '${JWT_AUDIENCE:?Set JWT_AUDIENCE in backend/.env}'
       JWT_PUBLIC_KEY: '${JWT_PUBLIC_KEY:?Set JWT_PUBLIC_KEY in backend/.env}'
+      WEB_ALLOWED_ORIGINS: '${WEB_ALLOWED_ORIGINS:?Set WEB_ALLOWED_ORIGINS in backend/.env}'
       LOGISTICS_SERVICE_CLIENT_ID: '${LOGISTICS_SERVICE_CLIENT_ID:?Set LOGISTICS_SERVICE_CLIENT_ID in backend/.env}'
       LOGISTICS_SERVICE_CLIENT_SECRET: '${LOGISTICS_SERVICE_CLIENT_SECRET:?Set LOGISTICS_SERVICE_CLIENT_SECRET in backend/.env}'
       IDENTITY_BASE_URL: http://identity-api:3001
@@ -225,6 +233,8 @@ services:
       S3_SECRET_KEY: '${S3_LOGISTICS_SECRET_KEY:?Set S3_LOGISTICS_SECRET_KEY in backend/.env}'
       SCHEDULER_ENABLED: '${SCHEDULER_ENABLED:-false}'
       INTROSPECT_TIMEOUT_MS: '${INTROSPECT_TIMEOUT_MS:-500}'
+    ports:
+      - '127.0.0.1:3003:3003'
     depends_on:
       logistics-migrate:
         condition: service_completed_successfully
@@ -246,7 +256,7 @@ services:
       SOS_HARD_LIMIT_PER_IP: '${SOS_HARD_LIMIT_PER_IP:-300}'
       NGINX_ENVSUBST_FILTER: '^SOS_(SOFT_LIMIT_PER_IP|HARD_LIMIT_PER_IP|HARD_BURST_PER_IP)$'
     ports:
-      - '${PUBLIC_PORT:-8080}:80'
+      - '127.0.0.1:${PUBLIC_PORT:-8080}:80'
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/proxy-common.conf:/etc/nginx/proxy-common.conf:ro

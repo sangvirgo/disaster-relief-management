@@ -5,11 +5,11 @@ import { randomBytes, randomUUID } from 'node:crypto';
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 const argon2 = require('argon2');
-const databaseUrl = process.env.TEST_DATABASE_URL;
-const baseUrl = new URL(process.env.IDENTITY_ADMIN_TEST_BASE_URL ?? 'http://127.0.0.1:3001/api/v1/identity');
-const clientId = process.env.TEST_SERVICE_CLIENT_ID;
-const clientSecret = process.env.TEST_SERVICE_CLIENT_SECRET;
-if (!databaseUrl || !clientId || !clientSecret) throw new Error('TEST_DATABASE_URL and test service credentials are required');
+const databaseUrl = process.env.C48_IDENTITY_DATABASE_URL;
+const baseUrl = new URL(process.env.C48_IDENTITY_BASE_URL ?? 'http://127.0.0.1:3001/api/v1/identity');
+const clientId = process.env.RESPONSE_SERVICE_CLIENT_ID;
+const clientSecret = process.env.RESPONSE_SERVICE_CLIENT_SECRET;
+if (!databaseUrl || !clientId || !clientSecret) throw new Error('The primary C48 Identity database URL and Response service credentials are required');
 
 const database = new Client({ connectionString: databaseUrl });
 const userIds = [];

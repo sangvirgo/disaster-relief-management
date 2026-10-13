@@ -1,16 +1,33 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
-const responseUrl = process.env.TEST_RESPONSE_BASE_URL;
-const identityUrl = process.env.TEST_IDENTITY_BASE_URL;
-const failedStorageUrl = process.env.TEST_RESPONSE_FAIL_BASE_URL;
-const responseDb = new Client({ connectionString: process.env.TEST_RESPONSE_DATABASE_URL });
-const identityDb = new Client({ connectionString: process.env.TEST_IDENTITY_DATABASE_URL });
+const responseUrl = requiredEnv('C48_RESPONSE_BASE_URL');
+const identityUrl = requiredEnv('C48_IDENTITY_BASE_URL');
+const responseDb = new Client({ connectionString: process.env.C48_RESPONSE_DATABASE_URL });
+const identityDb = new Client({ connectionString: process.env.C48_IDENTITY_DATABASE_URL });
+const backendRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
+const composeArgs = ['compose', '--profile', 'storage', '-p', 'c48', '--env-file', resolve(backendRoot, '.env'), '-f', resolve(backendRoot, 'infra/compose.yaml')];
 const intakeOrganizationId = '40000000-0000-4000-8000-000000000004';
 let ipSequence = 40;
+
+function requiredEnv(name) {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} must target the primary C48 stack`);
+  return value;
+}
+
+function storage(action) {
+  const args = [...composeArgs, ...action];
+  const result = spawnSync('docker', args, { stdio: 'inherit' });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`Could not ${action.join(' ')} the primary MinIO service (${result.status})`);
+}
 
 function key() { return randomUUID(); }
 function secret() { return randomBytes(32).toString('base64url'); }
@@ -57,7 +74,7 @@ async function registerAndLogin(label, clientKind = 'NATIVE') {
     headers: { 'Idempotency-Key': key(), 'X-Forwarded-For': ip() },
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.value));
-  const origin = 'https://c48.test';
+  const origin = process.env.C48_SMOKE_ORIGIN ?? 'http://localhost:8080';
   const csrf = clientKind === 'WEB' ? await call(identityUrl, 'auth/csrf', { headers: { Origin: origin } }) : undefined;
   const csrfCookies = csrf?.headers.getSetCookie() ?? [];
   const login = await call(identityUrl, 'auth/login', {
@@ -300,7 +317,7 @@ try {
   });
   assert.equal(download.status, 200, JSON.stringify(download.value));
   assert.equal(download.value.expires_in, 60);
-  assert.match(download.value.url, /memory-storage\.test/u);
+  assert.equal(new URL(download.value.url).host, new URL(requiredEnv('S3_PUBLIC_ENDPOINT')).host);
   const evidenceReplay = await upload(responseUrl, evidenceRequest, evidenceSecret, evidenceForm, uploadKey);
   assert.equal(evidenceReplay.status, 201, JSON.stringify(evidenceReplay.value));
   assert.equal(evidenceReplay.headers.get('idempotent-replay'), 'true');
@@ -317,12 +334,17 @@ try {
   assert.equal(evidenceCount.rows[0].count, 1, 'unsupported media must not reserve evidence quota');
 
   const beforeFailure = await responseDb.query('SELECT status,version,reporter_declared_danger FROM assistance_request WHERE id=$1', [evidenceRequest.id]);
-  const identityOfflineTrack = await call(failedStorageUrl, 'requests/track', {
-    headers: { Authorization: `Bearer ${reporter.token}`, 'X-Tracking-Code': evidenceRequest.tracking_code, 'X-Tracking-Secret': evidenceSecret },
-  });
-  assert.equal(identityOfflineTrack.status, 200, JSON.stringify(identityOfflineTrack.value));
-  const failedUpload = await upload(failedStorageUrl, evidenceRequest, evidenceSecret, evidenceForm);
-  assertVietnameseError(failedUpload, 503, 'STORAGE_UNAVAILABLE');
+  storage(['stop', 'minio']);
+  try {
+    const identityOfflineTrack = await call(responseUrl, 'requests/track', {
+      headers: { Authorization: `Bearer ${reporter.token}`, 'X-Tracking-Code': evidenceRequest.tracking_code, 'X-Tracking-Secret': evidenceSecret },
+    });
+    assert.equal(identityOfflineTrack.status, 200, JSON.stringify(identityOfflineTrack.value));
+    const failedUpload = await upload(responseUrl, evidenceRequest, evidenceSecret, evidenceForm);
+    assertVietnameseError(failedUpload, 503, 'STORAGE_UNAVAILABLE');
+  } finally {
+    storage(['up', '-d', '--wait', '--wait-timeout', '90', 'minio', 'minio-init']);
+  }
   const failedRow = await responseDb.query('SELECT state FROM evidence_metadata WHERE request_id=$1 ORDER BY created_at,id', [evidenceRequest.id]);
   assert.deepEqual(failedRow.rows.map((row) => row.state), ['READY', 'FAILED']);
   const afterFailure = await responseDb.query('SELECT status,version,reporter_declared_danger FROM assistance_request WHERE id=$1', [evidenceRequest.id]);

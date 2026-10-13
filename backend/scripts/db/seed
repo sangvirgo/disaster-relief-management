@@ -3,6 +3,6 @@ set -euo pipefail
 source "$(dirname -- "$0")/../dev/lib.sh"
 require_env_file
 if [[ $# -gt 0 && "$1" == "--reset" ]]; then
-  exec "$ROOT/backend/scripts/db/reset-demo"
+  exec "$ROOT/backend/scripts/db/reset-demo" --reset
 fi
-main_compose --profile seed run --rm seed
+main_compose --profile seed up --exit-code-from seed seed

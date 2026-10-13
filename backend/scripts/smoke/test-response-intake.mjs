@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID, sign } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import pg from 'pg';
 
 const { Client } = pg;
-const db = new Client({ connectionString: process.env.TEST_DATABASE_URL });
-const baseUrl = process.env.TEST_RESPONSE_BASE_URL;
-const proxyBaseUrl = process.env.TEST_RESPONSE_PROXY_BASE_URL;
-const privateKey = readFileSync(process.env.RESPONSE_TEST_PRIVATE_KEY_FILE, 'utf8');
+const db = new Client({ connectionString: process.env.C48_RESPONSE_DATABASE_URL });
+const baseUrl = process.env.C48_RESPONSE_BASE_URL;
+const proxyBaseUrl = process.env.C48_RESPONSE_PROXY_BASE_URL;
+const privateKey = Buffer.from(process.env.JWT_PRIVATE_KEY ?? '', 'base64');
+const origin = process.env.C48_SMOKE_ORIGIN;
 const organizationId = '40000000-0000-4000-8000-000000000004';
 const userId = '40000000-0000-4000-8000-000000000001';
 const fixtureTrigger = 't4_test_fail_subject';
@@ -20,7 +20,7 @@ function accessToken() {
   const now = Math.floor(Date.now() / 1000);
   const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
   const input = `${encode({ alg: 'RS256', typ: 'JWT' })}.${encode({
-    iss: 'https://c48.test', aud: 'c48-test', sub: userId,
+    iss: process.env.JWT_ISSUER, aud: process.env.JWT_AUDIENCE, sub: userId,
     sid: randomUUID(), iat: now, exp: now + 300, jti: randomUUID(),
   })}`;
   return `${input}.${sign('RSA-SHA256', Buffer.from(input), privateKey).toString('base64url')}`;
@@ -283,7 +283,7 @@ async function main() {
   const cookieRequest = await post(baseUrl, {
     payload: body({ reporter_contact_phone: null }), token: undefined,
     cookie: `c48_pre=preflight; c48_csrf=${csrfToken}; c48_access=${bearer}`,
-    origin: 'https://c48.test', csrf: csrfToken,
+    origin, csrf: csrfToken,
     forwardedIp: '198.51.100.21',
   });
   assert.equal(cookieRequest.status, 201, JSON.stringify(cookieRequest.value));
@@ -303,7 +303,7 @@ async function main() {
   const bearerOriginKey = key();
   const bearerOrigin = await post(baseUrl, {
     payload: body({ reporter_contact_phone: null }), idempotencyKey: bearerOriginKey,
-    token: bearer, origin: 'https://c48.test',
+    token: bearer, origin,
   });
   assertVietnameseError(bearerOrigin, 403, 'FORBIDDEN');
   await assertNoIdempotency(bearerOriginKey);

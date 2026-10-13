@@ -2,23 +2,18 @@
 set -euo pipefail
 source "$(dirname -- "$0")/../dev/lib.sh"
 require_env_file
-if [[ "${NODE_ENV:-}" == "production" ]] || awk -F= '
-  $1 ~ /^[[:space:]]*NODE_ENV[[:space:]]*$/ {
-    value = $2
-    sub(/[[:space:]]*#.*/, "", value)
-    gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
-    gsub(/"/, "", value)
-    gsub(sprintf("%c", 39), "", value)
-    if (tolower(value) == "production") found = 1
-  }
-  END { exit !found }
-' "$ROOT/backend/.env"; then
-  echo "Refusing to reset a production environment." >&2
-  exit 1
+require_nonproduction_env
+
+if [[ $# -ne 1 || "$1" != "--reset" ]]; then
+  printf 'Usage: scripts/db/reset-demo --reset\n' >&2
+  printf 'This removes only c48_pgdata, then migrates and reseeds the primary C48 databases. MinIO data is preserved.\n' >&2
+  exit 2
 fi
-read -r -p "This deletes the C48 demo database volume. Type c48-reset to continue: " answer
-[[ "$answer" == "c48-reset" ]] || { echo "Reset cancelled."; exit 1; }
-main_compose down --volumes --remove-orphans
-"$ROOT/backend/scripts/dev/up"
-"$ROOT/backend/scripts/db/migrate"
-"$ROOT/backend/scripts/db/seed"
+
+read -r -p 'This replaces the primary C48 database contents and reseeds demo data. Type c48-reset to continue: ' answer
+[[ "$answer" == "c48-reset" ]] || { echo 'Reset cancelled.'; exit 1; }
+
+bash "$ROOT/backend/scripts/db/reset-primary-databases" --reset
+bash "$ROOT/backend/scripts/db/migrate"
+bash "$ROOT/backend/scripts/db/seed"
+bash "$ROOT/backend/scripts/dev/up"

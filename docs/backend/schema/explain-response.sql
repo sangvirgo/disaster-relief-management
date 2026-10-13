@@ -1,6 +1,7 @@
 -- EXPLAIN (ANALYZE, BUFFERS, COSTS OFF) evidence for the Response service hot queries (T0-S exit gate).
--- Usage (from this directory, fresh empty database):
---   createdb hr_perf && psql -X -v ON_ERROR_STOP=1 -d hr_perf -f explain-response.sql
+-- Run only through backend/scripts/db/check-t8-candidate-explain, which wraps this fixture in
+-- a transaction against primary c48_response and rolls all table changes back. Do not create
+-- a separate database/schema or invoke this fixture directly.
 -- Fixed seed (setseed). Dataset: 200k assistance_request (+subject), 3k rescue_team (+position, 1-2 skills), ~20k mission, 300k request_event.
 -- Each query is run once silently (warm cache) and then recorded.
 \set ON_ERROR_STOP on

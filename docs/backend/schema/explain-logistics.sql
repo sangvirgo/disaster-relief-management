@@ -1,6 +1,7 @@
 -- Logistics EXPLAIN (ANALYZE, BUFFERS, COSTS OFF) evidence for T0-S (01-schema-review.md §9.4).
--- Usage (superuser, fresh database already loaded from logistics.sql):
---   createdb hl_perf && psql -d hl_perf -v ON_ERROR_STOP=1 -f logistics.sql && psql -d hl_perf -v ON_ERROR_STOP=1 -f explain-logistics.sql
+-- Historical large-fixture proof; do not execute as part of current integration checks.
+-- Current checks must not create scratch databases or schemas. Run only through a reviewed
+-- transactional check against the primary c48_logistics database if this proof is reactivated.
 -- Seeding is deterministic (setseed + md5-derived ids). Triggers are bypassed with session_replication_role = replica
 -- (the data is consistent by construction; constraints other than FK/triggers still apply), then VACUUM ANALYZE.
 \set ON_ERROR_STOP on

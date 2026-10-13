@@ -16,8 +16,4 @@ Turns the [technology and delivery plan](../c48-technology-and-delivery-plan.md)
 
 **Precedence:** business rules → the plan; column lists and endpoint shapes → this folder. If they conflict, stop and report.
 
-**Re-run the SQL checks** (needs Docker):
-```bash
-docker run -d --name c48pg -e POSTGRES_PASSWORD=x -p 127.0.0.1:55432:5432 postgis/postgis:17-3.5
-# for each service: create database, load <service>.sql, then run test-<service>.sql with psql -v ON_ERROR_STOP=1
-```
+The standalone PostgreSQL container command below this archived section was retired. Follow the [current backend pack](../../../backend/README.md), which runs checks against the main C48 Postgres service and does not create another database container.

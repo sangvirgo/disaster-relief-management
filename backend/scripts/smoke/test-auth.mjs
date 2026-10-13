@@ -4,12 +4,11 @@ import { randomBytes, randomUUID } from 'node:crypto';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
-const appDatabaseUrl = process.env.APP_TEST_DATABASE_URL;
-const baseUrl = new URL(process.env.AUTH_TEST_BASE_URL ?? 'http://identity-api:3001/api/v1/identity');
-const databaseUrl = process.env.TEST_DATABASE_URL;
-const origin = 'http://localhost';
-if (!databaseUrl) throw new Error('TEST_DATABASE_URL is required');
-if (!appDatabaseUrl) throw new Error('APP_TEST_DATABASE_URL is required');
+const databaseUrl = process.env.C48_IDENTITY_DATABASE_URL;
+const appDatabaseUrl = process.env.C48_IDENTITY_APP_DATABASE_URL;
+const baseUrl = new URL(process.env.C48_IDENTITY_BASE_URL ?? 'http://127.0.0.1:3001/api/v1/identity');
+const origin = process.env.C48_SMOKE_ORIGIN ?? 'http://localhost:8080';
+if (!databaseUrl || !appDatabaseUrl) throw new Error('C48_IDENTITY_DATABASE_URL and C48_IDENTITY_APP_DATABASE_URL must point at the primary C48 Identity database');
 
 process.env.DATABASE_URL = appDatabaseUrl;
 process.env.NODE_ENV = 'test';

@@ -14,11 +14,11 @@ Turns the [technology and delivery plan](../c48-technology-and-delivery-plan.md)
 
 **Precedence:** business rules → the plan; column lists and endpoint shapes → this folder. If they conflict, stop and report.
 
-**Re-run the SQL checks** (needs Docker):
+**Run the SQL and API checks** against the main C48 stack (needs Docker):
 ```bash
-docker run -d --name c48pg -e POSTGRES_PASSWORD=x -p 127.0.0.1:55432:5432 postgis/postgis:17-3.5
-# for each service: create database, load <service>.sql, then run test-<service>.sql with psql -v ON_ERROR_STOP=1
+bash backend/scripts/db/test-db --reset
 ```
+This requires the explicit reset flag, removes only `c48_pgdata`, preserves the MinIO volume `c48_minio-data`, and runs SQL checks in the existing PostgreSQL service. It does not create a separate database, schema, project, or runner container.
 
 **Focused logic update (2026-10-09, SQL aligned 2026-10-10):** the full main plan and all diagrams are retained. Read plan Sections 27–28 and 01-schema-review §7–§9. The SQL files in `schema/` implement those deltas (status in 01 §9.5), and T0 TypeORM migrations load the same files without diverging.
 
@@ -34,4 +34,4 @@ docker run -d --name c48pg -e POSTGRES_PASSWORD=x -p 127.0.0.1:55432:5432 postgi
 
 **T6 update (2026-10-11):** `POST /requests/proxy` requires a live Identity session, stores household provenance and derives region from the household pin. Open-account and rolling daily soft limits retain excess reports in `PROXY_QUOTA_REVIEW`; staff-only location/rejection signals are recorded without changing status/priority or blocking the reporter. The selected defaults are 3 open / 10 per rolling 24 hours; the activity flag uses three distinct ~100 m cells in 24 hours. These thresholds are provisional and require field calibration. Database/HTTP integration covers identity outage/revocation, idempotency, provenance, both quota limits, and private flags. T7 will make the review lane and staff flags visible in coordinator queue/detail APIs.
 
-**T13 update (2026-10-12):** Logistics receipt count revisions, independent review, exact-once posting, held-quantity release, receipt detail, derived expiry/condition flags, and dispute resolution are implemented. `EXPIRING_SOON` uses the user-selected 30-day threshold. `npm run build`, `npm test` (51 suites / 195 Jest tests + 2 Node tests), `npx tsc --noEmit`, and `bash scripts/db/test-db` pass; the T13 database smoke covers revision/review rules, concurrent posts, replay with a new key, held release, donor notices, public tracking projection, and dispute resolution. No migration/schema or OpenAPI snapshot changed. T14 is next.
+**T13 update (2026-10-12):** Logistics receipt count revisions, independent review, exact-once posting, held-quantity release, receipt detail, derived expiry/condition flags, and dispute resolution are implemented. `EXPIRING_SOON` uses the user-selected 30-day threshold. `npm run build`, `npm test` (51 suites / 195 Jest tests + 2 Node tests), `npx tsc --noEmit`, and the full database integration suite pass; the T13 database smoke covers revision/review rules, concurrent posts, replay with a new key, held release, donor notices, public tracking projection, and dispute resolution. No migration/schema or OpenAPI snapshot changed. T14 is next.

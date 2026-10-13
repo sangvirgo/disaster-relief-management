@@ -1,52 +1,113 @@
 #!/usr/bin/env bash
 set -euo pipefail
 source "$(dirname -- "$0")/../dev/lib.sh"
-C48_TEST_PROJECT="${C48_TEST_PROJECT:-c48-test}"
-for service in identity response logistics; do
+require_env_file
+load_backend_env
+require_nonproduction_env
+cd "$ROOT/backend"
+
+if [[ $# -ne 1 || "$1" != "--after-reset" ]]; then
+  printf 'This check runs migrations down on the primary C48 databases. Pass --after-reset only after a primary-volume reset and migration.\n' >&2
+  exit 2
+fi
+
+port="${POSTGRES_HOST_PORT:-55432}"
+run_migration() {
+  local service="$1" password="$2" direction="${3:-up}" url user
   case "$service" in
     identity) user=identity_migrator ;;
     response) user=response_migrator ;;
     logistics) user=logistics_migrator ;;
   esac
+  url="postgresql://${user}:${password}@127.0.0.1:${port}/c48_${service}"
+  if [[ "$direction" == down ]]; then
+    DATABASE_URL="$url" node "$ROOT/backend/dist/apps/$service/src/database/migrate.js" down
+  else
+    DATABASE_URL="$url" node "$ROOT/backend/dist/apps/$service/src/database/migrate.js"
+  fi
+}
+
+query() {
+  local service="$1" sql="$2"
+  main_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "c48_$service" -c "$sql"
+}
+
+assert_no_application_rows() {
+  local service="$1"
+  main_compose exec -T postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d "c48_$service" <<'SQL'
+DO $c48_guard$
+DECLARE
+  item record;
+  has_rows boolean;
+BEGIN
+  FOR item IN
+    SELECT n.nspname, c.relname
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind IN ('r', 'p', 'f')
+      AND c.relname NOT IN ('typeorm_migrations', 'typeorm_migrations_id_seq')
+      AND NOT EXISTS (
+        SELECT 1 FROM pg_depend d
+        WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid AND d.deptype = 'e'
+      )
+  LOOP
+    EXECUTE format('SELECT EXISTS (SELECT 1 FROM %I.%I LIMIT 1)', item.nspname, item.relname) INTO has_rows;
+    IF has_rows THEN
+      RAISE EXCEPTION 'Refusing migration rollback: public table %.% contains application rows', item.nspname, item.relname;
+    END IF;
+  END LOOP;
+END
+$c48_guard$;
+SQL
+}
+
+# Check every primary database before the first migration is reverted. This prevents a
+# later populated database from failing after an earlier service schema has been dropped.
+for service in identity response logistics; do
+  assert_no_application_rows "$service"
+  case "$service" in
+    identity) expected=1 ;;
+    response) expected=3 ;;
+    logistics) expected=1 ;;
+  esac
+  tracker_exists="$(query "$service" "SELECT to_regclass('public.typeorm_migrations') IS NOT NULL")"
+  [[ "$tracker_exists" == "t" ]] || { printf 'FAIL %s has no primary migration history; run reset and migration first\n' "$service" >&2; exit 1; }
+  applied="$(query "$service" 'SELECT count(*) FROM public.typeorm_migrations')"
+  [[ "$applied" == "$expected" ]] || { printf 'FAIL %s expected %s primary migrations before rollback, got %s\n' "$service" "$expected" "$applied" >&2; exit 1; }
+done
+
+for service in identity response logistics; do
+  case "$service" in
+    identity) password="$IDENTITY_MIGRATOR_PASSWORD" ;;
+    response) password="$RESPONSE_MIGRATOR_PASSWORD" ;;
+    logistics) password="$LOGISTICS_MIGRATOR_PASSWORD" ;;
+  esac
   down_runs=1
   [[ "$service" == response ]] && down_runs=3
-  database="c48_"$service"_down"
-  test_compose exec -T postgres createdb -U postgres -O "$user" -T "c48_$service" "$database"
-  url="postgresql://${user}:test-only@postgres:5432/$database"
+
   for ((run = 0; run < down_runs; run++)); do
-    test_compose run --rm --no-deps -e DATABASE_URL="$url" "$service-migrate" \
-      node "dist/apps/$service/src/database/migrate.js" down
+    run_migration "$service" "$password" down
     if [[ "$service" == response && "$run" == 0 ]]; then
-      index_count="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
-        -c "SELECT count(*) FROM pg_class WHERE relname='evidence_upload_ip_created_idx'")"
-      column_count="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
-        -c "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='evidence_metadata' AND column_name='upload_source_ip_hash'")"
-      cleanup_index_count="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
-        -c "SELECT count(*) FROM pg_class WHERE relname='evidence_cleanup_pending_idx'")"
-      cleanup_column_count="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
-        -c "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='evidence_metadata' AND column_name='cleanup_completed_at'")"
-      source_count="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
-        -c "SELECT count(*) FROM pg_class WHERE relname='request_source_ip_idx'")"
-      [[ "$index_count" == "0" && "$column_count" == "0" && "$cleanup_index_count" == "0" && "$cleanup_column_count" == "0" && "$source_count" == "1" ]] || { echo "FAIL T5 rollback did not remove only its evidence storage delta" >&2; exit 1; }
+      index_count="$(query response "SELECT count(*) FROM pg_class WHERE relname='evidence_upload_ip_created_idx'")"
+      column_count="$(query response "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='evidence_metadata' AND column_name='upload_source_ip_hash'")"
+      cleanup_index_count="$(query response "SELECT count(*) FROM pg_class WHERE relname='evidence_cleanup_pending_idx'")"
+      cleanup_column_count="$(query response "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='evidence_metadata' AND column_name='cleanup_completed_at'")"
+      source_count="$(query response "SELECT count(*) FROM pg_class WHERE relname='request_source_ip_idx'")"
+      [[ "$index_count" == "0" && "$column_count" == "0" && "$cleanup_index_count" == "0" && "$cleanup_column_count" == "0" && "$source_count" == "1" ]] || { echo 'FAIL T5 rollback did not remove only its evidence storage delta' >&2; exit 1; }
     fi
     if [[ "$service" == response && "$run" == 1 ]]; then
-      index_count="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
-        -c "SELECT count(*) FROM pg_class WHERE relname='request_source_ip_idx'")"
-      [[ "$index_count" == "0" ]] || { echo "FAIL T4 rollback left request_source_ip_idx in the T3 schema" >&2; exit 1; }
+      index_count="$(query response "SELECT count(*) FROM pg_class WHERE relname='request_source_ip_idx'")"
+      [[ "$index_count" == "0" ]] || { echo 'FAIL T4 rollback left request_source_ip_idx in the T3 schema' >&2; exit 1; }
     fi
   done
 
-  remaining="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
-    -c "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','f','S') AND c.relname NOT IN ('typeorm_migrations', 'typeorm_migrations_id_seq') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid='pg_class'::regclass AND d.objid=c.oid AND d.deptype='e')")"
-  [[ "$remaining" == "0" ]] || { echo "FAIL $service down left $remaining public objects" >&2; exit 1; }
+  remaining="$(query "$service" "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','f','S') AND c.relname NOT IN ('typeorm_migrations', 'typeorm_migrations_id_seq') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid='pg_class'::regclass AND d.objid=c.oid AND d.deptype='e')")"
+  [[ "$remaining" == "0" ]] || { printf 'FAIL %s down left %s public objects in the primary database\n' "$service" "$remaining" >&2; exit 1; }
 
-  test_compose run --rm --no-deps -e DATABASE_URL="$url" "$service-migrate" \
-    node "dist/apps/$service/src/database/migrate.js"
-  applied="$(test_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "$database" \
-    -c "SELECT count(*) FROM public.typeorm_migrations")"
+  run_migration "$service" "$password"
+  applied="$(query "$service" 'SELECT count(*) FROM public.typeorm_migrations')"
   expected=1
   [[ "$service" == response ]] && expected=3
-  [[ "$applied" == "$expected" ]] || { echo "FAIL $service expected $expected applied migrations, got $applied" >&2; exit 1; }
-  test_compose exec -T postgres dropdb -U postgres "$database"
-  echo "PASS $service migration up/down/up"
+  [[ "$applied" == "$expected" ]] || { printf 'FAIL %s expected %s applied migrations, got %s\n' "$service" "$expected" "$applied" >&2; exit 1; }
+  printf 'PASS %s primary database migration down/up\n' "$service"
 done

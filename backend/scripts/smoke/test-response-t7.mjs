@@ -4,10 +4,10 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
-const responseUrl = process.env.TEST_RESPONSE_BASE_URL;
-const identityUrl = process.env.TEST_IDENTITY_BASE_URL;
-const responseDb = new Client({ connectionString: process.env.TEST_RESPONSE_DATABASE_URL });
-const identityDb = new Client({ connectionString: process.env.TEST_IDENTITY_DATABASE_URL });
+const responseUrl = process.env.C48_RESPONSE_BASE_URL;
+const identityUrl = process.env.C48_IDENTITY_BASE_URL;
+const responseDb = new Client({ connectionString: process.env.C48_RESPONSE_DATABASE_URL });
+const identityDb = new Client({ connectionString: process.env.C48_IDENTITY_DATABASE_URL });
 const organizationId = '40000000-0000-4000-8000-000000000004';
 const requestIds = [];
 let identityIpSequence = 1;

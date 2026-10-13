@@ -17,5 +17,5 @@ Add focused unit and database-backed integration coverage for existing T8 behavi
 - Candidate exclusions are asserted against both `items` and `unknown_position`.
 - Suppressed position updates leave the stored row and audit count unchanged.
 - A nonexistent leader returns the existing `NOT_FOUND` contract and creates no team.
-- `npm run build`, `npm test`, `npx tsc --noEmit`, and `bash scripts/db/test-db` pass.
+- `npm run build`, `npm test`, `npx tsc --noEmit`, and `bash scripts/db/test-db --reset` pass against the main C48 Compose stack. The explicit reset removes only `c48_pgdata`, preserves `c48_minio-data` and MinIO objects, then recreates and reseeds the primary databases before HTTP smoke checks. Use `bash scripts/db/reset-demo --reset` to restore demo data separately when needed.
 - `contracts/openapi/*.json` and migration/schema files have no diff.

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname -- "$0")/../dev/lib.sh"
+require_env_file
+require_nonproduction_env
+
+if [[ $# -ne 1 || "$1" != "--reset" ]]; then
+  printf 'This removes only the c48_pgdata volume and recreates the main C48 PostgreSQL databases. Pass --reset explicitly. MinIO data is preserved.\n' >&2
+  exit 2
+fi
+
+main_compose down
+if docker volume inspect c48_pgdata >/dev/null 2>&1; then
+  docker volume rm c48_pgdata
+fi
+main_compose up -d --wait --wait-timeout 90 postgres
+main_compose up --exit-code-from db-init db-init
+
+printf 'Removed only c48_pgdata and initialized the primary C48 databases. The c48_minio-data volume was preserved.\n'
