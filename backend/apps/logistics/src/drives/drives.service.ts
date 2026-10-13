@@ -8,7 +8,7 @@ import { hasPermission } from '../../../../packages/technical/src/security/permi
 import { validateQuantity } from '../common/quantity';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { DriveItemDto, CreateDriveDto, PatchDriveDto, DriveReasonActionDto, DriveVersionActionDto } from './drives.dto';
-import { ResponseCampaign, LogisticsResponseCampaignClient } from './response-campaign.client';
+import { ResponseCampaign, LogisticsResponseCampaignClient } from '../integrations/response/response-campaign.client';
 import { assertExpectedVersion, cleanDriveText, requireDrivePermission } from './drives.helpers';
 
 export type DriveCommandRequest = Request & { idempotencyKey?: string };

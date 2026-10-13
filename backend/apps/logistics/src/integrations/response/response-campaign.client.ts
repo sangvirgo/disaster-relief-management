@@ -1,7 +1,7 @@
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
-import { CircuitBreakerClient } from '../../../../packages/technical/src/http/service-client';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { LogisticsIdentityService } from '../auth/logistics-identity.service';
+import { CircuitBreakerClient } from '../../../../../packages/technical/src/http/service-client';
+import { AppError } from '../../../../../packages/technical/src/errors/errors';
+import { LogisticsIdentityService } from '../../auth/logistics-identity.service';
 
 export const LOGISTICS_RESPONSE_CLIENT = Symbol('LOGISTICS_RESPONSE_CLIENT');
 export const RESPONSE_CAMPAIGN_CONFIG = Symbol('RESPONSE_CAMPAIGN_CONFIG');

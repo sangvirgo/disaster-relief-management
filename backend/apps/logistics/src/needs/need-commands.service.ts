@@ -126,10 +126,11 @@ async function releaseReservations(
   if (!rows.length) return;
 
   const warehouseIds = [...new Set(rows.map((row) => row.warehouse_id))].sort();
+  // Reservation changes go through the movement trigger; the app role cannot row-lock this protected table.
   const balances = await manager.query(
     `SELECT id,warehouse_id,item_id,reserved::text
        FROM stock_balance WHERE warehouse_id=ANY($1::uuid[]) AND item_id=$2
-      ORDER BY warehouse_id,item_id FOR UPDATE`,
+      ORDER BY warehouse_id,item_id`,
     [warehouseIds, need.item_id],
   ) as StockBalanceRow[];
   const byWarehouse = new Map(balances.map((balance) => [balance.warehouse_id, balance]));
@@ -276,14 +277,15 @@ export class NeedCommandsService {
     before: Record<string, unknown>,
   ) {
     if (current.unsettledIssued > 0n) throw new AppError('UNSETTLED_ISSUED_GOODS', { status: 409 });
-    const requested = quantityUnits(need.requested_quantity, Number(need.unit_scale));
+    const scale = Number(need.unit_scale);
+    const requested = quantityUnits(need.requested_quantity, scale);
     const cancelledRemaining = requested - current.delivered;
     if (cancelledRemaining < 0n) throw new AppError('INTERNAL_ERROR', { status: 500 });
     await releaseReservations(manager, need, commitments, actorId);
     const updated = await manager.query(
       `UPDATE relief_need SET cancelled_remaining=$3::numeric,status='CANCELLED',version=version+1
         WHERE id=$1 AND version=$2 RETURNING id`,
-      [need.id, dto.expected_version, cancelledRemaining.toString()],
+      [need.id, dto.expected_version, decimalFromUnits(cancelledRemaining, scale)],
     ) as Array<{ id: string }>;
     if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409 });
     const value = await readNeed(manager, need.id);

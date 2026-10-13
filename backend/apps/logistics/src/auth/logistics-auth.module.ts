@@ -22,6 +22,6 @@ import { LOGISTICS_AUTH_CONFIG, LogisticsSessionService } from './logistics-sess
     LogisticsIdentityService,
     LogisticsSessionService,
   ],
-  exports: [LogisticsSessionService, LogisticsIdentityService],
+  exports: [LOGISTICS_AUTH_CONFIG, LogisticsSessionService, LogisticsIdentityService],
 })
 export class LogisticsAuthModule {}

@@ -3,8 +3,12 @@ import { CircuitBreakerClient } from '../../../../packages/technical/src/http/se
 import { IdempotencyService } from '../../../../packages/technical/src/idempotency/idempotency';
 import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
 import { LogisticsAuthModule } from '../auth/logistics-auth.module';
+import { LogisticsServiceTokenGuard } from '../auth/logistics-service-token.guard';
+import { ResponseCampaignModule } from '../integrations/response/response-campaign.module';
 import { NeedsController } from './needs.controller';
+import { NeedCommitmentsService } from './need-commitments.service';
 import { NeedCommandsService } from './need-commands.service';
+import { NeedsQueriesService } from './needs-queries.service';
 import { NeedsService } from './needs.service';
 import {
   loadResponseAdmissionConfig, ResponseAdmissionClient, RESPONSE_ADMISSION_CLIENT,
@@ -12,11 +16,14 @@ import {
 } from './response-admission.client';
 
 @Module({
-  imports: [LogisticsAuthModule],
+  imports: [LogisticsAuthModule, ResponseCampaignModule],
   controllers: [NeedsController],
   providers: [
     NeedsService,
     NeedCommandsService,
+    NeedCommitmentsService,
+    NeedsQueriesService,
+    LogisticsServiceTokenGuard,
     IdempotencyService,
     IdempotencyKeyInterceptor,
     ResponseAdmissionClient,

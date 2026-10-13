@@ -1,6 +1,13 @@
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 
-const decimalPattern = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/u;
+const decimalPattern = /^(-?(?:0|[1-9][0-9]*))(?:\.([0-9]+))?$/u;
+
+function trimTrailingFractionZeros(value: string): string {
+  const match = decimalPattern.exec(value);
+  if (!match?.[2]) return value;
+  const fraction = match[2].replace(/0+$/u, '');
+  return fraction ? `${match[1]}.${fraction}` : match[1]!;
+}
 
 export function validateQuantity(
   value: string,
@@ -20,9 +27,10 @@ export function validateQuantity(
 }
 
 export function quantityUnits(value: string, scale: number): bigint {
-  validateQuantity(value, scale, { allowNegative: true, allowZero: true });
-  const negative = value.startsWith('-');
-  const unsigned = negative ? value.slice(1) : value;
+  const normalized = trimTrailingFractionZeros(value);
+  validateQuantity(normalized, scale, { allowNegative: true, allowZero: true });
+  const negative = normalized.startsWith('-');
+  const unsigned = negative ? normalized.slice(1) : normalized;
   const [integer, fraction = ''] = unsigned.split('.');
   const units = BigInt(`${integer}${fraction.padEnd(scale, '0')}`);
   return negative ? -units : units;

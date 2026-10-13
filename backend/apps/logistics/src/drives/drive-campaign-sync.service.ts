@@ -3,7 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { jitteredInterval } from '../../../../packages/technical/src/persistence/postgres-errors';
-import { LogisticsResponseCampaignClient } from './response-campaign.client';
+import { LogisticsResponseCampaignClient } from '../integrations/response/response-campaign.client';
 
 const intervalMs = 5 * 60_000;
 const jobName = 'logistics.donation-drive-campaign-sync';

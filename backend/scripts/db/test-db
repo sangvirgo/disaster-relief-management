@@ -32,7 +32,13 @@ test_compose exec -T -e PGPORT=5432 -e PGPASSWORD=test-only postgres bash /schem
 test_compose exec -T -e PGPORT=5432 -e PGPASSWORD=test-only postgres bash /schema/race-tests-logistics.sh
 test_compose run --rm auth-test
 test_compose run --rm identity-admin-test
-test_compose up -d --wait --wait-timeout 60 identity-api response-api logistics-api nginx
+if ! test_compose up -d --wait --wait-timeout 60 identity-api response-api logistics-api nginx; then
+  printf 'API startup failed; recent service logs follow:\n' >&2
+  test_compose ps -a >&2 || true
+  test_compose logs --no-color --tail=120 logistics-api 2>&1 >&2 || true
+  test_compose logs --no-color --tail=100 identity-api response-api nginx postgres 2>&1 >&2 || true
+  exit 1
+fi
 test_compose stop identity-api
 test_compose run --rm --no-deps response-intake-test
 test_compose up -d --wait --wait-timeout 60 identity-api
@@ -83,6 +89,17 @@ if ! test_compose run --rm --no-deps logistics-t11-test node scripts/smoke/test-
   test_compose logs --no-color --tail=100 logistics-api >&2
   printf 'Recent Identity API logs follow:\n' >&2
   test_compose logs --no-color --tail=100 identity-api >&2
+  printf 'Recent PostgreSQL logs follow:\n' >&2
+  test_compose logs --no-color --tail=200 postgres >&2
+  exit 1
+fi
+if ! test_compose run --rm --no-deps logistics-t11-test node scripts/smoke/test-logistics-t14.mjs; then
+  printf 'Logistics T14 failed; recent API logs follow:\n' >&2
+  test_compose logs --no-color --tail=100 logistics-api >&2
+  printf 'Recent Identity API logs follow:\n' >&2
+  test_compose logs --no-color --tail=100 identity-api >&2
+  printf 'Recent Response API logs follow:\n' >&2
+  test_compose logs --no-color --tail=100 response-api >&2
   printf 'Recent PostgreSQL logs follow:\n' >&2
   test_compose logs --no-color --tail=200 postgres >&2
   exit 1

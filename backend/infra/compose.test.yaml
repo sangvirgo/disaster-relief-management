@@ -388,6 +388,8 @@ services:
       TEST_IDENTITY_BASE_URL: http://identity-api:3001/api/v1/identity
       TEST_RESPONSE_BASE_URL: http://response-api:3002/api/v1/response
       TEST_RESPONSE_DATABASE_URL: postgresql://postgres:test-only@postgres:5432/c48_response
+      TEST_RESPONSE_SERVICE_CLIENT_ID: c48-response-test
+      TEST_RESPONSE_SERVICE_CLIENT_SECRET: c48-test-response-secret-not-for-deployment-0001
     command: ["node", "scripts/smoke/test-logistics-t11.mjs"]
     depends_on:
       logistics-api:

@@ -71,7 +71,7 @@ function setup(options: SetupOptions = {}) {
       if (sql.includes('FROM fulfillment_cycle') && sql.includes('FOR UPDATE')) return [cycle];
       if (sql.includes('FROM relief_need n JOIN fulfillment_cycle') && sql.includes('FOR UPDATE OF n')) return [need];
       if (sql.includes('FROM commitment') && sql.includes('FOR UPDATE')) return commitments;
-      if (sql.includes('FROM stock_balance') && sql.includes('FOR UPDATE')) return balances;
+      if (sql.includes('FROM stock_balance')) return balances;
       if (sql.includes('INSERT INTO stock_movement')) return [];
       if (sql.includes('UPDATE commitment')) return [{ id: values?.[0] }];
       if (sql.includes('UPDATE relief_need')) return [{ id: needId }];
@@ -170,6 +170,16 @@ describe('NeedCommandsService', () => {
     expect(calls.some((call) => call.sql.includes('UPDATE commitment'))).toBe(true);
     expect(calls.find((call) => call.sql.includes('UPDATE commitment'))?.values).toEqual(['commitment-1', '3', 7]);
     expect(calls.find((call) => call.sql.includes('UPDATE relief_need'))?.values).toEqual([needId, 1, '3']);
+  });
+
+  it('stores cancelled remaining quantity using the unit decimal scale', async () => {
+    const { service, calls, request } = setup({
+      need: { ...baseNeed, unit_scale: 2, requested_quantity: '12.000' },
+    });
+
+    await service.cancel(needId, { expected_version: 1, reason: 'Đã hủy nhu cầu.' }, request);
+
+    expect(calls.find((call) => call.sql.includes('UPDATE relief_need'))?.values).toEqual([needId, 1, '12.00']);
   });
 
   it('formats scaled reservation quantities as decimals in release movements', async () => {

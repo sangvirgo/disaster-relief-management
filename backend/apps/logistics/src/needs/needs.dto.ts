@@ -1,7 +1,34 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsString, IsUUID, Matches, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 const decimalQuantity = /^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/u;
+
+export class NeedsListQueryDto {
+  @IsOptional() @IsUUID('all')
+  declare request_id?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1)
+  declare work_cycle?: number;
+
+  @IsOptional() @IsString() @MaxLength(2_000)
+  declare cursor?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  declare limit?: number;
+}
+
+export class FulfillmentQueryDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1)
+  declare work_cycle?: number;
+}
+
+export class NeedContributionsQueryDto {
+  @IsOptional() @IsString() @MaxLength(2_000)
+  declare cursor?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  declare limit?: number;
+}
 
 export class CreateNeedDto {
   @IsUUID('all')
@@ -40,6 +67,25 @@ export class AdjustNeedQuantityDto {
 export class CancelNeedDto {
   @Type(() => Number) @IsInt() @Min(1)
   expected_version!: number;
+
+  @IsString() @MaxLength(1_000) @Matches(/\S/u)
+  reason!: string;
+}
+
+export class CreateNeedCommitmentDto {
+  @IsUUID('all')
+  warehouse_id!: string;
+
+  @IsString() @MaxLength(100) @Matches(decimalQuantity)
+  quantity!: string;
+}
+
+export class ReleaseCommitmentDto {
+  @Type(() => Number) @IsInt() @Min(1)
+  expected_version!: number;
+
+  @IsString() @MaxLength(100) @Matches(decimalQuantity)
+  quantity!: string;
 
   @IsString() @MaxLength(1_000) @Matches(/\S/u)
   reason!: string;

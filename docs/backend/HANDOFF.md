@@ -101,6 +101,16 @@ T7 exit evidence: `npx tsc --noEmit` passed; `npm test` passed 18 suites / 56 te
 - Evidence: `npm run build` passed; `npm test` passed 51 suites / 195 Jest tests plus 2 Node tests; `npx tsc --noEmit` passed; `bash scripts/db/test-db` passed through the T13 receipt smoke and final `Backend database checks passed.` marker. `git diff --check` passed; `backend/dist/` is ignored.
 - Next: T14 needs, commitments, and fulfillment. Keep the T5 AIStor provider acceptance gate open and do not edit existing migrations/schema without an explicit task requirement.
 
-## Next task: T14
+## T14 needs and fulfillment APIs — 2026-10-13
 
-Proceed with T14 in [06](06-implementation-tasks.md), following the documented dependency order. Keep the T5 selected-provider acceptance gate tracked separately; its AIStor artifact, private-access, and restore checks remain outstanding.
+- Added the Logistics needs feature with separate query, command, commitment, and integration services; request admission remains owned by the Response client. The controller exposes needs, adjustments/cancellation, commitments/release, scoped fulfillment board, paged contributions, and the service-token-protected internal fulfillment read.
+- Kept the Nest module graph feature-scoped: `NeedsModule` imports the auth and Response campaign modules, and registers its service-token guard locally. Added a provider-graph compilation test using the real feature module.
+- Added race/idempotency, permission/scope, Vietnamese error, quantity-scale, exact microsecond keyset cursor, contribution projection, and HTTP/PostgreSQL smoke coverage. The real database smoke caught two issues: board contribution aliases were missing from the SELECT, and cancellation passed scaled integer units into a decimal column. Both are fixed and regression-tested.
+- Verification: `npx tsc --noEmit` and `npx tsc --noEmit -p tsconfig.test.json` pass; `npm test` passes 63 Jest suites / 260 tests plus 2 Node tests; `npm run build` passes for all three apps; `bash scripts/db/test-db` passes all schema, migration, race, auth, Response, and Logistics T11–T14 checks. NestJS architecture review found no actionable boundary/DI issue.
+- No migration/schema or OpenAPI snapshot changed; `contracts/openapi` diff is empty. `dist/` remains ignored. The build output is not staged.
+- T14 settlement-driven auto-`FULFILLED` is still pending because delivery settlement is implemented in T15; verify the need status changes when delivered reaches requested as part of T15 integration.
+- Next: T15 distribution and handoff. Keep the T5 AIStor provider acceptance gate open and do not edit existing migrations/schema without an explicit task requirement.
+
+## Next task: T15
+
+Proceed with T15 in [06](06-implementation-tasks.md), following the documented dependency order. Add settlement-driven need auto-fulfillment coverage to the T15 settlement path. Keep the T5 selected-provider acceptance gate tracked separately; its AIStor artifact, private-access, and restore checks remain outstanding.
