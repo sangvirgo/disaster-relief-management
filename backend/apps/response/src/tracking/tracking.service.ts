@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
@@ -97,8 +97,55 @@ function versionConflict(actual: number, expected: number): never {
   throw new AppError('INTERNAL_ERROR', { status: 500 });
 }
 
+const trackingMinuteMs = 60_000;
+const trackingHourMs = 60 * trackingMinuteMs;
+
+class TrackingReadRateLimiter {
+  private readonly attempts = new Map<string, number[]>();
+  private lastPrunedAt = Number.NEGATIVE_INFINITY;
+
+  assertAllowed(clientIp: string): void {
+    const now = Date.now();
+    const key = createHash('sha256').update(clientIp).digest('hex');
+    const recent = (this.attempts.get(key) ?? []).filter((timestamp) => timestamp > now - trackingHourMs);
+    const minute = recent.filter((timestamp) => timestamp > now - trackingMinuteMs);
+    let retryAfterMs = 0;
+
+    if (recent.length >= 60) retryAfterMs = Math.max(retryAfterMs, recent[0]! + trackingHourMs - now);
+    if (minute.length >= 10) retryAfterMs = Math.max(retryAfterMs, minute[0]! + trackingMinuteMs - now);
+    if (retryAfterMs > 0) {
+      this.attempts.set(key, recent);
+      throw new AppError('RATE_LIMITED', { status: 429, retryAfterSeconds: Math.ceil(retryAfterMs / 1_000) });
+    }
+
+    if (!this.attempts.has(key) && this.attempts.size >= 20_000 && now - this.lastPrunedAt >= trackingMinuteMs) {
+      this.lastPrunedAt = now;
+      this.prune(now);
+    }
+    if (!this.attempts.has(key) && this.attempts.size >= 20_000) {
+      throw new AppError('RATE_LIMITED', { status: 429, retryAfterSeconds: 60 * 60 });
+    }
+    this.attempts.set(key, [...recent, now]);
+  }
+
+  private prune(now: number): void {
+    for (const [key, timestamps] of this.attempts) {
+      const recent = timestamps.filter((timestamp) => timestamp > now - trackingHourMs);
+      if (recent.length) this.attempts.set(key, recent);
+      else this.attempts.delete(key);
+      if (this.attempts.size < 20_000) return;
+    }
+  }
+}
+
+function trackingClientIp(request: import('express').Request): string {
+  return request.ip || request.socket?.remoteAddress || 'unknown';
+}
+
 @Injectable()
 export class TrackingService {
+  private readonly readRateLimiter = new TrackingReadRateLimiter();
+
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly idempotency: IdempotencyService,
@@ -113,6 +160,7 @@ export class TrackingService {
     trackingSecret: string | undefined,
     request: import('express').Request,
   ): Promise<Record<string, unknown>> {
+    this.readRateLimiter.assertAllowed(trackingClientIp(request));
     const session = await this.sessions.optional(request, this.access.validTrackingSecret(trackingSecret));
     const row = await this.access.byTrackingCapability(trackingCode, trackingSecret, session);
     return this.trackingView(row);
@@ -125,6 +173,7 @@ export class TrackingService {
     query: RequestEventsQueryDto,
     request: import('express').Request,
   ): Promise<{ items: ReporterEventView[]; more: boolean; cursor?: string }> {
+    this.readRateLimiter.assertAllowed(trackingClientIp(request));
     if (this.access.validTrackingSecret(trackingSecret)) {
       const row = await this.access.forRequest(requestId, trackingCode, trackingSecret, null);
       return this.readEvents(this.dataSource, row.id, query.cursor, query.limit ?? 50);

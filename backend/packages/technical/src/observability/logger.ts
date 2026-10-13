@@ -11,7 +11,12 @@ export const LOG_REDACT_PATHS = [
   'headers["x-csrf-token"]',
   'req.headers["x-tracking-code"]',
   'req.headers["x-tracking-secret"]', 'req.headers["x-donation-secret"]', 'req.headers["x-recovery-code"]', 'req.headers["x-csrf-token"]',
+  'headers.referer', 'req.headers.referer', 'headers.referrer', 'req.headers.referrer',
+  'url', '*.url', '*.*.url', 'req.originalUrl', 'originalUrl', '*.originalUrl', '*.*.originalUrl',
   'phone', '*.phone', '*.*.phone', 'body.phone', 'req.body.phone',
+  'reporter_contact_phone', '*.reporter_contact_phone', '*.*.reporter_contact_phone',
+  'beneficiary_contact_phone', '*.beneficiary_contact_phone', '*.*.beneficiary_contact_phone',
+  'alternate_contact_phone', '*.alternate_contact_phone', '*.*.alternate_contact_phone',
   'location', '*.location', '*.*.location', 'body.location', 'req.body.location',
   'password', '*.password', '*.*.password', 'body.password', 'req.body.password',
   'old_password', 'new_password', 'temporary_password', 'current_password',
@@ -25,6 +30,8 @@ export const LOG_REDACT_PATHS = [
   'donation_secret_hash', '*.donation_secret_hash', '*.*.donation_secret_hash', 'recovery_code_hash', '*.recovery_code_hash', '*.*.recovery_code_hash',
   'capability_secret_hash', '*.capability_secret_hash', '*.*.capability_secret_hash', 'code_hash', '*.code_hash', '*.*.code_hash',
   'token', '*.token', '*.*.token', 'access_token', 'refresh_token', '*.access_token', '*.refresh_token',
+  'signed_url', '*.signed_url', '*.*.signed_url', 'download_url', '*.download_url', '*.*.download_url',
+  'signedUrl', '*.signedUrl', '*.*.signedUrl', 'downloadUrl', '*.downloadUrl', '*.*.downloadUrl',
 ] as const;
 
 export function createPinoLogger(service: BackendService, level: LogLevel = 'info', destination?: DestinationStream): Logger {

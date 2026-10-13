@@ -228,6 +228,28 @@ describe('T1 technical package', () => {
     expect(nestOutput).not.toContain('private-location');
   });
 
+  it('redacts signed URLs and named reporter PII from nested log fields', () => {
+    let output = '';
+    const logger = createPinoLogger('response', 'info', new Writable({ write(chunk, _encoding, callback) { output += chunk.toString(); callback(); } }));
+    logger.info({
+      req: { url: '/evidence?X-Amz-Signature=signed-request-private', headers: { referer: 'https://example.test/?token=referer-private' } },
+      evidence: { signed_url: 'https://example.test/evidence?X-Amz-Signature=signed-field-private', download_url: 'https://example.test/evidence?signature=download-private' },
+      reporter_contact_phone: 'reporter-phone-private',
+      beneficiary_contact_phone: 'beneficiary-phone-private',
+      alternate_contact_phone: 'alternate-phone-private',
+      location: { coordinates: [105.123456, 21.123456] },
+    }, 'test');
+    expect(output).not.toContain('signed-request-private');
+    expect(output).not.toContain('referer-private');
+    expect(output).not.toContain('signed-field-private');
+    expect(output).not.toContain('download-private');
+    expect(output).not.toContain('reporter-phone-private');
+    expect(output).not.toContain('beneficiary-phone-private');
+    expect(output).not.toContain('alternate-phone-private');
+    expect(output).not.toContain('105.123456');
+    logger.flush();
+  });
+
   it('updates versioned rows with an optimistic version predicate', async () => {
     const manager = { queryRunner: { isTransactionActive: true }, query: jest.fn().mockResolvedValue([[{ id: 'req-1', status: 'TRIAGED', version: 3 }], 1]) };
     await expect(updateWhereVersion(manager as never, {

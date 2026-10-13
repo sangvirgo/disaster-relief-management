@@ -1,0 +1,128 @@
+# T18 hardening and evidence
+
+## Scope and evidence status
+
+T18 uses the existing C48 application and `backend/infra/compose.yaml`. The checks in this document do not create databases, schemas, demo records, or helper containers. Backup and restore tooling is provided, but neither operation has been run in this workspace.
+
+| Area | Implementation and evidence | Status and limit |
+|---|---|---|
+| Security headers and CSP | `backend/infra/nginx/nginx.conf` sets `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'`, and `Cache-Control: no-store`. The privacy access format uses `$uri` and omits query arguments. `backend/scripts/__tests__/t18-hardening.test.mjs` checks these directives; the ingress smoke can check live responses through Nginx. | Static evidence passes. Live ingress verification remains pending because port 8080 is already allocated and the Nginx container is `Created`; no request was sent to that listener. |
+| Throttling | Identity login applies 5 attempts/minute per IP+username, 30/minute per IP, and 300/minute globally; registration applies 3/hour per IP. Response tracking and event reads apply 10/minute and 60/hour per client IP in the application, matching the Nginx edge guard. Unit tests cover the minute/hour limits and a full-map expiry case. | The application limiter is bounded to 20,000 hashed client keys and is process-local. Full-map cleanup runs at most once per minute; until the next sweep, new client keys fail closed if the map remains full. The Nginx zones are per ingress process. Multi-replica coordination and IPv4 `/24` / IPv6 `/56` normalization remain deployment decisions; do not treat these local limits as a distributed abuse-control service. |
+| Logs and PII | Pino redaction covers request URLs/referers, signed/download URLs, and reporter, beneficiary, and alternate-contact phone fields. Nginx access logging records `$uri`, not the raw request target. `backend/packages/technical/test/t1-primitives.spec.ts` checks representative nested fields and signed URLs. | Unit evidence checks representative fields; it does not prove that every future log statement is safe. Review new structured log fields whenever they are added. |
+| Dependency audit | `npm audit --omit=dev` reports 0 production dependency vulnerabilities. | Full `npm audit` reports 20 moderate findings in the development dependency chain through Jest and `sprintf-js`. npm proposes a breaking `ts-jest` downgrade with `npm audit fix --force`; no dependency or lockfile changes were made in T18. |
+| Backup and restore | `backend/scripts/db/backup` dumps all three primary PostgreSQL databases through the existing `postgres` service and mirrors the two configured evidence buckets. Before creating artifacts, it compares the selected mc alias URL with `response-api`'s resolved `S3_PUBLIC_ENDPOINT`. It writes `object_inventory.jsonl` rows with bucket, key, byte size, and SHA-256. Restore validates checksums and archives, requires empty recovery databases, and compares each target cluster's `system_identifier` with the existing primary Compose PostgreSQL cluster before any `pg_restore`. | No backup artifact was created and no database restore was run. Endpoint mismatch or inspection failure blocks backup; restore fails closed when either cluster identifier cannot be read or matches. TC-29 restore execution is **pending** until an approved isolated recovery destination exists. Object restoration is blocked until an isolated endpoint and empty target buckets are independently verified. Never restore over `c48_identity`, `c48_response`, or `c48_logistics`. |
+| k6 performance scenario | `backend/test/k6/t18-hardening.js` defines 20 VUs, a 2-minute read-only warm-up, a 10-minute measured interval, and a 4:1 read-to-synthetic-SOS iteration mix with latency and failure thresholds. `setup()` rejects non-loopback URLs before workload startup and still requires explicit SOS-write opt-in, a pre-issued token, and an approved point. | Not run: it creates persistent SOS records and is a sustained workload. TC-PERF-01 evidence, dataset size, runtime hardware, and measured results remain pending. No synthetic data or 10k-row fixture was created. |
+| Vietnamese API error copy | The direct API smoke passed the anonymous Identity and Response 401 checks for `UNAUTHENTICATED`, exact Vietnamese messages, and `no-store`. The ingress smoke also covers correlation IDs, `VALIDATION_FAILED`, and security headers, but its validation POST and Nginx path were not exercised. | Direct 401 evidence passed. Pending: validation POST, ingress security headers, permission-denial copy with an existing low-privilege account, and Web/Mobile inert-rendering and accessibility evidence. |
+
+## TC-BE acceptance evidence
+
+- **TC-BE-27 — backend read-path subset passed; validation and client checks pending.** Direct API smoke passed after sandbox escalation. Exact command: `node --env-file=.env scripts/smoke/t18-hardening.mjs --direct-apis`. Output: `PASS Identity API 401 no-store/Vietnamese` and `PASS Response API 401 no-store/Vietnamese`; DTO POST explicitly skipped. The static hardening suite, Response tracking limiter unit test, and technical logger redaction unit test also passed. PENDING: validation POST, ingress security headers, permission-denial copy, and Web/Mobile inert-rendering/accessibility.
+- **TC-BE-28 — pending.** Timeout rollback — **PENDING**; idempotent retry — **PENDING**; pool bounds — **PENDING**. The tracking limiter unit test does not establish any of those database or request-lifecycle properties.
+- **TC-BE-29 — pending.** Audit/access checks — **PENDING**. If export or push surfaces are in scope, their privacy and Vietnamese-copy checks are also **PENDING**; no feature-level export/push evidence was gathered. The dependency audit result above is not evidence for these application checks.
+- **TC-29 restore — pending.** No backup artifact or restore was executed. Database restore requires an approved isolated recovery destination, and object restoration remains blocked pending independent endpoint and empty-target verification.
+
+Static verification for this evidence update:
+
+- From `backend/`: `node scripts/__tests__/t18-hardening.test.mjs` — **PASS (8/8)**.
+- From `backend/`: `node scripts/__tests__/t18-backup-safety.test.mjs` — **PASS (7/7)**, including private config permissions, symlinks, and non-regular config rejection; `node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand apps/response/test/tracking-pagination.spec.ts` — **PASS (5/5)**.
+- From `backend/`: `bash -n scripts/db/backup scripts/db/restore` and `node --check scripts/db/validate-mc-config.mjs` — **PASS**.
+- From `backend/`: `node --check --input-type=module < test/k6/t18-hardening.js` — **PASS**.
+- From the repository root: `git diff --check` — **PASS**.
+
+## Running the low-impact smoke
+
+The default ingress smoke makes two anonymous GET requests and one invalid `POST /requests` with an empty body. The POST has a valid idempotency key so the interceptor can pass it; Nest validation rejects the empty DTO before the controller handler and persistence service run. It does not register, log in, create a session, or print response bodies or credentials.
+
+From `backend/`, after the main APIs and the existing `nginx` service are already running:
+
+```sh
+node scripts/smoke/t18-hardening.mjs
+```
+
+The default origin is `http://127.0.0.1:8080`. `C48_T18_PUBLIC_BASE_URL` may select another loopback-published port; the script rejects non-loopback hosts. Expected evidence is three `PASS` lines for the Identity 401, Response 401, and DTO validation error. A failure is reported by endpoint and expected property, without dumping the response body.
+
+When ingress is unavailable, `--direct-apis` sends only the two anonymous GET requests to the existing loopback API ports 3001 and 3002. It checks error codes, exact Vietnamese messages, correlation IDs, and no-store behavior. It deliberately skips the invalid POST and cannot verify Nginx headers:
+
+```sh
+node scripts/smoke/t18-hardening.mjs --direct-apis
+```
+
+The corresponding static checks can be run from `backend/`:
+
+```sh
+node scripts/__tests__/t18-hardening.test.mjs
+```
+
+Current runtime inventory: Postgres and all three primary APIs were healthy after the authorized Nginx start attempt. Compose returned exit code 1 because `127.0.0.1:8080` was already allocated; the existing `nginx` container is `Created`, so no ingress request was sent. Compose also recreated its migration one-shots as dependencies; their logs report 0 migrations applied for Identity, Response, and Logistics. After sandbox escalation, `node --env-file=.env scripts/smoke/t18-hardening.mjs --direct-apis` passed the Identity API 401 and Response API 401 checks for no-store and Vietnamese messages. The direct mode explicitly skips the validation POST, so validation and ingress-header evidence remain pending.
+
+## Backup procedure
+
+Backups contain personal and operational data. Choose an access-controlled, encrypted destination outside the repository and protect it according to the organization’s retention policy. No retention period is set by this runbook. Run during a planned quiet window and coordinate intake/write activity: the three database dumps and object mirrors are sequential, not a single cross-service atomic snapshot. The script does not start or stop services.
+
+From the repository root, set `C48_MINIO_ALIAS` to the already-configured alias for the main MinIO endpoint and `MC_CONFIG_DIR` to its private configuration directory. Keep both outside Git and do not print their contents. Before invoking Compose or accessing a database, backup rejects symlinks in the configuration path, requires the directory to have no group/other permissions (`0700` or stricter), and requires `config.json` to be a regular non-symlink file with no group/other permissions (`0600` or stricter). It fails closed if it cannot verify these properties.
+
+```sh
+export C48_MINIO_ALIAS='c48-primary'
+export MC_CONFIG_DIR='/secure/operator/mc-config'
+backend/scripts/db/backup /secure/backups/c48
+```
+
+The script requires the existing `backend/.env` for Compose interpolation, uses only `backend/infra/compose.yaml` and its `postgres` service, applies a private file umask, and rejects destinations inside the repository. Before creating the destination or dumping databases, it reads `response-api`'s resolved `S3_PUBLIC_ENDPOINT` from Compose JSON and compares it with the selected alias `url` in `$MC_CONFIG_DIR/config.json`. It requires exact normalized HTTP(S) URL equality and fails closed if either value is missing, invalid, or different; command output and credentials are not printed. This verifies configured endpoint strings, not DNS routing or remote server identity. The script writes custom-format dumps for `c48_identity`, `c48_response`, and `c48_logistics`, mirrors `c48-response-evidence` and `c48-logistics-evidence`, then records one JSONL row per object in `object_inventory.jsonl` with `bucket`, `key`, `size_bytes`, and `sha256`. The inventory rejects symlinks and files that change while hashing. The checksum manifest covers the inventory too. It does not reset databases or remove data. Do not commit the output or paste its contents into logs or chat.
+
+The database-to-object mapping is:
+
+- Response object keys are referenced by `evidence_metadata` rows in `c48_response` and stored in `c48-response-evidence`.
+- The `c48_logistics` schema reserves attachment metadata; the configured `c48-logistics-evidence` bucket is mirrored as well so the backup includes the declared Logistics object store.
+
+Verify an artifact without modifying it:
+
+```sh
+cd /secure/backups/c48/c48-YYYYMMDDTHHMMSSZ
+sha256sum --check --strict manifest.sha256
+```
+
+## Isolated restore procedure
+
+TC-29 requires restore verification. Under the current no-test-database rule, this phase does not provision a separate database or object store. A backup must not be restored over the primary C48 databases. The execution gate remains **pending** until an authorized, isolated recovery destination is available.
+
+When that destination is available, an operator must first provide:
+
+1. An isolated PostgreSQL recovery service with existing empty databases named exactly `c48_recovery_identity`, `c48_recovery_response`, and `c48_recovery_logistics`. Do not add these to the main Compose project.
+2. A private `PGSERVICEFILE` outside the repository, mode `0600` or stricter, with service entries named by `PGSERVICE_IDENTITY`, `PGSERVICE_RESPONSE`, and `PGSERVICE_LOGISTICS`. Each entry must point to its corresponding isolated database.
+3. An independently verified isolated MinIO endpoint and two pre-created, empty target buckets. Alias configuration alone does not establish isolation; do not point a restore alias at the primary endpoint.
+4. A verified backup directory outside the repository.
+
+After checking those prerequisites, the operator can run the database restore with:
+
+```sh
+export PGSERVICEFILE='/secure/operator/pg_service.conf'
+export PGSERVICE_IDENTITY='c48-recovery-identity'
+export PGSERVICE_RESPONSE='c48-recovery-response'
+export PGSERVICE_LOGISTICS='c48-recovery-logistics'
+export C48_RESTORE_CONFIRM='I_HAVE_AN_ISOLATED_DESTINATION'
+backend/scripts/db/restore /secure/backups/c48/c48-YYYYMMDDTHHMMSSZ
+```
+
+Before inspecting target databases, the script reads `system_identifier` through the existing main Compose `postgres` service. It then reads the identifier through each configured recovery service and aborts before any restore if an identifier cannot be inspected, is malformed, or matches the primary cluster. Before restoring any archive, it checks all three target database names and counts user objects across custom schemas, relations, types/enums, functions/procedures, operators, collations/conversions, operator classes/families, text-search objects, extended statistics, large objects, publications, foreign data wrappers, foreign servers, event triggers, access methods, casts, procedural languages, transforms, default privileges, user mappings, and subscriptions scoped to the target database. It excludes `pg_catalog`, `information_schema`, and exact extension members (`pg_depend.deptype = 'e'`); for unnamespaced rows in `pg_am`, `pg_cast`, `pg_language`, `pg_transform`, `pg_default_acl`, and `pg_user_mapping`, it counts only normal object OIDs at or above 16384, excluding initdb built-ins and pinned rows. The built-in `public` schema itself is allowed while its contents are checked. Auto-extension dependencies (`deptype = 'x'`) remain counted because they are not extension members. User mappings are checked independently by their own catalog row, so an extension-owned foreign server does not suppress a mapping that could collide. A catalog query error or malformed count fails closed. A normal empty database with its default system objects yields zero. The target service role must be able to call `pg_control_system()`; inspection failure blocks the restore. It never creates or drops a database and never uses `pg_restore --clean` or `--create`. Do not run it against a primary database. Keep the restored databases isolated from application traffic until checks are complete.
+
+PostgreSQL 17 `pg_dump` includes non-system extensions as restore entries. The preflight counts top-level `pg_extension` rows with OIDs at or above 16384; lower-OID initdb-installed extensions are excluded, while extension member objects remain filtered because the extension is restored as a unit.
+
+Object restoration remains blocked until an operator independently verifies the isolated MinIO endpoint identity and confirms both target buckets are empty. An alias or environment variable is not sufficient evidence because it can resolve to the primary endpoint. This runbook provides no executable object-copy command; do not copy objects until that separate verification is documented and reviewed. Once an isolated destination is approved, verify object inventory and checksums against the private backup manifests and confirm application metadata-to-object references before recording TC-29 as passed. No such isolated verification has been performed for T18.
+
+## k6 scenario gate
+
+The scenario is intentionally opt-in and writes synthetic assistance requests during its measured interval. `setup()` accepts only HTTP(S) URLs using `localhost`, `[::1]`, or a canonical IPv4 address in `127.0.0.0/8`; a remote host is rejected before either workload starts. Do not run it until a performance window, approved test point/category, pre-issued reporter token, and cleanup/retention decision are in place. It does not create a fixture dataset or clean up generated requests.
+
+Example invocation, for an explicitly authorized performance window only:
+
+```sh
+K6_ENABLE_SOS_WRITES=1 \
+C48_K6_PUBLIC_URL='http://127.0.0.1:8080' \
+C48_K6_ACCESS_TOKEN='<pre-issued-token>' \
+C48_K6_SOS_LONGITUDE='<approved-longitude>' \
+C48_K6_SOS_LATITUDE='<approved-latitude>' \
+C48_K6_INCIDENT_CATEGORY='FLOOD' \
+k6 run backend/test/k6/t18-hardening.js
+```
+
+Record the host CPU, memory, PostgreSQL and application container limits, dataset row count, k6 version, checks, failed-request rate, and p95 read/SOS latency with any future result. The scenario thresholds are `<1%` failed HTTP requests, `>99%` checks, read p95 `<2s`, and SOS p95 `<3s`. T18 has no measured result yet.
