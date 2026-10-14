@@ -232,6 +232,17 @@ try {
   expectSuccess(secondCount);
   assert.equal(secondCount.value.count.revision, 2);
   assert.equal(secondCount.value.delivery.status, 'POSTED');
+  const releaseBeforeReview = await call(logisticsUrl, `donation-receipts/${receiptId}/release-held`, {
+    method: 'POST', actor: reviewer, idempotencyKey: key(),
+    body: { expected_version: 5, count_revision: 2, declaration_revision: 1, reason: 'Kiểm tra chặn trước khi duyệt.' },
+  });
+  expectVietnameseError(releaseBeforeReview, 409, 'RECEIPT_NOT_APPROVED');
+  ledger = await logisticsDb.query(
+    `SELECT count(*)::int AS movement_count,COALESCE(sum(delta_on_hand),0)::text AS quantity
+       FROM stock_movement WHERE receipt_id=$1`, [receiptId],
+  );
+  assert.equal(ledger.rows[0].movement_count, 1);
+  assert.equal(ledger.rows[0].quantity, '5.000');
   const secondApproval = await call(logisticsUrl, `donation-receipts/${receiptId}/review`, {
     method: 'POST', actor: reviewer, idempotencyKey: key(),
     body: { expected_version: 5, count_revision: 2, declaration_revision: 1, decision: 'APPROVE' },
@@ -243,6 +254,7 @@ try {
     method: 'POST', actor: reviewer, idempotencyKey: releaseKey, body: releaseBody,
   });
   expectSuccess(released);
+  assert.equal(released.value.delivery.status, 'POSTED');
   const releaseReplay = await call(logisticsUrl, `donation-receipts/${receiptId}/release-held`, {
     method: 'POST', actor: reviewer, idempotencyKey: releaseKey, body: releaseBody,
   });
@@ -281,7 +293,126 @@ try {
   assert.ok(notices.rows.some((row) => row.notice_type === 'DONATION_RECEIPT_DIFFERENCE'));
   assert.ok(notices.rows.some((row) => row.notice_type === 'DONATION_DISPUTE_RESOLVED'));
   assert.ok(payloads.every((payload) => /[\u0102-\u01b0\u1ea0-\u1ef9]/u.test(payload.message)));
-  console.log('PASS Logistics T13 receipt revisions, independent review, exact-once posting, held release, notices and dispute resolution');
+
+  const raceItemA = await call(logisticsUrl, 'items', {
+    method: 'POST', actor: manager, idempotencyKey: key(),
+    body: { item_type_code: itemType.value.code, unit_code: unit.value.code, name: `Vật tư T13 A ${suffix}` },
+  });
+  expectSuccess(raceItemA, 201);
+  const raceItemB = await call(logisticsUrl, 'items', {
+    method: 'POST', actor: manager, idempotencyKey: key(),
+    body: { item_type_code: itemType.value.code, unit_code: unit.value.code, name: `Vật tư T13 B ${suffix}` },
+  });
+  expectSuccess(raceItemB, 201);
+  const raceWarehouse = await call(logisticsUrl, 'warehouses', {
+    method: 'POST', actor: manager, idempotencyKey: key(),
+    body: { organization_id: organizationId, region_code: regionCode, name: `Kho race T13 ${suffix}` },
+  });
+  expectSuccess(raceWarehouse, 201);
+  const raceDrive = await call(logisticsUrl, 'donation-drives', {
+    method: 'POST', actor: manager, idempotencyKey: key(),
+    body: {
+      title: `Đợt race T13 ${suffix}`, intake_warehouse_id: raceWarehouse.value.id,
+      items: [
+        { item_id: raceItemA.value.id, target_quantity: '20.00' },
+        { item_id: raceItemB.value.id, target_quantity: '20.00' },
+      ],
+    },
+  });
+  expectSuccess(raceDrive, 201);
+  const openedRaceDrive = await call(logisticsUrl, `donation-drives/${raceDrive.value.id}/open`, {
+    method: 'POST', actor: manager, idempotencyKey: key(), body: { expected_version: raceDrive.value.version },
+  });
+  expectSuccess(openedRaceDrive);
+  const raceDeliveryA = await call(logisticsUrl, `public/donation-drives/${raceDrive.value.id}/deliveries`, {
+    method: 'POST', actor: donor, idempotencyKey: key(),
+    body: { donor_name: 'Người quyên góp T13 A', donor_phone: '09033334445', lines: [
+      { item_id: raceItemA.value.id, declared_quantity: '2.00' },
+      { item_id: raceItemB.value.id, declared_quantity: '3.00' },
+    ] },
+  });
+  expectSuccess(raceDeliveryA, 201);
+  const raceDeliveryB = await call(logisticsUrl, `public/donation-drives/${raceDrive.value.id}/deliveries`, {
+    method: 'POST', actor: donor, idempotencyKey: key(),
+    body: { donor_name: 'Người quyên góp T13 B', donor_phone: '09033334446', lines: [
+      { item_id: raceItemB.value.id, declared_quantity: '5.00' },
+      { item_id: raceItemA.value.id, declared_quantity: '7.00' },
+    ] },
+  });
+  expectSuccess(raceDeliveryB, 201);
+  const raceReceiptA = await call(logisticsUrl, 'donation-receipts', {
+    method: 'POST', actor: counter, idempotencyKey: key(),
+    body: { delivery_id: raceDeliveryA.value.id, warehouse_id: raceWarehouse.value.id },
+  });
+  expectSuccess(raceReceiptA, 201);
+  const raceReceiptB = await call(logisticsUrl, 'donation-receipts', {
+    method: 'POST', actor: counter, idempotencyKey: key(),
+    body: { delivery_id: raceDeliveryB.value.id, warehouse_id: raceWarehouse.value.id },
+  });
+  expectSuccess(raceReceiptB, 201);
+  const raceCountA = await call(logisticsUrl, `donation-receipts/${raceReceiptA.value.id}/counts`, {
+    method: 'POST', actor: counter, idempotencyKey: key(), body: { expected_version: 1, lines: [
+      { item_id: raceItemA.value.id, counted_quantity: '2.00', accepted_quantity: '2.00', held_quantity: '0.00', rejected_quantity: '0.00' },
+      { item_id: raceItemB.value.id, counted_quantity: '3.00', accepted_quantity: '3.00', held_quantity: '0.00', rejected_quantity: '0.00' },
+    ] },
+  });
+  expectSuccess(raceCountA);
+  const raceCountB = await call(logisticsUrl, `donation-receipts/${raceReceiptB.value.id}/counts`, {
+    method: 'POST', actor: counter, idempotencyKey: key(), body: { expected_version: 1, lines: [
+      { item_id: raceItemB.value.id, counted_quantity: '5.00', accepted_quantity: '5.00', held_quantity: '0.00', rejected_quantity: '0.00' },
+      { item_id: raceItemA.value.id, counted_quantity: '7.00', accepted_quantity: '7.00', held_quantity: '0.00', rejected_quantity: '0.00' },
+    ] },
+  });
+  expectSuccess(raceCountB);
+  for (const receipt of [raceReceiptA.value, raceReceiptB.value]) {
+    const approval = await call(logisticsUrl, `donation-receipts/${receipt.id}/review`, {
+      method: 'POST', actor: reviewer, idempotencyKey: key(),
+      body: { expected_version: 2, count_revision: 1, declaration_revision: 1, decision: 'APPROVE' },
+    });
+    expectSuccess(approval);
+  }
+  const emptyRaceBalances = await logisticsDb.query(
+    'SELECT item_id FROM stock_balance WHERE warehouse_id=$1 AND item_id=ANY($2::uuid[])',
+    [raceWarehouse.value.id, [raceItemA.value.id, raceItemB.value.id]],
+  );
+  assert.equal(emptyRaceBalances.rowCount, 0, 'race starts without stock_balance rows');
+  const racePosts = await Promise.all([raceReceiptA, raceReceiptB].map(({ value: receipt }) => call(
+    logisticsUrl, `donation-receipts/${receipt.id}/post`, {
+      method: 'POST', actor: reviewer, idempotencyKey: key(), body: { expected_version: 3 },
+    },
+  )));
+  for (const result of racePosts) {
+    expectSuccess(result);
+    assert.equal(result.value.delivery.status, 'POSTED');
+  }
+  const raceLedger = await logisticsDb.query(
+    `SELECT sm.receipt_id,b.item_id,count(*)::int AS movement_count,COALESCE(sum(sm.delta_on_hand),0)::text AS quantity
+       FROM stock_movement sm JOIN stock_balance b ON b.id=sm.balance_id
+      WHERE sm.receipt_id=ANY($1::uuid[]) AND b.warehouse_id=$2
+      GROUP BY sm.receipt_id,b.item_id ORDER BY sm.receipt_id,b.item_id`,
+    [[raceReceiptA.value.id, raceReceiptB.value.id], raceWarehouse.value.id],
+  );
+  assert.equal(raceLedger.rowCount, 4);
+  const expectedRaceMovements = new Map([
+    [`${raceReceiptA.value.id}:${raceItemA.value.id}`, '2.000'],
+    [`${raceReceiptA.value.id}:${raceItemB.value.id}`, '3.000'],
+    [`${raceReceiptB.value.id}:${raceItemA.value.id}`, '7.000'],
+    [`${raceReceiptB.value.id}:${raceItemB.value.id}`, '5.000'],
+  ]);
+  for (const movement of raceLedger.rows) {
+    assert.equal(movement.movement_count, 1);
+    assert.equal(expectedRaceMovements.get(`${movement.receipt_id}:${movement.item_id}`), movement.quantity);
+  }
+  const raceBalances = await logisticsDb.query(
+    'SELECT item_id,on_hand::text AS on_hand FROM stock_balance WHERE warehouse_id=$1 AND item_id=ANY($2::uuid[])',
+    [raceWarehouse.value.id, [raceItemA.value.id, raceItemB.value.id]],
+  );
+  assert.equal(raceBalances.rowCount, 2);
+  const raceOnHand = new Map(raceBalances.rows.map((row) => [row.item_id, row.on_hand]));
+  assert.equal(raceOnHand.get(raceItemA.value.id), '9.000');
+  assert.equal(raceOnHand.get(raceItemB.value.id), '8.000');
+
+  console.log('PASS Logistics T13 revisions, independent review, exact-once posting, opposite-order stock race, held release, notices and dispute resolution');
 } finally {
   await Promise.all([logisticsDb.end(), identityDb.end()]);
 }
