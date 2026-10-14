@@ -116,14 +116,33 @@ export class NeedsService {
       throw new AppError('VALIDATION_FAILED', { status: 400 });
     }
 
-    const admission = await this.response.admit(dto.request_id, dto.work_cycle, session.identityHeaders);
-    requireNeedManage(session.grants, admission);
-
-    return this.idempotency.execute(this.dataSource, {
+    const idempotent = {
       scopeKey: `user:${session.userId}`,
       command: 'logistics.needs.create',
       key: idempotencyKey,
       requestHash: requestHash(dto),
+    };
+    const replay = async (manager: EntityManager, resource: ResourceRef | null): Promise<Record<string, unknown>> => {
+      if (resource?.type !== 'relief_need') throw new AppError('INTERNAL_ERROR', { status: 500 });
+      const value = await readNeed(manager, resource.id);
+      requireNeedManage(session.grants, value as Pick<ResponseAdmission, 'organization_id' | 'region_code' | 'campaign_id'>);
+      return value;
+    };
+
+    let admission: ResponseAdmission;
+    try {
+      admission = await this.response.admit(dto.request_id, dto.work_cycle, session.identityHeaders);
+    } catch (error) {
+      return this.idempotency.execute(this.dataSource, {
+        ...idempotent,
+        execute: async () => { throw error; },
+        replay,
+      });
+    }
+    requireNeedManage(session.grants, admission);
+
+    return this.idempotency.execute(this.dataSource, {
+      ...idempotent,
       databaseErrorMappings: { unique: { need_one_live_per_item_uq: 'NEED_EXISTS' } },
       execute: async (manager) => {
         const cycle = await lockCycle(manager, admission);
@@ -153,12 +172,7 @@ export class NeedsService {
         await writeNeedAudit(manager, session.userId, 'NEED_CREATED', id, null, value, dto.reason ?? null);
         return { status: 201, value, resource: { type: 'relief_need', id } };
       },
-      replay: async (manager, resource: ResourceRef | null) => {
-        if (resource?.type !== 'relief_need') throw new AppError('INTERNAL_ERROR', { status: 500 });
-        const value = await readNeed(manager, resource.id);
-        requireNeedManage(session.grants, value as Pick<ResponseAdmission, 'organization_id' | 'region_code' | 'campaign_id'>);
-        return value;
-      },
+      replay,
     });
   }
 }

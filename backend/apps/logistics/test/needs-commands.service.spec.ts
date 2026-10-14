@@ -43,6 +43,7 @@ const baseNeed = {
 type SetupOptions = {
   cycleState?: 'OPEN' | 'FROZEN' | 'SEALED';
   need?: Partial<typeof baseNeed>;
+  grants?: Grant[];
   commitments?: Array<{
     id: string; warehouse_id: string; quantity: string; released_quantity: string;
     issued_quantity: string; delivered_quantity: string; returned_quantity: string; lost_quantity: string; version: number;
@@ -92,7 +93,7 @@ function setup(options: SetupOptions = {}) {
     }) => ({ ...(await command.execute(manager)), replay: false })),
   };
   const sessions = {
-    require: jest.fn(async () => ({ userId: actorId, grants: [coordinatorGrant], identityHeaders: {} })),
+    require: jest.fn(async () => ({ userId: actorId, grants: options.grants ?? [coordinatorGrant], identityHeaders: {} })),
   };
   const service = new NeedCommandsService(
     dataSource as unknown as DataSource,
@@ -100,10 +101,30 @@ function setup(options: SetupOptions = {}) {
     sessions as unknown as LogisticsSessionService,
   );
   const request = { idempotencyKey: '77777777-7777-4777-8777-777777777777' } as NeedCommandRequest;
-  return { service, calls, statements, manager, idempotency, sessions, request };
+  return { service, calls, statements, manager, dataSource, idempotency, sessions, request };
 }
 
 describe('NeedCommandsService', () => {
+  it.each(['increase', 'reduce', 'cancel'] as const)(
+    'rejects an outside-organization grant for %s before opening the transaction', async (action) => {
+      const outsideGrant: Grant = {
+        role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: '99999999-9999-4999-8999-999999999999',
+      };
+      const { service, request, dataSource, manager, idempotency } = setup({ grants: [outsideGrant] });
+      const commands = {
+        increase: () => service.increase(needId, { expected_version: 1, quantity: '4', reason: 'Tăng.' }, request),
+        reduce: () => service.reduce(needId, { expected_version: 1, quantity: '2', reason: 'Giảm.' }, request),
+        cancel: () => service.cancel(needId, { expected_version: 1, reason: 'Hủy.' }, request),
+      };
+
+      await expect(commands[action]()).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+      expect(manager.query).not.toHaveBeenCalled();
+      expect(idempotency.execute).not.toHaveBeenCalled();
+    },
+  );
+
   it('increases requested quantity on an open cycle and reopens a fulfilled need as partially fulfilled', async () => {
     const need = { ...baseNeed, status: 'FULFILLED', requested_quantity: '3', version: 4 };
     const { service, statements, calls, request, idempotency } = setup({

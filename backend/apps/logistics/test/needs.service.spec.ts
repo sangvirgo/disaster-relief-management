@@ -38,6 +38,7 @@ function setup(overrides: Partial<{
   point: { id: string; organization_id: string; region_code: string; status: string } | null;
   grants: Grant[];
   admissionError: Error;
+  existingReplay: boolean;
 }> = {}) {
   const calls: Array<{ sql: string; values?: unknown[] }> = [];
   const order: string[] = [];
@@ -47,7 +48,7 @@ function setup(overrides: Partial<{
   };
   const manager = {
     query: jest.fn(async (sql: string, values?: unknown[]) => {
-      calls.push({ sql, values });
+      calls.push(values ? { sql, values } : { sql });
       if (sql.includes('INSERT INTO fulfillment_cycle')) return [];
       if (sql.includes('FROM fulfillment_cycle') && sql.includes('FOR UPDATE')) return [cycle];
       if (sql.includes('FROM item i JOIN unit u')) return [{ id: itemId, status: overrides.itemStatus ?? 'ACTIVE', scale: 0 }];
@@ -61,11 +62,20 @@ function setup(overrides: Partial<{
   const dataSource = { transaction: jest.fn(async (operation: (manager: EntityManager) => Promise<unknown>) => operation(manager)) };
   const idempotency = {
     execute: jest.fn(async (_source: unknown, command: {
-      execute(manager: EntityManager): Promise<{ status: number; value: Record<string, unknown> }>;
+      scopeKey: string;
+      command: string;
+      key: string;
+      requestHash: string;
+      execute(manager: EntityManager): Promise<{ status: number; value: Record<string, unknown>; resource: { type: string; id: string } | null }>;
+      replay(manager: EntityManager, resource: { type: string; id: string } | null, status: number): Promise<Record<string, unknown>>;
     }) => {
       order.push('transaction');
+      if (overrides.existingReplay) {
+        const value = await command.replay(manager, { type: 'relief_need', id: needId }, 201);
+        return { status: 201, value, replay: true };
+      }
       const result = await command.execute(manager);
-      return { ...result, replay: false };
+      return { status: result.status, value: result.value, replay: false };
     }),
   };
   const sessions = {
@@ -118,13 +128,41 @@ describe('NeedsService.create', () => {
     expect(idempotency.execute).toHaveBeenCalledTimes(1);
   });
 
-  it('does not open a Logistics transaction when Response rejects admission', async () => {
+  it('passes a new key admission error through the idempotency command so its row rolls back', async () => {
     const { service, idempotency, response } = setup({ admissionError: new AppError('REQUEST_NOT_VERIFIED', { status: 409 }) });
 
     await expect(service.create(dto, request)).rejects.toMatchObject({ code: 'REQUEST_NOT_VERIFIED', status: 409 });
 
     expect(response.admit).toHaveBeenCalledTimes(1);
-    expect(idempotency.execute).not.toHaveBeenCalled();
+    expect(idempotency.execute).toHaveBeenCalledTimes(1);
+    expect(idempotency.execute).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      scopeKey: `user:${actorId}`, command: 'logistics.needs.create', key: request.idempotencyKey,
+    }));
+  });
+
+  it('replays a created need when Response later rejects admission for the same payload', async () => {
+    const { service, calls, idempotency } = setup({
+      admissionError: new AppError('REQUEST_NOT_VERIFIED', { status: 409 }), existingReplay: true,
+    });
+
+    const result = await service.create(dto, request);
+
+    expect(result).toMatchObject({ status: 201, replay: true, value: { id: needId } });
+    expect(idempotency.execute).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      scopeKey: `user:${actorId}`, command: 'logistics.needs.create', key: request.idempotencyKey,
+    }));
+    expect(calls.some(({ sql }) => sql.includes('INSERT INTO relief_need'))).toBe(false);
+  });
+
+  it('enforces grant scope on an admission-failure replay', async () => {
+    const admissionError = new AppError('REQUEST_NOT_VERIFIED', { status: 409 });
+    const outsideScope = setup({
+      admissionError,
+      existingReplay: true,
+      grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: '88888888-8888-4888-8888-888888888888' }],
+    });
+    await expect(outsideScope.service.create(dto, request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+    expect(outsideScope.idempotency.execute).toHaveBeenCalledTimes(1);
   });
 
   it('requires a live request-scoped NEED_MANAGE grant before opening the local transaction', async () => {

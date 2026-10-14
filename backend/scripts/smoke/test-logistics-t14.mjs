@@ -128,9 +128,19 @@ async function verifyRequest(request, coordinator) {
   assert.equal(verified.value.status, 'VERIFIED');
 }
 
+async function triageRequest(requestId, coordinator) {
+  const state = await requestState(requestId);
+  const triaged = await command(responseUrl, `requests/${requestId}/triage`, coordinator, {
+    expected_version: Number(state.version), priority: 'P2', priority_basis: 'COMPLETE',
+  });
+  expectSuccess(triaged);
+  assert.equal(triaged.value.status, 'TRIAGED');
+  return requestState(requestId);
+}
+
 async function requestState(requestId) {
   const result = await responseDb.query(
-    `SELECT status,work_cycle,organization_id,region_code,logistics_admitted_at,attribution_locked_at
+    `SELECT status,version,work_cycle,organization_id,region_code,logistics_admitted_at,attribution_locked_at
        FROM assistance_request WHERE id=$1`, [requestId],
   );
   assert.equal(result.rowCount, 1);
@@ -188,9 +198,10 @@ try {
   const pendingRequest = await createRequest(reporter);
   const pendingState = await requestState(pendingRequest.id);
   assert.equal(pendingState.status, 'SUBMITTED');
+  const failedAdmissionKey = key();
   const rejectedNeed = await command(logisticsUrl, 'needs', staff, {
     request_id: pendingRequest.id, work_cycle: Number(pendingState.work_cycle), item_id: item.value.id, quantity: '2.00',
-  });
+  }, failedAdmissionKey);
   expectVietnameseError(rejectedNeed, 409, 'REQUEST_NOT_VERIFIED');
   const rejectedState = await requestState(pendingRequest.id);
   assert.equal(rejectedState.status, 'SUBMITTED');
@@ -198,6 +209,12 @@ try {
   assert.equal(rejectedState.attribution_locked_at, null);
   const pendingCycle = await logisticsDb.query('SELECT id FROM fulfillment_cycle WHERE request_id=$1', [pendingRequest.id]);
   assert.equal(pendingCycle.rowCount, 0, 'an unverified request cannot create a Logistics cycle');
+  const failedAdmissionRecord = await logisticsDb.query(
+    `SELECT 1 FROM idempotency_record
+      WHERE scope_key=$1 AND command='logistics.needs.create' AND idempotency_key=$2`,
+    [`user:${staff.id}`, failedAdmissionKey],
+  );
+  assert.equal(failedAdmissionRecord.rowCount, 0, 'a new key rejected by Response must not persist');
 
   const request = await createRequest(reporter);
   await verifyRequest(request, staff);
@@ -221,6 +238,96 @@ try {
   assert.equal(need.status, 'OPEN');
   assert.equal(Number(need.version), 1);
   assert.equal(Number(need.item.unit.scale), 2);
+
+  const replayRequest = await createRequest(reporter);
+  await verifyRequest(replayRequest, staff);
+  const replayRequestState = await requestState(replayRequest.id);
+  const replayBody = {
+    request_id: replayRequest.id, work_cycle: Number(replayRequestState.work_cycle), item_id: sealedItem.value.id, quantity: '2.00',
+  };
+  const replayKey = key();
+  const originalReplayTarget = await command(logisticsUrl, 'needs', staff, replayBody, replayKey);
+  expectSuccess(originalReplayTarget, 201);
+  const stateAfterTriage = await triageRequest(replayRequest.id, staff);
+  const cancellation = await command(responseUrl, `requests/${replayRequest.id}/cancel`, staff, {
+    expected_version: Number(stateAfterTriage.version), reason: 'Dừng xử lý sau khi kiểm tra lại hiện trường.',
+  });
+  expectSuccess(cancellation, 202);
+  assert.equal((await requestState(replayRequest.id)).status, 'CANCELLED');
+  const replayAfterCancellation = await command(logisticsUrl, 'needs', staff, replayBody, replayKey);
+  expectSuccess(replayAfterCancellation, 201);
+  assert.equal(replayAfterCancellation.headers.get('idempotent-replay'), 'true');
+  assert.equal(replayAfterCancellation.value.id, originalReplayTarget.value.id);
+  const changedReplay = await command(logisticsUrl, 'needs', staff, { ...replayBody, quantity: '3.00' }, replayKey);
+  expectVietnameseError(changedReplay, 409, 'IDEMPOTENCY_KEY_REUSED');
+
+  const raceRequest = await createRequest(reporter);
+  await verifyRequest(raceRequest, staff);
+  const raceRequestState = await requestState(raceRequest.id);
+  const raceNeedResult = await command(logisticsUrl, 'needs', staff, {
+    request_id: raceRequest.id, work_cycle: Number(raceRequestState.work_cycle), item_id: item.value.id, quantity: '2.00',
+  });
+  expectSuccess(raceNeedResult, 201);
+  const stateAfterRaceTriage = await triageRequest(raceRequest.id, staff);
+  const resolutionIntent = await command(responseUrl, `requests/${raceRequest.id}/resolve`, staff, {
+    expected_version: Number(stateAfterRaceTriage.version),
+    resolution_reason: 'Đã rà soát nhu cầu cứu trợ.', outcome_basis: 'NO_ACTION_REQUIRED',
+  });
+  expectSuccess(resolutionIntent, 202);
+  const pendingResolution = await call(responseUrl, `operations/${resolutionIntent.value.operation_id}`, { actor: staff });
+  expectSuccess(pendingResolution);
+  assert.equal(pendingResolution.value.state, 'PENDING');
+
+  const [raceCommitment, raceSeal] = await Promise.all([
+    command(logisticsUrl, `needs/${raceNeedResult.value.id}/commitments`, staff, {
+      warehouse_id: warehouse.value.id, quantity: '1.00',
+    }),
+    call(logisticsUrl, `internal/requests/${raceRequest.id}/cycles/${raceRequestState.work_cycle}/seal`, {
+      method: 'POST',
+      body: { intent_id: resolutionIntent.value.operation_id, outcome_basis: 'NO_ACTION_REQUIRED' },
+      headers: { Authorization: `Bearer ${responseToken}` },
+    }),
+  ]);
+  expectVietnameseError(raceSeal, 409, 'CYCLE_NOT_SETTLED');
+  assert.ok(raceSeal.value.details?.reasons?.includes('OPEN_NEED'));
+  expectSuccess(raceCommitment, 201);
+  const raceCycle = await logisticsDb.query('SELECT state FROM fulfillment_cycle WHERE id=$1', [raceNeedResult.value.cycle_id]);
+  assert.equal(raceCycle.rowCount, 1);
+  assert.equal(raceCycle.rows[0].state, 'OPEN');
+  const raceCommitmentRow = await logisticsDb.query('SELECT id FROM commitment WHERE relief_need_id=$1', [raceNeedResult.value.id]);
+  assert.equal(raceCommitmentRow.rowCount, 1);
+
+  const retriedSeal = await call(logisticsUrl,
+    `internal/requests/${raceRequest.id}/cycles/${raceRequestState.work_cycle}/seal`, {
+      method: 'POST',
+      body: { intent_id: resolutionIntent.value.operation_id, outcome_basis: 'NO_ACTION_REQUIRED' },
+      headers: { Authorization: `Bearer ${responseToken}` },
+    });
+  expectVietnameseError(retriedSeal, 409, 'CYCLE_NOT_SETTLED');
+  assert.ok(retriedSeal.value.details?.reasons?.includes('OPEN_NEED'));
+  const pendingAfterRetry = await call(responseUrl, `operations/${resolutionIntent.value.operation_id}`, { actor: staff });
+  expectSuccess(pendingAfterRetry);
+  assert.equal(pendingAfterRetry.value.state, 'PENDING');
+  const cycleAfterRetry = await logisticsDb.query('SELECT state FROM fulfillment_cycle WHERE id=$1', [raceNeedResult.value.cycle_id]);
+  assert.equal(cycleAfterRetry.rows[0].state, 'OPEN');
+  const requestBeforeAbort = await requestState(raceRequest.id);
+  assert.equal(requestBeforeAbort.status, 'RESOLVING');
+  const abortResolution = await command(responseUrl, `requests/${raceRequest.id}/resolve/abort`, staff, {
+    expected_version: Number(requestBeforeAbort.version), reason: 'Dừng kiểm tra sau khi xác nhận nhu cầu chưa hoàn tất.',
+  });
+  expectSuccess(abortResolution, 202);
+  assert.equal(abortResolution.value.operation_id, resolutionIntent.value.operation_id);
+  assert.equal(abortResolution.value.state, 'ABORTING');
+  const [abortedOperation, requestAfterAbort] = await Promise.all([
+    call(responseUrl, `operations/${resolutionIntent.value.operation_id}`, { actor: staff }),
+    requestState(raceRequest.id),
+  ]);
+  expectSuccess(abortedOperation);
+  assert.equal(abortedOperation.value.state, 'ABORTED');
+  assert.notEqual(requestAfterAbort.status, 'RESOLVING');
+  assert.equal(requestAfterAbort.status, 'TRIAGED');
+  const cycleAfterAbort = await logisticsDb.query('SELECT state FROM fulfillment_cycle WHERE id=$1', [raceNeedResult.value.cycle_id]);
+  assert.equal(cycleAfterAbort.rows[0].state, 'OPEN');
 
   const admittedState = await requestState(request.id);
   assert.ok(admittedState.logistics_admitted_at);
@@ -438,7 +545,7 @@ try {
   );
   assert.deepEqual(unsettledBalance.rows, [{ on_hand: '19.000', reserved: '1.000' }]);
 
-  console.log('PASS Logistics T14 request admission, create race, quantity changes, cancel/release, unsettled-issued guard and sealed-cycle guard');
+  console.log('PASS Logistics T14 admission, idempotent replay after cancellation, commitment with OPEN_NEED seal-retry guard, quantity changes and cancellation guards');
 } finally {
   await Promise.all([logisticsDb.end(), responseDb.end(), identityDb.end()]);
 }
