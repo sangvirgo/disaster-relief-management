@@ -38,6 +38,55 @@ function accessToken(): string {
 }
 
 describe('Response optional reporter session', () => {
+  it('exposes the Identity active-account check used by team membership', () => {
+    const service = new ReporterSessionService({
+      identityBaseUrl: 'http://127.0.0.1:1', clientId: 'c48-response-test',
+      clientSecret: 'test-client-secret-not-for-deployment-0001', timeoutMs: 100,
+    }, intakeConfig);
+
+    expect(typeof (service as unknown as Record<string, unknown>)['activeUserCheck']).toBe('function');
+    service.onModuleDestroy();
+  });
+
+  it('uses its Identity service token and accepts only the no-identity activity projection', async () => {
+    const service = new ReporterSessionService({
+      identityBaseUrl: 'http://127.0.0.1:1', clientId: 'c48-response-test',
+      clientSecret: 'test-client-secret-not-for-deployment-0001', timeoutMs: 100,
+    }, intakeConfig);
+    const client = (service as unknown as { client: { post: jest.Mock } }).client;
+    client.post = jest.fn(async (path: string) => path.endsWith('/internal/token')
+      ? { status: 200, body: { access_token: 'identity-token', expires_in: 300 } }
+      : { status: 200, body: { active: false, reason: 'USER_INACTIVE' } }) as unknown as jest.Mock;
+    const check = (service as unknown as Record<string, unknown>)['activeUserCheck'] as ((id: string) => Promise<unknown>) | undefined;
+
+    expect(typeof check).toBe('function');
+    if (!check) return;
+    await expect(check.call(service, '00000000-0000-4000-8000-000000000001'))
+      .resolves.toEqual({ active: false, reason: 'USER_INACTIVE' });
+    expect(client.post).toHaveBeenNthCalledWith(2, '/api/v1/identity/internal/users:check-active', {
+      user_id: '00000000-0000-4000-8000-000000000001',
+    }, { headers: { authorization: 'Bearer identity-token' } });
+    service.onModuleDestroy();
+  });
+
+  it('fails closed on an invalid active-account response', async () => {
+    const service = new ReporterSessionService({
+      identityBaseUrl: 'http://127.0.0.1:1', clientId: 'c48-response-test',
+      clientSecret: 'test-client-secret-not-for-deployment-0001', timeoutMs: 100,
+    }, intakeConfig);
+    const client = (service as unknown as { client: { post: jest.Mock } }).client;
+    client.post = jest.fn(async (path: string) => path.endsWith('/internal/token')
+      ? { status: 200, body: { access_token: 'identity-token', expires_in: 300 } }
+      : { status: 200, body: { active: true, user_id: 'unrequested-data' } }) as unknown as jest.Mock;
+    const check = (service as unknown as Record<string, unknown>)['activeUserCheck'] as ((id: string) => Promise<unknown>) | undefined;
+
+    expect(typeof check).toBe('function');
+    if (!check) return;
+    await expect(check.call(service, '00000000-0000-4000-8000-000000000001'))
+      .rejects.toMatchObject({ code: 'IDENTITY_UNAVAILABLE', status: 503 });
+    service.onModuleDestroy();
+  });
+
   it('uses tracking capabilities without calling Identity and fails closed for session access', async () => {
     const service = new ReporterSessionService({
       identityBaseUrl: 'http://127.0.0.1:1', clientId: 'c48-response-test',

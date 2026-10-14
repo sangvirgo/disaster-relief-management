@@ -4,7 +4,7 @@ import {
 import type { Request, Response } from 'express';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
-import { CreateTeamDto, SetTeamPositionDto, TeamPageQueryDto, UpdateTeamDto } from './teams.dto';
+import { AddTeamMemberDto, CreateTeamDto, SetTeamPositionDto, TeamPageQueryDto, TransferTeamLeaderDto, UpdateTeamDto } from './teams.dto';
 import { TeamsService } from './teams.service';
 
 type TeamRequest = Request & { idempotencyKey?: string };
@@ -65,6 +65,50 @@ export class TeamsController {
   ) {
     noStore(response);
     const result = await this.teams.update(id, dto, key(request), request);
+    replayHeader(response, result.replay);
+    return result.value;
+  }
+
+  @Post('teams/:id/members')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async addMember(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Body() dto: AddTeamMemberDto,
+    @Req() request: TeamRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.teams.addMember(id, dto, key(request), request);
+    replayHeader(response, result.replay);
+    return result.value;
+  }
+
+  @Post('teams/:id/members/:user_id/remove')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async removeMember(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Param('user_id', new ParseUUIDPipe({ version: 'all' })) userId: string,
+    @Req() request: TeamRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    noStore(response);
+    const result = await this.teams.removeMember(id, userId, key(request), request);
+    replayHeader(response, result.replay);
+  }
+
+  @Post('teams/:id/leader')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async transferLeader(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Body() dto: TransferTeamLeaderDto,
+    @Req() request: TeamRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.teams.transferLeader(id, dto, key(request), request);
     replayHeader(response, result.replay);
     return result.value;
   }

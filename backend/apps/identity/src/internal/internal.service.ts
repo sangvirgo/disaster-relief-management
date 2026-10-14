@@ -23,6 +23,7 @@ interface IntrospectionRow {
 type TeamLeaderEligibilityReason = 'USER_NOT_FOUND' | 'USER_INACTIVE' | 'MEMBERSHIP_REQUIRED' | 'VOLUNTEER_GRANT_REQUIRED';
 
 type TeamLeaderEligibility = { eligible: true } | { eligible: false; reason: TeamLeaderEligibilityReason };
+type ActiveUserCheck = { active: true } | { active: false; reason: 'USER_NOT_FOUND' | 'USER_INACTIVE' };
 
 @Injectable()
 export class InternalService implements OnModuleInit, OnModuleDestroy {
@@ -96,6 +97,15 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
       [ids],
     ) as Array<{ id: string; display_name: string }>;
     return { items };
+  }
+
+  async activeUserCheck(userId: string): Promise<ActiveUserCheck> {
+    const rows = await this.introspectionDataSource.query(
+      'SELECT status FROM app_user WHERE id = $1',
+      [userId],
+    ) as Array<{ status: string }>;
+    if (!rows[0]) return { active: false, reason: 'USER_NOT_FOUND' };
+    return rows[0].status === 'ACTIVE' ? { active: true } : { active: false, reason: 'USER_INACTIVE' };
   }
 
   async lookupRegions(codes: string[]): Promise<{ items: Array<{ code: string; name: string }> }> {

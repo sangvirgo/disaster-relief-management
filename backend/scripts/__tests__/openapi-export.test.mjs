@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { collectControllerRoutes, emptyOpenApiDocument, exportOpenApi, exportOpenApiSnapshotIfValid, mergeOpenApiText, openApiSnapshotsMatch, routesFromSourceText, validateOpenApi, writeOpenApiSnapshotIfValid } from '../contracts/openapi.mjs';
+import { applyOpenApiDetails } from '../contracts/openapi-details.mjs';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const sourceDocuments = {
@@ -533,6 +534,67 @@ test('snapshots have unique dereferenced parameters and retain pagination constr
     const cursor = params.map((parameter) => dereferenceParameter(document, parameter)).find((parameter) => parameter?.name === 'cursor');
     assert.ok(cursor.schema.maxLength >= 2000);
   }
+});
+
+test('T8 team membership writes declare the required Idempotency-Key header', () => {
+  const response = exportService('response').document;
+  for (const operationId of [
+    'responseTeamsAddMember',
+    'responseTeamsRemoveMember',
+    'responseTeamsTransferLeader',
+  ]) {
+    const operation = operationById(response, operationId);
+    assert.ok(operation, `${operationId} is present in the Response contract`);
+    const parameter = operation.parameters?.find((candidate) => candidate.$ref === '#/components/parameters/IdempotencyKey');
+    assert.ok(parameter, `${operationId} references the shared IdempotencyKey parameter`);
+    const resolved = dereferenceParameter(response, parameter);
+    assert.equal(resolved.in, 'header');
+    assert.equal(resolved.name, 'Idempotency-Key');
+    assert.equal(resolved.required, true);
+  }
+});
+
+test('T8 leader transfer documents Identity unavailability and unchanged-version confirmation', () => {
+  const response = exportService('response').document;
+  const transfer = operationById(response, 'responseTeamsTransferLeader');
+  assert.ok(transfer.responses?.['503']?.content?.['application/json']?.examples?.IDENTITY_UNAVAILABLE);
+
+  const docs = fs.readFileSync(path.join(repositoryRoot, sourceDocuments.response), 'utf8');
+  assert.match(docs, /Identity unavailable → `IDENTITY_UNAVAILABLE` 503\./);
+  assert.ok(docs.includes('If `user_id` is already the leader, the request is an idempotent confirmation and returns the unchanged version.'));
+});
+
+test('T8 membership eligibility failures use state-transition errors while preserving leader-removal code', () => {
+  const response = exportService('response').document;
+  const add = operationById(response, 'responseTeamsAddMember');
+  const remove = operationById(response, 'responseTeamsRemoveMember');
+  const transfer = operationById(response, 'responseTeamsTransferLeader');
+  const examples = (operation, status) => operation.responses[status].content['application/json'].examples;
+
+  assert.ok(examples(add, '404').NOT_FOUND);
+  assert.ok(examples(add, '409').STATE_TRANSITION_INVALID);
+  assert.equal(examples(add, '409').TEAM_NOT_ELIGIBLE, undefined);
+  assert.ok(examples(remove, '409').LEADER_REQUIRED);
+  assert.ok(examples(transfer, '404').NOT_FOUND);
+  assert.ok(examples(transfer, '409').STATE_TRANSITION_INVALID);
+  assert.equal(examples(transfer, '409').TEAM_NOT_ELIGIBLE, undefined);
+  assert.equal(examples(transfer, '409').LEADER_REQUIRED, undefined);
+
+  const docs = fs.readFileSync(path.join(repositoryRoot, sourceDocuments.response), 'utf8');
+  assert.ok(docs.includes('inactive Identity account → `STATE_TRANSITION_INVALID` 409'));
+  assert.ok(docs.includes('`USER_INACTIVE`, `MEMBERSHIP_REQUIRED`, or `VOLUNTEER_GRANT_REQUIRED` → `STATE_TRANSITION_INVALID` 409'));
+});
+
+test('OpenAPI details preserve shared response references when no examples are removed', () => {
+  const response = { $ref: '#/components/responses/Conflict' };
+  const document = {
+    components: { schemas: {}, securitySchemes: {}, responses: { Conflict: { description: 'Conflict' } } },
+    paths: { '/unrelated': { get: { operationId: 'unmappedRoute', security: [], responses: { 409: response } } } },
+  };
+
+  applyOpenApiDetails(document, 'identity');
+
+  assert.deepEqual(document.paths['/unrelated'].get.responses['409'], response);
 });
 
 test('Identity auth transport security distinguishes Web CSRF and native refresh credentials', () => {

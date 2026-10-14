@@ -404,6 +404,233 @@ try {
     responseDb, responseUrl, reporter, coordinator, otherRegionCoordinator, appTeam,
     coordinatorTeam: created, organizationId, call, key, assertVietnameseError,
   });
+
+  const activeMember = await registerAndLogin('active-member-without-grants');
+  const addMemberKey = key();
+  const addMemberHeaders = {
+    Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': addMemberKey,
+  };
+  const addedMember = await call(responseUrl, `teams/${appTeam.value.id}/members`, {
+    method: 'POST', body: { user_id: activeMember.id }, headers: addMemberHeaders,
+  });
+  assert.equal(addedMember.status, 201, JSON.stringify(addedMember.value));
+  assert.equal(addedMember.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(addedMember.value, {
+    team_id: appTeam.value.id,
+    user_id: activeMember.id,
+    member_role: 'MEMBER',
+    joined_at: addedMember.value.joined_at,
+  });
+  assert.ok(Number.isFinite(Date.parse(addedMember.value.joined_at)));
+  const immediateAddReplay = await call(responseUrl, `teams/${appTeam.value.id}/members`, {
+    method: 'POST', body: { user_id: activeMember.id }, headers: addMemberHeaders,
+  });
+  assert.equal(immediateAddReplay.status, 201, JSON.stringify(immediateAddReplay.value));
+  assert.equal(immediateAddReplay.headers.get('idempotent-replay'), 'true');
+  assert.deepEqual(immediateAddReplay.value, addedMember.value);
+
+  const memberOnOtherTeam = await call(responseUrl, `teams/${created.value.id}/members`, {
+    method: 'POST', body: { user_id: activeMember.id },
+    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+  });
+  assertVietnameseError(memberOnOtherTeam, 409, 'USER_IN_OTHER_TEAM');
+  const coordinatorTeamMemberCount = await responseDb.query(
+    'SELECT count(*)::int AS count FROM team_member WHERE team_id=$1', [created.value.id],
+  );
+  assert.equal(coordinatorTeamMemberCount.rows[0].count, 0);
+
+  const coordinatorModeMember = await registerAndLogin('coordinator-mode-member');
+  const coordinatorModeAdd = await call(responseUrl, `teams/${created.value.id}/members`, {
+    method: 'POST', body: { user_id: coordinatorModeMember.id },
+    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+  });
+  assert.equal(coordinatorModeAdd.status, 201, JSON.stringify(coordinatorModeAdd.value));
+  assert.deepEqual(Object.keys(coordinatorModeAdd.value).sort(), ['joined_at', 'member_role', 'team_id', 'user_id']);
+  assert.equal(coordinatorModeAdd.value.team_id, created.value.id);
+  assert.equal(coordinatorModeAdd.value.user_id, coordinatorModeMember.id);
+  assert.equal(coordinatorModeAdd.value.member_role, 'MEMBER');
+  assert.ok(Number.isFinite(Date.parse(coordinatorModeAdd.value.joined_at)));
+
+  const crossTeamRaceMember = await registerAndLogin('cross-team-race');
+  const crossTeamAdds = await Promise.all([
+    call(responseUrl, `teams/${appTeam.value.id}/members`, {
+      method: 'POST', body: { user_id: crossTeamRaceMember.id },
+      headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+    }),
+    call(responseUrl, `teams/${created.value.id}/members`, {
+      method: 'POST', body: { user_id: crossTeamRaceMember.id },
+      headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+    }),
+  ]);
+  assert.equal(
+    crossTeamAdds.filter(({ status }) => status === 201).length,
+    1,
+    JSON.stringify(crossTeamAdds.map(({ status, value }) => ({ status, value }))),
+  );
+  assertVietnameseError(crossTeamAdds.find(({ status }) => status !== 201), 409, 'USER_IN_OTHER_TEAM');
+  const crossTeamMembership = await responseDb.query(
+    'SELECT team_id FROM team_member WHERE user_id=$1 AND left_at IS NULL', [crossTeamRaceMember.id],
+  );
+  assert.equal(crossTeamMembership.rowCount, 1, 'concurrent adds must leave one active team membership');
+  assert.ok([appTeam.value.id, created.value.id].includes(crossTeamMembership.rows[0].team_id));
+
+  const removedMember = await call(responseUrl, `teams/${appTeam.value.id}/members/${activeMember.id}/remove`, {
+    method: 'POST', headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+  });
+  assert.equal(removedMember.status, 204, JSON.stringify(removedMember.value));
+  assert.equal(removedMember.headers.get('cache-control'), 'no-store');
+  const historicalMembership = await responseDb.query(
+    'SELECT member_role,left_at FROM team_member WHERE team_id=$1 AND user_id=$2', [appTeam.value.id, activeMember.id],
+  );
+  assert.equal(historicalMembership.rowCount, 1, 'removal must preserve the historical membership row');
+  assert.ok(historicalMembership.rows[0].left_at);
+
+  const rejoinedMember = await call(responseUrl, `teams/${appTeam.value.id}/members`, {
+    method: 'POST', body: { user_id: activeMember.id },
+    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+  });
+  assert.equal(rejoinedMember.status, 201, JSON.stringify(rejoinedMember.value));
+  assert.equal(rejoinedMember.value.member_role, 'MEMBER');
+  const activeMembershipRows = await responseDb.query(
+    'SELECT member_role,left_at FROM team_member WHERE team_id=$1 AND user_id=$2', [appTeam.value.id, activeMember.id],
+  );
+  assert.equal(activeMembershipRows.rowCount, 1, 'rejoining must reactivate the existing historical row');
+  assert.deepEqual(activeMembershipRows.rows[0], { member_role: 'MEMBER', left_at: null });
+  const membershipAudit = await responseDb.query(
+    `SELECT action,created_at FROM audit_log
+      WHERE entity_type='team_member' AND entity_id=$1 ORDER BY created_at,id`,
+    [`${appTeam.value.id}:${activeMember.id}`],
+  );
+  assert.deepEqual(membershipAudit.rows.map(({ action }) => action), [
+    'TEAM_MEMBER_ADDED', 'TEAM_MEMBER_REMOVED', 'TEAM_MEMBER_ADDED',
+  ]);
+  assert.equal(rejoinedMember.value.joined_at, membershipAudit.rows[2].created_at.toISOString());
+
+  const replayAfterMembershipChanged = await call(responseUrl, `teams/${appTeam.value.id}/members`, {
+    method: 'POST', body: { user_id: activeMember.id }, headers: addMemberHeaders,
+  });
+  assert.equal(replayAfterMembershipChanged.status, 201, JSON.stringify(replayAfterMembershipChanged.value));
+  assert.equal(replayAfterMembershipChanged.headers.get('idempotent-replay'), 'true');
+  assert.deepEqual(replayAfterMembershipChanged.value, addedMember.value);
+
+  const cannotRemoveOnlyLeader = await call(
+    responseUrl, `teams/${appTeam.value.id}/members/${reporter.id}/remove`, {
+      method: 'POST', headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+    },
+  );
+  assertVietnameseError(cannotRemoveOnlyLeader, 409, 'LEADER_REQUIRED');
+  const preservedLeader = await responseDb.query(
+    'SELECT member_role,left_at FROM team_member WHERE team_id=$1 AND user_id=$2', [appTeam.value.id, reporter.id],
+  );
+  assert.deepEqual(preservedLeader.rows[0], { member_role: 'LEADER', left_at: null });
+
+  const eligibleLeader = await registerAndLogin('membership-leader');
+  await identityDb.query(
+    `INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)`, [eligibleLeader.id, organizationId],
+  );
+  await identityDb.query(
+    `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
+     VALUES ($1,'VOLUNTEER','ORGANIZATION',$2)`, [eligibleLeader.id, organizationId],
+  );
+  const leaderMember = await call(responseUrl, `teams/${appTeam.value.id}/members`, {
+    method: 'POST', body: { user_id: eligibleLeader.id },
+    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+  });
+  assert.equal(leaderMember.status, 201, JSON.stringify(leaderMember.value));
+
+  const beforeTransfer = await responseDb.query('SELECT version FROM rescue_team WHERE id=$1', [appTeam.value.id]);
+  const expectedVersion = Number(beforeTransfer.rows[0].version);
+  const transferKey = key();
+  const transferHeaders = { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': transferKey };
+  const transferBody = { user_id: eligibleLeader.id, expected_version: expectedVersion };
+  const transferred = await call(responseUrl, `teams/${appTeam.value.id}/leader`, {
+    method: 'POST', body: transferBody, headers: transferHeaders,
+  });
+  assert.equal(transferred.status, 200, JSON.stringify(transferred.value));
+  assert.equal(transferred.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(transferred.value, {
+    team_id: appTeam.value.id, leader_user_id: eligibleLeader.id, version: expectedVersion + 1,
+  });
+  const transferReplay = await call(responseUrl, `teams/${appTeam.value.id}/leader`, {
+    method: 'POST', body: transferBody, headers: transferHeaders,
+  });
+  assert.equal(transferReplay.status, 200, JSON.stringify(transferReplay.value));
+  assert.equal(transferReplay.headers.get('idempotent-replay'), 'true');
+  assert.deepEqual(transferReplay.value, transferred.value);
+
+  const staleTransfer = await call(responseUrl, `teams/${appTeam.value.id}/leader`, {
+    method: 'POST', body: transferBody,
+    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+  });
+  assertVietnameseError(staleTransfer, 409, 'VERSION_CONFLICT');
+
+  const transferBack = await call(responseUrl, `teams/${appTeam.value.id}/leader`, {
+    method: 'POST', body: { user_id: reporter.id, expected_version: expectedVersion + 1 },
+    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+  });
+  assert.equal(transferBack.status, 200, JSON.stringify(transferBack.value));
+  assert.equal(transferBack.value.leader_user_id, reporter.id);
+  assert.equal(transferBack.value.version, expectedVersion + 2);
+  const transferReplayAfterChange = await call(responseUrl, `teams/${appTeam.value.id}/leader`, {
+    method: 'POST', body: transferBody, headers: transferHeaders,
+  });
+  assert.equal(transferReplayAfterChange.status, 200, JSON.stringify(transferReplayAfterChange.value));
+  assert.equal(transferReplayAfterChange.headers.get('idempotent-replay'), 'true');
+  assert.deepEqual(transferReplayAfterChange.value, transferred.value);
+
+  const finalLeadership = await responseDb.query(
+    `SELECT t.version,m.user_id,m.member_role FROM rescue_team t
+      JOIN team_member m ON m.team_id=t.id AND m.left_at IS NULL AND m.member_role='LEADER'
+     WHERE t.id=$1`, [appTeam.value.id],
+  );
+  assert.deepEqual(finalLeadership.rows, [{
+    version: expectedVersion + 2, user_id: reporter.id, member_role: 'LEADER',
+  }]);
+
+  const concurrentLeader = await registerAndLogin('concurrent-leader');
+  await identityDb.query(
+    'INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)', [concurrentLeader.id, organizationId],
+  );
+  await identityDb.query(
+    `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
+     VALUES ($1,'VOLUNTEER','ORGANIZATION',$2)`, [concurrentLeader.id, organizationId],
+  );
+  const concurrentLeaderMember = await call(responseUrl, `teams/${appTeam.value.id}/members`, {
+    method: 'POST', body: { user_id: concurrentLeader.id },
+    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+  });
+  assert.equal(concurrentLeaderMember.status, 201, JSON.stringify(concurrentLeaderMember.value));
+
+  const beforeConcurrentTransfers = await responseDb.query(
+    'SELECT version FROM rescue_team WHERE id=$1', [appTeam.value.id],
+  );
+  const concurrentExpectedVersion = Number(beforeConcurrentTransfers.rows[0].version);
+  const concurrentTransfers = await Promise.all([eligibleLeader.id, concurrentLeader.id].map((userId) =>
+    call(responseUrl, `teams/${appTeam.value.id}/leader`, {
+      method: 'POST', body: { user_id: userId, expected_version: concurrentExpectedVersion },
+      headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+    })),
+  );
+  assert.equal(
+    concurrentTransfers.filter(({ status }) => status === 200).length,
+    1,
+    JSON.stringify(concurrentTransfers.map(({ status, value }) => ({ status, value }))),
+  );
+  const concurrentTransferConflict = concurrentTransfers.find(({ status }) => status !== 200);
+  assertVietnameseError(concurrentTransferConflict, 409, 'VERSION_CONFLICT');
+  const concurrentTransferWinner = concurrentTransfers.find(({ status }) => status === 200);
+  const concurrentLeadership = await responseDb.query(
+    `SELECT t.version,m.user_id,m.member_role FROM rescue_team t
+      JOIN team_member m ON m.team_id=t.id AND m.left_at IS NULL AND m.member_role='LEADER'
+     WHERE t.id=$1`, [appTeam.value.id],
+  );
+  assert.deepEqual(concurrentLeadership.rows, [{
+    version: concurrentExpectedVersion + 1,
+    user_id: concurrentTransferWinner.value.leader_user_id,
+    member_role: 'LEADER',
+  }]);
+  assert.ok([eligibleLeader.id, concurrentLeader.id].includes(concurrentLeadership.rows[0].user_id));
+
   assert.ok(reporter.id);
   console.log('T8 response team and skill catalog smoke checks passed.');
 } finally {

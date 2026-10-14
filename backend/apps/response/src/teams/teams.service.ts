@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type { Request } from 'express';
 import type { IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { CreateTeamDto, SetTeamPositionDto, TeamPageQueryDto, UpdateTeamDto } from './teams.dto';
+import { AddTeamMemberDto, CreateTeamDto, SetTeamPositionDto, TeamPageQueryDto, TransferTeamLeaderDto, UpdateTeamDto } from './teams.dto';
 import { TeamsProfileService } from './teams-profile.service';
 import { TeamsPositionService } from './teams-position.service';
 import { TeamsQueriesService } from './teams-queries.service';
+import { TeamsMembershipService } from './teams-membership.service';
 
 @Injectable()
 export class TeamsService {
@@ -12,6 +13,7 @@ export class TeamsService {
     private readonly queries: TeamsQueriesService,
     private readonly profile: TeamsProfileService,
     private readonly position: TeamsPositionService,
+    private readonly membership: TeamsMembershipService,
   ) {}
 
   skills(request: Request): Promise<Record<string, unknown>> {
@@ -36,5 +38,17 @@ export class TeamsService {
 
   setPosition(teamId: string, dto: SetTeamPositionDto, request: Request): Promise<void> {
     return this.position.set(teamId, dto, request);
+  }
+
+  addMember(teamId: string, dto: AddTeamMemberDto, key: string, request: Request) {
+    return this.membership.addMember(teamId, dto, key, request as Request & { idempotencyKey?: string });
+  }
+
+  removeMember(teamId: string, userId: string, key: string, request: Request) {
+    return this.membership.removeMember(teamId, userId, key, request as Request & { idempotencyKey?: string });
+  }
+
+  transferLeader(teamId: string, dto: TransferTeamLeaderDto, key: string, request: Request) {
+    return this.membership.transferLeader(teamId, dto, key, request as Request & { idempotencyKey?: string });
   }
 }

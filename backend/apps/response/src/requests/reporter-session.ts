@@ -36,6 +36,10 @@ export type TeamLeaderEligibility =
   | { eligible: true }
   | { eligible: false; reason: TeamLeaderEligibilityReason };
 
+export type ActiveUserCheck =
+  | { active: true }
+  | { active: false; reason: 'USER_NOT_FOUND' | 'USER_INACTIVE' };
+
 interface IdentityServiceToken {
   access_token: string;
   expires_in: number;
@@ -186,6 +190,27 @@ export class ReporterSessionService implements OnModuleDestroy {
     const reasons: TeamLeaderEligibilityReason[] = ['USER_NOT_FOUND', 'USER_INACTIVE', 'MEMBERSHIP_REQUIRED', 'VOLUNTEER_GRANT_REQUIRED'];
     if (value.eligible === false && keys === 'eligible,reason' && reasons.includes(value.reason as TeamLeaderEligibilityReason)) {
       return { eligible: false, reason: value.reason as TeamLeaderEligibilityReason };
+    }
+    throw unavailable();
+  }
+
+  async activeUserCheck(userId: string): Promise<ActiveUserCheck> {
+    const token = await this.getServiceToken();
+    let result;
+    try {
+      result = await this.client.post<unknown>('/api/v1/identity/internal/users:check-active', { user_id: userId }, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw unavailable();
+    }
+    if (result.status !== 200 || !result.body || typeof result.body !== 'object') throw unavailable();
+    const value = result.body as Record<string, unknown>;
+    const keys = Object.keys(value).sort().join(',');
+    if (value.active === true && keys === 'active') return { active: true };
+    if (value.active === false && keys === 'active,reason' && ['USER_NOT_FOUND', 'USER_INACTIVE'].includes(String(value.reason))) {
+      return { active: false, reason: value.reason as 'USER_NOT_FOUND' | 'USER_INACTIVE' };
     }
     throw unavailable();
   }

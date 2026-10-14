@@ -42,6 +42,13 @@ const teamViewSchema = object({
 }, ['id', 'name', 'kind', 'reporting_mode', 'availability', 'status', 'skills', 'position', 'version']);
 const teamPageSchema = object({ items: array(teamViewSchema), more: boolean(), cursor: text });
 const identityDetails = {
+  identityInternalActiveUserCheck: {
+    request: request(object({ user_id: id }, ['user_id'])),
+    response: response({ oneOf: [
+      object({ active: { type: 'boolean', const: true } }, ['active']),
+      object({ active: { type: 'boolean', const: false }, reason: { type: 'string', enum: ['USER_NOT_FOUND', 'USER_INACTIVE'] } }, ['active', 'reason']),
+    ] }),
+  },
   identityInternalTeamLeaderEligibility: {
     request: request(object({ user_id: id, organization_id: id }, ['user_id', 'organization_id'])),
     response: response({ oneOf: [object({ eligible: { type: 'boolean', const: true } }, ['eligible']), object({ eligible: { type: 'boolean', const: false }, reason: { type: 'string', enum: ['USER_NOT_FOUND', 'USER_INACTIVE', 'MEMBERSHIP_REQUIRED', 'VOLUNTEER_GRANT_REQUIRED'] } }, ['eligible', 'reason'])] }),
@@ -119,6 +126,20 @@ const responseDetails = {
   responseTeamsUpdate: {
     request: request(object({ expected_version: version, name: text, skill_codes: array(text), availability: text }, ['expected_version'])),
     response: response(teamViewSchema),
+  },
+  responseTeamsAddMember: {
+    parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }],
+    request: request(object({ user_id: id }, ['user_id'])),
+    response: response(object({ team_id: id, user_id: id, member_role: { type: 'string', enum: ['LEADER', 'MEMBER'] }, joined_at: dateTime }, ['team_id', 'user_id', 'member_role', 'joined_at'])),
+  },
+  responseTeamsRemoveMember: {
+    parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }],
+    noBody: true,
+  },
+  responseTeamsTransferLeader: {
+    parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }],
+    request: request(object({ user_id: id, expected_version: version }, ['user_id', 'expected_version'])),
+    response: response(object({ team_id: id, leader_user_id: id, version }, ['team_id', 'leader_user_id', 'version'])),
   },
 };
 
@@ -531,6 +552,7 @@ const errorCatalog = new Map([...fs.readFileSync(errorCatalogPath, 'utf8').match
   .map(([, code, status, message]) => [code, { status, message }]));
 
 const routeErrorCodes = {
+  identityInternalActiveUserCheck: ['FORBIDDEN'],
   identityInternalTeamLeaderEligibility: ['FORBIDDEN'],
   registerCitizen: ['USERNAME_TAKEN', 'PASSWORD_WEAK', 'RATE_LIMITED', 'CSRF_INVALID'],
   login: ['INVALID_CREDENTIALS', 'RATE_LIMITED', 'CSRF_INVALID'],
@@ -569,6 +591,9 @@ const routeErrorCodes = {
   responseRequestResolutionResolve: ['RESOLUTION_BLOCKED', 'RESOLUTION_BASIS_INVALID', 'PENDING_SUPPLEMENT_REVIEW', 'LOGISTICS_UNAVAILABLE'],
   responseRequestResolutionClose: ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   responseRequestResolutionReopen: ['CAMPAIGN_NOT_ACTIVE', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
+  responseTeamsAddMember: ['NOT_FOUND', 'IDENTITY_UNAVAILABLE', 'USER_IN_OTHER_TEAM', 'STATE_TRANSITION_INVALID'],
+  responseTeamsRemoveMember: ['NOT_FOUND', 'LEADER_REQUIRED'],
+  responseTeamsTransferLeader: ['NOT_FOUND', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'IDENTITY_UNAVAILABLE'],
   logisticsCatalogCreateItem: ['ITEM_NAME_TAKEN'],
   logisticsAssetsCreateVehicle: ['VEHICLE_IDENTIFIER_TAKEN'],
   logisticsNeedsCreate: ['QUANTITY_SCALE_INVALID', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'VALIDATION_FAILED', 'NEED_EXISTS', 'POINT_INACTIVE'],
@@ -619,6 +644,11 @@ const routeErrorCodes = {
   logisticsDrivesPublicDetail: ['NOT_FOUND'],
   logisticsStockCreateAdjustment: ['QUANTITY_SCALE_INVALID'],
   logisticsStockOpening: ['QUANTITY_SCALE_INVALID'],
+};
+
+const routeErrorCodesToRemove = {
+  responseTeamsAddMember: ['TEAM_NOT_ELIGIBLE'],
+  responseTeamsTransferLeader: ['TEAM_NOT_ELIGIBLE', 'LEADER_REQUIRED'],
 };
 
 const serviceSecuritySchemes = {
@@ -774,6 +804,7 @@ const identityConditionalSecurity = {
 };
 
 function removeErrorExamples(document, operation, codesToRemove) {
+  if (!codesToRemove.length) return;
   for (const [status, response] of Object.entries(operation.responses ?? {})) {
     let target = response;
     if (target?.$ref?.startsWith('#/components/responses/')) {
@@ -807,6 +838,7 @@ function applyErrorDetails(document, operation, service, method) {
   })) codes.add('CURSOR_INVALID');
   if (operation.security.some((requirement) => Object.hasOwn(requirement, 'CsrfToken'))) codes.add('CSRF_INVALID');
   for (const code of codes) responseForCode(document, operation, code);
+  removeErrorExamples(document, operation, routeErrorCodesToRemove[operation.operationId] ?? []);
   if (identityTransportRoute) removeErrorExamples(document, operation, ['UNAUTHENTICATED']);
   if (service === 'logistics' && operation.operationId === 'logisticsDistributionsReviewLoss') {
     removeErrorExamples(document, operation, ['LOSS_REVIEW_REQUIRED']);
@@ -871,6 +903,7 @@ export function applyOpenApiDetails(document, service) {
           };
         }) : []),
       ];
+      const configuredParameters = detail.parameters ?? [];
       const originalParameters = operation.parameters ?? [];
       const existingManagedRefs = new Set(originalParameters.flatMap((parameter) => {
         const resolved = resolveParameter(document, parameter);
@@ -882,7 +915,7 @@ export function applyOpenApiDetails(document, service) {
         return Boolean(parameter?.$ref);
       });
       const seenParameters = new Set();
-      operation.parameters = [...parameters, ...configuredQueries.filter((parameter) => !existingManagedRefs.has(parameter.name))].filter((parameter) => {
+      operation.parameters = [...parameters, ...configuredParameters, ...configuredQueries.filter((parameter) => !existingManagedRefs.has(parameter.name))].filter((parameter) => {
         const resolved = resolveParameter(document, parameter);
         const key = resolved?.in && resolved?.name ? `${resolved.in}:${resolved.name}` : `$ref:${parameter?.$ref}`;
         if (seenParameters.has(key)) return false;

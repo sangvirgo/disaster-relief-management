@@ -52,6 +52,44 @@ describe('Identity internal team leader eligibility endpoint', () => {
   });
 });
 
+describe('Identity internal active user check endpoint', () => {
+  const dto = { user_id: '00000000-0000-4000-8000-000000000001' };
+
+  function setup() {
+    const check = jest.fn(async () => ({ active: true }));
+    const controller = new InternalController({ activeUserCheck: check } as unknown as InternalService);
+    const response = { setHeader: jest.fn() } as unknown as Response;
+    return { check, controller, response };
+  }
+
+  it.each(['logistics', undefined])('rejects caller %s', async (serviceCaller) => {
+    const { check, controller, response } = setup();
+    const handler = (controller as unknown as Record<string, (...args: unknown[]) => unknown>)['activeUserCheck'];
+    expect(typeof handler).toBe('function');
+
+    await expect(handler!.call(controller, dto, { serviceCaller } as AdminRequest, response))
+      .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+    expect(check).not.toHaveBeenCalled();
+  });
+
+  it('requires the service-token guard', () => {
+    const handler = (InternalController.prototype as unknown as Record<string, unknown>)['activeUserCheck'];
+    expect(typeof handler).toBe('function');
+    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toContain(IdentityServiceGuard);
+  });
+
+  it('returns only account activity to Response and disables caching', async () => {
+    const { check, controller, response } = setup();
+    const handler = (controller as unknown as Record<string, (...args: unknown[]) => unknown>)['activeUserCheck'];
+    expect(typeof handler).toBe('function');
+
+    await expect(handler!.call(controller, dto, { serviceCaller: 'response' } as AdminRequest, response))
+      .resolves.toEqual({ active: true });
+    expect(check).toHaveBeenCalledWith(dto.user_id);
+    expect(response.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store');
+  });
+});
+
 describe('Identity internal region lookup endpoint', () => {
   const dto = { codes: ['VN01', 'VN02'] };
 

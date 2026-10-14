@@ -63,6 +63,19 @@ export class UpdateTeamDto {
   declare availability?: 'AVAILABLE' | 'UNAVAILABLE';
 }
 
+export class AddTeamMemberDto {
+  @IsUUID('all')
+  user_id!: string;
+}
+
+export class TransferTeamLeaderDto {
+  @IsUUID('all')
+  user_id!: string;
+
+  @Type(() => Number) @IsInt() @Min(1)
+  expected_version!: number;
+}
+
 export class TeamPositionLocationDto {
   @IsIn(['Point'])
   type!: 'Point';

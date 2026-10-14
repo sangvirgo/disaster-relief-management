@@ -32,6 +32,11 @@ export class LookupUsersDto {
   ids!: string[];
 }
 
+export class ActiveUserCheckDto {
+  @IsUUID('all')
+  user_id!: string;
+}
+
 export class RegionLookupDto {
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100)
   @IsString({ each: true }) @MinLength(1, { each: true }) @MaxLength(80, { each: true }) @Matches(/\S/u, { each: true })
