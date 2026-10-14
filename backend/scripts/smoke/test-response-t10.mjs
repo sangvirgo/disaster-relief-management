@@ -14,6 +14,11 @@ const users = [];
 const notices = [randomUUID(), randomUUID(), randomUUID()];
 const requestId = randomUUID();
 const unverifiedRequestId = randomUUID();
+const duplicateRequestId = randomUUID();
+const outOfScopeRequestId = randomUUID();
+const otherOrganizationId = randomUUID();
+const missionTeamIds = [randomUUID(), randomUUID()];
+const missionIds = [randomUUID(), randomUUID()];
 let campaignId;
 let secondCampaignId;
 
@@ -98,6 +103,11 @@ try {
     `INSERT INTO organization (id,name,organization_kind)
      VALUES ($1,$2,'COORDINATION')`,
     [organizationId, `T10 smoke ${organizationId}`],
+  );
+  await identityDb.query(
+    `INSERT INTO organization (id,name,organization_kind)
+     VALUES ($1,$2,'COORDINATION')`,
+    [otherOrganizationId, `T10 scope fixture ${otherOrganizationId}`],
   );
   await identityDb.query(
     'INSERT INTO region (code,name) VALUES ($1,$2)',
@@ -277,40 +287,185 @@ try {
   assert.equal(internalCampaign.value.organization_id, organizationId);
   assert.equal(internalCampaign.value.region_code, regionCode);
 
-  const paused = await call(responseUrl, `campaigns/${campaignId}/pause`, {
-    method: 'POST', body: { expected_version: 3, reason: 'Hoàn tất kiểm tra trạng thái' },
+  const draftToClose = await call(responseUrl, 'campaigns', {
+    method: 'POST', body: { ...campaignCreateBody, name: 'Chiến dịch đóng từ bản nháp T10' },
     headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
   });
-  expectSuccess(paused);
-  assert.equal(paused.value.status, 'PAUSED');
-  assert.equal(paused.value.version, 4);
+  expectSuccess(draftToClose, 201);
+  const draftCloseReason = 'Đóng chiến dịch bản nháp theo kế hoạch.';
+  const closedDraft = await call(responseUrl, `campaigns/${draftToClose.value.id}/close`, {
+    method: 'POST', body: { expected_version: 1, reason: draftCloseReason },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectSuccess(closedDraft);
+  assert.equal(closedDraft.value.status, 'CLOSED');
+  assert.equal(closedDraft.value.version, 2);
+  const closeAudit = await responseDb.query(
+    `SELECT actor_user_id,action,entity_type,entity_id,reason,
+            before_state->>'status' AS before_status,after_state->>'status' AS after_status
+       FROM audit_log
+      WHERE entity_type='campaign' AND entity_id=$1 AND action='CAMPAIGN_CLOSE'
+      ORDER BY created_at DESC,id DESC LIMIT 1`,
+    [draftToClose.value.id],
+  );
+  assert.equal(closeAudit.rowCount, 1, 'closing a campaign must persist an audit row');
+  assert.equal(closeAudit.rows[0].actor_user_id, coordinator.id);
+  assert.equal(closeAudit.rows[0].action, 'CAMPAIGN_CLOSE');
+  assert.equal(closeAudit.rows[0].entity_type, 'campaign');
+  assert.equal(closeAudit.rows[0].entity_id, draftToClose.value.id);
+  assert.equal(closeAudit.rows[0].reason, draftCloseReason);
+  assert.equal(closeAudit.rows[0].before_status, 'DRAFT');
+  assert.equal(closeAudit.rows[0].after_status, 'CLOSED');
 
+  const receivedAt = new Date(Date.now() - 30 * 60_000);
+  const verifiedAt = new Date(receivedAt.getTime() + 4 * 60_000);
+  const firstOfferAt = new Date(receivedAt.getTime() + 5 * 60_000);
+  const secondOfferAt = new Date(receivedAt.getTime() + 22 * 60_000);
   await responseDb.query(
     `INSERT INTO assistance_request
-       (id,tracking_code,campaign_id,incident_category_code,report_mode,reporter_user_id,organization_id,region_code,status,priority,priority_basis,received_at)
-     VALUES ($1,$2,$3,'UNKNOWN','SELF',$4,$5,$6,'VERIFIED','P2','COMPLETE',now()-interval '10 minutes')`,
-    [requestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, campaignId, coordinator.id, organizationId, regionCode],
+       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,region_code,status,priority,priority_basis,received_at)
+     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,$5,'DISPATCHED','P2','COMPLETE',$6)`,
+    [requestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, organizationId, regionCode, receivedAt],
   );
   await responseDb.query(
     `INSERT INTO request_subject (request_id,location,location_source)
      VALUES ($1,ST_GeogFromText('SRID=4326;POINT(105 15)'),'MANUAL_PIN')`,
     [requestId],
   );
+  const approvedFacts = {
+    report_mode: 'SELF', incident_category_code: 'UNKNOWN', description: 'Yêu cầu báo cáo kiểm thử T10.',
+    reporter_name: null, reporter_contact_phone: null, reporter_declared_danger: false,
+    region_code: regionCode, campaign_id: null, people_affected: 1,
+    location: { type: 'Point', coordinates: [105, 15], source: 'MANUAL_PIN' },
+  };
+  const [verificationEvent] = (await responseDb.query(
+    `INSERT INTO request_event (request_id,actor_user_id,event_type,visibility,from_status,to_status,payload,occurred_at)
+     VALUES ($1,$2,'REQUEST_VERIFIED','STAFF','VERIFYING','VERIFIED',$3::jsonb,$4) RETURNING id`,
+    [requestId, coordinator.id, JSON.stringify({ approved_facts: approvedFacts }), verifiedAt],
+  )).rows;
+  await responseDb.query(
+    `INSERT INTO verification_decision (request_id,outcome,basis,reviewer_user_id,decided_at)
+     VALUES ($1,'VERIFIED','CONTACT_CONFIRMED',$2,$3)`,
+    [requestId, coordinator.id, verifiedAt],
+  );
+  await responseDb.query('UPDATE assistance_request SET verification_revision=$2 WHERE id=$1', [requestId, verificationEvent.id]);
+
   await responseDb.query(
     `INSERT INTO assistance_request
-       (id,tracking_code,campaign_id,incident_category_code,report_mode,reporter_user_id,organization_id,region_code,status,received_at)
-     VALUES ($1,$2,$3,'UNKNOWN','SELF',$4,$5,$6,'SUBMITTED',now()-interval '5 minutes')`,
-    [unverifiedRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, campaignId, coordinator.id, organizationId, regionCode],
+       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,region_code,status,received_at)
+     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,$5,'SUBMITTED',$6)`,
+    [unverifiedRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, organizationId, regionCode, receivedAt],
   );
   await responseDb.query(
     `INSERT INTO request_subject (request_id,location,location_source)
      VALUES ($1,ST_GeogFromText('SRID=4326;POINT(105.01 15.01)'),'MANUAL_PIN')`,
     [unverifiedRequestId],
   );
-  const from = new Date(Date.now() - 3_600_000).toISOString();
+
+  await responseDb.query(
+    `INSERT INTO assistance_request
+       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,region_code,status,received_at)
+     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,$5,'SUBMITTED',$6)`,
+    [duplicateRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, organizationId, regionCode, receivedAt],
+  );
+  await responseDb.query(
+    `INSERT INTO request_subject (request_id,location,location_source)
+     VALUES ($1,ST_GeogFromText('SRID=4326;POINT(105 15)'),'MANUAL_PIN')`,
+    [duplicateRequestId],
+  );
+
+  await responseDb.query(
+    `INSERT INTO assistance_request
+       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,region_code,status,received_at)
+     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,$5,'VERIFIED',$6)`,
+    [outOfScopeRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, otherOrganizationId, regionCode, receivedAt],
+  );
+  await responseDb.query(
+    `INSERT INTO request_subject (request_id,location,location_source)
+     VALUES ($1,ST_GeogFromText('SRID=4326;POINT(105 15)'),'MANUAL_PIN')`,
+    [outOfScopeRequestId],
+  );
+  const [foreignVerificationEvent] = (await responseDb.query(
+    `INSERT INTO request_event (request_id,actor_user_id,event_type,visibility,from_status,to_status,payload,occurred_at)
+     VALUES ($1,$2,'REQUEST_VERIFIED','STAFF','VERIFYING','VERIFIED',$3::jsonb,$4) RETURNING id`,
+    [outOfScopeRequestId, coordinator.id, JSON.stringify({ approved_facts: approvedFacts }), verifiedAt],
+  )).rows;
+  await responseDb.query(
+    `INSERT INTO verification_decision (request_id,outcome,basis,reviewer_user_id,decided_at)
+     VALUES ($1,'VERIFIED','CONTACT_CONFIRMED',$2,$3)`,
+    [outOfScopeRequestId, coordinator.id, verifiedAt],
+  );
+  await responseDb.query('UPDATE assistance_request SET verification_revision=$2 WHERE id=$1', [outOfScopeRequestId, foreignVerificationEvent.id]);
+
+  const canonicalAttachKey = key();
+  const canonicalAttachBody = { campaign_id: campaignId, expected_version: 1 };
+  const canonicalAttach = await call(responseUrl, `requests/${requestId}/attach-campaign`, {
+    method: 'POST', body: canonicalAttachBody,
+    headers: { ...coordinatorAuth, 'Idempotency-Key': canonicalAttachKey },
+  });
+  expectSuccess(canonicalAttach);
+  assert.equal(canonicalAttach.value.campaign_id, campaignId);
+  assert.equal(canonicalAttach.value.version, 2);
+  const canonicalAttachReplay = await call(responseUrl, `requests/${requestId}/attach-campaign`, {
+    method: 'POST', body: canonicalAttachBody,
+    headers: { ...coordinatorAuth, 'Idempotency-Key': canonicalAttachKey },
+  });
+  expectSuccess(canonicalAttachReplay);
+  assert.equal(canonicalAttachReplay.headers.get('idempotent-replay'), 'true');
+  assert.equal(canonicalAttachReplay.value.version, 2);
+  const staleAttach = await call(responseUrl, `requests/${requestId}/attach-campaign`, {
+    method: 'POST', body: canonicalAttachBody,
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectVietnameseError(staleAttach, 409, 'VERSION_CONFLICT');
+
+  const invalidAttach = await call(responseUrl, `requests/${unverifiedRequestId}/attach-campaign`, {
+    method: 'POST', body: { campaign_id: 'invalid', expected_version: 1 },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectVietnameseError(invalidAttach, 400, 'VALIDATION_FAILED');
+  const unverifiedAttach = await call(responseUrl, `requests/${unverifiedRequestId}/attach-campaign`, {
+    method: 'POST', body: { campaign_id: campaignId, expected_version: 1 },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectSuccess(unverifiedAttach);
+  assert.equal(unverifiedAttach.value.version, 2);
+
+  const duplicated = await call(responseUrl, `requests/${duplicateRequestId}/duplicate`, {
+    method: 'POST',
+    body: { expected_version: 1, canonical_request_id: requestId, reason: 'Cùng một sự việc kiểm thử.' },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectSuccess(duplicated);
+  assert.equal(duplicated.value.status, 'DUPLICATE');
+  assert.equal(duplicated.value.canonical_request_id, requestId);
+  const duplicateAttach = await call(responseUrl, `requests/${duplicateRequestId}/attach-campaign`, {
+    method: 'POST', body: { campaign_id: campaignId, expected_version: 2 },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectSuccess(duplicateAttach);
+  assert.equal(duplicateAttach.value.campaign_id, campaignId);
+  assert.equal(duplicateAttach.value.version, 3);
+
+  await responseDb.query(
+    `INSERT INTO rescue_team (id,organization_id,operating_region_code,name,team_kind,reporting_mode,external_contact_note)
+     VALUES ($1,$3,$4,$5,'OTHER','COORDINATOR','Đội kiểm thử T10'),
+            ($2,$3,$4,$6,'OTHER','COORDINATOR','Đội kiểm thử T10')`,
+    [missionTeamIds[0], missionTeamIds[1], organizationId, regionCode, `T10 đội 1 ${missionTeamIds[0]}`, `T10 đội 2 ${missionTeamIds[1]}`],
+  );
+  await responseDb.query('UPDATE assistance_request SET attribution_locked_at=now() WHERE id=$1', [requestId]);
+  await responseDb.query(
+    `INSERT INTO mission (id,request_id,team_id,work_cycle,status,coordinator_user_id,verification_revision,created_at)
+     VALUES ($1,$2,$3,1,'OFFERED',$4,$5,$6),
+            ($7,$2,$8,1,'OFFERED',$4,$5,$9)`,
+    [missionIds[0], requestId, missionTeamIds[0], coordinator.id, verificationEvent.id, firstOfferAt,
+      missionIds[1], missionTeamIds[1], secondOfferAt],
+  );
+  const from = new Date(receivedAt.getTime() - 60_000).toISOString();
   const to = new Date(Date.now() + 60_000).toISOString();
-  const filter = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&region_code=${encodeURIComponent(regionCode)}&campaign_id=${campaignId}`;
-  const heatmap = await call(responseUrl, `map/heatmap?${filter}&status_layer=confirmed&cell_m=1000`, { headers: coordinatorAuth });
+  const dateRegionFilter = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&region_code=${encodeURIComponent(regionCode)}`;
+  const campaignFilter = `${dateRegionFilter}&campaign_id=${campaignId}`;
+  const heatmap = await call(responseUrl, `map/heatmap?${campaignFilter}&status_layer=confirmed&cell_m=1000`, { headers: coordinatorAuth });
   expectSuccess(heatmap);
   assert.equal(heatmap.value.items.length, 1, JSON.stringify(heatmap.value));
   assert.equal(heatmap.value.items[0].cell.type, 'Polygon');
@@ -327,7 +482,7 @@ try {
   assert.ok(signedArea > 0, 'RFC 7946 exterior polygon ring must be counter-clockwise');
   assert.equal(JSON.stringify(heatmap.value).includes(requestId), false, 'heatmap must not expose request identifiers');
 
-  const unverifiedHeatmap = await call(responseUrl, `map/heatmap?${filter}&status_layer=unverified&cell_m=1000`, { headers: coordinatorAuth });
+  const unverifiedHeatmap = await call(responseUrl, `map/heatmap?${campaignFilter}&status_layer=unverified&cell_m=1000`, { headers: coordinatorAuth });
   expectSuccess(unverifiedHeatmap);
   assert.equal(unverifiedHeatmap.value.items.length, 1, JSON.stringify(unverifiedHeatmap.value));
   assert.equal(unverifiedHeatmap.value.items[0].count, 1);
@@ -335,58 +490,79 @@ try {
   assert.equal(unverifiedHeatmap.value.items[0].center.type, 'Point');
   assert.equal(JSON.stringify(unverifiedHeatmap.value).includes(unverifiedRequestId), false, 'unverified heatmap must not expose request identifiers');
 
-  const summary = await call(responseUrl, `reports/summary?${filter}`, { headers: coordinatorAuth });
-  expectSuccess(summary);
-  assert.equal(summary.value.status_counts.VERIFIED, 1);
-  assert.equal(summary.value.priority_counts.P2, 1);
-  assert.equal(summary.value.active_missions, 0);
-  assert.equal(summary.value.overdue_missions, 0);
-  assert.equal(summary.value.median_seconds.receipt_to_verification, null);
-  assert.equal(summary.value.median_seconds.receipt_to_assignment, null);
+  const regionHeatmap = await call(responseUrl, `map/heatmap?${dateRegionFilter}&status_layer=confirmed&cell_m=1000`, { headers: coordinatorAuth });
+  expectSuccess(regionHeatmap);
+  assert.equal(regionHeatmap.value.items.length, 1, JSON.stringify(regionHeatmap.value));
+  assert.equal(regionHeatmap.value.items[0].count, 1, 'regional map excludes duplicates and requests outside the coordinator organization');
 
-  await responseDb.query('DELETE FROM request_subject WHERE request_id=ANY($1::uuid[])', [[requestId, unverifiedRequestId]]);
-  await responseDb.query('DELETE FROM assistance_request WHERE id=ANY($1::uuid[])', [[requestId, unverifiedRequestId]]);
-  const resumed = await call(responseUrl, `campaigns/${campaignId}/resume`, {
-    method: 'POST', body: { expected_version: 4 },
+  const paused = await call(responseUrl, `campaigns/${campaignId}/pause`, {
+    method: 'POST', body: { expected_version: 3, reason: 'Hoàn tất kiểm tra trạng thái' },
     headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
   });
-  expectSuccess(resumed);
-  assert.equal(resumed.value.status, 'ACTIVE');
-  assert.equal(resumed.value.version, 5);
-  const closed = await call(responseUrl, `campaigns/${campaignId}/close`, {
-    method: 'POST', body: { expected_version: 5, reason: 'Hoàn tất kiểm thử vòng đời' },
+  expectSuccess(paused);
+  assert.equal(paused.value.status, 'PAUSED');
+  assert.equal(paused.value.version, 4);
+
+  const detachKey = key();
+  const detachBody = { expected_version: 2 };
+  const detached = await call(responseUrl, `requests/${unverifiedRequestId}/detach-campaign`, {
+    method: 'POST', body: detachBody,
+    headers: { ...coordinatorAuth, 'Idempotency-Key': detachKey },
+  });
+  expectSuccess(detached);
+  assert.equal(detached.value.campaign_id, null);
+  assert.equal(detached.value.version, 3);
+  const detachReplay = await call(responseUrl, `requests/${unverifiedRequestId}/detach-campaign`, {
+    method: 'POST', body: detachBody,
+    headers: { ...coordinatorAuth, 'Idempotency-Key': detachKey },
+  });
+  expectSuccess(detachReplay);
+  assert.equal(detachReplay.headers.get('idempotent-replay'), 'true');
+  assert.equal(detachReplay.value.version, 3);
+  const attachToPausedCampaign = await call(responseUrl, `requests/${unverifiedRequestId}/attach-campaign`, {
+    method: 'POST', body: { campaign_id: campaignId, expected_version: 3 },
     headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
   });
-  expectSuccess(closed);
-  assert.equal(closed.value.status, 'CLOSED');
-  assert.equal(closed.value.version, 6);
+  expectVietnameseError(attachToPausedCampaign, 409, 'CAMPAIGN_NOT_ACTIVE');
+
+  const summary = await call(responseUrl, `reports/summary?${campaignFilter}`, { headers: coordinatorAuth });
+  expectSuccess(summary);
+  assert.equal(summary.value.status_counts.DISPATCHED, 1);
+  assert.equal(summary.value.status_counts.DUPLICATE, 1);
+  assert.equal(Object.hasOwn(summary.value.status_counts, 'SUBMITTED'), false, 'campaign filter excludes a detached request');
+  assert.equal(summary.value.priority_counts.P2, 1);
+  assert.equal(summary.value.active_missions, 2);
+  assert.equal(summary.value.overdue_missions, 1);
+  assert.equal(summary.value.median_seconds.receipt_to_verification, 240);
+  assert.equal(summary.value.median_seconds.receipt_to_assignment, 300);
+
+  const regionSummary = await call(responseUrl, `reports/summary?${dateRegionFilter}`, { headers: coordinatorAuth });
+  expectSuccess(regionSummary);
+  assert.equal(regionSummary.value.status_counts.DISPATCHED, 1);
+  assert.equal(regionSummary.value.status_counts.DUPLICATE, 1);
+  assert.equal(regionSummary.value.status_counts.SUBMITTED, 1);
+  assert.equal(Object.hasOwn(regionSummary.value.status_counts, 'VERIFIED'), false, 'report scope excludes the fixture from another organization');
+  assert.equal(regionSummary.value.priority_counts.P2, 1);
+  assert.equal(regionSummary.value.active_missions, 2);
+  assert.equal(regionSummary.value.overdue_missions, 1);
+  assert.equal(regionSummary.value.median_seconds.receipt_to_verification, 240);
+  assert.equal(regionSummary.value.median_seconds.receipt_to_assignment, 300);
+
+  const blockedClose = await call(responseUrl, `campaigns/${campaignId}/close`, {
+    method: 'POST', body: { expected_version: 4, reason: 'Đóng để kiểm tra yêu cầu còn mở.' },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectVietnameseError(blockedClose, 409, 'CAMPAIGN_HAS_OPEN_REQUESTS');
+
+  const closedSecondCampaign = await call(responseUrl, `campaigns/${secondCampaignId}/close`, {
+    method: 'POST', body: { expected_version: 2, reason: 'Kết thúc chiến dịch phụ kiểm thử.' },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectSuccess(closedSecondCampaign);
+  assert.equal(closedSecondCampaign.value.status, 'CLOSED');
+  assert.equal(closedSecondCampaign.value.version, 3);
 } finally {
-  try {
-    await responseDb.query('DELETE FROM notice WHERE id = ANY($1::uuid[])', [notices]);
-    await responseDb.query('DELETE FROM request_subject WHERE request_id=ANY($1::uuid[])', [[requestId, unverifiedRequestId]]);
-    await responseDb.query('DELETE FROM assistance_request WHERE id=ANY($1::uuid[])', [[requestId, unverifiedRequestId]]);
-    if (campaignId) {
-      await responseDb.query('DELETE FROM campaign WHERE id=$1', [campaignId]);
-    }
-    if (secondCampaignId) {
-      await responseDb.query('DELETE FROM campaign WHERE id=$1', [secondCampaignId]);
-    }
-    if (users[0]) {
-      await responseDb.query("DELETE FROM idempotency_record WHERE scope_key=$1 AND command LIKE 'response.campaign.%'", [`user:${users[0]}`]);
-    }
-    if (users.length) {
-      await identityDb.query('DELETE FROM refresh_session WHERE family_id IN (SELECT id FROM session_family WHERE user_id=ANY($1::uuid[]))', [users]);
-      await identityDb.query('DELETE FROM session_family WHERE user_id=ANY($1::uuid[])', [users]);
-      await identityDb.query('DELETE FROM role_grant WHERE user_id=ANY($1::uuid[])', [users]);
-      await identityDb.query('DELETE FROM membership WHERE user_id=ANY($1::uuid[])', [users]);
-      await identityDb.query('DELETE FROM app_user WHERE id=ANY($1::uuid[])', [users]);
-    }
-    await responseDb.query('DELETE FROM region_boundary WHERE region_code=$1', [regionCode]);
-    await identityDb.query('DELETE FROM region WHERE code=$1', [regionCode]);
-    await identityDb.query('DELETE FROM organization WHERE id=$1', [organizationId]);
-  } finally {
-    await Promise.allSettled([responseDb.end(), identityDb.end()]);
-  }
+  await Promise.allSettled([responseDb.end(), identityDb.end()]);
 }
 
 console.log('Response T10 HTTP smoke passed.');

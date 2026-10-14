@@ -14,6 +14,7 @@ import { RequestOperationsSupplementReviewService } from './request-operations.s
 import { RequestOperationsTeamCandidatesService } from './request-operations.team-candidates.service';
 import { RequestAdmissionController } from './request-admission.controller';
 import { RequestAdmissionService } from './request-admission.service';
+import { RequestCampaignAssociationService } from './request-campaign-association.service';
 import { ResponseServiceTokenGuard } from '../campaigns/service-token.guard';
 
 @Module({
@@ -31,6 +32,7 @@ import { ResponseServiceTokenGuard } from '../campaigns/service-token.guard';
     RequestOperationsVerificationService,
     RequestOperationsSupplementReviewService,
     RequestOperationsTeamCandidatesService,
+    RequestCampaignAssociationService,
     RequestAdmissionService,
     ResponseServiceTokenGuard,
   ],

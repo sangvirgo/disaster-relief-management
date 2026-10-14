@@ -12,8 +12,15 @@ const dateTime = string('date-time');
 const id = uuid();
 const version = integer();
 const quantity = { type: 'string', description: 'Decimal quantity encoded as a string and validated against the unit scale.' };
-const response = (schema, description = 'Documented response shape.') => ({ description, content: { 'application/json': { schema } } });
-const request = (schema) => ({ required: true, content: { 'application/json': { schema } } });
+const response = (schema, description = 'Documented response shape.', example, headers) => ({
+  description,
+  ...(headers ? { headers } : {}),
+  content: { 'application/json': { schema, ...(example ? { example } : {}) } },
+});
+const request = (schema, example) => ({
+  required: true,
+  content: { 'application/json': { schema, ...(example ? { example } : {}) } },
+});
 const item = (properties, required = []) => array(object(properties, required));
 const page = (rowProperties) => object({ items: item(rowProperties), more: boolean(), cursor: text });
 const versionBody = (properties = {}, required = []) => object({ expected_version: version, ...properties }, ['expected_version', ...required]);
@@ -41,6 +48,14 @@ const teamViewSchema = object({
   version,
 }, ['id', 'name', 'kind', 'reporting_mode', 'availability', 'status', 'skills', 'position', 'version']);
 const teamPageSchema = object({ items: array(teamViewSchema), more: boolean(), cursor: text });
+const idempotentCommandResponseHeaders = {
+  'Cache-Control': { $ref: '#/components/headers/CacheControlNoStore' },
+  'Idempotent-Replay': { $ref: '#/components/headers/IdempotentReplay' },
+};
+const requestCampaignAssociationViewSchema = object({
+  id, status: text, version, region_code: { anyOf: [text, { type: 'null' }] },
+  campaign_id: { anyOf: [id, { type: 'null' }] },
+}, ['id', 'status', 'version', 'region_code', 'campaign_id']);
 const identityDetails = {
   identityInternalActiveUserCheck: {
     request: request(object({ user_id: id }, ['user_id'])),
@@ -66,6 +81,30 @@ const identityPaginationQueries = {
 const responseDetails = {
   responseRequestOperationsEvidence: {
     response: response(object({ items: item({ id, state: text, size_bytes: integer(), detected_mime: text, checksum: text, created_at: dateTime }), more: boolean(), cursor: text })),
+  },
+  responseRequestOperationsAttachCampaign: {
+    parameters: [
+      { $ref: '#/components/parameters/RequestId' },
+      { $ref: '#/components/parameters/IdempotencyKey' },
+    ],
+    request: request(versionBody({ campaign_id: id }, ['campaign_id']), {
+      campaign_id: '00000000-0000-4000-8000-000000000003', expected_version: 7,
+    }),
+    response: response(requestCampaignAssociationViewSchema, 'Request after campaign attachment.', {
+      id: '00000000-0000-4000-8000-000000000001', status: 'TRIAGED', version: 8,
+      region_code: 'NORTH-01', campaign_id: '00000000-0000-4000-8000-000000000003',
+    }, idempotentCommandResponseHeaders),
+  },
+  responseRequestOperationsDetachCampaign: {
+    parameters: [
+      { $ref: '#/components/parameters/RequestId' },
+      { $ref: '#/components/parameters/IdempotencyKey' },
+    ],
+    request: request(versionBody(), { expected_version: 8 }),
+    response: response(requestCampaignAssociationViewSchema, 'Request after campaign detachment.', {
+      id: '00000000-0000-4000-8000-000000000001', status: 'TRIAGED', version: 9,
+      region_code: 'NORTH-01', campaign_id: null,
+    }, idempotentCommandResponseHeaders),
   },
   responseRequestResolutionInternalOperation: {
     response: response(object({ id, kind: text, state: text, request_id: id, work_cycle: integer(), request_status: text, organization_id: id, region_code: { anyOf: [text, { type: 'null' }] }, campaign_id: { anyOf: [id, { type: 'null' }] }, outcome_basis: { anyOf: [text, { type: 'null' }] } })),
@@ -585,6 +624,8 @@ const routeErrorCodes = {
   recordMissionOnBehalf: ['RECORDED_BASIS_REQUIRED', 'MISSION_NOT_LEADER', 'STATE_TRANSITION_INVALID'],
   createCampaign: ['FORBIDDEN', 'VERSION_CONFLICT'],
   closeCampaign: ['CAMPAIGN_HAS_OPEN_REQUESTS', 'VERSION_CONFLICT'],
+  responseRequestOperationsAttachCampaign: ['NOT_FOUND', 'CAMPAIGN_NOT_ACTIVE', 'ATTRIBUTION_LOCKED', 'VERSION_CONFLICT', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID'],
+  responseRequestOperationsDetachCampaign: ['NOT_FOUND', 'ATTRIBUTION_LOCKED', 'VERSION_CONFLICT', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID'],
   getRequestHeatmap: ['TOO_MANY_CELLS', 'VALIDATION_FAILED'],
   responseRequestAdmissionAdmit: ['ATTRIBUTION_LOCKED', 'REGION_REQUIRED', 'PENDING_SUPPLEMENT_REVIEW', 'REQUEST_NOT_VERIFIED'],
   responseMissionsReviewFailure: ['REASON_REQUIRED', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
@@ -905,12 +946,18 @@ export function applyOpenApiDetails(document, service) {
       ];
       const configuredParameters = detail.parameters ?? [];
       const originalParameters = operation.parameters ?? [];
+      const configuredParameterKeys = new Set(configuredParameters.flatMap((parameter) => {
+        const resolved = resolveParameter(document, parameter);
+        return resolved?.in && resolved?.name ? [`${resolved.in}:${resolved.name}`] : [];
+      }));
       const existingManagedRefs = new Set(originalParameters.flatMap((parameter) => {
         const resolved = resolveParameter(document, parameter);
         return parameter?.$ref && resolved?.in === 'query' && managedQueryNames.has(resolved.name) ? [resolved.name] : [];
       }));
       const parameters = originalParameters.filter((parameter) => {
         const resolved = resolveParameter(document, parameter);
+        const key = resolved?.in && resolved?.name ? `${resolved.in}:${resolved.name}` : null;
+        if (key && configuredParameterKeys.has(key)) return false;
         if (resolved?.in !== 'query' || !managedQueryNames.has(resolved.name)) return true;
         return Boolean(parameter?.$ref);
       });
@@ -940,7 +987,18 @@ export function applyOpenApiDetails(document, service) {
       const success = Object.keys(operation.responses ?? {}).find((status) => status.startsWith('2'));
       if (responseSchema && success) {
         const description = detail.response?.description ?? 'Documented response projection; see the source API specification for visibility and pagination rules.';
-        operation.responses[success] = response(responseSchema, description);
+        const documentedResponse = detail.response ?? response(responseSchema, description);
+        operation.responses[success] = {
+          ...documentedResponse,
+          description: documentedResponse.description ?? description,
+          content: {
+            ...(documentedResponse.content ?? {}),
+            'application/json': {
+              ...(documentedResponse.content?.['application/json'] ?? {}),
+              schema: responseSchema,
+            },
+          },
+        };
       }
       const gaps = detail.gap ? [detail.gap] : [];
       if (!detail.request && !detail.noBody && method !== 'get' && !['post'].includes(method)) gaps.push('The API specification does not define this operation’s JSON request body.');

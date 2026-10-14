@@ -5524,6 +5524,14 @@
                                    "message": "Dữ liệu đã được cập nhật. Vui lòng tải lại trước khi tiếp tục.",
                                    "correlation_id": "00000000-0000-4000-8000-000000000000"
                                  }
+                               },
+                               "CAMPAIGN_PAUSED": {
+                                 "summary": "CAMPAIGN_PAUSED",
+                                 "value": {
+                                   "code": "CAMPAIGN_PAUSED",
+                                   "message": "Chiến dịch đang tạm dừng.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
                                }
                              }
                            }
@@ -11745,6 +11753,520 @@
           }
         ]
       }
+    },
+    "/requests/{id}/attach-campaign": {
+      "post": {
+          "operationId": "responseRequestOperationsAttachCampaign",
+          "summary": "RequestOperationsController.attachCampaign",
+          "description": "Route exported from backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.attachCampaign. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/RequestId"
+            },
+            {
+              "$ref": "#/components/parameters/IdempotencyKey"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Request after campaign attachment.",
+              "headers": {
+                "Cache-Control": {
+                  "$ref": "#/components/headers/CacheControlNoStore"
+                },
+                "Idempotent-Replay": {
+                  "$ref": "#/components/headers/IdempotentReplay"
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "integer"
+                      },
+                      "region_code": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "campaign_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "status",
+                      "version",
+                      "region_code",
+                      "campaign_id"
+                    ]
+                  },
+                  "example": {
+                    "id": "00000000-0000-4000-8000-000000000001",
+                    "status": "TRIAGED",
+                    "version": 8,
+                    "region_code": "NORTH-01",
+                    "campaign_id": "00000000-0000-4000-8000-000000000003"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "VALIDATION_FAILED": {
+                      "summary": "VALIDATION_FAILED",
+                      "value": {
+                        "code": "VALIDATION_FAILED",
+                        "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "IDEMPOTENCY_KEY_INVALID": {
+                      "summary": "IDEMPOTENCY_KEY_INVALID",
+                      "value": {
+                        "code": "IDEMPOTENCY_KEY_INVALID",
+                        "message": "Mã yêu cầu không hợp lệ.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "NOT_FOUND": {
+                      "summary": "NOT_FOUND",
+                      "value": {
+                        "code": "NOT_FOUND",
+                        "message": "Không tìm thấy dữ liệu yêu cầu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "CAMPAIGN_NOT_ACTIVE": {
+                      "summary": "CAMPAIGN_NOT_ACTIVE",
+                      "value": {
+                        "code": "CAMPAIGN_NOT_ACTIVE",
+                        "message": "Chiến dịch hiện không hoạt động.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "ATTRIBUTION_LOCKED": {
+                      "summary": "ATTRIBUTION_LOCKED",
+                      "value": {
+                        "code": "ATTRIBUTION_LOCKED",
+                        "message": "Phạm vi xử lý đã được cố định cho chu kỳ này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "VERSION_CONFLICT": {
+                      "summary": "VERSION_CONFLICT",
+                      "value": {
+                        "code": "VERSION_CONFLICT",
+                        "message": "Dữ liệu đã được cập nhật. Vui lòng tải lại trước khi tiếp tục.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "IDEMPOTENCY_KEY_REUSED": {
+                      "summary": "IDEMPOTENCY_KEY_REUSED",
+                      "value": {
+                        "code": "IDEMPOTENCY_KEY_REUSED",
+                        "message": "Mã yêu cầu đã được dùng cho nội dung khác.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/03-response-api.md",
+          "x-c48-controller-source": "backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.attachCampaign",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": [],
+              "CsrfToken": []
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "expected_version": {
+                      "type": "integer"
+                    },
+                    "campaign_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "expected_version",
+                    "campaign_id"
+                  ]
+                },
+                "example": {
+                  "campaign_id": "00000000-0000-4000-8000-000000000003",
+                  "expected_version": 7
+                }
+              }
+            }
+          }
+        }
+    },
+    "/requests/{id}/detach-campaign": {
+      "post": {
+          "operationId": "responseRequestOperationsDetachCampaign",
+          "summary": "RequestOperationsController.detachCampaign",
+          "description": "Route exported from backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.detachCampaign. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/RequestId"
+            },
+            {
+              "$ref": "#/components/parameters/IdempotencyKey"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Request after campaign detachment.",
+              "headers": {
+                "Cache-Control": {
+                  "$ref": "#/components/headers/CacheControlNoStore"
+                },
+                "Idempotent-Replay": {
+                  "$ref": "#/components/headers/IdempotentReplay"
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "integer"
+                      },
+                      "region_code": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "campaign_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "status",
+                      "version",
+                      "region_code",
+                      "campaign_id"
+                    ]
+                  },
+                  "example": {
+                    "id": "00000000-0000-4000-8000-000000000001",
+                    "status": "TRIAGED",
+                    "version": 9,
+                    "region_code": "NORTH-01",
+                    "campaign_id": null
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "IDEMPOTENCY_KEY_INVALID": {
+                      "summary": "IDEMPOTENCY_KEY_INVALID",
+                      "value": {
+                        "code": "IDEMPOTENCY_KEY_INVALID",
+                        "message": "Mã yêu cầu không hợp lệ.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "NOT_FOUND": {
+                      "summary": "NOT_FOUND",
+                      "value": {
+                        "code": "NOT_FOUND",
+                        "message": "Không tìm thấy dữ liệu yêu cầu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "ATTRIBUTION_LOCKED": {
+                      "summary": "ATTRIBUTION_LOCKED",
+                      "value": {
+                        "code": "ATTRIBUTION_LOCKED",
+                        "message": "Phạm vi xử lý đã được cố định cho chu kỳ này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "VERSION_CONFLICT": {
+                      "summary": "VERSION_CONFLICT",
+                      "value": {
+                        "code": "VERSION_CONFLICT",
+                        "message": "Dữ liệu đã được cập nhật. Vui lòng tải lại trước khi tiếp tục.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "IDEMPOTENCY_KEY_REUSED": {
+                      "summary": "IDEMPOTENCY_KEY_REUSED",
+                      "value": {
+                        "code": "IDEMPOTENCY_KEY_REUSED",
+                        "message": "Mã yêu cầu đã được dùng cho nội dung khác.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/03-response-api.md",
+          "x-c48-controller-source": "backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.detachCampaign",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": [],
+              "CsrfToken": []
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "expected_version": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "expected_version"
+                  ]
+                },
+                "example": {
+                  "expected_version": 8
+                }
+              }
+            }
+          }
+        }
     }
   },
   "components": {

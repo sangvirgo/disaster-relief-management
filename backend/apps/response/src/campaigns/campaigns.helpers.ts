@@ -50,7 +50,7 @@ export function campaignNextStatus(status: CampaignStatus, action: CampaignActio
     activate: { DRAFT: 'ACTIVE' },
     pause: { ACTIVE: 'PAUSED' },
     resume: { PAUSED: 'ACTIVE' },
-    close: { ACTIVE: 'CLOSED', PAUSED: 'CLOSED' },
+    close: { DRAFT: 'CLOSED', ACTIVE: 'CLOSED', PAUSED: 'CLOSED' },
   };
   const target = transitions[action][status];
   if (!target) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });

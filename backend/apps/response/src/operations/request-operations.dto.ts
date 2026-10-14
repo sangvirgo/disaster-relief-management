@@ -59,6 +59,11 @@ export class RequestVersionDto {
   expected_version!: number;
 }
 
+export class AttachCampaignDto extends RequestVersionDto {
+  @IsUUID('all')
+  campaign_id!: string;
+}
+
 export class ContactAttemptDto {
   @IsIn(['REPORTER', 'BENEFICIARY', 'ALTERNATE', 'AUTHORITY'])
   contact_target!: string;

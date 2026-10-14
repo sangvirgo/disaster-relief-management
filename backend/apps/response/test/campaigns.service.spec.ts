@@ -88,6 +88,7 @@ describe('CampaignsService', () => {
 
   it('allows only the documented lifecycle edges and keeps CLOSED terminal', () => {
     expect(campaignNextStatus('DRAFT', 'activate')).toBe('ACTIVE');
+    expect(campaignNextStatus('DRAFT', 'close')).toBe('CLOSED');
     expect(campaignNextStatus('ACTIVE', 'pause')).toBe('PAUSED');
     expect(campaignNextStatus('PAUSED', 'resume')).toBe('ACTIVE');
     expect(campaignNextStatus('ACTIVE', 'close')).toBe('CLOSED');

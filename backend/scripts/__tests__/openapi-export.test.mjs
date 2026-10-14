@@ -585,6 +585,31 @@ test('T8 membership eligibility failures use state-transition errors while prese
   assert.ok(docs.includes('`USER_INACTIVE`, `MEMBERSHIP_REQUIRED`, or `VOLUNTEER_GRANT_REQUIRED` → `STATE_TRANSITION_INVALID` 409'));
 });
 
+test('T10 campaign association contracts document validated requests, responses, headers, and errors', () => {
+  const response = exportService('response').document;
+  const attach = operationById(response, 'responseRequestOperationsAttachCampaign');
+  const detach = operationById(response, 'responseRequestOperationsDetachCampaign');
+  assert.ok(attach);
+  assert.ok(detach);
+
+  for (const operation of [attach, detach]) {
+    assert.ok(operation.parameters.some((parameter) => parameter.$ref === '#/components/parameters/RequestId'));
+    assert.ok(operation.parameters.some((parameter) => parameter.$ref === '#/components/parameters/IdempotencyKey'));
+    assert.ok(operation.responses['200'].headers['Cache-Control']);
+    assert.ok(operation.responses['200'].headers['Idempotent-Replay']);
+  }
+  assert.deepEqual(attach.requestBody.content['application/json'].example, {
+    campaign_id: '00000000-0000-4000-8000-000000000003', expected_version: 7,
+  });
+  assert.deepEqual(detach.requestBody.content['application/json'].example, { expected_version: 8 });
+  assert.equal(attach.responses['200'].content['application/json'].example.campaign_id, '00000000-0000-4000-8000-000000000003');
+  assert.equal(detach.responses['200'].content['application/json'].example.campaign_id, null);
+
+  const docs = fs.readFileSync(path.join(repositoryRoot, sourceDocuments.response), 'utf8');
+  assert.ok(docs.includes('DRAFT→ACTIVE/CLOSED, ACTIVE→PAUSED/CLOSED, PAUSED→ACTIVE/CLOSED'));
+  assert.ok(docs.includes('DRAFT→CLOSED follows the campaign lifecycle in plan §8.4'));
+});
+
 test('OpenAPI details preserve shared response references when no examples are removed', () => {
   const response = { $ref: '#/components/responses/Conflict' };
   const document = {
@@ -819,6 +844,8 @@ test('documented route errors include verification, mission, donation, and quant
   expectErrors('response', 'responseRequestResolutionReopen', ['CAMPAIGN_NOT_ACTIVE']);
   expectErrors('response', 'responseRequestResolutionClose', ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID']);
   expectErrors('response', 'responseRequestResolutionReopen', ['CAMPAIGN_NOT_ACTIVE', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID']);
+  expectErrors('response', 'responseRequestOperationsAttachCampaign', ['NOT_FOUND', 'CAMPAIGN_NOT_ACTIVE', 'ATTRIBUTION_LOCKED', 'VERSION_CONFLICT', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID']);
+  expectErrors('response', 'responseRequestOperationsDetachCampaign', ['NOT_FOUND', 'ATTRIBUTION_LOCKED', 'VERSION_CONFLICT', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID']);
   expectErrors('response', 'responseRequestResolutionResolve', ['LOGISTICS_UNAVAILABLE']);
   expectErrors('logistics', 'logisticsDrivesPublicList', ['CURSOR_INVALID']);
   expectErrors('logistics', 'logisticsDrivesPublicDetail', ['NOT_FOUND']);

@@ -60,7 +60,8 @@ Code is random, purpose/object-bound, hashed and expires 30 minutes; issuance re
 | `POST /requests/{id}/authority-referrals` · Idem | `REQUEST_VERIFY` | `{ referred_body, note }` audit only, no state change |
 | `POST /requests/{id}/correct-region` · Idem · Ver | `REQUEST_UNASSIGNED_QUEUE` | `{ region_code, reason }` audited |
 | `POST /requests/{id}/supplements/{event_id}/review` · Idem · Ver | `REQUEST_VERIFY` | `{ decision: ACCEPT\|REJECT, reason, source_refs?, source_note? }`; reviews one pending `REPORTER_SUPPLEMENT` while VERIFYING or after verification. Acceptance applies reported facts and atomically points `verification_revision` to the immutable review snapshot; rejection leaves approved facts unchanged. Both decisions write `SUPPLEMENT_REVIEW`, bump the request version, and notify the reporter. |
-| `POST /requests/{id}/attach-campaign` / `detach-campaign` · Idem · Ver | `CAMPAIGN_MANAGE` | target campaign ACTIVE and org/region compatible |
+| `POST /requests/{id}/attach-campaign` · Idem · Ver | `CAMPAIGN_MANAGE` | `{ campaign_id, expected_version }` → `200 { id, status, version, region_code, campaign_id }`. Target must be ACTIVE and organization/region compatible. Moving an existing association requires scope over both campaigns. A changed association increments the request version and records `CAMPAIGN_ATTACHED`; an unchanged association is a no-op. |
+| `POST /requests/{id}/detach-campaign` · Idem · Ver | `CAMPAIGN_MANAGE` | `{ expected_version }` → `200 { id, status, version, region_code, campaign_id: null }`. A changed association increments the request version and records `CAMPAIGN_DETACHED`; an already detached request is a no-op. Both commands reject locked attribution (`ATTRIBUTION_LOCKED` 409); stale versions return `VERSION_CONFLICT` 409. |
 | `POST /requests/{id}/cancel` · Idem · Ver | `REQUEST_CANCEL` | `{ expected_version, reason }`; persist a CANCELLATION intent and `RESOLVING` barrier, then freeze Logistics outside the Response transaction and finalize `CANCELLED`. Finalization cancels current-cycle active missions and releases capacity; engaged teams become `UNAVAILABLE` with `readiness_required` until explicitly readied. Canonical inbound duplicates are orphaned to `VERIFYING` after cancellation. **Always `202 { operation_id, state }`**; poll `GET /operations/{id}`. Replay keeps the original `202`; completed polling returns `200`. Not allowed from `RESOLVING`/`RESOLVED`/`CLOSED` |
 | `POST /requests/{id}/resolve` · Idem · Ver | `REQUEST_RESOLVE` | `{ expected_version, resolution_reason, outcome_basis }`; reason required, no active mission, no pending follow-up. Every FAILED mission needs a current-cycle failure review; `REPLACED` names a completed same-request/current-cycle replacement. `RESCUE_COMPLETED` requires completed mission outcome evidence; `SUPPLY_ONLY` requires delivered aid and settled terminal needs; `NO_ACTION_REQUIRED` requires no delivered aid or reserved/unsettled goods. Persist a RESOLUTION intent and `RESOLVING` barrier, then seal Logistics outside the Response transaction and finalize. Always `202 { operation_id, state }`; poll `GET /operations/{id}`. `409 RESOLUTION_BLOCKED { reasons: [...] }` |
 | `POST /requests/{id}/resolve/abort` or `POST /operations/{id}/abort` · Idem · Ver | kind-specific `REQUEST_RESOLVE`/`REQUEST_CANCEL` | `{ expected_version, reason }`; atomically move the exact PENDING intent to ABORTING, ask Logistics to unseal that intent outside the Response transaction, then write the durable ABORTED tombstone and restore recomputed progress. No TTL or automatic unseal. The request-scoped alias accepts resolution intents; the operation route accepts both kinds. |
@@ -110,7 +111,7 @@ Errors: `TEAM_BUSY`, `TEAM_NOT_ELIGIBLE` (details: reason codes `INACTIVE|UNAVAI
 | Method & path | Perm | Behaviour |
 |---|---|---|
 | `POST /campaigns` · `PATCH /campaigns/{id}` · Idem · Ver | `CAMPAIGN_MANAGE` | Fields are `name`, `objective`, `region_code`, `starts_at`, `ends_at`; `organization_id` is derived from the caller's single matching grant and is never accepted from the body. PATCH is allowed only in DRAFT. |
-| `POST /campaigns/{id}/activate` · `/pause` · `/resume` · `/close` · Idem · Ver | `CAMPAIGN_MANAGE` | Body includes `expected_version`; pause/close also require non-empty `reason`. Transitions are DRAFT→ACTIVE, ACTIVE→PAUSED/CLOSED, PAUSED→ACTIVE/CLOSED; CLOSED is terminal. Close ⇒ `CAMPAIGN_HAS_OPEN_REQUESTS` 409 while linked canonical requests are non-terminal. |
+| `POST /campaigns/{id}/activate` · `/pause` · `/resume` · `/close` · Idem · Ver | `CAMPAIGN_MANAGE` | Body includes `expected_version`; pause/close also require non-empty `reason`. Transitions are DRAFT→ACTIVE/CLOSED, ACTIVE→PAUSED/CLOSED, PAUSED→ACTIVE/CLOSED; CLOSED is terminal. DRAFT→CLOSED follows the campaign lifecycle in plan §8.4. Close ⇒ `CAMPAIGN_HAS_OPEN_REQUESTS` 409 while linked canonical requests are non-terminal. |
 | `GET /campaigns?cursor=&limit=` · `GET /campaigns/{id}` | `CAMPAIGN_READ` in scope | Protected detail. Lists use keyset pagination, default limit 50, maximum 100, ordered by `(created_at DESC, id DESC)`. |
 | `GET /public/campaigns?cursor=&limit=` | public | **Allowlisted projection** only: `id`, `title` (campaign name), `objective`, `region_name`, `starts_at`, `ends_at`, and `status` (`ACTIVE`/`PAUSED`). No counts of people or coordinates. Keyset order and limits match the protected list. Unknown/unset region names are `null`; Identity lookup failure returns `IDENTITY_UNAVAILABLE`. |
 | `GET /internal/campaigns/{id}` | service token | `{ id, status, organization_id, region_code, version }` for Identity grants and Logistics checks. The bearer token audience is `response`; only `identity` and `logistics` callers are accepted. |
@@ -121,6 +122,37 @@ Errors: `TEAM_BUSY`, `TEAM_NOT_ELIGIBLE` (details: reason codes `INACTIVE|UNAVAI
 | `GET /notices?unread=&cursor=&limit=` · `POST /notices/{id}/read` | recipient (naturally idempotent) | Own recipient only; keyset order `(created_at DESC, id DESC)`, default limit 50 and maximum 100. Payload contains stable codes and IDs only; Vietnamese text is rendered from the client catalog. Reading an already-read notice succeeds without changing its first `read_at`. |
 
 Campaign request details: create accepts `{ name, objective?, region_code?, starts_at?, ends_at? }`; nullable fields default to `null`. Update and lifecycle bodies include `expected_version`. Activate/resume accept only `expected_version`; pause/close accept `{ expected_version, reason }`. Management views return `id`, `organization_id`, `region_code`, `name`, `objective`, `status`, `starts_at`, `ends_at`, `version`, and `created_at`. A caller may create a campaign only when exactly one organization in their `CAMPAIGN_MANAGE` grants matches the requested region (an omitted region matches organization grants only); otherwise the request is `FORBIDDEN`. A campaign's grants must match its organization, region, and campaign id for reads and mutations.
+
+Campaign association examples:
+
+```http
+POST /api/v1/response/requests/00000000-0000-4000-8000-000000000001/attach-campaign
+Idempotency-Key: 00000000-0000-4000-8000-000000000002
+Content-Type: application/json
+
+{ "campaign_id": "00000000-0000-4000-8000-000000000003", "expected_version": 7 }
+```
+
+```json
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "status": "TRIAGED",
+  "version": 8,
+  "region_code": "NORTH-01",
+  "campaign_id": "00000000-0000-4000-8000-000000000003"
+}
+```
+
+Detaching uses `POST /api/v1/response/requests/{id}/detach-campaign` with `{ "expected_version": 8 }` and returns the same request view with `campaign_id: null` and the incremented `version`.
+
+If the target campaign is not active, the attach response is `409` with the stable code and Vietnamese message below:
+
+```json
+{
+  "code": "CAMPAIGN_NOT_ACTIVE",
+  "message": "Chiến dịch hiện không hoạt động."
+}
+```
 
 Analytics query details: all time bounds use strict UTC RFC 3339 and must satisfy `from < to`. Heatmap applies the authorized organization/region/campaign scope before aggregation, never returns request IDs or coordinates, and fails rather than returning partial results after its cell or statement limit. Summary counts reflect current request status and priority for requests whose `received_at` falls in `[from,to)`; the first verified decision and first mission offer define the two measured durations. Cache keys include authenticated user, effective grants, and normalized filters; authorization runs before cache lookup. A missing or malformed Identity region lookup fails closed with `IDENTITY_UNAVAILABLE`.
 
