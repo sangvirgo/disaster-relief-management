@@ -121,6 +121,7 @@ try {
     );
 
     const manager = await registerAndLogin('manager', organizationId, ['OPERATIONS_MANAGER', 'INTAKE_STAFF', 'CAMPAIGN_MANAGER']);
+    const intakeOnly = await registerAndLogin('intake_only', organizationId, ['INTAKE_STAFF']);
     const donor = await registerAndLogin('donor', organizationId, []);
     const suffix = randomBytes(5).toString('hex').toUpperCase();
     const itemType = await call(logisticsUrl, 'item-types', {
@@ -141,6 +142,13 @@ try {
       body: { organization_id: organizationId, region_code: regionCode, name: `Kho T12 ${suffix}` },
     });
     expectSuccess(warehouse, 201);
+
+    const intakeOnlyPublish = await call(logisticsUrl, 'donation-drives', {
+      method: 'POST', actor: intakeOnly, idempotencyKey: key(),
+      body: { title: `Không được phép T12 ${suffix}`, intake_warehouse_id: warehouse.value.id,
+        items: [{ item_id: item.value.id, target_quantity: '20.00' }] },
+    });
+    expectVietnameseError(intakeOnlyPublish, 403, 'FORBIDDEN');
 
     const campaign = await call(responseUrl, 'campaigns', {
       method: 'POST', actor: manager, idempotencyKey: key(),
@@ -243,6 +251,12 @@ try {
     expectSuccess(claimed, 200);
     assert.equal(claimed.value.donor_user_id, donor.id);
     expectSuccess(await call(logisticsUrl, `public/donations/${first.result.value.id}`, { actor: donor }));
+    expectVietnameseError(await call(logisticsUrl, `public/donations/${first.result.value.id}`, {
+      headers: first.headers,
+    }), 400, 'DONATION_SECRET_INVALID');
+    expectVietnameseError(await call(logisticsUrl, `public/donations/${first.result.value.id}`, {
+      actor: manager,
+    }), 400, 'DONATION_SECRET_INVALID');
 
     const staffSecret = randomBytes(32).toString('base64url');
     const staffDelivery = await createGuestDelivery(publicDrive.id, item.value.id, 'Người quyên góp hỗ trợ', '09022223333', staffSecret);
