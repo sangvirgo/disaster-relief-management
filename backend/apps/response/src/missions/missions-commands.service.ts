@@ -257,7 +257,7 @@ export class MissionsCommandsService {
     },
   ): Promise<IdempotentOutcome<MissionCommandView>> {
     const permission = change.mode === 'ON_BEHALF' ? 'MISSION_RECORD_ON_BEHALF' : change.mode === 'ASSIGN' ? 'MISSION_ASSIGN' : undefined;
-    const request = await this.lockRequest(manager, requestId, session, permission);
+    const request = await this.lockRequest(manager, requestId, session, permission, change.command === 'accept');
     if (protectedRequestStatuses.includes(request.status)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
     const teams = await manager.query(
       `SELECT id,organization_id,operating_region_code,reporting_mode,availability,status,readiness_required,external_contact_note

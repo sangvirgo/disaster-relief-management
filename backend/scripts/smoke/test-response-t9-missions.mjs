@@ -302,6 +302,80 @@ export async function runMissionSmoke({
   assert.equal(afterOfferedCancel.rows[0].availability, 'AVAILABLE', 'canceling OFFERED must keep team readiness');
   assert.equal(afterOfferedCancel.rows[0].readiness_required, false);
 
+  const availabilityRaceRequest = await createTriagedRequest(context, 'tranh chấp lời mời và trạng thái đội');
+  const [availabilityRaceTeam] = (await responseDb.query(
+    'SELECT version FROM rescue_team WHERE id=$1 AND availability=\'AVAILABLE\'', [appTeam.value.id],
+  )).rows;
+  assert.ok(availabilityRaceTeam, 'the team must be available before the race');
+  let availabilityRaceMissionId;
+  let availabilityPatch;
+  await responseDb.query('BEGIN');
+  try {
+    // Keep the offer's FOR SHARE compatible while forcing PATCH's FOR UPDATE to wait.
+    await responseDb.query('SELECT id FROM rescue_team WHERE id=$1 FOR SHARE', [appTeam.value.id]);
+    const availabilityRaceOffer = await call(responseUrl, `requests/${availabilityRaceRequest.id}/missions`, {
+      method: 'POST', body: { expected_version: 3, team_id: appTeam.value.id, override_reason: 'Đội được chọn trong kiểm thử.' },
+      headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+    });
+    assert.equal(availabilityRaceOffer.status, 201, JSON.stringify(availabilityRaceOffer.value));
+    availabilityRaceMissionId = availabilityRaceOffer.value.id;
+    availabilityPatch = call(responseUrl, `teams/${appTeam.value.id}`, {
+      method: 'PATCH', body: { expected_version: Number(availabilityRaceTeam.version), availability: 'UNAVAILABLE' },
+      headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+    });
+    const patchWhileLocked = await Promise.race([
+      availabilityPatch.then((value) => ({ settled: true, value })),
+      new Promise((resolve) => setTimeout(() => resolve({ settled: false }), 150)),
+    ]);
+    assert.equal(patchWhileLocked.settled, false, "PATCH must wait for the team's offer-compatible lock");
+  } finally {
+    await responseDb.query('COMMIT');
+  }
+  const blockedAvailabilityPatch = await availabilityPatch;
+  assertVietnameseError(blockedAvailabilityPatch, 409, 'TEAM_BUSY');
+  const availabilityRaceState = await responseDb.query(
+    `SELECT t.availability,m.status FROM rescue_team t
+      JOIN mission m ON m.team_id=t.id AND m.request_id=$2 WHERE t.id=$1`,
+    [appTeam.value.id, availabilityRaceRequest.id],
+  );
+  assert.deepEqual(availabilityRaceState.rows, [{ availability: 'AVAILABLE', status: 'OFFERED' }]);
+  const availabilityRaceCancel = await call(responseUrl, `missions/${availabilityRaceMissionId}/cancel`, {
+    method: 'POST', body: { expected_version: 1, reason: 'Thu hồi lời mời sau kiểm thử tranh chấp.' },
+    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+  });
+  assert.equal(availabilityRaceCancel.status, 200, JSON.stringify(availabilityRaceCancel.value));
+
+  const unavailableFirstRequest = await createTriagedRequest(context, 'đội chưa sẵn sàng trước khi phân công');
+  const [availableTeamBeforePatch] = (await responseDb.query(
+    'SELECT version FROM rescue_team WHERE id=$1 AND availability=\'AVAILABLE\'', [appTeam.value.id],
+  )).rows;
+  assert.ok(availableTeamBeforePatch, 'the team must be available before PATCH-first coverage');
+  const unavailableFirstPatch = await call(responseUrl, `teams/${appTeam.value.id}`, {
+    method: 'PATCH', body: { expected_version: Number(availableTeamBeforePatch.version), availability: 'UNAVAILABLE' },
+    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+  });
+  assert.equal(unavailableFirstPatch.status, 200, JSON.stringify(unavailableFirstPatch.value));
+  const unavailableFirstOffer = await call(responseUrl, `requests/${unavailableFirstRequest.id}/missions`, {
+    method: 'POST', body: { expected_version: 3, team_id: appTeam.value.id, override_reason: 'Đội được chọn trong kiểm thử.' },
+    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+  });
+  assertVietnameseError(unavailableFirstOffer, 409, 'TEAM_NOT_ELIGIBLE');
+  assert.equal(unavailableFirstOffer.value.details?.reason, 'UNAVAILABLE');
+  const unavailableFirstMissions = await responseDb.query(
+    'SELECT id,status FROM mission WHERE request_id=$1', [unavailableFirstRequest.id],
+  );
+  assert.deepEqual(unavailableFirstMissions.rows, [], 'an unavailable team must not receive an offered mission');
+  const unavailableTeamState = await responseDb.query(
+    'SELECT availability,readiness_required,version FROM rescue_team WHERE id=$1', [appTeam.value.id],
+  );
+  assert.equal(unavailableTeamState.rows[0].availability, 'UNAVAILABLE');
+  assert.equal(unavailableTeamState.rows[0].readiness_required, false);
+  const restoredTeam = await call(responseUrl, `teams/${appTeam.value.id}`, {
+    method: 'PATCH', body: { expected_version: Number(unavailableTeamState.rows[0].version), availability: 'AVAILABLE' },
+    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+  });
+  assert.equal(restoredTeam.status, 200, JSON.stringify(restoredTeam.value));
+
   const acceptedCancelRequest = await createTriagedRequest(context, 'hủy nhiệm vụ đã nhận');
   const acceptedCancelOffer = await call(responseUrl, `requests/${acceptedCancelRequest.id}/missions`, {
     method: 'POST', body: { expected_version: 3, team_id: appTeam.value.id, override_reason: 'Đội được chọn trong kiểm thử.' },

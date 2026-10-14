@@ -33,15 +33,18 @@ const team: TeamRow = {
   latitude: null,
 };
 
-function fixture() {
+function fixture(activeMissions: unknown[] = [], currentTeam: TeamRow = team) {
   const dataSource = {} as DataSource;
-  const managerQuery = jest.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue([[], 0]);
+  const managerQuery = jest.fn<(...args: unknown[]) => Promise<unknown>>().mockImplementation(async (...args) => {
+    if (String(args[0]).includes('FROM mission WHERE team_id=$1')) return activeMissions;
+    return [[], 0];
+  });
   const manager = { query: managerQuery } as unknown as EntityManager;
   const queries = {
     findTeam: jest.fn<(...args: unknown[]) => Promise<TeamRow | undefined>>()
-      .mockResolvedValueOnce(team)
-      .mockResolvedValueOnce(team)
-      .mockResolvedValue(team),
+      .mockResolvedValueOnce(currentTeam)
+      .mockResolvedValueOnce(currentTeam)
+      .mockResolvedValue(currentTeam),
   } as unknown as TeamsQueriesService;
   const sessions = {
     require: jest.fn<(...args: unknown[]) => Promise<ReporterSession>>().mockResolvedValue({
@@ -70,5 +73,16 @@ describe('TeamsProfileService', () => {
       .rejects.toMatchObject({ code: 'VERSION_CONFLICT', status: 409, details: { current_version: 4 } });
 
     expect(managerQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not mark a team unavailable while it has an offered mission', async () => {
+    const { service, managerQuery } = fixture([{ status: 'OFFERED' }], { ...team, availability: 'AVAILABLE' });
+
+    await expect(service.update(
+      teamId, { expected_version: 4, availability: 'UNAVAILABLE' }, idempotencyKey, request,
+    )).rejects.toMatchObject({ code: 'TEAM_BUSY', status: 409 });
+
+    expect(managerQuery).toHaveBeenCalledTimes(1);
+  expect(String(managerQuery.mock.calls[0]?.[0] ?? '')).toContain("FROM mission WHERE team_id=$1 AND status='OFFERED'");
   });
 });

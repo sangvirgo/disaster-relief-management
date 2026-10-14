@@ -20,6 +20,15 @@ interface MissionsCommandsTestSurface {
     session: unknown,
     suggestedTeamId: string | null,
   ): Promise<unknown>;
+  changeInTransaction(
+    manager: TestQueryable,
+    missionId: string,
+    requestId: string,
+    teamId: string,
+    expectedVersion: number,
+    session: unknown,
+    change: { command: string; target: string; mode: string; reason?: string },
+  ): Promise<unknown>;
   recomputeRequest(
     manager: TestQueryable,
     request: { id: string; version: number; work_cycle: number; status: string },
@@ -113,6 +122,47 @@ describe('MissionsCommandsService campaign mission-offer eligibility', () => {
     expect(query.mock.calls.map(([sql]) => sql)).toEqual([
       'SELECT campaign_id FROM assistance_request WHERE id=$1',
       'SELECT status FROM campaign WHERE id=$1 FOR SHARE',
+    ]);
+  });
+});
+
+describe('MissionsCommandsService paused campaign mission changes', () => {
+  function changeWithPausedCampaign(command: string, target: string, mode: string) {
+    const query = jest.fn(async (sql: string) => {
+      if (sql === 'SELECT campaign_id FROM assistance_request WHERE id=$1') return [{ campaign_id: campaignId }];
+      if (sql === 'SELECT status FROM campaign WHERE id=$1 FOR SHARE') return [{ status: 'PAUSED' }];
+      if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [];
+      return [];
+    });
+
+    const promise = service().changeInTransaction(
+      { query }, missionId, requestId, teamId, 1,
+      { userId: coordinatorId, grants: [] }, { command, target, mode, reason: 'Lý do kiểm thử.' },
+    );
+    return { promise, query };
+  }
+
+  it('rejects accepting an existing offer after its campaign is paused', async () => {
+    const { promise, query } = changeWithPausedCampaign('accept', 'ACCEPTED', 'LEADER');
+
+    await expect(promise).rejects.toMatchObject({ code: 'CAMPAIGN_PAUSED', status: 409 });
+    expect(query.mock.calls.map(([sql]) => sql)).toEqual([
+      'SELECT campaign_id FROM assistance_request WHERE id=$1',
+      'SELECT status FROM campaign WHERE id=$1 FOR SHARE',
+    ]);
+  });
+
+  it.each([
+    ['decline', 'DECLINED', 'LEADER'],
+    ['cancel', 'CANCELLED', 'ASSIGN'],
+  ])('still reaches the request lock for %s while its campaign is paused', async (command, target, mode) => {
+    const { promise, query } = changeWithPausedCampaign(command, target, mode);
+
+    await expect(promise).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+    expect(query.mock.calls.map(([sql]) => sql)).toEqual([
+      'SELECT campaign_id FROM assistance_request WHERE id=$1',
+      'SELECT status FROM campaign WHERE id=$1 FOR SHARE',
+      expect.stringContaining('FROM assistance_request WHERE id=$1 FOR UPDATE'),
     ]);
   });
 });

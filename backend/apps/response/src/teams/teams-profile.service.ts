@@ -124,10 +124,15 @@ export class TeamsProfileService {
         if (!row) throw new AppError('NOT_FOUND', { status: 404 });
         await this.assertCanManage(row, session, manager);
         validateExpectedVersion(Number(row.version), dto.expected_version);
-        if (dto.availability === 'AVAILABLE') {
-          if (row.readiness_required) throw new AppError('TEAM_NOT_ELIGIBLE', { status: 409, details: { reason: 'UNAVAILABLE' } });
+        if (dto.availability === 'AVAILABLE' && row.readiness_required) {
+          throw new AppError('TEAM_NOT_ELIGIBLE', { status: 409, details: { reason: 'UNAVAILABLE' } });
+        }
+        if (dto.availability === 'AVAILABLE' || dto.availability === 'UNAVAILABLE') {
+          const activeStatuses = dto.availability === 'UNAVAILABLE'
+            ? "status='OFFERED'"
+            : "status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE')";
           const active = await manager.query(
-            `SELECT 1 FROM mission WHERE team_id=$1 AND status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE') LIMIT 1`,
+            `SELECT 1 FROM mission WHERE team_id=$1 AND ${activeStatuses} LIMIT 1`,
             [teamId],
           ) as unknown[];
           if (active.length) throw new AppError('TEAM_BUSY', { status: 409 });
