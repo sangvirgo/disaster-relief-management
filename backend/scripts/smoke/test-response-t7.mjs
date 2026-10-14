@@ -200,6 +200,38 @@ try {
   assert.equal(snapshot.rows[0].basis, 'CONTACT_CONFIRMED');
   assert.equal(snapshot.rows[0].payload.approved_facts.description, 'Nước đang dâng trong nhà.');
 
+  const concurrentVerificationRequest = await createRequest(reporter, 'SELF', selfBody([105.16, 15.16]));
+  const concurrentVerificationStart = await command(`requests/${concurrentVerificationRequest.id}/start-verification`, coordinator, { expected_version: 1 });
+  assert.equal(concurrentVerificationStart.status, 200, JSON.stringify(concurrentVerificationStart.value));
+  const concurrentVerificationAttempt = await command(`requests/${concurrentVerificationRequest.id}/contact-attempts`, coordinator, {
+    contact_target: 'REPORTER', outcome: 'REACHED', note: 'Đã xác nhận thông tin.',
+  });
+  assert.equal(concurrentVerificationAttempt.status, 201, JSON.stringify(concurrentVerificationAttempt.value));
+  const verificationRace = await Promise.all([
+    command(`requests/${concurrentVerificationRequest.id}/verify`, coordinator, {
+      expected_version: 3, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [concurrentVerificationAttempt.value.id] },
+    }),
+    command(`requests/${concurrentVerificationRequest.id}/verify`, secondCoordinator, {
+      expected_version: 3, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [concurrentVerificationAttempt.value.id] },
+    }),
+  ]);
+  const verificationWinners = verificationRace.filter((result) => result.status === 200);
+  const verificationLosers = verificationRace.filter((result) => result.status === 409);
+  assert.equal(verificationWinners.length, 1, JSON.stringify(verificationRace.map((result) => result.value)));
+  assert.equal(verificationLosers.length, 1, JSON.stringify(verificationRace.map((result) => result.value)));
+  assert.equal(verificationWinners[0].value.status, 'VERIFIED');
+  assert.equal(verificationWinners[0].value.version, 4);
+  assertVietnameseError(verificationLosers[0], 409, 'VERSION_CONFLICT');
+  const concurrentVerificationState = await responseDb.query(
+    `SELECT r.status,r.version::int AS version,
+            (SELECT count(*)::int FROM verification_decision d WHERE d.request_id=r.id AND d.outcome='VERIFIED') AS decisions,
+            (SELECT count(*)::int FROM request_event e WHERE e.request_id=r.id AND e.event_type='REQUEST_VERIFIED') AS verification_events
+       FROM assistance_request r WHERE r.id=$1`, [concurrentVerificationRequest.id],
+  );
+  assert.deepEqual(concurrentVerificationState.rows[0], {
+    status: 'VERIFIED', version: 4, decisions: 1, verification_events: 1,
+  }, 'concurrent verification commits one decision and one event');
+
   const supplementRequest = await createRequest(reporter, 'SELF', selfBody([105.12, 15.12]));
   const supplementStart = await command(`requests/${supplementRequest.id}/start-verification`, coordinator, { expected_version: 1 });
   assert.equal(supplementStart.status, 200, JSON.stringify(supplementStart.value));
