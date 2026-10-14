@@ -8,6 +8,7 @@ const { Client } = require('pg');
 const { finalDistributionHandoffPredicate } = require('../../dist/apps/logistics/src/reports/donation-report.helpers.js');
 const { physicalHandoffsLateralSql } = require('../../dist/apps/logistics/src/reports/reconciliation-report.helpers.js');
 const logisticsUrl = (process.env.C48_LOGISTICS_BASE_URL ?? 'http://127.0.0.1:3003/api/v1/logistics').replace(/\/+$/u, '');
+const responseUrl = (process.env.C48_RESPONSE_BASE_URL ?? 'http://127.0.0.1:3002/api/v1/response').replace(/\/+$/u, '');
 const identityUrl = (process.env.C48_IDENTITY_BASE_URL ?? 'http://127.0.0.1:3001/api/v1/identity').replace(/\/+$/u, '');
 const logisticsDb = new Client({ connectionString: databaseUrl('C48_LOGISTICS_DATABASE_URL', 'LOGISTICS_MIGRATOR_PASSWORD', 'logistics_migrator', 'c48_logistics') });
 const identityDb = new Client({ connectionString: databaseUrl('C48_IDENTITY_DATABASE_URL', 'IDENTITY_MIGRATOR_PASSWORD', 'identity_migrator', 'c48_identity') });
@@ -239,6 +240,27 @@ async function verifyPrimaryDatabaseReportFixture() {
     point_receipt_final: '0', household_handout_final: '2.000',
   }]);
 }
+
+function mapReconciliationItems(rows) {
+  return rows.map((row) => ({
+    item: { id: row.item_id, name: row.item_name },
+    unit: { code: row.unit_code, display_name: row.unit_name, scale: Number(row.unit_scale) },
+    intake_accepted: row.intake_accepted,
+    posted_movements: row.posted_movements,
+    posted_reserved_movements: row.posted_reserved_movements,
+    reserved: row.reserved,
+    issued_in_transit: row.issued_in_transit,
+    at_point: row.at_point,
+    delivered: row.delivered,
+    returned: row.returned,
+    lost: row.lost,
+    flags: {
+      balance_mismatch: row.balance_mismatch,
+      commitment_counter_mismatch: row.commitment_counter_mismatch,
+    },
+  }));
+}
+
 async function main() {
   await Promise.all([logisticsDb.connect(), identityDb.connect()]);
   const cleanupUserIds = new Set();
@@ -247,9 +269,11 @@ async function main() {
     await verifyFinalHandoffAttribution();
     await verifyPrimaryDatabaseReportFixture();
     const warehouses = await logisticsDb.query(
-      `SELECT w.id,w.organization_id,w.region_code FROM warehouse w
+      `SELECT w.id,w.organization_id,w.region_code,
+              (SELECT count(*)::int FROM stock_balance b WHERE b.warehouse_id=w.id) AS balance_count
+         FROM warehouse w
         WHERE EXISTS (SELECT 1 FROM stock_balance b WHERE b.warehouse_id=w.id)
-        ORDER BY w.id LIMIT 1`,
+        ORDER BY balance_count DESC,w.id LIMIT 1`,
     );
     let warehouse = warehouses.rows[0];
     let organizationId = warehouse?.organization_id;
@@ -274,7 +298,7 @@ async function main() {
       });
       createdWarehouseId = created.value?.id;
       expectSuccess(created, 201);
-      warehouse = { id: created.value.id, organization_id: organizationId, region_code: regionCode };
+      warehouse = { id: created.value.id, organization_id: organizationId, region_code: regionCode, balance_count: 0 };
     }
 
     const deniedActor = await loginSmokeActor(organizationId, cleanupUserIds);
@@ -286,21 +310,73 @@ async function main() {
 
     const stock = await call(logisticsUrl, `stock?warehouse_id=${warehouse.id}&limit=100`, { actor });
     expectSuccess(stock);
-    const stockReport = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${warehouse.id}&limit=100`, { actor });
+    const stockOracle = await logisticsDb.query(
+      `WITH held AS MATERIALIZED (
+         SELECT receipt.warehouse_id,line.item_id
+           FROM donation_receipt receipt
+           JOIN LATERAL (SELECT MAX(revision) AS revision FROM receipt_count WHERE receipt_id=receipt.id) latest
+             ON latest.revision IS NOT NULL
+           JOIN receipt_count_line line ON line.receipt_id=receipt.id AND line.revision=latest.revision
+          WHERE receipt.warehouse_id=$1
+          GROUP BY receipt.warehouse_id,line.item_id
+       ), inventory AS (
+         SELECT b.item_id FROM stock_balance b WHERE b.warehouse_id=$1
+         UNION ALL
+         SELECT held.item_id FROM held
+          WHERE NOT EXISTS (
+            SELECT 1 FROM stock_balance b
+             WHERE b.warehouse_id=held.warehouse_id AND b.item_id=held.item_id
+          )
+       )
+       SELECT inventory.item_id,
+              COALESCE(balance.on_hand,0)::text AS on_hand,
+              COALESCE(balance.reserved,0)::text AS reserved,
+              (COALESCE(balance.on_hand,0)-COALESCE(balance.reserved,0))::text AS available
+         FROM inventory
+         LEFT JOIN stock_balance balance ON balance.warehouse_id=$1 AND balance.item_id=inventory.item_id
+        ORDER BY inventory.item_id`,
+      [warehouse.id],
+    );
+    const stockReport = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${warehouse.id}&limit=1`, { actor });
     expectSuccess(stockReport);
     assert.equal(typeof stockReport.value.generated_at, 'string');
+    assert.equal(stockReport.value.items[0]?.item.id, stockOracle.rows[0]?.item_id);
+    assert.equal(stockReport.value.more, stockOracle.rows.length > 1);
     const stockByItem = new Map(stock.value.items.map((row) => [row.item_id, row]));
     for (const row of stockReport.value.items) {
       const source = stockByItem.get(row.item.id);
-      assert.ok(source, `stock summary returned unknown item ${row.item.id}`);
-      assert.equal(row.on_hand, source.on_hand);
-      assert.equal(row.reserved, source.reserved);
-      assert.equal(row.available, source.available);
+      const expected = stockOracle.rows[0];
+      assert.equal(row.on_hand, expected.on_hand);
+      assert.equal(row.reserved, expected.reserved);
+      assert.equal(row.available, expected.available);
+      if (source) {
+        assert.equal(row.on_hand, source.on_hand);
+        assert.equal(row.reserved, source.reserved);
+        assert.equal(row.available, source.available);
+      }
       assert.equal(typeof row.held, 'string');
       assert.equal(typeof row.in_transit, 'string');
     }
+    if (stockOracle.rows.length > 1) {
+      assert.equal(stockReport.value.more, true);
+      assert.equal(typeof stockReport.value.cursor, 'string');
+      const stockPage2 = await call(
+        logisticsUrl,
+        `reports/stock-summary?warehouse_id=${warehouse.id}&limit=1&cursor=${encodeURIComponent(stockReport.value.cursor)}`,
+        { actor },
+      );
+      expectSuccess(stockPage2);
+      assert.equal(stockPage2.value.items.length, 1);
+      assert.equal(stockPage2.value.items[0].item.id, stockOracle.rows[1].item_id);
+      assert.equal(stockPage2.value.more, stockOracle.rows.length > 2);
+      assert.equal(stockPage2.value.items[0].on_hand, stockOracle.rows[1].on_hand);
+      assert.equal(stockPage2.value.items[0].reserved, stockOracle.rows[1].reserved);
+      assert.equal(stockPage2.value.items[0].available, stockOracle.rows[1].available);
+    } else {
+      console.log('SKIP T17 stock page-2 assertion: selected warehouse has fewer than two report rows.');
+    }
 
-    const reconciliation = await call(logisticsUrl, `reconciliation?warehouse_id=${warehouse.id}&limit=100`, { actor });
+    const reconciliation = await call(logisticsUrl, `reconciliation?warehouse_id=${warehouse.id}&limit=1`, { actor });
     expectSuccess(reconciliation);
     assert.equal(typeof reconciliation.value.generated_at, 'string');
     const reconciliationOracle = await logisticsDb.query(
@@ -386,25 +462,42 @@ async function main() {
       assert.deepEqual(reconciliation.value.items, []);
       assert.equal(reconciliation.value.more, false);
     } else {
-      const expectedReconciliationItems = reconciliationOracle.rows.slice(0, 100).map((row) => ({
-        item: { id: row.item_id, name: row.item_name },
-        unit: { code: row.unit_code, display_name: row.unit_name, scale: Number(row.unit_scale) },
-        intake_accepted: row.intake_accepted,
-        posted_movements: row.posted_movements,
-        posted_reserved_movements: row.posted_reserved_movements,
-        reserved: row.reserved,
-        issued_in_transit: row.issued_in_transit,
-        at_point: row.at_point,
-        delivered: row.delivered,
-        returned: row.returned,
-        lost: row.lost,
-        flags: {
-          balance_mismatch: row.balance_mismatch,
-          commitment_counter_mismatch: row.commitment_counter_mismatch,
-        },
-      }));
+      const expectedReconciliationItems = mapReconciliationItems(reconciliationOracle.rows.slice(0, 1));
       assert.deepEqual(reconciliation.value.items, expectedReconciliationItems);
-      assert.equal(reconciliation.value.more, reconciliationOracle.rows.length > 100);
+      assert.equal(reconciliation.value.more, reconciliationOracle.rows.length > 1);
+      if (reconciliationOracle.rows.length > 1) {
+        assert.equal(typeof reconciliation.value.cursor, 'string');
+        const reconciliationPage2 = await call(
+          logisticsUrl,
+          `reconciliation?warehouse_id=${warehouse.id}&limit=1&cursor=${encodeURIComponent(reconciliation.value.cursor)}`,
+          { actor },
+        );
+        expectSuccess(reconciliationPage2);
+        const expectedPage2 = mapReconciliationItems(reconciliationOracle.rows.slice(1, 2));
+        assert.deepEqual(reconciliationPage2.value.items, expectedPage2);
+        assert.notEqual(
+          reconciliationPage2.value.items[0].item.id,
+          reconciliation.value.items[0].item.id,
+          'reconciliation cursor page must not repeat the first item',
+        );
+        assert.equal(reconciliationPage2.value.more, reconciliationOracle.rows.length > 2);
+        if (reconciliationOracle.rows.length > 2) {
+          assert.equal(typeof reconciliationPage2.value.cursor, 'string');
+          const reconciliationPage3 = await call(
+            logisticsUrl,
+            `reconciliation?warehouse_id=${warehouse.id}&limit=1&cursor=${encodeURIComponent(reconciliationPage2.value.cursor)}`,
+            { actor },
+          );
+          expectSuccess(reconciliationPage3);
+          assert.deepEqual(
+            reconciliationPage3.value.items,
+            mapReconciliationItems(reconciliationOracle.rows.slice(2, 3)),
+          );
+          assert.equal(reconciliationPage3.value.more, reconciliationOracle.rows.length > 3);
+        }
+      } else {
+        console.log('SKIP T17 reconciliation page-2 assertion: selected warehouse has fewer than two balance rows.');
+      }
     }
 
     const now = new Date();
@@ -422,6 +515,15 @@ async function main() {
         assert.equal(typeof need[key], 'string');
       }
     }
+
+    const responseReport = await call(
+      responseUrl,
+      `reports/summary?region_code=${encodeURIComponent(warehouse.region_code)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      { actor },
+    );
+    expectSuccess(responseReport);
+    assert.equal(typeof responseReport.value.generated_at, 'string');
+    assert.equal(responseReport.value.filters.region_code, warehouse.region_code);
 
     const publicSummaryPath = `public/donation-reports/summary?warehouse_id=${warehouse.id}&limit=5`;
     const publicSummary = await call(logisticsUrl, publicSummaryPath);
@@ -454,6 +556,11 @@ async function main() {
 
     const invalidView = await call(logisticsUrl, `public/donation-reports/summary?warehouse_id=${warehouse.id}&drive_id=${randomUUID()}`);
     expectVietnameseError(invalidView, 400, 'VALIDATION_FAILED');
+
+    console.log(
+      `T17 populated main-stack report checks passed: warehouse balances=${warehouse.balance_count}, ` +
+      `reconciliation rows=${reconciliationOracle.rows.length}.`,
+    );
   } finally {
     try {
       if (createdWarehouseId) await logisticsDb.query('DELETE FROM warehouse WHERE id=$1', [createdWarehouseId]);
