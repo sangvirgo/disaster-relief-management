@@ -43,14 +43,9 @@ BEGIN;
 CREATE FUNCTION pg_temp.u(h text) RETURNS uuid LANGUAGE sql IMMUTABLE AS
 $$ SELECT ('00000000-0000-4000-8000-' || lpad(h, 12, '0'))::uuid $$;
 
-INSERT INTO region (code, name) VALUES
-  ('DEMO_A', 'Khu vực Nam (demo)'),
-  ('DEMO_B', 'Khu vực Trung (demo)')
-ON CONFLICT DO NOTHING;
-
+-- @include campaign support
 INSERT INTO organization (id, name, organization_kind) VALUES
-  (pg_temp.u('1'), 'Trung tâm điều phối C48 (demo)',    'COORDINATION'),
-  (pg_temp.u('2'), 'Hội tình nguyện miền Nam (demo)',   'VOLUNTEER')
+  (pg_temp.u('2'), 'Hội tình nguyện miền Nam (demo)', 'VOLUNTEER')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO app_user (id, username, display_name, password_hash, status, must_change_password)

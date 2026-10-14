@@ -42,22 +42,7 @@ INSERT INTO incident_category_skill (category_code, skill_code) VALUES
   ('FLOOD','BOAT'), ('TRAPPED','BOAT'), ('MEDICAL','FIRST_AID'), ('LANDSLIDE','CLIMBING')
 ON CONFLICT DO NOTHING;
 
--- Boundaries are simple rectangles. DEMO_A lon 106.60-106.80 / lat 10.70-10.85; DEMO_B lon 107.50-107.70 / lat 16.00-16.15.
--- The point (lon 105.0, lat 21.0) lies in neither, so a request there stays region-less (R7).
-INSERT INTO region_boundary (region_code, geom) VALUES
-  ('DEMO_A', ST_Multi(ST_MakeEnvelope(106.60, 10.70, 106.80, 10.85, 4326))),
-  ('DEMO_B', ST_Multi(ST_MakeEnvelope(107.50, 16.00, 107.70, 16.15, 4326)))
-ON CONFLICT DO NOTHING;
-
--- ---------- campaigns ----------
-INSERT INTO campaign (id, organization_id, region_code, name, objective, status, starts_at, ends_at, created_by_user_id, created_at) VALUES
-  (pg_temp.u('c1'), pg_temp.u('1'), 'DEMO_A', 'Chiến dịch cứu trợ khẩn cấp mùa mưa lũ',
-   'Tiếp nhận nhu cầu, điều phối cứu hộ và hỗ trợ nhu yếu phẩm cho người dân bị ảnh hưởng.', 'ACTIVE',
-   now() - interval '7 days', now() + interval '30 days', pg_temp.u('104'), now() - interval '8 days'),
-  (pg_temp.u('c2'), pg_temp.u('1'), 'DEMO_B', 'Chiến dịch hỗ trợ sơ tán và an sinh cộng đồng',
-   'Hỗ trợ sơ tán an toàn, nước sạch và nhu yếu phẩm thiết yếu cho các hộ dân trong vùng ảnh hưởng.', 'ACTIVE',
-   now() - interval '7 days', now() + interval '30 days', pg_temp.u('104'), now() - interval '2 days')
-ON CONFLICT DO NOTHING;
+-- @include demo campaigns
 
 -- ---------- teams ----------
 INSERT INTO rescue_team (id, organization_id, operating_region_code, name, team_kind, reporting_mode, external_contact_note,
