@@ -35,6 +35,22 @@ function assertVietnameseError(result, status, code) {
   assert.equal(result.headers.get('cache-control'), 'no-store');
 }
 
+async function waitForTeamRowLockWaits(database, blockerPid, minimum) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const result = await database.query(
+      `SELECT count(*)::int AS count FROM pg_stat_activity
+        WHERE datname=current_database() AND pid<>$1 AND wait_event_type='Lock'
+          AND $1=ANY(pg_blocking_pids(pid))
+          AND query ILIKE '%FROM rescue_team t%'`,
+      [blockerPid],
+    );
+    if (result.rows[0].count >= minimum) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  assert.fail(`Timed out waiting for ${minimum} team command(s) on the locked rescue_team row`);
+}
+
 async function registerAndLogin(label, regionCode) {
   const suffix = randomBytes(5).toString('hex');
   const credentials = {
@@ -630,6 +646,81 @@ try {
     member_role: 'LEADER',
   }]);
   assert.ok([eligibleLeader.id, concurrentLeader.id].includes(concurrentLeadership.rows[0].user_id));
+
+  const beforeRemovalTransfer = await responseDb.query(
+    `SELECT t.version,m.user_id AS leader_user_id FROM rescue_team t
+      JOIN team_member m ON m.team_id=t.id AND m.left_at IS NULL AND m.member_role='LEADER'
+     WHERE t.id=$1`, [appTeam.value.id],
+  );
+  assert.equal(beforeRemovalTransfer.rows.length, 1);
+  const removalTransferVersion = Number(beforeRemovalTransfer.rows[0].version);
+  const removalTransferTarget = await responseDb.query(
+    `SELECT user_id FROM team_member
+      WHERE team_id=$1 AND user_id=ANY($2::uuid[]) AND member_role='MEMBER' AND left_at IS NULL
+      ORDER BY user_id LIMIT 1`, [appTeam.value.id, [eligibleLeader.id, concurrentLeader.id]],
+  );
+  assert.equal(removalTransferTarget.rows.length, 1);
+  const targetUserId = removalTransferTarget.rows[0].user_id;
+  const lockDb = new Client({ connectionString: process.env.C48_RESPONSE_DATABASE_URL });
+  await lockDb.connect();
+  let transactionOpen = false;
+  let pendingRace;
+  let racedTransfer;
+  let racedRemoval;
+  try {
+    await lockDb.query('BEGIN');
+    transactionOpen = true;
+    await lockDb.query('SELECT id FROM rescue_team WHERE id=$1 FOR UPDATE', [appTeam.value.id]);
+    const blockerPid = (await lockDb.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    pendingRace = Promise.allSettled([
+      call(responseUrl, `teams/${appTeam.value.id}/leader`, {
+        method: 'POST', body: { user_id: targetUserId, expected_version: removalTransferVersion },
+        headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+      }),
+      call(responseUrl, `teams/${appTeam.value.id}/members/${targetUserId}/remove`, {
+        method: 'POST', headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+      }),
+    ]);
+    await waitForTeamRowLockWaits(responseDb, blockerPid, 2);
+    await lockDb.query('COMMIT');
+    transactionOpen = false;
+    const raceResults = await pendingRace;
+    if (raceResults[0].status === 'rejected') throw raceResults[0].reason;
+    if (raceResults[1].status === 'rejected') throw raceResults[1].reason;
+    [racedTransfer, racedRemoval] = raceResults.map(({ value }) => value);
+  } finally {
+    if (transactionOpen) await lockDb.query('ROLLBACK');
+    if (pendingRace) await pendingRace.catch(() => undefined);
+    await lockDb.end();
+  }
+  if (racedRemoval.status === 204) {
+    assertVietnameseError(racedTransfer, 404, 'NOT_FOUND');
+  } else {
+    assertVietnameseError(racedRemoval, 409, 'LEADER_REQUIRED');
+    assert.equal(racedTransfer.status, 200, JSON.stringify(racedTransfer.value));
+    assert.deepEqual(racedTransfer.value, {
+      team_id: appTeam.value.id, leader_user_id: targetUserId, version: removalTransferVersion + 1,
+    });
+  }
+  const afterRemovalTransfer = await responseDb.query(
+    `SELECT t.version,m.user_id,m.member_role FROM rescue_team t
+      JOIN team_member m ON m.team_id=t.id AND m.left_at IS NULL AND m.member_role='LEADER'
+     WHERE t.id=$1`, [appTeam.value.id],
+  );
+  assert.equal(afterRemovalTransfer.rows.length, 1, 'APP team must retain one active leader');
+  assert.deepEqual(afterRemovalTransfer.rows[0], {
+    version: removalTransferVersion + (racedTransfer.status === 200 ? 1 : 0),
+    user_id: racedTransfer.status === 200 ? targetUserId : beforeRemovalTransfer.rows[0].leader_user_id,
+    member_role: 'LEADER',
+  });
+  const racedMember = await responseDb.query(
+    'SELECT member_role,left_at FROM team_member WHERE team_id=$1 AND user_id=$2',
+    [appTeam.value.id, targetUserId],
+  );
+  assert.equal(racedMember.rows.length, 1);
+  assert.equal(racedMember.rows[0].member_role, racedTransfer.status === 200 ? 'LEADER' : 'MEMBER');
+  if (racedTransfer.status === 200) assert.equal(racedMember.rows[0].left_at, null);
+  else assert.ok(racedMember.rows[0].left_at);
 
   assert.ok(reporter.id);
   console.log('T8 response team and skill catalog smoke checks passed.');
