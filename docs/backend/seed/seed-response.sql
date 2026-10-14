@@ -51,12 +51,12 @@ ON CONFLICT DO NOTHING;
 
 -- ---------- campaigns ----------
 INSERT INTO campaign (id, organization_id, region_code, name, objective, status, starts_at, ends_at, created_by_user_id, created_at) VALUES
-  (pg_temp.u('c1'), pg_temp.u('1'), 'DEMO_A', 'Chiến dịch cứu trợ lũ Khu vực Nam (demo)',
-   'Cứu hộ và cứu trợ khẩn cấp cho các hộ bị ngập (dữ liệu demo).', 'ACTIVE',
+  (pg_temp.u('c1'), pg_temp.u('1'), 'DEMO_A', 'Chiến dịch cứu trợ khẩn cấp mùa mưa lũ',
+   'Tiếp nhận nhu cầu, điều phối cứu hộ và hỗ trợ nhu yếu phẩm cho người dân bị ảnh hưởng.', 'ACTIVE',
    now() - interval '7 days', now() + interval '30 days', pg_temp.u('104'), now() - interval '8 days'),
-  (pg_temp.u('c2'), pg_temp.u('1'), 'DEMO_B', 'Chiến dịch chuẩn bị mùa mưa bão Khu vực Trung (demo)',
-   'Bản nháp chiến dịch chuẩn bị trước mùa mưa bão (dữ liệu demo).', 'DRAFT',
-   NULL, NULL, pg_temp.u('104'), now() - interval '2 days')
+  (pg_temp.u('c2'), pg_temp.u('1'), 'DEMO_B', 'Chiến dịch hỗ trợ sơ tán và an sinh cộng đồng',
+   'Hỗ trợ sơ tán an toàn, nước sạch và nhu yếu phẩm thiết yếu cho các hộ dân trong vùng ảnh hưởng.', 'ACTIVE',
+   now() - interval '7 days', now() + interval '30 days', pg_temp.u('104'), now() - interval '2 days')
 ON CONFLICT DO NOTHING;
 
 -- ---------- teams ----------
@@ -359,8 +359,8 @@ SELECT pg_temp.must('teams: 5 teams, mixed kinds/modes, stale position, no posit
 SELECT pg_temp.must('regions do not overlap and 9 categories / 5 skills / 4 category-skill links',
   NOT (SELECT ST_Intersects(a.geom, b.geom) FROM region_boundary a, region_boundary b WHERE a.region_code = 'DEMO_A' AND b.region_code = 'DEMO_B')
   AND (SELECT count(*) FROM incident_category) = 9 AND (SELECT count(*) FROM skill) = 5 AND (SELECT count(*) FROM incident_category_skill) = 4);
-SELECT pg_temp.must('2 campaigns ACTIVE+DRAFT; 3 notices for coord1',
-  (SELECT count(*) FROM campaign WHERE status IN ('ACTIVE','DRAFT')) = 2
+SELECT pg_temp.must('2 active campaigns; 3 notices for coord1',
+  (SELECT count(*) FROM campaign WHERE status = 'ACTIVE') = 2
   AND (SELECT count(*) FROM notice WHERE recipient_user_id = pg_temp.u('102')) = 3
   AND (SELECT count(*) FROM evidence_metadata) = 0);
 
