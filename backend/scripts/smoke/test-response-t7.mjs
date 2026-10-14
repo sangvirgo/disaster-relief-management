@@ -109,6 +109,22 @@ async function command(path, user, body, idempotencyKey = key()) {
   return { ...result, idempotencyKey };
 }
 
+async function waitForRequestRowLockWaits(database, blockerPid, minimum) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const result = await database.query(
+      `SELECT count(*)::int AS count FROM pg_stat_activity
+        WHERE datname=current_database() AND pid<>$1 AND wait_event_type='Lock'
+          AND $1=ANY(pg_blocking_pids(pid))
+          AND query ILIKE '%FROM assistance_request WHERE id=$1 FOR UPDATE%'`,
+      [blockerPid],
+    );
+    if (result.rows[0].count >= minimum) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  assert.fail(`Timed out waiting for ${minimum} verification command(s) on the locked assistance_request row`);
+}
+
 await Promise.all([responseDb.connect(), identityDb.connect()]);
 try {
   await identityDb.query(
@@ -207,14 +223,33 @@ try {
     contact_target: 'REPORTER', outcome: 'REACHED', note: 'Đã xác nhận thông tin.',
   });
   assert.equal(concurrentVerificationAttempt.status, 201, JSON.stringify(concurrentVerificationAttempt.value));
-  const verificationRace = await Promise.all([
-    command(`requests/${concurrentVerificationRequest.id}/verify`, coordinator, {
-      expected_version: 3, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [concurrentVerificationAttempt.value.id] },
-    }),
-    command(`requests/${concurrentVerificationRequest.id}/verify`, secondCoordinator, {
-      expected_version: 3, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [concurrentVerificationAttempt.value.id] },
-    }),
-  ]);
+  const lockDb = new Client({ connectionString: process.env.C48_RESPONSE_DATABASE_URL });
+  await lockDb.connect();
+  let transactionOpen = false;
+  let pendingVerificationRace;
+  let verificationRace;
+  try {
+    await lockDb.query('BEGIN');
+    transactionOpen = true;
+    await lockDb.query('SELECT id FROM assistance_request WHERE id=$1 FOR UPDATE', [concurrentVerificationRequest.id]);
+    const blockerPid = (await lockDb.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    pendingVerificationRace = Promise.all([
+      command(`requests/${concurrentVerificationRequest.id}/verify`, coordinator, {
+        expected_version: 3, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [concurrentVerificationAttempt.value.id] },
+      }),
+      command(`requests/${concurrentVerificationRequest.id}/verify`, secondCoordinator, {
+        expected_version: 3, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [concurrentVerificationAttempt.value.id] },
+      }),
+    ]);
+    await waitForRequestRowLockWaits(responseDb, blockerPid, 2);
+    await lockDb.query('COMMIT');
+    transactionOpen = false;
+    verificationRace = await pendingVerificationRace;
+  } finally {
+    if (transactionOpen) await lockDb.query('ROLLBACK');
+    if (pendingVerificationRace) await pendingVerificationRace.catch(() => undefined);
+    await lockDb.end();
+  }
   const verificationWinners = verificationRace.filter((result) => result.status === 200);
   const verificationLosers = verificationRace.filter((result) => result.status === 409);
   assert.equal(verificationWinners.length, 1, JSON.stringify(verificationRace.map((result) => result.value)));
