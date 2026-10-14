@@ -12,6 +12,14 @@ import { CatalogPageQueryDto, CreateItemDto, CreateItemTypeDto, CreateUnitDto, D
 type Queryable = Pick<DataSource | EntityManager, 'query'>;
 type LogisticsRequest = Request & { idempotencyKey?: string };
 
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+function validItemCursor(cursor: ReturnType<typeof decodeKeysetCursor>): boolean {
+  if (cursor.sort.length !== 1 || typeof cursor.sort[0] !== 'string' || !uuidPattern.test(cursor.id)) return false;
+  const date = new Date(cursor.sort[0]);
+  return Number.isFinite(date.getTime()) && date.toISOString() === cursor.sort[0];
+}
+
 interface ItemRow {
   id: string;
   item_type_code: string;
@@ -98,7 +106,7 @@ export class CatalogService {
     await this.sessions.require(request);
     const filters = { type: query.type ?? null, status: query.status ?? null, query: query.query?.trim().toLocaleLowerCase('en-US') || null };
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : null;
-    if (cursor && (cursor.sort.length !== 1 || typeof cursor.sort[0] !== 'string')) throw new AppError('CURSOR_INVALID', { status: 400 });
+    if (cursor && !validItemCursor(cursor)) throw new AppError('CURSOR_INVALID', { status: 400 });
 
     const values: unknown[] = [];
     const conditions: string[] = [];

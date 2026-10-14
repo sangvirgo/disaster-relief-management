@@ -1,8 +1,24 @@
 import { jest } from '@jest/globals';
+import { encodeKeysetCursor } from '../../../packages/technical/src/pagination/keyset';
 import { CatalogService } from '../src/catalog/catalog.service';
 import { hasCatalogManageGrant } from '../src/catalog/catalog.helpers';
 
 describe('Logistics catalog permissions', () => {
+  it.each([
+    ['timestamp', ['not-a-time'], '33333333-3333-4333-8333-333333333333'],
+    ['id', ['2026-01-01T00:00:00.000Z'], 'not-a-uuid'],
+  ] as const)('rejects an item cursor with an invalid %s before querying', async (_field, sort, id) => {
+    const filters = { type: null, status: null, query: null };
+    const cursor = encodeKeysetCursor(sort, id, filters);
+    const dataSource = { query: jest.fn(async () => []) };
+    const sessions = { require: jest.fn(async () => ({ userId: '11111111-1111-4111-8111-111111111111', grants: [] })) };
+    const service = new CatalogService(dataSource as never, {} as never, sessions as never);
+
+    await expect(service.items({ cursor }, { method: 'GET', headers: {} } as never))
+      .rejects.toMatchObject({ code: 'CURSOR_INVALID', status: 400 });
+    expect(dataSource.query).not.toHaveBeenCalled();
+  });
+
   it('rejects catalog writes before opening an idempotent command without CATALOG_MANAGE', async () => {
     const dataSource = { query: jest.fn(), transaction: jest.fn() };
     const idempotency = { execute: jest.fn() };

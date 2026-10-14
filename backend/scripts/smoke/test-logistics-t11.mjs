@@ -9,6 +9,7 @@ const identityUrl = requiredEnv('C48_IDENTITY_BASE_URL').replace(/\/+$/u, '');
 const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DATABASE_URL') });
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
 const organizationId = randomUUID();
+const otherOrganizationId = randomUUID();
 const regionCode = `T11_${randomBytes(5).toString('hex').toUpperCase()}`;
 let identityIp = 200;
 
@@ -50,7 +51,7 @@ function expectVietnameseError(result, status, code) {
   assert.equal(result.headers.get('cache-control'), 'no-store');
 }
 
-async function registerAndLogin(label, roles) {
+async function registerAndLogin(label, roles, grantOrganizationId = organizationId) {
   const suffix = randomBytes(5).toString('hex');
   const credentials = {
     username: `t11${label}${suffix}`,
@@ -69,7 +70,7 @@ async function registerAndLogin(label, roles) {
     await identityDb.query(
       `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
        VALUES ($1,$2,'ORGANIZATION',$3)`,
-      [userId, role, organizationId],
+      [userId, role, grantOrganizationId],
     );
   }
   const login = await call(identityUrl, 'auth/login', {
@@ -92,11 +93,16 @@ try {
     [organizationId, `T11 test ${organizationId}`],
   );
   await identityDb.query(
+    `INSERT INTO organization (id,name,organization_kind) VALUES ($1,$2,'COORDINATION')`,
+    [otherOrganizationId, `T11 other organization ${otherOrganizationId}`],
+  );
+  await identityDb.query(
     'INSERT INTO region (code,name) VALUES ($1,$2)',
     [regionCode, 'Khu vực kiểm thử T11'],
   );
 
   const operator = await registerAndLogin('ops', ['OPERATIONS_MANAGER']);
+  const otherOrganizationOperator = await registerAndLogin('other_org_ops', ['OPERATIONS_MANAGER'], otherOrganizationId);
   const requester = await registerAndLogin('requester', ['INTAKE_STAFF', 'REVIEWER']);
   const reviewers = await Promise.all([
     registerAndLogin('reviewer_a', ['REVIEWER']),
@@ -148,7 +154,7 @@ try {
     method: 'POST', actor: operator, idempotencyKey: key(),
     body: {
       organization_id: organizationId, region_code: regionCode,
-      identifier: `T11-${suffix}`, vehicle_type: 'Xe tải kiểm thử',
+      identifier: `T11-${suffix}`, vehicle_type: 'Xe tải kiểm thử', capacity: '100.00', capacity_unit: unitCode,
     },
   });
   expectSuccess(vehicle, 201);
@@ -164,6 +170,50 @@ try {
   const pointDetail = await call(logisticsUrl, `relief-points/${point.value.id}`, { actor: operator });
   expectSuccess(pointDetail);
   assert.equal(pointDetail.value.id, point.value.id);
+
+  const hiddenPoint = await call(logisticsUrl, `relief-points/${point.value.id}`, { actor: otherOrganizationOperator });
+  expectVietnameseError(hiddenPoint, 404, 'NOT_FOUND');
+  const forbiddenPatch = await call(logisticsUrl, `relief-points/${point.value.id}`, {
+    method: 'PATCH', actor: otherOrganizationOperator, idempotencyKey: key(),
+    body: { expected_version: 1, operating_note: 'Không được phép cập nhật.' },
+  });
+  expectVietnameseError(forbiddenPatch, 404, 'NOT_FOUND');
+
+  const invalidPointPatch = await call(logisticsUrl, `relief-points/${point.value.id}`, {
+    method: 'PATCH', actor: operator, idempotencyKey: key(),
+    body: { expected_version: 1, location: { type: 'Point', coordinates: [181, 21.03] } },
+  });
+  expectVietnameseError(invalidPointPatch, 400, 'VALIDATION_FAILED');
+
+  const updatedWarehouse = await call(logisticsUrl, `warehouses/${warehouse.value.id}`, {
+    method: 'PATCH', actor: operator, idempotencyKey: key(),
+    body: { expected_version: 1, name: `Kho T11 cập nhật ${suffix}`, location_public: true },
+  });
+  expectSuccess(updatedWarehouse);
+  assert.equal(updatedWarehouse.value.version, 2);
+  assert.equal(updatedWarehouse.value.location_public, true);
+
+  const updatedPoint = await call(logisticsUrl, `relief-points/${point.value.id}`, {
+    method: 'PATCH', actor: operator, idempotencyKey: key(),
+    body: { expected_version: 1, operating_note: `T11 cập nhật ${suffix}` },
+  });
+  expectSuccess(updatedPoint);
+  assert.equal(updatedPoint.value.version, 2);
+  assert.equal(updatedPoint.value.operating_note, `T11 cập nhật ${suffix}`);
+
+  const stalePointPatch = await call(logisticsUrl, `relief-points/${point.value.id}`, {
+    method: 'PATCH', actor: operator, idempotencyKey: key(),
+    body: { expected_version: 1, name: `Điểm cũ ${suffix}` },
+  });
+  expectVietnameseError(stalePointPatch, 409, 'VERSION_CONFLICT');
+
+  const updatedVehicle = await call(logisticsUrl, `vehicles/${vehicle.value.id}`, {
+    method: 'PATCH', actor: operator, idempotencyKey: key(),
+    body: { expected_version: 1, identifier: `T11-${suffix}-UPDATED`, capacity: '120.00', capacity_unit: unitCode },
+  });
+  expectSuccess(updatedVehicle);
+  assert.equal(updatedVehicle.value.version, 2);
+  assert.equal(updatedVehicle.value.capacity, '120.000');
 
   const opening = await call(logisticsUrl, 'stock/opening', {
     method: 'POST', actor: operator, idempotencyKey: key(),
@@ -218,7 +268,50 @@ try {
   assert.equal(ledger.rows[0]?.balanced, true, 'stock balance must equal the append-only movement sum');
   assert.equal(Number(ledger.rows[0]?.adjustment_movements), 1, 'approval race must post exactly one movement');
 
-  console.log('PASS Logistics T11 catalog, assets, stock opening, independent adjustment review race, and ledger reads');
+  for (const [path, asset] of [
+    ['warehouses', warehouse.value],
+    ['relief-points', point.value],
+    ['vehicles', vehicle.value],
+  ]) {
+    const deactivated = await call(logisticsUrl, `${path}/${asset.id}/deactivate`, {
+      method: 'POST', actor: operator, idempotencyKey: key(), body: { expected_version: 2 },
+    });
+    expectSuccess(deactivated);
+    assert.equal(deactivated.value.status, 'INACTIVE');
+    assert.equal(deactivated.value.version, 3);
+
+    const historical = await call(logisticsUrl, `${path}?status=INACTIVE&limit=100`, { actor: operator });
+    expectSuccess(historical);
+    const retained = historical.value.items.find((row) => row.id === asset.id);
+    assert.equal(retained?.status, 'INACTIVE');
+    assert.equal(retained?.version, 3);
+  }
+
+  const assetHistory = await logisticsDb.query(
+    `SELECT action,entity_id,before_state,after_state FROM audit_log
+      WHERE entity_type=ANY($1::text[]) AND entity_id=ANY($2::text[])`,
+    [['warehouse', 'relief_point', 'vehicle'], [warehouse.value.id, point.value.id, vehicle.value.id]],
+  );
+  assert.equal(assetHistory.rowCount, 9, 'asset create, update and deactivation audit history must be retained');
+  for (const [asset, prefix] of [
+    [warehouse.value, 'WAREHOUSE'],
+    [point.value, 'RELIEF_POINT'],
+    [vehicle.value, 'VEHICLE'],
+  ]) {
+    const history = assetHistory.rows.filter((row) => row.entity_id === asset.id);
+    assert.equal(history.length, 3, `expected create, update and deactivation history for ${prefix}`);
+    const created = history.find((row) => row.action === `${prefix}_CREATED`);
+    const updated = history.find((row) => row.action === `${prefix}_UPDATED`);
+    const deactivated = history.find((row) => row.action === `${prefix}_DEACTIVATED`);
+    assert.equal(created?.before_state, null);
+    assert.equal(created?.after_state.version, 1);
+    assert.equal(updated?.before_state.version, 1);
+    assert.equal(updated?.after_state.version, 2);
+    assert.equal(deactivated?.before_state.version, 2);
+    assert.equal(deactivated?.after_state.version, 3);
+  }
+
+  console.log('PASS Logistics T11 catalog, asset CRUD/scope/history, stock opening, independent adjustment review race, and ledger reads');
 } finally {
   await Promise.all([logisticsDb.end(), identityDb.end()]);
 }
