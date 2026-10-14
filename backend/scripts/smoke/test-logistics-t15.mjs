@@ -10,11 +10,11 @@ const identityUrl = requiredEnv('C48_IDENTITY_BASE_URL').replace(/\/+$/u, '');
 const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DATABASE_URL') });
 const responseDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
-const organizationId = '40000000-0000-4000-8000-000000000004';
+const organizationId = requiredEnv('DEMO_INTAKE_ORGANIZATION_ID');
 const suffix = randomBytes(5).toString('hex').toUpperCase();
 const regionCode = `T15_${suffix}`;
 const categoryCode = `T15_FLOOD_${suffix}`;
-let identityIp = 20;
+let identityIp = 20 + randomBytes(1)[0] % 200;
 let requestIp = 120;
 
 function requiredEnv(name) {
@@ -25,16 +25,16 @@ function requiredEnv(name) {
 
 function key() { return randomUUID(); }
 
-async function waitForLockWait(queryFragment, label) {
+async function waitForLockWait(relation, label, previousWaiter = 0) {
   const deadline = Date.now() + 5_000;
   while (Date.now() < deadline) {
-    await logisticsDb.query('SELECT pg_stat_clear_snapshot()');
     const waiting = await logisticsDb.query(
-      `SELECT 1 FROM pg_stat_activity
-        WHERE datname=current_database() AND wait_event_type='Lock' AND query ILIKE $1 LIMIT 1`,
-      [`%${queryFragment}%`],
+      `SELECT DISTINCT pid FROM pg_locks
+        WHERE relation=$1::regclass AND pid<>pg_backend_pid() AND pid<>$2
+          AND pg_blocking_pids(pid) && ARRAY[pg_backend_pid(),$2]::int[] LIMIT 1`,
+      [relation, previousWaiter],
     );
-    if (waiting.rowCount) return;
+    if (waiting.rowCount) return waiting.rows[0].pid;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   assert.fail(`Timed out waiting for ${label} database lock`);
@@ -256,6 +256,22 @@ try {
   });
   expectSuccess(reliefPoint, 201);
 
+  for (const approved of [false, true]) {
+    const candidate = await createDistribution(staff, warehouse.value.id, item.value.id, '1.00', reliefPoint.value.id);
+    if (approved) {
+      expectSuccess(await command(logisticsUrl, `distributions/${candidate.id}/approve`, approver, { expected_version: 1 }));
+    }
+    const cancelled = await command(logisticsUrl, `distributions/${candidate.id}/cancel`, approved ? approver : staff, { expected_version: 1 });
+    expectSuccess(cancelled);
+    assert.equal(cancelled.value.status, 'CANCELLED');
+    assert.equal(cancelled.value.version, 2);
+    const movements = await logisticsDb.query(
+      'SELECT id FROM stock_movement WHERE distribution_line_id=ANY($1::uuid[])',
+      [candidate.lines.map((line) => line.id)],
+    );
+    assert.equal(movements.rowCount, 0);
+  }
+
   const request = await createRequest(reporter);
   await verifyRequest(request, staff);
   const requestState = await responseDb.query('SELECT work_cycle FROM assistance_request WHERE id=$1', [request.id]);
@@ -367,6 +383,28 @@ try {
   const pointDistribution = await createDistribution(staff, warehouse.value.id, item.value.id, '6.00', reliefPoint.value.id);
   const pointIssued = await approveAndDispatch(pointDistribution, approver, dispatcher);
   const pointLineId = pointIssued.lines[0].id;
+  const beforeCancellation = await logisticsDb.query(
+    'SELECT on_hand::text,reserved::text FROM stock_balance WHERE warehouse_id=$1 AND item_id=$2',
+    [warehouse.value.id, item.value.id],
+  );
+  const movementsBeforeCancellation = await logisticsDb.query(
+    'SELECT id,movement_type FROM stock_movement WHERE distribution_line_id=$1 ORDER BY id', [pointLineId],
+  );
+  assert.equal(movementsBeforeCancellation.rows.filter((row) => row.movement_type === 'ISSUE').length, 1);
+  const rejectedCancellation = await command(logisticsUrl, `distributions/${pointDistribution.id}/cancel`, staff, {
+    expected_version: pointIssued.version,
+  });
+  expectVietnameseError(rejectedCancellation, 409, 'ALREADY_DISPATCHED');
+  const afterCancellation = await logisticsDb.query(
+    'SELECT on_hand::text,reserved::text FROM stock_balance WHERE warehouse_id=$1 AND item_id=$2',
+    [warehouse.value.id, item.value.id],
+  );
+  const movementsAfterCancellation = await logisticsDb.query(
+    'SELECT id,movement_type FROM stock_movement WHERE distribution_line_id=$1 ORDER BY id', [pointLineId],
+  );
+  assert.deepEqual(afterCancellation.rows, beforeCancellation.rows);
+  assert.deepEqual(movementsAfterCancellation.rows, movementsBeforeCancellation.rows);
+  assert.equal((await distributionDetail(pointDistribution.id, staff)).status, 'DISPATCHED');
   const receiptBody = {
     handoff_kind: 'POINT_RECEIPT',
     receiver_label: 'Nhân viên điểm cứu trợ T15',
@@ -520,6 +558,113 @@ try {
   await identityDb.query('UPDATE app_user SET authz_version=authz_version+1 WHERE id=$1', [reviewWinner.id]);
   await login(reviewWinner);
 
+  const targetItem = await command(logisticsUrl, 'items', staff, {
+    item_type_code: itemType.value.code, unit_code: unit.value.code, name: `Vật tư giao tại điểm T15 ${suffix}`,
+  });
+  expectSuccess(targetItem, 201);
+  expectSuccess(await command(logisticsUrl, 'stock/opening', staff, {
+    warehouse_id: warehouse.value.id,
+    lines: [{ item_id: targetItem.value.id, quantity: '3.00' }],
+    note: 'Tồn kiểm thử giao tại điểm và đối soát sau niêm phong.',
+  }), 201);
+  const targetRequest = await createRequest(reporter);
+  await verifyRequest(targetRequest, staff);
+  const targetRequestState = await responseDb.query(
+    'SELECT version,work_cycle FROM assistance_request WHERE id=$1', [targetRequest.id],
+  );
+  expectSuccess(await command(responseUrl, `requests/${targetRequest.id}/triage`, staff, {
+    expected_version: Number(targetRequestState.rows[0].version), priority: 'P3', priority_basis: 'COMPLETE',
+  }));
+  const targetNeed = await command(logisticsUrl, 'needs', staff, {
+    request_id: targetRequest.id, work_cycle: Number(targetRequestState.rows[0].work_cycle),
+    item_id: targetItem.value.id, quantity: '3.00', designated_point_id: reliefPoint.value.id,
+    reason: 'Điểm cứu trợ tiếp nhận hàng cho khu dân cư.',
+  });
+  expectSuccess(targetNeed, 201);
+  assert.equal(targetNeed.value.delivery_target_kind, 'RELIEF_POINT');
+  const targetCommitment = await command(logisticsUrl, `needs/${targetNeed.value.id}/commitments`, staff, {
+    warehouse_id: warehouse.value.id, quantity: '3.00',
+  });
+  expectSuccess(targetCommitment, 201);
+  const targetDistribution = await createDistribution(
+    staff, warehouse.value.id, targetItem.value.id, '3.00', reliefPoint.value.id, targetCommitment.value.id,
+  );
+  const targetIssued = await approveAndDispatch(targetDistribution, approver, dispatcher);
+  const targetLineId = targetIssued.lines[0].id;
+  const targetReceipt = await handoff(targetDistribution.id, secondRecorder, {
+    handoff_kind: 'POINT_RECEIPT', receiver_label: 'Nhân viên điểm cứu trợ T15',
+    confirmation_basis: 'Điểm cứu trợ đã kiểm đếm đủ hàng.', occurred_at: new Date().toISOString(),
+    lines: [{ distribution_line_id: targetLineId, quantity: '3.00' }],
+  });
+  expectSuccess(targetReceipt.result, 201);
+  const targetFulfillment = await call(logisticsUrl, `requests/${targetRequest.id}/fulfillment`, { actor: staff });
+  expectSuccess(targetFulfillment);
+  assert.equal(targetFulfillment.value.needs[0].status, 'FULFILLED');
+  assert.equal(Number(targetFulfillment.value.needs[0].delivered), 3);
+  const settlementBeforeCustody = await logisticsDb.query(
+    'SELECT handoff_line_id,commitment_id,settlement_type FROM issued_line_settlement WHERE commitment_id=$1 ORDER BY handoff_line_id',
+    [targetCommitment.value.id],
+  );
+  assert.deepEqual(settlementBeforeCustody.rows, [{
+    handoff_line_id: targetReceipt.result.value.lines[0].id,
+    commitment_id: targetCommitment.value.id, settlement_type: 'DELIVERED',
+  }]);
+  const countersBeforeCustody = await logisticsDb.query(
+    'SELECT issued_quantity::text,delivered_quantity::text,returned_quantity::text,lost_quantity::text,version FROM commitment WHERE id=$1',
+    [targetCommitment.value.id],
+  );
+  assert.equal(Number(countersBeforeCustody.rows[0].issued_quantity), 3);
+  assert.equal(Number(countersBeforeCustody.rows[0].delivered_quantity), 3);
+  const beforeResolve = await responseDb.query('SELECT version FROM assistance_request WHERE id=$1', [targetRequest.id]);
+  const targetResolution = await command(responseUrl, `requests/${targetRequest.id}/resolve`, staff, {
+    expected_version: Number(beforeResolve.rows[0].version), outcome_basis: 'SUPPLY_ONLY',
+    resolution_reason: 'Điểm cứu trợ đã tiếp nhận đủ nhu cầu được giao.',
+  });
+  expectSuccess(targetResolution, 202);
+  const targetOperation = await call(responseUrl, `operations/${targetResolution.value.operation_id}`, { actor: staff });
+  expectSuccess(targetOperation);
+  assert.equal(targetOperation.value.state, 'COMPLETED');
+  const targetCycle = await logisticsDb.query('SELECT state FROM fulfillment_cycle WHERE request_id=$1', [targetRequest.id]);
+  assert.deepEqual(targetCycle.rows, [{ state: 'SEALED' }]);
+
+  for (const [kind, actor] of [['HOUSEHOLD_HANDOUT', secondRecorder], ['RETURN', returner], ['LOSS', secondRecorder]]) {
+    const custody = await handoff(targetDistribution.id, actor, {
+      handoff_kind: kind,
+      ...(kind === 'HOUSEHOLD_HANDOUT' ? {} : { source_stage: 'AT_POINT' }),
+      ...(kind === 'LOSS' ? {} : { receiver_label: kind === 'RETURN' ? `Kho ${suffix}` : 'Hộ dân tại điểm T15' }),
+      confirmation_basis: 'Xác nhận biến động hàng thực tế tại điểm sau khi hoàn thành nhu cầu.',
+      occurred_at: new Date().toISOString(),
+      lines: [{ distribution_line_id: targetLineId, quantity: '1.00' }],
+    });
+    expectSuccess(custody.result, 201);
+    if (kind === 'LOSS') {
+      assert.equal(custody.result.value.status, 'PENDING_LOSS');
+      expectSuccess(await command(logisticsUrl, `distributions/${targetDistribution.id}/handoffs/${custody.result.value.id}/review-loss`, approver, {
+        expected_version: 1, decision: 'APPROVE', reason: 'Đã kiểm tra và xác nhận mất hàng tại điểm.',
+      }));
+    }
+    const countersAfterCustody = await logisticsDb.query(
+      'SELECT issued_quantity::text,delivered_quantity::text,returned_quantity::text,lost_quantity::text,version FROM commitment WHERE id=$1',
+      [targetCommitment.value.id],
+    );
+    assert.deepEqual(countersAfterCustody.rows, countersBeforeCustody.rows);
+    const settlementsAfterCustody = await logisticsDb.query(
+      'SELECT handoff_line_id,commitment_id,settlement_type FROM issued_line_settlement WHERE commitment_id=$1 ORDER BY handoff_line_id',
+      [targetCommitment.value.id],
+    );
+    assert.deepEqual(settlementsAfterCustody.rows, settlementBeforeCustody.rows);
+  }
+  const targetFinalState = await distributionDetail(targetDistribution.id, staff);
+  assert.equal(targetFinalState.status, 'RECONCILED');
+  assert.equal(Number(targetFinalState.lines[0].in_transit), 0);
+  assert.equal(Number(targetFinalState.lines[0].at_point), 0);
+  assert.equal(Number(targetFinalState.lines[0].lost), 1);
+  const targetStock = await logisticsDb.query(
+    'SELECT on_hand::text,reserved::text FROM stock_balance WHERE warehouse_id=$1 AND item_id=$2',
+    [warehouse.value.id, targetItem.value.id],
+  );
+  assert.deepEqual(targetStock.rows, [{ on_hand: '1.000', reserved: '0.000' }]);
+
   const raceItem = await command(logisticsUrl, 'items', staff, {
     item_type_code: itemType.value.code, unit_code: unit.value.code, name: `Vật tư đua ngừng hoạt động T15 ${suffix}`,
   });
@@ -539,14 +684,14 @@ try {
   try {
     await logisticsDb.query('SELECT id FROM item WHERE id=$1 FOR UPDATE', [raceItem.value.id]);
     deactivateRace = command(logisticsUrl, `items/${raceItem.value.id}/deactivate`, staff, { expected_version: 1 });
-    await waitForLockWait('FROM item WHERE id = $1 FOR UPDATE', 'item deactivation');
+    const deactivationWaiter = await waitForLockWait('item', 'item deactivation');
     itemDispatchRace = command(
       logisticsUrl,
       `distributions/${itemRaceDistribution.id}/dispatch`,
       dispatcher,
       { expected_version: 1 },
     );
-    await waitForLockWait('FOR SHARE OF i', 'catalog item');
+    await waitForLockWait('item', 'catalog item', deactivationWaiter);
     await logisticsDb.query('COMMIT');
     expectSuccess(await deactivateRace);
     expectVietnameseError(await itemDispatchRace, 400, 'VALIDATION_FAILED');
@@ -580,7 +725,7 @@ try {
       dispatcher,
       { expected_version: 1 },
     );
-    await waitForLockWait('FROM relief_point WHERE id=$1 FOR SHARE', 'relief point');
+    await waitForLockWait('relief_point', 'relief point');
     await logisticsDb.query('COMMIT');
     const rejectedDispatch = await assetDispatchRace;
     expectVietnameseError(rejectedDispatch, 409, 'POINT_INACTIVE');

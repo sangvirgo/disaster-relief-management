@@ -32,15 +32,59 @@ const cancelledDistribution = {
 } as unknown as DistributionContext;
 
 const manager = { query: jest.fn() } as unknown as EntityManager;
+const loadDistribution = jest.fn().mockResolvedValue(cancelledDistribution);
 
 await jest.unstable_mockModule('../src/distributions/distributions.read', () => ({
-  loadDistribution: jest.fn().mockResolvedValue(cancelledDistribution),
+  loadDistribution,
   readDistributionView: jest.fn().mockResolvedValue({ id: cancelledDistribution.id, status: 'CANCELLED' }),
 }));
 
 const { DistributionCommandsService } = await import('../src/distributions/distribution-commands.service');
 
 describe('distribution cancellation idempotency replay', () => {
+  it.each([
+    ['DRAFT', 'preparer-1', 'OPERATIONS_MANAGER'],
+    ['APPROVED', 'approver-1', 'REVIEWER'],
+  ])('allows the %s actor to cancel before dispatch', async (status, userId, roleCode) => {
+    loadDistribution.mockResolvedValue({ ...cancelledDistribution, status, version: 1 });
+    const query = jest.fn().mockResolvedValue([]);
+    const transaction = { query } as unknown as EntityManager;
+    const service = new DistributionCommandsService(
+      {} as DataSource,
+      { execute: async (_source: unknown, input: { execute: (tx: EntityManager) => Promise<unknown> }) => input.execute(transaction) } as never,
+      { require: async () => ({ userId, grants: [{ role_code: roleCode, scope_type: 'ORGANIZATION', organization_id: 'organization-1' }] }) } as never,
+      {} as never,
+    );
+    try {
+      await service.cancel(cancelledDistribution.id, { expected_version: 1 }, { idempotencyKey: 'cancel-key' } as never);
+      expect(query.mock.calls).toContainEqual([
+        "UPDATE distribution SET status='CANCELLED',version=version+1 WHERE id=$1 AND version=$2",
+        [cancelledDistribution.id, 1],
+      ]);
+      expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO audit_log'))).toBe(true);
+    } finally {
+      loadDistribution.mockResolvedValue(cancelledDistribution);
+    }
+  });
+
+  it('rejects cancellation after dispatch without writing state or stock', async () => {
+    loadDistribution.mockResolvedValue({ ...cancelledDistribution, status: 'DISPATCHED', version: 1 });
+    const query = jest.fn();
+    const service = new DistributionCommandsService(
+      {} as DataSource,
+      { execute: async (_source: unknown, input: { execute: (tx: EntityManager) => Promise<unknown> }) => input.execute({ query } as unknown as EntityManager) } as never,
+      { require: async () => ({ userId: 'preparer-1', grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: 'organization-1' }] }) } as never,
+      {} as never,
+    );
+    try {
+      await expect(service.cancel(cancelledDistribution.id, { expected_version: 1 }, { idempotencyKey: 'cancel-key' } as never))
+        .rejects.toMatchObject({ code: 'ALREADY_DISPATCHED', status: 409 });
+      expect(query).not.toHaveBeenCalled();
+    } finally {
+      loadDistribution.mockResolvedValue(cancelledDistribution);
+    }
+  });
+
   it('allows a reviewer-only approver to replay their cancellation', async () => {
     const grants: Grant[] = [{
       role_code: 'REVIEWER',
