@@ -2,7 +2,7 @@
 
 ## Scope and evidence status
 
-T18 uses the existing C48 application and `backend/infra/compose.yaml`. The checks in this document do not create databases, schemas, demo records, or helper containers. Backup and restore tooling is provided, but neither operation has been run in this workspace.
+T18 uses the existing C48 application and `backend/infra/compose.yaml`. The checks do not create databases, schemas, or helper containers, and leave no synthetic operational records. The authenticated audit permission smoke briefly creates temporary Identity users, grants, and sessions in the primary database, verifies their actor-specific audit count stays `0 -> 0`, and checks that its temporary rows are removed. Backup and restore tooling is provided, but neither operation has been run in this workspace.
 
 | Area | Implementation and evidence | Status and limit |
 |---|---|---|
@@ -12,18 +12,19 @@ T18 uses the existing C48 application and `backend/infra/compose.yaml`. The chec
 | Dependency audit | `npm audit --omit=dev` reports 0 production dependency vulnerabilities. | Full `npm audit` reports 20 moderate findings in the development dependency chain through Jest and `sprintf-js`. npm proposes a breaking `ts-jest` downgrade with `npm audit fix --force`; no dependency or lockfile changes were made in T18. |
 | Backup and restore | `backend/scripts/db/backup` dumps all three primary PostgreSQL databases through the existing `postgres` service and mirrors the two configured evidence buckets. Before creating artifacts, it compares the selected mc alias URL with `response-api`'s resolved `S3_PUBLIC_ENDPOINT`. It writes `object_inventory.jsonl` rows with bucket, key, byte size, and SHA-256. Restore validates checksums and archives, requires empty recovery databases, and compares each target cluster's `system_identifier` with the existing primary Compose PostgreSQL cluster before any `pg_restore`. | No backup artifact was created and no database restore was run. Endpoint mismatch or inspection failure blocks backup; restore fails closed when either cluster identifier cannot be read or matches. TC-29 restore execution is **pending** until an approved isolated recovery destination exists. Object restoration is blocked until an isolated endpoint and empty target buckets are independently verified. Never restore over `c48_identity`, `c48_response`, or `c48_logistics`. |
 | k6 performance scenario | `backend/test/k6/t18-hardening.js` defines 20 VUs, a 2-minute read-only warm-up, a 10-minute measured interval, and a 4:1 read-to-synthetic-SOS iteration mix with latency and failure thresholds. `setup()` rejects non-loopback URLs before workload startup and still requires explicit SOS-write opt-in, a pre-issued token, and an approved point. | Not run: it creates persistent SOS records and is a sustained workload. TC-PERF-01 evidence, dataset size, runtime hardware, and measured results remain pending. No synthetic data or 10k-row fixture was created. |
-| Vietnamese API error copy | The direct API smoke passed the anonymous Identity and Response 401 checks for `UNAUTHENTICATED`, exact Vietnamese messages, and `no-store`. The ingress smoke also covers correlation IDs, `VALIDATION_FAILED`, and security headers, but its validation POST and Nginx path were not exercised. | Direct 401 evidence passed. Pending: validation POST, ingress security headers, permission-denial copy with an existing low-privilege account, and Web/Mobile inert-rendering and accessibility evidence. |
+| Vietnamese API error copy | The direct API smoke passed anonymous Identity, Response, and Logistics audit 401 checks for `UNAUTHENTICATED`, exact Vietnamese messages, and `no-store`. The ingress smoke also covers correlation IDs, `VALIDATION_FAILED`, and security headers, but its validation POST and Nginx path were not exercised. | Direct 401 evidence passed. The authenticated Logistics permission-denial copy also passed with a temporary restricted Identity actor. Pending: validation POST, ingress security headers, and Web/Mobile inert-rendering and accessibility evidence. |
+| Audit access | Logistics exposes the documented `GET /audit-logs` with required `entity_type`, optional `entity_id`, filter-bound keyset paging, and system `AUDIT_READ`. The route reads the existing `audit_log` table and adds no write path or schema. Producers record identifiers, lifecycle/version changes, and staff-entered reasons; no credential or signed-URL field is emitted by the reviewed producers. | Unit, DTO, module-wiring, and OpenAPI checks pass. Main-stack allow/deny smoke passed: temporary system ADMIN received 200, restricted VOLUNTEER received Vietnamese `FORBIDDEN`, and both actor-specific Identity audit counts stayed 0 → 0. The script verified cleanup of its temporary users, grants, session families, and refresh sessions. Free-text reasons remain privileged data; the route is system-ADMIN-only and `no-store`, and staff must not put credentials or signed URLs in those notes. The current index places `entity_id` before the ordering columns, so a page filtered only by `entity_type` may sort all matching audit rows; no representative-scale `EXPLAIN` was run. Revisit indexing before high-volume use without changing the current schema in this phase. |
 
 ## TC-BE acceptance evidence
 
-- **TC-BE-27 — backend read-path subset passed; validation and client checks pending.** Direct API smoke passed after sandbox escalation. Exact command: `node --env-file=.env scripts/smoke/t18-hardening.mjs --direct-apis`. Output: `PASS Identity API 401 no-store/Vietnamese` and `PASS Response API 401 no-store/Vietnamese`; DTO POST explicitly skipped. The static hardening suite, Response tracking limiter unit test, and technical logger redaction unit test also passed. PENDING: validation POST, ingress security headers, permission-denial copy, and Web/Mobile inert-rendering/accessibility.
+- **TC-BE-27 — backend read-path subset passed; validation and client checks pending.** Direct API smoke passed after sandbox escalation. Exact command: `node --env-file=.env scripts/smoke/t18-hardening.mjs --direct-apis`. Output: Identity, Response, and Logistics audit anonymous 401 checks passed for `no-store` and Vietnamese copy; DTO POST explicitly skipped. The authenticated Logistics permission-denial copy also passed with a temporary restricted Identity actor. The static hardening suite, Response tracking limiter unit test, and technical logger redaction unit test passed. PENDING: validation POST, ingress security headers, and Web/Mobile inert-rendering/accessibility.
 - **TC-BE-28 — pending.** Timeout rollback — **PENDING**; idempotent retry — **PENDING**; pool bounds — **PENDING**. The tracking limiter unit test does not establish any of those database or request-lifecycle properties.
-- **TC-BE-29 — pending.** Audit/access checks — **PENDING**. If export or push surfaces are in scope, their privacy and Vietnamese-copy checks are also **PENDING**; no feature-level export/push evidence was gathered. The dependency audit result above is not evidence for these application checks.
+- **TC-BE-29 — partial.** The Logistics audit reader is restricted to system `AUDIT_READ`; unit tests prove non-admin grants are denied before querying, DTO tests cover filter/page limits, and the OpenAPI contract documents required response fields and validation errors. Main-stack authenticated allow/deny checks passed: system ADMIN received 200, restricted VOLUNTEER received exact Vietnamese `FORBIDDEN`, and actor-specific Identity audit counts were 0 before and after the GET checks. The temporary Identity actors, grants, session families, and refresh sessions were removed and verified absent. A focused static review of Logistics audit producers and Pino redaction found no automatically emitted password, token, secret, or signed-URL fields; full cross-service producer/log review remains open, and staff-entered reason text remains untrusted privileged data. Entity-type-only pagination has no representative-scale query-plan evidence. CSV export and push are not implemented, so their conditional checks do not apply. The dependency audit result above is not evidence for these application checks.
 - **TC-29 restore — pending.** No backup artifact or restore was executed. Database restore requires an approved isolated recovery destination, and object restoration remains blocked pending independent endpoint and empty-target verification.
 
 Static verification for this evidence update:
 
-- From `backend/`: `node scripts/__tests__/t18-hardening.test.mjs` — **PASS (8/8)**.
+- From `backend/`: `node scripts/__tests__/t18-hardening.test.mjs` — **PASS (10/10)**, including a connection-string host-override regression that exits before connecting.
 - From `backend/`: `node scripts/__tests__/t18-backup-safety.test.mjs` — **PASS (7/7)**, including private config permissions, symlinks, and non-regular config rejection; `node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand apps/response/test/tracking-pagination.spec.ts` — **PASS (5/5)**.
 - From `backend/`: `bash -n scripts/db/backup scripts/db/restore` and `node --check scripts/db/validate-mc-config.mjs` — **PASS**.
 - From `backend/`: `node --check --input-type=module < test/k6/t18-hardening.js` — **PASS**.
@@ -31,7 +32,7 @@ Static verification for this evidence update:
 
 ## Running the low-impact smoke
 
-The default ingress smoke makes two anonymous GET requests and one invalid `POST /requests` with an empty body. The POST has a valid idempotency key so the interceptor can pass it; Nest validation rejects the empty DTO before the controller handler and persistence service run. It does not register, log in, create a session, or print response bodies or credentials.
+The default ingress smoke makes three anonymous GET requests (Identity, Response, Logistics audit) and one invalid `POST /requests` with an empty body. The POST has a valid idempotency key so the interceptor can pass it; Nest validation rejects the empty DTO before the controller handler and persistence service run. Optional pre-issued tokens enable read-only Logistics audit allow/deny checks. The smoke does not register, log in, create a session, or print response bodies or credentials.
 
 From `backend/`, after the main APIs and the existing `nginx` service are already running:
 
@@ -39,13 +40,21 @@ From `backend/`, after the main APIs and the existing `nginx` service are alread
 node scripts/smoke/t18-hardening.mjs
 ```
 
-The default origin is `http://127.0.0.1:8080`. `C48_T18_PUBLIC_BASE_URL` may select another loopback-published port; the script rejects non-loopback hosts. Expected evidence is three `PASS` lines for the Identity 401, Response 401, and DTO validation error. A failure is reported by endpoint and expected property, without dumping the response body.
+The default origin is `http://127.0.0.1:8080`. `C48_T18_PUBLIC_BASE_URL` may select another loopback-published port; the script rejects non-loopback hosts. Expected evidence is four `PASS` lines for Identity 401, Response 401, Logistics audit 401, and DTO validation. A failure is reported by endpoint and expected property, without dumping the response body.
 
-When ingress is unavailable, `--direct-apis` sends only the two anonymous GET requests to the existing loopback API ports 3001 and 3002. It checks error codes, exact Vietnamese messages, correlation IDs, and no-store behavior. It deliberately skips the invalid POST and cannot verify Nginx headers:
+When ingress is unavailable, `--direct-apis` sends the three anonymous GET requests to existing loopback API ports 3001, 3002, and 3003. It checks error codes, exact Vietnamese messages, correlation IDs, and no-store behavior. It deliberately skips the invalid POST and cannot verify Nginx headers. Optional `C48_T18_AUDIT_READ_TOKEN` and `C48_T18_AUDIT_DENIED_TOKEN` values check that a system `AUDIT_READ` reader can retrieve a filtered page and a restricted reader receives Vietnamese `FORBIDDEN`; without either token, that check is explicitly skipped.
 
 ```sh
 node scripts/smoke/t18-hardening.mjs --direct-apis
 ```
+
+For authenticated audit permission checks against the primary stack, run:
+
+```sh
+node --env-file=.env scripts/smoke/test-logistics-audit-access.mjs
+```
+
+This smoke requires a PostgreSQL URL for `c48_identity` on loopback port `55432` and rejects URL query or fragment overrides before connecting. It creates a temporary system ADMIN and restricted VOLUNTEER directly in Identity, logs them in, and sends only GET requests to Logistics `audit-logs`. It records the temporary actors' Identity audit-row count before and after the API checks (expected `0 -> 0`), then removes and verifies only their refresh sessions, sessions, grants, and user rows. It does not modify either service's `audit_log`, run migrations/seeds, or reset a volume.
 
 The corresponding static checks can be run from `backend/`:
 
@@ -53,7 +62,7 @@ The corresponding static checks can be run from `backend/`:
 node scripts/__tests__/t18-hardening.test.mjs
 ```
 
-Current runtime inventory: Postgres and all three primary APIs were healthy after the authorized Nginx start attempt. Compose returned exit code 1 because `127.0.0.1:8080` was already allocated; the existing `nginx` container is `Created`, so no ingress request was sent. Compose also recreated its migration one-shots as dependencies; their logs report 0 migrations applied for Identity, Response, and Logistics. After sandbox escalation, `node --env-file=.env scripts/smoke/t18-hardening.mjs --direct-apis` passed the Identity API 401 and Response API 401 checks for no-store and Vietnamese messages. The direct mode explicitly skips the validation POST, so validation and ingress-header evidence remain pending.
+Current runtime inventory: Postgres and all three primary APIs are healthy. Only the existing `logistics-api` service was rebuilt/recreated for the audit route; no database volume, migration, or seed job was run. The existing `nginx` container is `Created` and port 8080 is unavailable, so no ingress request was sent. The direct smoke passed anonymous Identity, Response, and Logistics audit 401 checks for no-store and Vietnamese messages. The authenticated audit smoke passed its system ADMIN allow and restricted VOLUNTEER deny checks with Identity audit rows 0 -> 0 and verified temporary actor cleanup. Direct mode skips validation POST; validation and ingress-header evidence remain pending.
 
 ## Backup procedure
 

@@ -3,6 +3,9 @@ import { Global, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { jest } from '@jest/globals';
+import { AuditController } from '../src/audit/audit.controller';
+import { AuditModule } from '../src/audit/audit.module';
+import { AuditService } from '../src/audit/audit.service';
 import { ReportsController } from '../src/reports/reports.controller';
 import { DonationReportService } from '../src/reports/donation-report.service';
 import { FulfillmentReportService } from '../src/reports/fulfillment-report.service';
@@ -20,7 +23,7 @@ const dataSourceToken = getDataSourceToken();
 class TestDataSourceModule {}
 
 describe('ReportsModule', () => {
-  it('owns the four documented report endpoints and resolves their providers', async () => {
+  it('registers documented report and audit endpoints with their providers', async () => {
     const overrides: Record<string, string> = {
       NODE_ENV: 'test',
       DATABASE_URL: 'postgres://logistics_app_login:unit-only@127.0.0.1:55432/c48_logistics',
@@ -38,14 +41,17 @@ describe('ReportsModule', () => {
 
     try {
       const { AppModule } = await import('../src/app.module');
-      const moduleRef = await Test.createTestingModule({ imports: [TestDataSourceModule, ReportsModule] }).compile();
+      const moduleRef = await Test.createTestingModule({ imports: [TestDataSourceModule, ReportsModule, AuditModule] }).compile();
 
       expect(Reflect.getMetadata('imports', AppModule)).toContain(ReportsModule);
+      expect(Reflect.getMetadata('imports', AppModule)).toContain(AuditModule);
       expect(Reflect.getMetadata('controllers', ReportsModule)).toContain(ReportsController);
       expect(moduleRef.get(StockReportService)).toBeInstanceOf(StockReportService);
       expect(moduleRef.get(FulfillmentReportService)).toBeInstanceOf(FulfillmentReportService);
       expect(moduleRef.get(DonationReportService)).toBeInstanceOf(DonationReportService);
       expect(moduleRef.get(ReconciliationReportService)).toBeInstanceOf(ReconciliationReportService);
+      expect(Reflect.getMetadata('controllers', AuditModule)).toContain(AuditController);
+      expect(moduleRef.get(AuditService)).toBeInstanceOf(AuditService);
       await moduleRef.close();
     } finally {
       for (const [key, value] of previous) {

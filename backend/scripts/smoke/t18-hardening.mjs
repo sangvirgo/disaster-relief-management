@@ -24,9 +24,13 @@ const identityBase = directApiMode
 const responseBase = directApiMode
   ? loopbackBase(process.env.C48_T18_RESPONSE_BASE_URL || 'http://127.0.0.1:3002', 'C48_T18_RESPONSE_BASE_URL')
   : publicBase;
+const logisticsBase = directApiMode
+  ? loopbackBase(process.env.C48_T18_LOGISTICS_BASE_URL || 'http://127.0.0.1:3003', 'C48_T18_LOGISTICS_BASE_URL')
+  : publicBase;
 
 const errorCopy = {
   UNAUTHENTICATED: 'Bạn cần đăng nhập để thực hiện thao tác này.',
+  FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
   VALIDATION_FAILED: 'Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.',
 };
 
@@ -80,6 +84,44 @@ verifyError(unauthenticatedResponse, {
   checkIngressHeaders: !directApiMode,
 });
 console.log(`${directApiMode ? 'PASS Response API' : 'PASS ingress + Response'} 401: ${directApiMode ? 'no-store, Vietnamese copy.' : 'security headers, no-store, Vietnamese copy.'}`);
+
+const auditPath = '/api/v1/logistics/audit-logs?entity_type=distribution&limit=1';
+const unauthenticatedAudit = await request(logisticsBase, auditPath);
+verifyError(unauthenticatedAudit, {
+  status: 401,
+  code: 'UNAUTHENTICATED',
+  path: 'GET /api/v1/logistics/audit-logs (anonymous)',
+  checkIngressHeaders: !directApiMode,
+});
+console.log(`${directApiMode ? 'PASS Logistics API' : 'PASS ingress + Logistics'} audit route 401: no-store, Vietnamese copy.`);
+
+const auditReaderToken = process.env.C48_T18_AUDIT_READ_TOKEN;
+if (auditReaderToken) {
+  const auditPage = await request(logisticsBase, auditPath, { headers: { Authorization: `Bearer ${auditReaderToken}` } });
+  assert.equal(auditPage.response.status, 200, 'AUDIT_READ request must succeed');
+  assert.equal(auditPage.response.headers.get('cache-control'), 'no-store', 'audit rows must not be cached');
+  assert.ok(Array.isArray(auditPage.value?.items), 'audit page must contain items');
+  assert.ok(auditPage.value.items.every((item) => item.entity_type === 'distribution'), 'audit page must respect entity_type');
+  assert.ok(auditPage.value.next_cursor === null || typeof auditPage.value.next_cursor === 'string', 'audit page cursor must be nullable text');
+  assert.ok(!JSON.stringify(auditPage.value).includes(auditReaderToken), 'audit response must not contain the bearer token');
+  console.log('PASS Logistics audit access: system AUDIT_READ token received a filtered, no-store page.');
+} else {
+  console.log('SKIP Logistics audit allow check: C48_T18_AUDIT_READ_TOKEN is not set.');
+}
+
+const deniedAuditToken = process.env.C48_T18_AUDIT_DENIED_TOKEN;
+if (deniedAuditToken) {
+  const deniedAudit = await request(logisticsBase, auditPath, { headers: { Authorization: `Bearer ${deniedAuditToken}` } });
+  verifyError(deniedAudit, {
+    status: 403,
+    code: 'FORBIDDEN',
+    path: 'GET /api/v1/logistics/audit-logs (restricted reader)',
+    checkIngressHeaders: !directApiMode,
+  });
+  console.log('PASS Logistics audit access: token without AUDIT_READ received Vietnamese FORBIDDEN.');
+} else {
+  console.log('SKIP Logistics audit deny check: C48_T18_AUDIT_DENIED_TOKEN is not set.');
+}
 
 if (directApiMode) {
   console.log('SKIP DTO POST: direct mode sends GET requests only.');

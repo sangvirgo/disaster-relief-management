@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const nginx = readFileSync(new URL('../../infra/nginx/nginx.conf', import.meta.url), 'utf8');
@@ -141,18 +143,61 @@ test('the performance scenario is gated before it can send SOS writes', () => {
   assert.ok(k6.indexOf('if (!isLoopbackBaseUrl(publicBaseUrl))') < k6.indexOf("K6_ENABLE_SOS_WRITES !== '1'"));
 });
 
-test('the hardening smoke covers only anonymous reads and a DTO rejected before persistence', () => {
+test('the hardening smoke covers anonymous routes and optional read-only audit access', () => {
   const smoke = readFileSync(new URL('../smoke/t18-hardening.mjs', import.meta.url), 'utf8');
   assert.match(smoke, /\/api\/v1\/identity\/me/u);
   assert.match(smoke, /\/api\/v1\/response\/requests\/mine\?limit=1/u);
+  assert.match(smoke, /\/api\/v1\/logistics\/audit-logs\?entity_type=distribution/u);
   assert.match(smoke, /\/api\/v1\/response\/requests/u);
+  assert.match(smoke, /C48_T18_AUDIT_READ_TOKEN/u);
+  assert.match(smoke, /C48_T18_AUDIT_DENIED_TOKEN/u);
+  assert.match(smoke, /AUDIT_READ/u);
   assert.match(smoke, /--direct-apis/u);
   assert.match(smoke, /127\.0\.0\.1:3001/u);
   assert.match(smoke, /127\.0\.0\.1:3002/u);
+  assert.match(smoke, /127\.0\.0\.1:3003/u);
   assert.match(smoke, /VALIDATION_FAILED/u);
   assert.match(smoke, /UNAUTHENTICATED/u);
   assert.match(smoke, /cache-control/iu);
   assert.doesNotMatch(smoke, /\/auth\/(?:register|login)|\/auth\/refresh|node:child_process|from ['"]pg['"]/u);
+});
+
+test('the main-stack audit access smoke uses temporary Identity grants and removes only its own rows', () => {
+  const smoke = readFileSync(new URL('../smoke/test-logistics-audit-access.mjs', import.meta.url), 'utf8');
+  assert.match(smoke, /C48_IDENTITY_DATABASE_URL/u);
+  assert.match(smoke, /'c48_identity'/u);
+  assert.match(smoke, /url\.port !== '55432'/u);
+  assert.match(smoke, /\['127\.0\.0\.1', 'localhost', '\[::1\]'\]\.includes\(url\.hostname\)/u);
+  assert.match(smoke, /url\.search \|\| url\.hash/u);
+  assert.match(smoke, /\['postgres:', 'postgresql:'\]\.includes\(url\.protocol\)/u);
+  assert.match(smoke, /createTemporaryActor\('ADMIN'/u);
+  assert.match(smoke, /createTemporaryActor\('VOLUNTEER'/u);
+  assert.match(smoke, /\/api\/v1\/identity\/auth\/login/u);
+  assert.match(smoke, /\/api\/v1\/logistics\/audit-logs\?entity_type=distribution/u);
+  assert.match(smoke, /assert\.equal\(allowed\.status, 200/u);
+  assert.match(smoke, /assert\.equal\(denied\.body\?\.code, 'FORBIDDEN'/u);
+  assert.match(smoke, /Bạn không có quyền thực hiện thao tác này\./u);
+  assert.match(smoke, /DELETE FROM refresh_session/u);
+  assert.match(smoke, /refresh_sessions: 0/u);
+  assert.match(smoke, /DELETE FROM session_family/u);
+  assert.match(smoke, /DELETE FROM role_grant/u);
+  assert.match(smoke, /DELETE FROM app_user/u);
+  assert.doesNotMatch(smoke, /DELETE\s+FROM\s+audit_log|TRUNCATE\s+audit_log/iu);
+});
+
+test('the audit smoke rejects PostgreSQL target overrides before connecting', () => {
+  const smokePath = fileURLToPath(new URL('../smoke/test-logistics-audit-access.mjs', import.meta.url));
+  const result = spawnSync(process.execPath, [smokePath], {
+    encoding: 'utf8',
+    timeout: 3_000,
+    env: {
+      ...process.env,
+      C48_IDENTITY_DATABASE_URL: 'postgresql://127.0.0.1:55432/c48_identity?host=192.0.2.1',
+    },
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /primary loopback c48_identity database/u);
 });
 
 test('the runbook keeps recovery isolated and reports restore and load gates honestly', () => {
@@ -183,15 +228,16 @@ test('the setup and T18 evidence docs distinguish passed backend checks from pen
   assert.match(runbook, /## TC-BE acceptance evidence/u);
   assert.match(runbook, /TC-BE-27[\s\S]*backend[\s\S]*passed[\s\S]*Web\/Mobile[\s\S]*inert-rendering[\s\S]*pending/iu);
   assert.match(runbook, /TC-BE-28[\s\S]*timeout rollback[\s\S]*pending[\s\S]*idempotent retry[\s\S]*pending[\s\S]*pool bounds[\s\S]*pending/iu);
-  assert.match(runbook, /TC-BE-29[\s\S]*audit\/access[\s\S]*pending[\s\S]*export[\s\S]*push[\s\S]*pending/iu);
+  assert.match(runbook, /TC-BE-29[\s\S]*Main-stack authenticated allow\/deny checks passed[\s\S]*static review of Logistics audit producers and Pino redaction[\s\S]*CSV export and push are not implemented/iu);
   assert.match(runbook, /TC-BE-27[\s\S]*direct API smoke passed/iu);
   assert.match(runbook, /node --env-file=\.env scripts\/smoke\/t18-hardening\.mjs --direct-apis/u);
-  assert.match(runbook, /PASS Identity API 401 no-store\/Vietnamese/u);
-  assert.match(runbook, /PASS Response API 401 no-store\/Vietnamese/u);
+  assert.match(runbook, /Identity, Response, and Logistics audit anonymous 401 checks passed[\s\S]*Vietnamese/iu);
+  assert.match(runbook, /node --env-file=\.env scripts\/smoke\/test-logistics-audit-access\.mjs/u);
+  assert.match(runbook, /Identity audit rows 0 -> 0/u);
   assert.match(runbook, /DTO POST explicitly skipped/u);
-  assert.match(runbook, /PENDING: validation POST, ingress security headers, permission-denial copy, and Web\/Mobile inert-rendering\/accessibility/u);
+  assert.match(runbook, /PENDING: validation POST, ingress security headers, and Web\/Mobile inert-rendering\/accessibility/u);
   assert.doesNotMatch(runbook, /direct smoke was blocked by sandbox `EPERM`|direct GET-only API smoke did not complete|direct runtime evidence remains pending too/u);
-  assert.match(runbook, /node scripts\/__tests__\/t18-hardening\.test\.mjs.*PASS \(8\/8\)/u);
+  assert.match(runbook, /node scripts\/__tests__\/t18-hardening\.test\.mjs.*PASS \(10\/10\)/u);
   assert.match(runbook, /node scripts\/__tests__\/t18-backup-safety\.test\.mjs.*PASS \(7\/7\)/u);
   assert.match(runbook, /git diff --check.*PASS/u);
   assert.match(tracking, /private lastPrunedAt = Number\.NEGATIVE_INFINITY/u);

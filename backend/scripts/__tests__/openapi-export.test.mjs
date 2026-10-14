@@ -1196,3 +1196,21 @@ test('source-defined Logistics projections and collection envelopes match their 
   const needsRows = schemaAt(logistics, successSchema(logistics, operationById(logistics, 'logisticsNeedsList')), ['items', '[]']).properties;
   assert.equal(needsRows.unit.properties.name, undefined, 'needs use unit.display_name');
 });
+
+test('Logistics audit OpenAPI records its DTO constraints and validation error', () => {
+  const logistics = exportService('logistics').document;
+  const operation = operationById(logistics, 'logisticsAuditList');
+  const parameters = Object.fromEntries(operation.parameters.map((parameter) => {
+    const resolved = dereferenceParameter(logistics, parameter);
+    return [resolved.name, resolved];
+  }));
+
+  assert.deepEqual(parameters.entity_type.schema, {
+    type: 'string', minLength: 2, maxLength: 64, pattern: '^[a-z][a-z0-9_]{1,63}$',
+  });
+  assert.deepEqual(parameters.entity_id.schema, { type: 'string', maxLength: 200 });
+  assert.deepEqual(parameters.cursor.schema, { type: 'string', maxLength: 2048 });
+  assert.equal(parameters.entity_type.required, true);
+  assert.deepEqual(successSchema(logistics, operation).required, ['items', 'next_cursor']);
+  assert.equal(operation.responses['400'].content['application/json'].examples.VALIDATION_FAILED.value.code, 'VALIDATION_FAILED');
+});

@@ -393,6 +393,15 @@ const receiptViewSchema = object({
 });
 
 const sharedLogisticsResponses = {
+  logisticsAuditList: object({
+    items: item({
+      id: text, actor_user_id: nullableValue(id), action: text, entity_type: text, entity_id: text,
+      before_state: nullableValue({ type: 'object', additionalProperties: true }),
+      after_state: nullableValue({ type: 'object', additionalProperties: true }),
+      reason: nullableValue(text), correlation_id: nullableValue(id), created_at: dateTime,
+    }, ['id', 'actor_user_id', 'action', 'entity_type', 'entity_id', 'before_state', 'after_state', 'reason', 'correlation_id', 'created_at']),
+    next_cursor: nullableValue(text),
+  }, ['items', 'next_cursor']),
   logisticsCatalogItemTypes: object({ items: array(catalogCodeSchema), next_cursor: nullableValue(text) }),
   logisticsCatalogUnits: object({ items: array(catalogUnitSchema), next_cursor: nullableValue(text) }),
   logisticsCatalogItems: object({ items: array(catalogItemSchema), next_cursor: nullableValue(text) }),
@@ -562,6 +571,7 @@ const sharedLogisticsResponses = {
 };
 
 const logisticsQueries = {
+  logisticsAuditList: ['entity_type', 'entity_id', 'cursor', 'limit'],
   logisticsCatalogItemTypes: ['cursor', 'limit'], logisticsCatalogUnits: ['cursor', 'limit'],
   logisticsCatalogItems: ['type', 'status', 'query', 'cursor', 'limit'], logisticsAssetsWarehouses: ['status', 'cursor', 'limit'],
   logisticsAssetsVehicles: ['status', 'cursor', 'limit'], logisticsAssetsReliefPoints: ['status', 'cursor', 'limit'],
@@ -577,6 +587,7 @@ const logisticsQueries = {
 };
 
 const logisticsRequiredQueries = {
+  logisticsAuditList: ['entity_type'],
   logisticsReportsReconciliationSummary: ['warehouse_id'],
   logisticsReportsFulfillmentSummary: ['from', 'to'],
 };
@@ -584,6 +595,14 @@ const logisticsRequiredQueries = {
 const logisticsQueryConstraints = {
   logisticsReportsFulfillmentSummary: 'At least one of campaign_id or region_code is required; from is inclusive and to is exclusive.',
   logisticsReportsPublicDonationSummary: 'Exactly one of drive_id, campaign_id, or warehouse_id is required.',
+};
+
+const logisticsQuerySchemas = {
+  logisticsAuditList: {
+    entity_type: { type: 'string', minLength: 2, maxLength: 64, pattern: '^[a-z][a-z0-9_]{1,63}$' },
+    entity_id: { type: 'string', maxLength: 200 },
+    cursor: { type: 'string', maxLength: 2048 },
+  },
 };
 
 const errorCatalogPath = fileURLToPath(new URL('../../../docs/backend/07-error-catalog.md', import.meta.url));
@@ -635,6 +654,7 @@ const routeErrorCodes = {
   responseTeamsAddMember: ['NOT_FOUND', 'IDENTITY_UNAVAILABLE', 'USER_IN_OTHER_TEAM', 'STATE_TRANSITION_INVALID'],
   responseTeamsRemoveMember: ['NOT_FOUND', 'LEADER_REQUIRED'],
   responseTeamsTransferLeader: ['NOT_FOUND', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'IDENTITY_UNAVAILABLE'],
+  logisticsAuditList: ['CURSOR_INVALID', 'VALIDATION_FAILED'],
   logisticsCatalogCreateItem: ['ITEM_NAME_TAKEN'],
   logisticsAssetsCreateVehicle: ['VEHICLE_IDENTIFIER_TAKEN'],
   logisticsNeedsCreate: ['QUANTITY_SCALE_INVALID', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'VALIDATION_FAILED', 'NEED_EXISTS', 'POINT_INACTIVE'],
@@ -937,10 +957,10 @@ export function applyOpenApiDetails(document, service) {
             name,
             in: 'query',
             required: required.includes(name),
-            schema: name === 'limit' ? { type: 'integer', minimum: 1, maximum: 100, default: 50 } :
+            schema: logisticsQuerySchemas[operation.operationId]?.[name] ?? (name === 'limit' ? { type: 'integer', minimum: 1, maximum: 100, default: 50 } :
               name === 'work_cycle' ? { type: 'integer', minimum: 1 } :
               ['from', 'to'].includes(name) ? dateTime :
-                ['drive_id', 'campaign_id', 'warehouse_id', 'item_id', 'request_id'].includes(name) ? id : text,
+                ['drive_id', 'campaign_id', 'warehouse_id', 'item_id', 'request_id'].includes(name) ? id : text),
           };
         }) : []),
       ];

@@ -9,7 +9,7 @@ Roles are a **code catalog** (`role_grant.role_code` CHECK in [identity.sql](sch
 | Permission | CITIZEN | VOLUNTEER | COORDINATOR | CAMPAIGN_MANAGER | OPERATIONS_MANAGER | INTAKE_STAFF | REVIEWER | DISTRIBUTION_STAFF | ADMIN |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | `USER_MANAGE`, `GRANT_MANAGE`, `ORG_MANAGE` (session revocation happens as a side effect of these) |  |  |  |  |  |  |  |  | ● |
-| `AUDIT_READ` (Identity audit) |  |  |  |  |  |  |  |  | ● |
+| `AUDIT_READ` (Identity and Logistics audit) |  |  |  |  |  |  |  |  | ● |
 | `REQUEST_CREATE_PROXY` (needs live session) | ● | ● | ● | ● | ● | ● | ● | ● | ● |
 | `REQUEST_QUEUE_READ`, `REQUEST_DETAIL_READ`, `TEAM_READ`, `MISSION_OVERDUE_READ`, `CAMPAIGN_READ` |  |  | ● |  |  |  |  |  |  |
 | `REQUEST_VERIFY`, `REQUEST_TRIAGE`, `REQUEST_CANCEL`, `REQUEST_REOPEN`, `REQUEST_RESOLVE` |  |  | ● |  |  |  |  |  |  |
