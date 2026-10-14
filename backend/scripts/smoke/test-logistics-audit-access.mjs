@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -150,8 +150,33 @@ try {
   assert.equal(allowed.status, 200, 'SYSTEM ADMIN with AUDIT_READ must access the Logistics audit route');
   assert.equal(allowed.headers.get('cache-control'), 'no-store');
   assert.ok(Array.isArray(allowed.body?.items));
-  assert.ok(allowed.body.items.every((item) => item.entity_type === 'distribution'));
   assert.ok(allowed.body.next_cursor === null || typeof allowed.body.next_cursor === 'string');
+  const auditItems = allowed.body.items;
+  if (auditItems.length === 0) {
+    console.log('SKIP Logistics audit filtering: no distribution audit rows; content is not verified.');
+  } else {
+    assert.ok(auditItems.length > 0, 'a populated distribution page must be non-empty');
+    assert.ok(auditItems.every((item) => item.entity_type === 'distribution'), 'audit page must respect entity_type');
+    const entityId = auditItems[0].entity_id;
+    assert.equal(typeof entityId, 'string');
+    assert.ok(entityId.length > 0);
+    const entityAuditPath = `/api/v1/logistics/audit-logs?entity_type=distribution&entity_id=${encodeURIComponent(entityId)}&limit=1`;
+    const entityAudit = await request(logisticsOrigin, entityAuditPath, { token: adminToken });
+    assert.equal(entityAudit.status, 200, 'SYSTEM ADMIN must retrieve an entity_id-filtered audit page');
+    assert.equal(entityAudit.headers.get('cache-control'), 'no-store');
+    assert.ok(Array.isArray(entityAudit.body?.items));
+    assert.ok(entityAudit.body.items.length > 0, 'the selected audit row must remain visible with both filters');
+    assert.ok(entityAudit.body.items.every((item) => item.entity_type === 'distribution' && item.entity_id === entityId),
+      'audit page must respect entity_type and entity_id');
+    const nonmatchingEntityId = randomUUID();
+    assert.notEqual(nonmatchingEntityId, entityId);
+    const unmatchedAuditPath = `/api/v1/logistics/audit-logs?entity_type=distribution&entity_id=${nonmatchingEntityId}&limit=1`;
+    const unmatchedAudit = await request(logisticsOrigin, unmatchedAuditPath, { token: adminToken });
+    assert.equal(unmatchedAudit.status, 200, 'SYSTEM ADMIN must retrieve an empty page for a valid nonmatching entity_id');
+    assert.equal(unmatchedAudit.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(unmatchedAudit.body?.items, [], 'entity_id filtering must exclude rows with a nonmatching entity_id');
+    console.log('PASS Logistics audit filtering: populated results match the requested entity_id; a valid nonmatching entity_id returns no rows.');
+  }
 
   const denied = await request(logisticsOrigin, auditPath, { token: restrictedToken });
   assert.equal(denied.status, 403);
@@ -163,7 +188,7 @@ try {
 
   const auditRowsAfter = await temporaryAuditRowCount();
   assert.equal(auditRowsAfter, auditRowsBefore, 'the read-only access smoke must not append Identity audit records');
-  console.log(`PASS Logistics audit access: SYSTEM ADMIN allowed; restricted actor received Vietnamese FORBIDDEN; Identity audit rows ${auditRowsBefore} -> ${auditRowsAfter}.`);
+  console.log(`PASS Logistics audit permissions: SYSTEM ADMIN allowed; restricted actor received Vietnamese FORBIDDEN; Identity audit rows ${auditRowsBefore} -> ${auditRowsAfter}.`);
 } finally {
   try {
     await cleanupTemporaryActors();

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 
 const arguments_ = process.argv.slice(2);
 if (arguments_.some((argument) => argument !== '--direct-apis') || arguments_.length > 1) {
@@ -101,10 +102,37 @@ if (auditReaderToken) {
   assert.equal(auditPage.response.status, 200, 'AUDIT_READ request must succeed');
   assert.equal(auditPage.response.headers.get('cache-control'), 'no-store', 'audit rows must not be cached');
   assert.ok(Array.isArray(auditPage.value?.items), 'audit page must contain items');
-  assert.ok(auditPage.value.items.every((item) => item.entity_type === 'distribution'), 'audit page must respect entity_type');
   assert.ok(auditPage.value.next_cursor === null || typeof auditPage.value.next_cursor === 'string', 'audit page cursor must be nullable text');
   assert.ok(!JSON.stringify(auditPage.value).includes(auditReaderToken), 'audit response must not contain the bearer token');
-  console.log('PASS Logistics audit access: system AUDIT_READ token received a filtered, no-store page.');
+  const auditItems = auditPage.value.items;
+  if (auditItems.length === 0) {
+    console.log('SKIP Logistics audit filtering: no distribution audit rows; content is not verified.');
+  } else {
+    assert.ok(auditItems.length > 0, 'a populated distribution page must be non-empty');
+    assert.ok(auditItems.every((item) => item.entity_type === 'distribution'), 'audit page must respect entity_type');
+    const entityId = auditItems[0].entity_id;
+    assert.equal(typeof entityId, 'string');
+    assert.ok(entityId.length > 0);
+    const entityAuditPath = `/api/v1/logistics/audit-logs?entity_type=distribution&entity_id=${encodeURIComponent(entityId)}&limit=1`;
+    const entityAudit = await request(logisticsBase, entityAuditPath, { headers: { Authorization: `Bearer ${auditReaderToken}` } });
+    assert.equal(entityAudit.response.status, 200, 'AUDIT_READ request must retrieve an entity_id-filtered page');
+    assert.equal(entityAudit.response.headers.get('cache-control'), 'no-store', 'audit rows must not be cached');
+    assert.ok(Array.isArray(entityAudit.value?.items), 'entity_id-filtered page must contain items');
+    assert.ok(entityAudit.value.items.length > 0, 'the selected audit row must remain visible with both filters');
+    assert.ok(entityAudit.value.items.every((item) => item.entity_type === 'distribution' && item.entity_id === entityId),
+      'audit page must respect entity_type and entity_id');
+    assert.ok(!JSON.stringify(entityAudit.value).includes(auditReaderToken), 'audit response must not contain the bearer token');
+    const nonmatchingEntityId = randomUUID();
+    assert.notEqual(nonmatchingEntityId, entityId);
+    const unmatchedAuditPath = `/api/v1/logistics/audit-logs?entity_type=distribution&entity_id=${nonmatchingEntityId}&limit=1`;
+    const unmatchedAudit = await request(logisticsBase, unmatchedAuditPath, { headers: { Authorization: `Bearer ${auditReaderToken}` } });
+    assert.equal(unmatchedAudit.response.status, 200, 'AUDIT_READ must retrieve an empty page for a valid nonmatching entity_id');
+    assert.equal(unmatchedAudit.response.headers.get('cache-control'), 'no-store', 'audit rows must not be cached');
+    assert.deepEqual(unmatchedAudit.value?.items, [], 'entity_id filtering must exclude rows with a nonmatching entity_id');
+    assert.ok(!JSON.stringify(unmatchedAudit.value).includes(auditReaderToken), 'audit response must not contain the bearer token');
+    console.log('PASS Logistics audit filtering: populated results match the requested entity_id; a valid nonmatching entity_id returns no rows.');
+  }
+  console.log('PASS Logistics audit access: system AUDIT_READ token received a no-store 200 response.');
 } else {
   console.log('SKIP Logistics audit allow check: C48_T18_AUDIT_READ_TOKEN is not set.');
 }
