@@ -1,0 +1,182 @@
+{
+  "info": {
+    "name": "C48 Backend Demo",
+    "description": "Bộ request demo các luồng backend C48 trên stack chính. API dùng trực tiếp các cổng 3001/3002/3003 được publish tại loopback trong backend/infra/compose.yaml. Chạy các request kiểm tra kết nối trước; các request POST chỉ tạo dữ liệu khi người dùng chủ động gửi.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "00 · Kiểm tra kết nối",
+      "description": "Ba API phải trả HTTP 200 tại /health/ready sau khi Docker Compose báo healthy.",
+      "item": [
+        {
+          "name": "Identity · ready",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{identityOrigin}}/health/ready" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Identity sẵn sàng', function () { pm.response.to.have.status(200); });"] } }]
+        },
+        {
+          "name": "Response · ready",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{responseOrigin}}/health/ready" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Response sẵn sàng', function () { pm.response.to.have.status(200); });"] } }]
+        },
+        {
+          "name": "Logistics · ready",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{logisticsOrigin}}/health/ready" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Logistics sẵn sàng', function () { pm.response.to.have.status(200); });"] } }]
+        }
+      ]
+    },
+    {
+      "name": "01 · Identity · tài khoản công dân",
+      "description": "Đăng ký tài khoản demo rồi đăng nhập Native để lấy access token. Tài khoản đăng ký mới chỉ có vai trò CITIZEN.",
+      "item": [
+        {
+          "name": "1. Đăng ký công dân",
+          "description": "Tạo một tài khoản demo lâu dài trong database chính. Khi đăng ký lại, hãy đổi cả demoUsername và registerIdempotencyKey.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Idempotency-Key", "value": "{{registerIdempotencyKey}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{demoUsername}}\",\n  \"password\": \"{{demoPassword}}\",\n  \"display_name\": \"Tài khoản demo C48\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{identityBaseUrl}}/auth/register"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Đăng ký trả HTTP 201', function () { pm.response.to.have.status(201); });"] } }]
+        },
+        {
+          "name": "2. Đăng nhập Native",
+          "description": "Đăng nhập bằng tài khoản vừa tạo. Access token được lưu vào biến accessToken để dùng cho các request Response.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{demoUsername}}\",\n  \"password\": \"{{demoPassword}}\",\n  \"client_kind\": \"NATIVE\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{identityBaseUrl}}/auth/login"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Đăng nhập trả HTTP 200', function () { pm.response.to.have.status(200); });", "if (pm.response.code === 200) {", "  const body = pm.response.json();", "  if (body.access_token) pm.collectionVariables.set('accessToken', body.access_token);", "}"] } }]
+        }
+      ]
+    },
+    {
+      "name": "02 · Response · SOS và theo dõi",
+      "description": "Xem chiến dịch công khai, gửi một yêu cầu SELF bằng tài khoản công dân và theo dõi yêu cầu bằng access token cùng tracking code.",
+      "item": [
+        {
+          "name": "1. Danh sách chiến dịch công khai",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{responseBaseUrl}}/public/campaigns?limit=10" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Danh sách chiến dịch trả HTTP 200', function () { pm.response.to.have.status(200); });"] } }]
+        },
+        {
+          "name": "2. Gửi yêu cầu SOS SELF",
+          "description": "Ghi một yêu cầu demo vào database chính. Vị trí dùng ghim thủ công tại TP. Hồ Chí Minh; hãy đổi sosIdempotencyKey nếu muốn tạo yêu cầu mới.",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Idempotency-Key", "value": "{{sosIdempotencyKey}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"incident_category_code\": \"{{incidentCategoryCode}}\",\n  \"description\": \"Yêu cầu hỗ trợ dùng để demo backend C48.\",\n  \"people_affected\": 2,\n  \"reporter_declared_danger\": false,\n  \"location\": {\n    \"type\": \"Point\",\n    \"coordinates\": [106.7009, 10.7769],\n    \"source\": \"MANUAL_PIN\"\n  }\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{responseBaseUrl}}/requests"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Tạo yêu cầu trả HTTP 201', function () { pm.response.to.have.status(201); });", "if (pm.response.code === 201) {", "  const body = pm.response.json();", "  if (body.id) pm.collectionVariables.set('requestId', body.id);", "  if (body.tracking_code) pm.collectionVariables.set('trackingCode', body.tracking_code);", "}"] } }]
+        },
+        {
+          "name": "3. Yêu cầu của tôi",
+          "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }, "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{responseBaseUrl}}/requests/mine?limit=10" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Danh sách yêu cầu của tôi trả HTTP 200', function () { pm.response.to.have.status(200); });"] } }]
+        },
+        {
+          "name": "4. Theo dõi yêu cầu",
+          "description": "Chạy sau request tạo SOS. API chỉ trả thông tin dành cho người báo tin; không trả ghi chú nội bộ hay vị trí chính xác cho staff.",
+          "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }, "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "X-Tracking-Code", "value": "{{trackingCode}}" }], "url": "{{responseBaseUrl}}/requests/track" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Tra cứu yêu cầu trả HTTP 200', function () { pm.response.to.have.status(200); });"] } }]
+        }
+      ]
+    },
+    {
+      "name": "03 · Logistics · quyên góp công khai",
+      "description": "Xem các đợt tiếp nhận đang mở. Có thể tạo khai báo quyên góp demo nếu danh sách có đợt OPEN; khai báo chưa làm tăng tồn kho, nhân viên kho phải kiểm đếm và duyệt.",
+      "item": [
+        {
+          "name": "1. Danh sách đợt quyên góp đang mở",
+          "description": "Request này tự lưu ID của đợt đầu tiên và mặt hàng đầu tiên vào donationDriveId/donationItemId nếu có dữ liệu.",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{logisticsBaseUrl}}/public/donation-drives?limit=10" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Danh sách đợt quyên góp trả HTTP 200', function () { pm.response.to.have.status(200); });", "if (pm.response.code === 200) {", "  const body = pm.response.json();", "  const drive = body.items && body.items[0];", "  pm.collectionVariables.unset('donationDriveId');", "  pm.collectionVariables.unset('donationItemId');", "  if (drive) {", "    pm.collectionVariables.set('donationDriveId', drive.id);", "    if (drive.items && drive.items[0]) pm.collectionVariables.set('donationItemId', drive.items[0].item_id);", "  }", "}"] } }]
+        },
+        {
+          "name": "2. Chi tiết đợt quyên góp",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{logisticsBaseUrl}}/public/donation-drives/{{donationDriveId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Chi tiết đợt quyên góp trả HTTP 200', function () { pm.response.to.have.status(200); });"] } }]
+        },
+        {
+          "name": "3. Tạo khai báo quyên góp demo",
+          "description": "Tạo một khai báo lâu dài ở database chính. Chạy sau khi lấy được donationDriveId/donationItemId; quantity là chuỗi thập phân theo đơn vị của mặt hàng. Idempotency-Key cố định để retry không tạo bản ghi thứ hai.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Idempotency-Key", "value": "{{donationIdempotencyKey}}" }, { "key": "X-Donation-Secret", "value": "{{donationSecret}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"donor_name\": \"Người quyên góp demo C48\",\n  \"donor_phone\": \"0900000000\",\n  \"lines\": [\n    {\n      \"item_id\": \"{{donationItemId}}\",\n      \"declared_quantity\": \"1\"\n    }\n  ]\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{logisticsBaseUrl}}/public/donation-drives/{{donationDriveId}}/deliveries"
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": ["if (!pm.collectionVariables.get('donationSecret')) {", "  const secret = pm.variables.replaceIn('{{$guid}}') + pm.variables.replaceIn('{{$guid}}');", "  pm.collectionVariables.set('donationSecret', secret);", "}"] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Khai báo quyên góp trả HTTP 201', function () { pm.response.to.have.status(201); });", "if (pm.response.code === 201) {", "  const body = pm.response.json();", "  if (body.id) pm.collectionVariables.set('donationId', body.id);", "}"] } }
+          ]
+        },
+        {
+          "name": "4. Theo dõi khai báo quyên góp",
+          "description": "Chạy sau khi tạo khai báo. Donation secret được giữ trong biến Postman của collection để dùng như capability riêng của người quyên góp.",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }, { "key": "X-Donation-Secret", "value": "{{donationSecret}}" }], "url": "{{logisticsBaseUrl}}/public/donations/{{donationId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Theo dõi khai báo trả HTTP 200', function () { pm.response.to.have.status(200); });"] } }]
+        },
+        {
+          "name": "5. Tổng hợp quyên góp đã nhập kho",
+          "description": "Báo cáo chỉ tính các bút toán đã được kiểm đếm/duyệt và ghi nhận; khai báo vừa tạo chưa xuất hiện trong tồn kho.",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{logisticsBaseUrl}}/public/donation-reports/summary?drive_id={{donationDriveId}}&limit=10" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Báo cáo quyên góp trả HTTP 200', function () { pm.response.to.have.status(200); });"] } }]
+        }
+      ]
+    },
+    {
+      "name": "04 · Operations · request cần quyền nhân viên",
+      "description": "Tùy chọn. Nhập thông tin đăng nhập một tài khoản đã được cấp đúng grant/scope; tài khoản công dân mới đăng ký sẽ không được phép xem queue hoặc báo cáo kho.",
+      "item": [
+        {
+          "name": "1. Đăng nhập tài khoản nhân viên",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{staffUsername}}\",\n  \"password\": \"{{staffPassword}}\",\n  \"client_kind\": \"NATIVE\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{identityBaseUrl}}/auth/login" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Đăng nhập nhân viên trả HTTP 200', function () { pm.response.to.have.status(200); });", "if (pm.response.code === 200) {", "  const body = pm.response.json();", "  if (body.access_token) pm.collectionVariables.set('staffAccessToken', body.access_token);", "}"] } }]
+        },
+        {
+          "name": "2. Queue điều phối có scope",
+          "description": "Cần grant REQUEST_QUEUE_READ và scope phù hợp. Queue có phân trang keyset và không làm thay đổi yêu cầu.",
+          "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{staffAccessToken}}", "type": "string" }] }, "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{responseBaseUrl}}/requests?limit=10" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Queue điều phối trả HTTP 200', function () { pm.response.to.have.status(200); });"] } }]
+        },
+        {
+          "name": "3. Báo cáo tồn kho có scope",
+          "description": "Cần grant REPORT_READ và scope kho phù hợp. Đây là báo cáo đọc, không sửa tồn kho.",
+          "request": { "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{staffAccessToken}}", "type": "string" }] }, "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{logisticsBaseUrl}}/reports/stock-summary?limit=10" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Báo cáo tồn kho trả HTTP 200', function () { pm.response.to.have.status(200); });"] } }]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "identityOrigin", "value": "http://127.0.0.1:3001", "type": "string" },
+    { "key": "responseOrigin", "value": "http://127.0.0.1:3002", "type": "string" },
+    { "key": "logisticsOrigin", "value": "http://127.0.0.1:3003", "type": "string" },
+    { "key": "identityBaseUrl", "value": "http://127.0.0.1:3001/api/v1/identity", "type": "string" },
+    { "key": "responseBaseUrl", "value": "http://127.0.0.1:3002/api/v1/response", "type": "string" },
+    { "key": "logisticsBaseUrl", "value": "http://127.0.0.1:3003/api/v1/logistics", "type": "string" },
+    { "key": "incidentCategoryCode", "value": "T16_FLOOD_02354B4988", "type": "string", "description": "Mã đang tồn tại trong database C48 hiện tại; nếu DB được seed lại, chọn một mã có thật ở schema hiện tại." },
+    { "key": "demoUsername", "value": "demo_c48_citizen_01", "type": "string" },
+    { "key": "demoPassword", "value": "C48-Demo-2026-MatKhau!", "type": "string" },
+    { "key": "registerIdempotencyKey", "value": "c48-demo-register-001", "type": "string" },
+    { "key": "sosIdempotencyKey", "value": "c48-demo-sos-001", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "requestId", "value": "", "type": "string" },
+    { "key": "trackingCode", "value": "", "type": "string" },
+    { "key": "donationDriveId", "value": "", "type": "string" },
+    { "key": "donationItemId", "value": "", "type": "string" },
+    { "key": "donationSecret", "value": "", "type": "string" },
+    { "key": "donationIdempotencyKey", "value": "c48-demo-donation-001", "type": "string" },
+    { "key": "donationId", "value": "", "type": "string" },
+    { "key": "staffUsername", "value": "", "type": "string" },
+    { "key": "staffPassword", "value": "", "type": "string" },
+    { "key": "staffAccessToken", "value": "", "type": "string" }
+  ]
+}
