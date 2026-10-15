@@ -261,6 +261,95 @@ function mapReconciliationItems(rows) {
   }));
 }
 
+async function verifyPopulatedDriveAcceptedReport() {
+  const drives = await logisticsDb.query(`
+    SELECT drive.id AS drive_id,
+           bool_or(movement.movement_type='RECEIPT_HELD_RELEASE') AS has_held_release
+      FROM donation_drive drive
+      JOIN donation_delivery delivery ON delivery.drive_id=drive.id
+      JOIN donation_receipt receipt ON receipt.delivery_id=delivery.id
+      JOIN stock_movement movement ON movement.receipt_id=receipt.id
+     WHERE movement.movement_type IN ('RECEIPT','RECEIPT_HELD_RELEASE')
+     GROUP BY drive.id
+    HAVING SUM(movement.delta_on_hand)>0
+     ORDER BY bool_or(movement.movement_type='RECEIPT_HELD_RELEASE') DESC,drive.id
+     LIMIT 1
+  `);
+  if (drives.rowCount === 0) {
+    console.log('SKIP T17 drive-accepted report: no posted donation receipt is available in the primary database.');
+    return;
+  }
+
+  const driveId = drives.rows[0].drive_id;
+  const hasHeldRelease = drives.rows[0].has_held_release;
+  let reports;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    reports = [];
+    let cursor;
+    const seenCursors = new Set();
+    do {
+      const query = new URLSearchParams({ drive_id: driveId, limit: '100' });
+      if (cursor) query.set('cursor', cursor);
+      const report = await call(logisticsUrl, `public/donation-reports/summary?${query}`);
+      expectSuccess(report);
+      assert.equal(report.value.view, 'DRIVE_ACCEPTED');
+      assert.equal(report.value.filter_id, driveId);
+      assert.ok(Array.isArray(report.value.items));
+      assert.equal(typeof report.value.generated_at, 'string');
+      assert.ok(Number.isFinite(Date.parse(report.value.generated_at)));
+      reports.push(report.value);
+      if (!report.value.more) break;
+      assert.equal(typeof report.value.cursor, 'string');
+      assert.equal(seenCursors.has(report.value.cursor), false, 'report cursor must advance');
+      seenCursors.add(report.value.cursor);
+      cursor = report.value.cursor;
+    } while (true);
+
+    const latestMovement = await logisticsDb.query(`
+      SELECT max(movement.created_at) AS latest_at
+        FROM stock_movement movement
+        JOIN donation_receipt receipt ON receipt.id=movement.receipt_id
+        JOIN donation_delivery delivery ON delivery.id=receipt.delivery_id
+       WHERE delivery.drive_id=$1
+         AND movement.movement_type IN ('RECEIPT','RECEIPT_HELD_RELEASE')
+    `, [driveId]);
+    const oldestSnapshot = Math.min(...reports.map((report) => Date.parse(report.generated_at)));
+    const latestMovementAt = latestMovement.rows[0].latest_at;
+    const receiptAfterSnapshot = latestMovementAt && new Date(latestMovementAt).getTime() > oldestSnapshot;
+    const cacheAgeMs = Date.now() - oldestSnapshot;
+    if (!receiptAfterSnapshot && (attempt > 0 || cacheAgeMs >= 61_000)) break;
+    if (attempt === 1) assert.fail('Donation report cache did not catch up with the latest posted receipt movement.');
+    // shortcut: the report cache cannot share a DB snapshot with this SQL oracle; run without concurrent receipt writes.
+    const waitMs = receiptAfterSnapshot ? 61_000 : Math.max(1, 61_000 - cacheAgeMs);
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
+
+  const acceptedRows = await logisticsDb.query(`
+    SELECT item.id AS item_id,item.name AS item_name,unit.code AS unit_code,
+           unit.display_name AS unit_name,unit.scale AS unit_scale,
+           SUM(movement.delta_on_hand)::text AS quantity
+      FROM stock_movement movement
+      JOIN stock_balance balance ON balance.id=movement.balance_id
+      JOIN donation_receipt receipt ON receipt.id=movement.receipt_id
+      JOIN donation_delivery delivery ON delivery.id=receipt.delivery_id
+      JOIN donation_drive drive ON drive.id=delivery.drive_id
+      JOIN item ON item.id=balance.item_id
+      JOIN unit ON unit.code=item.unit_code
+     WHERE drive.id=$1::uuid
+       AND movement.movement_type IN ('RECEIPT','RECEIPT_HELD_RELEASE')
+     GROUP BY item.id,unit.code
+     ORDER BY item.id
+  `, [driveId]);
+
+  assert.deepEqual(reports.flatMap((report) => report.items), acceptedRows.rows.map((row) => ({
+    item: { id: row.item_id, name: row.item_name },
+    unit: { code: row.unit_code, display_name: row.unit_name, scale: Number(row.unit_scale) },
+    accepted: row.quantity,
+  })));
+  assert.equal(reports.at(-1).more, false);
+  console.log(`PASS T17 drive-accepted report against posted primary receipts: items=${acceptedRows.rowCount}, held_release=${hasHeldRelease}.`);
+}
+
 async function main() {
   await Promise.all([logisticsDb.connect(), identityDb.connect()]);
   const cleanupUserIds = new Set();
@@ -268,6 +357,7 @@ async function main() {
   try {
     await verifyFinalHandoffAttribution();
     await verifyPrimaryDatabaseReportFixture();
+    await verifyPopulatedDriveAcceptedReport();
     const warehouses = await logisticsDb.query(
       `SELECT w.id,w.organization_id,w.region_code,
               (SELECT count(*)::int FROM stock_balance b WHERE b.warehouse_id=w.id) AS balance_count
