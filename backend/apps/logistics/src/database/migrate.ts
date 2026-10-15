@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  process.stderr.write('Logistics migration failed: ' + (error instanceof Error ? error.message : 'unknown error') + '\n');
+main().catch(() => {
+  process.stderr.write('Logistics migration failed: MIGRATION_FAILED\n');
   process.exitCode = 1;
 });
