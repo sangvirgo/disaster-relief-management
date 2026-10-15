@@ -1,47 +1,83 @@
 #!/usr/bin/env bash
 set -euo pipefail
 source "$(dirname -- "$0")/../dev/lib.sh"
-C48_TEST_PROJECT="c48-test-$$"
-export C48_TEST_PROJECT
-RESPONSE_TEST_JWT_PRIVATE_KEY="$(base64 -w0 "$ROOT/backend/test/fixtures/response-test-private.pem")"
-export RESPONSE_TEST_JWT_PRIVATE_KEY
+require_env_file
+require_nonproduction_env
+
+if [[ $# -ne 1 || "$1" != "--reset" ]]; then
+  printf 'This suite resets the primary C48 PostgreSQL volume. Pass --reset to remove only c48_pgdata; MinIO data is preserved.\n' >&2
+  exit 2
+fi
+
+load_backend_env
+export_smoke_env
+cd "$ROOT/backend"
+
+stack_started=0
 cleanup() {
-  test_compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+  local status=$?
+  trap - EXIT
+  if [[ "$stack_started" == 1 ]]; then
+    unset SCHEDULER_ENABLED SOS_SOFT_LIMIT_PER_IP SOS_HARD_LIMIT_PER_IP SOS_GLOBAL_PER_MIN PROXY_OPEN_CAP PROXY_DAILY_SOFT_LIMIT
+    load_backend_env
+    if ! main_compose --profile storage up -d --force-recreate --wait --wait-timeout 120 minio-init nginx; then
+      printf 'Could not restore the primary stack settings from backend/.env.\n' >&2
+      [[ "$status" -ne 0 ]] || status=1
+    fi
+  fi
+  exit "$status"
 }
 trap cleanup EXIT
 
-test_compose up -d --wait --wait-timeout 90 postgres
-test_compose up -d db-init
-test_compose build identity-migrate response-migrate logistics-migrate
-for service in identity response logistics; do
-  test_compose run --rm --no-deps "$service-migrate"
-done
-
-C48_TEST_PROJECT="$C48_TEST_PROJECT" "$ROOT/backend/scripts/db/check-schema-dump"
-test_compose run --rm --no-deps idempotency-test
-C48_TEST_PROJECT="$C48_TEST_PROJECT" "$ROOT/backend/scripts/db/check-migration-down"
-test_compose exec -T postgres bash /test/scripts/proofs/prove-migrated-race.sh
-test_compose exec -T postgres bash /test/scripts/proofs/prove-cycle-fence.sh
+npm run build
+main_compose build identity-migrate response-migrate logistics-migrate identity-api response-api logistics-api
+bash "$ROOT/backend/scripts/db/reset-primary-databases" --reset
+bash "$ROOT/backend/scripts/db/check-schema-dump" --after-reset
+bash "$ROOT/backend/scripts/db/check-migration-down" --after-reset
+main_compose exec -T postgres bash -s < "$ROOT/backend/scripts/proofs/prove-migrated-race.sh"
+main_compose exec -T postgres bash -s < "$ROOT/backend/scripts/proofs/prove-cycle-fence.sh"
 
 for service in identity response logistics; do
-  test_compose exec -T -w /schema postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d "c48_$service" \
+  main_compose exec -T -w /schema postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d "c48_$service" \
     -f "/schema/test-$service.sql"
 done
+main_compose exec -T postgres bash -c 'export PGPASSWORD="$POSTGRES_PASSWORD"; bash /schema/race-tests-response.sh'
+main_compose exec -T postgres bash -c 'export PGPASSWORD="$POSTGRES_PASSWORD"; bash /schema/race-tests-logistics.sh'
 
-test_compose exec -T -e PGPORT=5432 -e PGPASSWORD=test-only postgres bash /schema/race-tests-response.sh
-test_compose exec -T -e PGPORT=5432 -e PGPASSWORD=test-only postgres bash /schema/race-tests-logistics.sh
-test_compose run --rm auth-test
-test_compose run --rm identity-admin-test
-test_compose up -d --wait --wait-timeout 60 identity-api response-api logistics-api nginx
-test_compose stop identity-api
-test_compose run --rm --no-deps response-intake-test
-test_compose up -d --wait --wait-timeout 60 identity-api
-test_compose up -d --wait --wait-timeout 60 response-t5-api response-storage-down-api
-test_compose run --rm --no-deps response-t5-test
-test_compose run --rm --no-deps response-t6-test
-if ! test_compose run --rm --no-deps response-t7-test; then
-  printf 'Response T7 failed; recent API logs follow:\n' >&2
-  test_compose logs --no-color --tail=100 response-t5-api >&2
+# Clear SQL proof fixtures from the primary databases and restore their seeded schema before API smoke.
+bash "$ROOT/backend/scripts/db/reset-primary-databases" --reset
+bash "$ROOT/backend/scripts/db/migrate"
+bash "$ROOT/backend/scripts/db/seed"
+export SCHEDULER_ENABLED=true
+export SOS_SOFT_LIMIT_PER_IP=2
+export SOS_HARD_LIMIT_PER_IP=5
+export SOS_GLOBAL_PER_MIN=4
+export PROXY_OPEN_CAP=3
+export PROXY_DAILY_SOFT_LIMIT=10
+stack_started=1
+main_compose --profile storage up -d --build --wait --wait-timeout 180 minio-init nginx
+
+node scripts/smoke/test-idempotency.mjs
+node scripts/smoke/test-auth.mjs
+node scripts/smoke/test-identity-admin.mjs
+node scripts/smoke/test-response-intake.mjs
+node scripts/smoke/test-response-t5.mjs
+node scripts/smoke/test-response-t6.mjs
+node scripts/smoke/test-response-t7.mjs
+node scripts/smoke/test-response-t8.mjs
+node scripts/smoke/test-response-t10.mjs
+node scripts/smoke/test-logistics-t11.mjs
+node scripts/smoke/test-logistics-t12.mjs
+node scripts/smoke/test-logistics-t13.mjs
+node scripts/smoke/test-logistics-t14.mjs
+node scripts/smoke/test-logistics-t15.mjs
+node scripts/smoke/test-response-t16.mjs
+
+main_compose stop identity-api
+if ! node scripts/smoke/test-logistics-t12.mjs --identity-down; then
+  printf 'Logistics T12 guest check with Identity stopped failed. Recent primary service logs follow:\n' >&2
+  main_compose logs --no-color --tail=100 logistics-api postgres >&2
   exit 1
 fi
-echo "Backend database checks passed."
+main_compose --profile storage up -d --wait --wait-timeout 60 identity-api
+printf 'Backend checks passed against the primary C48 stack. Integration rows remain in the main databases; run scripts/db/reset-demo --reset when demo data should replace them.\n'

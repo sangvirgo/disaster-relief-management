@@ -42,22 +42,7 @@ INSERT INTO incident_category_skill (category_code, skill_code) VALUES
   ('FLOOD','BOAT'), ('TRAPPED','BOAT'), ('MEDICAL','FIRST_AID'), ('LANDSLIDE','CLIMBING')
 ON CONFLICT DO NOTHING;
 
--- Boundaries are simple rectangles. DEMO_A lon 106.60-106.80 / lat 10.70-10.85; DEMO_B lon 107.50-107.70 / lat 16.00-16.15.
--- The point (lon 105.0, lat 21.0) lies in neither, so a request there stays region-less (R7).
-INSERT INTO region_boundary (region_code, geom) VALUES
-  ('DEMO_A', ST_Multi(ST_MakeEnvelope(106.60, 10.70, 106.80, 10.85, 4326))),
-  ('DEMO_B', ST_Multi(ST_MakeEnvelope(107.50, 16.00, 107.70, 16.15, 4326)))
-ON CONFLICT DO NOTHING;
-
--- ---------- campaigns ----------
-INSERT INTO campaign (id, organization_id, region_code, name, objective, status, starts_at, ends_at, created_by_user_id, created_at) VALUES
-  (pg_temp.u('c1'), pg_temp.u('1'), 'DEMO_A', 'Chiến dịch cứu trợ lũ Khu vực Nam (demo)',
-   'Cứu hộ và cứu trợ khẩn cấp cho các hộ bị ngập (dữ liệu demo).', 'ACTIVE',
-   now() - interval '7 days', now() + interval '30 days', pg_temp.u('104'), now() - interval '8 days'),
-  (pg_temp.u('c2'), pg_temp.u('1'), 'DEMO_B', 'Chiến dịch chuẩn bị mùa mưa bão Khu vực Trung (demo)',
-   'Bản nháp chiến dịch chuẩn bị trước mùa mưa bão (dữ liệu demo).', 'DRAFT',
-   NULL, NULL, pg_temp.u('104'), now() - interval '2 days')
-ON CONFLICT DO NOTHING;
+-- @include demo campaigns
 
 -- ---------- teams ----------
 INSERT INTO rescue_team (id, organization_id, operating_region_code, name, team_kind, reporting_mode, external_contact_note,
@@ -359,8 +344,8 @@ SELECT pg_temp.must('teams: 5 teams, mixed kinds/modes, stale position, no posit
 SELECT pg_temp.must('regions do not overlap and 9 categories / 5 skills / 4 category-skill links',
   NOT (SELECT ST_Intersects(a.geom, b.geom) FROM region_boundary a, region_boundary b WHERE a.region_code = 'DEMO_A' AND b.region_code = 'DEMO_B')
   AND (SELECT count(*) FROM incident_category) = 9 AND (SELECT count(*) FROM skill) = 5 AND (SELECT count(*) FROM incident_category_skill) = 4);
-SELECT pg_temp.must('2 campaigns ACTIVE+DRAFT; 3 notices for coord1',
-  (SELECT count(*) FROM campaign WHERE status IN ('ACTIVE','DRAFT')) = 2
+SELECT pg_temp.must('2 active campaigns; 3 notices for coord1',
+  (SELECT count(*) FROM campaign WHERE status = 'ACTIVE') = 2
   AND (SELECT count(*) FROM notice WHERE recipient_user_id = pg_temp.u('102')) = 3
   AND (SELECT count(*) FROM evidence_metadata) = 0);
 

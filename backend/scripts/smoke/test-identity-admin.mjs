@@ -5,11 +5,11 @@ import { randomBytes, randomUUID } from 'node:crypto';
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 const argon2 = require('argon2');
-const databaseUrl = process.env.TEST_DATABASE_URL;
-const baseUrl = new URL(process.env.IDENTITY_ADMIN_TEST_BASE_URL ?? 'http://127.0.0.1:3001/api/v1/identity');
-const clientId = process.env.TEST_SERVICE_CLIENT_ID;
-const clientSecret = process.env.TEST_SERVICE_CLIENT_SECRET;
-if (!databaseUrl || !clientId || !clientSecret) throw new Error('TEST_DATABASE_URL and test service credentials are required');
+const databaseUrl = process.env.C48_IDENTITY_DATABASE_URL;
+const baseUrl = new URL(process.env.C48_IDENTITY_BASE_URL ?? 'http://127.0.0.1:3001/api/v1/identity');
+const clientId = process.env.RESPONSE_SERVICE_CLIENT_ID;
+const clientSecret = process.env.RESPONSE_SERVICE_CLIENT_SECRET;
+if (!databaseUrl || !clientId || !clientSecret) throw new Error('The primary C48 Identity database URL and Response service credentials are required');
 
 const database = new Client({ connectionString: databaseUrl });
 const userIds = [];
@@ -165,6 +165,21 @@ try {
     headers: { 'Idempotency-Key': idem() },
   });
   assert.equal(region.status, 201, JSON.stringify(region.body));
+  const lookedUpRegion = await call('/internal/regions:lookup', {
+    method: 'POST', token: serviceToken.body.access_token, body: { codes: [regionCode, 'UNKNOWN_REGION'] },
+  });
+  assert.equal(lookedUpRegion.status, 200, JSON.stringify(lookedUpRegion.body));
+  assert.deepEqual(lookedUpRegion.body.items, [{ code: regionCode, name: 'Khu vực thử nghiệm' }]);
+  assert.equal(lookedUpRegion.headers.get('cache-control'), 'no-store');
+  const unauthenticatedRegionLookup = await call('/internal/regions:lookup', {
+    method: 'POST', body: { codes: [regionCode] },
+  });
+  expectError(unauthenticatedRegionLookup, 401, 'UNAUTHENTICATED');
+  const invalidRegionLookup = await call('/internal/regions:lookup', {
+    method: 'POST', token: serviceToken.body.access_token, body: { codes: ['x'.repeat(81)] },
+  });
+  expectError(invalidRegionLookup, 400, 'VALIDATION_FAILED');
+  assert.equal(invalidRegionLookup.headers.get('cache-control'), 'no-store');
   const regionList = await call('/regions?limit=100', { token: adminToken });
   assert.ok(regionList.body.items.some((item) => item.code === regionCode));
   const regionGrant = await call(`/users/${userId}/grants`, {
@@ -310,6 +325,11 @@ try {
   });
   assert.equal(disabled.status, 200, JSON.stringify(disabled.body));
   assert.equal(disabled.body.status, 'DISABLED');
+  const disabledLookup = await call('/internal/users:lookup', {
+    method: 'POST', token: serviceToken.body.access_token, body: { ids: [userId, randomUUID()] },
+  });
+  assert.equal(disabledLookup.status, 200, JSON.stringify(disabledLookup.body));
+  assert.deepEqual(disabledLookup.body.items, [{ id: userId, display_name: 'Nhân viên cứu trợ' }]);
   expectError(await call('/auth/login', {
     method: 'POST', body: { username: userPayload.username, password: temporaryPassword, client_kind: 'NATIVE' },
     headers: { 'X-Forwarded-For': nextIp() },
@@ -351,9 +371,11 @@ try {
     method: 'POST', token: serviceToken.body.access_token, body: { ids: [userId, randomUUID()] },
   });
   assert.equal(lookedUp.status, 200, JSON.stringify(lookedUp.body));
-  assert.deepEqual(lookedUp.body.items, [{ id: userId, display_name: 'Nhân viên cứu trợ' }]);
+  assert.deepEqual(lookedUp.body.items, [{
+    id: userId, display_name: 'Nhân viên cứu trợ',
+  }]);
 
-  console.log('PASS Identity admin grants/revocation, last-admin guard, audit, keyset users, and service-only introspection/lookup on PostgreSQL');
+  console.log('PASS Identity admin, region/user service lookups, and authorization checks on PostgreSQL');
 } finally {
   if (familyIds.length) await database.query('DELETE FROM refresh_session WHERE family_id = ANY($1::uuid[])', [familyIds]).catch(() => undefined);
   if (userIds.length) {

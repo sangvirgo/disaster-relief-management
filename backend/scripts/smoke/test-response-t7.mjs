@@ -4,10 +4,10 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
-const responseUrl = process.env.TEST_RESPONSE_BASE_URL;
-const identityUrl = process.env.TEST_IDENTITY_BASE_URL;
-const responseDb = new Client({ connectionString: process.env.TEST_RESPONSE_DATABASE_URL });
-const identityDb = new Client({ connectionString: process.env.TEST_IDENTITY_DATABASE_URL });
+const responseUrl = process.env.C48_RESPONSE_BASE_URL;
+const identityUrl = process.env.C48_IDENTITY_BASE_URL;
+const responseDb = new Client({ connectionString: process.env.C48_RESPONSE_DATABASE_URL });
+const identityDb = new Client({ connectionString: process.env.C48_IDENTITY_DATABASE_URL });
 const organizationId = '40000000-0000-4000-8000-000000000004';
 const requestIds = [];
 let identityIpSequence = 1;
@@ -87,10 +87,14 @@ function proxyBody(coordinates) {
   };
 }
 
-async function createRequest(reporter, mode, body) {
+async function createRequest(reporter, mode, body, forwardedIp) {
   const result = await call(responseUrl, mode === 'PROXY' ? 'requests/proxy' : 'requests', {
     method: 'POST', body,
-    headers: { Authorization: `Bearer ${reporter.token}`, 'Idempotency-Key': key() },
+    headers: {
+      Authorization: `Bearer ${reporter.token}`,
+      'Idempotency-Key': key(),
+      ...(forwardedIp ? { 'X-Forwarded-For': forwardedIp } : {}),
+    },
   });
   assert.equal(result.status, 201, JSON.stringify(result.value));
   requestIds.push(result.value.id);
@@ -103,6 +107,22 @@ async function command(path, user, body, idempotencyKey = key()) {
     headers: { Authorization: `Bearer ${user.token}`, 'Idempotency-Key': idempotencyKey },
   });
   return { ...result, idempotencyKey };
+}
+
+async function waitForRequestRowLockWaits(database, blockerPid, minimum) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const result = await database.query(
+      `SELECT count(*)::int AS count FROM pg_stat_activity
+        WHERE datname=current_database() AND pid<>$1 AND wait_event_type='Lock'
+          AND $1=ANY(pg_blocking_pids(pid))
+          AND query ILIKE '%FROM assistance_request WHERE id=$1 FOR UPDATE%'`,
+      [blockerPid],
+    );
+    if (result.rows[0].count >= minimum) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  assert.fail(`Timed out waiting for ${minimum} verification command(s) on the locked assistance_request row`);
 }
 
 await Promise.all([responseDb.connect(), identityDb.connect()]);
@@ -196,6 +216,57 @@ try {
   assert.equal(snapshot.rows[0].basis, 'CONTACT_CONFIRMED');
   assert.equal(snapshot.rows[0].payload.approved_facts.description, 'Nước đang dâng trong nhà.');
 
+  const concurrentVerificationRequest = await createRequest(reporter, 'SELF', selfBody([105.16, 15.16]));
+  const concurrentVerificationStart = await command(`requests/${concurrentVerificationRequest.id}/start-verification`, coordinator, { expected_version: 1 });
+  assert.equal(concurrentVerificationStart.status, 200, JSON.stringify(concurrentVerificationStart.value));
+  const concurrentVerificationAttempt = await command(`requests/${concurrentVerificationRequest.id}/contact-attempts`, coordinator, {
+    contact_target: 'REPORTER', outcome: 'REACHED', note: 'Đã xác nhận thông tin.',
+  });
+  assert.equal(concurrentVerificationAttempt.status, 201, JSON.stringify(concurrentVerificationAttempt.value));
+  const lockDb = new Client({ connectionString: process.env.C48_RESPONSE_DATABASE_URL });
+  await lockDb.connect();
+  let transactionOpen = false;
+  let pendingVerificationRace;
+  let verificationRace;
+  try {
+    await lockDb.query('BEGIN');
+    transactionOpen = true;
+    await lockDb.query('SELECT id FROM assistance_request WHERE id=$1 FOR UPDATE', [concurrentVerificationRequest.id]);
+    const blockerPid = (await lockDb.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    pendingVerificationRace = Promise.all([
+      command(`requests/${concurrentVerificationRequest.id}/verify`, coordinator, {
+        expected_version: 3, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [concurrentVerificationAttempt.value.id] },
+      }),
+      command(`requests/${concurrentVerificationRequest.id}/verify`, secondCoordinator, {
+        expected_version: 3, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [concurrentVerificationAttempt.value.id] },
+      }),
+    ]);
+    await waitForRequestRowLockWaits(responseDb, blockerPid, 2);
+    await lockDb.query('COMMIT');
+    transactionOpen = false;
+    verificationRace = await pendingVerificationRace;
+  } finally {
+    if (transactionOpen) await lockDb.query('ROLLBACK');
+    if (pendingVerificationRace) await pendingVerificationRace.catch(() => undefined);
+    await lockDb.end();
+  }
+  const verificationWinners = verificationRace.filter((result) => result.status === 200);
+  const verificationLosers = verificationRace.filter((result) => result.status === 409);
+  assert.equal(verificationWinners.length, 1, JSON.stringify(verificationRace.map((result) => result.value)));
+  assert.equal(verificationLosers.length, 1, JSON.stringify(verificationRace.map((result) => result.value)));
+  assert.equal(verificationWinners[0].value.status, 'VERIFIED');
+  assert.equal(verificationWinners[0].value.version, 4);
+  assertVietnameseError(verificationLosers[0], 409, 'VERSION_CONFLICT');
+  const concurrentVerificationState = await responseDb.query(
+    `SELECT r.status,r.version::int AS version,
+            (SELECT count(*)::int FROM verification_decision d WHERE d.request_id=r.id AND d.outcome='VERIFIED') AS decisions,
+            (SELECT count(*)::int FROM request_event e WHERE e.request_id=r.id AND e.event_type='REQUEST_VERIFIED') AS verification_events
+       FROM assistance_request r WHERE r.id=$1`, [concurrentVerificationRequest.id],
+  );
+  assert.deepEqual(concurrentVerificationState.rows[0], {
+    status: 'VERIFIED', version: 4, decisions: 1, verification_events: 1,
+  }, 'concurrent verification commits one decision and one event');
+
   const supplementRequest = await createRequest(reporter, 'SELF', selfBody([105.12, 15.12]));
   const supplementStart = await command(`requests/${supplementRequest.id}/start-verification`, coordinator, { expected_version: 1 });
   assert.equal(supplementStart.status, 200, JSON.stringify(supplementStart.value));
@@ -273,19 +344,23 @@ try {
 
   const unassigned = await createRequest(reporter, 'SELF', selfBody([150, 50]));
   const secondUnassigned = await createRequest(reporter, 'SELF', selfBody([151, 51]));
-  const firstUnassignedPage = await call(responseUrl, 'requests/unassigned?limit=1', { headers: { Authorization: `Bearer ${coordinator.token}` } });
-  assert.equal(firstUnassignedPage.status, 200, JSON.stringify(firstUnassignedPage.value));
-  assert.equal(firstUnassignedPage.value.more, true);
-  const secondUnassignedPage = await call(responseUrl, `requests/unassigned?limit=1&cursor=${encodeURIComponent(firstUnassignedPage.value.cursor)}`, {
-    headers: { Authorization: `Bearer ${coordinator.token}` },
-  });
-  assert.equal(secondUnassignedPage.status, 200, JSON.stringify(secondUnassignedPage.value));
-  assert.notEqual(secondUnassignedPage.value.items[0]?.id, firstUnassignedPage.value.items[0]?.id, 'unassigned cursor advances to a different request');
-  assert.ok([unassigned.id, secondUnassigned.id].includes(firstUnassignedPage.value.items[0]?.id));
-  assert.ok([unassigned.id, secondUnassigned.id].includes(secondUnassignedPage.value.items[0]?.id));
-  const unassignedQueue = await call(responseUrl, 'requests/unassigned?limit=20', { headers: { Authorization: `Bearer ${coordinator.token}` } });
-  assert.equal(unassignedQueue.status, 200, JSON.stringify(unassignedQueue.value));
-  assert.ok(unassignedQueue.value.items.some((item) => item.id === unassigned.id));
+  const seenUnassignedIds = new Set();
+  let unassignedCursor;
+  while (!seenUnassignedIds.has(unassigned.id) || !seenUnassignedIds.has(secondUnassigned.id)) {
+    const cursorParam = unassignedCursor ? `&cursor=${encodeURIComponent(unassignedCursor)}` : '';
+    const unassignedPage = await call(responseUrl, `requests/unassigned?limit=1${cursorParam}`, {
+      headers: { Authorization: `Bearer ${coordinator.token}` },
+    });
+    assert.equal(unassignedPage.status, 200, JSON.stringify(unassignedPage.value));
+    const id = unassignedPage.value.items[0]?.id;
+    assert.ok(id);
+    assert.ok(!seenUnassignedIds.has(id), 'unassigned cursor advances to a different request');
+    seenUnassignedIds.add(id);
+    if (seenUnassignedIds.has(unassigned.id) && seenUnassignedIds.has(secondUnassigned.id)) break;
+    assert.equal(unassignedPage.value.more, true, 'both T7 fixtures appear before the unassigned queue ends');
+    assert.ok(unassignedPage.value.cursor);
+    unassignedCursor = unassignedPage.value.cursor;
+  }
   const corrected = await command(`requests/${unassigned.id}/correct-region`, coordinator, {
     expected_version: 1, region_code: 'T7_REGION', reason: 'Đối chiếu lại địa bàn.',
   });
@@ -320,7 +395,7 @@ try {
   });
   assertVietnameseError(noIndependentSource, 409, 'SECOND_COORDINATOR_REQUIRED');
 
-  const candidate = await createRequest(reporter, 'SELF', selfBody([105.115, 15.1], '+84987654321'));
+  const candidate = await createRequest(reporter, 'SELF', selfBody([105.115, 15.1], '+84987654321'), '198.51.100.77');
   const candidates = await call(responseUrl, `requests/${proxyRequests[0].id}/verification-candidates`, {
     headers: { Authorization: `Bearer ${coordinator.token}` },
   });
@@ -332,7 +407,8 @@ try {
   });
   assert.equal(corroborated.status, 200, JSON.stringify(corroborated.value));
 
-  const concurrenceRequest = await createRequest(proxyReporter, 'PROXY', proxyBody([105.2, 15.25]));
+  const concurrenceReporter = await registerAndLogin('concurproxy');
+  const concurrenceRequest = await createRequest(concurrenceReporter, 'PROXY', proxyBody([105.2, 15.25]));
   const concurrenceStart = await command(`requests/${concurrenceRequest.id}/start-verification`, coordinator, { expected_version: 1 });
   assert.equal(concurrenceStart.status, 200, JSON.stringify(concurrenceStart.value));
   const concurrence = await command(`requests/${concurrenceRequest.id}/concur`, secondCoordinator, { expected_version: 2, note: 'Đã rà soát độc lập.' });
@@ -340,7 +416,7 @@ try {
   const noteSupplement = await call(responseUrl, `requests/${concurrenceRequest.id}/supplements`, {
     method: 'POST', body: { expected_version: 3, description: 'Bổ sung ghi chú không làm thay đổi dữ kiện.' },
     headers: {
-      Authorization: `Bearer ${proxyReporter.token}`, 'X-Tracking-Code': concurrenceRequest.tracking_code,
+      Authorization: `Bearer ${concurrenceReporter.token}`, 'X-Tracking-Code': concurrenceRequest.tracking_code,
       'Idempotency-Key': key(),
     },
   });
@@ -356,7 +432,7 @@ try {
   assert.equal(decision.rows[0].reviewer_user_id, coordinator.id);
   assert.equal(decision.rows[0].concurring_user_id, secondCoordinator.id);
 
-  const materialConcurrenceRequest = await createRequest(proxyReporter, 'PROXY', proxyBody([105.3, 15.3]));
+  const materialConcurrenceRequest = await createRequest(concurrenceReporter, 'PROXY', proxyBody([105.3, 15.3]));
   const materialStart = await command(`requests/${materialConcurrenceRequest.id}/start-verification`, coordinator, { expected_version: 1 });
   assert.equal(materialStart.status, 200, JSON.stringify(materialStart.value));
   const materialConcurrence = await command(`requests/${materialConcurrenceRequest.id}/concur`, secondCoordinator, { expected_version: 2, note: 'Đã đối chiếu dữ kiện ban đầu.' });
@@ -364,7 +440,7 @@ try {
   const materialSupplement = await call(responseUrl, `requests/${materialConcurrenceRequest.id}/supplements`, {
     method: 'POST', body: { expected_version: 3, people_affected: 4 },
     headers: {
-      Authorization: `Bearer ${proxyReporter.token}`, 'X-Tracking-Code': materialConcurrenceRequest.tracking_code,
+      Authorization: `Bearer ${concurrenceReporter.token}`, 'X-Tracking-Code': materialConcurrenceRequest.tracking_code,
       'Idempotency-Key': key(),
     },
   });
@@ -427,7 +503,10 @@ try {
     [[duplicateOne.id, duplicateTwo.id]],
   );
   assert.equal(orphanState.rowCount, 2);
-  assert.ok(orphanState.rows.every((child) => child.status === 'VERIFYING' && child.canonical_request_id === null && Number(child.version) === 2));
+  assert.ok(
+    orphanState.rows.every((child) => child.status === 'VERIFYING' && child.canonical_request_id === null && Number(child.version) === 3),
+    JSON.stringify({ expected: 'VERIFYING, canonical_request_id=null, version=3', actual: orphanState.rows }),
+  );
   const orphanEvents = await responseDb.query(
     `SELECT e.actor_user_id,e.payload FROM request_event e WHERE e.request_id=ANY($1::uuid[]) AND e.event_type='DUPLICATE_ORPHANED'`,
     [[duplicateOne.id, duplicateTwo.id]],

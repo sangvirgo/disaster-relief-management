@@ -4,7 +4,7 @@ import type { IdempotentResult } from '../../../../packages/technical/src/idempo
 import type { ReporterSession } from '../requests/reporter-session';
 import type {
   AuthorityReferralDto, ContactAttemptDto, ConcurRequestDto, CorrectRegionDto, DuplicateRequestDto,
-  RejectRequestDto, RequestQueueQueryDto, RequestOperationPageDto, RequestVersionDto,
+  AttachCampaignDto, RejectRequestDto, RequestQueueQueryDto, RequestOperationPageDto, RequestVersionDto, TeamCandidatesQueryDto,
   SupplementReviewDto, TriageRequestDto, VerifyRequestDto,
 } from './request-operations.dto';
 import { loadOperationsConfig } from './request-operations.helpers';
@@ -14,6 +14,8 @@ import { RequestOperationsVerificationService } from './request-operations.verif
 import { RequestOperationsSupplementReviewService } from './request-operations.supplement-review.service';
 import { RequestOperationsTriageService } from './request-operations.triage.service';
 import { RequestOperationsDedupReferralService } from './request-operations.dedup-referral.service';
+import { RequestOperationsTeamCandidatesService } from './request-operations.team-candidates.service';
+import { RequestCampaignAssociationService } from './request-campaign-association.service';
 
 export { REQUEST_OPERATIONS_CONFIG } from './request-operations.config';
 export type { RequestOperationsConfig } from './request-operations.types';
@@ -26,6 +28,8 @@ export class RequestOperationsService {
     private readonly supplementReview: RequestOperationsSupplementReviewService,
     private readonly triageService: RequestOperationsTriageService,
     private readonly dedupReferral: RequestOperationsDedupReferralService,
+    private readonly teamCandidatesService: RequestOperationsTeamCandidatesService,
+    private readonly campaignAssociation: RequestCampaignAssociationService,
   ) {}
 
   static config(): RequestOperationsConfig { return loadOperationsConfig(); }
@@ -60,6 +64,10 @@ export class RequestOperationsService {
 
   async missions(requestId: string, query: RequestOperationPageDto, request: Request): Promise<Record<string, unknown>> {
     return this.queries.missions(requestId, query, request);
+  }
+
+  async teamCandidates(requestId: string, query: TeamCandidatesQueryDto, request: Request): Promise<Record<string, unknown>> {
+    return this.teamCandidatesService.list(requestId, query, request);
   }
 
   async duplicateCandidates(requestId: string, request: Request): Promise<Record<string, unknown>> {
@@ -104,6 +112,14 @@ export class RequestOperationsService {
 
   async correctRegion(requestId: string, dto: CorrectRegionDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
     return this.dedupReferral.correctRegion(requestId, dto, key, request);
+  }
+
+  async attachCampaign(requestId: string, dto: AttachCampaignDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
+    return this.campaignAssociation.attach(requestId, dto, key, request);
+  }
+
+  async detachCampaign(requestId: string, dto: RequestVersionDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
+    return this.campaignAssociation.detach(requestId, dto, key, request);
   }
 
   async reviewSupplement(

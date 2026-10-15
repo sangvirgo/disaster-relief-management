@@ -17,6 +17,11 @@ export class RequestOperationPageDto {
   declare limit?: number;
 }
 
+export class TeamCandidatesQueryDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1)
+  declare radius_m?: number;
+}
+
 export class RequestQueueQueryDto extends RequestOperationPageDto {
   @IsOptional() @IsIn(statuses)
   declare status?: string;
@@ -52,6 +57,11 @@ export class RequestQueueQueryDto extends RequestOperationPageDto {
 export class RequestVersionDto {
   @Type(() => Number) @IsInt() @Min(1)
   expected_version!: number;
+}
+
+export class AttachCampaignDto extends RequestVersionDto {
+  @IsUUID('all')
+  campaign_id!: string;
 }
 
 export class ContactAttemptDto {

@@ -8,11 +8,11 @@ import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '../.
 import { hasPermission } from '../../../../packages/technical/src/security/permissions';
 import { JobRunner } from '../../../../packages/technical/src/persistence/jobs';
 import { hashPurposeBoundSecret } from '../../../../packages/technical/src/security/secret-hash';
-import { ReporterSessionService } from '../requests/reporter-session';
+import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from '../requests/request-intake.service';
 import { ReporterAccessService, ReporterRequestRow } from '../tracking/reporter-access.service';
-import { EvidenceMime } from './evidence-media';
-import { stageEvidenceMultipart } from './evidence-upload';
+import { EvidenceMime } from '../../../../packages/technical/src/media/evidence-media';
+import { stageEvidenceMultipart } from '../../../../packages/technical/src/uploads/evidence-upload';
 import { EvidenceObjectStorage, EvidenceStorageConfig, RESPONSE_EVIDENCE_STORAGE } from './evidence-storage';
 
 const requestAttachmentCountLimit = 5;
@@ -22,7 +22,8 @@ const maxMultipartBytes = 55 * 1024 * 1024;
 
 interface EvidenceRow {
   id: string;
-  request_id: string;
+  request_id: string | null;
+  mission_id: string | null;
   object_key: string;
   state: 'PENDING' | 'READY' | 'FAILED';
   declared_bytes: string | number;
@@ -49,7 +50,7 @@ function requestIp(request: Request): string {
   return request.ip || request.socket.remoteAddress || 'unknown';
 }
 
-function uploadEligible(row: ReporterRequestRow): boolean {
+function uploadEligible(row: Pick<ReporterRequestRow, 'review_lane' | 'status'>): boolean {
   return row.review_lane === 'NORMAL' && ['SUBMITTED', 'VERIFYING', 'VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(row.status);
 }
 
@@ -63,8 +64,25 @@ function view(row: EvidenceRow): EvidenceView {
   };
 }
 
-function evidenceKey(requestId: string, evidenceId: string): string {
-  return `req/${requestId}/${evidenceId}`;
+function evidenceKey(requestId: string, evidenceId: string, missionId?: string): string {
+  return missionId ? `mission/${missionId}/${evidenceId}` : `req/${requestId}/${evidenceId}`;
+}
+
+interface MissionUploadOwner extends Pick<ReporterRequestRow, 'review_lane' | 'status' | 'organization_id' | 'region_code' | 'campaign_id'> {
+  request_id: string;
+  team_id: string;
+  team_reporting_mode: 'APP' | 'COORDINATOR';
+  team_status: 'ACTIVE' | 'INACTIVE';
+  mission_status: string;
+}
+
+interface EvidenceUploadOwner {
+  requestId: string;
+  missionId?: string;
+  session: ReporterSession | null;
+  trackingCode?: string;
+  trackingSecret?: string;
+  hasTrackingCapability: boolean;
 }
 
 @Injectable()
@@ -108,6 +126,21 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
     const session = await this.sessions.optional(request, hasTrackingCapability);
     const owner = await this.access.forRequest(requestId, trackingCode, trackingSecret, session);
     if (!uploadEligible(owner)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+    return this.uploadOwned({
+      requestId, session, hasTrackingCapability,
+      ...(trackingCode === undefined ? {} : { trackingCode }),
+      ...(trackingSecret === undefined ? {} : { trackingSecret }),
+    }, idempotencyKey, request);
+  }
+
+  async uploadMission(missionId: string, idempotencyKey: string, request: Request): Promise<IdempotentResult<EvidenceView>> {
+    const session = await this.sessions.require(request);
+    const owner = await this.missionUploadOwner(this.dataSource, missionId, session);
+    if (!uploadEligible(owner)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+    return this.uploadOwned({ requestId: owner.request_id, missionId, session, hasTrackingCapability: false }, idempotencyKey, request);
+  }
+
+  private async uploadOwned(owner: EvidenceUploadOwner, idempotencyKey: string, request: Request): Promise<IdempotentResult<EvidenceView>> {
     const rawLength = request.headers['content-length'];
     if (typeof rawLength !== 'string' || !/^\d+$/.test(rawLength)) throw new AppError('LENGTH_REQUIRED', { status: 411 });
     const declaredBytes = Number(rawLength);
@@ -122,11 +155,16 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
     try {
       staged = await stageEvidenceMultipart(request, declaredBytes);
       const sourceIpHash = hashPurposeBoundSecret(requestIp(request), 'sos-source-ip', this.intakeConfig.peppers, 'v1');
-      const quotaIpHash = session ? null : sourceIpHash;
-      const capabilityHash = hasTrackingCapability ? this.access.trackingSecretHash(trackingSecret!) : undefined;
-      scopeKey = `response.evidence.request:${requestId}:${session?.userId ?? 'guest'}`;
-      const requestHash = canonicalRequestHash({
-        request_id: requestId, uploader_user_id: session?.userId ?? null, declared_bytes: declaredBytes,
+      const quotaIpHash = owner.session ? null : sourceIpHash;
+      const capabilityHash = owner.hasTrackingCapability ? this.access.trackingSecretHash(owner.trackingSecret!) : undefined;
+      scopeKey = owner.missionId
+        ? `response.evidence.mission:${owner.missionId}:${owner.session!.userId}`
+        : `response.evidence.request:${owner.requestId}:${owner.session?.userId ?? 'guest'}`;
+      const requestHash = canonicalRequestHash(owner.missionId ? {
+        mission_id: owner.missionId, uploader_user_id: owner.session?.userId ?? null, declared_bytes: declaredBytes,
+        file_bytes: staged.size, detected_mime: staged.mime, checksum: staged.checksum,
+      } : {
+        request_id: owner.requestId, uploader_user_id: owner.session?.userId ?? null, declared_bytes: declaredBytes,
         file_bytes: staged.size, detected_mime: staged.mime, checksum: staged.checksum,
       }, capabilityHash);
       const result = await this.idempotency.execute(this.dataSource, {
@@ -136,24 +174,31 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
         requestHash,
         execute: async (manager) => {
           if (quotaIpHash) await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [quotaIpHash]);
-          const lockedOwner = await this.access.forRequest(requestId, trackingCode, trackingSecret, session, manager, true);
+          const lockedOwner = owner.missionId
+            ? await this.missionUploadOwner(manager, owner.missionId, owner.session!, true)
+            : await this.access.forRequest(owner.requestId, owner.trackingCode, owner.trackingSecret, owner.session, manager, true);
           if (!uploadEligible(lockedOwner)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
-          await this.reserveQuota(manager, requestId, quotaIpHash, declaredBytes);
+          await this.reserveQuota(manager, owner.requestId, quotaIpHash, declaredBytes);
           evidenceId = randomUUID();
-          objectKey = evidenceKey(requestId, evidenceId);
+          objectKey = evidenceKey(owner.requestId, evidenceId, owner.missionId);
           await manager.query(
             `INSERT INTO evidence_metadata
-              (id,request_id,object_key,state,declared_bytes,uploader_user_id,upload_source_ip_hash)
-             VALUES ($1,$2,$3,'PENDING',$4,$5,$6)`,
-            [evidenceId, requestId, objectKey, declaredBytes, session?.userId ?? null, sourceIpHash],
+              (id,request_id,mission_id,object_key,state,declared_bytes,uploader_user_id,upload_source_ip_hash)
+             VALUES ($1,$2,$3,$4,'PENDING',$5,$6,$7)`,
+            [evidenceId, owner.missionId ? null : owner.requestId, owner.missionId ?? null, objectKey, declaredBytes, owner.session?.userId ?? null, sourceIpHash],
           );
           return { status: 201, value: { id: evidenceId, state: 'PENDING' }, resource: { type: 'evidence_metadata', id: evidenceId } };
         },
         replay: async (manager, resource) => {
           if (resource?.type !== 'evidence_metadata') throw new AppError('INTERNAL_ERROR', { status: 500 });
-          const rows = await manager.query('SELECT id,request_id,state,declared_bytes,size_bytes,detected_mime,checksum,created_at,object_key FROM evidence_metadata WHERE id=$1', [resource.id]) as EvidenceRow[];
+          const ownerColumn = owner.missionId ? 'mission_id' : 'request_id';
+          const ownerId = owner.missionId ?? owner.requestId;
+          const rows = await manager.query(
+            `SELECT id,request_id,mission_id,state,declared_bytes,size_bytes,detected_mime,checksum,created_at,object_key
+               FROM evidence_metadata WHERE id=$1 AND ${ownerColumn}=$2`, [resource.id, ownerId],
+          ) as EvidenceRow[];
           const row = rows[0];
-          if (!row || row.request_id !== requestId) throw new AppError('NOT_FOUND', { status: 404 });
+          if (!row) throw new AppError('NOT_FOUND', { status: 404 });
           return row.state === 'READY' ? view(row) : { id: row.id, state: row.state } as unknown as EvidenceView;
         },
       });
@@ -165,13 +210,13 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
       }
 
       const id = evidenceId;
-      objectKey = evidenceKey(requestId, id);
+      objectKey = evidenceKey(owner.requestId, id, owner.missionId);
       try {
         await this.storage.putObject(objectKey, staged.path, staged.size, staged.mime, staged.checksum);
         const [rows] = await this.dataSource.query(
           `UPDATE evidence_metadata SET state='READY',size_bytes=$2,detected_mime=$3,checksum=$4
             WHERE id=$1 AND state='PENDING'
-            RETURNING id,request_id,object_key,state,declared_bytes,size_bytes,detected_mime,checksum,created_at`,
+            RETURNING id,request_id,mission_id,object_key,state,declared_bytes,size_bytes,detected_mime,checksum,created_at`,
           [id, staged.size, staged.mime, staged.checksum],
         ) as [EvidenceRow[], number];
         if (!rows[0]) throw storageUnavailable();
@@ -192,17 +237,39 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
 
   async download(evidenceId: string, trackingCode: string | undefined, trackingSecret: string | undefined, request: Request): Promise<{ url: string; expires_in: number }> {
     const rows = await this.dataSource.query(
-      `SELECT e.id,e.request_id,e.object_key,e.state,r.tracking_code,r.reporter_user_id,r.organization_id,r.region_code,r.campaign_id
-         FROM evidence_metadata e JOIN assistance_request r ON r.id=e.request_id
+      `SELECT e.id,e.request_id,e.mission_id,e.object_key,e.state,
+              r.tracking_code,r.reporter_user_id,r.organization_id,r.region_code,r.campaign_id,m.team_id
+         FROM evidence_metadata e
+         LEFT JOIN mission m ON m.id=e.mission_id
+         JOIN assistance_request r ON r.id=coalesce(e.request_id,m.request_id)
         WHERE e.id=$1 AND e.state='READY'`, [evidenceId],
-    ) as Array<{ id: string; request_id: string; object_key: string; state: string; tracking_code: string; reporter_user_id: string | null; organization_id: string; region_code: string | null; campaign_id: string | null }>;
+    ) as Array<{
+      id: string; request_id: string | null; mission_id: string | null; object_key: string; state: string;
+      tracking_code: string; reporter_user_id: string | null; organization_id: string; region_code: string | null;
+      campaign_id: string | null; team_id: string | null;
+    }>;
     const evidence = rows[0];
     if (!evidence) throw new AppError('NOT_FOUND', { status: 404 });
     const session = await this.sessions.optional(request, this.access.validTrackingSecret(trackingSecret));
     const staffAllowed = session && hasPermission(session.grants, 'REQUEST_DETAIL_READ', {
       organizationId: evidence.organization_id, regionCode: evidence.region_code, campaignId: evidence.campaign_id,
     });
-    if (!staffAllowed) await this.access.forRequest(evidence.request_id, trackingCode, trackingSecret, session);
+    if (evidence.mission_id) {
+      if (!session) throw new AppError('UNAUTHENTICATED', { status: 401 });
+      const memberRows = evidence.team_id
+        ? await this.dataSource.query(
+          'SELECT 1 FROM team_member WHERE team_id=$1 AND user_id=$2 AND left_at IS NULL LIMIT 1',
+          [evidence.team_id, session.userId],
+        ) as unknown[]
+        : [];
+      const coordinatorAllowed = hasPermission(session.grants, 'MISSION_RECORD_ON_BEHALF', {
+        organizationId: evidence.organization_id, regionCode: evidence.region_code, campaignId: evidence.campaign_id,
+      });
+      if (!memberRows.length && !staffAllowed && !coordinatorAllowed) throw new AppError('FORBIDDEN', { status: 403 });
+    } else {
+      if (!evidence.request_id) throw new AppError('INTERNAL_ERROR', { status: 500 });
+      if (!staffAllowed) await this.access.forRequest(evidence.request_id, trackingCode, trackingSecret, session);
+    }
     try {
       return { url: await this.storage.signedGetUrl(evidence.object_key, this.storageConfig.signedUrlTtlSeconds), expires_in: this.storageConfig.signedUrlTtlSeconds };
     } catch {
@@ -213,7 +280,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
   async reconcilePending(): Promise<number> {
     let objects: Array<{ id: string; object_key: string }> = [];
     const ran = await this.jobs.runOnce('response.evidence.reconcile.pending', async (manager) => {
-      const [rows] = await manager.query(
+      const rows = await manager.query(
         `WITH candidates AS (
            SELECT id,state FROM evidence_metadata
             WHERE created_at<clock_timestamp()-interval '15 minutes'
@@ -228,7 +295,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
          UNION ALL
          SELECT e.id,e.object_key FROM evidence_metadata e JOIN candidates c ON c.id=e.id
           WHERE c.state='FAILED' AND e.state='FAILED' AND e.cleanup_completed_at IS NULL`,
-      ) as [Array<{ id: string; object_key: string }>, number];
+      ) as Array<{ id: string; object_key: string }>;
       objects = rows;
       return rows.length;
     });
@@ -252,7 +319,9 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
   private async reserveQuota(manager: EntityManager, requestId: string, sourceIpHash: string | null, declaredBytes: number): Promise<void> {
     const ownerRows = await manager.query(
       `SELECT count(*)::int AS count,coalesce(sum(coalesce(size_bytes,declared_bytes)),0)::text AS used
-         FROM evidence_metadata WHERE request_id=$1 AND state IN ('PENDING','READY')`, [requestId],
+         FROM evidence_metadata e
+        WHERE (e.request_id=$1 OR e.mission_id IN (SELECT id FROM mission WHERE request_id=$1))
+          AND e.state IN ('PENDING','READY')`, [requestId],
     ) as Array<{ count: number; used: string }>;
     const owner = ownerRows[0];
     if (!owner || owner.count >= requestAttachmentCountLimit || Number(owner.used) + declaredBytes > ownerAttachmentByteLimit) {
@@ -283,7 +352,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
     const deadline = Date.now() + 30_000;
     while (Date.now() < deadline) {
       const rows = await this.dataSource.query(
-        'SELECT id,request_id,object_key,state,declared_bytes,size_bytes,detected_mime,checksum,created_at FROM evidence_metadata WHERE id=$1', [id],
+        'SELECT id,request_id,mission_id,object_key,state,declared_bytes,size_bytes,detected_mime,checksum,created_at FROM evidence_metadata WHERE id=$1', [id],
       ) as EvidenceRow[];
       const row = rows[0];
       if (!row || row.state === 'FAILED') throw storageUnavailable();
@@ -291,5 +360,37 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     throw storageUnavailable();
+  }
+
+  private async missionUploadOwner(
+    queryable: Pick<DataSource | EntityManager, 'query'>,
+    missionId: string,
+    session: ReporterSession,
+    lockRequest = false,
+  ): Promise<MissionUploadOwner> {
+    const rows = await queryable.query(
+      `SELECT m.request_id,m.team_id,m.status AS mission_status,
+              r.review_lane,r.status,r.organization_id,r.region_code,r.campaign_id,
+              t.reporting_mode AS team_reporting_mode,t.status AS team_status
+         FROM mission m
+         JOIN assistance_request r ON r.id=m.request_id
+         JOIN rescue_team t ON t.id=m.team_id
+        WHERE m.id=$1${lockRequest ? ' FOR UPDATE OF r' : ''}`, [missionId],
+    ) as MissionUploadOwner[];
+    const owner = rows[0];
+    if (!owner) throw new AppError('NOT_FOUND', { status: 404 });
+    if (owner.team_status !== 'ACTIVE') throw new AppError('TEAM_NOT_ELIGIBLE', { status: 409 });
+
+    const memberRows = await queryable.query(
+      `SELECT member_role FROM team_member
+        WHERE team_id=$1 AND user_id=$2 AND left_at IS NULL LIMIT 1`,
+      [owner.team_id, session.userId],
+    ) as Array<{ member_role: 'LEADER' | 'MEMBER' }>;
+    const isLeader = owner.team_reporting_mode === 'APP' && memberRows[0]?.member_role === 'LEADER';
+    const isScopedCoordinator = hasPermission(session.grants, 'MISSION_RECORD_ON_BEHALF', {
+      organizationId: owner.organization_id, regionCode: owner.region_code, campaignId: owner.campaign_id,
+    });
+    if (!isLeader && !isScopedCoordinator) throw new AppError('FORBIDDEN', { status: 403 });
+    return owner;
   }
 }

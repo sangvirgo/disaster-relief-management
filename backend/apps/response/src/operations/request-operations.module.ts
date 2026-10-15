@@ -11,10 +11,15 @@ import { RequestOperationsTriageService } from './request-operations.triage.serv
 import { RequestOperationsDedupReferralService } from './request-operations.dedup-referral.service';
 import { RequestOperationsVerificationService } from './request-operations.verification.service';
 import { RequestOperationsSupplementReviewService } from './request-operations.supplement-review.service';
+import { RequestOperationsTeamCandidatesService } from './request-operations.team-candidates.service';
+import { RequestAdmissionController } from './request-admission.controller';
+import { RequestAdmissionService } from './request-admission.service';
+import { RequestCampaignAssociationService } from './request-campaign-association.service';
+import { ResponseServiceTokenGuard } from '../campaigns/service-token.guard';
 
 @Module({
   imports: [RequestIntakeModule],
-  controllers: [RequestOperationsController],
+  controllers: [RequestOperationsController, RequestAdmissionController],
   providers: [
     { provide: REQUEST_OPERATIONS_CONFIG, useFactory: () => RequestOperationsService.config() },
     RequestOperationsService,
@@ -26,6 +31,10 @@ import { RequestOperationsSupplementReviewService } from './request-operations.s
     RequestOperationsDedupReferralService,
     RequestOperationsVerificationService,
     RequestOperationsSupplementReviewService,
+    RequestOperationsTeamCandidatesService,
+    RequestCampaignAssociationService,
+    RequestAdmissionService,
+    ResponseServiceTokenGuard,
   ],
   exports: [RequestOperationsService],
 })

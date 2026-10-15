@@ -30,6 +30,13 @@ Before analysis, design, implementation, or further research, read:
 - Verify time-sensitive dependency/provider facts against primary sources before implementation. Existing research dates do not establish current support or compatibility.
 - Before context exhaustion, leave a handoff describing completed work, remaining work, decisions, checks actually run, and the next concrete task. Never include secrets.
 
+## Backend Compose and database test invariant
+
+- `backend/infra/compose.yaml` is the only Compose file. Do not add a separate test database, Compose project, test/helper/runner container, API variant, or test-only Docker resource.
+- Run backend integration and smoke checks from the host against the main C48 APIs and the same primary PostgreSQL service/databases: `c48_identity`, `c48_response`, and `c48_logistics`. Use the loopback-published ports and `C48_*_DATABASE_URL` variables; do not create transient databases or schemas for checks.
+- Migration and seed jobs remain the declared main-stack services. SQL checks may use `docker compose exec postgres` against the primary databases.
+- Reset PostgreSQL only through an explicit `--reset` command (`bash backend/scripts/db/test-db --reset` or `bash backend/scripts/db/reset-demo --reset`). The reset path may remove only the `c48_pgdata` volume; preserve `c48_minio-data` and all MinIO objects. Normal startup must never remove volumes.
+
 ## Mandatory Vietnamese language policy
 
 - Match the language of the user's current message for progress updates, clarification questions, explanations, and final responses: Vietnamese for Vietnamese messages, English for English messages. An explicit request for another response language takes precedence. This conversational rule does not change the product-language rules below.

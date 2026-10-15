@@ -258,7 +258,7 @@ export class RequestOperationsVerificationService {
             .filter((grant) => grantCovers(grant, child)).map((grant) => grant.user_id))];
           if (recipients.length) await manager.query(
             `INSERT INTO notice (source_id,source_version,recipient_user_id,notice_type,payload)
-             SELECT $1,$2,recipient,'DUPLICATE_ORPHANED',jsonb_build_object('text_code','DUPLICATE_ORPHANED','request_id',$1)
+             SELECT $1,$2,recipient,'DUPLICATE_ORPHANED',jsonb_build_object('text_code','DUPLICATE_ORPHANED','request_id',$1::uuid)
                FROM unnest($3::uuid[]) AS recipient
              ON CONFLICT DO NOTHING`, [child.id, version, recipients],
           );

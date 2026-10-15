@@ -50,7 +50,7 @@ Throttling (Nginx + app): login 5 / minute per IP+username, 30 / minute per IP; 
 
 Every admin write inserts an `audit_log` row (actor, action, entity, before/after, reason, correlation id) in the same transaction.
 
-Campaign-scoped grants call the Response internal campaign lookup before the Identity transaction. The Identity client is implemented; until Response implements `GET /internal/campaigns/{id}` in T10, campaign grants fail closed with `RESPONSE_UNAVAILABLE`.
+Campaign-scoped grants call the Response internal campaign lookup before the Identity transaction. The lookup returns campaign status, organization, region, and version; grants fail closed when Response is unavailable.
 
 ## 4. Internal endpoints (Compose network only; Nginx returns 404)
 
@@ -58,7 +58,10 @@ Campaign-scoped grants call the Response internal campaign lookup before the Ide
 |---|---|---|
 | `POST /internal/token` | Response, Logistics | client-credentials → `{ access_token, expires_in }` (aud-restricted) |
 | `POST /internal/introspect` | Response, Logistics | `{ sid, sub }` (from an already signature-verified JWT) → `200 { active, user_id, display_name, status, authz_version, grants: [...] }`; `active=false` if the family is revoked/expired, the user is disabled, or `authz_version` is stale. Dedicated pool (max 4), `statement_timeout` 500 ms, p95 ≤ 100 ms. The local 10-VU/15-second smoke measured p95 4.09 ms; callers coalesce identical concurrent calls and use a circuit breaker (00 §3.2) |
-| `POST /internal/users:lookup` | Response, Logistics | `{ ids: [uuid ≤ 100] }` → `{ items: [ { id, display_name } ] }` for showing actor names; unknown ids omitted; callers must derive IDs from records in their own database and enforce that ownership before calling. Identity cannot verify relationships held only by another service; lookup calls are logged by count. Each service's integration must test this boundary before using lookup. |
+| `POST /internal/users:lookup` | Response, Logistics | `{ ids: [uuid ≤ 100] }` → `{ items: [ { id, display_name } ] }`; unknown ids omitted. Disabled and non-volunteer users are included so callers can render historical actor names. Callers must derive IDs from records in their own database and enforce that ownership before calling. Lookup calls are logged by count. |
+| `POST /internal/users:check-active` | Response only | `{ user_id }` → `{ active: true }` or `{ active: false, reason: USER_NOT_FOUND\|USER_INACTIVE }`. Checks only whether `app_user` exists and has status `ACTIVE`; returns no Identity fields, memberships, or grants, and explicitly rejects Logistics. Used only to gate team membership. |
+| `POST /internal/regions:lookup` | Response only | `{ codes: [1..100 nonblank strings, each ≤ 80 characters] }` → `{ items: [ { code, name } ] }`; unknown codes are omitted. Reads only the Identity region catalog and explicitly rejects Logistics. |
+| `POST /internal/team-leader-eligibility` | Response only | `{ user_id, organization_id }` → `{ eligible: true }` or `{ eligible: false, reason }`, where `reason` is `USER_NOT_FOUND`, `USER_INACTIVE`, `MEMBERSHIP_REQUIRED`, or `VOLUNTEER_GRANT_REQUIRED`. Eligibility requires an active account, active membership in the active organization, and a current VOLUNTEER grant scoped to SYSTEM or that same organization. The endpoint returns no user identity fields and explicitly rejects Logistics. |
 | `POST /internal/request-coordinators` | Response only | `{ organization_id }` → active users' current COORDINATOR grants plus organization-scoped OPERATIONS_MANAGER grants; used to revalidate a second coordinator at verification and resolve scoped overdue-notice recipients. The route requires a valid Identity service token and explicitly rejects callers other than Response. |
 | `GET /internal/organizations/{id}` | Response, Logistics | existence/kind/status check |
 

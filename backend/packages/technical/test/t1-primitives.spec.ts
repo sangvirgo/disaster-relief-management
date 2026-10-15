@@ -171,24 +171,32 @@ describe('T1 technical package', () => {
   it('validates runtime database and network configuration without echoing credentials', () => {
     expect(validateEnvironment({ DATABASE_URL: 'postgresql://user:secret@localhost/c48', PORT: '3001', DB_LOCK_TIMEOUT_MS: '4500', DB_STATEMENT_TIMEOUT_MS: '12000' }, 'identity'))
       .toMatchObject({ port: 3001, dbPoolMax: 20, dbLockTimeoutMs: 4500, dbStatementTimeoutMs: 12000 });
+    expect(validateEnvironment({ DATABASE_URL: 'postgresql://user:secret@localhost/c48', DB_POOL_MAX: '100' }, 'identity'))
+      .toMatchObject({ dbPoolMax: 100 });
+    expect(() => validateEnvironment({ DATABASE_URL: 'postgresql://user:secret@localhost/c48', DB_POOL_MAX: '101' }, 'identity'))
+      .toThrow('DB_POOL_MAX');
     expect(() => validateEnvironment({ DATABASE_URL: 'not-a-url', PORT: '70000' }, 'identity'))
       .toThrow(expect.not.stringContaining('secret'));
 
     const original = {
       databaseUrl: process.env.DATABASE_URL,
+      poolMax: process.env.DB_POOL_MAX,
       lockTimeout: process.env.DB_LOCK_TIMEOUT_MS,
       statementTimeout: process.env.DB_STATEMENT_TIMEOUT_MS,
     };
     process.env.DATABASE_URL = 'postgresql://user:secret@localhost/c48';
+    process.env.DB_POOL_MAX = '73';
     process.env.DB_LOCK_TIMEOUT_MS = '4500';
     process.env.DB_STATEMENT_TIMEOUT_MS = '12000';
     try {
       expect(postgresOptions([], 'identity')).toMatchObject({
-        extra: { options: '-c lock_timeout=4500 -c statement_timeout=12000' },
+        extra: { max: 73, options: '-c lock_timeout=4500 -c statement_timeout=12000' },
       });
     } finally {
       if (original.databaseUrl === undefined) delete process.env.DATABASE_URL;
       else process.env.DATABASE_URL = original.databaseUrl;
+      if (original.poolMax === undefined) delete process.env.DB_POOL_MAX;
+      else process.env.DB_POOL_MAX = original.poolMax;
       if (original.lockTimeout === undefined) delete process.env.DB_LOCK_TIMEOUT_MS;
       else process.env.DB_LOCK_TIMEOUT_MS = original.lockTimeout;
       if (original.statementTimeout === undefined) delete process.env.DB_STATEMENT_TIMEOUT_MS;
@@ -226,6 +234,28 @@ describe('T1 technical package', () => {
     nestLogger.warn('request from phone 0900000000 at private-location');
     expect(nestOutput).not.toContain('0900000000');
     expect(nestOutput).not.toContain('private-location');
+  });
+
+  it('redacts signed URLs and named reporter PII from nested log fields', () => {
+    let output = '';
+    const logger = createPinoLogger('response', 'info', new Writable({ write(chunk, _encoding, callback) { output += chunk.toString(); callback(); } }));
+    logger.info({
+      req: { url: '/evidence?X-Amz-Signature=signed-request-private', headers: { referer: 'https://example.test/?token=referer-private' } },
+      evidence: { signed_url: 'https://example.test/evidence?X-Amz-Signature=signed-field-private', download_url: 'https://example.test/evidence?signature=download-private' },
+      reporter_contact_phone: 'reporter-phone-private',
+      beneficiary_contact_phone: 'beneficiary-phone-private',
+      alternate_contact_phone: 'alternate-phone-private',
+      location: { coordinates: [105.123456, 21.123456] },
+    }, 'test');
+    expect(output).not.toContain('signed-request-private');
+    expect(output).not.toContain('referer-private');
+    expect(output).not.toContain('signed-field-private');
+    expect(output).not.toContain('download-private');
+    expect(output).not.toContain('reporter-phone-private');
+    expect(output).not.toContain('beneficiary-phone-private');
+    expect(output).not.toContain('alternate-phone-private');
+    expect(output).not.toContain('105.123456');
+    logger.flush();
   });
 
   it('updates versioned rows with an optimistic version predicate', async () => {

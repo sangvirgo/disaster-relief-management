@@ -6,7 +6,7 @@ import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
 import {
   AuthorityReferralDto, ContactAttemptDto, ConcurRequestDto, CorrectRegionDto, DuplicateRequestDto,
-  RejectRequestDto, RequestQueueQueryDto, RequestOperationPageDto, RequestVersionDto,
+  AttachCampaignDto, RejectRequestDto, RequestQueueQueryDto, RequestOperationPageDto, RequestVersionDto, TeamCandidatesQueryDto,
   SupplementReviewDto, TriageRequestDto, VerifyRequestDto,
 } from './request-operations.dto';
 import { RequestOperationsService } from './request-operations.service';
@@ -74,6 +74,12 @@ export class RequestOperationsController {
   async missions(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Query() query: RequestOperationPageDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     noStore(response);
     return this.operations.missions(id, query, request);
+  }
+
+  @Get('requests/:id/team-candidates')
+  async teamCandidates(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Query() query: TeamCandidatesQueryDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.operations.teamCandidates(id, query, request);
   }
 
   @Get('requests/:id')
@@ -168,6 +174,26 @@ export class RequestOperationsController {
   async correctRegion(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Body() dto: CorrectRegionDto, @Req() request: OperationRequest, @Res({ passthrough: true }) response: Response) {
     noStore(response);
     const result = await this.operations.correctRegion(id, dto, key(request), request);
+    replay(response, result.replay);
+    return result.value;
+  }
+
+  @Post('requests/:id/attach-campaign')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async attachCampaign(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Body() dto: AttachCampaignDto, @Req() request: OperationRequest, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    const result = await this.operations.attachCampaign(id, dto, key(request), request);
+    replay(response, result.replay);
+    return result.value;
+  }
+
+  @Post('requests/:id/detach-campaign')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async detachCampaign(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Body() dto: RequestVersionDto, @Req() request: OperationRequest, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    const result = await this.operations.detachCampaign(id, dto, key(request), request);
     replay(response, result.replay);
     return result.value;
   }

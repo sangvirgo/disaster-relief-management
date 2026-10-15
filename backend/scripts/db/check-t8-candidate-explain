@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname -- "$0")/../dev/lib.sh"
+require_env_file
+load_backend_env
+require_nonproduction_env
+
+main_compose up -d --wait --wait-timeout 90 postgres
+{
+  printf 'BEGIN;\n'
+  sed '/^\\i response\.sql$/d' "$ROOT/docs/backend/schema/explain-response.sql"
+  printf '\nROLLBACK;\n'
+} | main_compose exec -T postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d c48_response
+
+printf 'PASS Response query-plan proof rolled back on the primary C48 Response database\n'

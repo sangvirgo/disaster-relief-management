@@ -20,6 +20,11 @@ interface IntrospectionRow {
   campaign_id: string | null;
 }
 
+type TeamLeaderEligibilityReason = 'USER_NOT_FOUND' | 'USER_INACTIVE' | 'MEMBERSHIP_REQUIRED' | 'VOLUNTEER_GRANT_REQUIRED';
+
+type TeamLeaderEligibility = { eligible: true } | { eligible: false; reason: TeamLeaderEligibilityReason };
+type ActiveUserCheck = { active: true } | { active: false; reason: 'USER_NOT_FOUND' | 'USER_INACTIVE' };
+
 @Injectable()
 export class InternalService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(InternalService.name);
@@ -92,6 +97,47 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
       [ids],
     ) as Array<{ id: string; display_name: string }>;
     return { items };
+  }
+
+  async activeUserCheck(userId: string): Promise<ActiveUserCheck> {
+    const rows = await this.introspectionDataSource.query(
+      'SELECT status FROM app_user WHERE id = $1',
+      [userId],
+    ) as Array<{ status: string }>;
+    if (!rows[0]) return { active: false, reason: 'USER_NOT_FOUND' };
+    return rows[0].status === 'ACTIVE' ? { active: true } : { active: false, reason: 'USER_INACTIVE' };
+  }
+
+  async lookupRegions(codes: string[]): Promise<{ items: Array<{ code: string; name: string }> }> {
+    const items = await this.introspectionDataSource.query(
+      'SELECT code, name FROM region WHERE code = ANY($1::text[]) ORDER BY code',
+      [codes],
+    ) as Array<{ code: string; name: string }>;
+    return { items };
+  }
+
+  async teamLeaderEligibility(userId: string, organizationId: string): Promise<TeamLeaderEligibility> {
+    const rows = await this.introspectionDataSource.query(
+      `SELECT CASE
+                WHEN u.id IS NULL THEN 'USER_NOT_FOUND'
+                WHEN u.status <> 'ACTIVE' THEN 'USER_INACTIVE'
+                WHEN o.id IS NULL OR m.user_id IS NULL THEN 'MEMBERSHIP_REQUIRED'
+                WHEN NOT EXISTS (
+                  SELECT 1 FROM role_grant g
+                   WHERE g.user_id = u.id AND g.role_code = 'VOLUNTEER' AND g.revoked_at IS NULL
+                     AND ((g.scope_type = 'SYSTEM' AND g.organization_id IS NULL AND g.region_code IS NULL AND g.campaign_id IS NULL)
+                       OR (g.scope_type = 'ORGANIZATION' AND g.organization_id = o.id AND g.region_code IS NULL AND g.campaign_id IS NULL))
+                ) THEN 'VOLUNTEER_GRANT_REQUIRED'
+                ELSE NULL
+              END AS reason
+         FROM (SELECT $1::uuid AS user_id, $2::uuid AS organization_id) requested
+         LEFT JOIN app_user u ON u.id = requested.user_id
+         LEFT JOIN organization o ON o.id = requested.organization_id AND o.status = 'ACTIVE'
+         LEFT JOIN membership m ON m.user_id = u.id AND m.organization_id = o.id AND m.status = 'ACTIVE'`,
+      [userId, organizationId],
+    ) as Array<{ reason: TeamLeaderEligibilityReason | null }>;
+    const reason = rows[0]?.reason;
+    return reason ? { eligible: false, reason } : { eligible: true };
   }
 
   async requestCoordinators(organizationId: string): Promise<{ items: Array<Record<string, unknown>> }> {

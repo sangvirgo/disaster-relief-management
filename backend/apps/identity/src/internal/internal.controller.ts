@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post
 import type { Request, Response } from 'express';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { InternalService } from './internal.service';
-import { IntrospectDto, LookupUsersDto, RequestCoordinatorQueryDto, ServiceTokenDto } from './internal.dto';
+import { ActiveUserCheckDto, IntrospectDto, LookupUsersDto, RegionLookupDto, RequestCoordinatorQueryDto, ServiceTokenDto, TeamLeaderEligibilityDto } from './internal.dto';
 import { AdminRequest, IdentityServiceGuard } from '../admin/admin-security';
 
 function noStore(response: Response): void {
@@ -34,6 +34,45 @@ export class InternalController {
   async lookupUsers(@Body() dto: LookupUsersDto, @Res({ passthrough: true }) response: Response): Promise<Record<string, unknown>> {
     noStore(response);
     return this.internalService.lookupUsers(dto.ids);
+  }
+
+  @Post('users\\:check-active')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(IdentityServiceGuard)
+  async activeUserCheck(
+    @Body() dto: ActiveUserCheckDto,
+    @Req() request: AdminRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<Record<string, unknown>> {
+    noStore(response);
+    if (request.serviceCaller !== 'response') throw new AppError('FORBIDDEN', { status: 403 });
+    return this.internalService.activeUserCheck(dto.user_id);
+  }
+
+  @Post('regions\\:lookup')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(IdentityServiceGuard)
+  async lookupRegions(
+    @Body() dto: RegionLookupDto,
+    @Req() request: AdminRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<Record<string, unknown>> {
+    noStore(response);
+    if (request.serviceCaller !== 'response') throw new AppError('FORBIDDEN', { status: 403 });
+    return this.internalService.lookupRegions(dto.codes);
+  }
+
+  @Post('team-leader-eligibility')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(IdentityServiceGuard)
+  async teamLeaderEligibility(
+    @Body() dto: TeamLeaderEligibilityDto,
+    @Req() request: AdminRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<Record<string, unknown>> {
+    noStore(response);
+    if (request.serviceCaller !== 'response') throw new AppError('FORBIDDEN', { status: 403 });
+    return this.internalService.teamLeaderEligibility(dto.user_id, dto.organization_id);
   }
 
   @Post('request-coordinators')

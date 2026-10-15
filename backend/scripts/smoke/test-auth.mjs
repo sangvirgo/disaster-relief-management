@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { cleanupAuthSmokeFixtures } from './test-auth-cleanup.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
-const appDatabaseUrl = process.env.APP_TEST_DATABASE_URL;
-const baseUrl = new URL(process.env.AUTH_TEST_BASE_URL ?? 'http://identity-api:3001/api/v1/identity');
-const databaseUrl = process.env.TEST_DATABASE_URL;
-const origin = 'http://localhost';
-if (!databaseUrl) throw new Error('TEST_DATABASE_URL is required');
-if (!appDatabaseUrl) throw new Error('APP_TEST_DATABASE_URL is required');
+const databaseUrl = process.env.C48_IDENTITY_DATABASE_URL;
+const appDatabaseUrl = process.env.C48_IDENTITY_APP_DATABASE_URL;
+const baseUrl = new URL(process.env.C48_IDENTITY_BASE_URL ?? 'http://127.0.0.1:3001/api/v1/identity');
+const origin = process.env.C48_SMOKE_ORIGIN ?? 'http://localhost:8080';
+if (!databaseUrl || !appDatabaseUrl) throw new Error('C48_IDENTITY_DATABASE_URL and C48_IDENTITY_APP_DATABASE_URL must point at the primary C48 Identity database');
 
 process.env.DATABASE_URL = appDatabaseUrl;
 process.env.NODE_ENV = 'test';
@@ -23,8 +23,12 @@ const appDatabase = new DataSource(postgresOptions([], 'identity'));
 const idempotency = new IdempotencyService();
 const userIds = new Set();
 const familyIds = new Set();
-const idempotencyKeys = new Set();
-let sequence = 1;
+const idempotencyRecords = new Map();
+let sequence = 201 + randomBytes(1)[0] % 50;
+
+function trackIdempotency(scopeKey, command, key) {
+  idempotencyRecords.set(JSON.stringify([scopeKey, command, key]), { scopeKey, command, key });
+}
 
 function ip() {
   return `198.51.100.${sequence++}`;
@@ -74,7 +78,7 @@ function userInput() {
 }
 
 async function register(input, key = randomUUID(), requestIp = ip()) {
-  idempotencyKeys.add(key);
+  trackIdempotency('anon:register', 'identity.auth.register', key);
   return call('/auth/register', {
     method: 'POST', body: input,
     headers: { 'Idempotency-Key': key, 'X-Forwarded-For': requestIp },
@@ -106,14 +110,18 @@ try {
   assert.ok(!csrf.setCookies.find((value) => value.startsWith('c48_csrf='))?.includes('HttpOnly'));
 
   const privileged = userInput();
+  const forbiddenFieldsKey = randomUUID();
+  trackIdempotency('anon:register', 'identity.auth.register', forbiddenFieldsKey);
   const forbiddenFields = await call('/auth/register', {
     method: 'POST', body: { ...privileged, role_code: 'ADMIN', scope_type: 'SYSTEM' }, cookies: browserCookies,
-    headers: { Origin: origin, 'X-CSRF-Token': csrf.body.csrf_token, 'Idempotency-Key': randomUUID(), 'X-Forwarded-For': ip() },
+    headers: { Origin: origin, 'X-CSRF-Token': csrf.body.csrf_token, 'Idempotency-Key': forbiddenFieldsKey, 'X-Forwarded-For': ip() },
   });
   expectError(forbiddenFields, 400, 'VALIDATION_FAILED');
+  const missingCsrfKey = randomUUID();
+  trackIdempotency('anon:register', 'identity.auth.register', missingCsrfKey);
   const missingCsrf = await call('/auth/register', {
     method: 'POST', body: privileged, cookies: browserCookies,
-    headers: { Origin: origin, 'Idempotency-Key': randomUUID(), 'X-Forwarded-For': ip() },
+    headers: { Origin: origin, 'Idempotency-Key': missingCsrfKey, 'X-Forwarded-For': ip() },
   });
   expectError(missingCsrf, 403, 'CSRF_INVALID');
 
@@ -129,7 +137,6 @@ try {
   assert.ok(!JSON.stringify(registered.body).includes(input.password));
   const userId = registered.body.user.id;
   userIds.add(userId);
-  idempotencyKeys.add(registerKey);
   const replay = await register(input, registerKey, ip());
   assert.equal(replay.status, 201);
   assert.equal(replay.headers.get('idempotent-replay'), 'true');
@@ -198,7 +205,7 @@ try {
 
   const newPassword = `A safer field account ${randomBytes(5).toString('hex')}!`;
   const changeKey = randomUUID();
-  idempotencyKeys.add(changeKey);
+  trackIdempotency(`user:${userId}`, 'identity.auth.change-password', changeKey);
   const changeBody = { current_password: input.password, new_password: newPassword };
   const changed = await call('/auth/change-password', {
     method: 'POST', body: changeBody,
@@ -287,7 +294,7 @@ try {
   assert.equal(activeTokens.rows[0].count, 0);
 
   const statementKey = randomUUID();
-  idempotencyKeys.add(statementKey);
+  trackIdempotency(`user:${userId}`, 'identity.auth.statement-timeout-smoke', statementKey);
   const statementHash = canonicalRequestHash({ action: 'statement-timeout-smoke', user_id: userId });
   let statementAttempts = 0;
   const statementCommand = (execute) => ({
@@ -327,7 +334,7 @@ try {
   assert.equal(successfulEffects, 1);
 
   const lockKey = randomUUID();
-  idempotencyKeys.add(lockKey);
+  trackIdempotency(`user:${userId}`, 'identity.auth.lock-timeout-smoke', lockKey);
   const lockHash = canonicalRequestHash({ action: 'lock-timeout-smoke', user_id: userId });
   const versionBefore = await database.query('SELECT version FROM app_user WHERE id = $1', [userId]);
   const lockCommand = (execute) => ({
@@ -392,19 +399,18 @@ try {
   });
   expectError(unknownLogin, 401, 'INVALID_CREDENTIALS');
 
-  console.log('PASS Identity register, cookies/CSRF, native transport, password change, replay/reuse, and authz-version refresh barrier on PostgreSQL');
 } finally {
-  await database.query('ROLLBACK').catch(() => undefined);
-  if (userIds.size) {
-    const ids = [...userIds];
-    await database.query('DELETE FROM refresh_session WHERE family_id = ANY(SELECT id FROM session_family WHERE user_id = ANY($1::uuid[]))', [ids]).catch(() => undefined);
-    await database.query('DELETE FROM session_family WHERE user_id = ANY($1::uuid[])', [ids]).catch(() => undefined);
-    await database.query('DELETE FROM role_grant WHERE user_id = ANY($1::uuid[])', [ids]).catch(() => undefined);
-    await database.query('DELETE FROM app_user WHERE id = ANY($1::uuid[])', [ids]).catch(() => undefined);
+  try {
+    await cleanupAuthSmokeFixtures({
+      database, userIds, familyIds, idempotencyRecords: [...idempotencyRecords.values()],
+    });
+  } finally {
+    try {
+      if (appDatabase.isInitialized) await appDatabase.destroy();
+    } finally {
+      await database.end();
+    }
   }
-  if (idempotencyKeys.size) {
-    await database.query('DELETE FROM idempotency_record WHERE idempotency_key = ANY($1::uuid[])', [[...idempotencyKeys]]).catch(() => undefined);
-  }
-  if (appDatabase.isInitialized) await appDatabase.destroy();
-  await database.end();
 }
+
+console.log('PASS Identity register, cookies/CSRF, native transport, password change, replay/reuse, and authz-version refresh barrier on PostgreSQL');

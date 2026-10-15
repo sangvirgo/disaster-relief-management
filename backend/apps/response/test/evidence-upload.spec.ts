@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { PassThrough, Readable } from 'node:stream';
 import type { Request } from 'express';
 import { AppError } from '../../../packages/technical/src/errors/errors';
-import { stageEvidenceMultipart } from '../src/evidence/evidence-upload';
+import { stageEvidenceMultipart, type StagedEvidenceFile } from '../../../packages/technical/src/uploads/evidence-upload';
 
 function multipart(file: Buffer, filename = 'photo.png', declaredType = 'application/octet-stream') {
   const boundary = '----c48-evidence-test';
@@ -14,7 +14,50 @@ function multipart(file: Buffer, filename = 'photo.png', declaredType = 'applica
   return { boundary, body: Buffer.concat([prefix, file, suffix]) };
 }
 
+async function waitForAbortedListener(request: Request): Promise<void> {
+  const deadline = Date.now() + 2_000;
+  while (request.listenerCount('aborted') === 0) {
+    if (Date.now() >= deadline) throw new Error('Timed out waiting for the multipart abort listener');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+async function cleanupPendingUpload(
+  request: Request,
+  upload: Promise<StagedEvidenceFile>,
+  timeoutMs = 500,
+): Promise<boolean> {
+  const settled = upload.then(async (staged) => {
+    await staged.cleanup();
+    return true;
+  }, () => true).catch(() => false);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  request.aborted = true;
+  request.end();
+  request.destroy();
+  try {
+    return await Promise.race([
+      settled,
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 describe('Response multipart evidence staging', () => {
+  it('bounds cleanup when staging never settles', async () => {
+    const stream = new PassThrough();
+    const request = stream as unknown as Request;
+    const upload = new Promise<StagedEvidenceFile>(() => undefined);
+
+    await expect(cleanupPendingUpload(request, upload, 20)).resolves.toBe(false);
+    expect(stream.destroyed).toBe(true);
+    expect(stream.writableEnded).toBe(true);
+  }, 1_000);
+
   it('streams the one file, hashes bytes, and ignores client MIME metadata', async () => {
     const file = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('synthetic')]);
     const form = multipart(file, 'report.jpg', 'image/jpeg');
@@ -50,21 +93,27 @@ describe('Response multipart evidence staging', () => {
     request.headers = { 'content-type': `multipart/form-data; boundary=${form.boundary}` };
     request.complete = false;
     const upload = stageEvidenceMultipart(request, form.body.length);
-    for (let attempt = 0; attempt < 100 && request.listenerCount('aborted') === 0; attempt++) {
+    try {
+      await waitForAbortedListener(request);
+      expect(request.listenerCount('aborted')).toBeGreaterThan(0);
+      request.write(form.body.subarray(0, Math.floor(form.body.length / 2)));
       await new Promise((resolve) => setImmediate(resolve));
-    }
-    expect(request.listenerCount('aborted')).toBeGreaterThan(0);
-    request.write(form.body.subarray(0, Math.floor(form.body.length / 2)));
-    await new Promise((resolve) => setImmediate(resolve));
-    request.emit('aborted');
+      request.emit('aborted');
 
-    const settled = await Promise.race([
-      upload.then(() => true, () => true),
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 500)),
-    ]);
-    if (!settled) request.end();
-    expect(settled).toBe(true);
-    await expect(upload).rejects.toMatchObject<AppError>({ code: 'VALIDATION_FAILED' });
+      const settled = await Promise.race([
+        upload.then(() => true, () => true),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 500)),
+      ]);
+      if (!settled) {
+        request.aborted = true;
+        request.end();
+      }
+      expect(settled).toBe(true);
+      await expect(upload).rejects.toMatchObject<AppError>({ code: 'VALIDATION_FAILED' });
+    } finally {
+      const cleaned = await cleanupPendingUpload(request, upload);
+      if (!cleaned) throw new Error('Timed out waiting for multipart upload cleanup after destroying the request');
+    }
   });
 
   it('rejects a request that aborted before local staging started', async () => {
@@ -83,15 +132,21 @@ describe('Response multipart evidence staging', () => {
     const request = new PassThrough() as unknown as Request;
     request.headers = { 'content-type': `multipart/form-data; boundary=${form.boundary}` };
     const upload = stageEvidenceMultipart(request, form.body.length);
-    for (let attempt = 0; attempt < 100 && request.listenerCount('aborted') === 0; attempt++) {
-      await new Promise((resolve) => setImmediate(resolve));
-    }
-    expect(request.listenerCount('aborted')).toBeGreaterThan(0);
-    const directory = (await readdir(tmpdir())).find((name) => name.startsWith('c48-evidence-') && !before.has(name));
-    expect(directory).toBeDefined();
-    await rm(join(tmpdir(), directory!), { recursive: true, force: true });
-    request.end(form.body);
+    let directory: string | undefined;
+    try {
+      await waitForAbortedListener(request);
+      expect(request.listenerCount('aborted')).toBeGreaterThan(0);
+      const createdDirectories = (await readdir(tmpdir())).filter((name) => name.startsWith('c48-evidence-') && !before.has(name));
+      expect(createdDirectories).toHaveLength(1);
+      directory = createdDirectories[0];
+      await rm(join(tmpdir(), directory!), { recursive: true, force: true });
+      request.end(form.body);
 
-    await expect(upload).rejects.toMatchObject<AppError>({ code: 'STORAGE_UNAVAILABLE' });
+      await expect(upload).rejects.toMatchObject<AppError>({ code: 'STORAGE_UNAVAILABLE' });
+    } finally {
+      const cleaned = await cleanupPendingUpload(request, upload);
+      if (!cleaned) throw new Error('Timed out waiting for multipart upload cleanup after destroying the request');
+      if (directory) await rm(join(tmpdir(), directory), { recursive: true, force: true });
+    }
   });
 });

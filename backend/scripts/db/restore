@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+backend_dir="$(cd -- "$script_dir/../.." && pwd -P)"
+repo_root="$(cd -- "$backend_dir/.." && pwd -P)"
+compose_file="$backend_dir/infra/compose.yaml"
+
+usage() {
+  cat <<'USAGE'
+Usage: PGSERVICE_IDENTITY=c48-recovery-identity \
+  PGSERVICE_RESPONSE=c48-recovery-response \
+  PGSERVICE_LOGISTICS=c48-recovery-logistics \
+  PGSERVICEFILE=/private/path/pg_service.conf \
+  C48_RESTORE_CONFIRM=I_HAVE_AN_ISOLATED_DESTINATION \
+  backend/scripts/db/restore ABSOLUTE_BACKUP_DIRECTORY
+
+Restores the three PostgreSQL custom dumps into an existing empty database
+whose name starts with c48_recovery_. It never creates or drops a database and
+refuses the primary C48 database names. Evidence objects are restored separately
+with the matching isolated MinIO endpoint, as described in docs/backend/t18-hardening.md.
+USAGE
+}
+
+fail() { printf 'Restore refused: %s\n' "$1" >&2; exit 2; }
+
+if [[ "${1:-}" == '--help' ]]; then usage; exit 0; fi
+[[ $# -eq 1 ]] || { usage >&2; exit 2; }
+[[ "${C48_RESTORE_CONFIRM:-}" == 'I_HAVE_AN_ISOLATED_DESTINATION' ]] || fail 'explicit isolated-destination confirmation is required'
+[[ -n "${PGSERVICEFILE:-}" && -f "$PGSERVICEFILE" ]] || fail 'PGSERVICEFILE must point to an existing protected libpq service file'
+[[ "$PGSERVICEFILE" == /* ]] || fail 'PGSERVICEFILE must be an absolute path outside the repository'
+command -v psql >/dev/null && command -v pg_restore >/dev/null || fail 'psql and pg_restore are required on the host'
+[[ -f "$backend_dir/.env" ]] || fail 'backend/.env is required to inspect the primary PostgreSQL service'
+command -v docker >/dev/null || fail 'docker is required to inspect the primary PostgreSQL cluster'
+
+compose() {
+  docker compose --env-file "$backend_dir/.env" --project-directory "$backend_dir" -f "$compose_file" "$@"
+}
+
+backup_dir="$(realpath -e -- "$1")"
+[[ -d "$backup_dir" ]] || fail 'the backup directory must exist'
+case "$backup_dir/" in
+  "$repo_root/"*) fail 'backup artifacts must stay outside the repository' ;;
+esac
+[[ -f "$backup_dir/manifest.txt" && -f "$backup_dir/manifest.sha256" ]] || fail 'the backup manifest is missing'
+(cd -- "$backup_dir" && sha256sum --check --strict manifest.sha256 >/dev/null) || fail 'backup checksum validation failed'
+
+service_file="$(realpath -e -- "$PGSERVICEFILE")"
+case "$service_file/" in
+  "$repo_root/"*) fail 'PGSERVICEFILE must stay outside the repository' ;;
+esac
+service_file_mode="$(stat -c '%a' -- "$service_file")"
+[[ "$service_file_mode" =~ ^[0-7]{3,4}$ ]] || fail 'could not verify PGSERVICEFILE permissions'
+(( (8#$service_file_mode & 077) == 0 )) || fail 'PGSERVICEFILE must not be readable or writable by group or other users'
+
+if ! primary_system_identifier="$(compose exec -T postgres psql --username=postgres --no-psqlrc --quiet --tuples-only --no-align --set=ON_ERROR_STOP=1 --dbname=postgres --command='SELECT system_identifier::text FROM pg_control_system()' 2>/dev/null)"; then
+  fail 'could not inspect primary PostgreSQL cluster identity'
+fi
+primary_system_identifier="${primary_system_identifier//[[:space:]]/}"
+[[ "$primary_system_identifier" =~ ^[0-9]+$ ]] || fail 'could not inspect primary PostgreSQL cluster identity'
+
+for database in c48_identity c48_response c48_logistics; do
+  service_suffix="${database#c48_}"
+  service_variable="PGSERVICE_${service_suffix^^}"
+  service_name="${!service_variable:-}"
+  [[ "$service_name" =~ ^[A-Za-z0-9_-]+$ ]] || fail "$service_variable must name a protected libpq service"
+  connection="service=$service_name"
+  if ! target_system_identifier="$(psql "$connection" --no-psqlrc --quiet --tuples-only --no-align --set=ON_ERROR_STOP=1 --command='SELECT system_identifier::text FROM pg_control_system()' 2>/dev/null)"; then
+    fail 'could not inspect recovery PostgreSQL cluster identity'
+  fi
+  target_system_identifier="${target_system_identifier//[[:space:]]/}"
+  [[ "$target_system_identifier" =~ ^[0-9]+$ ]] || fail 'could not inspect recovery PostgreSQL cluster identity'
+  [[ "$target_system_identifier" != "$primary_system_identifier" ]] || fail 'recovery target is on the primary PostgreSQL cluster'
+
+  target_database="$(psql "$connection" --no-psqlrc --quiet --tuples-only --no-align --set=ON_ERROR_STOP=1 --command='SELECT current_database()')"
+  case "$target_database" in
+    c48_identity|c48_response|c48_logistics) fail 'restoring over a primary C48 database is forbidden' ;;
+  esac
+  [[ "$target_database" == "c48_recovery_$service_suffix" ]] || fail "$service_variable must connect to c48_recovery_$service_suffix"
+  user_object_query="$(cat <<'SQL'
+WITH extension_members AS (
+  SELECT classid, objid
+    FROM pg_depend
+   WHERE refclassid = 'pg_extension'::regclass AND deptype = 'e'
+),
+user_namespaces AS (
+  SELECT n.oid, n.nspname
+    FROM pg_namespace n
+   WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname !~ '^pg_'
+),
+user_objects AS (
+  SELECT 1
+    FROM user_namespaces n
+   WHERE n.nspname <> 'public'
+     AND NOT EXISTS (
+       SELECT 1 FROM extension_members e
+        WHERE e.classid = 'pg_namespace'::regclass AND e.objid = n.oid
+     )
+  UNION ALL
+  SELECT 1 FROM pg_class c JOIN user_namespaces n ON n.oid = c.relnamespace
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_class'::regclass AND e.objid = c.oid)
+  UNION ALL
+  SELECT 1 FROM pg_type t JOIN user_namespaces n ON n.oid = t.typnamespace
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_type'::regclass AND e.objid = t.oid)
+  UNION ALL
+  SELECT 1 FROM pg_proc p JOIN user_namespaces n ON n.oid = p.pronamespace
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_proc'::regclass AND e.objid = p.oid)
+  UNION ALL
+  SELECT 1 FROM pg_operator o JOIN user_namespaces n ON n.oid = o.oprnamespace
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_operator'::regclass AND e.objid = o.oid)
+  UNION ALL
+  SELECT 1 FROM pg_collation c JOIN user_namespaces n ON n.oid = c.collnamespace
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_collation'::regclass AND e.objid = c.oid)
+  UNION ALL
+  SELECT 1 FROM pg_conversion c JOIN user_namespaces n ON n.oid = c.connamespace
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_conversion'::regclass AND e.objid = c.oid)
+  UNION ALL
+  SELECT 1 FROM pg_opclass o JOIN user_namespaces n ON n.oid = o.opcnamespace
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_opclass'::regclass AND e.objid = o.oid)
+  UNION ALL
+  SELECT 1 FROM pg_opfamily o JOIN user_namespaces n ON n.oid = o.opfnamespace
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_opfamily'::regclass AND e.objid = o.oid)
+  UNION ALL
+  SELECT 1 FROM pg_ts_config t JOIN user_namespaces n ON n.oid = t.cfgnamespace
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_ts_config'::regclass AND e.objid = t.oid)
+  UNION ALL
+  SELECT 1 FROM pg_ts_dict t JOIN user_namespaces n ON n.oid = t.dictnamespace
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_ts_dict'::regclass AND e.objid = t.oid)
+  UNION ALL
+  SELECT 1 FROM pg_ts_parser t JOIN user_namespaces n ON n.oid = t.prsnamespace
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_ts_parser'::regclass AND e.objid = t.oid)
+  UNION ALL
+  SELECT 1 FROM pg_ts_template t JOIN user_namespaces n ON n.oid = t.tmplnamespace
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_ts_template'::regclass AND e.objid = t.oid)
+  UNION ALL
+  SELECT 1 FROM pg_statistic_ext s JOIN user_namespaces n ON n.oid = s.stxnamespace
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_statistic_ext'::regclass AND e.objid = s.oid)
+  UNION ALL
+  SELECT 1 FROM pg_largeobject_metadata l
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_largeobject_metadata'::regclass AND e.objid = l.oid)
+  UNION ALL
+  SELECT 1 FROM pg_publication p
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_publication'::regclass AND e.objid = p.oid)
+  UNION ALL
+  SELECT 1 FROM pg_foreign_data_wrapper f
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_foreign_data_wrapper'::regclass AND e.objid = f.oid)
+  UNION ALL
+  SELECT 1 FROM pg_foreign_server s
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_foreign_server'::regclass AND e.objid = s.oid)
+  UNION ALL
+  SELECT 1 FROM pg_event_trigger t
+   WHERE NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_event_trigger'::regclass AND e.objid = t.oid)
+  UNION ALL
+  SELECT 1 FROM pg_extension x
+   WHERE x.oid >= 16384
+  UNION ALL
+  SELECT 1 FROM pg_am a
+   WHERE a.oid >= 16384
+     AND NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_am'::regclass AND e.objid = a.oid)
+  UNION ALL
+  SELECT 1 FROM pg_cast c
+   WHERE c.oid >= 16384
+     AND NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_cast'::regclass AND e.objid = c.oid)
+  UNION ALL
+  SELECT 1 FROM pg_language l
+   WHERE l.lanispl AND l.oid >= 16384
+     AND NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_language'::regclass AND e.objid = l.oid)
+  UNION ALL
+  SELECT 1 FROM pg_transform t
+   WHERE t.oid >= 16384
+     AND NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_transform'::regclass AND e.objid = t.oid)
+  UNION ALL
+  SELECT 1 FROM pg_default_acl d
+   WHERE d.oid >= 16384
+     AND NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_default_acl'::regclass AND e.objid = d.oid)
+  UNION ALL
+  SELECT 1 FROM pg_user_mapping m
+   WHERE m.oid >= 16384
+     AND NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_user_mapping'::regclass AND e.objid = m.oid)
+  UNION ALL
+  SELECT 1 FROM pg_subscription s
+   JOIN pg_database d ON d.oid = s.subdbid
+   WHERE d.datname = current_database()
+     AND NOT EXISTS (SELECT 1 FROM extension_members e WHERE e.classid = 'pg_subscription'::regclass AND e.objid = s.oid)
+)
+SELECT count(*) FROM user_objects;
+SQL
+)"
+  if ! target_user_object_count="$(psql "$connection" --no-psqlrc --quiet --tuples-only --no-align --set=ON_ERROR_STOP=1 --command="$user_object_query" 2>/dev/null)"; then
+    fail 'could not verify recovery database has no user-created objects'
+  fi
+  target_user_object_count="${target_user_object_count//[[:space:]]/}"
+  [[ "$target_user_object_count" =~ ^[0-9]+$ ]] || fail 'could not verify recovery database has no user-created objects'
+  [[ "$target_user_object_count" == '0' ]] || fail "$target_database is not empty"
+  archive="$backup_dir/$database.dump"
+  [[ -f "$archive" ]] || fail "missing archive for $database"
+  pg_restore --list "$archive" >/dev/null || fail "invalid archive for $database"
+done
+
+for database in c48_identity c48_response c48_logistics; do
+  service_suffix="${database#c48_}"
+  service_variable="PGSERVICE_${service_suffix^^}"
+  service_name="${!service_variable}"
+  printf 'Restoring %s into the isolated destination.\n' "$database"
+  pg_restore --exit-on-error --no-owner --no-acl --dbname="service=$service_name" "$backup_dir/$database.dump"
+done
+printf 'Database archives restored. Follow the runbook to restore matching evidence objects and verify metadata-to-object consistency.\n'

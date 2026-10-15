@@ -1,36 +1,43 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export PGHOST=127.0.0.1 PGPORT=5432 PGUSER=postgres PGPASSWORD=test-only
-DB=c48_logistics_fence
-psql -X -q -v ON_ERROR_STOP=1 -d postgres -c "DROP DATABASE IF EXISTS $DB"
-psql -X -q -v ON_ERROR_STOP=1 -d postgres -c "CREATE DATABASE $DB TEMPLATE c48_logistics"
-P() { psql -X -qAt -v ON_ERROR_STOP=1 -d "$DB" "$@"; }
+export PGHOST=127.0.0.1 PGPORT=5432 PGUSER=postgres PGDATABASE=c48_logistics
+export PGPASSWORD="${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must come from the primary C48 PostgreSQL service}"
 
-P >/dev/null <<'SQL'
-INSERT INTO fulfillment_cycle (id,request_id,work_cycle,organization_id,state) VALUES
-  ('00000000-0000-0000-0000-0000000000c1','00000000-0000-0000-0000-0000000000c2',1,'00000000-0000-0000-0000-0000000000c3','OPEN');
-INSERT INTO cycle_intent (intent_id,cycle_id,kind,state) VALUES
-  ('00000000-0000-0000-0000-0000000000c4','00000000-0000-0000-0000-0000000000c1','RESOLUTION','ABORTED');
-INSERT INTO cycle_intent (intent_id,cycle_id,kind,state) VALUES
-  ('00000000-0000-0000-0000-0000000000c5','00000000-0000-0000-0000-0000000000c1','RESOLUTION','SEALED');
-UPDATE fulfillment_cycle SET state='SEALED' WHERE id='00000000-0000-0000-0000-0000000000c1';
-SQL
-
-P <<'SQL'
-DO $test$
+psql -X -q -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+DO $proof$
+DECLARE
+  v_cycle_id uuid := gen_random_uuid();
+  v_aborted_id uuid := gen_random_uuid();
+  v_sealed_id uuid := gen_random_uuid();
+  v_request_id uuid := gen_random_uuid();
+  v_organization_id uuid := gen_random_uuid();
+  state_value text;
+  mismatch_count integer;
 BEGIN
+  INSERT INTO fulfillment_cycle (id,request_id,work_cycle,organization_id,state)
+    VALUES (v_cycle_id,v_request_id,1,v_organization_id,'OPEN');
+  INSERT INTO cycle_intent (intent_id,cycle_id,kind,state)
+    VALUES (v_aborted_id,v_cycle_id,'RESOLUTION','ABORTED');
+  INSERT INTO cycle_intent (intent_id,cycle_id,kind,state)
+    VALUES (v_sealed_id,v_cycle_id,'RESOLUTION','SEALED');
+  UPDATE fulfillment_cycle SET state='SEALED' WHERE id=v_cycle_id;
+
   BEGIN
-    UPDATE cycle_intent SET state='SEALED' WHERE intent_id='00000000-0000-0000-0000-0000000000c4';
+    UPDATE cycle_intent SET state='SEALED' WHERE intent_id=v_aborted_id;
     RAISE EXCEPTION 'delayed seal unexpectedly changed an aborted intent';
   EXCEPTION WHEN check_violation THEN
     RAISE NOTICE 'PASS durable ABORTED tombstone refused delayed seal';
   END;
+
+  SELECT state INTO state_value FROM cycle_intent WHERE intent_id=v_aborted_id;
+  SELECT count(*) INTO mismatch_count FROM check_cycle_state_matches_intent() WHERE cycle_id=v_cycle_id;
+  IF state_value <> 'ABORTED' OR mismatch_count <> 0 THEN
+    RAISE EXCEPTION 'cycle intent fence failed: state %, mismatch count %', state_value, mismatch_count;
+  END IF;
+  RAISE NOTICE 'PASS aborted cycle intent remains fenced while the newer seal stays current';
 END
-$test$;
+$proof$;
+ROLLBACK;
 SQL
-STATE="$(P -c "SELECT state FROM cycle_intent WHERE intent_id='00000000-0000-0000-0000-0000000000c4'")"
-MISMATCH="$(P -c "SELECT count(*) FROM check_cycle_state_matches_intent() WHERE cycle_id='00000000-0000-0000-0000-0000000000c1'")"
-[ "$STATE" = ABORTED ] && [ "$MISMATCH" = 0 ] || { echo "FAIL durable cycle intent fence" >&2; exit 1; }
-echo "PASS aborted cycle intent remains fenced while the newer seal stays current"
-psql -X -q -v ON_ERROR_STOP=1 -d postgres -c "DROP DATABASE $DB"

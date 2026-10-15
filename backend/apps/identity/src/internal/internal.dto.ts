@@ -1,4 +1,4 @@
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
 import { ServiceName } from '../auth/service-tokens';
 
 export class ServiceTokenDto {
@@ -30,6 +30,25 @@ export class LookupUsersDto {
   @ArrayMaxSize(100)
   @IsUUID('all', { each: true })
   ids!: string[];
+}
+
+export class ActiveUserCheckDto {
+  @IsUUID('all')
+  user_id!: string;
+}
+
+export class RegionLookupDto {
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100)
+  @IsString({ each: true }) @MinLength(1, { each: true }) @MaxLength(80, { each: true }) @Matches(/\S/u, { each: true })
+  codes!: string[];
+}
+
+export class TeamLeaderEligibilityDto {
+  @IsUUID('all')
+  user_id!: string;
+
+  @IsUUID('all')
+  organization_id!: string;
 }
 
 export class RequestCoordinatorQueryDto {

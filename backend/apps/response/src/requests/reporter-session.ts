@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { CircuitBreakerClient } from '../../../../packages/technical/src/http/service-client';
 import type { Grant } from '../../../../packages/technical/src/security/permissions';
+import type { ServiceName } from '../../../../packages/technical/src/security/service-token';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from './request-intake.service';
 import { reporterAccessClaims, ReporterAccessTokenClaims } from './reporter-token';
 
@@ -28,6 +29,16 @@ export interface RequestCoordinatorGrant {
   region_code: string | null;
   campaign_id: string | null;
 }
+
+export type TeamLeaderEligibilityReason = 'USER_NOT_FOUND' | 'USER_INACTIVE' | 'MEMBERSHIP_REQUIRED' | 'VOLUNTEER_GRANT_REQUIRED';
+
+export type TeamLeaderEligibility =
+  | { eligible: true }
+  | { eligible: false; reason: TeamLeaderEligibilityReason };
+
+export type ActiveUserCheck =
+  | { active: true }
+  | { active: false; reason: 'USER_NOT_FOUND' | 'USER_INACTIVE' };
 
 interface IdentityServiceToken {
   access_token: string;
@@ -70,8 +81,8 @@ export function loadReporterSessionConfig(env: Record<string, string | undefined
 @Injectable()
 export class ReporterSessionService implements OnModuleDestroy {
   private readonly client: CircuitBreakerClient;
-  private serviceToken?: { value: string; refreshAt: number };
-  private tokenRequest: Promise<string> | undefined;
+  private readonly serviceTokens = new Map<ServiceName, { value: string; refreshAt: number }>();
+  private readonly tokenRequests = new Map<ServiceName, Promise<string>>();
   private readonly inFlight = new Map<string, Promise<ReporterSession>>();
 
   constructor(
@@ -91,6 +102,10 @@ export class ReporterSessionService implements OnModuleDestroy {
     const session = await this.optional(request);
     if (!session) throw new AppError('UNAUTHENTICATED', { status: 401 });
     return session;
+  }
+
+  serviceToken(audience: ServiceName): Promise<string> {
+    return this.getServiceToken(audience);
   }
 
   async requestCoordinatorGrants(organizationId: string): Promise<RequestCoordinatorGrant[]> {
@@ -120,6 +135,84 @@ export class ReporterSessionService implements OnModuleDestroy {
     });
     if (!valid) throw unavailable();
     return items as RequestCoordinatorGrant[];
+  }
+
+  async lookupRegionNames(codes: string[]): Promise<Map<string, string>> {
+    const requested = [...new Set(codes)];
+    if (!requested.length) return new Map();
+
+    const token = await this.getServiceToken();
+    let result;
+    try {
+      result = await this.client.post<unknown>('/api/v1/identity/internal/regions:lookup', { codes: requested }, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw unavailable();
+    }
+    if (result.status !== 200 || !result.body || typeof result.body !== 'object') throw unavailable();
+    const items = (result.body as Record<string, unknown>).items;
+    if (!Array.isArray(items)) throw unavailable();
+
+    const requestedCodes = new Set(requested);
+    const names = new Map<string, string>();
+    for (const item of items) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) throw unavailable();
+      const region = item as Record<string, unknown>;
+      if (typeof region.code !== 'string' || !requestedCodes.has(region.code) ||
+          typeof region.name !== 'string' || !region.name.trim() || names.has(region.code)) throw unavailable();
+      names.set(region.code, region.name);
+    }
+    return names;
+  }
+
+  async teamLeaderEligibility(userId: string, organizationId: string): Promise<TeamLeaderEligibility> {
+    const token = await this.getServiceToken();
+    let result;
+    try {
+      result = await this.client.post<unknown>('/api/v1/identity/internal/team-leader-eligibility', {
+        user_id: userId,
+        organization_id: organizationId,
+      }, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw unavailable();
+    }
+    if (result.status !== 200 || !result.body || typeof result.body !== 'object') {
+      throw unavailable();
+    }
+    const value = result.body as Record<string, unknown>;
+    const keys = Object.keys(value).sort().join(',');
+    if (value.eligible === true && keys === 'eligible') return { eligible: true };
+    const reasons: TeamLeaderEligibilityReason[] = ['USER_NOT_FOUND', 'USER_INACTIVE', 'MEMBERSHIP_REQUIRED', 'VOLUNTEER_GRANT_REQUIRED'];
+    if (value.eligible === false && keys === 'eligible,reason' && reasons.includes(value.reason as TeamLeaderEligibilityReason)) {
+      return { eligible: false, reason: value.reason as TeamLeaderEligibilityReason };
+    }
+    throw unavailable();
+  }
+
+  async activeUserCheck(userId: string): Promise<ActiveUserCheck> {
+    const token = await this.getServiceToken();
+    let result;
+    try {
+      result = await this.client.post<unknown>('/api/v1/identity/internal/users:check-active', { user_id: userId }, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw unavailable();
+    }
+    if (result.status !== 200 || !result.body || typeof result.body !== 'object') throw unavailable();
+    const value = result.body as Record<string, unknown>;
+    const keys = Object.keys(value).sort().join(',');
+    if (value.active === true && keys === 'active') return { active: true };
+    if (value.active === false && keys === 'active,reason' && ['USER_NOT_FOUND', 'USER_INACTIVE'].includes(String(value.reason))) {
+      return { active: false, reason: value.reason as 'USER_NOT_FOUND' | 'USER_INACTIVE' };
+    }
+    throw unavailable();
   }
 
   onModuleDestroy(): void {
@@ -155,24 +248,26 @@ export class ReporterSessionService implements OnModuleDestroy {
     return { userId: claims.sub, grants: value.grants as Grant[] };
   }
 
-  private async getServiceToken(): Promise<string> {
-    if (this.serviceToken && this.serviceToken.refreshAt > Date.now()) return this.serviceToken.value;
-    if (this.tokenRequest) return this.tokenRequest;
+  private async getServiceToken(audience: ServiceName = 'identity'): Promise<string> {
+    const cached = this.serviceTokens.get(audience);
+    if (cached && cached.refreshAt > Date.now()) return cached.value;
+    const pending = this.tokenRequests.get(audience);
+    if (pending) return pending;
     const operation = this.client.post<unknown>('/api/v1/identity/internal/token', {
       client_id: this.config.clientId,
       client_secret: this.config.clientSecret,
-      audience: 'identity',
+      audience,
     }).then((result) => {
       if (result.status !== 200 || !result.body || typeof result.body !== 'object') throw unavailable();
       const value = result.body as Partial<IdentityServiceToken>;
       if (typeof value.access_token !== 'string' || !Number.isInteger(value.expires_in) || value.expires_in! < 1) throw unavailable();
-      this.serviceToken = { value: value.access_token, refreshAt: Date.now() + Math.max(1, value.expires_in! - 30) * 1_000 };
+      this.serviceTokens.set(audience, { value: value.access_token, refreshAt: Date.now() + Math.max(1, value.expires_in! - 30) * 1_000 });
       return value.access_token;
     }).catch((error: unknown) => {
       if (error instanceof AppError) throw error;
       throw unavailable();
-    }).finally(() => { this.tokenRequest = undefined; });
-    this.tokenRequest = operation;
+    }).finally(() => { this.tokenRequests.delete(audience); });
+    this.tokenRequests.set(audience, operation);
     return operation;
   }
 }

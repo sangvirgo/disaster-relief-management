@@ -2,34 +2,66 @@
 set -euo pipefail
 
 source "$(dirname -- "$0")/../dev/lib.sh"
-C48_TEST_PROJECT="${C48_TEST_PROJECT:-c48-test}"
-export C48_TEST_PROJECT
-dc() { test_compose "$@"; }
+require_env_file
+load_backend_env
+require_nonproduction_env
+
+if [[ $# -ne 1 || "$1" != "--after-reset" ]]; then
+  printf 'This check loads canonical schema into the primary C48 databases. Pass --after-reset only after a primary-volume reset.\n' >&2
+  exit 2
+fi
+
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
+cleanup() { rm -rf "$tmp"; }
+trap cleanup EXIT
+
+cd "$ROOT/backend"
+
+assert_fresh_primary_database() {
+  local service="$1" objects history
+  objects="$(main_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "c48_$service" -c "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'f', 'S') AND c.relname NOT IN ('typeorm_migrations', 'typeorm_migrations_id_seq') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid AND d.deptype = 'e')")"
+  history="$(main_compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U postgres -d "c48_$service" -c "SELECT to_regclass('public.typeorm_migrations') IS NOT NULL")"
+  [[ "$objects" == "0" && "$history" == "f" ]] || {
+    printf 'FAIL %s is not freshly reset: found %s application public objects and migration history exists=%s\n' "$service" "$objects" "$history" >&2
+    exit 1
+  }
+}
+
+dump_schema() {
+  local service="$1" path="$2"
+  main_compose exec -T postgres pg_dump -U postgres --schema-only --no-owner --no-privileges -n public \
+    --exclude-table=public.typeorm_migrations \
+    --exclude-table=public.typeorm_migrations_id_seq "c48_$service" \
+    | sed -E 's/^\\restrict .*/\\restrict C48_SCHEMA_DUMP/; s/^\\unrestrict .*/\\unrestrict C48_SCHEMA_DUMP/' > "$path"
+}
 
 for service in identity response logistics; do
-  case "$service" in
-    identity) migrator=identity_migrator; extension=citext ;;
-    response) migrator=response_migrator; extension=postgis ;;
-    logistics) migrator=logistics_migrator; extension=postgis ;;
-  esac
+  assert_fresh_primary_database "$service"
+  main_compose exec -T postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d "c48_$service" -f "/schema/$service.sql"
+  dump_schema "$service" "$tmp/$service.source.sql"
+done
 
-  dc exec -T postgres createdb -U postgres -O "$migrator" "baseline_$service"
-  dc exec -T postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d "baseline_$service" -c "CREATE EXTENSION IF NOT EXISTS $extension"
-  dc exec -T -e PGUSER="$migrator" -e PGPASSWORD=test-only postgres \
-    psql -X -v ON_ERROR_STOP=1 -d "baseline_$service" -f "/schema/$service.sql"
+# Reuse the migration's exact schema-drop routine on the same primary DBs. The fake
+# QueryRunner emits its SQL; psql executes it as the existing postgres superuser.
+node <<'NODE' > "$tmp/drop-schema.sql"
+const { dropSchema } = require('./dist/packages/technical/src/persistence/schema-migration.js');
+dropSchema({ query: async (sql) => { process.stdout.write(`${sql}\n`); } }).catch((error) => {
+  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  process.exitCode = 1;
+});
+NODE
 
-  dc exec -T postgres pg_dump -U postgres --schema-only --no-owner \
-    --exclude-table=public.typeorm_migrations \
-    --exclude-table=public.typeorm_migrations_id_seq "c48_$service" > "$tmp/$service.migrated.sql"
-  dc exec -T postgres pg_dump -U postgres --schema-only --no-owner \
-    "baseline_$service" > "$tmp/$service.baseline.sql"
+for service in identity response logistics; do
+  main_compose exec -T postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d "c48_$service" < "$tmp/drop-schema.sql"
+done
 
-  if diff -u "$tmp/$service.baseline.sql" "$tmp/$service.migrated.sql"; then
-    printf 'PASS %s migration dump matches schema/%s.sql\n' "$service" "$service"
-  else
-    printf 'FAIL %s migration dump differs from schema/%s.sql\n' "$service" "$service" >&2
+bash "$ROOT/backend/scripts/db/migrate"
+
+for service in identity response logistics; do
+  dump_schema "$service" "$tmp/$service.migrated.sql"
+  if ! diff -u "$tmp/$service.source.sql" "$tmp/$service.migrated.sql"; then
+    printf 'FAIL %s migration dump differs from canonical schema dump\n' "$service" >&2
     exit 1
   fi
+  printf 'PASS %s primary schema dump matches canonical schema\n' "$service"
 done

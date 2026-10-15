@@ -37,7 +37,9 @@
           "403": {
             "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.csrf",
+        "security": []
       }
     },
     "/auth/register": {
@@ -61,35 +63,148 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "Citizen account created or replayed.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegisterResponse"
-                }
-              }
-            }
+                       "201": {
+                         "description": "Citizen account created or replayed.",
+                         "headers": {
+                           "Idempotent-Replay": {
+                             "$ref": "#/components/headers/IdempotentReplay"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/RegisterResponse"
+                             }
+                           }
+                         }
+                       },
+                       "400": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "PASSWORD_WEAK": {
+                                 "summary": "PASSWORD_WEAK",
+                                 "value": {
+                                   "code": "PASSWORD_WEAK",
+                                   "message": "Mật khẩu chưa đủ mạnh (tối thiểu 10 ký tự, không phổ biến).",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "CSRF_INVALID": {
+                                 "summary": "CSRF_INVALID",
+                                 "value": {
+                                   "code": "CSRF_INVALID",
+                                   "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "409": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "USERNAME_TAKEN": {
+                                 "summary": "USERNAME_TAKEN",
+                                 "value": {
+                                   "code": "USERNAME_TAKEN",
+                                   "message": "Tên đăng nhập đã được sử dụng.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "429": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "RATE_LIMITED": {
+                                 "summary": "RATE_LIMITED",
+                                 "value": {
+                                   "code": "RATE_LIMITED",
+                                   "message": "Bạn thao tác quá nhanh. Vui lòng thử lại sau.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.register",
+        "security": [
+                      {
+                        "WebPreSessionCookie": [],
+                        "CsrfToken": []
+                      },
+                      {}
+                    ],
+        "x-c48-conditional-security": {
+          "access_token_required": false,
+          "web": {
+            "required": [
+              "Origin allowed by Identity",
+              "cookie c48_pre",
+              "header X-CSRF-Token"
+            ]
           },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          },
-          "429": {
-            "$ref": "#/components/responses/Error"
+          "native": {
+            "required": [],
+            "forbidden": [
+              "Cookie",
+              "Origin"
+            ]
           }
         }
       }
@@ -110,42 +225,147 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "New session.",
-            "headers": {
-              "X-CSRF-Token": {
-                "$ref": "#/components/headers/CsrfToken"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/WebLoginResponse"
-                    },
-                    {
-                      "$ref": "#/components/schemas/NativeLoginResponse"
-                    }
-                  ]
-                }
-              }
-            }
+                       "200": {
+                         "description": "New session.",
+                         "headers": {
+                           "X-CSRF-Token": {
+                             "$ref": "#/components/headers/CsrfToken"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "oneOf": [
+                                 {
+                                   "$ref": "#/components/schemas/WebLoginResponse"
+                                 },
+                                 {
+                                   "$ref": "#/components/schemas/NativeLoginResponse"
+                                 }
+                               ]
+                             }
+                           }
+                         }
+                       },
+                       "400": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "INVALID_CREDENTIALS": {
+                                 "summary": "INVALID_CREDENTIALS",
+                                 "value": {
+                                   "code": "INVALID_CREDENTIALS",
+                                   "message": "Tên đăng nhập hoặc mật khẩu không đúng.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "CSRF_INVALID": {
+                                 "summary": "CSRF_INVALID",
+                                 "value": {
+                                   "code": "CSRF_INVALID",
+                                   "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "429": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "RATE_LIMITED": {
+                                 "summary": "RATE_LIMITED",
+                                 "value": {
+                                   "code": "RATE_LIMITED",
+                                   "message": "Bạn thao tác quá nhanh. Vui lòng thử lại sau.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.login",
+        "security": [
+                      {
+                        "WebPreSessionCookie": [],
+                        "CsrfToken": []
+                      },
+                      {}
+                    ],
+        "x-c48-conditional-security": {
+          "access_token_required": false,
+          "web": {
+            "required": [
+              "Origin allowed by Identity",
+              "cookie c48_pre",
+              "header X-CSRF-Token"
+            ]
           },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "429": {
-            "$ref": "#/components/responses/Error"
+          "native": {
+            "required": [
+              "JSON body client_kind=NATIVE"
+            ],
+            "forbidden": [
+              "Cookie",
+              "Origin"
+            ]
           }
         }
       }
@@ -166,39 +386,150 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Rotated session; Web gets new cookies and CSRF token, Native gets JSON tokens.",
-            "headers": {
-              "X-CSRF-Token": {
-                "$ref": "#/components/headers/CsrfToken"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/WebRefreshResponse"
-                    },
-                    {
-                      "$ref": "#/components/schemas/NativeRefreshResponse"
-                    }
-                  ]
-                }
-              }
-            }
+                       "200": {
+                         "description": "Rotated session; Web gets new cookies and CSRF token, Native gets JSON tokens.",
+                         "headers": {
+                           "X-CSRF-Token": {
+                             "$ref": "#/components/headers/CsrfToken"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "oneOf": [
+                                 {
+                                   "$ref": "#/components/schemas/WebRefreshResponse"
+                                 },
+                                 {
+                                   "$ref": "#/components/schemas/NativeRefreshResponse"
+                                 }
+                               ]
+                             }
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "REFRESH_REUSED": {
+                                 "summary": "REFRESH_REUSED",
+                                 "value": {
+                                   "code": "REFRESH_REUSED",
+                                   "message": "Phiên đăng nhập không còn an toàn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "CSRF_INVALID": {
+                                 "summary": "CSRF_INVALID",
+                                 "value": {
+                                   "code": "CSRF_INVALID",
+                                   "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "409": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "REFRESH_RACE": {
+                                 "summary": "REFRESH_RACE",
+                                 "value": {
+                                   "code": "REFRESH_RACE",
+                                   "message": "Phiên đang được làm mới ở nơi khác. Vui lòng thử lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.refresh",
+        "security": [
+                      {
+                        "WebRefreshCookie": [],
+                        "WebPreSessionCookie": [],
+                        "CsrfToken": []
+                      },
+                      {}
+                    ],
+        "x-c48-conditional-security": {
+          "access_token_required": false,
+          "web": {
+            "required": [
+              "Origin allowed by Identity",
+              "cookie c48_refresh",
+              "cookie c48_pre",
+              "header X-CSRF-Token"
+            ]
           },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
+          "native": {
+            "required": [
+              "JSON body refresh_token"
+            ],
+            "forbidden": [
+              "Cookie",
+              "Origin"
+            ]
           }
         }
       }
@@ -217,21 +548,74 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Session family revoked.",
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "204": {
+                         "description": "Session family revoked.",
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.logout"
       }
     },
     "/auth/change-password": {
@@ -263,27 +647,118 @@
           }
         },
         "responses": {
-          "204": {
-            "description": "Password changed or idempotency replayed.",
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "204": {
+                         "description": "Password changed or idempotency replayed.",
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "400": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "PASSWORD_WEAK": {
+                                 "summary": "PASSWORD_WEAK",
+                                 "value": {
+                                   "code": "PASSWORD_WEAK",
+                                   "message": "Mật khẩu chưa đủ mạnh (tối thiểu 10 ký tự, không phổ biến).",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "INVALID_CREDENTIALS": {
+                                 "summary": "INVALID_CREDENTIALS",
+                                 "value": {
+                                   "code": "INVALID_CREDENTIALS",
+                                   "message": "Tên đăng nhập hoặc mật khẩu không đúng.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "CSRF_INVALID": {
+                                 "summary": "CSRF_INVALID",
+                                 "value": {
+                                   "code": "CSRF_INVALID",
+                                   "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "409": {
+                         "$ref": "#/components/responses/Error"
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.changePassword"
       }
     },
     "/me": {
@@ -299,28 +774,81 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Current user; credential fields are omitted.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MeResponse"
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "200": {
+                         "description": "Current user; credential fields are omitted.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/MeResponse"
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.me"
       }
     },
     "/users": {
@@ -336,55 +864,128 @@
           }
         ],
         "parameters": [
-          {
-            "name": "query",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 64
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "ACTIVE",
-                "DISABLED"
-              ]
-            }
-          },
-          {
-            "$ref": "#/components/parameters/Cursor"
-          },
-          {
-            "$ref": "#/components/parameters/Limit"
-          }
-        ],
+                        {
+                          "name": "query",
+                          "in": "query",
+                          "schema": {
+                            "type": "string",
+                            "maxLength": 64
+                          }
+                        },
+                        {
+                          "name": "status",
+                          "in": "query",
+                          "schema": {
+                            "type": "string",
+                            "enum": [
+                              "ACTIVE",
+                              "DISABLED"
+                            ]
+                          }
+                        },
+                        {
+                          "$ref": "#/components/parameters/Cursor"
+                        },
+                        {
+                          "$ref": "#/components/parameters/Limit"
+                        }
+                      ],
         "responses": {
-          "200": {
-            "description": "Credential-free user page.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserPage"
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "200": {
+                         "description": "Credential-free user page.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/UserPage"
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "400": {
+                         "description": "Documented error response; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "CURSOR_INVALID": {
+                                 "summary": "CURSOR_INVALID",
+                                 "value": {
+                                   "code": "CURSOR_INVALID",
+                                   "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/users/users.controller.ts#UsersController.list"
       },
       "post": {
         "operationId": "createIdentityUser",
@@ -414,37 +1015,134 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "Created account.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminUser"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "201": {
+                         "description": "Created account.",
+                         "headers": {
+                           "Idempotent-Replay": {
+                             "$ref": "#/components/headers/IdempotentReplay"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/AdminUser"
+                             }
+                           }
+                         }
+                       },
+                       "400": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "PASSWORD_WEAK": {
+                                 "summary": "PASSWORD_WEAK",
+                                 "value": {
+                                   "code": "PASSWORD_WEAK",
+                                   "message": "Mật khẩu chưa đủ mạnh (tối thiểu 10 ký tự, không phổ biến).",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "409": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "USERNAME_TAKEN": {
+                                 "summary": "USERNAME_TAKEN",
+                                 "value": {
+                                   "code": "USERNAME_TAKEN",
+                                   "message": "Tên đăng nhập đã được sử dụng.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/users/users.controller.ts#UsersController.create"
       }
     },
     "/users/{id}": {
@@ -465,31 +1163,84 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Credential-free user detail.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserDetail"
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "200": {
+                         "description": "Credential-free user detail.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/UserDetail"
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "404": {
+                         "$ref": "#/components/responses/Error"
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/users/users.controller.ts#UsersController.get"
       }
     },
     "/users/{id}/disable": {
@@ -523,37 +1274,112 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Disabled account.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminUser"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "200": {
+                         "description": "Disabled account.",
+                         "headers": {
+                           "Idempotent-Replay": {
+                             "$ref": "#/components/headers/IdempotentReplay"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/AdminUser"
+                             }
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "404": {
+                         "$ref": "#/components/responses/Error"
+                       },
+                       "409": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "LAST_ADMIN": {
+                                 "summary": "LAST_ADMIN",
+                                 "value": {
+                                   "code": "LAST_ADMIN",
+                                   "message": "Không thể thực hiện vì đây là quản trị viên cuối cùng.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/users/users.controller.ts#UsersController.disable"
       }
     },
     "/users/{id}/enable": {
@@ -587,37 +1413,112 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Enabled account.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminUser"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "200": {
+                         "description": "Enabled account.",
+                         "headers": {
+                           "Idempotent-Replay": {
+                             "$ref": "#/components/headers/IdempotentReplay"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/AdminUser"
+                             }
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "404": {
+                         "$ref": "#/components/responses/Error"
+                       },
+                       "409": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "LAST_ADMIN": {
+                                 "summary": "LAST_ADMIN",
+                                 "value": {
+                                   "code": "LAST_ADMIN",
+                                   "message": "Không thể thực hiện vì đây là quản trị viên cuối cùng.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/users/users.controller.ts#UsersController.enable"
       }
     },
     "/users/{id}/reset-password": {
@@ -652,33 +1553,130 @@
           }
         },
         "responses": {
-          "204": {
-            "description": "Password reset or replayed.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "204": {
+                         "description": "Password reset or replayed.",
+                         "headers": {
+                           "Idempotent-Replay": {
+                             "$ref": "#/components/headers/IdempotentReplay"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "400": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "PASSWORD_WEAK": {
+                                 "summary": "PASSWORD_WEAK",
+                                 "value": {
+                                   "code": "PASSWORD_WEAK",
+                                   "message": "Mật khẩu chưa đủ mạnh (tối thiểu 10 ký tự, không phổ biến).",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "404": {
+                         "$ref": "#/components/responses/Error"
+                       },
+                       "409": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "LAST_ADMIN": {
+                                 "summary": "LAST_ADMIN",
+                                 "value": {
+                                   "code": "LAST_ADMIN",
+                                   "message": "Không thể thực hiện vì đây là quản trị viên cuối cùng.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/users/users.controller.ts#UsersController.resetPassword"
       }
     },
     "/users/{id}/grants": {
@@ -694,50 +1692,123 @@
           }
         ],
         "parameters": [
-          {
-            "$ref": "#/components/parameters/UserId"
-          },
-          {
-            "name": "include_revoked",
-            "in": "query",
-            "schema": {
-              "type": "boolean",
-              "default": false
-            }
-          },
-          {
-            "$ref": "#/components/parameters/Cursor"
-          },
-          {
-            "$ref": "#/components/parameters/Limit"
-          }
-        ],
+                        {
+                          "$ref": "#/components/parameters/UserId"
+                        },
+                        {
+                          "name": "include_revoked",
+                          "in": "query",
+                          "schema": {
+                            "type": "boolean",
+                            "default": false
+                          }
+                        },
+                        {
+                          "$ref": "#/components/parameters/Cursor"
+                        },
+                        {
+                          "$ref": "#/components/parameters/Limit"
+                        }
+                      ],
         "responses": {
-          "200": {
-            "description": "Grant page.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GrantPage"
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "200": {
+                         "description": "Grant page.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/GrantPage"
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "400": {
+                         "description": "Documented error response; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "CURSOR_INVALID": {
+                                 "summary": "CURSOR_INVALID",
+                                 "value": {
+                                   "code": "CURSOR_INVALID",
+                                   "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "404": {
+                         "$ref": "#/components/responses/Error"
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/grants/grants.controller.ts#GrantsController.list"
       },
       "post": {
         "operationId": "createIdentityUserGrant",
@@ -770,43 +1841,162 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "Grant created.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Grant"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "201": {
+                         "description": "Grant created.",
+                         "headers": {
+                           "Idempotent-Replay": {
+                             "$ref": "#/components/headers/IdempotentReplay"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/Grant"
+                             }
+                           }
+                         }
+                       },
+                       "400": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "SCOPE_INVALID": {
+                                 "summary": "SCOPE_INVALID",
+                                 "value": {
+                                   "code": "SCOPE_INVALID",
+                                   "message": "Phạm vi quyền không hợp lệ.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "404": {
+                         "$ref": "#/components/responses/Error"
+                       },
+                       "409": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "GRANT_EXISTS": {
+                                 "summary": "GRANT_EXISTS",
+                                 "value": {
+                                   "code": "GRANT_EXISTS",
+                                   "message": "Quyền này đã được cấp cho người dùng.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "503": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "RESPONSE_UNAVAILABLE": {
+                                 "summary": "RESPONSE_UNAVAILABLE",
+                                 "value": {
+                                   "code": "RESPONSE_UNAVAILABLE",
+                                   "message": "Dịch vụ tiếp nhận và điều phối tạm thời không khả dụng. Vui lòng thử lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/grants/grants.controller.ts#GrantsController.create"
       }
     },
     "/grants/{id}/revoke": {
@@ -841,37 +2031,112 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Grant revoked.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Grant"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "200": {
+                         "description": "Grant revoked.",
+                         "headers": {
+                           "Idempotent-Replay": {
+                             "$ref": "#/components/headers/IdempotentReplay"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/Grant"
+                             }
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "404": {
+                         "$ref": "#/components/responses/Error"
+                       },
+                       "409": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "LAST_ADMIN": {
+                                 "summary": "LAST_ADMIN",
+                                 "value": {
+                                   "code": "LAST_ADMIN",
+                                   "message": "Không thể thực hiện vì đây là quản trị viên cuối cùng.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/grants/grants.controller.ts#GrantsController.revoke"
       }
     },
     "/organizations": {
@@ -887,36 +2152,109 @@
           }
         ],
         "parameters": [
-          {
-            "$ref": "#/components/parameters/Cursor"
-          },
-          {
-            "$ref": "#/components/parameters/Limit"
-          }
-        ],
+                        {
+                          "$ref": "#/components/parameters/Cursor"
+                        },
+                        {
+                          "$ref": "#/components/parameters/Limit"
+                        }
+                      ],
         "responses": {
-          "200": {
-            "description": "Organization page.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrganizationPage"
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "200": {
+                         "description": "Organization page.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/OrganizationPage"
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "400": {
+                         "description": "Documented error response; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "CURSOR_INVALID": {
+                                 "summary": "CURSOR_INVALID",
+                                 "value": {
+                                   "code": "CURSOR_INVALID",
+                                   "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/organizations/organizations.controller.ts#OrganizationsController.list"
       },
       "post": {
         "operationId": "createIdentityOrganization",
@@ -945,37 +2283,112 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "Organization created.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Organization"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "201": {
+                         "description": "Organization created.",
+                         "headers": {
+                           "Idempotent-Replay": {
+                             "$ref": "#/components/headers/IdempotentReplay"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/Organization"
+                             }
+                           }
+                         }
+                       },
+                       "400": {
+                         "$ref": "#/components/responses/Error"
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "409": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "ORGANIZATION_NAME_TAKEN": {
+                                 "summary": "ORGANIZATION_NAME_TAKEN",
+                                 "value": {
+                                   "code": "ORGANIZATION_NAME_TAKEN",
+                                   "message": "Tên tổ chức đã tồn tại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/organizations/organizations.controller.ts#OrganizationsController.create"
       }
     },
     "/organizations/{id}/deactivate": {
@@ -1010,37 +2423,112 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Organization deactivated.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Organization"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "200": {
+                         "description": "Organization deactivated.",
+                         "headers": {
+                           "Idempotent-Replay": {
+                             "$ref": "#/components/headers/IdempotentReplay"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/Organization"
+                             }
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "404": {
+                         "$ref": "#/components/responses/Error"
+                       },
+                       "409": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "ORGANIZATION_IN_USE": {
+                                 "summary": "ORGANIZATION_IN_USE",
+                                 "value": {
+                                   "code": "ORGANIZATION_IN_USE",
+                                   "message": "Tổ chức đang được sử dụng nên chưa thể ngừng hoạt động.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/organizations/organizations.controller.ts#OrganizationsController.deactivate"
       }
     },
     "/organizations/{id}/members": {
@@ -1084,37 +2572,90 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "Membership active.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Membership"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "201": {
+                         "description": "Membership active.",
+                         "headers": {
+                           "Idempotent-Replay": {
+                             "$ref": "#/components/headers/IdempotentReplay"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/Membership"
+                             }
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "404": {
+                         "$ref": "#/components/responses/Error"
+                       },
+                       "409": {
+                         "$ref": "#/components/responses/Error"
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/organizations/organizations.controller.ts#OrganizationsController.addMember"
       }
     },
     "/organizations/{id}/members/{userId}/remove": {
@@ -1142,30 +2683,83 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Membership removed or replayed.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "204": {
+                         "description": "Membership removed or replayed.",
+                         "headers": {
+                           "Idempotent-Replay": {
+                             "$ref": "#/components/headers/IdempotentReplay"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "404": {
+                         "$ref": "#/components/responses/Error"
+                       },
+                       "409": {
+                         "$ref": "#/components/responses/Error"
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/organizations/organizations.controller.ts#OrganizationsController.removeMember"
       }
     },
     "/regions": {
@@ -1181,33 +2775,104 @@
           }
         ],
         "parameters": [
-          {
-            "$ref": "#/components/parameters/Cursor"
-          },
-          {
-            "$ref": "#/components/parameters/Limit"
-          }
-        ],
+                        {
+                          "$ref": "#/components/parameters/Cursor"
+                        },
+                        {
+                          "$ref": "#/components/parameters/Limit"
+                        }
+                      ],
         "responses": {
-          "200": {
-            "description": "Region page.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegionPage"
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "200": {
+                         "description": "Region page.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/RegionPage"
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "400": {
+                         "description": "Documented error response; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "CURSOR_INVALID": {
+                                 "summary": "CURSOR_INVALID",
+                                 "value": {
+                                   "code": "CURSOR_INVALID",
+                                   "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Documented error response; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/regions/regions.controller.ts#RegionsController.list"
       },
       "post": {
         "operationId": "createIdentityRegion",
@@ -1236,37 +2901,112 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "Region created.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Region"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "201": {
+                         "description": "Region created.",
+                         "headers": {
+                           "Idempotent-Replay": {
+                             "$ref": "#/components/headers/IdempotentReplay"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/Region"
+                             }
+                           }
+                         }
+                       },
+                       "400": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "SCOPE_INVALID": {
+                                 "summary": "SCOPE_INVALID",
+                                 "value": {
+                                   "code": "SCOPE_INVALID",
+                                   "message": "Phạm vi quyền không hợp lệ.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "409": {
+                         "$ref": "#/components/responses/Error"
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/regions/regions.controller.ts#RegionsController.create"
       }
     },
     "/regions/{code}/deactivate": {
@@ -1300,37 +3040,90 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Region deactivated.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Region"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "200": {
+                         "description": "Region deactivated.",
+                         "headers": {
+                           "Idempotent-Replay": {
+                             "$ref": "#/components/headers/IdempotentReplay"
+                           },
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/Region"
+                             }
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "404": {
+                         "$ref": "#/components/responses/Error"
+                       },
+                       "409": {
+                         "$ref": "#/components/responses/Error"
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/regions/regions.controller.ts#RegionsController.deactivate"
       }
     },
     "/audit-logs": {
@@ -1346,56 +3139,131 @@
           }
         ],
         "parameters": [
-          {
-            "name": "entity_type",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "pattern": "^[a-z][a-z0-9_]{1,63}$"
-            }
-          },
-          {
-            "name": "entity_id",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "maxLength": 200
-            }
-          },
-          {
-            "$ref": "#/components/parameters/Cursor"
-          },
-          {
-            "$ref": "#/components/parameters/Limit"
-          }
-        ],
+                        {
+                          "name": "entity_type",
+                          "in": "query",
+                          "required": true,
+                          "schema": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_]{1,63}$"
+                          }
+                        },
+                        {
+                          "name": "entity_id",
+                          "in": "query",
+                          "schema": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
+                        },
+                        {
+                          "$ref": "#/components/parameters/Cursor"
+                        },
+                        {
+                          "$ref": "#/components/parameters/Limit"
+                        }
+                      ],
         "responses": {
-          "200": {
-            "description": "Audit page; secret/password fields are excluded by the write paths.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuditPage"
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "200": {
+                         "description": "Audit page; secret/password fields are excluded by the write paths.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/AuditPage"
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "400": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "CURSOR_INVALID": {
+                                 "summary": "CURSOR_INVALID",
+                                 "value": {
+                                   "code": "CURSOR_INVALID",
+                                   "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/audit/audit.controller.ts#AuditController.list"
       }
     },
     "/internal/token": {
@@ -1414,31 +3282,89 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Audience-bound token, valid for five minutes.",
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ServiceTokenResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
+                       "200": {
+                         "description": "Audience-bound token, valid for five minutes.",
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ServiceTokenResponse"
+                             }
+                           }
+                         }
+                       },
+                       "400": {
+                         "$ref": "#/components/responses/Error"
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/internal/internal.controller.ts#InternalController.token",
+        "security": [
+          {
+            "IdentityServiceBearer": []
           }
-        }
+        ]
       }
     },
     "/internal/introspect": {
@@ -1477,25 +3403,76 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Current session state and live grants.",
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IntrospectionResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "200": {
+                         "description": "Current session state and live grants.",
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/IntrospectionResponse"
+                             }
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Documented error response; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/internal/internal.controller.ts#InternalController.introspect"
       }
     },
     "/internal/users:lookup": {
@@ -1534,25 +3511,197 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Unknown users are omitted.",
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserLookupResponse"
+                       "200": {
+                         "description": "Unknown users are omitted.",
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/UserLookupResponse"
+                             }
+                           }
+                         }
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Documented error response; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/internal/internal.controller.ts#InternalController.lookupUsers"
+      }
+    },
+    "/internal/regions:lookup": {
+      "post": {
+        "operationId": "lookupIdentityRegions",
+        "summary": "Resolve region display names for Response campaigns",
+        "description": "Restricted to a valid Response service token. Unknown codes are omitted. Response includes Cache-Control: no-store.",
+        "tags": [
+          "Internal"
+        ],
+        "security": [
+          {
+            "IdentityServiceBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "codes"
+                ],
+                "properties": {
+                  "codes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80,
+                      "pattern": "\\S"
+                    }
+                  }
                 }
               }
             }
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "responses": {
+                       "200": {
+                         "description": "Unknown region codes are omitted.",
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/RegionLookupResponse"
+                             }
+                           }
+                         }
+                       },
+                       "400": {
+                         "$ref": "#/components/responses/Error"
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/internal/internal.controller.ts#InternalController.lookupRegions"
       }
     },
     "/internal/request-coordinators": {
@@ -1579,34 +3728,87 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Current active staff grants.",
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RequestCoordinatorGrantPage"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "$ref": "#/components/responses/Error"
-          },
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "500": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
+                       "200": {
+                         "description": "Current active staff grants.",
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/RequestCoordinatorGrantPage"
+                             }
+                           }
+                         }
+                       },
+                       "400": {
+                         "$ref": "#/components/responses/Error"
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "500": {
+                         "$ref": "#/components/responses/Error"
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/internal/internal.controller.ts#InternalController.requestCoordinators"
       }
     },
     "/internal/organizations/{id}": {
@@ -1625,29 +3827,339 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Organization identity fields.",
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
+                       "200": {
+                         "description": "Organization identity fields.",
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         },
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/InternalOrganization"
+                             }
+                           }
+                         }
+                       },
+                       "400": {
+                         "$ref": "#/components/responses/Error"
+                       },
+                       "401": {
+                         "description": "Vietnamese error message; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "UNAUTHENTICATED": {
+                                 "summary": "UNAUTHENTICATED",
+                                 "value": {
+                                   "code": "UNAUTHENTICATED",
+                                   "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               },
+                               "SESSION_EXPIRED": {
+                                 "summary": "SESSION_EXPIRED",
+                                 "value": {
+                                   "code": "SESSION_EXPIRED",
+                                   "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "headers": {
+                           "Cache-Control": {
+                             "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "403": {
+                         "description": "Documented error response; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "FORBIDDEN": {
+                                 "summary": "FORBIDDEN",
+                                 "value": {
+                                   "code": "FORBIDDEN",
+                                   "message": "Bạn không có quyền thực hiện thao tác này.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         }
+                       },
+                       "404": {
+                         "$ref": "#/components/responses/Error"
+                       }
+                     },
+        "x-c48-controller-source": "backend/apps/identity/src/internal/internal.controller.ts#InternalController.organization"
+      }
+    },
+    "/internal/team-leader-eligibility": {
+      "post": {
+          "operationId": "identityInternalTeamLeaderEligibility",
+          "summary": "InternalController.teamLeaderEligibility",
+          "description": "Route exported from backend/apps/identity/src/internal/internal.controller.ts#InternalController.teamLeaderEligibility. Detailed request, response, and error contract: docs/backend/02-identity-api.md. This export does not infer payload schemas.",
+          "responses": {
+            "200": {
+              "description": "Documented response shape.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "eligible": {
+                            "type": "boolean",
+                            "const": true
+                          }
+                        },
+                        "required": [
+                          "eligible"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "eligible": {
+                            "type": "boolean",
+                            "const": false
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "USER_NOT_FOUND",
+                              "USER_INACTIVE",
+                              "MEMBERSHIP_REQUIRED",
+                              "VOLUNTEER_GRANT_REQUIRED"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "eligible",
+                          "reason"
+                        ]
+                      }
+                    ]
+                  }
+                }
               }
             },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalOrganization"
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
                 }
               }
             }
           },
-          "400": {
-            "$ref": "#/components/responses/Error"
+          "x-c48-contract-source": "docs/backend/02-identity-api.md",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "organization_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "user_id",
+                    "organization_id"
+                  ]
+                }
+              }
+            }
+          },
+          "x-c48-controller-source": "backend/apps/identity/src/internal/internal.controller.ts#InternalController.teamLeaderEligibility",
+          "security": [
+            {
+              "IdentityServiceBearer": []
+            }
+          ]
+        }
+    },
+    "/internal/users:check-active": {
+      "post": {
+        "operationId": "identityInternalActiveUserCheck",
+        "summary": "InternalController.activeUserCheck",
+        "description": "Route exported from backend/apps/identity/src/internal/internal.controller.ts#InternalController.activeUserCheck. Detailed request, response, and error contract: docs/backend/02-identity-api.md. This export does not infer payload schemas.",
+        "responses": {
+          "200": {
+            "description": "Documented response shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "active": {
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "active"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "active": {
+                          "type": "boolean",
+                          "const": false
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "USER_NOT_FOUND",
+                            "USER_INACTIVE"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "active",
+                        "reason"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
           },
           "401": {
-            "$ref": "#/components/responses/Error"
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
           },
-          "404": {
-            "$ref": "#/components/responses/Error"
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/02-identity-api.md",
+        "x-c48-controller-source": "backend/apps/identity/src/internal/internal.controller.ts#InternalController.activeUserCheck",
+        "security": [
+          {
+            "IdentityServiceBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "user_id"
+                ]
+              }
+            }
           }
         }
       }
@@ -1669,6 +4181,21 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "5-minute RS256 service JWT"
+      },
+      "CsrfToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-CSRF-Token"
+      },
+      "WebRefreshCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "c48_refresh"
+      },
+      "WebPreSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "c48_pre"
       }
     },
     "parameters": {
@@ -2867,6 +5394,32 @@
                   "format": "uuid"
                 },
                 "display_name": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "RegionLookupResponse": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "code",
+                "name"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "name": {
                   "type": "string"
                 }
               }

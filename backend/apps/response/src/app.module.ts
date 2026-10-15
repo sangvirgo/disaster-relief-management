@@ -8,6 +8,13 @@ import { RequestIntakeModule } from './requests/request-intake.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { EvidenceModule } from './evidence/evidence.module';
 import { RequestOperationsModule } from './operations/request-operations.module';
+import { TeamsModule } from './teams/teams.module';
+import { MissionsModule } from './missions/missions.module';
+import { CampaignsModule } from './campaigns/campaigns.module';
+import { MapModule } from './map/map.module';
+import { ReportsModule } from './reports/reports.module';
+import { NoticesModule } from './notices/notices.module';
+import { RequestResolutionModule } from './resolution/request-resolution.module';
 
 @Module({
   imports: [
@@ -17,6 +24,13 @@ import { RequestOperationsModule } from './operations/request-operations.module'
     TrackingModule,
     EvidenceModule,
     RequestOperationsModule,
+    TeamsModule,
+    MissionsModule,
+    CampaignsModule,
+    MapModule,
+    ReportsModule,
+    NoticesModule,
+    RequestResolutionModule,
   ],
 })
 export class AppModule {}

@@ -54,7 +54,7 @@ export class RequestOperationsPersistenceService {
     if (!recipientId) return;
     await manager.query(
       `INSERT INTO notice (recipient_user_id,source_id,source_version,notice_type,payload)
-       VALUES ($1,$2,$3,$4,jsonb_build_object('text_code',$5::text,'request_id',$2)) ON CONFLICT DO NOTHING`,
+       VALUES ($1,$2,$3,$4,jsonb_build_object('text_code',$5::text,'request_id',$2::uuid)) ON CONFLICT DO NOTHING`,
       [recipientId, requestId, version, type, textCode],
     );
   }

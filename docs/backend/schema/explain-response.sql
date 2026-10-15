@@ -1,6 +1,7 @@
 -- EXPLAIN (ANALYZE, BUFFERS, COSTS OFF) evidence for the Response service hot queries (T0-S exit gate).
--- Usage (from this directory, fresh empty database):
---   createdb hr_perf && psql -X -v ON_ERROR_STOP=1 -d hr_perf -f explain-response.sql
+-- Run only through backend/scripts/db/check-t8-candidate-explain, which wraps this fixture in
+-- a transaction against primary c48_response and rolls all table changes back. Do not create
+-- a separate database/schema or invoke this fixture directly.
 -- Fixed seed (setseed). Dataset: 200k assistance_request (+subject), 3k rescue_team (+position, 1-2 skills), ~20k mission, 300k request_event.
 -- Each query is run once silently (warm cache) and then recorded.
 \set ON_ERROR_STOP on
@@ -55,6 +56,11 @@ UPDATE assistance_request d SET status='DUPLICATE', canonical_request_id=c.id
  WHERE d.id = c.dup;
 INSERT INTO request_subject (request_id,people_affected,location,location_source)
 SELECT id, 1 + (i % 9), ST_SetSRID(ST_MakePoint(lon,lat),4326)::geography, 'MANUAL_PIN' FROM seed;
+SELECT a.id AS rid
+  FROM assistance_request a JOIN request_subject s ON s.request_id=a.id
+ WHERE a.status='VERIFIED' AND a.region_code='R1' AND a.incident_category_code='FLOOD'
+   AND a.organization_id='00000000-0000-0000-0000-0000000000d1' AND a.received_at>now()-interval '20 days'
+ ORDER BY a.id LIMIT 1 \gset
 
 -- ---------- teams (3k), positions, skills ----------
 INSERT INTO rescue_team (id,organization_id,operating_region_code,name,team_kind,availability)
@@ -85,6 +91,17 @@ SELECT sn.request_id, t.id, 1,
        CASE WHEN sn.i % 10 = 0 THEN now() - random()*interval '23 hours' ELSE now() - interval '2 days' - random()*interval '28 days' END
 FROM snap sn JOIN tm t ON t.n = 1 + (sn.i % 3000);
 
+-- Make the eligibility predicates selective but ensure the measured query has a real candidate.
+UPDATE rescue_team SET reporting_mode='COORDINATOR',external_contact_note='T8 EXPLAIN synthetic contact',availability='AVAILABLE',status='ACTIVE',readiness_required=false;
+SELECT t.id AS candidate_team_id
+  FROM rescue_team t JOIN team_position p ON p.team_id=t.id
+ WHERE NOT EXISTS (SELECT 1 FROM mission m WHERE m.team_id=t.id AND m.status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE'))
+ ORDER BY t.id LIMIT 1 \gset
+UPDATE team_position p SET location=s.location,captured_at=now()-interval '5 minutes',source='COORDINATOR_REPORTED'
+  FROM request_subject s WHERE p.team_id=:'candidate_team_id' AND s.request_id=:'rid';
+INSERT INTO team_skill (team_id,skill_code)
+VALUES (:'candidate_team_id','BOAT'),(:'candidate_team_id','ROPE') ON CONFLICT DO NOTHING;
+
 ANALYZE;
 SELECT 'assistance_request' t, count(*) FROM assistance_request UNION ALL SELECT 'request_subject', count(*) FROM request_subject
  UNION ALL SELECT 'verified+ open', count(*) FROM assistance_request WHERE status IN ('VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING')
@@ -106,7 +123,7 @@ SELECT count(*) AS events_on_timeline_request FROM request_event WHERE request_i
 
 -- ---------- queries: stored as text with @token@ placeholders, substituted with quoted literals (so the planner sees constants) ----------
 CREATE TEMP TABLE params (k text PRIMARY KEY, v text);
-INSERT INTO params VALUES ('rid',:'rid'),('oid',:'oid'),('rloc',:'rloc'),('rts',:'rts'),('rcat',:'rcat'),('cid',:'cid'),('uid',:'uid'),('tid',:'tid'),('kts',:'kts'),('kid',:'kid'),('sourcehash','v1:'||repeat('a',64));
+INSERT INTO params VALUES ('rid',:'rid'),('oid',:'oid'),('rloc',:'rloc'),('rts',:'rts'),('rcat',:'rcat'),('cid',:'cid'),('uid',:'uid'),('tid',:'tid'),('kts',:'kts'),('kid',:'kid'),('sourcehash','v1:'||repeat('a',64)),('team_region','R1'),('team_radius','10000');
 CREATE TEMP TABLE q (n int PRIMARY KEY, label text, sql text);
 INSERT INTO q VALUES
 (1, 'i   candidate teams (10 km, fresh, AVAILABLE, no active mission, skills superset, band order)', $q$
@@ -156,7 +173,54 @@ SELECT id, received_at FROM assistance_request
  ORDER BY received_at, id LIMIT 50 $q$),
 (8, 'viii per-IP soft-throttle count by purpose-bound source hash', $q$
 SELECT count(*) FROM assistance_request
- WHERE source_ip_hash = @sourcehash@ AND received_at >= now() - interval '1 minute' $q$);
+ WHERE source_ip_hash = @sourcehash@ AND received_at >= now() - interval '1 minute' $q$),
+(9, 'ix   T8 current candidate eligibility SQL (3k teams; request_operations.team-candidates.service.ts:37-84)', $q$
+WITH target AS (
+  SELECT r.id,r.organization_id,r.region_code,r.incident_category_code,s.location AS request_location,
+         statement_timestamp() AS query_time
+    FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
+   WHERE r.id=@rid@ AND r.organization_id=@oid@ AND r.region_code IS NOT DISTINCT FROM @team_region@
+), eligible AS (
+  SELECT t.id,t.organization_id,t.operating_region_code,t.name,t.team_kind,t.reporting_mode,t.availability,t.status,
+         t.readiness_required,t.version,t.created_at,
+         COALESCE((SELECT array_agg(ts.skill_code ORDER BY ts.skill_code) FROM team_skill ts WHERE ts.team_id=t.id),ARRAY[]::text[]) AS skills,
+         floor(extract(epoch FROM (q.query_time-p.captured_at)))::int AS position_age_s,
+         p.accuracy_m AS position_accuracy_m,p.source AS position_source,
+         NULL::float8 AS longitude,NULL::float8 AS latitude,
+         p.team_id AS position_team_id,p.captured_at,p.location AS position_location,q.request_location,q.query_time,
+         CASE WHEN p.captured_at BETWEEN q.query_time-interval '30 minutes' AND q.query_time
+              THEN ST_Distance(q.request_location,p.location) END AS distance_m,
+         recent.recent_missions_24h
+    FROM rescue_team t CROSS JOIN target q
+    LEFT JOIN team_position p ON p.team_id=t.id
+    LEFT JOIN LATERAL (
+      SELECT count(DISTINCT m.id)::int AS recent_missions_24h
+        FROM mission m
+       WHERE m.team_id=t.id AND m.status NOT IN ('DECLINED','CANCELLED')
+         AND (m.created_at BETWEEN q.query_time-interval '24 hours' AND q.query_time
+           OR EXISTS (SELECT 1 FROM mission_event me
+                       WHERE me.mission_id=m.id
+                         AND me.recorded_at BETWEEN q.query_time-interval '24 hours' AND q.query_time))
+    ) recent ON true
+   WHERE t.status='ACTIVE' AND t.availability='AVAILABLE' AND NOT t.readiness_required
+     AND t.organization_id=q.organization_id AND t.operating_region_code=q.region_code
+     AND ((t.reporting_mode='APP' AND EXISTS (
+             SELECT 1 FROM team_member tm WHERE tm.team_id=t.id AND tm.member_role='LEADER' AND tm.left_at IS NULL))
+       OR (t.reporting_mode='COORDINATOR' AND NULLIF(btrim(t.external_contact_note),'') IS NOT NULL))
+     AND NOT EXISTS (SELECT 1 FROM mission active
+                      WHERE active.team_id=t.id AND active.status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE'))
+     AND NOT EXISTS (SELECT 1 FROM incident_category_skill required
+                      WHERE required.category_code=q.incident_category_code
+                        AND NOT EXISTS (SELECT 1 FROM team_skill ts
+                                         WHERE ts.team_id=t.id AND ts.skill_code=required.skill_code))
+)
+SELECT id,organization_id,operating_region_code,name,team_kind,reporting_mode,availability,status,readiness_required,version,created_at,
+       skills,position_age_s,position_accuracy_m,position_source,longitude,latitude,distance_m,recent_missions_24h
+  FROM eligible
+ WHERE position_team_id IS NULL
+    OR captured_at < query_time-interval '30 minutes' OR captured_at > query_time
+    OR (captured_at >= query_time-interval '30 minutes' AND captured_at <= query_time
+        AND ST_DWithin(request_location,position_location,@team_radius@::float8)) $q$);
 
 CREATE FUNCTION run_explain(do_print boolean) RETURNS SETOF text LANGUAGE plpgsql AS $$
 DECLARE r record; stmt text; p record; line text;

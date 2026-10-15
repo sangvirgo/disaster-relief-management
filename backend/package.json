@@ -20,6 +20,8 @@
     "start:identity": "node dist/apps/identity/src/main.js",
     "start:response": "node dist/apps/response/src/main.js",
     "start:logistics": "node dist/apps/logistics/src/main.js",
+    "contracts:export": "node scripts/contracts/openapi.mjs --export",
+    "contracts:check": "node scripts/contracts/openapi.mjs --check",
     "migration:up:identity": "node dist/apps/identity/src/database/migrate.js",
     "migration:up:response": "node dist/apps/response/src/database/migrate.js",
     "migration:up:logistics": "node dist/apps/logistics/src/database/migrate.js",

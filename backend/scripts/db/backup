@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+backend_dir="$(cd -- "$script_dir/../.." && pwd -P)"
+repo_root="$(cd -- "$backend_dir/.." && pwd -P)"
+compose_file="$backend_dir/infra/compose.yaml"
+
+usage() {
+  cat <<'USAGE'
+Usage: backend/scripts/db/backup ABSOLUTE_PRIVATE_DIRECTORY
+
+Creates custom-format dumps for c48_identity, c48_response, and c48_logistics,
+then mirrors both evidence buckets to a new timestamped directory. The output
+must be outside the repository. Requires the existing Postgres service to be
+running, backend/.env, mc, MC_CONFIG_DIR, and C48_MINIO_ALIAS configured for
+the primary MinIO endpoint. No service is started or stopped.
+USAGE
+}
+
+fail() { printf 'Backup refused: %s\n' "$1" >&2; exit 2; }
+
+if [[ "${1:-}" == '--help' ]]; then usage; exit 0; fi
+[[ $# -eq 1 ]] || { usage >&2; exit 2; }
+[[ "$1" == /* ]] || fail 'the destination must be an absolute path outside the repository'
+[[ -f "$backend_dir/.env" ]] || fail 'backend/.env is required for Compose interpolation'
+[[ -n "${C48_MINIO_ALIAS:-}" && -n "${MC_CONFIG_DIR:-}" ]] || fail 'C48_MINIO_ALIAS and MC_CONFIG_DIR are required'
+command -v docker >/dev/null || fail 'docker is unavailable'
+command -v mc >/dev/null || fail 'mc is unavailable'
+if ! mc_config_file="$(node "$script_dir/validate-mc-config.mjs" "$MC_CONFIG_DIR" 2>/dev/null)"; then
+  fail 'MC_CONFIG_DIR and config.json must be private regular paths with no symlinks'
+fi
+
+compose() {
+  docker compose --env-file "$backend_dir/.env" --project-directory "$backend_dir" -f "$compose_file" "$@"
+}
+
+if ! compose config --format json 2>/dev/null | node "$script_dir/verify-minio-endpoint.mjs" "$mc_config_file" "$C48_MINIO_ALIAS" >/dev/null 2>&1; then
+  fail 'configured MinIO alias endpoint could not be verified against response-api S3_PUBLIC_ENDPOINT'
+fi
+
+destination_root="$(realpath -m -- "$1")"
+case "$destination_root/" in
+  "$repo_root/"*) fail 'the destination must be outside the repository' ;;
+esac
+[[ "$destination_root" != '/' ]] || fail 'the filesystem root cannot be a backup destination'
+mkdir -p -m 700 -- "$destination_root"
+chmod 700 -- "$destination_root"
+destination_root="$(cd -- "$destination_root" && pwd -P)"
+
+timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+output_dir="$destination_root/c48-$timestamp"
+mkdir -m 700 -- "$output_dir" || fail 'the timestamped output directory already exists'
+mkdir -m 700 -- "$output_dir/objects"
+temporary_file=''
+trap 'if [[ -n "${temporary_file:-}" ]]; then rm -f -- "$temporary_file"; fi' EXIT
+
+for database in c48_identity c48_response c48_logistics; do
+  temporary_file="$output_dir/.${database}.dump.partial"
+  compose exec -T postgres pg_dump --username=postgres --format=custom --no-owner --no-acl --dbname "$database" > "$temporary_file"
+  chmod 600 -- "$temporary_file"
+  mv -- "$temporary_file" "$output_dir/$database.dump"
+  temporary_file=''
+done
+
+for bucket in c48-response-evidence c48-logistics-evidence; do
+  mkdir -m 700 -- "$output_dir/objects/$bucket"
+  mc --config-dir "$MC_CONFIG_DIR" mirror --preserve "$C48_MINIO_ALIAS/$bucket" "$output_dir/objects/$bucket"
+done
+
+node "$script_dir/object-inventory.mjs" "$output_dir/objects" "$output_dir/object_inventory.jsonl" || fail 'could not create the object inventory manifest'
+
+{
+  printf 'created_utc=%s\n' "$(date -u +%FT%TZ)"
+  printf 'source=backend/infra/compose.yaml postgres service and configured MinIO alias\n'
+  printf 'format=PostgreSQL custom dumps; current objects mirrored with mc --preserve; object_inventory.jsonl records bucket, key, size_bytes, sha256\n'
+} > "$output_dir/manifest.txt"
+chmod 600 -- "$output_dir/manifest.txt"
+chmod 600 -- "$output_dir/object_inventory.jsonl"
+(cd -- "$output_dir" && find . -type f ! -name manifest.sha256 -print0 | sort -z | xargs -0 sha256sum > manifest.sha256)
+chmod 600 -- "$output_dir/manifest.sha256"
+printf 'Private backup created: %s\n' "$output_dir"
