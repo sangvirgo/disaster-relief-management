@@ -12,11 +12,17 @@ const responseServiceClientSecret = requiredEnv('RESPONSE_SERVICE_CLIENT_SECRET'
 const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DATABASE_URL') });
 const responseDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
-const organizationId = '40000000-0000-4000-8000-000000000004';
+const connectedDatabases = [];
+const organizationId = process.env.DEMO_INTAKE_ORGANIZATION_ID ?? '40000000-0000-4000-8000-000000000004';
 const suffix = randomBytes(5).toString('hex').toUpperCase();
+const ipNetworks = ['192.0.2', '198.51.100', '203.0.113'];
+const identityNetwork = ipNetworks[Number.parseInt(suffix.slice(0, 2), 16) % ipNetworks.length];
+const requestNetwork = ipNetworks[(ipNetworks.indexOf(identityNetwork) + 1) % ipNetworks.length];
 const regionCode = `T14_${suffix}`;
-let identityIp = 230;
-let requestIp = 240;
+const longitude = -160 + Number.parseInt(suffix.slice(0, 4), 16) % 140;
+const latitude = -70 + Number.parseInt(suffix.slice(4, 8), 16) % 140;
+let identityIp = Number.parseInt(suffix.slice(2, 4), 16) % 200 + 1;
+let requestIp = Number.parseInt(suffix.slice(4, 6), 16) % 200 + 1;
 
 function requiredEnv(name) {
   const value = process.env[name];
@@ -67,7 +73,7 @@ async function registerAndLogin(label, roles = []) {
     display_name: `Người dùng kiểm thử T14 ${label} ${accountSuffix}`,
     password: `Logistics T14 test ${accountSuffix}!`,
   };
-  const sourceIp = `198.51.100.${identityIp++}`;
+  const sourceIp = `${identityNetwork}.${identityIp++}`;
   const registered = await call(identityUrl, 'auth/register', {
     method: 'POST', body: credentials, idempotencyKey: key(), headers: { 'X-Forwarded-For': sourceIp },
   });
@@ -106,9 +112,9 @@ async function createRequest(reporter) {
     reporter_contact_phone: '+84912345678',
     reporter_declared_danger: false,
     location: {
-      type: 'Point', coordinates: [-120, -20], source: 'GPS', accuracy_m: 8, captured_at: new Date().toISOString(),
+      type: 'Point', coordinates: [longitude, latitude], source: 'GPS', accuracy_m: 8, captured_at: new Date().toISOString(),
     },
-  }, key(), { 'X-Forwarded-For': `198.51.100.${requestIp++}` });
+  }, key(), { 'X-Forwarded-For': `${requestNetwork}.${requestIp++}` });
   assert.equal(result.status, 201, JSON.stringify(result.value));
   return result.value;
 }
@@ -147,8 +153,51 @@ async function requestState(requestId) {
   return result.rows[0];
 }
 
-await Promise.all([logisticsDb.connect(), responseDb.connect(), identityDb.connect()]);
+async function waitForRequestRowLockWaiters(database, blockerPid, minimum, pendingCommands) {
+  const waiters = (async () => {
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      const result = await database.query(
+        `SELECT pid,pg_blocking_pids(pid) AS blockers FROM pg_stat_activity
+          WHERE datname=current_database() AND pid<>$1`,
+        [blockerPid],
+      );
+      const blocked = result.rows.filter(({ blockers }) => blockers.includes(blockerPid)).map(({ pid }) => pid);
+      if (blocked.length >= minimum) return blocked;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.fail(`Timed out waiting for ${minimum} request-row lock waiter(s)`);
+  })();
+  const completed = Promise.race(pendingCommands.map((pending) => pending.then(
+    (result) => ({ result }), (error) => ({ error }),
+  )));
+  const outcome = await Promise.race([waiters.then((blocked) => ({ blocked })), completed]);
+  if (outcome.blocked) return outcome.blocked;
+  if (outcome.error) throw outcome.error;
+  assert.fail(`A command completed before ${minimum} request-row lock waiter(s) appeared: HTTP ${outcome.result.status} ${JSON.stringify(outcome.result.value)}`);
+}
+
+async function waitForAdmissionBlockedByOffer(database, offerPid, admissionPid, teamBlockerPid) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const result = await database.query(
+      `SELECT pid,pg_blocking_pids(pid) AS blockers
+         FROM pg_stat_activity WHERE pid=ANY($1::int[])`,
+      [[offerPid, admissionPid]],
+    );
+    const offer = result.rows.find(({ pid }) => pid === offerPid);
+    const admission = result.rows.find(({ pid }) => pid === admissionPid);
+    if (offer?.blockers.includes(teamBlockerPid) && admission?.blockers.includes(offerPid)) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  assert.fail('The Logistics admission did not wait behind the offer transaction holding the request row');
+}
+
 try {
+  for (const database of [logisticsDb, responseDb, identityDb]) {
+    await database.connect();
+    connectedDatabases.push(database);
+  }
   await identityDb.query(
     `INSERT INTO organization (id,name,organization_kind)
      VALUES ($1,'T14 test organization','COORDINATION') ON CONFLICT (id) DO NOTHING`, [organizationId],
@@ -157,8 +206,8 @@ try {
   await responseDb.query("INSERT INTO incident_category (code,display_name) VALUES ('T14_FLOOD','Lũ lụt') ON CONFLICT (code) DO NOTHING");
   await responseDb.query(
     `INSERT INTO region_boundary (region_code,geom) VALUES
-      ($1,ST_Multi(ST_GeomFromText('POLYGON((-121 -21,-119 -21,-119 -19,-121 -19,-121 -21))',4326)))
-     ON CONFLICT (region_code) DO NOTHING`, [regionCode],
+      ($1,ST_Multi(ST_MakeEnvelope($2,$3,$4,$5,4326)))
+     ON CONFLICT (region_code) DO NOTHING`, [regionCode, longitude - 0.25, latitude - 0.25, longitude + 0.25, latitude + 0.25],
   );
 
   const [staff, reporter] = await Promise.all([
@@ -166,6 +215,16 @@ try {
     registerAndLogin('reporter'),
   ]);
   const responseToken = await responseServiceToken();
+  const attributionTeam = await command(responseUrl, 'teams', staff, {
+    name: `Đội kiểm thử T14 ${suffix}`,
+    organization_id: organizationId,
+    operating_region_code: regionCode,
+    team_kind: 'GOVERNMENT',
+    reporting_mode: 'COORDINATOR',
+    external_contact_note: 'Liên hệ nội bộ phục vụ kiểm thử.',
+    skill_codes: [],
+  });
+  expectSuccess(attributionTeam, 201);
   const itemType = await command(logisticsUrl, 'item-types', staff, {
     code: `T14_${suffix}`, display_name: 'Vật tư kiểm thử T14',
   });
@@ -198,6 +257,7 @@ try {
   const pendingRequest = await createRequest(reporter);
   const pendingState = await requestState(pendingRequest.id);
   assert.equal(pendingState.status, 'SUBMITTED');
+  assert.equal(pendingState.region_code, regionCode, 'the T14 request must resolve inside its unique test region');
   const failedAdmissionKey = key();
   const rejectedNeed = await command(logisticsUrl, 'needs', staff, {
     request_id: pendingRequest.id, work_cycle: Number(pendingState.work_cycle), item_id: item.value.id, quantity: '2.00',
@@ -215,6 +275,92 @@ try {
     [`user:${staff.id}`, failedAdmissionKey],
   );
   assert.equal(failedAdmissionRecord.rowCount, 0, 'a new key rejected by Response must not persist');
+
+  const attributionRaceRequest = await createRequest(reporter);
+  await verifyRequest(attributionRaceRequest, staff);
+  const attributionRaceInitialState = await triageRequest(attributionRaceRequest.id, staff);
+  assert.equal(attributionRaceInitialState.status, 'TRIAGED');
+  assert.equal(attributionRaceInitialState.region_code, regionCode);
+  assert.equal(attributionRaceInitialState.attribution_locked_at, null);
+  assert.equal(attributionRaceInitialState.logistics_admitted_at, null);
+
+  const lockDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
+  const teamLockDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
+  let lockConnected = false;
+  let teamLockConnected = false;
+  let requestTransactionOpen = false;
+  let teamTransactionOpen = false;
+  let pendingOffer;
+  let pendingAdmission;
+  let attributionOffer;
+  let attributionNeed;
+  try {
+    await lockDb.connect();
+    lockConnected = true;
+    await teamLockDb.connect();
+    teamLockConnected = true;
+    await lockDb.query('BEGIN');
+    requestTransactionOpen = true;
+    await lockDb.query("SET LOCAL idle_in_transaction_session_timeout = '30s'");
+    await lockDb.query('SELECT id FROM assistance_request WHERE id=$1 FOR UPDATE', [attributionRaceRequest.id]);
+    const requestBlockerPid = (await lockDb.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    await teamLockDb.query('BEGIN');
+    teamTransactionOpen = true;
+    await teamLockDb.query("SET LOCAL idle_in_transaction_session_timeout = '30s'");
+    await teamLockDb.query('SELECT id FROM rescue_team WHERE id=$1 FOR UPDATE', [attributionTeam.value.id]);
+    const teamBlockerPid = (await teamLockDb.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+
+    pendingOffer = command(responseUrl, `requests/${attributionRaceRequest.id}/missions`, staff, {
+      expected_version: Number(attributionRaceInitialState.version),
+      team_id: attributionTeam.value.id,
+      override_reason: 'Đội được chọn cho kiểm thử tranh chấp đóng dấu điều phối.',
+    });
+    pendingOffer.catch(() => undefined);
+    const [offerPid] = await waitForRequestRowLockWaiters(responseDb, requestBlockerPid, 1, [pendingOffer]);
+
+    pendingAdmission = command(logisticsUrl, 'needs', staff, {
+      request_id: attributionRaceRequest.id,
+      work_cycle: Number(attributionRaceInitialState.work_cycle),
+      item_id: item.value.id,
+      quantity: '1.00',
+    });
+    pendingAdmission.catch(() => undefined);
+    const admissionWaiters = await waitForRequestRowLockWaiters(responseDb, offerPid, 1, [pendingAdmission]);
+    assert.equal(admissionWaiters.length, 1, 'only the Logistics admission should wait behind the mission offer');
+    const [admissionPid] = admissionWaiters;
+
+    await lockDb.query('COMMIT');
+    requestTransactionOpen = false;
+    await waitForAdmissionBlockedByOffer(responseDb, offerPid, admissionPid, teamBlockerPid);
+    await teamLockDb.query('COMMIT');
+    teamTransactionOpen = false;
+    [attributionOffer, attributionNeed] = await Promise.all([pendingOffer, pendingAdmission]);
+  } finally {
+    if (requestTransactionOpen && lockConnected) await lockDb.query('ROLLBACK').catch(() => undefined);
+    if (teamTransactionOpen && teamLockConnected) await teamLockDb.query('ROLLBACK').catch(() => undefined);
+    await Promise.all([pendingOffer, pendingAdmission].filter(Boolean).map((pending) => pending.catch(() => undefined)));
+    await Promise.all([
+      ...(lockConnected ? [lockDb.end()] : []),
+      ...(teamLockConnected ? [teamLockDb.end()] : []),
+    ]);
+  }
+  expectSuccess(attributionOffer, 201);
+  assert.equal(attributionOffer.value.status, 'OFFERED');
+  expectSuccess(attributionNeed, 201);
+  const attributionRaceFinalState = await requestState(attributionRaceRequest.id);
+  assert.equal(attributionRaceFinalState.status, 'DISPATCHED');
+  assert.ok(attributionRaceFinalState.attribution_locked_at);
+  assert.ok(attributionRaceFinalState.logistics_admitted_at);
+  assert.equal(
+    Number(attributionRaceFinalState.version),
+    Number(attributionRaceInitialState.version) + 2,
+    'the first mission offer and first Logistics admission must each increment request version once',
+  );
+  const attributionOrder = await responseDb.query(
+    `SELECT attribution_locked_at < logistics_admitted_at AS offer_stamped_before_admission
+       FROM assistance_request WHERE id=$1`, [attributionRaceRequest.id],
+  );
+  assert.equal(attributionOrder.rows[0].offer_stamped_before_admission, true);
 
   const request = await createRequest(reporter);
   await verifyRequest(request, staff);
@@ -296,6 +442,13 @@ try {
   assert.equal(raceCycle.rows[0].state, 'OPEN');
   const raceCommitmentRow = await logisticsDb.query('SELECT id FROM commitment WHERE relief_need_id=$1', [raceNeedResult.value.id]);
   assert.equal(raceCommitmentRow.rowCount, 1);
+  const raceCommitmentMovement = await logisticsDb.query(
+    `SELECT balance_id,movement_type,delta_reserved::text FROM stock_movement WHERE commitment_id=$1`,
+    [raceCommitmentRow.rows[0].id],
+  );
+  assert.deepEqual(raceCommitmentMovement.rows, [{
+    balance_id: balanceId, movement_type: 'RESERVE', delta_reserved: '1.000',
+  }]);
 
   const retriedSeal = await call(logisticsUrl,
     `internal/requests/${raceRequest.id}/cycles/${raceRequestState.work_cycle}/seal`, {
@@ -431,7 +584,7 @@ try {
   const beforeCancelBalance = await logisticsDb.query(
     'SELECT on_hand::text,reserved::text FROM stock_balance WHERE id=$1', [balanceId],
   );
-  assert.deepEqual(beforeCancelBalance.rows, [{ on_hand: '20.000', reserved: '5.000' }]);
+  assert.deepEqual(beforeCancelBalance.rows, [{ on_hand: '20.000', reserved: '6.000' }]);
 
   const freezeIntentId = randomUUID();
   await logisticsDb.query(
@@ -464,7 +617,7 @@ try {
   const balanceAfterCancel = await logisticsDb.query(
     'SELECT on_hand::text,reserved::text FROM stock_balance WHERE id=$1', [balanceId],
   );
-  assert.deepEqual(balanceAfterCancel.rows, [{ on_hand: '20.000', reserved: '0.000' }]);
+  assert.deepEqual(balanceAfterCancel.rows, [{ on_hand: '20.000', reserved: '1.000' }]);
   const movements = await logisticsDb.query(
     `SELECT movement_type,delta_reserved::text
        FROM stock_movement WHERE commitment_id=$1`, [commitmentId],
@@ -543,9 +696,9 @@ try {
   const unsettledBalance = await logisticsDb.query(
     'SELECT on_hand::text,reserved::text FROM stock_balance WHERE id=$1', [balanceId],
   );
-  assert.deepEqual(unsettledBalance.rows, [{ on_hand: '19.000', reserved: '1.000' }]);
+  assert.deepEqual(unsettledBalance.rows, [{ on_hand: '19.000', reserved: '2.000' }]);
 
   console.log('PASS Logistics T14 admission, idempotent replay after cancellation, commitment with OPEN_NEED seal-retry guard, quantity changes and cancellation guards');
 } finally {
-  await Promise.all([logisticsDb.end(), responseDb.end(), identityDb.end()]);
+  await Promise.all(connectedDatabases.map((database) => database.end()));
 }
