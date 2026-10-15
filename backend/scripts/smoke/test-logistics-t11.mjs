@@ -11,7 +11,8 @@ const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATA
 const organizationId = randomUUID();
 const otherOrganizationId = randomUUID();
 const regionCode = `T11_${randomBytes(5).toString('hex').toUpperCase()}`;
-let identityIp = 200;
+const identityNetwork = randomBytes(2);
+let identityIp = 10;
 
 function requiredEnv(name) {
   const value = process.env[name];
@@ -58,7 +59,7 @@ async function registerAndLogin(label, roles, grantOrganizationId = organization
     display_name: `Người dùng kiểm thử T11 ${label} ${suffix}`,
     password: `Logistics T11 test ${suffix}!`,
   };
-  const sourceIp = `198.51.100.${identityIp++}`;
+  const sourceIp = `10.${identityNetwork.readUInt8(0)}.${identityNetwork.readUInt8(1)}.${identityIp++}`;
   const registered = await call(identityUrl, 'auth/register', {
     method: 'POST', body: credentials,
     idempotencyKey: key(),
@@ -268,6 +269,23 @@ try {
   assert.equal(ledger.rows[0]?.balanced, true, 'stock balance must equal the append-only movement sum');
   assert.equal(Number(ledger.rows[0]?.adjustment_movements), 1, 'approval race must post exactly one movement');
 
+  const deactivatedItem = await call(logisticsUrl, `items/${item.value.id}/deactivate`, {
+    method: 'POST', actor: operator, idempotencyKey: key(), body: { expected_version: item.value.version },
+  });
+  expectSuccess(deactivatedItem);
+  assert.equal(deactivatedItem.value.status, 'INACTIVE');
+  assert.equal(deactivatedItem.value.version, item.value.version + 1);
+  const inactiveItems = await call(logisticsUrl, `items?type=${typeCode}&status=INACTIVE&limit=100`, { actor: operator });
+  expectSuccess(inactiveItems);
+  const retainedItem = inactiveItems.value.items.find((row) => row.id === item.value.id);
+  assert.equal(retainedItem?.status, 'INACTIVE');
+  assert.equal(retainedItem?.version, deactivatedItem.value.version);
+  const openingWithInactiveItem = await call(logisticsUrl, 'stock/opening', {
+    method: 'POST', actor: operator, idempotencyKey: key(),
+    body: { warehouse_id: warehouse.value.id, lines: [{ item_id: item.value.id, quantity: '1.00' }], note: 'Không thể nhập hàng cho vật tư đã ngừng sử dụng.' },
+  });
+  expectVietnameseError(openingWithInactiveItem, 400, 'VALIDATION_FAILED');
+
   for (const [path, asset] of [
     ['warehouses', warehouse.value],
     ['relief-points', point.value],
@@ -289,8 +307,13 @@ try {
 
   const assetHistory = await logisticsDb.query(
     `SELECT action,entity_id,before_state,after_state FROM audit_log
-      WHERE entity_type=ANY($1::text[]) AND entity_id=ANY($2::text[])`,
-    [['warehouse', 'relief_point', 'vehicle'], [warehouse.value.id, point.value.id, vehicle.value.id]],
+      WHERE entity_type=ANY($1::text[]) AND entity_id=ANY($2::text[]) AND action=ANY($3::text[])`,
+    [
+      ['warehouse', 'relief_point', 'vehicle'],
+      [warehouse.value.id, point.value.id, vehicle.value.id],
+      ['WAREHOUSE_CREATED', 'WAREHOUSE_UPDATED', 'WAREHOUSE_DEACTIVATED', 'RELIEF_POINT_CREATED', 'RELIEF_POINT_UPDATED',
+        'RELIEF_POINT_DEACTIVATED', 'VEHICLE_CREATED', 'VEHICLE_UPDATED', 'VEHICLE_DEACTIVATED'],
+    ],
   );
   assert.equal(assetHistory.rowCount, 9, 'asset create, update and deactivation audit history must be retained');
   for (const [asset, prefix] of [

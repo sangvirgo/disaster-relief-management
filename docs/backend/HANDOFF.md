@@ -194,6 +194,13 @@ Formal stocktakes under FR-REC-02 are deferred by the plan and outside this cont
 - `node --check scripts/smoke/test-response-t10.mjs` and `git diff --check` passed. No API, schema, migration, or OpenAPI contract changed; smoke-created records remain durable.
 - Heatmap timing against the 10k seed and the 200k query-plan gate remain open.
 
+## T11 test coverage follow-up — 2026-10-15
+
+- Added unit cases for scale-zero fractional values and `NaN`/infinite quantities. Extended the primary-stack smoke to verify an inactive catalog item remains listed and is rejected by a new opening-stock command with the existing Vietnamese `VALIDATION_FAILED` response.
+- The smoke also checks asset history by the nine asset lifecycle actions. The first run exposed an unrelated `OPENING_STOCK_POSTED` row sharing the warehouse ID; the query now scopes to the asset lifecycle actions before checking the three create/update/deactivation records per asset.
+- Verification: `stock.helpers.spec.ts` passed 1 suite / 7 tests; `node --check` and `git diff --check` passed; the T11 smoke passed against Identity/Logistics on ports 3001/3003 and the primary PostgreSQL databases. No full build or full test suite was run during this follow-up. The smoke leaves its users, assets, and stock ledger fixtures in the primary databases; no reset or volume removal was done.
+- No API, schema, migration, or OpenAPI contract changed. `schema/test-logistics.sql` contains the append-only/TRUNCATE assertion; the `scripts/db/test-db` entrypoint requires `--reset`, so it was not run in this follow-up.
+
 ## Next concrete action
 
-Next: close the remaining T11 test gaps and finish the T12 recovery/evidence APIs and T15 handoff evidence follow-up. Also keep the external gates open: obtain the AIStor lab artifact/license for T5/TC-29; capture populated donation and fulfillment examples and dashboard evidence for T17; and schedule T8/T10/T17 query-plan, T18 ingress/pool/log/client checks, restore, and performance evidence. Do not treat passing unit tests or API smokes as closure of those gates. The acceptance matrix in [T19 traceability](T19-traceability.md) is the current gate ledger.
+Next: complete independent review and primary-stack verification of the T12 recovery/evidence APIs, then finish the T15 handoff evidence follow-up. Keep the external gates open: obtain the AIStor lab artifact/license for T5/TC-29; capture populated donation and fulfillment examples and dashboard evidence for T17; and schedule T8/T10/T17 query-plan, T18 ingress/pool/log/client checks, restore, and performance evidence. Do not treat passing unit tests or API smokes as closure of those gates. The acceptance matrix in [T19 traceability](T19-traceability.md) is the current gate ledger.

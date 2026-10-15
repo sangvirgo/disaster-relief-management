@@ -6,8 +6,13 @@ describe('Logistics stock rules', () => {
     expect(validateQuantity('12.50', 2)).toBe('12.50');
     expect(() => validateQuantity('1e2', 2)).toThrow();
     expect(() => validateQuantity('1.001', 2)).toThrow();
+    expect(() => validateQuantity('1.0004', 0)).toThrow();
     expect(() => validateQuantity('1000000000000000', 0)).toThrow();
     expect(() => validateQuantity('0', 0)).toThrow();
+  });
+
+  it.each(['NaN', 'Infinity', '-Infinity'])('rejects non-finite quantity %s', (value) => {
+    expect(() => validateQuantity(value, 2)).toThrow(expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }));
   });
 
   it('allows signed adjustment deltas but rejects zero', () => {
