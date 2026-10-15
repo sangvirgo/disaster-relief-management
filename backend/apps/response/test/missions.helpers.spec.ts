@@ -17,6 +17,7 @@ describe('mission state rules', () => {
     expect(missionProgressStatus(['OFFERED', 'ACCEPTED'])).toBe('IN_PROGRESS');
     expect(missionProgressStatus(['COMPLETED', 'DECLINED'])).toBe('TRIAGED');
     expect(missionProgressStatus(['OFFERED'], 'RESOLVING')).toBeNull();
+    expect(missionProgressStatus([], 'RESOLVING')).toBeNull();
     expect(missionProgressStatus([], 'CANCELLED')).toBeNull();
   });
 });

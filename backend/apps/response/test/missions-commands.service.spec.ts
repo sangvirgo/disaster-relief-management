@@ -89,9 +89,75 @@ describe('MissionsCommandsService UPDATE RETURNING handling', () => {
     )).rejects.toMatchObject({ code: 'VERSION_CONFLICT', details: { current_version: 2 } });
     expect(query.mock.calls.some(([sql]) => sql.startsWith('INSERT INTO request_event'))).toBe(false);
   });
+
+  it('does not rewrite request progress when an active mission keeps it IN_PROGRESS', async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.startsWith('SELECT status FROM mission')) return [{ status: 'EN_ROUTE' }];
+      return [];
+    });
+
+    await service().recomputeRequest(
+      { query }, { id: requestId, version: 4, work_cycle: 1, status: 'IN_PROGRESS' }, coordinatorId, missionId,
+    );
+
+    expect(query.mock.calls.some(([sql]) => sql.startsWith('UPDATE assistance_request'))).toBe(false);
+    expect(query.mock.calls.some(([sql]) => sql.startsWith('INSERT INTO request_event'))).toBe(false);
+  });
+
+  it('keeps a RESOLVING request unchanged during mission-progress recomputation', async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.startsWith('SELECT status FROM mission')) return [];
+      return [];
+    });
+
+    await service().recomputeRequest(
+      { query }, { id: requestId, version: 5, work_cycle: 1, status: 'RESOLVING' }, coordinatorId, missionId,
+    );
+
+    expect(query.mock.calls.some(([sql]) => sql.startsWith('UPDATE assistance_request'))).toBe(false);
+    expect(query.mock.calls.some(([sql]) => sql.startsWith('INSERT INTO request_event'))).toBe(false);
+  });
+
+  it('rejects a mission transition after the request enters RESOLVING', async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql === 'SELECT campaign_id FROM assistance_request WHERE id=$1') return [{ campaign_id: null }];
+      if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
+        id: requestId, status: 'RESOLVING', version: 5, organization_id: organizationId, region_code: 'T8_REGION',
+        campaign_id: null, incident_category_code: 'FLOOD', priority: 'P2', priority_basis: 'COMPLETE',
+        work_cycle: 1, verification_revision: revisionId, attribution_locked_at: null, reporter_user_id: null,
+      }];
+      return [];
+    });
+
+    await expect(service().changeInTransaction(
+      { query }, missionId, requestId, teamId, 3, { userId: coordinatorId, grants: [] },
+      { command: 'transition', target: 'EN_ROUTE', mode: 'LEADER' },
+    )).rejects.toMatchObject({ code: 'STATE_TRANSITION_INVALID', status: 409 });
+    expect(query.mock.calls.some(([sql]) => sql.startsWith('UPDATE mission'))).toBe(false);
+  });
 });
 
 describe('MissionsCommandsService campaign mission-offer eligibility', () => {
+  it('rejects a first mission offer when the request has no region', async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.startsWith('SELECT campaign_id FROM assistance_request')) return [{ campaign_id: null }];
+      if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
+        id: requestId, status: 'TRIAGED', version: 1, organization_id: organizationId, region_code: null,
+        campaign_id: null, incident_category_code: 'FLOOD', priority: 'P2', priority_basis: 'COMPLETE',
+        work_cycle: 1, verification_revision: revisionId, attribution_locked_at: null, reporter_user_id: null,
+      }];
+      return [];
+    });
+
+    await expect(service().offerInTransaction(
+      { query }, requestId, { expected_version: 1, team_id: teamId } as CreateMissionDto,
+      { userId: coordinatorId, grants: [{
+        role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId,
+      }] }, null,
+    )).rejects.toMatchObject({ code: 'REGION_REQUIRED', status: 409 });
+    expect(query.mock.calls.some(([sql]) => sql.includes('FROM rescue_team'))).toBe(false);
+  });
+
   async function offerWithCampaignStatus(status: string) {
     const query = jest.fn(async (sql: string) => {
       if (sql.startsWith('SELECT campaign_id FROM assistance_request')) return [{ campaign_id: campaignId }];
