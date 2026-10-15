@@ -258,11 +258,11 @@ test('the setup and T18 evidence docs distinguish passed backend checks from pen
   assert.match(runbook, /TC-BE-28 — partial[\s\S]*statement-timeout rollback across three attempts[\s\S]*lock-timeout rollback[\s\S]*idempotent retries\/replays[\s\S]*Runtime pool saturation\/bounds remain \*\*PENDING\*\*/u);
   assert.match(runbook, /configuration unit test in `backend\/packages\/technical\/test\/t1-primitives\.spec\.ts` verifies that `DB_POOL_MAX=100` is accepted, `101` is rejected, and `postgresOptions` passes the configured value as `extra\.max`\./u);
   assert.match(tasks, /T18 \| \*\*Hardening \+ evidence — IMPLEMENTED; acceptance gates open\*\*[^\n]*Logistics admin-only audit reader/u);
-  assert.match(tasks, /Main-stack direct checks pass anonymous 401, Vietnamese validation 400, audit allow\/deny, and populated `entity_id` filtering; auth timeout\/retry smoke passes and verifies cleanup\. TC-BE-27 ingress and client checks; TC-BE-28 runtime pool saturation; remaining TC-BE-29 cross-service log review and query-plan evidence; TC-29 restore; and hardware-recorded TC-PERF-01 remain open/u);
+  assert.match(tasks, /Main-stack direct checks pass anonymous 401, Vietnamese validation 400, audit allow\/deny, and populated `entity_id` filtering; auth timeout\/retry smoke passes and verifies cleanup\. The full Nginx ingress smoke passed on port 8081\. Web\/Mobile accessibility, TC-BE-28 runtime pool saturation, remaining TC-BE-29 cross-service log review and query-plan evidence, TC-29 restore, and hardware-recorded TC-PERF-01 remain open/u);
   assert.match(runbook, /TC-BE-29[\s\S]*main-stack audit smoke passed SYSTEM ADMIN access[\s\S]*populated matching\/nonmatching `entity_id` filters[\s\S]*static review of Logistics audit producers and Pino redaction[\s\S]*CSV export and push are not implemented/iu);
-  assert.match(runbook, /TC-BE-27[\s\S]*direct-API subset passed[\s\S]*invalid DTO POST[\s\S]*port 8080 was unavailable[\s\S]*checks remain pending/iu);
-  assert.match(runbook, /node --env-file=\.env scripts\/smoke\/t18-hardening\.mjs --direct-apis/u);
-  assert.match(runbook, /Identity, Response, and Logistics anonymous 401 checks \(`no-store`, Vietnamese copy\) and an invalid DTO POST \(`400 VALIDATION_FAILED`, Vietnamese copy\)/iu);
+  assert.match(runbook, /TC-BE-27[\s\S]*direct API smoke passed[\s\S]*validation POST[\s\S]*port 8080 remains occupied[\s\S]*inert-rendering and accessibility checks remain pending/iu);
+  assert.match(runbook, /C48_T18_PUBLIC_BASE_URL=http:\/\/127\.0\.0\.1:8081 node --env-file=\.env scripts\/smoke\/t18-hardening\.mjs/u);
+  assert.match(runbook, /Identity, Response, and Logistics anonymous 401 checks \(`no-store`, Vietnamese copy\) and validation POST \(`400 VALIDATION_FAILED`, Vietnamese copy\)/iu);
   assert.match(runbook, /node --env-file=\.env scripts\/smoke\/test-logistics-audit-access\.mjs/u);
   assert.match(runbook, /Identity audit rows 0 -> 0/u);
   assert.doesNotMatch(runbook, /DTO POST explicitly skipped/u);
