@@ -171,24 +171,32 @@ describe('T1 technical package', () => {
   it('validates runtime database and network configuration without echoing credentials', () => {
     expect(validateEnvironment({ DATABASE_URL: 'postgresql://user:secret@localhost/c48', PORT: '3001', DB_LOCK_TIMEOUT_MS: '4500', DB_STATEMENT_TIMEOUT_MS: '12000' }, 'identity'))
       .toMatchObject({ port: 3001, dbPoolMax: 20, dbLockTimeoutMs: 4500, dbStatementTimeoutMs: 12000 });
+    expect(validateEnvironment({ DATABASE_URL: 'postgresql://user:secret@localhost/c48', DB_POOL_MAX: '100' }, 'identity'))
+      .toMatchObject({ dbPoolMax: 100 });
+    expect(() => validateEnvironment({ DATABASE_URL: 'postgresql://user:secret@localhost/c48', DB_POOL_MAX: '101' }, 'identity'))
+      .toThrow('DB_POOL_MAX');
     expect(() => validateEnvironment({ DATABASE_URL: 'not-a-url', PORT: '70000' }, 'identity'))
       .toThrow(expect.not.stringContaining('secret'));
 
     const original = {
       databaseUrl: process.env.DATABASE_URL,
+      poolMax: process.env.DB_POOL_MAX,
       lockTimeout: process.env.DB_LOCK_TIMEOUT_MS,
       statementTimeout: process.env.DB_STATEMENT_TIMEOUT_MS,
     };
     process.env.DATABASE_URL = 'postgresql://user:secret@localhost/c48';
+    process.env.DB_POOL_MAX = '73';
     process.env.DB_LOCK_TIMEOUT_MS = '4500';
     process.env.DB_STATEMENT_TIMEOUT_MS = '12000';
     try {
       expect(postgresOptions([], 'identity')).toMatchObject({
-        extra: { options: '-c lock_timeout=4500 -c statement_timeout=12000' },
+        extra: { max: 73, options: '-c lock_timeout=4500 -c statement_timeout=12000' },
       });
     } finally {
       if (original.databaseUrl === undefined) delete process.env.DATABASE_URL;
       else process.env.DATABASE_URL = original.databaseUrl;
+      if (original.poolMax === undefined) delete process.env.DB_POOL_MAX;
+      else process.env.DB_POOL_MAX = original.poolMax;
       if (original.lockTimeout === undefined) delete process.env.DB_LOCK_TIMEOUT_MS;
       else process.env.DB_LOCK_TIMEOUT_MS = original.lockTimeout;
       if (original.statementTimeout === undefined) delete process.env.DB_STATEMENT_TIMEOUT_MS;

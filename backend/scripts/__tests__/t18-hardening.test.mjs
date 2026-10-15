@@ -7,8 +7,9 @@ import test from 'node:test';
 const nginx = readFileSync(new URL('../../infra/nginx/nginx.conf', import.meta.url), 'utf8');
 
 test('the ingress keeps required security headers and excludes query strings from access logs', () => {
-  assert.match(nginx, /log_format privacy[^;]*\$uri/u);
-  assert.doesNotMatch(nginx.match(/log_format privacy[^;]*/u)?.[0] ?? '', /\$request\b|\$args\b/u);
+  const accessLog = nginx.match(/log_format privacy[^;]*/u)?.[0] ?? '';
+  assert.match(accessLog, /\$uri/u);
+  assert.doesNotMatch(accessLog, /\$(?:request|request_uri|args|remote_addr|remote_user|http_x_forwarded_for|http_user_agent|http_referer)\b/u);
   assert.match(nginx, /add_header X-Content-Type-Options nosniff always;/u);
   assert.match(nginx, /add_header Referrer-Policy no-referrer always;/u);
   assert.match(nginx, /add_header Content-Security-Policy "default-src 'self'; frame-ancestors 'none'" always;/u);
@@ -143,8 +144,9 @@ test('the performance scenario is gated before it can send SOS writes', () => {
   assert.ok(k6.indexOf('if (!isLoopbackBaseUrl(publicBaseUrl))') < k6.indexOf("K6_ENABLE_SOS_WRITES !== '1'"));
 });
 
-test('the hardening smoke covers anonymous routes and optional read-only audit access', () => {
+test('the hardening smoke covers anonymous routes, invalid DTOs, and optional read-only audit access', () => {
   const smoke = readFileSync(new URL('../smoke/t18-hardening.mjs', import.meta.url), 'utf8');
+  const invalidDtoCheck = smoke.match(/const invalidIntake = await request\([\s\S]*?verifyError\(invalidIntake,\s*\{[\s\S]*?\}\);/u)?.[0] ?? '';
   assert.match(smoke, /\/api\/v1\/identity\/me/u);
   assert.match(smoke, /\/api\/v1\/response\/requests\/mine\?limit=1/u);
   assert.match(smoke, /\/api\/v1\/logistics\/audit-logs\?entity_type=distribution/u);
@@ -162,6 +164,13 @@ test('the hardening smoke covers anonymous routes and optional read-only audit a
   assert.match(smoke, /assert\.deepEqual\(unmatchedAudit\.value\?\.items, \[\]/u);
   assert.match(smoke, /PASS Logistics audit filtering: populated results match the requested entity_id; a valid nonmatching entity_id returns no rows/u);
   assert.match(smoke, /--direct-apis/u);
+  assert.match(smoke, /'Idempotency-Key': randomUUID\(\)/u);
+  assert.match(smoke, /checkIngressHeaders: !directApiMode/u);
+  assert.doesNotMatch(smoke, /SKIP DTO POST/u);
+  assert.match(invalidDtoCheck, /method: 'POST'/u);
+  assert.match(invalidDtoCheck, /body: \{\}/u);
+  assert.match(invalidDtoCheck, /status: 400/u);
+  assert.match(invalidDtoCheck, /code: 'VALIDATION_FAILED'/u);
   assert.match(smoke, /127\.0\.0\.1:3001/u);
   assert.match(smoke, /127\.0\.0\.1:3002/u);
   assert.match(smoke, /127\.0\.0\.1:3003/u);
@@ -239,24 +248,25 @@ test('the runbook keeps recovery isolated and reports restore and load gates hon
 test('the setup and T18 evidence docs distinguish passed backend checks from pending acceptance gates', () => {
   const setup = readFileSync(new URL('../../../docs/backend/00-setup.md', import.meta.url), 'utf8');
   const runbook = readFileSync(new URL('../../../docs/backend/t18-hardening.md', import.meta.url), 'utf8');
+  const tasks = readFileSync(new URL('../../../docs/backend/06-implementation-tasks.md', import.meta.url), 'utf8');
   const tracking = readFileSync(new URL('../../apps/response/src/tracking/tracking.service.ts', import.meta.url), 'utf8');
 
   assert.match(setup, /TC-29 restore execution remains pending/u);
   assert.doesNotMatch(setup, /restore verified on an empty stack/u);
   assert.match(runbook, /## TC-BE acceptance evidence/u);
   assert.match(runbook, /TC-BE-27[\s\S]*backend[\s\S]*passed[\s\S]*Web\/Mobile[\s\S]*inert-rendering[\s\S]*pending/iu);
-  assert.match(runbook, /TC-BE-28[\s\S]*timeout rollback[\s\S]*pending[\s\S]*idempotent retry[\s\S]*pending[\s\S]*pool bounds[\s\S]*pending/iu);
-  assert.match(runbook, /TC-BE-29[\s\S]*Main-stack authenticated allow\/deny checks passed[\s\S]*static review of Logistics audit producers and Pino redaction[\s\S]*CSV export and push are not implemented/iu);
-  assert.match(runbook, /prior main-stack run did not establish non-empty audit content or `entity_id` filtering/iu);
-  assert.match(runbook, /SKIP Logistics audit filtering: no distribution audit rows; content is not verified/u);
-  assert.match(runbook, /updated content check is pending a rerun/u);
-  assert.match(runbook, /TC-BE-27[\s\S]*direct API smoke passed/iu);
+  assert.match(runbook, /TC-BE-28 — partial[\s\S]*statement-timeout rollback across three attempts[\s\S]*lock-timeout rollback[\s\S]*idempotent retries\/replays[\s\S]*Runtime pool saturation\/bounds remain \*\*PENDING\*\*/u);
+  assert.match(runbook, /configuration unit test in `backend\/packages\/technical\/test\/t1-primitives\.spec\.ts` verifies that `DB_POOL_MAX=100` is accepted, `101` is rejected, and `postgresOptions` passes the configured value as `extra\.max`\./u);
+  assert.match(tasks, /T18 \| \*\*Hardening \+ evidence — IMPLEMENTED; acceptance gates open\*\*[^\n]*Logistics admin-only audit reader/u);
+  assert.match(tasks, /Main-stack direct checks pass anonymous 401, Vietnamese validation 400, audit allow\/deny, and populated `entity_id` filtering; auth timeout\/retry smoke passes and verifies cleanup\. TC-BE-27 ingress and client checks; TC-BE-28 runtime pool saturation; remaining TC-BE-29 cross-service log review and query-plan evidence; TC-29 restore; and hardware-recorded TC-PERF-01 remain open/u);
+  assert.match(runbook, /TC-BE-29[\s\S]*main-stack audit smoke passed SYSTEM ADMIN access[\s\S]*populated matching\/nonmatching `entity_id` filters[\s\S]*static review of Logistics audit producers and Pino redaction[\s\S]*CSV export and push are not implemented/iu);
+  assert.match(runbook, /TC-BE-27[\s\S]*direct-API subset passed[\s\S]*invalid DTO POST[\s\S]*port 8080 was unavailable[\s\S]*checks remain pending/iu);
   assert.match(runbook, /node --env-file=\.env scripts\/smoke\/t18-hardening\.mjs --direct-apis/u);
-  assert.match(runbook, /Identity, Response, and Logistics audit anonymous 401 checks passed[\s\S]*Vietnamese/iu);
+  assert.match(runbook, /Identity, Response, and Logistics anonymous 401 checks \(`no-store`, Vietnamese copy\) and an invalid DTO POST \(`400 VALIDATION_FAILED`, Vietnamese copy\)/iu);
   assert.match(runbook, /node --env-file=\.env scripts\/smoke\/test-logistics-audit-access\.mjs/u);
   assert.match(runbook, /Identity audit rows 0 -> 0/u);
-  assert.match(runbook, /DTO POST explicitly skipped/u);
-  assert.match(runbook, /PENDING: validation POST, ingress security headers, and Web\/Mobile inert-rendering\/accessibility/u);
+  assert.doesNotMatch(runbook, /DTO POST explicitly skipped/u);
+  assert.match(runbook, /Web\/Mobile inert-rendering and accessibility checks remain pending/u);
   assert.doesNotMatch(runbook, /direct smoke was blocked by sandbox `EPERM`|direct GET-only API smoke did not complete|direct runtime evidence remains pending too/u);
   assert.match(runbook, /node scripts\/__tests__\/t18-hardening\.test\.mjs.*PASS \(10\/10\)/u);
   assert.match(runbook, /node scripts\/__tests__\/t18-backup-safety\.test\.mjs.*PASS \(7\/7\)/u);

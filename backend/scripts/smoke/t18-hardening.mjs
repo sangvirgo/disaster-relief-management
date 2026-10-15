@@ -151,22 +151,18 @@ if (deniedAuditToken) {
   console.log('SKIP Logistics audit deny check: C48_T18_AUDIT_DENIED_TOKEN is not set.');
 }
 
-if (directApiMode) {
-  console.log('SKIP DTO POST: direct mode sends GET requests only.');
-} else {
-  const invalidIntake = await request(responseBase, '/api/v1/response/requests', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Idempotency-Key': 'f6e8a19b-2c34-4f75-8a12-9d46a3f17b20',
-    },
-    body: {},
-  });
-  verifyError(invalidIntake, {
-    status: 400,
-    code: 'VALIDATION_FAILED',
-    path: 'POST /api/v1/response/requests (invalid DTO)',
-    checkIngressHeaders: true,
-  });
-  console.log('PASS DTO rejection: validation stopped before the intake handler; Vietnamese copy verified with ingress headers.');
-}
+const invalidIntake = await request(responseBase, '/api/v1/response/requests', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Idempotency-Key': randomUUID(),
+  },
+  body: {},
+});
+verifyError(invalidIntake, {
+  status: 400,
+  code: 'VALIDATION_FAILED',
+  path: 'POST /api/v1/response/requests (invalid DTO)',
+  checkIngressHeaders: !directApiMode,
+});
+console.log(`PASS DTO rejection: validation stopped before the intake handler; Vietnamese copy verified through ${directApiMode ? 'the direct API' : 'the ingress'}.`);
