@@ -11,8 +11,8 @@ import { hashPurposeBoundSecret } from '../../../../packages/technical/src/secur
 import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from '../requests/request-intake.service';
 import { ReporterAccessService, ReporterRequestRow } from '../tracking/reporter-access.service';
-import { EvidenceMime } from './evidence-media';
-import { stageEvidenceMultipart } from './evidence-upload';
+import { EvidenceMime } from '../../../../packages/technical/src/media/evidence-media';
+import { stageEvidenceMultipart } from '../../../../packages/technical/src/uploads/evidence-upload';
 import { EvidenceObjectStorage, EvidenceStorageConfig, RESPONSE_EVIDENCE_STORAGE } from './evidence-storage';
 
 const requestAttachmentCountLimit = 5;

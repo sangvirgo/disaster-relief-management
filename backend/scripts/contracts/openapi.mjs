@@ -414,6 +414,16 @@ export function mergeOpenApiText(raw, current, exported) {
         componentInsertions.push(['securitySchemes', schemes]);
       }
     }
+    for (const category of ['parameters', 'headers']) {
+      const values = exported.components?.[category] ?? {};
+      if (!Object.keys(values).length) continue;
+      const categoryNode = componentProperties.get(category)?.initializer;
+      if (categoryNode && ts.isObjectLiteralExpression(categoryNode)) {
+        edits.push(...objectPropertyEdits(raw, sourceFile, categoryNode, Object.entries(values)));
+      } else {
+        componentInsertions.push([category, values]);
+      }
+    }
     edits.push(...objectPropertyEdits(raw, sourceFile, componentsNode, componentInsertions));
   }
   let merged = raw;

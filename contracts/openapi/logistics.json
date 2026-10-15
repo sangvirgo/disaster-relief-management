@@ -19634,6 +19634,1096 @@
             }
           ]
         }
+    },
+    "/donation-deliveries/{id}/recovery": {
+      "post": {
+          "operationId": "logisticsDonationsIssueRecovery",
+          "summary": "DonationsController.issueRecovery",
+          "description": "Route exported from backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.issueRecovery. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "Idempotency-Key",
+              "in": "header",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "description": "The code is valid for 30 minutes; an idempotent replay returns issuance metadata without the code.",
+              "headers": {
+                "Cache-Control": {
+                  "description": "Prevents storage of the Logistics API result.",
+                  "schema": {
+                    "type": "string",
+                    "enum": [
+                      "no-store"
+                    ]
+                  }
+                },
+                "Idempotent-Replay": {
+                  "description": "Present as true when this response replays the original command result.",
+                  "schema": {
+                    "type": "string",
+                    "enum": [
+                      "true"
+                    ]
+                  }
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "issuance_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "recovery_code": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9_-]{43}$",
+                            "description": "One-use code shown only in the first issuance response."
+                          },
+                          "expires_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "issuance_id",
+                          "recovery_code",
+                          "expires_at"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "issuance_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "expires_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "issuance_id",
+                          "expires_at"
+                        ]
+                      }
+                    ]
+                  },
+                  "example": {
+                    "issuance_id": "00000000-0000-4000-8000-000000000001",
+                    "recovery_code": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                    "expires_at": "2026-10-15T12:30:00.000Z"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "VALIDATION_FAILED": {
+                      "summary": "VALIDATION_FAILED",
+                      "value": {
+                        "code": "VALIDATION_FAILED",
+                        "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "IDEMPOTENCY_KEY_INVALID": {
+                      "summary": "IDEMPOTENCY_KEY_INVALID",
+                      "value": {
+                        "code": "IDEMPOTENCY_KEY_INVALID",
+                        "message": "Mã yêu cầu không hợp lệ.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "NOT_FOUND": {
+                      "summary": "NOT_FOUND",
+                      "value": {
+                        "code": "NOT_FOUND",
+                        "message": "Không tìm thấy dữ liệu yêu cầu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "VERSION_CONFLICT": {
+                      "summary": "VERSION_CONFLICT",
+                      "value": {
+                        "code": "VERSION_CONFLICT",
+                        "message": "Dữ liệu đã được cập nhật. Vui lòng tải lại trước khi tiếp tục.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "ALREADY_CLAIMED": {
+                      "summary": "ALREADY_CLAIMED",
+                      "value": {
+                        "code": "ALREADY_CLAIMED",
+                        "message": "Yêu cầu này đã được gắn với một tài khoản.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/04-logistics-api.md",
+          "x-c48-controller-source": "backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.issueRecovery",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": [],
+              "CsrfToken": []
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "expected_version": {
+                      "type": "integer"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "maxLength": 1000
+                    },
+                    "confirmation_basis": {
+                      "type": "string",
+                      "maxLength": 1000
+                    },
+                    "source_note": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 1000
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "expected_version",
+                    "reason",
+                    "confirmation_basis"
+                  ]
+                },
+                "example": {
+                  "expected_version": 3,
+                  "reason": "Đã xác minh qua số điện thoại",
+                  "confirmation_basis": "Đối chiếu với người quyên góp"
+                }
+              }
+            }
+          }
+        }
+    },
+    "/evidence/{id}/download": {
+      "get": {
+          "operationId": "logisticsDonationsDownloadEvidence",
+          "summary": "DonationsController.downloadEvidence",
+          "description": "Route exported from backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.downloadEvidence. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Short-lived signed URL issued after each access check.",
+              "headers": {
+                "Cache-Control": {
+                  "description": "Prevents storage of the Logistics API result.",
+                  "schema": {
+                    "type": "string",
+                    "enum": [
+                      "no-store"
+                    ]
+                  }
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "expires_in": {
+                        "type": "integer",
+                        "const": 60
+                      }
+                    },
+                    "required": [
+                      "url",
+                      "expires_in"
+                    ]
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "DONATION_SECRET_INVALID": {
+                      "summary": "DONATION_SECRET_INVALID",
+                      "value": {
+                        "code": "DONATION_SECRET_INVALID",
+                        "message": "Mã bảo mật quyên góp không hợp lệ.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "VALIDATION_FAILED": {
+                      "summary": "VALIDATION_FAILED",
+                      "value": {
+                        "code": "VALIDATION_FAILED",
+                        "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "NOT_FOUND": {
+                      "summary": "NOT_FOUND",
+                      "value": {
+                        "code": "NOT_FOUND",
+                        "message": "Không tìm thấy dữ liệu yêu cầu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "503": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "STORAGE_UNAVAILABLE": {
+                      "summary": "STORAGE_UNAVAILABLE",
+                      "value": {
+                        "code": "STORAGE_UNAVAILABLE",
+                        "message": "Kho lưu trữ tệp tạm thời không khả dụng. Yêu cầu của bạn vẫn được giữ.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/04-logistics-api.md",
+          "x-c48-controller-source": "backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.downloadEvidence",
+          "security": [
+            {
+              "DonationSecret": []
+            },
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": []
+            }
+          ]
+        }
+    },
+    "/public/donations/{id}/evidence": {
+      "post": {
+          "operationId": "logisticsDonationsUploadEvidence",
+          "summary": "DonationsController.uploadEvidence",
+          "description": "Route exported from backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.uploadEvidence. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "Idempotency-Key",
+              "in": "header",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            {
+              "name": "dispute_id",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "description": "Stored private Logistics evidence metadata.",
+              "headers": {
+                "Cache-Control": {
+                  "description": "Prevents storage of the Logistics API result.",
+                  "schema": {
+                    "type": "string",
+                    "enum": [
+                      "no-store"
+                    ]
+                  }
+                },
+                "Idempotent-Replay": {
+                  "description": "Present as true when this response replays the original command result.",
+                  "schema": {
+                    "type": "string",
+                    "enum": [
+                      "true"
+                    ]
+                  }
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "state": {
+                        "type": "string",
+                        "const": "READY"
+                      },
+                      "size_bytes": {
+                        "type": "integer"
+                      },
+                      "detected_mime": {
+                        "type": "string",
+                        "enum": [
+                          "image/jpeg",
+                          "image/png",
+                          "video/mp4"
+                        ]
+                      },
+                      "checksum": {
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "state",
+                      "size_bytes",
+                      "detected_mime",
+                      "checksum",
+                      "created_at"
+                    ]
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "DONATION_SECRET_INVALID": {
+                      "summary": "DONATION_SECRET_INVALID",
+                      "value": {
+                        "code": "DONATION_SECRET_INVALID",
+                        "message": "Mã bảo mật quyên góp không hợp lệ.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "VALIDATION_FAILED": {
+                      "summary": "VALIDATION_FAILED",
+                      "value": {
+                        "code": "VALIDATION_FAILED",
+                        "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "IDEMPOTENCY_KEY_INVALID": {
+                      "summary": "IDEMPOTENCY_KEY_INVALID",
+                      "value": {
+                        "code": "IDEMPOTENCY_KEY_INVALID",
+                        "message": "Mã yêu cầu không hợp lệ.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "NOT_FOUND": {
+                      "summary": "NOT_FOUND",
+                      "value": {
+                        "code": "NOT_FOUND",
+                        "message": "Không tìm thấy dữ liệu yêu cầu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "EVIDENCE_LIMIT_REACHED": {
+                      "summary": "EVIDENCE_LIMIT_REACHED",
+                      "value": {
+                        "code": "EVIDENCE_LIMIT_REACHED",
+                        "message": "Đã đạt giới hạn số lượng hoặc dung lượng tệp đính kèm.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "411": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "LENGTH_REQUIRED": {
+                      "summary": "LENGTH_REQUIRED",
+                      "value": {
+                        "code": "LENGTH_REQUIRED",
+                        "message": "Yêu cầu tải tệp thiếu thông tin kích thước.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "413": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "PAYLOAD_TOO_LARGE": {
+                      "summary": "PAYLOAD_TOO_LARGE",
+                      "value": {
+                        "code": "PAYLOAD_TOO_LARGE",
+                        "message": "Tệp hoặc nội dung vượt quá giới hạn cho phép.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "415": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNSUPPORTED_MEDIA": {
+                      "summary": "UNSUPPORTED_MEDIA",
+                      "value": {
+                        "code": "UNSUPPORTED_MEDIA",
+                        "message": "Định dạng tệp không được hỗ trợ.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "429": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "RATE_LIMITED": {
+                      "summary": "RATE_LIMITED",
+                      "value": {
+                        "code": "RATE_LIMITED",
+                        "message": "Bạn thao tác quá nhanh. Vui lòng thử lại sau.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "503": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "STORAGE_UNAVAILABLE": {
+                      "summary": "STORAGE_UNAVAILABLE",
+                      "value": {
+                        "code": "STORAGE_UNAVAILABLE",
+                        "message": "Kho lưu trữ tệp tạm thời không khả dụng. Yêu cầu của bạn vẫn được giữ.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/04-logistics-api.md",
+          "x-c48-controller-source": "backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.uploadEvidence",
+          "security": [
+            {
+              "DonationSecret": []
+            },
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": [],
+              "CsrfToken": []
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "multipart/form-data": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "file": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  },
+                  "required": [
+                    "file"
+                  ]
+                }
+              }
+            }
+          }
+        }
+    },
+    "/public/donations/recover": {
+      "post": {
+          "operationId": "logisticsDonationsRecover",
+          "summary": "DonationsController.recover",
+          "description": "Route exported from backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.recover. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
+          "responses": {
+            "200": {
+              "description": "Delivery bound to the authenticated donor account.",
+              "headers": {
+                "Cache-Control": {
+                  "description": "Prevents storage of the Logistics API result.",
+                  "schema": {
+                    "type": "string",
+                    "enum": [
+                      "no-store"
+                    ]
+                  }
+                },
+                "Idempotent-Replay": {
+                  "description": "Present as true when this response replays the original command result.",
+                  "schema": {
+                    "type": "string",
+                    "enum": [
+                      "true"
+                    ]
+                  }
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "public_code": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "donor_user_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "capability_revoked": {
+                        "type": "boolean",
+                        "const": true
+                      },
+                      "version": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "public_code",
+                      "status",
+                      "donor_user_id",
+                      "capability_revoked",
+                      "version"
+                    ]
+                  },
+                  "example": {
+                    "id": "00000000-0000-4000-8000-000000000002",
+                    "public_code": "ABCDEFGH",
+                    "status": "DECLARED",
+                    "donor_user_id": "00000000-0000-4000-8000-000000000003",
+                    "capability_revoked": true,
+                    "version": 4
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "VALIDATION_FAILED": {
+                      "summary": "VALIDATION_FAILED",
+                      "value": {
+                        "code": "VALIDATION_FAILED",
+                        "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "IDEMPOTENCY_KEY_INVALID": {
+                      "summary": "IDEMPOTENCY_KEY_INVALID",
+                      "value": {
+                        "code": "IDEMPOTENCY_KEY_INVALID",
+                        "message": "Mã yêu cầu không hợp lệ.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "NOT_FOUND": {
+                      "summary": "NOT_FOUND",
+                      "value": {
+                        "code": "NOT_FOUND",
+                        "message": "Không tìm thấy dữ liệu yêu cầu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "ALREADY_CLAIMED": {
+                      "summary": "ALREADY_CLAIMED",
+                      "value": {
+                        "code": "ALREADY_CLAIMED",
+                        "message": "Yêu cầu này đã được gắn với một tài khoản.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/04-logistics-api.md",
+          "x-c48-controller-source": "backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.recover",
+          "security": [
+            {
+              "NativeBearer": [],
+              "RecoveryCode": []
+            },
+            {
+              "WebAccessCookie": [],
+              "CsrfToken": [],
+              "RecoveryCode": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "in": "header",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "public_code": {
+                      "type": "string",
+                      "pattern": "^[0-9A-HJKMNP-TV-Z]{8,16}$"
+                    }
+                  },
+                  "required": [
+                    "public_code"
+                  ]
+                },
+                "example": {
+                  "public_code": "ABCDEFGH"
+                }
+              }
+            }
+          }
+        }
     }
   },
   "components": {
@@ -19699,6 +20789,42 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-Donation-Secret"
+      },
+      "RecoveryCode": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Recovery-Code"
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "headers": {
+      "IdempotentReplay": {
+        "description": "Present as true when this response replays the original command result.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "true"
+          ]
+        }
+      },
+      "CacheControlNoStore": {
+        "description": "Prevents storage of the Logistics API result.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "no-store"
+          ]
+        }
       }
     }
   }

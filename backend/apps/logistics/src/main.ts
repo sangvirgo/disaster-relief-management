@@ -8,6 +8,7 @@ async function bootstrap(): Promise<void> {
   const logger = new PinoNestLogger(createPinoLogger('logistics', config.logLevel));
   const app = await NestFactory.create(AppModule, { logger });
   app.use(correlationMiddleware());
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   app.useGlobalFilters(new ApiExceptionFilter(loadErrorCatalog(), 'logistics'));
   app.setGlobalPrefix('api/v1/logistics', {

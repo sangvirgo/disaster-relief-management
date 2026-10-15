@@ -52,6 +52,10 @@ const idempotentCommandResponseHeaders = {
   'Cache-Control': { $ref: '#/components/headers/CacheControlNoStore' },
   'Idempotent-Replay': { $ref: '#/components/headers/IdempotentReplay' },
 };
+const logisticsCommandResponseHeaders = {
+  'Cache-Control': { description: 'Prevents storage of the Logistics API result.', schema: { type: 'string', enum: ['no-store'] } },
+  'Idempotent-Replay': { description: 'Present as true when this response replays the original command result.', schema: { type: 'string', enum: ['true'] } },
+};
 const requestCampaignAssociationViewSchema = object({
   id, status: text, version, region_code: { anyOf: [text, { type: 'null' }] },
   campaign_id: { anyOf: [id, { type: 'null' }] },
@@ -225,6 +229,39 @@ const logisticsDetails = {
   logisticsDonationsCreateDelivery: {
     request: request(object({ donor_name: text, donor_phone: text, lines: item({ item_id: id, declared_quantity: quantity }, ['item_id', 'declared_quantity']) }, ['donor_name', 'donor_phone', 'lines'])),
     response: response(object({ id, public_code: text, status: { type: 'string', const: 'DECLARED' }, declaration_revision: { type: 'integer', const: 1 } }), 'Created donor declaration representation.'),
+  },
+  logisticsDonationsIssueRecovery: {
+    parameters: [{ name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' } }],
+    request: request(object({ expected_version: version, reason: { type: 'string', maxLength: 1000 }, confirmation_basis: { type: 'string', maxLength: 1000 }, source_note: { anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }] } }, ['expected_version', 'reason', 'confirmation_basis']), {
+      expected_version: 3, reason: 'Đã xác minh qua số điện thoại', confirmation_basis: 'Đối chiếu với người quyên góp',
+    }),
+    response: response({ oneOf: [
+      object({ issuance_id: id, recovery_code: { type: 'string', pattern: '^[A-Za-z0-9_-]{43}$', description: 'One-use code shown only in the first issuance response.' }, expires_at: dateTime }, ['issuance_id', 'recovery_code', 'expires_at']),
+      object({ issuance_id: id, expires_at: dateTime }, ['issuance_id', 'expires_at']),
+    ] }, 'The code is valid for 30 minutes; an idempotent replay returns issuance metadata without the code.', {
+      issuance_id: '00000000-0000-4000-8000-000000000001', recovery_code: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', expires_at: '2026-10-15T12:30:00.000Z',
+    }, logisticsCommandResponseHeaders),
+  },
+  logisticsDonationsRecover: {
+    parameters: [{ name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' } }],
+    request: request(object({ public_code: { type: 'string', pattern: '^[0-9A-HJKMNP-TV-Z]{8,16}$' } }, ['public_code']), { public_code: 'ABCDEFGH' }),
+    response: response(object({ id, public_code: text, status: text, donor_user_id: id, capability_revoked: { type: 'boolean', const: true }, version }, ['id', 'public_code', 'status', 'donor_user_id', 'capability_revoked', 'version']), 'Delivery bound to the authenticated donor account.', {
+      id: '00000000-0000-4000-8000-000000000002', public_code: 'ABCDEFGH', status: 'DECLARED',
+      donor_user_id: '00000000-0000-4000-8000-000000000003', capability_revoked: true, version: 4,
+    }, logisticsCommandResponseHeaders),
+  },
+  logisticsDonationsUploadEvidence: {
+    parameters: [{ name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' } }],
+    request: {
+      required: true,
+      content: { 'multipart/form-data': { schema: object({ file: { type: 'string', format: 'binary' } }, ['file']) } },
+    },
+    response: response(object({ id, state: { type: 'string', const: 'READY' }, size_bytes: integer(), detected_mime: { type: 'string', enum: ['image/jpeg', 'image/png', 'video/mp4'] }, checksum: text, created_at: dateTime }, ['id', 'state', 'size_bytes', 'detected_mime', 'checksum', 'created_at']), 'Stored private Logistics evidence metadata.', undefined, logisticsCommandResponseHeaders),
+  },
+  logisticsDonationsDownloadEvidence: {
+    response: response(object({ url: { type: 'string', format: 'uri' }, expires_in: { type: 'integer', const: 60 } }, ['url', 'expires_in']), 'Short-lived signed URL issued after each access check.', undefined, {
+      'Cache-Control': { description: 'Prevents storage of the Logistics API result.', schema: { type: 'string', enum: ['no-store'] } },
+    }),
   },
   logisticsDonationsReviseDeclaration: { request: request(object({ expected_version: version, lines: item({ item_id: id, declared_quantity: quantity }, ['item_id', 'declared_quantity']) }, ['expected_version', 'lines'])) },
   logisticsDonationsOpenDispute: { request: request(object({ reason: text }, ['reason'])) },
@@ -571,6 +608,7 @@ const sharedLogisticsResponses = {
 };
 
 const logisticsQueries = {
+  logisticsDonationsUploadEvidence: ['dispute_id'],
   logisticsAuditList: ['entity_type', 'entity_id', 'cursor', 'limit'],
   logisticsCatalogItemTypes: ['cursor', 'limit'], logisticsCatalogUnits: ['cursor', 'limit'],
   logisticsCatalogItems: ['type', 'status', 'query', 'cursor', 'limit'], logisticsAssetsWarehouses: ['status', 'cursor', 'limit'],
@@ -673,6 +711,10 @@ const routeErrorCodes = {
   logisticsDrivesResume: ['CAMPAIGN_NOT_ACTIVE', 'RESPONSE_UNAVAILABLE', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   logisticsDrivesClose: ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   logisticsDonationsCreateDelivery: ['QUANTITY_SCALE_INVALID', 'DRIVE_NOT_OPEN', 'DRIVE_WINDOW_CLOSED', 'ITEM_NOT_ON_DRIVE', 'DONATION_SECRET_INVALID', 'DONATION_SECRET_IN_USE', 'RATE_LIMITED'],
+  logisticsDonationsIssueRecovery: ['NOT_FOUND', 'FORBIDDEN', 'VERSION_CONFLICT', 'ALREADY_CLAIMED', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_INVALID'],
+  logisticsDonationsRecover: ['NOT_FOUND', 'ALREADY_CLAIMED', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_INVALID'],
+  logisticsDonationsUploadEvidence: ['NOT_FOUND', 'DONATION_SECRET_INVALID', 'EVIDENCE_LIMIT_REACHED', 'LENGTH_REQUIRED', 'PAYLOAD_TOO_LARGE', 'UNSUPPORTED_MEDIA', 'STORAGE_UNAVAILABLE', 'RATE_LIMITED', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_INVALID'],
+  logisticsDonationsDownloadEvidence: ['NOT_FOUND', 'DONATION_SECRET_INVALID', 'FORBIDDEN', 'STORAGE_UNAVAILABLE', 'VALIDATION_FAILED'],
   logisticsDonationsTrack: ['DONATION_SECRET_INVALID'],
   logisticsDonationsReviseDeclaration: ['QUANTITY_SCALE_INVALID', 'DONATION_SECRET_INVALID', 'DECLARATION_LOCKED', 'STALE_REVISION', 'VERSION_CONFLICT'],
   logisticsDonationsAssistedDeclaration: ['QUANTITY_SCALE_INVALID', 'VERSION_CONFLICT'],
@@ -737,6 +779,7 @@ const serviceSecuritySchemes = {
     ServiceToken: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
     CsrfToken: { type: 'apiKey', in: 'header', name: 'X-CSRF-Token' },
     DonationSecret: { type: 'apiKey', in: 'header', name: 'X-Donation-Secret' },
+    RecoveryCode: { type: 'apiKey', in: 'header', name: 'X-Recovery-Code' },
   },
 };
 
@@ -800,6 +843,8 @@ function routeSecurity(service, routePath, method, operationId) {
   }
   if (operationId === 'logisticsDonationsClaim') return sessionSecurity(service, true).map((requirement) => ({ ...requirement, DonationSecret: [] }));
   if (operationId === 'logisticsDonationsUploadEvidence') return capabilitySecurity('DonationSecret', true, true);
+  if (operationId === 'logisticsDonationsRecover') return sessionSecurity(service, true).map((requirement) => ({ ...requirement, RecoveryCode: [] }));
+  if (operationId === 'logisticsDonationsDownloadEvidence') return capabilitySecurity('DonationSecret', true, false);
   if (routePath.startsWith('/internal/')) return [{ ServiceToken: [] }];
   return sessionSecurity(service, write);
 }
@@ -816,6 +861,7 @@ function requiresExactSecurity(service, routePath, operationId) {
     'logisticsDrivesPublicList', 'logisticsDrivesPublicDetail', 'logisticsReportsPublicDonationSummary',
     'logisticsDonationsCreateDelivery', 'logisticsDonationsTrack', 'logisticsDonationsReviseDeclaration',
     'logisticsDonationsClaim', 'logisticsDonationsOpenDispute', 'logisticsDonationsUploadEvidence',
+    'logisticsDonationsIssueRecovery', 'logisticsDonationsRecover', 'logisticsDonationsDownloadEvidence',
   ].includes(operationId);
 }
 
@@ -924,6 +970,21 @@ export function applyOpenApiDetails(document, service) {
     additionalProperties: false,
   };
   Object.assign(document.components.securitySchemes, serviceSecuritySchemes[service] ?? {});
+  if (service === 'logistics') {
+    document.components.parameters ??= {};
+    document.components.parameters.IdempotencyKey ??= {
+      name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' },
+    };
+    document.components.headers ??= {};
+    document.components.headers.IdempotentReplay ??= {
+      description: 'Present as true when this response replays the original command result.',
+      schema: { type: 'string', enum: ['true'] },
+    };
+    document.components.headers.CacheControlNoStore ??= {
+      description: 'Prevents storage of the Logistics API result.',
+      schema: { type: 'string', enum: ['no-store'] },
+    };
+  }
   for (const [routePath, pathItem] of Object.entries(document.paths ?? {})) {
     for (const [method, operation] of Object.entries(pathItem)) {
       if (!operation || typeof operation !== 'object' || !operation.operationId) continue;
@@ -960,7 +1021,7 @@ export function applyOpenApiDetails(document, service) {
             schema: logisticsQuerySchemas[operation.operationId]?.[name] ?? (name === 'limit' ? { type: 'integer', minimum: 1, maximum: 100, default: 50 } :
               name === 'work_cycle' ? { type: 'integer', minimum: 1 } :
               ['from', 'to'].includes(name) ? dateTime :
-                ['drive_id', 'campaign_id', 'warehouse_id', 'item_id', 'request_id'].includes(name) ? id : text),
+                ['drive_id', 'campaign_id', 'warehouse_id', 'item_id', 'request_id', 'dispute_id'].includes(name) ? id : text),
           };
         }) : []),
       ];

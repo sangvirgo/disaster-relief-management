@@ -1,12 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
+import { randomBytes } from 'node:crypto';
 import type { Request } from 'express';
 import { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '../../../../packages/technical/src/idempotency/idempotency';
+import { hashPurposeBoundSecret } from '../../../../packages/technical/src/security/secret-hash';
 import { validateQuantity } from '../common/quantity';
 import { LogisticsSessionService, AuthenticatedLogisticsSession } from '../auth/logistics-session.service';
-import { CreateDonationDeliveryDto, DeclarationRevisionDto, OpenDonationDisputeDto, DonationLineDto } from './donations.dto';
+import {
+  CreateDonationDeliveryDto, DeclarationRevisionDto, DonationRecoveryIssueDto, DonationRecoveryRedeemDto,
+  OpenDonationDisputeDto, DonationLineDto,
+} from './donations.dto';
 import { DonationPhoneThrottle } from './donation-phone-throttle.service';
 import { assertDriveWindow, assertExpectedVersion, cleanDriveText, generatePublicCode, requireDrivePermission } from './drives.helpers';
 import { DONATION_SECRET_CONFIG, DonationSecretConfig, donationCapabilityHash, verifyDonationCapability } from './donations.helpers';
@@ -33,6 +38,12 @@ interface DeliveryRow {
 function key(request: DonationCommandRequest): string {
   if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
   return request.idempotencyKey;
+}
+
+function validRecoveryCode(code: string | undefined): code is string {
+  if (!code || !/^[A-Za-z0-9_-]{43}$/u.test(code)) return false;
+  const bytes = Buffer.from(code, 'base64url');
+  return bytes.length === 32 && bytes.toString('base64url') === code;
 }
 
 function hasCredential(request: Request): boolean {
@@ -279,6 +290,135 @@ export class DonationsService {
         return { status: 200, value: { id, capability_revoked: false, version: Number(delivery.version) }, resource: { type: 'donation_delivery', id } };
       },
       replay: (manager, resource) => this.replayDelivery(manager, resource),
+    });
+  }
+
+  async issueRecovery(
+    id: string,
+    dto: DonationRecoveryIssueDto,
+    request: DonationCommandRequest,
+  ): Promise<IdempotentResult<Record<string, unknown>>> {
+    const session = await this.sessions.require(request);
+    return this.idempotency.execute(this.dataSource, {
+      scopeKey: `user:${session.userId}`,
+      command: 'logistics.donation-capability.recovery.issue',
+      key: key(request),
+      requestHash: canonicalRequestHash({ delivery_id: id, dto, user_id: session.userId }),
+      execute: async (manager) => {
+        const delivery = await this.findDelivery(manager, id, true);
+        requireDrivePermission(session, 'DONATION_INTAKE', delivery);
+        assertExpectedVersion(delivery.version, dto.expected_version);
+        if (delivery.donor_user_id) throw new AppError('ALREADY_CLAIMED', { status: 409 });
+
+        const recoveryCode = randomBytes(32).toString('base64url');
+        const codeHash = hashPurposeBoundSecret(
+          recoveryCode, `donation-recovery:${id}`, this.secretConfig.peppers, this.secretConfig.currentPepperVersion,
+        );
+        const rows = await manager.query(
+          `INSERT INTO capability_recovery (delivery_id,code_hash,expires_at,issued_by_user_id,basis,source_note)
+           VALUES ($1,$2,clock_timestamp()+interval '30 minutes',$3,$4,$5) RETURNING id,expires_at`,
+          [id, codeHash, session.userId, dto.confirmation_basis, dto.source_note ?? null],
+        ) as Array<{ id: string; expires_at: Date | string }>;
+        const issuance = rows[0];
+        if (!issuance) throw new AppError('INTERNAL_ERROR', { status: 500 });
+        await manager.query(
+          `UPDATE capability_recovery SET consumed_at=clock_timestamp(),consumed_by_user_id=$2
+            WHERE delivery_id=$1 AND id<>$3 AND consumed_at IS NULL`,
+          [id, session.userId, issuance.id],
+        );
+        const [updated] = await manager.query(
+          'UPDATE donation_delivery SET version=version+1 WHERE id=$1 AND version=$2 RETURNING version',
+          [id, dto.expected_version],
+        ) as [Array<{ version: number }>, number];
+        if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409 });
+        await writeAudit(manager, session.userId, 'CAPABILITY_RECOVERY_ISSUED', delivery, {
+          id, version: Number(updated[0].version), issuance_id: issuance.id,
+        }, dto.reason);
+        return {
+          status: 201,
+          value: { issuance_id: issuance.id, recovery_code: recoveryCode, expires_at: new Date(issuance.expires_at).toISOString() },
+          resource: { type: 'capability_recovery', id: issuance.id },
+        };
+      },
+      replay: async (manager, resource) => {
+        if (resource?.type !== 'capability_recovery') throw new AppError('INTERNAL_ERROR', { status: 500 });
+        const rows = await manager.query(
+          'SELECT id,expires_at FROM capability_recovery WHERE id=$1', [resource.id],
+        ) as Array<{ id: string; expires_at: Date | string }>;
+        const issuance = rows[0];
+        if (!issuance) throw new AppError('NOT_FOUND', { status: 404 });
+        return { issuance_id: issuance.id, expires_at: new Date(issuance.expires_at).toISOString() };
+      },
+    });
+  }
+
+  async recover(
+    dto: DonationRecoveryRedeemDto,
+    recoveryCode: string | undefined,
+    request: DonationCommandRequest,
+  ): Promise<IdempotentResult<Record<string, unknown>>> {
+    const session = await this.sessions.require(request);
+    const deliveries = await this.dataSource.query(
+      'SELECT id FROM donation_delivery WHERE public_code=$1', [dto.public_code],
+    ) as Array<{ id: string }>;
+    const deliveryId = deliveries[0]?.id;
+    if (!deliveryId) throw new AppError('NOT_FOUND', { status: 404 });
+    const codeHash = validRecoveryCode(recoveryCode)
+      ? hashPurposeBoundSecret(recoveryCode, `donation-recovery:${deliveryId}`, this.secretConfig.peppers, this.secretConfig.currentPepperVersion)
+      : null;
+
+    return this.idempotency.execute(this.dataSource, {
+      scopeKey: `user:${session.userId}`,
+      command: 'logistics.donation-capability.recovery.redeem',
+      key: key(request),
+      requestHash: canonicalRequestHash({ public_code: dto.public_code }, codeHash ?? undefined),
+      execute: async (manager) => {
+        const rows = await manager.query(
+          `SELECT id,drive_id,organization_id,public_code,donor_user_id,donor_name,donor_phone,
+                  capability_hash,status,version,w.region_code
+             FROM donation_delivery dd JOIN donation_drive d ON d.id=dd.drive_id
+             JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE dd.id=$1 FOR UPDATE OF dd`,
+          [deliveryId],
+        ) as DeliveryRow[];
+        const delivery = rows[0];
+        if (!delivery) throw new AppError('NOT_FOUND', { status: 404 });
+        if (!codeHash) throw new AppError('NOT_FOUND', { status: 404 });
+        const recoveryRows = await manager.query(
+          `SELECT id FROM capability_recovery
+            WHERE delivery_id=$1 AND code_hash=$2 AND expires_at>clock_timestamp() AND consumed_at IS NULL
+            FOR UPDATE`,
+          [deliveryId, codeHash],
+        ) as Array<{ id: string }>;
+        const recovery = recoveryRows[0];
+        if (!recovery) throw new AppError('NOT_FOUND', { status: 404 });
+        if (delivery.donor_user_id) throw new AppError('ALREADY_CLAIMED', { status: 409 });
+        await manager.query(
+          `UPDATE capability_recovery SET consumed_at=clock_timestamp(),consumed_by_user_id=$2
+            WHERE id=$1 AND consumed_at IS NULL`,
+          [recovery.id, session.userId],
+        );
+        const [updated] = await manager.query(
+          `UPDATE donation_delivery SET donor_user_id=$2,capability_hash=NULL,version=version+1
+            WHERE id=$1 AND donor_user_id IS NULL RETURNING status,version`,
+          [deliveryId, session.userId],
+        ) as [Array<{ status: string; version: number }>, number];
+        if (!updated[0]) throw new AppError('ALREADY_CLAIMED', { status: 409 });
+        const value = {
+          id: delivery.id, public_code: delivery.public_code, status: updated[0].status,
+          donor_user_id: session.userId, capability_revoked: true, version: Number(updated[0].version),
+        };
+        await writeAudit(manager, session.userId, 'DONATION_CAPABILITY_RECOVERED', delivery, value);
+        return { status: 200, value, resource: { type: 'donation_delivery', id: deliveryId } };
+      },
+      replay: async (manager, resource) => {
+        if (resource?.type !== 'donation_delivery') throw new AppError('INTERNAL_ERROR', { status: 500 });
+        const rows = await manager.query(
+          'SELECT id,public_code,status,donor_user_id,version FROM donation_delivery WHERE id=$1', [resource.id],
+        ) as Array<{ id: string; public_code: string; status: string; donor_user_id: string | null; version: number }>;
+        const delivery = rows[0];
+        if (!delivery) throw new AppError('NOT_FOUND', { status: 404 });
+        return { ...delivery, capability_revoked: true, version: Number(delivery.version) };
+      },
     });
   }
 

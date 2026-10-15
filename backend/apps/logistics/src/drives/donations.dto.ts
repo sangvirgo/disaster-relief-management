@@ -38,6 +38,25 @@ export class OpenDonationDisputeDto {
   reason!: string;
 }
 
+export class DonationRecoveryIssueDto {
+  @IsInt() @Min(1)
+  expected_version!: number;
+
+  @IsString() @MinLength(1) @MaxLength(1000) @Matches(/\S/u)
+  reason!: string;
+
+  @IsString() @MinLength(1) @MaxLength(1000) @Matches(/\S/u)
+  confirmation_basis!: string;
+
+  @IsOptional() @IsString() @MaxLength(1000)
+  declare source_note?: string;
+}
+
+export class DonationRecoveryRedeemDto {
+  @IsString() @Matches(/^[0-9A-HJKMNP-TV-Z]{8,16}$/u)
+  public_code!: string;
+}
+
 export class DonationPageQueryDto {
   @IsOptional() @IsUUID('all')
   drive_id?: string;

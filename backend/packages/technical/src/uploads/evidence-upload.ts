@@ -7,8 +7,8 @@ import { join } from 'node:path';
 import type { Request } from 'express';
 import { Transform, type TransformCallback } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { detectEvidenceMime, evidenceSizeLimit, EvidenceMime } from './evidence-media';
+import { AppError } from '../errors/errors';
+import { detectEvidenceMime, evidenceSizeLimit, EvidenceMime } from '../media/evidence-media';
 
 const maxMultipartBytes = 55 * 1024 * 1024;
 const maxFileBytes = 50 * 1024 * 1024;

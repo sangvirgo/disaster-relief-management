@@ -38,6 +38,27 @@ async function call(base, path, { method = 'GET', body, actor, headers: extraHea
   return { status: response.status, headers: response.headers, value };
 }
 
+async function callMultipart(base, path, { file, actor, headers: extraHeaders = {}, idempotencyKey } = {}) {
+  const boundary = `c48-t12-${randomUUID()}`;
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="evidence.png"\r\nContent-Type: image/png\r\n\r\n`),
+    file,
+    Buffer.from(`\r\n--${boundary}--\r\n`),
+  ]);
+  const headers = {
+    ...extraHeaders,
+    ...(actor ? { Authorization: `Bearer ${actor.token}` } : {}),
+    ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+    'Content-Type': `multipart/form-data; boundary=${boundary}`,
+    'Content-Length': String(body.length),
+  };
+  const response = await fetch(`${base}/${path}`, { method: 'POST', headers, body });
+  const text = await response.text();
+  let value;
+  try { value = text ? JSON.parse(text) : undefined; } catch { value = text; }
+  return { status: response.status, headers: response.headers, value };
+}
+
 function expectSuccess(result, status = 200) {
   assert.equal(result.status, status, JSON.stringify(result.value));
   assert.equal(result.headers.get('cache-control'), 'no-store');
@@ -276,7 +297,55 @@ try {
     });
     expectVietnameseError(revokedTrack, 400, 'DONATION_SECRET_INVALID');
 
-    console.log('PASS Logistics T12 public drives, lifecycle, declarations, revisions, disputes, claim, assisted entry, and capability revocation');
+    const recoveryKey = key();
+    const recoveryBody = {
+      expected_version: revoked.value.version,
+      reason: 'Người quyên góp báo mất mã theo dõi.',
+      confirmation_basis: 'Đối chiếu lại số điện thoại đã đăng ký.',
+      source_note: 'Gọi lại số điện thoại trong hồ sơ.',
+    };
+    const issued = await call(logisticsUrl, `donation-deliveries/${staffDelivery.result.value.id}/recovery`, {
+      method: 'POST', actor: manager, idempotencyKey: recoveryKey, body: recoveryBody,
+    });
+    expectSuccess(issued, 201);
+    assert.equal(typeof issued.value.recovery_code, 'string');
+    const issuedReplay = await call(logisticsUrl, `donation-deliveries/${staffDelivery.result.value.id}/recovery`, {
+      method: 'POST', actor: manager, idempotencyKey: recoveryKey, body: recoveryBody,
+    });
+    expectSuccess(issuedReplay, 201);
+    assert.equal(issuedReplay.headers.get('idempotent-replay'), 'true');
+    assert.equal(Object.hasOwn(issuedReplay.value, 'recovery_code'), false);
+
+    const recoveryRequest = { public_code: staffDelivery.result.value.public_code };
+    const wrongCode = await call(logisticsUrl, 'public/donations/recover', {
+      method: 'POST', actor: donor, idempotencyKey: key(), body: recoveryRequest,
+      headers: { 'X-Recovery-Code': randomBytes(32).toString('base64url') },
+    });
+    expectVietnameseError(wrongCode, 404, 'NOT_FOUND');
+    const recovered = await call(logisticsUrl, 'public/donations/recover', {
+      method: 'POST', actor: donor, idempotencyKey: key(), body: recoveryRequest,
+      headers: { 'X-Recovery-Code': issued.value.recovery_code },
+    });
+    expectSuccess(recovered, 200);
+    assert.equal(recovered.value.donor_user_id, donor.id);
+    assert.equal(recovered.value.capability_revoked, true);
+
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('T12 evidence')]);
+    const evidence = await callMultipart(logisticsUrl, `public/donations/${staffDelivery.result.value.id}/evidence`, {
+      actor: donor, file: png, idempotencyKey: key(),
+    });
+    if (evidence.status === 503 && evidence.value?.code === 'STORAGE_UNAVAILABLE') {
+      throw new Error('Logistics T12 attachment integration returned STORAGE_UNAVAILABLE; verify AIStor configuration/availability and the attachment READY update');
+    }
+    expectSuccess(evidence, 201);
+    assert.equal(evidence.value.state, 'READY');
+    assert.equal(evidence.value.detected_mime, 'image/png');
+    const download = await call(logisticsUrl, `evidence/${evidence.value.id}/download`, { actor: donor });
+    expectSuccess(download, 200);
+    assert.equal(download.value.expires_in, 60);
+    assert.equal(typeof download.value.url, 'string');
+
+    console.log('PASS Logistics T12 public drives, lifecycle, declarations, revisions, disputes, claim, assisted entry, recovery, and capability revocation');
   }
 } finally {
   await logisticsDb.end();

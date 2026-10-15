@@ -11,6 +11,12 @@ import { DrivesController } from './drives.controller';
 import { DriveQueriesService } from './drives-queries.service';
 import { DrivesService } from './drives.service';
 import { ResponseCampaignModule } from '../integrations/response/response-campaign.module';
+import { DonationAttachmentsService } from './donation-attachments.service';
+import {
+  createDonationAttachmentStorage, loadDonationAttachmentStorageConfig, LOGISTICS_ATTACHMENT_STORAGE,
+} from './donation-attachment-storage';
+
+const attachmentStorageConfig = 'LOGISTICS_ATTACHMENT_STORAGE_CONFIG';
 
 @Module({
   imports: [LogisticsAuthModule, ResponseCampaignModule],
@@ -22,8 +28,15 @@ import { ResponseCampaignModule } from '../integrations/response/response-campai
     DonationsService,
     DonationPhoneThrottle,
     DonationsQueriesService,
+    DonationAttachmentsService,
     DriveCampaignSyncService,
     { provide: DONATION_SECRET_CONFIG, useFactory: () => loadDonationSecretConfig() },
+    { provide: attachmentStorageConfig, useFactory: () => loadDonationAttachmentStorageConfig() },
+    {
+      provide: LOGISTICS_ATTACHMENT_STORAGE,
+      useFactory: createDonationAttachmentStorage,
+      inject: [attachmentStorageConfig],
+    },
   ],
 })
 export class DrivesModule {}

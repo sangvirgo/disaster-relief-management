@@ -343,6 +343,26 @@ test('text export inserts new operations without reformatting curated JSON', () 
   assert.ok(mergedDocument.paths['/items'].post.responses['201'].description.includes('04-logistics-api.md'));
 });
 
+test('snapshot merger writes newly exported component parameters and headers', () => {
+  const current = {
+    openapi: '3.1.0',
+    paths: {},
+    components: { schemas: {}, securitySchemes: {} },
+  };
+  const raw = `${JSON.stringify(current, null, 2)}\n`;
+  const exported = structuredClone(current);
+  exported.components.parameters = {
+    IdempotencyKey: { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' } },
+  };
+  exported.components.headers = {
+    CacheControlNoStore: { description: 'No store.', schema: { type: 'string', enum: ['no-store'] } },
+  };
+
+  const merged = JSON.parse(mergeOpenApiText(raw, current, exported));
+
+  assert.deepEqual(merged, exported);
+});
+
 test('text export replaces stale security, response, and source metadata on curated operations', () => {
   const raw = JSON.stringify({
     openapi: '3.1.0',
@@ -814,6 +834,26 @@ test('documented pagination, evidence, stock movement, and relief point projecti
     assert.ok(reliefPointFields[field], `relief point includes ${field}`);
   }
   assert.equal(reliefPoint['x-c48-contract-gap'], undefined);
+});
+
+test('T12 Logistics recovery and attachment routes document one-use recovery and private evidence access', () => {
+  const logistics = exportService('logistics').document;
+  const issue = operationById(logistics, 'logisticsDonationsIssueRecovery');
+  const redeem = operationById(logistics, 'logisticsDonationsRecover');
+  const upload = operationById(logistics, 'logisticsDonationsUploadEvidence');
+  const download = operationById(logistics, 'logisticsDonationsDownloadEvidence');
+
+  assert.ok(issue && redeem && upload && download);
+  assert.equal(logistics.components.securitySchemes.RecoveryCode.name, 'X-Recovery-Code');
+  assert.deepEqual(issue.responses['201'].content['application/json'].schema.oneOf.map((shape) => shape.required), [
+    ['issuance_id', 'recovery_code', 'expires_at'], ['issuance_id', 'expires_at'],
+  ]);
+  assert.ok(redeem.security.some((requirement) => requirement.RecoveryCode && requirement.NativeBearer));
+  assert.equal(upload.requestBody.content['multipart/form-data'].schema.required.includes('file'), true);
+  assert.ok(upload.parameters.some((parameter) => parameter.name === 'dispute_id' && parameter.in === 'query'));
+  assert.ok(upload.responses['503'].content['application/json'].examples.STORAGE_UNAVAILABLE);
+  assert.deepEqual(download.responses['200'].content['application/json'].schema.properties.expires_in, { type: 'integer', const: 60 });
+  assert.ok(download.security.some((requirement) => requirement.DonationSecret));
 });
 
 test('documented route errors include verification, mission, donation, and quantity conflicts', () => {

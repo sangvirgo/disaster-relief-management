@@ -1,4 +1,4 @@
-import { detectEvidenceMime, evidenceSizeLimit } from '../src/evidence/evidence-media';
+import { detectEvidenceMime, evidenceSizeLimit } from '../../../packages/technical/src/media/evidence-media';
 import { loadEvidenceStorageConfig } from '../src/evidence/evidence-storage';
 
 describe('Response evidence media validation', () => {

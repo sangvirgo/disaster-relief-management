@@ -1,11 +1,15 @@
 import {
-  Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, Res, UseInterceptors,
+  Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, Res, UseInterceptors,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
-import { CreateDonationDeliveryDto, DeclarationRevisionDto, OpenDonationDisputeDto } from './donations.dto';
+import {
+  CreateDonationDeliveryDto, DeclarationRevisionDto, DonationRecoveryIssueDto, DonationRecoveryRedeemDto,
+  OpenDonationDisputeDto,
+} from './donations.dto';
 import { DonationCommandRequest, DonationsService } from './donations.service';
 import { DonationsQueriesService } from './donations-queries.service';
+import { DonationAttachmentsService } from './donation-attachments.service';
 
 function noStore(response: Response): void {
   response.setHeader('Cache-Control', 'no-store');
@@ -20,7 +24,50 @@ export class DonationsController {
   constructor(
     private readonly donations: DonationsService,
     private readonly queries: DonationsQueriesService,
+    private readonly attachments: DonationAttachmentsService,
   ) {}
+
+  @Post('public/donations/recover')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async recover(
+    @Body() dto: DonationRecoveryRedeemDto,
+    @Headers('x-recovery-code') recoveryCode: string | undefined,
+    @Req() request: DonationCommandRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.donations.recover(dto, recoveryCode, request);
+    replay(response, result.replay);
+    return result.value;
+  }
+
+  @Post('public/donations/:id/evidence')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async uploadEvidence(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Query('dispute_id', new ParseUUIDPipe({ version: 'all', optional: true })) disputeId: string | undefined,
+    @Headers('x-donation-secret') secret: string | undefined,
+    @Req() request: DonationCommandRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.attachments.upload(id, disputeId, secret, request);
+    replay(response, result.replay);
+    return result.value;
+  }
+
+  @Get('evidence/:id/download')
+  async downloadEvidence(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Headers('x-donation-secret') secret: string | undefined,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    return this.attachments.download(id, secret, request);
+  }
 
   @Post('public/donation-drives/:id/deliveries')
   @HttpCode(HttpStatus.CREATED)
@@ -121,6 +168,21 @@ export class DonationsController {
   ) {
     noStore(response);
     const result = await this.donations.revokeCapability(id, request);
+    replay(response, result.replay);
+    return result.value;
+  }
+
+  @Post('donation-deliveries/:id/recovery')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async issueRecovery(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Body() dto: DonationRecoveryIssueDto,
+    @Req() request: DonationCommandRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.donations.issueRecovery(id, dto, request);
     replay(response, result.replay);
     return result.value;
   }
