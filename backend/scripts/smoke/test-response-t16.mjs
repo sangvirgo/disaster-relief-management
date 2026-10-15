@@ -22,15 +22,22 @@ const responseLock = new Client({ connectionString: requiredEnv('C48_RESPONSE_DA
 const logisticsLock = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DATABASE_URL') });
 const operationActors = new Map();
 let logisticsStopped = false;
+let recoveryFenceHeld = false;
+let recoveryFenceConfirmed = false;
+let responseWorkerDisabled = false;
+
+if (process.env.SCHEDULER_ENABLED !== 'false') {
+  throw new Error('T16 recovery smoke requires SCHEDULER_ENABLED=false in the primary stack configuration.');
+}
 
 function mainCompose(args, env = process.env) {
   return execFileSync('docker', ['compose', '-p', 'c48', '--env-file', fileURLToPath(new URL('../../.env', import.meta.url)),
     '-f', fileURLToPath(new URL('../../infra/compose.yaml', import.meta.url)), ...args], { stdio: 'pipe', env, encoding: 'utf8' });
 }
 
-function responseService(schedulerEnabled) {
+function responseService(schedulerEnabled, recoveryEnabled = false) {
   mainCompose(['up', '-d', '--no-deps', '--force-recreate', '--wait', 'response-api'],
-    { ...process.env, SCHEDULER_ENABLED: String(schedulerEnabled) });
+    { ...process.env, SCHEDULER_ENABLED: String(schedulerEnabled), RESOLUTION_RECOVERY_ENABLED: String(recoveryEnabled) });
 }
 
 function logisticsService(action) {
@@ -47,20 +54,59 @@ async function waitFor(check, label, timeoutMs = 45_000) {
 }
 
 async function recoveryFence(locked) {
-  await recoveryLock.query(locked
-    ? "SELECT pg_advisory_lock(hashtext('response-resolution-recovery'))"
-    : "SELECT pg_advisory_unlock(hashtext('response-resolution-recovery'))");
+  try {
+    if (recoveryFenceHeld === locked) await recoveryLock.query('SELECT pg_backend_pid()');
+    else await recoveryLock.query(locked
+      ? "SELECT pg_advisory_lock(hashtext('response-resolution-recovery'))"
+      : "SELECT pg_advisory_unlock(hashtext('response-resolution-recovery'))");
+    recoveryFenceHeld = locked;
+    recoveryFenceConfirmed = true;
+  } catch (error) {
+    recoveryFenceConfirmed = false;
+    throw error;
+  }
 }
 
-async function waitForBlocked(database, blocker, minimum = 1) {
-  await waitFor(async () => {
-    const result = await database.query(
-      `WITH RECURSIVE blocked AS (
-         SELECT pid FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid))
-         UNION SELECT a.pid FROM pg_stat_activity a JOIN blocked b ON b.pid=ANY(pg_blocking_pids(a.pid))
-       ) SELECT count(*)::int AS count FROM blocked`, [blocker]);
-    return result.rows[0].count >= minimum;
-  }, `${minimum} primary API transaction(s) blocked`, 40_000);
+async function assertOnlyEligibleRecoveryIntent(operationId) {
+  const result = await responseDb.query(
+    `SELECT i.id FROM resolution_intent i JOIN assistance_request r ON r.id=i.request_id
+      WHERE r.status='RESOLVING' AND i.state IN ('PENDING','ABORTING') ORDER BY i.created_at,i.id`,
+  );
+  assert.deepEqual(result.rows.map(({ id }) => id), [operationId],
+    'The global recovery scheduler must have only the T16 intent eligible; run this smoke in a quiet resolution window.');
+}
+
+async function waitForBlocked(database, blocker, minimum = 1, diagnostic = {}) {
+  try {
+    await waitFor(async () => {
+      const result = await database.query(
+        `WITH RECURSIVE blocked AS (
+           SELECT pid FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid))
+           UNION SELECT a.pid FROM pg_stat_activity a JOIN blocked b ON b.pid=ANY(pg_blocking_pids(a.pid))
+         ) SELECT count(*)::int AS count FROM blocked`, [blocker]);
+      return result.rows[0].count >= minimum;
+    }, `${minimum} primary API transaction(s) blocked`, diagnostic.timeoutMs ?? 40_000);
+  } catch (error) {
+    const [activity, intent, cycle] = await Promise.all([
+      database.query(
+        `SELECT pid,application_name,state,wait_event_type,wait_event,pg_blocking_pids(pid) AS blockers,
+                left(query,200) AS query
+           FROM pg_stat_activity
+          WHERE datname=current_database() AND (pid=$1 OR application_name='c48_response')
+          ORDER BY pid`, [blocker],
+      ).catch((queryError) => ({ rows: [{ diagnostic_error: queryError.code ?? 'QUERY_FAILED' }] })),
+      diagnostic.operationId ? database.query(
+        `SELECT i.id,i.state,i.version,r.id AS request_id,r.status AS request_status,r.version AS request_version,
+                r.work_cycle,i.expected_request_version
+           FROM resolution_intent i JOIN assistance_request r ON r.id=i.request_id WHERE i.id=$1`, [diagnostic.operationId],
+      ).catch((queryError) => ({ rows: [{ diagnostic_error: queryError.code ?? 'QUERY_FAILED' }] })) : Promise.resolve({ rows: [] }),
+      diagnostic.requestId && diagnostic.logisticsDatabase ? diagnostic.logisticsDatabase.query(
+        'SELECT state,version FROM fulfillment_cycle WHERE request_id=$1 ORDER BY work_cycle DESC LIMIT 1', [diagnostic.requestId],
+      ).catch((queryError) => ({ rows: [{ diagnostic_error: queryError.code ?? 'QUERY_FAILED' }] })) : Promise.resolve({ rows: [] }),
+    ]);
+    console.error('T16 blocked-transaction diagnostics:', JSON.stringify({ activity: activity.rows, intent: intent.rows, cycle: cycle.rows }));
+    throw error;
+  }
 }
 
 async function cycleCommand(action, requestId, workCycle, operationId) {
@@ -223,6 +269,12 @@ async function pendingResolution(request, coordinator) {
   }
 }
 
+const initialSchedulerSettings = mainCompose([
+  'exec', '-T', 'response-api', 'printenv', 'SCHEDULER_ENABLED', 'RESOLUTION_RECOVERY_ENABLED',
+]).trim().split(/\r?\n/u);
+assert.deepEqual(initialSchedulerSettings, ['false', 'false'],
+  'T16 requires both Response scheduler settings disabled before the smoke starts.');
+
 await Promise.all([responseDb.connect(), logisticsDb.connect(), identityDb.connect(), recoveryLock.connect(), responseLock.connect(), logisticsLock.connect()]);
 try {
   await recoveryFence(true);
@@ -369,12 +421,20 @@ try {
   const crashOperation = await pendingResolution(crashRequest, coordinator);
   await responseLock.query('BEGIN');
   try {
-    await responseLock.query("SET LOCAL idle_in_transaction_session_timeout='60s'");
+    await responseLock.query("SET LOCAL idle_in_transaction_session_timeout='120s'");
     await responseLock.query('SELECT id FROM resolution_intent WHERE id=$1 FOR UPDATE', [crashOperation.operation_id]);
     const lockPid = (await responseLock.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
     expectSuccess(await cycleCommand('seal', crashRequest.id, crashOperation.work_cycle, crashOperation.operation_id));
+    // shortcut: recovery has no per-intent filter; this check cannot block new work, so run during a quiet resolution window.
+    await assertOnlyEligibleRecoveryIntent(crashOperation.operation_id);
+    responseService(false, true);
     await recoveryFence(false);
-    await waitForBlocked(responseDb, lockPid);
+    await waitForBlocked(responseDb, lockPid, 1, {
+      timeoutMs: 75_000,
+      operationId: crashOperation.operation_id,
+      requestId: crashRequest.id,
+      logisticsDatabase: logisticsDb,
+    });
     const blockedCas = mainCompose(['exec', '-T', 'postgres', 'psql', '-X', '-At', '-U', 'postgres', '-d', 'c48_response', '-c',
       `SELECT count(*) FROM pg_stat_activity WHERE application_name='c48_response' AND wait_event_type='Lock'
         AND query LIKE 'UPDATE resolution_intent SET state=''COMPLETED''%'
@@ -393,11 +453,23 @@ try {
   } finally {
     await responseLock.query('ROLLBACK');
   }
-  responseService(true);
   assert.equal((await requestState(crashRequest.id)).status, 'RESOLVING');
   assert.equal((await responseDb.query('SELECT state FROM resolution_intent WHERE id=$1', [crashOperation.operation_id])).rows[0].state, 'PENDING');
+  await assertOnlyEligibleRecoveryIntent(crashOperation.operation_id);
   await recoveryFence(false);
-  await waitFor(async () => (await requestState(crashRequest.id)).status === 'RESOLVED', 'restarted worker commits the same sealed pending intent');
+  responseService(false, true);
+  try {
+    await waitFor(async () => (await requestState(crashRequest.id)).status === 'RESOLVED',
+      'restarted worker commits the same sealed pending intent', 90_000);
+  } catch (error) {
+    const [intent, request, cycle] = await Promise.all([
+      responseDb.query('SELECT state,updated_at FROM resolution_intent WHERE id=$1', [crashOperation.operation_id]),
+      requestState(crashRequest.id),
+      logisticsDb.query('SELECT state,version FROM fulfillment_cycle WHERE request_id=$1 ORDER BY work_cycle DESC LIMIT 1', [crashRequest.id]),
+    ]);
+    console.error('T16 recovery diagnostics:', JSON.stringify({ intent: intent.rows, request, cycle: cycle.rows }));
+    throw error;
+  }
   await recoveryFence(true);
   const recovered = await call(responseUrl, `operations/${crashOperation.operation_id}`, { actor: coordinator });
   expectSuccess(recovered);
@@ -462,10 +534,11 @@ try {
   const raceRequest = await settledRequest(reporter, coordinator, item.value.id);
   const raceOperation = await pendingResolution(raceRequest, coordinator);
   expectSuccess(await cycleCommand('seal', raceRequest.id, raceOperation.work_cycle, raceOperation.operation_id));
+  await assertOnlyEligibleRecoveryIntent(raceOperation.operation_id);
   await responseLock.query('BEGIN');
   let racedAbort;
   try {
-    await responseLock.query("SET LOCAL idle_in_transaction_session_timeout='60s'");
+    await responseLock.query("SET LOCAL idle_in_transaction_session_timeout='120s'");
     await responseLock.query('SELECT id FROM assistance_request WHERE id=$1 FOR UPDATE', [raceRequest.id]);
     const lockPid = (await responseLock.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
     await recoveryFence(false);
@@ -486,24 +559,63 @@ try {
 
   console.log('T16 Response resolution/cancellation HTTP and PostgreSQL smoke passed.');
 } finally {
+  let cleanupError;
+  let responseApiAvailable = true;
+  try { if (logisticsStopped) logisticsService('start'); } catch (error) { cleanupError = error; }
+  await Promise.all([
+    responseLock.query('ROLLBACK').catch((error) => { cleanupError ??= error; }),
+    logisticsLock.query('ROLLBACK').catch((error) => { cleanupError ??= error; }),
+  ]);
+  try { await recoveryFence(true); } catch (error) {
+    cleanupError ??= error;
+    try { await recoveryFence(true); } catch (retryError) { cleanupError ??= retryError; }
+  }
   try {
-    if (logisticsStopped) logisticsService('start');
-    responseService(false);
-    await Promise.all([responseLock.query('ROLLBACK').catch(() => undefined), logisticsLock.query('ROLLBACK').catch(() => undefined)]);
+    responseService(false, false);
+    responseWorkerDisabled = true;
+  } catch (error) {
+    cleanupError ??= error;
+    responseApiAvailable = false;
+    try {
+      mainCompose(['stop', 'response-api']);
+      responseWorkerDisabled = true;
+      responseApiAvailable = false;
+      responseService(false, false);
+      responseApiAvailable = true;
+    } catch (retryError) { cleanupError ??= retryError; }
+  }
+  if (responseApiAvailable) {
     for (const [operationId, actor] of operationActors) {
-      const operation = await call(responseUrl, `operations/${operationId}`, { actor });
-      if (['PENDING', 'ABORTING'].includes(operation.value?.state)) {
-        const state = await requestState(operation.value.request_id);
-        expectSuccess(await command(responseUrl, `operations/${operationId}/abort`, actor, {
-          expected_version: Number(state.version), reason: 'Dọn thao tác kiểm thử chưa hoàn tất.',
-        }), 202);
-        assert.equal((await call(responseUrl, `operations/${operationId}`, { actor })).value.state, 'ABORTED');
-      }
+      try {
+        const operation = await call(responseUrl, `operations/${operationId}`, { actor });
+        if (['PENDING', 'ABORTING'].includes(operation.value?.state)) {
+          const state = await requestState(operation.value.request_id);
+          expectSuccess(await command(responseUrl, `operations/${operationId}/abort`, actor, {
+            expected_version: Number(state.version), reason: 'Dọn thao tác kiểm thử chưa hoàn tất.',
+          }), 202);
+          assert.equal((await call(responseUrl, `operations/${operationId}`, { actor })).value.state, 'ABORTED');
+        }
+      } catch (error) { cleanupError ??= error; }
     }
+  } else {
+    cleanupError ??= new Error('Response API was stopped to keep the recovery worker from running; restart it before continuing.');
+  }
+  try {
     assert.equal((await responseDb.query(`SELECT count(*)::int AS count FROM resolution_intent i JOIN assistance_request r ON r.id=i.request_id
       WHERE i.state IN ('PENDING','ABORTING') AND r.incident_category_code=$1`, [categoryCode])).rows[0].count, 0);
+  } catch (error) { cleanupError ??= error; }
+  try {
+    if (!responseWorkerDisabled && !(recoveryFenceHeld && recoveryFenceConfirmed)) await recoveryFence(true);
+    if (responseWorkerDisabled && recoveryFenceHeld) await recoveryFence(false);
+    if (responseWorkerDisabled) await recoveryLock.end();
+    else if (recoveryFenceHeld && recoveryFenceConfirmed) {
+      console.error('FATAL: Response recovery worker could not be disabled; the advisory fence is confirmed held. Stop response-api before ending this process.');
+    } else {
+      console.error('FATAL: Response recovery worker could not be disabled and the advisory fence is not confirmed. Stop response-api immediately; it may still be scanning intents.');
+      // Keep this session open until Response is stopped, in case the lock reached PostgreSQL before its reply was lost.
+    }
   } finally {
-    await recoveryLock.end();
     await Promise.all([responseDb.end(), logisticsDb.end(), identityDb.end(), responseLock.end(), logisticsLock.end()]);
   }
+  if (cleanupError) throw cleanupError;
 }
