@@ -1,4 +1,7 @@
 -- These campaign rows are shared by the full fixture and the safe additive seed path.
+INSERT INTO incident_category (code, display_name) VALUES ('UNKNOWN', 'Chưa rõ')
+ON CONFLICT (code) DO NOTHING;
+
 INSERT INTO region_boundary (region_code, geom) VALUES
   ('DEMO_A', ST_Multi(ST_MakeEnvelope(106.60, 10.70, 106.80, 10.85, 4326))),
   ('DEMO_B', ST_Multi(ST_MakeEnvelope(107.50, 16.00, 107.70, 16.15, 4326)))

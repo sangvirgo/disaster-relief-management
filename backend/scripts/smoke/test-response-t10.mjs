@@ -14,6 +14,7 @@ const users = [];
 const notices = [randomUUID(), randomUUID(), randomUUID()];
 const requestId = randomUUID();
 const unverifiedRequestId = randomUUID();
+const closeRequestId = randomUUID();
 const duplicateRequestId = randomUUID();
 const outOfScopeRequestId = randomUUID();
 const otherOrganizationId = randomUUID();
@@ -61,7 +62,7 @@ async function registerAndLogin(label) {
     display_name: `Người dùng kiểm thử T10 ${label} ${suffix}`,
     password: `Response T10 test ${suffix}!`,
   };
-  const sourceIp = `198.51.100.${10 + users.length}`;
+  const sourceIp = `198.18.${randomBytes(2).join('.')}`;
   const registered = await call(identityUrl, 'auth/register', {
     method: 'POST', body: credentials,
     headers: { 'Idempotency-Key': key(), 'X-Forwarded-For': sourceIp },
@@ -554,13 +555,124 @@ try {
   });
   expectVietnameseError(blockedClose, 409, 'CAMPAIGN_HAS_OPEN_REQUESTS');
 
-  const closedSecondCampaign = await call(responseUrl, `campaigns/${secondCampaignId}/close`, {
-    method: 'POST', body: { expected_version: 2, reason: 'Kết thúc chiến dịch phụ kiểm thử.' },
+  const pausedSecondCampaign = await call(responseUrl, `campaigns/${secondCampaignId}/pause`, {
+    method: 'POST', body: { expected_version: 2, reason: 'Tạm dừng chiến dịch phụ kiểm thử.' },
     headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
   });
-  expectSuccess(closedSecondCampaign);
-  assert.equal(closedSecondCampaign.value.status, 'CLOSED');
-  assert.equal(closedSecondCampaign.value.version, 3);
+  expectSuccess(pausedSecondCampaign);
+  assert.equal(pausedSecondCampaign.value.status, 'PAUSED');
+  assert.equal(pausedSecondCampaign.value.version, 3);
+
+  const publicPausedCampaigns = await call(responseUrl, 'public/campaigns?limit=100');
+  expectSuccess(publicPausedCampaigns);
+  const publicPausedCampaign = publicPausedCampaigns.value.items.find((item) => item.id === secondCampaignId);
+  assert.ok(publicPausedCampaign, 'paused campaigns remain in the public projection');
+  assert.equal(publicPausedCampaign.status, 'PAUSED');
+
+  const resumedSecondCampaign = await call(responseUrl, `campaigns/${secondCampaignId}/resume`, {
+    method: 'POST', body: { expected_version: 3 },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectSuccess(resumedSecondCampaign);
+  assert.equal(resumedSecondCampaign.value.status, 'ACTIVE');
+  assert.equal(resumedSecondCampaign.value.version, 4);
+
+  await responseDb.query(
+    `INSERT INTO assistance_request
+       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,region_code,status,received_at)
+     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,$5,'SUBMITTED',now())`,
+    [closeRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, otherRecipient.id, organizationId, regionCode],
+  );
+  await responseDb.query(
+    `INSERT INTO request_subject (request_id,people_affected,location,location_source,location_accuracy_m,location_captured_at)
+     VALUES ($1,1,ST_GeogFromText('SRID=4326;POINT(105.5 15.5)'),'GPS',8,now())`,
+    [closeRequestId],
+  );
+  await responseDb.query(
+    `INSERT INTO request_event (request_id,actor_user_id,event_type,visibility,from_status,to_status,payload)
+     VALUES ($1,$2,'REQUEST_SUBMITTED','REPORTER',NULL,'SUBMITTED',$3::jsonb)`,
+    [closeRequestId, otherRecipient.id, JSON.stringify({ public_text_code: 'RECEIVED', review_lane: 'NORMAL' })],
+  );
+
+  const closeRequestAttached = await call(responseUrl, `requests/${closeRequestId}/attach-campaign`, {
+    method: 'POST', body: { campaign_id: secondCampaignId, expected_version: 1 },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectSuccess(closeRequestAttached);
+  assert.equal(closeRequestAttached.value.campaign_id, secondCampaignId);
+  assert.equal(closeRequestAttached.value.version, 2);
+
+  const secondCampaignBlockedClose = await call(responseUrl, `campaigns/${secondCampaignId}/close`, {
+    method: 'POST', body: { expected_version: 4, reason: 'Đóng khi yêu cầu còn đang xử lý.' },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectVietnameseError(secondCampaignBlockedClose, 409, 'CAMPAIGN_HAS_OPEN_REQUESTS');
+
+  const closeRequestVerification = await call(responseUrl, `requests/${closeRequestId}/start-verification`, {
+    method: 'POST', body: { expected_version: 2 },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectSuccess(closeRequestVerification);
+  assert.equal(closeRequestVerification.value.status, 'VERIFYING');
+
+  const closeRequestContact = await call(responseUrl, `requests/${closeRequestId}/contact-attempts`, {
+    method: 'POST', body: { contact_target: 'REPORTER', outcome: 'REACHED', note: 'Đã xác nhận thông tin.' },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectSuccess(closeRequestContact, 201);
+
+  const closeRequestVerified = await call(responseUrl, `requests/${closeRequestId}/verify`, {
+    method: 'POST',
+    body: { expected_version: 4, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [closeRequestContact.value.id] } },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectSuccess(closeRequestVerified);
+  assert.equal(closeRequestVerified.value.status, 'VERIFIED');
+
+  const closeRequestTriaged = await call(responseUrl, `requests/${closeRequestId}/triage`, {
+    method: 'POST', body: { expected_version: 5, priority: 'P3', priority_basis: 'COMPLETE' },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectSuccess(closeRequestTriaged);
+  assert.equal(closeRequestTriaged.value.status, 'TRIAGED');
+
+  const closeRequestResolved = await call(responseUrl, `requests/${closeRequestId}/resolve`, {
+    method: 'POST', body: { expected_version: 6, resolution_reason: 'Đã rà soát, không cần hỗ trợ thêm.', outcome_basis: 'NO_ACTION_REQUIRED' },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectSuccess(closeRequestResolved, 202);
+  const closeOperation = await call(responseUrl, `operations/${closeRequestResolved.value.operation_id}`, { headers: coordinatorAuth });
+  expectSuccess(closeOperation);
+  assert.equal(closeOperation.value.state, 'COMPLETED');
+
+  const closeRequestState = await responseDb.query('SELECT status,version FROM assistance_request WHERE id=$1', [closeRequestId]);
+  assert.deepEqual(closeRequestState.rows, [{ status: 'RESOLVED', version: 8 }]);
+  const closedRequest = await call(responseUrl, `requests/${closeRequestId}/close`, {
+    method: 'POST', body: { expected_version: 8 },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectSuccess(closedRequest);
+  assert.equal(closedRequest.value.status, 'CLOSED');
+
+  const closedSecondCampaignFinal = await call(responseUrl, `campaigns/${secondCampaignId}/close`, {
+    method: 'POST', body: { expected_version: 4, reason: 'Hoàn tất chiến dịch kiểm thử.' },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectSuccess(closedSecondCampaignFinal);
+  assert.equal(closedSecondCampaignFinal.value.status, 'CLOSED');
+  assert.equal(closedSecondCampaignFinal.value.version, 5);
+
+  const attachAfterClose = await call(responseUrl, `requests/${unverifiedRequestId}/attach-campaign`, {
+    method: 'POST', body: { campaign_id: secondCampaignId, expected_version: 3 },
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectVietnameseError(attachAfterClose, 409, 'CAMPAIGN_NOT_ACTIVE');
+
+  const closedCampaignHistory = await call(responseUrl, `requests/${closeRequestId}/events?limit=100`, { headers: coordinatorAuth });
+  expectSuccess(closedCampaignHistory);
+  assert.ok(closedCampaignHistory.value.items.some((event) => event.event_type === 'CAMPAIGN_ATTACHED'));
+  assert.ok(closedCampaignHistory.value.items.some((event) => event.event_type === 'REQUEST_RESOLVED'));
+  assert.ok(closedCampaignHistory.value.items.some((event) => event.event_type === 'REQUEST_CLOSED'));
 } finally {
   await Promise.allSettled([responseDb.end(), identityDb.end()]);
 }

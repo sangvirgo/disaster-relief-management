@@ -14,7 +14,7 @@ Identity now includes user administration, organizations and memberships, scoped
 
 The security follow-up isolates Compose environment variables per service, keeps signing keys and client credentials out of unrelated APIs, makes grant self-checks UUID-case-insensitive, and binds temporary-password idempotency to the existing purpose-bound peppered secret hash. Identity responses now set `Cache-Control: no-store`; shared OpenAPI error responses document that header. User lookup ownership is enforced by the consuming service because Identity cannot query another service's records.
 
-The Response campaign lookup client is present and fails closed on missing or malformed responses. `GET /internal/campaigns/{id}` is specified in [03-response-api](03-response-api.md) but is not implemented until T10, so campaign-scoped grant creation will return `RESPONSE_UNAVAILABLE` until T10 lands.
+The Response campaign lookup client is present and fails closed on missing or malformed responses. `GET /internal/campaigns/{id}` is implemented under T10; campaign-scoped grant creation uses it and returns `RESPONSE_UNAVAILABLE` when the lookup is missing or malformed.
 
 ## T4 completed
 
@@ -187,6 +187,13 @@ The original T19 verification passed 96 Jest suites / 404 tests and 48 Node test
 
 Formal stocktakes under FR-REC-02 are deferred by the plan and outside this contract slice. Remaining T18 and T17 acceptance gates are listed in the traceability file. See the ordered task table for the next backend phase and the current acceptance ledger before starting work.
 
+## T10 follow-up — 2026-10-15
+
+- The additive seed path now inserts the canonical `UNKNOWN` incident category with `ON CONFLICT DO NOTHING`; it runs for both empty-database full seed and existing-data campaign seed. `bash scripts/db/seed` passed against the main stack without resetting data or volumes.
+- The Response T10 main-stack smoke passed after the seed change. It now covers paused campaigns in the public projection, blocking campaign closure while a linked request is open, completing and closing that request, closing the campaign, rejecting later attachment, and reading its event history. Registration fixtures use fresh reserved source IPs so repeated smoke runs do not exhaust Identity's per-IP registration limit.
+- `node --check scripts/smoke/test-response-t10.mjs` and `git diff --check` passed. No API, schema, migration, or OpenAPI contract changed; smoke-created records remain durable.
+- Heatmap timing against the 10k seed and the 200k query-plan gate remain open.
+
 ## Next concrete action
 
-Next: arrange an approved isolated recovery destination and obtain the AIStor lab artifact/license for T5/TC-29. For T17, use safe authorized data to capture populated donation and fulfillment examples, complete client dashboard evidence, and identify a representative-scale `EXPLAIN` method without inserting irreversible fixtures into the primary ledger. Schedule the remaining T18 ingress, pool saturation, full log review, client accessibility, audit query-plan, restore, and performance evidence. Do not treat the passing full suite or API smokes as closure of those external gates. The acceptance matrix in [T19 traceability](T19-traceability.md) is the current gate ledger.
+Next: close the remaining T11 test gaps and finish the T12 recovery/evidence APIs and T15 handoff evidence follow-up. Also keep the external gates open: obtain the AIStor lab artifact/license for T5/TC-29; capture populated donation and fulfillment examples and dashboard evidence for T17; and schedule T8/T10/T17 query-plan, T18 ingress/pool/log/client checks, restore, and performance evidence. Do not treat passing unit tests or API smokes as closure of those gates. The acceptance matrix in [T19 traceability](T19-traceability.md) is the current gate ledger.
