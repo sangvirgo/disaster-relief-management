@@ -1,4 +1,4 @@
-# Session handoff — C48 backend, 2026-10-14
+# Session handoff — C48 backend, 2026-10-15
 
 Read [AGENTS.md](../../AGENTS.md), [project context](../c48-project-context.md), plan Sections 27–28, then [README](README.md) → [00-setup](00-setup.md) → [01 §7–§9](01-schema-review.md). Follow the ordered task table in [06-implementation-tasks](06-implementation-tasks.md), one task at a time.
 
@@ -6,7 +6,7 @@ Read [AGENTS.md](../../AGENTS.md), [project context](../c48-project-context.md),
 
 ## Objective
 
-Continue only the backend work on `codex/backend-t9-t19`. T0–T19 implementation commits are present through `1a7fce7`; the current working tree contains a T18 Logistics audit-reader follow-up and its contract/docs/tests. T8 team membership and leader endpoints were completed in `9c4a795`, and the current contract inventory now validates 33 Identity, 79 Response, and 80 Logistics routes. T5's selected-provider gate, T17's populated donation/fulfillment, dashboard/UI and report-scale evidence, and T18's remaining operational gates are open. AI agent/service work is outside this scope. The API contracts and SQL in `docs/backend/` take precedence for shapes; the main plan governs business behavior.
+Continue only the backend work on `codex/backend-t9-t19`. T0–T19 implementation commits are present through `1a7fce7`; this follow-up adds reviewed T8, T9, T14, T17, and T18 verification changes in separate commits. T8 team membership and leader endpoints were completed in `9c4a795`, and the current contract inventory validates 33 Identity, 79 Response, and 80 Logistics routes. T5's selected-provider gate, T17's populated donation/fulfillment, dashboard/UI and report-scale evidence, and T18's remaining operational gates are open. AI agent/service work is outside this scope. The API contracts and SQL in `docs/backend/` take precedence for shapes; the main plan governs business behavior.
 
 ## T3 completed
 
@@ -172,14 +172,21 @@ Logistics now implements the previously documented `GET /audit-logs` on the prim
 
 Open T18 gates: the ingress smoke could not use port 8080; validation POST, Web/Mobile inert rendering/accessibility, TC-BE-28 timeout/retry/pool checks, full cross-service TC-BE-29 producer/log review, isolated TC-29 restore, and hardware-recorded TC-PERF-01 remain pending. Representative-scale audit-reader `EXPLAIN` and index review also remain open. See [T18 hardening and evidence](t18-hardening.md) for commands, limits, and runbooks.
 
-## T19 contracts, traceability, and handoff — 2026-10-13
+### T18 primary-stack follow-up — 2026-10-15
+
+- The direct API smoke passed anonymous Identity/Response/Logistics 401 checks and an invalid DTO POST returning Vietnamese `400 VALIDATION_FAILED`. The separate Logistics audit smoke passed SYSTEM ADMIN access, restricted VOLUNTEER denial, and populated matching/nonmatching `entity_id` filters; temporary audit actors were cleaned up.
+- `test-auth.mjs` passed statement/lock timeout rollback and idempotent retry/replay checks. Its cleanup is transactional and verifies no tracked fixture rows remain. Runtime pool saturation remains unverified.
+- Remaining T18 gates: live Nginx ingress on 8080 (occupied by another local container), Web/Mobile accessibility and inert rendering, runtime pool saturation, full cross-service log review, representative-scale audit query plan, isolated restore, and recorded hardware performance. This replaces the 2026-10-14 pending list above for the checks completed here.
+- `backend/infra/compose.yaml` remains the sole Compose file. Identity, Response, Logistics, and Postgres containers were healthy; no test database, test container, reset, seeding, or volume deletion was used. The T8/T9/T14 smokes created persistent synthetic demo rows; auth and audit access smokes cleaned up their temporary Identity actors.
+
+## T19 contracts, traceability, and handoff — refreshed 2026-10-15
 
 Added `backend/scripts/contracts/openapi.mjs` and `openapi-details.mjs`, plus focused exporter tests. The dependency-free exporter currently inventories 192 NestJS routes and records source file/handler provenance and explicit route-level security. The snapshots include Identity 33, Response 79, and Logistics 80 operations; current `x-c48-contract-gap` counts are zero. The 47 Logistics handlers that previously had gap markers now use source-defined projections, and the T8 membership/leader routes are in the Response inventory. Focused assertions cover these projections, corrected list/report schemas, selected catalog-backed error codes/statuses, DTO constraints, and security alternatives. They do not exhaustively compare every runtime error branch or perform general JSON Schema semantic validation. `docs/backend/T19-traceability.md` maps UR/FR/NFR derivations, identifies OpenAPI-slice exclusions, records user-guide inputs, and separates executed checks from remaining gates.
 
-The original T19 verification passed 96 Jest suites / 404 tests and 48 Node tests. The latest full check passed 101 Jest suites / 476 tests and 59 Node tests, both TypeScript checks, build for all services, and contract checks. After the later T8 routes and current T18 audit endpoint, the inventory is 33/79/80. Two consecutive exports matched hashes: Identity `a1595450effa…`, Response `eb8e4d9343ec…`, Logistics `23613b86ca9f…`. The exporter still rejects Path Item `$ref`s before route projection, detects dangling path-level refs and duplicate normalized controller routes, and validates before writing.
+The original T19 verification passed 96 Jest suites / 404 tests and 48 Node tests. The latest full check passed 102 Jest suites / 483 tests and 64 Node tests, both TypeScript checks, build for all services, and contract checks. After the later T8 routes and current T18 audit endpoint, the inventory is 33/79/80. Two consecutive exports matched hashes: Identity `a1595450effa…`, Response `eb8e4d9343ec…`, Logistics `23613b86ca9f…`. The exporter still rejects Path Item `$ref`s before route projection, detects dangling path-level refs and duplicate normalized controller routes, and validates before writing. The latest export/check produced no OpenAPI snapshot diff.
 
 Formal stocktakes under FR-REC-02 are deferred by the plan and outside this contract slice. Remaining T18 and T17 acceptance gates are listed in the traceability file. See the ordered task table for the next backend phase and the current acceptance ledger before starting work.
 
 ## Next concrete action
 
-Arrange an approved isolated recovery destination and obtain the AIStor lab artifact/license to close the T5 and TC-29 gates. Then schedule the remaining T18 ingress, transaction/pool, full log review, client-accessibility, and performance checks; capture a representative-scale audit query plan before deciding whether a new index is needed. For T17, collect populated donation and fulfillment examples from authorized existing data, capture Web/Mobile stale/unavailable behavior, and identify a safe representative-scale `EXPLAIN` method without seeding irreversible rows into the primary ledger. The acceptance matrix in [T19 traceability](T19-traceability.md) is the current gate ledger.
+Next: arrange an approved isolated recovery destination and obtain the AIStor lab artifact/license for T5/TC-29. For T17, use safe authorized data to capture populated donation and fulfillment examples, complete client dashboard evidence, and identify a representative-scale `EXPLAIN` method without inserting irreversible fixtures into the primary ledger. Schedule the remaining T18 ingress, pool saturation, full log review, client accessibility, audit query-plan, restore, and performance evidence. Do not treat the passing full suite or API smokes as closure of those external gates. The acceptance matrix in [T19 traceability](T19-traceability.md) is the current gate ledger.
