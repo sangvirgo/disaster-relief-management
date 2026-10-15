@@ -3,6 +3,52 @@ import { RequestResolutionFinalizer } from '../src/resolution/request-resolution
 import { RequestResolutionRecoveryService } from '../src/resolution/request-resolution-recovery.service';
 
 describe('RequestResolutionRecoveryService', () => {
+  it('runs only the recovery worker when its specific setting is enabled', () => {
+    const previousScheduler = process.env.SCHEDULER_ENABLED;
+    const previousRecovery = process.env.RESOLUTION_RECOVERY_ENABLED;
+    jest.useFakeTimers();
+    process.env.SCHEDULER_ENABLED = 'false';
+    process.env.RESOLUTION_RECOVERY_ENABLED = 'true';
+    try {
+      const service = new RequestResolutionRecoveryService({} as never, {} as never);
+
+      service.onModuleInit();
+
+      expect(jest.getTimerCount()).toBe(1);
+      service.onModuleDestroy();
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+      if (previousScheduler === undefined) delete process.env.SCHEDULER_ENABLED;
+      else process.env.SCHEDULER_ENABLED = previousScheduler;
+      if (previousRecovery === undefined) delete process.env.RESOLUTION_RECOVERY_ENABLED;
+      else process.env.RESOLUTION_RECOVERY_ENABLED = previousRecovery;
+    }
+  });
+
+  it('keeps recovery enabled with the global scheduler setting', () => {
+    const previousScheduler = process.env.SCHEDULER_ENABLED;
+    const previousRecovery = process.env.RESOLUTION_RECOVERY_ENABLED;
+    jest.useFakeTimers();
+    process.env.SCHEDULER_ENABLED = 'true';
+    process.env.RESOLUTION_RECOVERY_ENABLED = 'false';
+    try {
+      const service = new RequestResolutionRecoveryService({} as never, {} as never);
+
+      service.onModuleInit();
+
+      expect(jest.getTimerCount()).toBe(1);
+      service.onModuleDestroy();
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+      if (previousScheduler === undefined) delete process.env.SCHEDULER_ENABLED;
+      else process.env.SCHEDULER_ENABLED = previousScheduler;
+      if (previousRecovery === undefined) delete process.env.RESOLUTION_RECOVERY_ENABLED;
+      else process.env.RESOLUTION_RECOVERY_ENABLED = previousRecovery;
+    }
+  });
+
   it('skips the scan when another worker holds the advisory lock and releases its runner', async () => {
     const runner = {
       connect: jest.fn(async () => undefined),

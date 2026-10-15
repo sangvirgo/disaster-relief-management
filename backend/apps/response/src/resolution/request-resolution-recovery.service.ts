@@ -25,7 +25,7 @@ export class RequestResolutionRecoveryService implements OnModuleInit, OnModuleD
   ) {}
 
   onModuleInit(): void {
-    if (process.env.SCHEDULER_ENABLED !== 'true') return;
+    if (process.env.SCHEDULER_ENABLED !== 'true' && process.env.RESOLUTION_RECOVERY_ENABLED !== 'true') return;
     this.active = true;
     this.scheduleNext();
   }
