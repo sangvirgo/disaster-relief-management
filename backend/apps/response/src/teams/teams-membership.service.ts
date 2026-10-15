@@ -165,7 +165,7 @@ export class TeamsMembershipService {
           [teamId, userId],
         ) as [Array<{ left_at: Date | string }>, number];
         if (!updated?.[0]) throw new AppError('NOT_FOUND', { status: 404 });
-        await this.audit(manager, session.userId, 'TEAM_MEMBER_REMOVED', teamId, userId,
+        await this.auditMember(manager, session.userId, 'TEAM_MEMBER_REMOVED', teamId, userId,
           { team_id: teamId, user_id: userId, member_role: member.member_role },
           { team_id: teamId, user_id: userId, member_role: member.member_role, left_at: updated[0].left_at });
         return { status: 204, value: null, resource: null };

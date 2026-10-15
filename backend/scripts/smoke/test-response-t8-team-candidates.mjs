@@ -10,7 +10,7 @@ function assertVietnamese(result, status, code) {
 
 async function addCandidateTeam(responseDb, organizationId, coordinatorId, {
   id = randomUUID(), name, position, skills = ['T8_A', 'T8_C'], teamOrganizationId = organizationId,
-  regionCode = 'T8_REGION', reportingMode = 'COORDINATOR', availability = 'AVAILABLE', status = 'ACTIVE',
+  regionCode, reportingMode = 'COORDINATOR', availability = 'AVAILABLE', status = 'ACTIVE',
   readinessRequired = false, externalContactNote = 'Liên hệ kiểm thử T8',
 }) {
   await responseDb.query(
@@ -31,7 +31,8 @@ async function addCandidateTeam(responseDb, organizationId, coordinatorId, {
   return id;
 }
 
-export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter, coordinator, otherRegionCoordinator, organizationId, appTeam, call, key }) {
+export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter, coordinator, otherRegionCoordinator, organizationId, regionCode, otherRegionCode, appTeam, call, key }) {
+  const addTeam = (options) => addCandidateTeam(responseDb, organizationId, coordinator.id, { regionCode, ...options });
   await responseDb.query("INSERT INTO incident_category (code,display_name) VALUES ('T8_TEAM_CANDIDATES','Kiểm thử chọn đội') ON CONFLICT (code) DO NOTHING");
   await responseDb.query(
     `INSERT INTO incident_category_skill (category_code,skill_code) VALUES ('T8_TEAM_CANDIDATES','T8_A'),('T8_TEAM_CANDIDATES','T8_C')
@@ -47,12 +48,12 @@ export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter
     headers: { Authorization: `Bearer ${reporter.token}`, 'Idempotency-Key': key() },
   });
   assert.equal(request.status, 201, JSON.stringify(request.value));
-  await responseDb.query("UPDATE assistance_request SET region_code='T8_REGION' WHERE id=$1", [request.value.id]);
+  await responseDb.query('UPDATE assistance_request SET region_code=$2 WHERE id=$1', [request.value.id, regionCode]);
 
   const checkedScope = await responseDb.query(
     'SELECT organization_id,region_code FROM assistance_request WHERE id=$1', [request.value.id],
   );
-  assert.deepEqual(checkedScope.rows, [{ organization_id: organizationId, region_code: 'T8_REGION' }]);
+  assert.deepEqual(checkedScope.rows, [{ organization_id: organizationId, region_code: regionCode }]);
 
   const endpoint = `requests/${request.value.id}/team-candidates`;
   assertVietnamese(await call(responseUrl, endpoint), 401, 'UNAUTHENTICATED');
@@ -67,41 +68,41 @@ export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter
   assert.match(invalidRadius.value?.message ?? '', /[\u0102-\u01b0\u1ea0-\u1ef9]/u, 'expected Vietnamese validation copy');
 
   await responseDb.query('INSERT INTO team_skill (team_id,skill_code) VALUES ($1,\'T8_C\') ON CONFLICT DO NOTHING', [appTeam.value.id]);
-  const staleTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+  const staleTeam = await addTeam({
     name: 'vị trí cũ', position: { longitude: 104.5, latitude: 14.5, captured_at: new Date(Date.now() - 31 * 60_000) },
   });
-  const missingTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, { name: 'thiếu vị trí' });
-  const futureTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+  const missingTeam = await addTeam({ name: 'thiếu vị trí' });
+  const futureTeam = await addTeam({
     name: 'thời gian tương lai', position: { longitude: 104.5, latitude: 14.5, captured_at: new Date(Date.now() + 60_000) },
   });
-  const busyTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, { name: 'đang có nhiệm vụ' });
-  const farTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+  const busyTeam = await addTeam({ name: 'đang có nhiệm vụ' });
+  const farTeam = await addTeam({
     name: 'ngoài bán kính', position: { longitude: 104.9, latitude: 14.5, captured_at: new Date() },
   });
-  const missingSkillTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+  const missingSkillTeam = await addTeam({
     name: 'thiếu kỹ năng', skills: ['T8_A'], position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
   });
-  const wrongOrganizationTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+  const wrongOrganizationTeam = await addTeam({
     name: 'sai tổ chức', teamOrganizationId: randomUUID(),
     position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
   });
-  const wrongRegionTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
-    name: 'sai khu vực', regionCode: 'T8_OTHER',
+  const wrongRegionTeam = await addTeam({
+    name: 'sai khu vực', regionCode: otherRegionCode,
     position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
   });
-  const unavailableTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+  const unavailableTeam = await addTeam({
     name: 'không sẵn sàng', availability: 'UNAVAILABLE',
     position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
   });
-  const readinessRequiredTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+  const readinessRequiredTeam = await addTeam({
     name: 'cần kiểm tra sẵn sàng', readinessRequired: true,
     position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
   });
-  const inactiveTeam = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+  const inactiveTeam = await addTeam({
     name: 'đội ngừng hoạt động', status: 'INACTIVE',
     position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
   });
-  const appTeamWithoutLeader = await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+  const appTeamWithoutLeader = await addTeam({
     name: 'đội ứng dụng thiếu trưởng đội', reportingMode: 'APP',
     position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
   });
@@ -182,17 +183,17 @@ export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter
   });
   assert.equal(p1Request.status, 201, JSON.stringify(p1Request.value));
   await responseDb.query(
-    "UPDATE assistance_request SET region_code='T8_REGION',priority='P1',priority_basis='COMPLETE' WHERE id=$1",
-    [p1Request.value.id],
+    "UPDATE assistance_request SET region_code=$2,priority='P1',priority_basis='COMPLETE' WHERE id=$1",
+    [p1Request.value.id, regionCode],
   );
 
   const fartherTeamId = `0${randomUUID().slice(1)}`;
   const nearestTeamId = `f${randomUUID().slice(1)}`;
   assert.ok(fartherTeamId < nearestTeamId, 'farther team id sorts first to expose a rounded-distance tie');
-  await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+  await addTeam({
     id: fartherTeamId, name: 'P1 xa hơn', position: { longitude: 105.2000012, latitude: 15.2, captured_at: new Date() },
   });
-  await addCandidateTeam(responseDb, organizationId, coordinator.id, {
+  await addTeam({
     id: nearestTeamId, name: 'P1 gần hơn', position: { longitude: 105.200001, latitude: 15.2, captured_at: new Date() },
   });
 
@@ -220,7 +221,7 @@ export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter
   assert.equal(p1Candidates.value.items[0].distance_m, p1Candidates.value.items[1].distance_m);
 
   const requestScope = checkedScope.rows[0];
-  await responseDb.query("UPDATE assistance_request SET region_code='T8_OTHER' WHERE id=$1", [request.value.id]);
+  await responseDb.query('UPDATE assistance_request SET region_code=$2 WHERE id=$1', [request.value.id, otherRegionCode]);
   const staleTarget = await responseDb.query(
     `SELECT r.id FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
       WHERE r.id=$1 AND r.organization_id=$2 AND r.region_code IS NOT DISTINCT FROM $3`,

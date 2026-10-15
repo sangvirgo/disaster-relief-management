@@ -10,8 +10,12 @@ const responseUrl = process.env.C48_RESPONSE_BASE_URL;
 const identityUrl = process.env.C48_IDENTITY_BASE_URL;
 const responseDb = new Client({ connectionString: process.env.C48_RESPONSE_DATABASE_URL });
 const identityDb = new Client({ connectionString: process.env.C48_IDENTITY_DATABASE_URL });
-const organizationId = '40000000-0000-4000-8000-000000000004';
-let identityIpSequence = 1;
+const organizationId = process.env.DEMO_INTAKE_ORGANIZATION_ID;
+assert.ok(organizationId, 'DEMO_INTAKE_ORGANIZATION_ID is required');
+const runSuffix = randomBytes(5).toString('hex').toUpperCase();
+const regionCode = `T8_${runSuffix}`;
+const otherRegionCode = `T8_OTHER_${runSuffix}`;
+let identityIpSequence = 32 + randomBytes(1)[0] % 160;
 
 function identityIp() { return `198.51.100.${identityIpSequence++}`; }
 function key() { return randomUUID(); }
@@ -35,20 +39,34 @@ function assertVietnameseError(result, status, code) {
   assert.equal(result.headers.get('cache-control'), 'no-store');
 }
 
-async function waitForTeamRowLockWaits(database, blockerPid, minimum) {
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
-    const result = await database.query(
-      `SELECT count(*)::int AS count FROM pg_stat_activity
-        WHERE datname=current_database() AND pid<>$1 AND wait_event_type='Lock'
-          AND $1=ANY(pg_blocking_pids(pid))
-          AND query ILIKE '%FROM rescue_team t%'`,
-      [blockerPid],
-    );
-    if (result.rows[0].count >= minimum) return;
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-  assert.fail(`Timed out waiting for ${minimum} team command(s) on the locked rescue_team row`);
+async function waitForTeamRowLockWaits(database, blockerPid, minimum, pendingCommands) {
+  const waiters = (async () => {
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      const result = await database.query(
+        `SELECT pid,pg_blocking_pids(pid) AS blockers FROM pg_stat_activity
+          WHERE datname=current_database() AND pid<>$1`,
+        [blockerPid],
+      );
+      const directWaiters = new Set(
+        result.rows.filter(({ blockers }) => blockers.includes(blockerPid)).map(({ pid }) => pid),
+      );
+      const queuedWaiters = new Set(
+        result.rows.filter(({ pid, blockers }) => blockers.some((blockedBy) => directWaiters.has(blockedBy))).map(({ pid }) => pid),
+      );
+      const blocked = new Set([...directWaiters, ...queuedWaiters]);
+      if (blocked.size >= minimum) return blocked;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.fail(`Timed out waiting for ${minimum} team command(s) on the locked rescue_team row`);
+  })();
+  const completed = Promise.race(pendingCommands.map((pending) => pending.then(
+    (result) => ({ result }), (error) => ({ error }),
+  )));
+  const outcome = await Promise.race([waiters.then((blocked) => ({ blocked })), completed]);
+  if (outcome.blocked) return outcome.blocked;
+  if (outcome.error) throw outcome.error;
+  assert.fail(`Team command completed before ${minimum} lock waiters appeared: HTTP ${outcome.result.status} ${JSON.stringify(outcome.result.value)}`);
 }
 
 async function registerAndLogin(label, regionCode) {
@@ -89,7 +107,7 @@ async function createAppTeam(coordinatorToken, leaderUserId, name = `Đội ứn
   return call(responseUrl, 'teams', {
     method: 'POST',
     body: {
-      name, organization_id: organizationId, operating_region_code: 'T8_REGION',
+      name, organization_id: organizationId, operating_region_code: regionCode,
       team_kind: 'VOLUNTEER', reporting_mode: 'APP', leader_user_id: leaderUserId, skill_codes: ['T8_A'],
     },
     headers: { Authorization: `Bearer ${coordinatorToken}`, 'Idempotency-Key': key() },
@@ -109,13 +127,14 @@ try {
     [organizationId],
   );
   await identityDb.query(
-    `INSERT INTO region (code,name) VALUES ('T8_REGION','Khu vực T8'),('T8_OTHER','Khu vực khác T8') ON CONFLICT (code) DO NOTHING`,
+    `INSERT INTO region (code,name) VALUES ($1,$2),($3,$4) ON CONFLICT (code) DO NOTHING`,
+    [regionCode, 'Khu vực T8', otherRegionCode, 'Khu vực khác T8'],
   );
   await responseDb.query(
     `INSERT INTO region_boundary (region_code,geom) VALUES
-      ('T8_REGION',ST_Multi(ST_GeomFromText('POLYGON((104 14,106 14,106 16,104 16,104 14))',4326))),
-      ('T8_OTHER',ST_Multi(ST_GeomFromText('POLYGON((107 14,109 14,109 16,107 16,107 14))',4326)))
-     ON CONFLICT (region_code) DO NOTHING`,
+      ($1,ST_Multi(ST_GeomFromText('POLYGON((104 14,106 14,106 16,104 16,104 14))',4326))),
+      ($2,ST_Multi(ST_GeomFromText('POLYGON((107 14,109 14,109 16,107 16,107 14))',4326)))
+     ON CONFLICT (region_code) DO NOTHING`, [regionCode, otherRegionCode],
   );
   await responseDb.query(
     `INSERT INTO skill (code,display_name) VALUES ('T8_A','Kỹ năng A'),('T8_B','Kỹ năng B'),('T8_C','Kỹ năng C') ON CONFLICT (code) DO NOTHING`,
@@ -123,7 +142,8 @@ try {
 
   const reporter = await registerAndLogin('reporter');
   const coordinator = await registerAndLogin('coordinator');
-  const otherRegionCoordinator = await registerAndLogin('other', 'T8_OTHER');
+  const otherRegionCoordinator = await registerAndLogin('other', otherRegionCode);
+  const overdueReader = await registerAndLogin('overdue-reader', regionCode);
   await identityDb.query(
     `INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)
      ON CONFLICT (user_id,organization_id) DO UPDATE SET status='ACTIVE'`,
@@ -152,7 +172,7 @@ try {
   const createBody = {
     name: 'Đội cứu hộ không dùng ứng dụng',
     organization_id: organizationId,
-    operating_region_code: 'T8_REGION',
+    operating_region_code: regionCode,
     team_kind: 'GOVERNMENT',
     reporting_mode: 'COORDINATOR',
     external_contact_note: externalContact,
@@ -177,7 +197,7 @@ try {
   assert.equal(replayed.headers.get('idempotent-replay'), 'true');
   assert.equal(replayed.value.id, created.value.id);
 
-  const teamPage = await call(responseUrl, 'teams?region_code=T8_REGION&limit=10', {
+  const teamPage = await call(responseUrl, `teams?region_code=${regionCode}&limit=10`, {
     headers: { Authorization: `Bearer ${coordinator.token}` },
   });
   assert.equal(teamPage.status, 200, JSON.stringify(teamPage.value));
@@ -401,7 +421,7 @@ try {
   const nonexistentLeaderTeam = await responseDb.query('SELECT id FROM rescue_team WHERE name=$1', [nonexistentLeaderName]);
   assert.equal(nonexistentLeaderTeam.rowCount, 0, 'a nonexistent leader must not create a team');
 
-  const outOfScope = await call(responseUrl, 'teams?region_code=T8_REGION&limit=10', {
+  const outOfScope = await call(responseUrl, `teams?region_code=${regionCode}&limit=10`, {
     headers: { Authorization: `Bearer ${otherRegionCoordinator.token}` },
   });
   assert.equal(outOfScope.status, 200, JSON.stringify(outOfScope.value));
@@ -415,10 +435,12 @@ try {
   assert.equal(memberCount.rows[0].count, 0, 'COORDINATOR teams must not create fake user accounts or memberships');
   const storedContact = await responseDb.query('SELECT external_contact_note FROM rescue_team WHERE id=$1', [created.value.id]);
   assert.equal(storedContact.rows[0].external_contact_note, externalContact);
-  await runTeamCandidatesSmoke({ responseDb, responseUrl, reporter, coordinator, otherRegionCoordinator, organizationId, appTeam, call, key });
+  await runTeamCandidatesSmoke({
+    responseDb, responseUrl, reporter, coordinator, otherRegionCoordinator, organizationId, regionCode, otherRegionCode, appTeam, call, key,
+  });
   await runMissionSmoke({
-    responseDb, responseUrl, reporter, coordinator, otherRegionCoordinator, appTeam,
-    coordinatorTeam: created, organizationId, call, key, assertVietnameseError,
+    responseDb, responseUrl, reporter, coordinator, otherRegionCoordinator, overdueReader, appTeam,
+    coordinatorTeam: created, organizationId, regionCode, call, key, assertVietnameseError,
   });
 
   const activeMember = await registerAndLogin('active-member-without-grants');
@@ -672,16 +694,15 @@ try {
     transactionOpen = true;
     await lockDb.query('SELECT id FROM rescue_team WHERE id=$1 FOR UPDATE', [appTeam.value.id]);
     const blockerPid = (await lockDb.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
-    pendingRace = Promise.allSettled([
-      call(responseUrl, `teams/${appTeam.value.id}/leader`, {
-        method: 'POST', body: { user_id: targetUserId, expected_version: removalTransferVersion },
-        headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
-      }),
-      call(responseUrl, `teams/${appTeam.value.id}/members/${targetUserId}/remove`, {
-        method: 'POST', headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
-      }),
-    ]);
-    await waitForTeamRowLockWaits(responseDb, blockerPid, 2);
+    const transferPending = call(responseUrl, `teams/${appTeam.value.id}/leader`, {
+      method: 'POST', body: { user_id: targetUserId, expected_version: removalTransferVersion },
+      headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+    });
+    const removalPending = call(responseUrl, `teams/${appTeam.value.id}/members/${targetUserId}/remove`, {
+      method: 'POST', headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+    });
+    pendingRace = Promise.allSettled([transferPending, removalPending]);
+    await waitForTeamRowLockWaits(responseDb, blockerPid, 2, [transferPending, removalPending]);
     await lockDb.query('COMMIT');
     transactionOpen = false;
     const raceResults = await pendingRace;

@@ -256,7 +256,9 @@ describe('TeamsMembershipService', () => {
     });
     expect(state.members.get(userId)?.left_at).toEqual(joinedAt);
     expect(managerQuery.mock.calls.some(([sql]) => String(sql).startsWith('DELETE FROM team_member'))).toBe(false);
-    expect(state.auditActions).toContain('TEAM_MEMBER_REMOVED');
+    expect(state.auditEvents).toContainEqual(expect.objectContaining({
+      entity_type: 'team_member', entity_id: `${teamId}:${userId}`, action: 'TEAM_MEMBER_REMOVED',
+    }));
   });
 
   it('prevents removal of the active leader', async () => {
