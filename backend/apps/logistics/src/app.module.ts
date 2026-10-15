@@ -7,9 +7,8 @@ import { CatalogModule } from './catalog/catalog.module';
 import { InitialLogistics1710000000000 } from './database/migrations/InitialLogistics1710000000000';
 import { ReceiptsModule } from './receipts/receipts.module';
 import { StockModule } from './stock/stock.module';
-import { DrivesModule } from './drives/drives.module';
 import { NeedsModule } from './needs/needs.module';
-import { DistributionsModule } from './distributions/distributions.module';
+import { EvidenceModule } from './evidence/evidence.module';
 import { FulfillmentCyclesModule } from './fulfillment-cycles/fulfillment-cycles.module';
 import { ReportsModule } from './reports/reports.module';
 
@@ -20,9 +19,8 @@ import { ReportsModule } from './reports/reports.module';
     CatalogModule,
     AssetsModule,
     StockModule,
-    DrivesModule,
+    EvidenceModule,
     NeedsModule,
-    DistributionsModule,
     FulfillmentCyclesModule,
     ReceiptsModule,
     ReportsModule,

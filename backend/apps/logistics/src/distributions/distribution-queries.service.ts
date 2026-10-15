@@ -7,7 +7,10 @@ import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/tec
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { hasWarehouseScope, stockWarehouseScopeSql } from '../stock/stock.scope';
 import { DistributionListQueryDto } from './distributions.dto';
+import type { DistributionHandoffKind } from './distributions.helpers';
 import { distributionView, loadDistribution, loadDistributions, readDistributionLines } from './distributions.read';
+import { requireHandoffReadPermission } from './handoff-permissions.helpers';
+import { readHandoffView } from './handoffs.read';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -82,5 +85,47 @@ export class DistributionQueriesService {
     requireReadScope(session.grants, distribution.organization_id, distribution.warehouse_region_code);
     const groupedLines = await readDistributionLines(this.dataSource, [id]);
     return distributionView(distribution, groupedLines.get(id) ?? []);
+  }
+
+  async handoffDetail(distributionId: string, handoffId: string, request: Request): Promise<Record<string, unknown>> {
+    const session = await this.sessions.require(request);
+    const distribution = await loadDistribution(this.dataSource, distributionId);
+    requireReadScope(session.grants, distribution.organization_id, distribution.warehouse_region_code);
+    const handoffs = await this.dataSource.query(
+      'SELECT h.handoff_kind FROM handoff_record h WHERE h.distribution_id=$1 AND h.id=$2',
+      [distributionId, handoffId],
+    ) as Array<{ handoff_kind: DistributionHandoffKind }>;
+    const handoffKindRow = handoffs[0];
+    if (!handoffKindRow) throw new AppError('NOT_FOUND', { status: 404 });
+    requireHandoffReadPermission(session.grants, handoffKindRow.handoff_kind, distribution);
+
+    const [handoff, evidenceRows] = await Promise.all([
+      readHandoffView(this.dataSource, distributionId, handoffId),
+      this.dataSource.query(
+        `SELECT a.id,a.state,a.size_bytes,a.detected_mime,a.created_at
+           FROM logistics_attachment a
+          WHERE a.handoff_id=$1 AND a.state='READY'
+            AND EXISTS (SELECT 1 FROM handoff_record h WHERE h.id=$1 AND h.distribution_id=$2)
+          ORDER BY a.created_at,a.id`,
+        [handoffId, distributionId],
+      ) as Promise<Array<{
+        id: string;
+        state: 'READY';
+        size_bytes: number | string;
+        detected_mime: string;
+        created_at: Date | string;
+      }>>,
+    ]);
+
+    return {
+      ...handoff,
+      evidence: evidenceRows.map((row) => ({
+        id: row.id,
+        state: row.state,
+        size_bytes: Number(row.size_bytes),
+        detected_mime: row.detected_mime,
+        created_at: new Date(row.created_at).toISOString(),
+      })),
+    };
   }
 }

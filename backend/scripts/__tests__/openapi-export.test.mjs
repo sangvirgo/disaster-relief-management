@@ -856,6 +856,46 @@ test('T12 Logistics recovery and attachment routes document one-use recovery and
   assert.ok(download.security.some((requirement) => requirement.DonationSecret));
 });
 
+test('T15 Logistics handoff detail documents kind-specific permissions and forbidden response', () => {
+  const logistics = exportService('logistics').document;
+  const detail = operationById(logistics, 'logisticsDistributionsHandoffDetail');
+
+  assert.ok(detail);
+  assert.match(detail.description, /matching warehouse scope/u);
+  for (const permission of ['HANDOFF_RECORD', 'DONATION_INTAKE', 'DISTRIBUTION_DISPATCH', 'LOSS_APPROVE']) {
+    assert.ok(detail.description.includes(permission), `handoff detail documents ${permission}`);
+  }
+  assert.ok(detail.responses['403'].content['application/json'].examples.FORBIDDEN);
+  assert.ok(detail.responses['404'].content['application/json'].examples.NOT_FOUND);
+});
+
+test('T15 Logistics handoff evidence upload and download document scoped access rules', () => {
+  const logistics = exportService('logistics').document;
+  const upload = operationById(logistics, 'logisticsDistributionsUploadHandoffEvidence');
+  const download = operationById(logistics, 'logisticsDonationsDownloadEvidence');
+
+  assert.ok(upload && download);
+  assert.equal(download.summary, 'EvidenceController.download');
+  assert.match(upload.description, /authenticated session/u);
+  assert.match(upload.description, /warehouse scope/u);
+  for (const permission of ['HANDOFF_RECORD', 'DONATION_INTAKE', 'DISTRIBUTION_DISPATCH']) {
+    assert.ok(upload.description.includes(permission), `handoff upload documents ${permission}`);
+  }
+  assert.match(upload.description, /LOSS_APPROVE alone does not permit upload/u);
+  assert.match(download.description, /on every request/u);
+  assert.match(download.description, /60 seconds/u);
+  assert.match(download.description, /outside the required scope or without applicable permission returns 403 FORBIDDEN/u);
+  assert.match(download.description, /missing or non-READY evidence returns 404 NOT_FOUND/u);
+  for (const permission of ['HANDOFF_RECORD', 'DONATION_INTAKE', 'DISTRIBUTION_DISPATCH', 'LOSS_APPROVE', 'DONATION_REVIEW']) {
+    assert.ok(download.description.includes(permission), `evidence download documents ${permission}`);
+  }
+  for (const operation of [upload, download]) {
+    for (const [status, code] of [['401', 'UNAUTHENTICATED'], ['403', 'FORBIDDEN'], ['404', 'NOT_FOUND']]) {
+      assert.ok(operation.responses[status]?.content?.['application/json']?.examples?.[code], `${operation.operationId} documents ${status} ${code}`);
+    }
+  }
+});
+
 test('documented route errors include verification, mission, donation, and quantity conflicts', () => {
   const documents = Object.fromEntries(['identity', 'response', 'logistics'].map((service) => [service, exportService(service).document]));
   const catalog = catalogErrors();

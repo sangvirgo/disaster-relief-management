@@ -58,6 +58,29 @@ async function call(base, path, { method = 'GET', body, actor, idempotencyKey, h
   return { status: response.status, headers: response.headers, value };
 }
 
+async function callMultipart(base, path, { file, actor, idempotencyKey = key() }) {
+  const boundary = `c48-t15-${randomUUID()}`;
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="handoff-evidence.png"\r\nContent-Type: image/png\r\n\r\n`),
+    file,
+    Buffer.from(`\r\n--${boundary}--\r\n`),
+  ]);
+  const response = await fetch(`${base}/${path}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${actor.token}`,
+      'Idempotency-Key': idempotencyKey,
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      'Content-Length': String(body.length),
+    },
+    body,
+  });
+  const text = await response.text();
+  let value;
+  try { value = text ? JSON.parse(text) : undefined; } catch { value = text; }
+  return { status: response.status, headers: response.headers, value };
+}
+
 function command(base, path, actor, body, idempotencyKey = key(), method = 'POST') {
   return call(base, path, { method, actor, body, idempotencyKey });
 }
@@ -172,10 +195,11 @@ async function verifyRequest(request, coordinator) {
   assert.equal(verified.status, 200, JSON.stringify(verified.value));
 }
 
-async function createDistribution(actor, warehouseId, itemId, quantity, reliefPointId = null, commitmentId = null) {
+async function createDistribution(actor, warehouseId, itemId, quantity, reliefPointId = null, commitmentId = null, vehicleId = null) {
   const body = {
     warehouse_id: warehouseId,
     ...(reliefPointId ? { relief_point_id: reliefPointId } : {}),
+    ...(vehicleId ? { vehicle_id: vehicleId } : {}),
     purpose: commitmentId ? 'REQUEST_AID' : 'POINT_REPLENISHMENT',
     lines: [{ item_id: itemId, quantity, ...(commitmentId ? { commitment_id: commitmentId } : {}) }],
   };
@@ -242,6 +266,15 @@ try {
     organization_id: organizationId, region_code: regionCode, name: `Kho phân phối T15 ${suffix}`,
   });
   expectSuccess(warehouse, 201);
+  const lowCapacityVehicle = await command(logisticsUrl, 'vehicles', staff, {
+    organization_id: organizationId,
+    region_code: regionCode,
+    identifier: `T15-${suffix}`,
+    vehicle_type: 'Xe tải kiểm thử',
+    capacity: '1.00',
+    capacity_unit: unit.value.code,
+  });
+  expectSuccess(lowCapacityVehicle, 201);
   const opening = await command(logisticsUrl, 'stock/opening', staff, {
     warehouse_id: warehouse.value.id,
     lines: [{ item_id: item.value.id, quantity: '25.00' }],
@@ -290,13 +323,22 @@ try {
   expectSuccess(commitmentResult, 201);
   const commitmentId = commitmentResult.value.id;
 
+  const underCapacity = await createDistribution(
+    staff, warehouse.value.id, item.value.id, '1.00', null, commitmentId, lowCapacityVehicle.value.id,
+  );
+  assert.equal((await distributionDetail(underCapacity.id, staff)).vehicle_capacity_exceeded, false);
+  expectSuccess(await command(logisticsUrl, `distributions/${underCapacity.id}/cancel`, staff, { expected_version: 1 }));
+
   const frozenCandidate = await createDistribution(staff, warehouse.value.id, item.value.id, '5.00', null, commitmentId);
   const frozenCandidateApproval = await command(logisticsUrl, `distributions/${frozenCandidate.id}/approve`, approver, { expected_version: 1 });
   expectSuccess(frozenCandidateApproval);
 
-  const requestAid = await createDistribution(staff, warehouse.value.id, item.value.id, '1.00', null, commitmentId);
+  const requestAid = await createDistribution(
+    staff, warehouse.value.id, item.value.id, '1.00', null, commitmentId, lowCapacityVehicle.value.id,
+  );
   const prepared = await command(logisticsUrl, `distributions/${requestAid.id}/prepare-from-commitments`, staff, { expected_version: 1 });
   expectSuccess(prepared);
+  assert.equal(prepared.value.vehicle_capacity_exceeded, true, 'capacity is reported as a warning during preparation');
   assert.equal(prepared.value.lines.length, 1);
   assert.equal(Number(prepared.value.lines[0].quantity), 10);
   const reducedPreparation = await command(logisticsUrl, `distributions/${requestAid.id}/lines`, staff, {
@@ -306,7 +348,13 @@ try {
   expectSuccess(reducedPreparation);
   assert.equal(Number(reducedPreparation.value.lines[0].quantity), 5);
   const issued = await approveAndDispatch(reducedPreparation.value, approver, dispatcher, 3);
+  assert.equal(issued.vehicle_capacity_exceeded, true, 'capacity is reported as a warning after dispatch');
   const requestAidLineId = issued.lines[0].id;
+  const overCapacityStock = await logisticsDb.query(
+    'SELECT on_hand::text,reserved::text FROM stock_balance WHERE warehouse_id=$1 AND item_id=$2',
+    [warehouse.value.id, item.value.id],
+  );
+  assert.deepEqual(overCapacityStock.rows, [{ on_hand: '20.000', reserved: '5.000' }], 'over-capacity dispatch still issues the reserved stock');
   const directHandoffBody = {
     handoff_kind: 'DIRECT_HOUSEHOLD',
     receiver_label: 'Hộ dân kiểm thử T15',
@@ -339,6 +387,42 @@ try {
   const recorded = await handoff(requestAid.id, fieldRecorder, directHandoffBody);
   expectSuccess(recorded.result, 201);
   assert.equal(recorded.result.value.status, 'RECORDED');
+
+  const png = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.from(`T15 handoff evidence ${suffix}`),
+  ]);
+  const uploadedEvidence = await callMultipart(
+    logisticsUrl,
+    `distributions/${requestAid.id}/handoffs/${recorded.result.value.id}/evidence`,
+    { file: png, actor: fieldRecorder },
+  );
+  if (uploadedEvidence.status === 503 && uploadedEvidence.value?.code === 'STORAGE_UNAVAILABLE') {
+    throw new Error('Logistics T15 handoff evidence upload returned STORAGE_UNAVAILABLE; start/configure the primary AIStor service before running this smoke');
+  }
+  expectSuccess(uploadedEvidence, 201);
+  assert.equal(uploadedEvidence.value.state, 'READY');
+  assert.equal(uploadedEvidence.value.detected_mime, 'image/png');
+  assert.equal(Object.hasOwn(uploadedEvidence.value, 'object_key'), false);
+
+  const handoffDetail = await call(
+    logisticsUrl, `distributions/${requestAid.id}/handoffs/${recorded.result.value.id}`, { actor: staff },
+  );
+  expectSuccess(handoffDetail);
+  assert.ok(handoffDetail.value.evidence.some((file) => file.id === uploadedEvidence.value.id && file.state === 'READY'));
+  assert.equal(JSON.stringify(handoffDetail.value.evidence).includes('object_key'), false);
+  assert.equal(JSON.stringify(handoffDetail.value.evidence).includes('signed'), false);
+
+  const evidenceDownload = await call(logisticsUrl, `evidence/${uploadedEvidence.value.id}/download`, { actor: fieldRecorder });
+  if (evidenceDownload.status === 503 && evidenceDownload.value?.code === 'STORAGE_UNAVAILABLE') {
+    throw new Error('Logistics T15 handoff evidence download returned STORAGE_UNAVAILABLE; verify the primary AIStor service before running this smoke');
+  }
+  expectSuccess(evidenceDownload);
+  assert.equal(evidenceDownload.value.expires_in, 60);
+  assert.equal(new URL(evidenceDownload.value.url).searchParams.get('X-Amz-Expires'), '60');
+  const deniedEvidenceDownload = await call(logisticsUrl, `evidence/${uploadedEvidence.value.id}/download`, { actor: reporter });
+  expectVietnameseError(deniedEvidenceDownload, 403, 'FORBIDDEN');
+
   const replay = await handoff(requestAid.id, fieldRecorder, directHandoffBody, recorded.idempotencyKey);
   expectSuccess(replay.result, 201);
   assert.equal(replay.result.headers.get('idempotent-replay'), 'true');

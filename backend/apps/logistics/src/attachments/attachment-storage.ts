@@ -5,13 +5,13 @@ import type { EvidenceMime } from '../../../../packages/technical/src/media/evid
 
 export const LOGISTICS_ATTACHMENT_STORAGE = Symbol('LOGISTICS_ATTACHMENT_STORAGE');
 
-export interface DonationAttachmentStorage {
+export interface AttachmentStorage {
   putObject(key: string, path: string, size: number, mime: EvidenceMime, checksum: string): Promise<void>;
   deleteObject(key: string): Promise<void>;
   signedGetUrl(key: string, mime: EvidenceMime, expiresIn: number): Promise<string>;
 }
 
-export interface DonationAttachmentStorageConfig {
+export interface AttachmentStorageConfig {
   nodeEnv: string;
   endpoint: string;
   publicEndpoint: string;
@@ -30,7 +30,7 @@ function validEndpoint(value: string, allowHttp: boolean): boolean {
   }
 }
 
-export function loadDonationAttachmentStorageConfig(env: Record<string, string | undefined> = process.env): DonationAttachmentStorageConfig {
+export function loadAttachmentStorageConfig(env: Record<string, string | undefined> = process.env): AttachmentStorageConfig {
   const nodeEnv = env.NODE_ENV ?? 'development';
   if (nodeEnv === 'test') {
     return {
@@ -52,11 +52,11 @@ export function loadDonationAttachmentStorageConfig(env: Record<string, string |
   return { nodeEnv, endpoint, publicEndpoint, bucket, accessKey, secretKey };
 }
 
-export class S3DonationAttachmentStorage implements DonationAttachmentStorage {
+export class S3AttachmentStorage implements AttachmentStorage {
   private readonly internal: S3Client;
   private readonly public: S3Client;
 
-  constructor(private readonly config: DonationAttachmentStorageConfig) {
+  constructor(private readonly config: AttachmentStorageConfig) {
     const credentials = { accessKeyId: config.accessKey, secretAccessKey: config.secretKey };
     this.internal = new S3Client({
       endpoint: config.endpoint, region: 'us-east-1', forcePathStyle: true, credentials,
@@ -90,7 +90,7 @@ export class S3DonationAttachmentStorage implements DonationAttachmentStorage {
   }
 }
 
-export class MemoryDonationAttachmentStorage implements DonationAttachmentStorage {
+export class MemoryAttachmentStorage implements AttachmentStorage {
   async putObject(key: string, path: string, size: number): Promise<void> {
     let actual = 0;
     for await (const chunk of createReadStream(path)) actual += Buffer.byteLength(chunk);
@@ -104,6 +104,6 @@ export class MemoryDonationAttachmentStorage implements DonationAttachmentStorag
   }
 }
 
-export function createDonationAttachmentStorage(config: DonationAttachmentStorageConfig): DonationAttachmentStorage {
-  return config.nodeEnv === 'test' ? new MemoryDonationAttachmentStorage() : new S3DonationAttachmentStorage(config);
+export function createAttachmentStorage(config: AttachmentStorageConfig): AttachmentStorage {
+  return config.nodeEnv === 'test' ? new MemoryAttachmentStorage() : new S3AttachmentStorage(config);
 }

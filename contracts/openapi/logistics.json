@@ -366,7 +366,8 @@
                               "type": "integer"
                             },
                             "vehicle_capacity_exceeded": {
-                              "type": "boolean"
+                              "type": "boolean",
+                              "description": "Warning only; exceeding capacity does not block preparation or dispatch."
                             },
                             "lines": {
                               "type": "array",
@@ -706,7 +707,8 @@
                         "type": "integer"
                       },
                       "vehicle_capacity_exceeded": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "Warning only; exceeding capacity does not block preparation or dispatch."
                       },
                       "lines": {
                         "type": "array",
@@ -1174,7 +1176,8 @@
                         "type": "integer"
                       },
                       "vehicle_capacity_exceeded": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "Warning only; exceeding capacity does not block preparation or dispatch."
                       },
                       "lines": {
                         "type": "array",
@@ -1468,7 +1471,8 @@
                         "type": "integer"
                       },
                       "vehicle_capacity_exceeded": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "Warning only; exceeding capacity does not block preparation or dispatch."
                       },
                       "lines": {
                         "type": "array",
@@ -1825,7 +1829,8 @@
                         "type": "integer"
                       },
                       "vehicle_capacity_exceeded": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "Warning only; exceeding capacity does not block preparation or dispatch."
                       },
                       "lines": {
                         "type": "array",
@@ -2182,7 +2187,8 @@
                         "type": "integer"
                       },
                       "vehicle_capacity_exceeded": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "Warning only; exceeding capacity does not block preparation or dispatch."
                       },
                       "lines": {
                         "type": "array",
@@ -3218,7 +3224,8 @@
                         "type": "integer"
                       },
                       "vehicle_capacity_exceeded": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "Warning only; exceeding capacity does not block preparation or dispatch."
                       },
                       "lines": {
                         "type": "array",
@@ -3620,7 +3627,8 @@
                         "type": "integer"
                       },
                       "vehicle_capacity_exceeded": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "Warning only; exceeding capacity does not block preparation or dispatch."
                       },
                       "lines": {
                         "type": "array",
@@ -3997,7 +4005,8 @@
                         "type": "integer"
                       },
                       "vehicle_capacity_exceeded": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "Warning only; exceeding capacity does not block preparation or dispatch."
                       },
                       "lines": {
                         "type": "array",
@@ -19929,8 +19938,8 @@
     "/evidence/{id}/download": {
       "get": {
           "operationId": "logisticsDonationsDownloadEvidence",
-          "summary": "DonationsController.downloadEvidence",
-          "description": "Route exported from backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.downloadEvidence. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
+          "summary": "EvidenceController.download",
+          "description": "Rechecks the current evidence owner and authorization on every request before issuing a private-storage signed URL valid for 60 seconds. Donation/dispute evidence is readable by the delivery owner, a valid donation capability, or scoped DONATION_INTAKE/DONATION_REVIEW staff. Handoff evidence requires current warehouse scope: HANDOFF_RECORD for normal handoffs, DONATION_INTAKE or DISTRIBUTION_DISPATCH for RETURN, and HANDOFF_RECORD or LOSS_APPROVE for LOSS. Missing authentication for handoff evidence returns 401 UNAUTHENTICATED; an authenticated caller outside the required scope or without applicable permission returns 403 FORBIDDEN; missing or non-READY evidence returns 404 NOT_FOUND. Invalid or missing donation capability without owner or staff access returns 400 DONATION_SECRET_INVALID.",
           "parameters": [
             {
               "in": "path",
@@ -20095,7 +20104,7 @@
             }
           },
           "x-c48-contract-source": "docs/backend/04-logistics-api.md",
-          "x-c48-controller-source": "backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.downloadEvidence",
+          "x-c48-controller-source": "backend/apps/logistics/src/evidence/evidence.controller.ts#EvidenceController.download",
           "security": [
             {
               "DonationSecret": []
@@ -20719,6 +20728,623 @@
                 },
                 "example": {
                   "public_code": "ABCDEFGH"
+                }
+              }
+            }
+          }
+        }
+    },
+    "/distributions/{id}/handoffs/{handoffId}": {
+      "get": {
+          "operationId": "logisticsDistributionsHandoffDetail",
+          "summary": "DistributionsController.handoffDetail",
+          "description": "Requires an authenticated session and matching warehouse scope. DIRECT_HOUSEHOLD, POINT_RECEIPT, and HOUSEHOLD_HANDOUT require HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH; LOSS requires HANDOFF_RECORD or LOSS_APPROVE. Missing permission returns 403 FORBIDDEN; out-of-scope access returns 404 NOT_FOUND. See docs/backend/04-logistics-api.md for the response shape.",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "in": "path",
+              "name": "handoffId",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Documented response projection; see the source API specification for visibility and pagination rules.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "distribution_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "handoff_kind": {
+                        "type": "string"
+                      },
+                      "source_stage": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "receiver_user_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "receiver_label": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "recorder_user_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "confirmation_basis": {
+                        "type": "string"
+                      },
+                      "occurred_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "version": {
+                        "type": "integer"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "review": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "decision": {
+                                "type": "string"
+                              },
+                              "reviewer_user_id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "reason": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "lines": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "distribution_line_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "commitment_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "quantity": {
+                              "type": "string",
+                              "description": "Decimal quantity encoded as a string and validated against the unit scale."
+                            },
+                            "unit_code": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "evidence": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "state": {
+                              "type": "string",
+                              "const": "READY"
+                            },
+                            "size_bytes": {
+                              "type": "integer"
+                            },
+                            "detected_mime": {
+                              "type": "string",
+                              "enum": [
+                                "image/jpeg",
+                                "image/png",
+                                "video/mp4"
+                              ]
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "state",
+                            "size_bytes",
+                            "detected_mime",
+                            "created_at"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "NOT_FOUND": {
+                      "summary": "NOT_FOUND",
+                      "value": {
+                        "code": "NOT_FOUND",
+                        "message": "Không tìm thấy dữ liệu yêu cầu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/04-logistics-api.md",
+          "x-c48-controller-source": "backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.handoffDetail",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": []
+            }
+          ]
+        }
+    },
+    "/distributions/{id}/handoffs/{handoffId}/evidence": {
+      "post": {
+          "operationId": "logisticsDistributionsUploadHandoffEvidence",
+          "summary": "DistributionsController.uploadHandoffEvidence",
+          "description": "Requires an authenticated session. The handoff must belong to the path distribution and be in the caller's current warehouse scope; missing, mismatched, or out-of-scope records return 404 NOT_FOUND. DIRECT_HOUSEHOLD, POINT_RECEIPT, HOUSEHOLD_HANDOUT, and LOSS require HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH. Missing authentication returns 401 UNAUTHENTICATED; an in-scope caller without the required permission returns 403 FORBIDDEN. LOSS_APPROVE alone does not permit upload. Accepts one multipart file named file and requires Idempotency-Key; returns READY private evidence metadata.",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "in": "path",
+              "name": "handoffId",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "Idempotency-Key",
+              "in": "header",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          ],
+          "responses": {
+            "201": {
+              "description": "Stored private handoff evidence metadata.",
+              "headers": {
+                "Cache-Control": {
+                  "description": "Prevents storage of the Logistics API result.",
+                  "schema": {
+                    "type": "string",
+                    "enum": [
+                      "no-store"
+                    ]
+                  }
+                },
+                "Idempotent-Replay": {
+                  "description": "Present as true when this response replays the original command result.",
+                  "schema": {
+                    "type": "string",
+                    "enum": [
+                      "true"
+                    ]
+                  }
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "state": {
+                        "type": "string",
+                        "const": "READY"
+                      },
+                      "size_bytes": {
+                        "type": "integer"
+                      },
+                      "detected_mime": {
+                        "type": "string",
+                        "enum": [
+                          "image/jpeg",
+                          "image/png",
+                          "video/mp4"
+                        ]
+                      },
+                      "checksum": {
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "state",
+                      "size_bytes",
+                      "detected_mime",
+                      "checksum",
+                      "created_at"
+                    ]
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "VALIDATION_FAILED": {
+                      "summary": "VALIDATION_FAILED",
+                      "value": {
+                        "code": "VALIDATION_FAILED",
+                        "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "IDEMPOTENCY_KEY_INVALID": {
+                      "summary": "IDEMPOTENCY_KEY_INVALID",
+                      "value": {
+                        "code": "IDEMPOTENCY_KEY_INVALID",
+                        "message": "Mã yêu cầu không hợp lệ.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "NOT_FOUND": {
+                      "summary": "NOT_FOUND",
+                      "value": {
+                        "code": "NOT_FOUND",
+                        "message": "Không tìm thấy dữ liệu yêu cầu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "EVIDENCE_LIMIT_REACHED": {
+                      "summary": "EVIDENCE_LIMIT_REACHED",
+                      "value": {
+                        "code": "EVIDENCE_LIMIT_REACHED",
+                        "message": "Đã đạt giới hạn số lượng hoặc dung lượng tệp đính kèm.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "411": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "LENGTH_REQUIRED": {
+                      "summary": "LENGTH_REQUIRED",
+                      "value": {
+                        "code": "LENGTH_REQUIRED",
+                        "message": "Yêu cầu tải tệp thiếu thông tin kích thước.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "413": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "PAYLOAD_TOO_LARGE": {
+                      "summary": "PAYLOAD_TOO_LARGE",
+                      "value": {
+                        "code": "PAYLOAD_TOO_LARGE",
+                        "message": "Tệp hoặc nội dung vượt quá giới hạn cho phép.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "415": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNSUPPORTED_MEDIA": {
+                      "summary": "UNSUPPORTED_MEDIA",
+                      "value": {
+                        "code": "UNSUPPORTED_MEDIA",
+                        "message": "Định dạng tệp không được hỗ trợ.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "503": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "STORAGE_UNAVAILABLE": {
+                      "summary": "STORAGE_UNAVAILABLE",
+                      "value": {
+                        "code": "STORAGE_UNAVAILABLE",
+                        "message": "Kho lưu trữ tệp tạm thời không khả dụng. Yêu cầu của bạn vẫn được giữ.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/04-logistics-api.md",
+          "x-c48-controller-source": "backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.uploadHandoffEvidence",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": [],
+              "CsrfToken": []
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "multipart/form-data": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "file": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  },
+                  "required": [
+                    "file"
+                  ]
                 }
               }
             }

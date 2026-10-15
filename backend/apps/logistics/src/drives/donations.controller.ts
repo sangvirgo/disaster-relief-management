@@ -58,17 +58,6 @@ export class DonationsController {
     return result.value;
   }
 
-  @Get('evidence/:id/download')
-  async downloadEvidence(
-    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
-    @Headers('x-donation-secret') secret: string | undefined,
-    @Req() request: Request,
-    @Res({ passthrough: true }) response: Response,
-  ) {
-    noStore(response);
-    return this.attachments.download(id, secret, request);
-  }
-
   @Post('public/donation-drives/:id/deliveries')
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(IdempotencyKeyInterceptor)

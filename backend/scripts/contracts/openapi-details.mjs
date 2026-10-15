@@ -259,6 +259,8 @@ const logisticsDetails = {
     response: response(object({ id, state: { type: 'string', const: 'READY' }, size_bytes: integer(), detected_mime: { type: 'string', enum: ['image/jpeg', 'image/png', 'video/mp4'] }, checksum: text, created_at: dateTime }, ['id', 'state', 'size_bytes', 'detected_mime', 'checksum', 'created_at']), 'Stored private Logistics evidence metadata.', undefined, logisticsCommandResponseHeaders),
   },
   logisticsDonationsDownloadEvidence: {
+    summary: 'EvidenceController.download',
+    description: 'Rechecks the current evidence owner and authorization on every request before issuing a private-storage signed URL valid for 60 seconds. Donation/dispute evidence is readable by the delivery owner, a valid donation capability, or scoped DONATION_INTAKE/DONATION_REVIEW staff. Handoff evidence requires current warehouse scope: HANDOFF_RECORD for normal handoffs, DONATION_INTAKE or DISTRIBUTION_DISPATCH for RETURN, and HANDOFF_RECORD or LOSS_APPROVE for LOSS. Missing authentication for handoff evidence returns 401 UNAUTHENTICATED; an authenticated caller outside the required scope or without applicable permission returns 403 FORBIDDEN; missing or non-READY evidence returns 404 NOT_FOUND. Invalid or missing donation capability without owner or staff access returns 400 DONATION_SECRET_INVALID.',
     response: response(object({ url: { type: 'string', format: 'uri' }, expires_in: { type: 'integer', const: 60 } }, ['url', 'expires_in']), 'Short-lived signed URL issued after each access check.', undefined, {
       'Cache-Control': { description: 'Prevents storage of the Logistics API result.', schema: { type: 'string', enum: ['no-store'] } },
     }),
@@ -324,6 +326,25 @@ const logisticsDetails = {
   logisticsDistributionsCancel: { request: request(object({ expected_version: version }, ['expected_version'])) },
   logisticsDistributionsReconcile: { request: request(object({ expected_version: version }, ['expected_version'])) },
   logisticsDistributionsCreateHandoff: { request: request(object({ handoff_kind: { type: 'string', enum: ['DIRECT_HOUSEHOLD', 'POINT_RECEIPT', 'HOUSEHOLD_HANDOUT', 'RETURN', 'LOSS'] }, source_stage: { type: 'string', enum: ['IN_TRANSIT', 'AT_POINT'] }, receiver_user_id: id, receiver_label: text, confirmation_basis: text, occurred_at: dateTime, lines: item({ distribution_line_id: id, quantity }, ['distribution_line_id', 'quantity']) }, ['handoff_kind', 'confirmation_basis', 'occurred_at', 'lines'])) },
+  logisticsDistributionsHandoffDetail: {
+    description: 'Requires an authenticated session and matching warehouse scope. DIRECT_HOUSEHOLD, POINT_RECEIPT, and HOUSEHOLD_HANDOUT require HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH; LOSS requires HANDOFF_RECORD or LOSS_APPROVE. Missing permission returns 403 FORBIDDEN; out-of-scope access returns 404 NOT_FOUND. See docs/backend/04-logistics-api.md for the response shape.',
+  },
+  logisticsDistributionsUploadHandoffEvidence: {
+    description: 'Requires an authenticated session. The handoff must belong to the path distribution and be in the caller\'s current warehouse scope; missing, mismatched, or out-of-scope records return 404 NOT_FOUND. DIRECT_HOUSEHOLD, POINT_RECEIPT, HOUSEHOLD_HANDOUT, and LOSS require HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH. Missing authentication returns 401 UNAUTHENTICATED; an in-scope caller without the required permission returns 403 FORBIDDEN. LOSS_APPROVE alone does not permit upload. Accepts one multipart file named file and requires Idempotency-Key; returns READY private evidence metadata.',
+    parameters: [{ name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' } }],
+    request: {
+      required: true,
+      content: { 'multipart/form-data': { schema: object({ file: { type: 'string', format: 'binary' } }, ['file']) } },
+    },
+    response: response(object({
+      id,
+      state: { type: 'string', const: 'READY' },
+      size_bytes: integer(),
+      detected_mime: { type: 'string', enum: ['image/jpeg', 'image/png', 'video/mp4'] },
+      checksum: text,
+      created_at: dateTime,
+    }, ['id', 'state', 'size_bytes', 'detected_mime', 'checksum', 'created_at']), 'Stored private handoff evidence metadata.', undefined, logisticsCommandResponseHeaders),
+  },
   logisticsDistributionsReviewLoss: { request: request(object({ expected_version: version, decision: { type: 'string', enum: ['APPROVE', 'REJECT'] }, reason: text }, ['expected_version', 'decision', 'reason'])) },
 };
 
@@ -351,7 +372,9 @@ const distributionViewSchema = object({
   purpose: text, status: text, preparer_user_id: id, approver_user_id: nullableValue(id),
   approved_version: nullableValue(integer()), dispatch_actor_user_id: nullableValue(id),
   dispatched_at: nullableValue(dateTime), reconciled_at: nullableValue(dateTime), created_at: dateTime,
-  version, vehicle_capacity_exceeded: boolean(), lines: array(distributionLineSchema),
+  version,
+  vehicle_capacity_exceeded: { type: 'boolean', description: 'Warning only; exceeding capacity does not block preparation or dispatch.' },
+  lines: array(distributionLineSchema),
 });
 const handoffViewSchema = object({
   id, distribution_id: id, handoff_kind: text, source_stage: nullableValue(text),
@@ -359,6 +382,17 @@ const handoffViewSchema = object({
   confirmation_basis: text, occurred_at: dateTime, created_at: dateTime, version, status: text,
   review: nullableValue(object({ decision: text, reviewer_user_id: id, reason: nullableValue(text) })),
   lines: item({ id, distribution_line_id: id, commitment_id: nullableValue(id), quantity, unit_code: text }),
+});
+const handoffEvidenceMetadataSchema = object({
+  id,
+  state: { type: 'string', const: 'READY' },
+  size_bytes: integer(),
+  detected_mime: { type: 'string', enum: ['image/jpeg', 'image/png', 'video/mp4'] },
+  created_at: dateTime,
+}, ['id', 'state', 'size_bytes', 'detected_mime', 'created_at']);
+const handoffDetailSchema = object({
+  ...handoffViewSchema.properties,
+  evidence: array(handoffEvidenceMetadataSchema),
 });
 const commitmentValueSchema = object({
   id, relief_need_id: id, item_id: id, warehouse_id: id, quantity, released_quantity: quantity,
@@ -575,6 +609,7 @@ const sharedLogisticsResponses = {
   logisticsDistributionsReconcile: distributionViewSchema,
   logisticsDistributionsCreateHandoff: handoffViewSchema,
   logisticsDistributionsReviewLoss: handoffViewSchema,
+  logisticsDistributionsHandoffDetail: handoffDetailSchema,
   logisticsStockBalances: page({
     balance_id: id, warehouse_id: id, item_id: id, item_name: text, item_type: text, unit_code: text,
     unit: text, scale: integer(), on_hand: quantity, reserved: quantity, available: quantity,
@@ -714,7 +749,7 @@ const routeErrorCodes = {
   logisticsDonationsIssueRecovery: ['NOT_FOUND', 'FORBIDDEN', 'VERSION_CONFLICT', 'ALREADY_CLAIMED', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_INVALID'],
   logisticsDonationsRecover: ['NOT_FOUND', 'ALREADY_CLAIMED', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_INVALID'],
   logisticsDonationsUploadEvidence: ['NOT_FOUND', 'DONATION_SECRET_INVALID', 'EVIDENCE_LIMIT_REACHED', 'LENGTH_REQUIRED', 'PAYLOAD_TOO_LARGE', 'UNSUPPORTED_MEDIA', 'STORAGE_UNAVAILABLE', 'RATE_LIMITED', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_INVALID'],
-  logisticsDonationsDownloadEvidence: ['NOT_FOUND', 'DONATION_SECRET_INVALID', 'FORBIDDEN', 'STORAGE_UNAVAILABLE', 'VALIDATION_FAILED'],
+  logisticsDonationsDownloadEvidence: ['NOT_FOUND', 'UNAUTHENTICATED', 'DONATION_SECRET_INVALID', 'FORBIDDEN', 'STORAGE_UNAVAILABLE', 'VALIDATION_FAILED'],
   logisticsDonationsTrack: ['DONATION_SECRET_INVALID'],
   logisticsDonationsReviseDeclaration: ['QUANTITY_SCALE_INVALID', 'DONATION_SECRET_INVALID', 'DECLARATION_LOCKED', 'STALE_REVISION', 'VERSION_CONFLICT'],
   logisticsDonationsAssistedDeclaration: ['QUANTITY_SCALE_INVALID', 'VERSION_CONFLICT'],
@@ -740,6 +775,8 @@ const routeErrorCodes = {
   logisticsDistributionsDispatch: ['APPROVAL_STALE', 'INSUFFICIENT_STOCK', 'POINT_INACTIVE', 'VEHICLE_INACTIVE', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   logisticsDistributionsCancel: ['ALREADY_DISPATCHED', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   logisticsDistributionsCreateHandoff: ['QUANTITY_SCALE_INVALID', 'HANDOFF_EXCEEDS_BALANCE', 'HANDOFF_KIND_INVALID', 'SETTLEMENT_EXCEEDS_ISSUED', 'STATE_TRANSITION_INVALID'],
+  logisticsDistributionsHandoffDetail: ['NOT_FOUND', 'UNAUTHENTICATED', 'FORBIDDEN'],
+  logisticsDistributionsUploadHandoffEvidence: ['NOT_FOUND', 'UNAUTHENTICATED', 'FORBIDDEN', 'EVIDENCE_LIMIT_REACHED', 'LENGTH_REQUIRED', 'PAYLOAD_TOO_LARGE', 'UNSUPPORTED_MEDIA', 'STORAGE_UNAVAILABLE', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_INVALID'],
   logisticsDistributionsReviewLoss: ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'HANDOFF_KIND_INVALID'],
   logisticsDistributionsReconcile: ['LOSS_REVIEW_REQUIRED', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   logisticsDistributionsPrepareFromCommitments: ['TOO_MANY_LINES', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'ALREADY_DISPATCHED'],
@@ -1061,6 +1098,8 @@ export function applyOpenApiDetails(document, service) {
       }
       applyErrorDetails(document, operation, service, method);
       if (!operation['x-c48-contract-source']) continue;
+      if (detail.summary) operation.summary = detail.summary;
+      if (detail.description) operation.description = detail.description;
       delete operation['x-c48-contract-gap'];
       if (detail.request) operation.requestBody = detail.request;
       if (logisticsQueryConstraints[operation.operationId]) operation['x-c48-query-constraints'] = logisticsQueryConstraints[operation.operationId];

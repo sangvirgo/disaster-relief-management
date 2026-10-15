@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post
 import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
 import type { IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
+import { HandoffAttachmentsService } from './handoff-attachments.service';
 import {
   CreateDistributionDto, CreateHandoffDto, DistributionListQueryDto, ExpectedDistributionVersionDto,
   ReplaceDistributionLinesDto, ReviewLossDto,
@@ -26,6 +27,7 @@ export class DistributionsController {
     private readonly commands: DistributionCommandsService,
     private readonly handoffs: HandoffCommandsService,
     private readonly queries: DistributionQueriesService,
+    private readonly attachments: HandoffAttachmentsService,
   ) {}
 
   @Post()
@@ -136,6 +138,30 @@ export class DistributionsController {
   ) {
     noStore(response);
     return this.commandResult(response, this.handoffs.create(id, dto, request));
+  }
+
+  @Get(':id/handoffs/:handoffId')
+  handoffDetail(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Param('handoffId', new ParseUUIDPipe({ version: 'all' })) handoffId: string,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    return this.queries.handoffDetail(id, handoffId, request);
+  }
+
+  @Post(':id/handoffs/:handoffId/evidence')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  uploadHandoffEvidence(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Param('handoffId', new ParseUUIDPipe({ version: 'all' })) handoffId: string,
+    @Req() request: DistributionCommandRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    return this.commandResult(response, this.attachments.uploadHandoff(id, handoffId, request));
   }
 
   @Post(':id/handoffs/:handoffId/review-loss')

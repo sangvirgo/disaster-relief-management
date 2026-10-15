@@ -28,7 +28,8 @@ Roles are a **code catalog** (`role_grant.role_code` CHECK in [identity.sql](sch
 | `DISTRIBUTION_PREPARE` |  |  |  |  | ● | ● |  | ● |  |
 | `DISTRIBUTION_REVIEW` (approve) |  |  |  |  | ● |  | ● |  |  |
 | `DISTRIBUTION_DISPATCH` (issue stock) |  |  |  |  |  | ● |  | ● |  |
-| `HANDOFF_RECORD` (all handoff kinds incl. RETURN) |  |  |  |  |  |  |  | ● |  |
+| `HANDOFF_RECORD` (DIRECT_HOUSEHOLD, POINT_RECEIPT, HOUSEHOLD_HANDOUT, and LOSS recording) |  |  |  |  |  |  |  | ● |  |
+| RETURN handoff recording (`DONATION_INTAKE` or `DISTRIBUTION_DISPATCH`) |  |  |  |  |  | ● |  | ● |  |
 | `LOSS_APPROVE`, `ADJUSTMENT_REVIEW` |  |  |  |  | ● |  | ● |  |  |
 | `STOCK_ADJUST_REQUEST` |  |  |  |  |  | ● |  | ● |  |
 
@@ -53,7 +54,7 @@ A grant is `(role, scope_type, organization, region?, campaign?)`.
 | Assistance request | Reporter (account owner or valid tracking secret) sees own request, REPORTER-visibility timeline, may supplement in permitted states. Staff need `REQUEST_*` + scope. Assigned team leader/members see only the task fields in 03 §"Mission view". Contact phones: reporter, scoped coordinators, assigned team **leader** only. |
 | Mission | Read: active team members and scoped coordinators. Accept/decline/advance/result: **active leader only**. Cancel/fail/record-on-behalf: scoped coordinator with reason. |
 | Team | Edit own team: active leader. `TEAM_MANAGE_ANY`: scoped coordinator. |
-| Evidence | Download requires current authorization on the owning request/mission/donation/handoff; signed URL TTL 60 s. |
+| Evidence | Download requires current authorization on the owning request/mission/donation/handoff; signed URL TTL 60 s. Handoff access also requires matching warehouse scope. RETURN handoffs require `DONATION_INTAKE` or `DISTRIBUTION_DISPATCH`; other handoff detail/evidence reads require `HANDOFF_RECORD`, except LOSS reads also allow `LOSS_APPROVE` so an independent reviewer can inspect evidence. Recording or uploading LOSS evidence still requires `HANDOFF_RECORD`. |
 | Donation | Account owner or valid donation secret; staff via drive/intake-site scope. Receipt number/name/phone alone grants nothing. |
 | Distribution | Approver differs from preparer and dispatcher; preparer may dispatch (DB CHECK + service). Recorder of a handoff ≠ its receiver. LOSS approver ≠ recorder. |
 | Receipt | Reviewer ≠ every count author (service rule + test). |

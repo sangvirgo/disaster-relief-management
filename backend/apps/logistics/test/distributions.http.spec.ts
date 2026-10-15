@@ -7,12 +7,14 @@ import { ApiExceptionFilter, loadErrorCatalog } from '../../../packages/technica
 import { LOGISTICS_IDENTITY_CLIENT, LOGISTICS_IDENTITY_CONFIG, LogisticsIdentityService } from '../src/auth/logistics-identity.service';
 import { LOGISTICS_AUTH_CONFIG, LogisticsSessionService } from '../src/auth/logistics-session.service';
 import { LogisticsServiceTokenGuard } from '../src/auth/logistics-service-token.guard';
+import { AttachmentLifecycleService } from '../src/attachments/attachment-lifecycle.service';
 import { ResponseCampaignModule } from '../src/integrations/response/response-campaign.module';
 import { LOGISTICS_RESPONSE_CLIENT, LogisticsResponseCampaignClient, RESPONSE_CAMPAIGN_CONFIG } from '../src/integrations/response/response-campaign.client';
 import { DistributionCommandsService } from '../src/distributions/distribution-commands.service';
 import { DistributionQueriesService } from '../src/distributions/distribution-queries.service';
 import { DistributionsModule } from '../src/distributions/distributions.module';
 import { HandoffCommandsService } from '../src/distributions/handoff-commands.service';
+import { HandoffAttachmentsService } from '../src/distributions/handoff-attachments.service';
 
 const distributionId = '88888888-8888-4888-8888-888888888888';
 const handoffId = '99999999-9999-4999-8999-999999999999';
@@ -36,6 +38,10 @@ describe('Logistics distributions HTTP', () => {
   const queries = {
     list: jest.fn(async () => ({ items: [], more: false })),
     detail: jest.fn(async () => ({ id: distributionId, lines: [] })),
+    handoffDetail: jest.fn(async () => ({ id: handoffId, distribution_id: distributionId, evidence: [] })),
+  };
+  const attachments = {
+    uploadHandoff: jest.fn(async () => ({ status: 201, value: { id: handoffId, state: 'READY' }, replay: false })),
   };
 
   beforeAll(async () => {
@@ -43,6 +49,8 @@ describe('Logistics distributions HTTP', () => {
       .overrideProvider(DistributionCommandsService).useValue(commands)
       .overrideProvider(HandoffCommandsService).useValue(handoffs)
       .overrideProvider(DistributionQueriesService).useValue(queries)
+      .overrideProvider(HandoffAttachmentsService).useValue(attachments)
+      .overrideProvider(AttachmentLifecycleService).useValue({})
       .overrideGuard(LogisticsServiceTokenGuard).useValue({ canActivate: () => true })
       .overrideProvider(LOGISTICS_AUTH_CONFIG).useValue({})
       .overrideProvider(LOGISTICS_IDENTITY_CONFIG).useValue({})
@@ -140,6 +148,28 @@ describe('Logistics distributions HTTP', () => {
     await request(app.getHttpServer()).get(`/api/v1/logistics/distributions/${distributionId}`).expect(200);
     expect(queries.list).toHaveBeenCalled();
     expect(queries.detail).toHaveBeenCalledWith(distributionId, expect.any(Object));
+  });
+
+  it('reads scoped handoff detail through the query service', async () => {
+    const result = await request(app.getHttpServer())
+      .get(`/api/v1/logistics/distributions/${distributionId}/handoffs/${handoffId}`)
+      .expect(200)
+      .expect('Cache-Control', 'no-store');
+
+    expect(result.body).toEqual({ id: handoffId, distribution_id: distributionId, evidence: [] });
+    expect(queries.handoffDetail).toHaveBeenCalledWith(distributionId, handoffId, expect.any(Object));
+  });
+
+  it('routes nested handoff evidence upload through the shared attachment service', async () => {
+    const result = await request(app.getHttpServer())
+      .post(`/api/v1/logistics/distributions/${distributionId}/handoffs/${handoffId}/evidence`)
+      .set('Idempotency-Key', idempotencyKey)
+      .attach('file', Buffer.from('test-evidence'), { filename: 'evidence.png', contentType: 'image/png' })
+      .expect(201)
+      .expect('Cache-Control', 'no-store');
+
+    expect(result.body).toEqual({ id: handoffId, state: 'READY' });
+    expect(attachments.uploadHandoff).toHaveBeenCalledWith(distributionId, handoffId, expect.any(Object));
   });
 
   it('rejects a distribution page size above the API maximum', async () => {

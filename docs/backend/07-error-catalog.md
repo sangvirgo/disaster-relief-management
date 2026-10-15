@@ -48,7 +48,7 @@ Every error the API can return has one row here. The implementation loads this t
 | `TRACKING_SECRET_INVALID` | 400 | Response | Mã bảo mật theo dõi không hợp lệ. |
 | `TRACKING_SECRET_IN_USE` | 409 | Response | Không thể sử dụng mã bảo mật này. Vui lòng tạo mã khác. |
 | `ALREADY_CLAIMED` | 409 | Response | Yêu cầu này đã được gắn với một tài khoản. |
-| `EVIDENCE_LIMIT_REACHED` | 409 | Response | Đã đạt giới hạn số lượng hoặc dung lượng tệp đính kèm. |
+| `EVIDENCE_LIMIT_REACHED` | 409 | Response + Logistics | Đã đạt giới hạn số lượng hoặc dung lượng tệp đính kèm. |
 | **Response — verification / priority** | | | |
 | `REASON_REQUIRED` | 400 | Response | Vui lòng nhập lý do. |
 | `VERIFICATION_BASIS_REQUIRED` | 400 | Response | Vui lòng chọn cơ sở xác minh. |
