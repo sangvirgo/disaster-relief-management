@@ -91,3 +91,14 @@ test('T10 clustered heatmap stays under the MapService cell cap and follows its 
   assert.ok(normalizedFixture.includes('IF heatmap_cell_count>5000 THEN'));
   assert.ok(normalizedFixture.includes("set_config('statement_timeout','5s',true)"));
 });
+
+test('T10 fixture tolerates incident categories already present in the seeded primary database', () => {
+  const categorySeed = fixture.match(/INSERT INTO incident_category VALUES[\s\S]*?;/u)?.[0] ?? '';
+  assert.match(categorySeed, /ON CONFLICT \(code\) DO NOTHING/u);
+});
+
+test('T10 team fixture limits positions and skills to teams it creates', () => {
+  const normalizedFixture = normalizeSql(fixture);
+  assert.ok(normalizedFixture.includes('CREATE TEMP TABLE team_seed AS SELECT gen_random_uuid() AS id,i AS n FROM generate_series(1,3000) i;'));
+  assert.ok(normalizedFixture.includes('CREATE TEMP TABLE tm AS SELECT id,n FROM team_seed;'));
+});

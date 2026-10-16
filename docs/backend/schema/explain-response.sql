@@ -14,7 +14,8 @@ INSERT INTO region_boundary VALUES
  ('R1', ST_Multi(ST_GeomFromText('POLYGON((106 10,107 10,107 11,106 11,106 10))',4326))),
  ('R2', ST_Multi(ST_GeomFromText('POLYGON((107 10,108 10,108 11,107 11,107 10))',4326))),
  ('R3', ST_Multi(ST_GeomFromText('POLYGON((105 10,106 10,106 11,105 11,105 10))',4326)));
-INSERT INTO incident_category VALUES ('FLOOD','Ngập lụt'),('FIRE','Hỏa hoạn'),('MEDICAL','Y tế'),('UNKNOWN','Chưa rõ');
+INSERT INTO incident_category VALUES ('FLOOD','Ngập lụt'),('FIRE','Hỏa hoạn'),('MEDICAL','Y tế'),('UNKNOWN','Chưa rõ')
+ON CONFLICT (code) DO NOTHING;
 INSERT INTO skill VALUES ('BOAT','Xuồng'),('ROPE','Dây cứu hộ'),('MEDIC','Y tế');
 INSERT INTO incident_category_skill VALUES ('FLOOD','BOAT'),('FLOOD','ROPE'),('FIRE','ROPE'),('MEDICAL','MEDIC');
 INSERT INTO campaign (id,organization_id,region_code,name,status,created_by_user_id)
@@ -95,11 +96,13 @@ SELECT a.id AS rid
  ORDER BY a.id LIMIT 1 \gset
 
 -- ---------- teams (3k), positions, skills ----------
+CREATE TEMP TABLE team_seed AS
+SELECT gen_random_uuid() AS id,i AS n FROM generate_series(1,3000) i;
 INSERT INTO rescue_team (id,organization_id,operating_region_code,name,team_kind,availability)
-SELECT gen_random_uuid(), '00000000-0000-0000-0000-0000000000d1', 'R1', 'Đội '||i,
-       (ARRAY['VOLUNTEER','MILITARY','GOVERNMENT'])[1 + i % 3], CASE WHEN random() < 0.9 THEN 'AVAILABLE' ELSE 'UNAVAILABLE' END
-FROM generate_series(1,3000) i;
-CREATE TEMP TABLE tm AS SELECT id, row_number() OVER (ORDER BY id) AS n FROM rescue_team;
+SELECT id, '00000000-0000-0000-0000-0000000000d1', 'R1', 'Đội '||n,
+       (ARRAY['VOLUNTEER','MILITARY','GOVERNMENT'])[1 + n % 3], CASE WHEN random() < 0.9 THEN 'AVAILABLE' ELSE 'UNAVAILABLE' END
+FROM team_seed;
+CREATE TEMP TABLE tm AS SELECT id,n FROM team_seed;
 INSERT INTO team_position (team_id,location,accuracy_m,captured_at,source,set_by_user_id)
 SELECT id, ST_SetSRID(ST_MakePoint(106 + random(), 10 + random()),4326)::geography, 15, now() - random()*interval '40 minutes', 'GPS', gen_random_uuid()
 FROM tm WHERE n <= 2900;
