@@ -21,6 +21,7 @@ function reportItem(row) {
 }
 
 export function assertFulfillmentReportPage(report, oracleRows, offset, limit) {
+  assert.ok(oracleRows.length > 0, 'T17 smoke requires populated fulfillment rows');
   assert.deepEqual(report.items, oracleRows.slice(offset, offset + limit).map(reportItem));
   assert.equal(report.more, oracleRows.length > offset + limit);
   if (report.more) assert.equal(typeof report.cursor, 'string');

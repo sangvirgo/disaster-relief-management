@@ -17,6 +17,9 @@ export async function registerAndLoginT17User({ cleanupUserIds, register, grant,
 export async function cleanupT17TestUsers(identityDb, userIds) {
   for (const userId of userIds) {
     await identityDb.query(
+      "UPDATE session_family SET revoked_at=now(),revoke_reason='LOGOUT' WHERE user_id=$1 AND revoked_at IS NULL", [userId],
+    );
+    await identityDb.query(
       'UPDATE role_grant SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL', [userId],
     );
     await identityDb.query(

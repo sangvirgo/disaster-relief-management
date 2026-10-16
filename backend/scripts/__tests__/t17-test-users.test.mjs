@@ -18,7 +18,7 @@ test('keeps a registered user available for cleanup when grant setup fails', asy
   assert.deepEqual([...cleanupUserIds], [userId]);
 });
 
-test('revokes grants and disables every tracked smoke user', async () => {
+test('revokes sessions and grants before disabling every tracked smoke user', async () => {
   assert.equal(typeof userSupport.cleanupT17TestUsers, 'function');
   const userId = '22222222-2222-4222-8222-222222222222';
   const calls = [];
@@ -27,9 +27,11 @@ test('revokes grants and disables every tracked smoke user', async () => {
     query: async (sql, values) => calls.push([sql, values]),
   }, new Set([userId]));
 
-  assert.equal(calls.length, 2);
-  assert.match(calls[0][0], /UPDATE role_grant SET revoked_at=now\(\)/u);
+  assert.equal(calls.length, 3);
+  assert.match(calls[0][0], /UPDATE session_family SET revoked_at=now\(\),revoke_reason='LOGOUT'/u);
   assert.deepEqual(calls[0][1], [userId]);
-  assert.match(calls[1][0], /UPDATE app_user SET status='DISABLED',authz_version=authz_version\+1/u);
+  assert.match(calls[1][0], /UPDATE role_grant SET revoked_at=now\(\)/u);
   assert.deepEqual(calls[1][1], [userId]);
+  assert.match(calls[2][0], /UPDATE app_user SET status='DISABLED',authz_version=authz_version\+1/u);
+  assert.deepEqual(calls[2][1], [userId]);
 });

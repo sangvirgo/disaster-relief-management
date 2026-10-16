@@ -354,43 +354,32 @@ async function verifyPopulatedDriveAcceptedReport() {
 async function main() {
   await Promise.all([logisticsDb.connect(), identityDb.connect()]);
   const cleanupUserIds = new Set();
-  let createdWarehouseId;
   try {
     await verifyFinalHandoffAttribution();
     await verifyPrimaryDatabaseReportFixture();
     await verifyPopulatedDriveAcceptedReport();
+    const now = new Date();
+    const to = now.toISOString();
+    const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1_000).toISOString();
     const warehouses = await logisticsDb.query(
       `SELECT w.id,w.organization_id,w.region_code,
-              (SELECT count(*)::int FROM stock_balance b WHERE b.warehouse_id=w.id) AS balance_count
+              (SELECT count(*)::int FROM stock_balance b WHERE b.warehouse_id=w.id) AS balance_count,
+              (SELECT count(*)::int
+                 FROM relief_need n
+                 JOIN fulfillment_cycle c ON c.id=n.cycle_id
+                WHERE c.organization_id=w.organization_id AND c.region_code=w.region_code
+                  AND n.created_at >= $1::timestamptz AND n.created_at < $2::timestamptz) AS fulfillment_need_count
          FROM warehouse w
-        WHERE EXISTS (SELECT 1 FROM stock_balance b WHERE b.warehouse_id=w.id)
-        ORDER BY balance_count DESC,w.id LIMIT 1`,
+        WHERE w.region_code IS NOT NULL
+          AND EXISTS (SELECT 1 FROM stock_balance b WHERE b.warehouse_id=w.id)
+        ORDER BY fulfillment_need_count DESC,balance_count DESC,w.id LIMIT 1`,
+      [from, to],
     );
-    let warehouse = warehouses.rows[0];
-    let organizationId = warehouse?.organization_id;
-    let regionCode = warehouse?.region_code;
-    if (!warehouse) {
-      const configuredOrganizationId = process.env.DEMO_INTAKE_ORGANIZATION_ID;
-      const organizations = configuredOrganizationId
-        ? await identityDb.query('SELECT id FROM organization WHERE id=$1', [configuredOrganizationId])
-        : await identityDb.query('SELECT id FROM organization ORDER BY id LIMIT 1');
-      organizationId = organizations.rows[0]?.id;
-      assert.ok(organizationId, 'T17 smoke requires an existing organization in the primary Identity database');
-      const regions = await identityDb.query("SELECT code FROM region WHERE status='ACTIVE' ORDER BY code LIMIT 1");
-      regionCode = regions.rows[0]?.code;
-      assert.ok(regionCode, 'T17 smoke requires an active region in the primary Identity database');
-    }
+    const warehouse = warehouses.rows[0];
+    assert.ok(Number(warehouse?.fulfillment_need_count) > 0, 'T17 smoke requires a recent fulfillment need in a warehouse region');
+    const organizationId = warehouse.organization_id;
 
     const actor = await loginSmokeActor(organizationId, cleanupUserIds, 'OPERATIONS_MANAGER');
-    if (!warehouse) {
-      const created = await call(logisticsUrl, 'warehouses', {
-        method: 'POST', actor, headers: { 'Idempotency-Key': randomUUID() },
-        body: { organization_id: organizationId, region_code: regionCode, name: `Kho báo cáo T17 ${randomBytes(4).toString('hex')}` },
-      });
-      createdWarehouseId = created.value?.id;
-      expectSuccess(created, 201);
-      warehouse = { id: created.value.id, organization_id: organizationId, region_code: regionCode, balance_count: 0 };
-    }
 
     const deniedActor = await loginSmokeActor(organizationId, cleanupUserIds);
     const deniedReport = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${warehouse.id}`, { actor: deniedActor });
@@ -591,9 +580,6 @@ async function main() {
       }
     }
 
-    const now = new Date();
-    const to = now.toISOString();
-    const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1_000).toISOString();
     const fulfillmentLimit = 5;
     const fulfillmentOracle = await logisticsDb.query(
       `SELECT n.id AS need_id,c.request_id,c.id AS cycle_id,c.work_cycle,c.region_code,c.campaign_id,
@@ -684,13 +670,9 @@ async function main() {
     );
   } finally {
     try {
-      if (createdWarehouseId) await logisticsDb.query('DELETE FROM warehouse WHERE id=$1', [createdWarehouseId]);
+      await cleanupT17TestUsers(identityDb, cleanupUserIds);
     } finally {
-      try {
-        await cleanupT17TestUsers(identityDb, cleanupUserIds);
-      } finally {
-        await Promise.all([logisticsDb.end(), identityDb.end()]);
-      }
+      await Promise.all([logisticsDb.end(), identityDb.end()]);
     }
   }
 }
