@@ -3,16 +3,22 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const smokeSource = readFileSync(new URL('../smoke/test-logistics-t17.mjs', import.meta.url), 'utf8');
+const fulfillmentReport = await import('../smoke/t17-fulfillment-report.mjs');
 const fixtureStart = smokeSource.indexOf('async function verifyPrimaryDatabaseReportFixture()');
 const fixtureEnd = smokeSource.indexOf('\nasync function main()', fixtureStart);
 assert.notEqual(fixtureStart, -1, 'T17 report fixture exists');
 assert.notEqual(fixtureEnd, -1, 'T17 report fixture ends before the HTTP smoke');
 const fixtureSource = smokeSource.slice(fixtureStart, fixtureEnd);
 const reconciliationStart = smokeSource.indexOf('const reconciliation = await call(');
-const fulfillmentStart = smokeSource.indexOf('const now = new Date()', reconciliationStart);
+const fulfillmentStart = smokeSource.indexOf('const fulfillmentLimit =', reconciliationStart);
 assert.notEqual(reconciliationStart, -1, 'T17 reconciliation endpoint check exists');
 assert.notEqual(fulfillmentStart, -1, 'T17 reconciliation endpoint check ends before fulfillment');
 const reconciliationSource = smokeSource.slice(reconciliationStart, fulfillmentStart);
+const fulfillmentScopeStart = smokeSource.indexOf('const warehouses = await logisticsDb.query(');
+const fulfillmentActorStart = smokeSource.indexOf('const actor = await loginSmokeActor', fulfillmentScopeStart);
+assert.notEqual(fulfillmentScopeStart, -1, 'T17 fulfillment scope selection exists');
+assert.notEqual(fulfillmentActorStart, -1, 'T17 actors are created after report scope selection');
+const fulfillmentScopeSource = smokeSource.slice(fulfillmentScopeStart, fulfillmentActorStart);
 
 test('T17 report fixture is SELECT-only and reuses production handoff predicates', () => {
   assert.match(fixtureSource, /\bWITH\b[\s\S]*\bVALUES\b/u);
@@ -20,6 +26,20 @@ test('T17 report fixture is SELECT-only and reuses production handoff predicates
   assert.match(fixtureSource, /finalDistributionHandoffPredicate/u);
   assert.doesNotMatch(fixtureSource, /\bCREATE\s+(?:TEMP(?:ORARY)?\s+)?TABLE\b/iu);
   assert.doesNotMatch(fixtureSource, /\b(?:BEGIN|COMMIT|ROLLBACK|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\b/iu);
+});
+
+test('T17 fulfillment smoke rejects an empty primary report oracle', () => {
+  assert.throws(
+    () => fulfillmentReport.assertFulfillmentReportPage({ items: [], more: false }, [], 0, 5),
+    /requires populated fulfillment rows/u,
+  );
+});
+
+test('T17 selects a recent populated fulfillment scope before registering smoke users', () => {
+  assert.match(fulfillmentScopeSource, /fulfillment_need_count/u);
+  assert.match(fulfillmentScopeSource, /ORDER BY fulfillment_need_count DESC/u);
+  assert.match(fulfillmentScopeSource, /AND EXISTS \(SELECT 1 FROM stock_balance b WHERE b\.warehouse_id=w\.id\)/u);
+  assert.match(fulfillmentScopeSource, /assert\.ok\(Number\(warehouse\?\.fulfillment_need_count\) > 0/u);
 });
 
 test('T17 reconciliation endpoint is deep-compared with a primary-row oracle', () => {

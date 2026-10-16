@@ -292,6 +292,40 @@ describe('T1 technical package', () => {
     await expect(claimBatch(claimManager as never, 'SELECT id FROM notice ORDER BY id', [], 101)).rejects.toThrow(RangeError);
   });
 
+  it('recurs only when enabled and stops after cancellation', async () => {
+    const previousScheduler = process.env.SCHEDULER_ENABLED;
+    const transaction = jest.fn(async () => false);
+    const dataSource = { transaction };
+    const work = jest.fn(async () => undefined);
+    let stopSchedule: (() => void) | undefined;
+    jest.useFakeTimers();
+    const random = jest.spyOn(Math, 'random').mockReturnValue(0.5);
+
+    try {
+      process.env.SCHEDULER_ENABLED = 'false';
+      stopSchedule = new JobRunner(dataSource as never).schedule('disabled-job', 1_000, work);
+      await jest.advanceTimersByTimeAsync(2_000);
+      expect(transaction).not.toHaveBeenCalled();
+      stopSchedule();
+      stopSchedule = undefined;
+
+      process.env.SCHEDULER_ENABLED = 'true';
+      stopSchedule = new JobRunner(dataSource as never).schedule('enabled-job', 1_000, work);
+      await jest.advanceTimersByTimeAsync(2_400);
+      expect(transaction).toHaveBeenCalledTimes(2);
+      stopSchedule();
+      stopSchedule = undefined;
+      await jest.advanceTimersByTimeAsync(2_400);
+      expect(transaction).toHaveBeenCalledTimes(2);
+    } finally {
+      stopSchedule?.();
+      random.mockRestore();
+      jest.useRealTimers();
+      if (previousScheduler === undefined) delete process.env.SCHEDULER_ENABLED;
+      else process.env.SCHEDULER_ENABLED = previousScheduler;
+    }
+  });
+
   it('coalesces identical live service calls and opens a per-callee circuit after five failures', async () => {
     let hits = 0;
     let fail = false;

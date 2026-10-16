@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { cleanupT17TestUsers, registerAndLoginT17User } from './t17-test-users.mjs';
+import { assertFulfillmentReportPage, selectReportWarehouse } from './t17-fulfillment-report.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -353,52 +354,52 @@ async function verifyPopulatedDriveAcceptedReport() {
 async function main() {
   await Promise.all([logisticsDb.connect(), identityDb.connect()]);
   const cleanupUserIds = new Set();
-  let createdWarehouseId;
   try {
     await verifyFinalHandoffAttribution();
     await verifyPrimaryDatabaseReportFixture();
     await verifyPopulatedDriveAcceptedReport();
+    const now = new Date();
+    const to = now.toISOString();
+    const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1_000).toISOString();
     const warehouses = await logisticsDb.query(
       `SELECT w.id,w.organization_id,w.region_code,
-              (SELECT count(*)::int FROM stock_balance b WHERE b.warehouse_id=w.id) AS balance_count
+              (SELECT count(*)::int FROM stock_balance b WHERE b.warehouse_id=w.id) AS balance_count,
+              (SELECT count(*)::int
+                 FROM relief_need n
+                 JOIN fulfillment_cycle c ON c.id=n.cycle_id
+                WHERE c.organization_id=w.organization_id AND c.region_code=w.region_code
+                  AND n.created_at >= $1::timestamptz AND n.created_at < $2::timestamptz) AS fulfillment_need_count
          FROM warehouse w
-        WHERE EXISTS (SELECT 1 FROM stock_balance b WHERE b.warehouse_id=w.id)
-        ORDER BY balance_count DESC,w.id LIMIT 1`,
+        WHERE w.region_code IS NOT NULL
+          AND EXISTS (SELECT 1 FROM stock_balance b WHERE b.warehouse_id=w.id)
+        ORDER BY fulfillment_need_count DESC,balance_count DESC,w.id LIMIT 1`,
+      [from, to],
     );
-    let warehouse = warehouses.rows[0];
-    let organizationId = warehouse?.organization_id;
-    let regionCode = warehouse?.region_code;
-    if (!warehouse) {
-      const configuredOrganizationId = process.env.DEMO_INTAKE_ORGANIZATION_ID;
-      const organizations = configuredOrganizationId
-        ? await identityDb.query('SELECT id FROM organization WHERE id=$1', [configuredOrganizationId])
-        : await identityDb.query('SELECT id FROM organization ORDER BY id LIMIT 1');
-      organizationId = organizations.rows[0]?.id;
-      assert.ok(organizationId, 'T17 smoke requires an existing organization in the primary Identity database');
-      const regions = await identityDb.query("SELECT code FROM region WHERE status='ACTIVE' ORDER BY code LIMIT 1");
-      regionCode = regions.rows[0]?.code;
-      assert.ok(regionCode, 'T17 smoke requires an active region in the primary Identity database');
-    }
+    const warehouse = warehouses.rows[0];
+    assert.ok(Number(warehouse?.fulfillment_need_count) > 0, 'T17 smoke requires a recent fulfillment need in a warehouse region');
+    const organizationId = warehouse.organization_id;
+    const reportWarehouseCandidates = await logisticsDb.query(
+      `SELECT w.id,w.organization_id,count(b.id)::int AS balance_count
+         FROM warehouse w
+         JOIN stock_balance b ON b.warehouse_id=w.id
+        GROUP BY w.id,w.organization_id
+        ORDER BY balance_count DESC,w.id`,
+    );
+    const reportWarehouse = selectReportWarehouse(reportWarehouseCandidates.rows, warehouse);
 
     const actor = await loginSmokeActor(organizationId, cleanupUserIds, 'OPERATIONS_MANAGER');
-    if (!warehouse) {
-      const created = await call(logisticsUrl, 'warehouses', {
-        method: 'POST', actor, headers: { 'Idempotency-Key': randomUUID() },
-        body: { organization_id: organizationId, region_code: regionCode, name: `Kho báo cáo T17 ${randomBytes(4).toString('hex')}` },
-      });
-      createdWarehouseId = created.value?.id;
-      expectSuccess(created, 201);
-      warehouse = { id: created.value.id, organization_id: organizationId, region_code: regionCode, balance_count: 0 };
-    }
+    const reportActor = reportWarehouse.organization_id === organizationId
+      ? actor
+      : await loginSmokeActor(reportWarehouse.organization_id, cleanupUserIds, 'OPERATIONS_MANAGER');
 
     const deniedActor = await loginSmokeActor(organizationId, cleanupUserIds);
-    const deniedReport = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${warehouse.id}`, { actor: deniedActor });
+    const deniedReport = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${reportWarehouse.id}`, { actor: deniedActor });
     expectVietnameseError(deniedReport, 403, 'FORBIDDEN');
 
-    const noSession = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${warehouse.id}`);
+    const noSession = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${reportWarehouse.id}`);
     expectVietnameseError(noSession, 401, 'UNAUTHENTICATED');
 
-    const stock = await call(logisticsUrl, `stock?warehouse_id=${warehouse.id}&limit=100`, { actor });
+    const stock = await call(logisticsUrl, `stock?warehouse_id=${reportWarehouse.id}&limit=100`, { actor: reportActor });
     expectSuccess(stock);
     const stockOracle = await logisticsDb.query(
       `WITH held AS MATERIALIZED (
@@ -425,9 +426,9 @@ async function main() {
          FROM inventory
          LEFT JOIN stock_balance balance ON balance.warehouse_id=$1 AND balance.item_id=inventory.item_id
         ORDER BY inventory.item_id`,
-      [warehouse.id],
+      [reportWarehouse.id],
     );
-    const stockReport = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${warehouse.id}&limit=1`, { actor });
+    const stockReport = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${reportWarehouse.id}&limit=1`, { actor: reportActor });
     expectSuccess(stockReport);
     assert.equal(typeof stockReport.value.generated_at, 'string');
     assert.equal(stockReport.value.items[0]?.item.id, stockOracle.rows[0]?.item_id);
@@ -452,8 +453,8 @@ async function main() {
       assert.equal(typeof stockReport.value.cursor, 'string');
       const stockPage2 = await call(
         logisticsUrl,
-        `reports/stock-summary?warehouse_id=${warehouse.id}&limit=1&cursor=${encodeURIComponent(stockReport.value.cursor)}`,
-        { actor },
+        `reports/stock-summary?warehouse_id=${reportWarehouse.id}&limit=1&cursor=${encodeURIComponent(stockReport.value.cursor)}`,
+        { actor: reportActor },
       );
       expectSuccess(stockPage2);
       assert.equal(stockPage2.value.items.length, 1);
@@ -466,7 +467,7 @@ async function main() {
       console.log('SKIP T17 stock page-2 assertion: selected warehouse has fewer than two report rows.');
     }
 
-    const reconciliation = await call(logisticsUrl, `reconciliation?warehouse_id=${warehouse.id}&limit=1`, { actor });
+    const reconciliation = await call(logisticsUrl, `reconciliation?warehouse_id=${reportWarehouse.id}&limit=1`, { actor: reportActor });
     expectSuccess(reconciliation);
     assert.equal(typeof reconciliation.value.generated_at, 'string');
     const reconciliationOracle = await logisticsDb.query(
@@ -545,7 +546,7 @@ async function main() {
          ) physical ON TRUE
         WHERE b.warehouse_id=$1::uuid
         ORDER BY b.id ASC LIMIT 101`,
-      [warehouse.id],
+      [reportWarehouse.id],
     );
     if (reconciliationOracle.rows.length === 0) {
       console.log('SKIP TC-REC-01 populated main-API evidence pending: no stock_balance rows in the primary logistics database; verified the empty reconciliation page.');
@@ -559,8 +560,8 @@ async function main() {
         assert.equal(typeof reconciliation.value.cursor, 'string');
         const reconciliationPage2 = await call(
           logisticsUrl,
-          `reconciliation?warehouse_id=${warehouse.id}&limit=1&cursor=${encodeURIComponent(reconciliation.value.cursor)}`,
-          { actor },
+          `reconciliation?warehouse_id=${reportWarehouse.id}&limit=1&cursor=${encodeURIComponent(reconciliation.value.cursor)}`,
+          { actor: reportActor },
         );
         expectSuccess(reconciliationPage2);
         const expectedPage2 = mapReconciliationItems(reconciliationOracle.rows.slice(1, 2));
@@ -575,8 +576,8 @@ async function main() {
           assert.equal(typeof reconciliationPage2.value.cursor, 'string');
           const reconciliationPage3 = await call(
             logisticsUrl,
-            `reconciliation?warehouse_id=${warehouse.id}&limit=1&cursor=${encodeURIComponent(reconciliationPage2.value.cursor)}`,
-            { actor },
+            `reconciliation?warehouse_id=${reportWarehouse.id}&limit=1&cursor=${encodeURIComponent(reconciliationPage2.value.cursor)}`,
+            { actor: reportActor },
           );
           expectSuccess(reconciliationPage3);
           assert.deepEqual(
@@ -590,21 +591,48 @@ async function main() {
       }
     }
 
-    const now = new Date();
-    const to = now.toISOString();
-    const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1_000).toISOString();
-    const fulfillment = await call(
-      logisticsUrl,
-      `reports/fulfillment?region_code=${encodeURIComponent(warehouse.region_code)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&limit=5`,
-      { actor },
+    const fulfillmentLimit = 5;
+    const fulfillmentOracle = await logisticsDb.query(
+      `SELECT n.id AS need_id,c.request_id,c.id AS cycle_id,c.work_cycle,c.region_code,c.campaign_id,
+              n.item_id,i.name AS item_name,un.code AS unit_code,un.display_name AS unit_name,un.scale AS unit_scale,
+              n.original_quantity::text AS original,
+              GREATEST(n.original_quantity-n.requested_quantity,0)::text AS reduced,
+              COALESCE(n.cancelled_remaining,0)::text AS cancelled_remaining,
+              CASE WHEN n.status='CANCELLED' THEN '0'::numeric ELSE n.requested_quantity END::text AS active_requested,
+              COALESCE(SUM(cm.delivered_quantity),0)::text AS delivered,
+              CASE WHEN n.status='CANCELLED' THEN '0'::numeric
+                   ELSE GREATEST(n.requested_quantity-COALESCE(SUM(cm.delivered_quantity),0),0) END::text AS active_outstanding,
+              n.status
+         FROM relief_need n
+         JOIN fulfillment_cycle c ON c.id=n.cycle_id
+         JOIN item i ON i.id=n.item_id
+         JOIN unit un ON un.code=i.unit_code
+         LEFT JOIN commitment cm ON cm.relief_need_id=n.id
+        WHERE c.organization_id=$1 AND c.region_code=$2
+          AND n.created_at >= $3::timestamptz AND n.created_at < $4::timestamptz
+        GROUP BY n.id,c.id,i.id,un.code
+        ORDER BY n.id ASC`,
+      [warehouse.organization_id, warehouse.region_code, from, to],
     );
-    expectSuccess(fulfillment);
-    assert.equal(typeof fulfillment.value.generated_at, 'string');
-    for (const need of fulfillment.value.items) {
-      for (const key of ['original', 'reduced', 'cancelled_remaining', 'active_requested', 'delivered', 'active_outstanding']) {
-        assert.equal(typeof need[key], 'string');
-      }
-    }
+    let fulfillmentOffset = 0;
+    let fulfillmentCursor;
+    const fulfillmentCursors = new Set();
+    do {
+      const query = new URLSearchParams({
+        region_code: warehouse.region_code, from, to, limit: String(fulfillmentLimit),
+      });
+      if (fulfillmentCursor) query.set('cursor', fulfillmentCursor);
+      const fulfillment = await call(logisticsUrl, `reports/fulfillment?${query}`, { actor });
+      expectSuccess(fulfillment);
+      assert.equal(typeof fulfillment.value.generated_at, 'string');
+      assertFulfillmentReportPage(fulfillment.value, fulfillmentOracle.rows, fulfillmentOffset, fulfillmentLimit);
+      if (!fulfillment.value.more) break;
+      assert.ok(fulfillment.value.items.length > 0, 'fulfillment report cursor must advance');
+      assert.equal(fulfillmentCursors.has(fulfillment.value.cursor), false, 'fulfillment report cursor must advance');
+      fulfillmentCursors.add(fulfillment.value.cursor);
+      fulfillmentOffset += fulfillment.value.items.length;
+      fulfillmentCursor = fulfillment.value.cursor;
+    } while (true);
 
     const responseReport = await call(
       responseUrl,
@@ -648,18 +676,14 @@ async function main() {
     expectVietnameseError(invalidView, 400, 'VALIDATION_FAILED');
 
     console.log(
-      `T17 populated main-stack report checks passed: warehouse balances=${warehouse.balance_count}, ` +
+      `T17 populated main-stack report checks passed: stock report rows=${stockOracle.rows.length}, ` +
       `reconciliation rows=${reconciliationOracle.rows.length}.`,
     );
   } finally {
     try {
-      if (createdWarehouseId) await logisticsDb.query('DELETE FROM warehouse WHERE id=$1', [createdWarehouseId]);
+      await cleanupT17TestUsers(identityDb, cleanupUserIds);
     } finally {
-      try {
-        await cleanupT17TestUsers(identityDb, cleanupUserIds);
-      } finally {
-        await Promise.all([logisticsDb.end(), identityDb.end()]);
-      }
+      await Promise.all([logisticsDb.end(), identityDb.end()]);
     }
   }
 }

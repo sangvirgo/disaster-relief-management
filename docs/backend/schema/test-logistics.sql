@@ -12,17 +12,17 @@ SELECT expect_fail('vehicle identifier case-insensitive', $$INSERT INTO vehicle 
 -- ledger drives the balance
 INSERT INTO stock_movement (balance_id,movement_type,delta_on_hand,delta_reserved,operation_ref,actor_user_id) VALUES ('00000000-0000-0000-0000-0000000000e1','OPENING',5,0,'open1',gen_random_uuid());
 SELECT 'balance after OPENING +5: '||on_hand FROM stock_balance;
-SELECT expect_fail('reserved <= on_hand', $$UPDATE stock_balance SET reserved=6$$);
+SELECT expect_fail('reserved <= on_hand', $$UPDATE stock_balance SET reserved=6 WHERE id='00000000-0000-0000-0000-0000000000e1'$$);
 SELECT expect_fail('ISSUE shape', $$INSERT INTO stock_movement (balance_id,movement_type,delta_on_hand,delta_reserved,commitment_id,operation_ref,actor_user_id) VALUES ('00000000-0000-0000-0000-0000000000e1','ISSUE',-1,0,gen_random_uuid(),'op1',gen_random_uuid())$$);
 SELECT expect_fail('RESERVE needs a source', $$INSERT INTO stock_movement (balance_id,movement_type,delta_on_hand,delta_reserved,operation_ref,actor_user_id) VALUES ('00000000-0000-0000-0000-0000000000e1','RESERVE',0,1,'op3',gen_random_uuid())$$);
 SELECT expect_fail('OPENING must not carry a commitment', $$INSERT INTO stock_movement (balance_id,movement_type,delta_on_hand,delta_reserved,commitment_id,operation_ref,actor_user_id) VALUES ('00000000-0000-0000-0000-0000000000e1','OPENING',1,0,gen_random_uuid(),'op4',gen_random_uuid())$$);
 SELECT expect_fail('ADJUSTMENT without an approved request', $$INSERT INTO stock_movement (balance_id,movement_type,delta_on_hand,delta_reserved,reason,adjustment_id,operation_ref,actor_user_id) VALUES ('00000000-0000-0000-0000-0000000000e1','ADJUSTMENT',100,0,'x',gen_random_uuid(),'op5',gen_random_uuid())$$);
 -- two-person adjustment
 INSERT INTO stock_adjustment (id,balance_id,delta_on_hand,reason,requested_by_user_id) VALUES ('00000000-0000-0000-0000-000000000aa1','00000000-0000-0000-0000-0000000000e1',-2,'hao hụt','00000000-0000-0000-0000-000000000001');
-SELECT expect_fail('adjustment cannot be self-reviewed', $$UPDATE stock_adjustment SET status='APPROVED',reviewed_by_user_id=requested_by_user_id,reviewed_at=now()$$);
-SELECT expect_fail('reject needs a note', $$UPDATE stock_adjustment SET status='REJECTED',reviewed_by_user_id='00000000-0000-0000-0000-000000000002',reviewed_at=now()$$);
-UPDATE stock_adjustment SET status='APPROVED',reviewed_by_user_id='00000000-0000-0000-0000-000000000002',reviewed_at=now();
-SELECT expect_fail('reviewed adjustment is immutable', $$UPDATE stock_adjustment SET reason='changed'$$);
+SELECT expect_fail('adjustment cannot be self-reviewed', $$UPDATE stock_adjustment SET status='APPROVED',reviewed_by_user_id=requested_by_user_id,reviewed_at=now() WHERE id='00000000-0000-0000-0000-000000000aa1'$$);
+SELECT expect_fail('reject needs a note', $$UPDATE stock_adjustment SET status='REJECTED',reviewed_by_user_id='00000000-0000-0000-0000-000000000002',reviewed_at=now() WHERE id='00000000-0000-0000-0000-000000000aa1'$$);
+UPDATE stock_adjustment SET status='APPROVED',reviewed_by_user_id='00000000-0000-0000-0000-000000000002',reviewed_at=now() WHERE id='00000000-0000-0000-0000-000000000aa1';
+SELECT expect_fail('reviewed adjustment is immutable', $$UPDATE stock_adjustment SET reason='changed' WHERE id='00000000-0000-0000-0000-000000000aa1'$$);
 INSERT INTO stock_movement (balance_id,movement_type,delta_on_hand,delta_reserved,reason,adjustment_id,operation_ref,actor_user_id) VALUES ('00000000-0000-0000-0000-0000000000e1','ADJUSTMENT',-2,0,'hao hụt','00000000-0000-0000-0000-000000000aa1','ADJ:1','00000000-0000-0000-0000-000000000002');
 SELECT 'balance after approved ADJUSTMENT -2: '||on_hand FROM stock_balance;
 -- the balance CHECK (not an unrelated FK) must stop an approved adjustment that would drive on_hand below zero
@@ -38,7 +38,7 @@ DO $$ BEGIN
   END;
 END $$;
 SELECT expect_fail('adjustment applied only once (different op ref)', $$INSERT INTO stock_movement (balance_id,movement_type,delta_on_hand,delta_reserved,reason,adjustment_id,operation_ref,actor_user_id) VALUES ('00000000-0000-0000-0000-0000000000e1','ADJUSTMENT',-2,0,'hao hụt','00000000-0000-0000-0000-000000000aa1','ADJ:2','00000000-0000-0000-0000-000000000002')$$);
-SELECT expect_fail('ledger append-only', $$DELETE FROM stock_movement$$);
+SELECT expect_fail('ledger append-only', $$DELETE FROM stock_movement WHERE operation_ref='open1'$$);
 SELECT expect_fail('ledger cannot be truncated', $$TRUNCATE stock_movement CASCADE$$);
 -- drive / organization consistency
 SELECT expect_fail('drive organization must equal intake warehouse organization', $$INSERT INTO donation_drive (organization_id,intake_warehouse_id,title) VALUES (gen_random_uuid(),'00000000-0000-0000-0000-0000000000d1','Đợt 1')$$);
@@ -51,14 +51,14 @@ INSERT INTO donation_line VALUES ('00000000-0000-0000-0000-000000000a11',1,'0000
 SELECT expect_fail('piece quantity cannot have decimals', $$INSERT INTO donation_declaration (delivery_id,revision,created_by_kind) VALUES ('00000000-0000-0000-0000-000000000a11',2,'DONOR'); INSERT INTO donation_line VALUES ('00000000-0000-0000-0000-000000000a11',2,'00000000-0000-0000-0000-0000000000c1',0.5)$$);
 INSERT INTO donation_declaration (delivery_id,revision,created_by_kind) VALUES ('00000000-0000-0000-0000-000000000a11',3,'DONOR');
 INSERT INTO donation_line VALUES ('00000000-0000-0000-0000-000000000a11',3,'00000000-0000-0000-0000-0000000000c2',12.500);
-SELECT expect_fail('declarations are immutable', $$UPDATE donation_declaration SET created_by_kind='STAFF_ASSISTED'$$);
+SELECT expect_fail('declarations are immutable', $$UPDATE donation_declaration SET created_by_kind='STAFF_ASSISTED' WHERE delivery_id='00000000-0000-0000-0000-000000000a11' AND revision=1$$);
 -- receipt: counts, independent review
 INSERT INTO donation_receipt (id,delivery_id,warehouse_id) VALUES ('00000000-0000-0000-0000-000000000b11','00000000-0000-0000-0000-000000000a11','00000000-0000-0000-0000-0000000000d1');
 INSERT INTO receipt_count (receipt_id,revision,counted_by_user_id) VALUES ('00000000-0000-0000-0000-000000000b11',1,'00000000-0000-0000-0000-0000000000a1'),('00000000-0000-0000-0000-000000000b11',2,'00000000-0000-0000-0000-0000000000a2');
 INSERT INTO receipt_count_line (receipt_id,revision,item_id,counted_quantity,accepted_quantity,held_quantity,rejected_quantity) VALUES ('00000000-0000-0000-0000-000000000b11',1,'00000000-0000-0000-0000-0000000000c1',58,55,0,3);
 INSERT INTO receipt_count_line (receipt_id,revision,item_id,counted_quantity,accepted_quantity,held_quantity,rejected_quantity) VALUES ('00000000-0000-0000-0000-000000000b11',2,'00000000-0000-0000-0000-0000000000c1',58,50,5,3);
 SELECT expect_fail('counted must equal split', $$INSERT INTO receipt_count_line (receipt_id,revision,item_id,counted_quantity,accepted_quantity,held_quantity,rejected_quantity) VALUES ('00000000-0000-0000-0000-000000000b11',1,'00000000-0000-0000-0000-0000000000c2',10,5,0,0)$$);
-SELECT expect_fail('count revisions immutable', $$UPDATE receipt_count_line SET accepted_quantity=58$$);
+SELECT expect_fail('count revisions immutable', $$UPDATE receipt_count_line SET accepted_quantity=58 WHERE receipt_id='00000000-0000-0000-0000-000000000b11' AND revision=1 AND item_id='00000000-0000-0000-0000-0000000000c1'$$);
 SELECT expect_fail('count lines respect unit scale', $$INSERT INTO receipt_count_line (receipt_id,revision,item_id,counted_quantity,accepted_quantity,held_quantity,rejected_quantity) VALUES ('00000000-0000-0000-0000-000000000b11',1,'00000000-0000-0000-0000-0000000000c1',1.5,1.5,0,0)$$);
 SELECT expect_fail('reviewer must not be a count author', $$INSERT INTO receipt_review (receipt_id,delivery_id,count_revision,declaration_revision,reviewer_user_id,decision) VALUES ('00000000-0000-0000-0000-000000000b11','00000000-0000-0000-0000-000000000a11',2,3,'00000000-0000-0000-0000-0000000000a1','APPROVE')$$);
 SELECT expect_fail('review must name a real declaration revision', $$INSERT INTO receipt_review (receipt_id,delivery_id,count_revision,declaration_revision,reviewer_user_id,decision) VALUES ('00000000-0000-0000-0000-000000000b11','00000000-0000-0000-0000-000000000a11',2,99,'00000000-0000-0000-0000-0000000000b1','APPROVE')$$);
@@ -72,11 +72,11 @@ SELECT expect_fail('resolved dispute needs note and resolver', $$INSERT INTO don
 INSERT INTO fulfillment_cycle (id,request_id,work_cycle,organization_id) VALUES ('00000000-0000-0000-0000-000000000c11',gen_random_uuid(),1,'00000000-0000-0000-0000-00000000aaa1');
 INSERT INTO relief_need (id,cycle_id,item_id,original_quantity,requested_quantity) VALUES ('00000000-0000-0000-0000-000000000a21','00000000-0000-0000-0000-000000000c11','00000000-0000-0000-0000-0000000000c1',20,20);
 SELECT expect_fail('one live need per item per cycle', $$INSERT INTO relief_need (cycle_id,item_id,original_quantity,requested_quantity) VALUES ('00000000-0000-0000-0000-000000000c11','00000000-0000-0000-0000-0000000000c1',5,5)$$);
-SELECT expect_fail('cancelled_remaining bounded by requested', $$UPDATE relief_need SET status='CANCELLED',cancelled_remaining=99999$$);
+SELECT expect_fail('cancelled_remaining bounded by requested', $$UPDATE relief_need SET status='CANCELLED',cancelled_remaining=99999 WHERE id='00000000-0000-0000-0000-000000000a21'$$);
 SELECT expect_fail('commitment item must equal the need item', $$INSERT INTO commitment (relief_need_id,item_id,warehouse_id,quantity,created_by_user_id) VALUES ('00000000-0000-0000-0000-000000000a21','00000000-0000-0000-0000-0000000000c2','00000000-0000-0000-0000-0000000000d1',1,gen_random_uuid())$$);
 INSERT INTO commitment (id,relief_need_id,item_id,warehouse_id,quantity,created_by_user_id) VALUES ('00000000-0000-0000-0000-000000000a31','00000000-0000-0000-0000-000000000a21','00000000-0000-0000-0000-0000000000c1','00000000-0000-0000-0000-0000000000d1',12,gen_random_uuid());
-SELECT expect_fail('issued cannot exceed quantity-released', $$UPDATE commitment SET issued_quantity=13$$);
-SELECT expect_fail('settled cannot exceed issued', $$UPDATE commitment SET issued_quantity=5, delivered_quantity=6$$);
+SELECT expect_fail('issued cannot exceed quantity-released', $$UPDATE commitment SET issued_quantity=13 WHERE id='00000000-0000-0000-0000-000000000a31'$$);
+SELECT expect_fail('settled cannot exceed issued', $$UPDATE commitment SET issued_quantity=5, delivered_quantity=6 WHERE id='00000000-0000-0000-0000-000000000a31'$$);
 INSERT INTO distribution (id,warehouse_id,organization_id,purpose,preparer_user_id,relief_point_id) VALUES ('00000000-0000-0000-0000-000000000d11','00000000-0000-0000-0000-0000000000d1','00000000-0000-0000-0000-00000000aaa1','CAMPAIGN_DISTRIBUTION','00000000-0000-0000-0000-000000000001',NULL),('00000000-0000-0000-0000-000000000d12','00000000-0000-0000-0000-0000000000d1','00000000-0000-0000-0000-00000000aaa1','POINT_REPLENISHMENT','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000d9');
 SELECT expect_fail('POINT_REPLENISHMENT needs a point', $$INSERT INTO distribution (warehouse_id,organization_id,purpose,preparer_user_id) VALUES ('00000000-0000-0000-0000-0000000000d1','00000000-0000-0000-0000-00000000aaa1','POINT_REPLENISHMENT',gen_random_uuid())$$);
 SELECT expect_fail('distribution organization must equal warehouse organization', $$INSERT INTO distribution (warehouse_id,organization_id,purpose,preparer_user_id) VALUES ('00000000-0000-0000-0000-0000000000d1',gen_random_uuid(),'CAMPAIGN_DISTRIBUTION',gen_random_uuid())$$);
@@ -97,7 +97,7 @@ SELECT expect_fail('handoff line must belong to the same distribution as its hea
 INSERT INTO handoff_line (id,handoff_id,distribution_id,distribution_line_id,quantity) VALUES ('00000000-0000-0000-0000-000000000f21','00000000-0000-0000-0000-000000000f11','00000000-0000-0000-0000-000000000d12','00000000-0000-0000-0000-000000000e12',5);
 SELECT expect_fail('same line twice in one handoff', $$INSERT INTO handoff_line (handoff_id,distribution_id,distribution_line_id,quantity) VALUES ('00000000-0000-0000-0000-000000000f11','00000000-0000-0000-0000-000000000d12','00000000-0000-0000-0000-000000000e12',1)$$);
 SELECT expect_fail('RETURN needs a source stage', $$INSERT INTO handoff_record (distribution_id,handoff_kind,recorder_user_id,confirmation_basis,occurred_at) VALUES ('00000000-0000-0000-0000-000000000d12','RETURN',gen_random_uuid(),'x',now())$$);
-SELECT expect_fail('handoff records are immutable', $$UPDATE handoff_record SET confirmation_basis='đổi'$$);
+SELECT expect_fail('handoff records are immutable', $$UPDATE handoff_record SET confirmation_basis='đổi' WHERE id='00000000-0000-0000-0000-000000000f11'$$);
 SELECT expect_fail('RETURN movement needs its handoff line', $$INSERT INTO stock_movement (balance_id,movement_type,delta_on_hand,delta_reserved,operation_ref,actor_user_id) VALUES ('00000000-0000-0000-0000-0000000000e1','RETURN',1,0,'ret0',gen_random_uuid())$$);
 
 -- ================= T0-S additions =================
@@ -154,7 +154,7 @@ SELECT expect_fail('one settlement per handoff line', $$INSERT INTO issued_line_
 DO $$ BEGIN IF (SELECT count(*) FROM commitment_counter_mismatch) <> 1 THEN RAISE EXCEPTION 'FAIL reconciliation should detect stale counters'; END IF; RAISE NOTICE 'PASS reconciliation view detects stale counters'; END $$;
 UPDATE commitment SET issued_quantity = 6, delivered_quantity = 6 WHERE id = '00000000-0000-0000-0000-000000000a31';
 DO $$ BEGIN IF EXISTS (SELECT 1 FROM commitment_counter_mismatch) THEN RAISE EXCEPTION 'FAIL reconciliation mismatch on fixture'; END IF; RAISE NOTICE 'PASS counter reconciliation: zero mismatches'; END $$;
-SELECT expect_fail('settlements are append-only', $$UPDATE issued_line_settlement SET settlement_type='LOST'$$);
+SELECT expect_fail('settlements are append-only', $$UPDATE issued_line_settlement SET settlement_type='LOST' WHERE handoff_line_id='00000000-0000-0000-0000-000000000f22' AND commitment_id='00000000-0000-0000-0000-000000000a31'$$);
 
 -- loss handoff review
 INSERT INTO handoff_record (id,distribution_id,handoff_kind,source_stage,recorder_user_id,confirmation_basis,occurred_at) VALUES ('00000000-0000-0000-0000-000000000f14','00000000-0000-0000-0000-000000000d13','LOSS','IN_TRANSIT','00000000-0000-0000-0000-000000000022','mất hàng',now());
@@ -165,7 +165,7 @@ SELECT expect_fail('only LOSS handoffs can be reviewed', $$INSERT INTO handoff_l
 SELECT expect_fail('loss review needs a reason', $$INSERT INTO handoff_loss_review (handoff_id,reviewer_user_id,decision,reason) VALUES ('00000000-0000-0000-0000-000000000f14','00000000-0000-0000-0000-000000000033','APPROVE',' ')$$);
 INSERT INTO handoff_loss_review (handoff_id,reviewer_user_id,decision,reason) VALUES ('00000000-0000-0000-0000-000000000f14','00000000-0000-0000-0000-000000000033','APPROVE','đã xác minh');
 SELECT expect_fail('second loss review rejected', $$INSERT INTO handoff_loss_review (handoff_id,reviewer_user_id,decision,reason) VALUES ('00000000-0000-0000-0000-000000000f14','00000000-0000-0000-0000-000000000044','REJECT','khác')$$);
-SELECT expect_fail('loss review is append-only', $$UPDATE handoff_loss_review SET decision='REJECT'$$);
+SELECT expect_fail('loss review is append-only', $$UPDATE handoff_loss_review SET decision='REJECT' WHERE handoff_id='00000000-0000-0000-0000-000000000f14' AND reviewer_user_id='00000000-0000-0000-0000-000000000033'$$);
 SELECT expect_fail('handoff_record update still rejected', $$UPDATE handoff_record SET confirmation_basis='đổi' WHERE id='00000000-0000-0000-0000-000000000f14'$$);
 INSERT INTO issued_line_settlement (handoff_line_id,commitment_id,settlement_type) VALUES ('00000000-0000-0000-0000-000000000f24','00000000-0000-0000-0000-000000000a31','LOST');
 UPDATE commitment SET issued_quantity = 8, lost_quantity = 2 WHERE id = '00000000-0000-0000-0000-000000000a31';
@@ -180,10 +180,10 @@ DO $$ BEGIN IF (SELECT count(*) FROM check_cycle_state_matches_intent()) <> 1 TH
 UPDATE fulfillment_cycle SET state='SEALED' WHERE id='00000000-0000-0000-0000-000000000c11';
 DO $$ BEGIN IF EXISTS (SELECT 1 FROM check_cycle_state_matches_intent()) THEN RAISE EXCEPTION 'FAIL sealed cycle should match'; END IF; RAISE NOTICE 'PASS SEALED cycle matches SEALED intent'; END $$;
 SELECT expect_fail('only one live intent per cycle', $$INSERT INTO cycle_intent (intent_id,cycle_id,kind,state) VALUES (gen_random_uuid(),'00000000-0000-0000-0000-000000000c11','CANCELLATION','FROZEN')$$);
-SELECT expect_fail('intent binding columns are immutable', $$UPDATE cycle_intent SET kind='CANCELLATION',state='FROZEN'$$);
-SELECT expect_fail('intent cannot be deleted', $$DELETE FROM cycle_intent$$);
+SELECT expect_fail('intent binding columns are immutable', $$UPDATE cycle_intent SET kind='CANCELLATION',state='FROZEN' WHERE intent_id='00000000-0000-0000-0000-0000000001a1'$$);
+SELECT expect_fail('intent cannot be deleted', $$DELETE FROM cycle_intent WHERE intent_id='00000000-0000-0000-0000-0000000001a1'$$);
 UPDATE cycle_intent SET state='ABORTED' WHERE intent_id='00000000-0000-0000-0000-0000000001a1';
-SELECT expect_fail('aborted intent cannot be revived', $$UPDATE cycle_intent SET state='SEALED'$$);
+SELECT expect_fail('aborted intent cannot be revived', $$UPDATE cycle_intent SET state='SEALED' WHERE intent_id='00000000-0000-0000-0000-0000000001a1'$$);
 DO $$ BEGIN IF (SELECT count(*) FROM check_cycle_state_matches_intent()) <> 1 THEN RAISE EXCEPTION 'FAIL expected mismatch: SEALED cycle, aborted intent'; END IF; RAISE NOTICE 'PASS mismatch detected: SEALED cycle, only aborted intent'; END $$;
 UPDATE fulfillment_cycle SET state='OPEN' WHERE id='00000000-0000-0000-0000-000000000c11';
 INSERT INTO cycle_intent (intent_id,cycle_id,kind,state) VALUES (gen_random_uuid(),'00000000-0000-0000-0000-000000000c11','RESOLUTION','ABORTED'),(gen_random_uuid(),'00000000-0000-0000-0000-000000000c11','CANCELLATION','ABORTED');
@@ -223,6 +223,7 @@ INSERT INTO item (id,item_type_code,unit_code,name) VALUES ('00000000-0000-0000-
 INSERT INTO warehouse (id,organization_id,region_code,name) VALUES ('00000000-0000-0000-0000-0000000000d4','00000000-0000-0000-0000-00000000aaa1','R1','Kho phân quyền');
 INSERT INTO stock_balance (id,warehouse_id,item_id) VALUES ('00000000-0000-0000-0000-0000000000e2','00000000-0000-0000-0000-0000000000d4','00000000-0000-0000-0000-0000000000c3');
 INSERT INTO stock_movement (balance_id,movement_type,delta_on_hand,delta_reserved,operation_ref,actor_user_id) VALUES ('00000000-0000-0000-0000-0000000000e2','OPENING',10,0,'role-open0',gen_random_uuid());
+INSERT INTO audit_log (id,action,entity_type,entity_id) OVERRIDING SYSTEM VALUE VALUES (9000000000000000000,'T11_PROOF','proof','T11_PROOF');
 
 DO $$ BEGIN
   IF NOT (SELECT p.prosecdef FROM pg_proc p WHERE p.proname='apply_stock_movement') THEN RAISE EXCEPTION 'FAIL apply_stock_movement is not SECURITY DEFINER'; END IF;
@@ -236,9 +237,9 @@ DO $$ BEGIN
 END $$;
 
 SET ROLE c48_logistics_app;
-SELECT expect_sqlstate('app: direct UPDATE stock_balance denied', $$UPDATE stock_balance SET on_hand = on_hand + 1000$$, '42501');
-SELECT expect_sqlstate('app: direct UPDATE of reserved denied', $$UPDATE stock_balance SET reserved = 1$$, '42501');
-SELECT expect_sqlstate('app: DELETE stock_balance denied', $$DELETE FROM stock_balance$$, '42501');
+SELECT expect_sqlstate('app: direct UPDATE stock_balance denied', $$UPDATE stock_balance SET on_hand = on_hand + 1000 WHERE id='00000000-0000-0000-0000-0000000000e2'$$, '42501');
+SELECT expect_sqlstate('app: direct UPDATE of reserved denied', $$UPDATE stock_balance SET reserved = 1 WHERE id='00000000-0000-0000-0000-0000000000e2'$$, '42501');
+SELECT expect_sqlstate('app: DELETE stock_balance denied', $$DELETE FROM stock_balance WHERE id='00000000-0000-0000-0000-0000000000e2'$$, '42501');
 SELECT expect_sqlstate('app: TRUNCATE stock_balance denied', $$TRUNCATE stock_balance CASCADE$$, '42501');
 SELECT expect_sqlstate('app: INSERT stock_balance with on_hand=5 denied', $$INSERT INTO stock_balance (warehouse_id,item_id,on_hand) VALUES ('00000000-0000-0000-0000-0000000000d4','00000000-0000-0000-0000-0000000000c1',5)$$, '42501');
 INSERT INTO stock_balance (id,warehouse_id,item_id) VALUES ('00000000-0000-0000-0000-0000000000e3','00000000-0000-0000-0000-0000000000d4','00000000-0000-0000-0000-0000000000c1');
@@ -257,20 +258,20 @@ DO $$ DECLARE b record; BEGIN
 END $$;
 SELECT expect_sqlstate('app: over-reserve still stopped by the balance CHECK', $$INSERT INTO stock_movement (balance_id,movement_type,delta_on_hand,delta_reserved,commitment_id,operation_ref,actor_user_id) VALUES ('00000000-0000-0000-0000-0000000000e3','RESERVE',0,5,'00000000-0000-0000-0000-000000000a31','role-res2',gen_random_uuid())$$, '23514');
 -- append-only tables: privilege error first, trigger second
-SELECT expect_sqlstate('app: UPDATE stock_movement denied', $$UPDATE stock_movement SET reason='x'$$, '42501');
-SELECT expect_sqlstate('app: DELETE stock_movement denied', $$DELETE FROM stock_movement$$, '42501');
+SELECT expect_sqlstate('app: UPDATE stock_movement denied', $$UPDATE stock_movement SET reason='x' WHERE operation_ref='role-open0'$$, '42501');
+SELECT expect_sqlstate('app: DELETE stock_movement denied', $$DELETE FROM stock_movement WHERE operation_ref='role-open0'$$, '42501');
 SELECT expect_sqlstate('app: TRUNCATE stock_movement denied', $$TRUNCATE stock_movement$$, '42501');
-SELECT expect_sqlstate('app: UPDATE receipt_review denied', $$UPDATE receipt_review SET reason='x'$$, '42501');
-SELECT expect_sqlstate('app: DELETE receipt_review denied', $$DELETE FROM receipt_review$$, '42501');
+SELECT expect_sqlstate('app: UPDATE receipt_review denied', $$UPDATE receipt_review SET reason='x' WHERE receipt_id='00000000-0000-0000-0000-000000000b11' AND count_revision=2 AND declaration_revision=3$$, '42501');
+SELECT expect_sqlstate('app: DELETE receipt_review denied', $$DELETE FROM receipt_review WHERE receipt_id='00000000-0000-0000-0000-000000000b11' AND count_revision=2 AND declaration_revision=3$$, '42501');
 SELECT expect_sqlstate('app: TRUNCATE receipt_review denied', $$TRUNCATE receipt_review$$, '42501');
-SELECT expect_sqlstate('app: UPDATE handoff_record denied', $$UPDATE handoff_record SET confirmation_basis='x'$$, '42501');
-SELECT expect_sqlstate('app: DELETE handoff_record denied', $$DELETE FROM handoff_record$$, '42501');
+SELECT expect_sqlstate('app: UPDATE handoff_record denied', $$UPDATE handoff_record SET confirmation_basis='x' WHERE id='00000000-0000-0000-0000-000000000f11'$$, '42501');
+SELECT expect_sqlstate('app: DELETE handoff_record denied', $$DELETE FROM handoff_record WHERE id='00000000-0000-0000-0000-000000000f11'$$, '42501');
 SELECT expect_sqlstate('app: TRUNCATE handoff_record denied', $$TRUNCATE handoff_record CASCADE$$, '42501');
-SELECT expect_sqlstate('app: UPDATE handoff_loss_review denied', $$UPDATE handoff_loss_review SET reason='x'$$, '42501');
-SELECT expect_sqlstate('app: DELETE handoff_loss_review denied', $$DELETE FROM handoff_loss_review$$, '42501');
+SELECT expect_sqlstate('app: UPDATE handoff_loss_review denied', $$UPDATE handoff_loss_review SET reason='x' WHERE handoff_id='00000000-0000-0000-0000-000000000f14' AND reviewer_user_id='00000000-0000-0000-0000-000000000033'$$, '42501');
+SELECT expect_sqlstate('app: DELETE handoff_loss_review denied', $$DELETE FROM handoff_loss_review WHERE handoff_id='00000000-0000-0000-0000-000000000f14' AND reviewer_user_id='00000000-0000-0000-0000-000000000033'$$, '42501');
 SELECT expect_sqlstate('app: TRUNCATE handoff_loss_review denied', $$TRUNCATE handoff_loss_review$$, '42501');
-SELECT expect_sqlstate('app: UPDATE issued_line_settlement denied', $$UPDATE issued_line_settlement SET settlement_type='LOST'$$, '42501');
-SELECT expect_sqlstate('app: UPDATE audit_log denied', $$UPDATE audit_log SET action='x'$$, '42501');
+SELECT expect_sqlstate('app: UPDATE issued_line_settlement denied', $$UPDATE issued_line_settlement SET settlement_type='LOST' WHERE handoff_line_id='00000000-0000-0000-0000-000000000f24' AND commitment_id='00000000-0000-0000-0000-000000000a31'$$, '42501');
+SELECT expect_sqlstate('app: UPDATE audit_log denied', $$UPDATE audit_log SET action='x' WHERE id=9000000000000000000$$, '42501');
 -- the function and the schema are not the app role's to change
 SELECT expect_sqlstate('app: CREATE OR REPLACE apply_stock_movement denied', $$CREATE OR REPLACE FUNCTION apply_stock_movement() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END'$$, '42501');
 SELECT expect_sqlstate('app: DROP FUNCTION apply_stock_movement denied', $$DROP FUNCTION apply_stock_movement() CASCADE$$, '42501');
@@ -279,16 +280,16 @@ SELECT expect_sqlstate('app: CREATE TABLE in public denied', $$CREATE TABLE publ
 SELECT expect_sqlstate('app: DISABLE TRIGGER stock_movement_apply denied', $$ALTER TABLE stock_movement DISABLE TRIGGER stock_movement_apply$$, '42501');
 -- mutable tables stay usable; DELETE only on the cleanup tables
 INSERT INTO idempotency_record (scope_key,command,idempotency_key,request_hash) VALUES ('s','c','00000000-0000-0000-0000-0000000000f9','h');
-DELETE FROM idempotency_record;
-INSERT INTO notice (recipient_user_id,source_id,source_version,notice_type) VALUES (gen_random_uuid(),gen_random_uuid(),1,'T');
-DELETE FROM notice;
+DELETE FROM idempotency_record WHERE scope_key='s' AND command='c' AND idempotency_key='00000000-0000-0000-0000-0000000000f9';
+INSERT INTO notice (recipient_user_id,source_id,source_version,notice_type) VALUES ('00000000-0000-0000-0000-0000000000f8','00000000-0000-0000-0000-0000000000f7',1,'T');
+DELETE FROM notice WHERE recipient_user_id='00000000-0000-0000-0000-0000000000f8' AND source_id='00000000-0000-0000-0000-0000000000f7' AND source_version=1 AND notice_type='T';
 SELECT 'PASS app: INSERT + DELETE on idempotency_record and notice';
-SELECT expect_sqlstate('app: DELETE warehouse denied', $$DELETE FROM warehouse$$, '42501');
+SELECT expect_sqlstate('app: DELETE warehouse denied', $$DELETE FROM warehouse WHERE id='00000000-0000-0000-0000-0000000000d4'$$, '42501');
 UPDATE donation_delivery SET status='COUNTING' WHERE id='00000000-0000-0000-0000-000000000a13';
 SELECT 'PASS app: UPDATE on a mutable table (donation_delivery) allowed';
 UPDATE cycle_intent SET state='ABORTED' WHERE state='FROZEN' AND intent_id='00000000-0000-0000-0000-0000000001a2';
 SELECT 'PASS app: cycle_intent UPDATE to ABORTED allowed (trigger limits it to that)';
-SELECT expect_sqlstate('app: cycle_intent cannot be revived (trigger)', $$UPDATE cycle_intent SET state='FROZEN'$$, '23514');
+SELECT expect_sqlstate('app: cycle_intent cannot be revived (trigger)', $$UPDATE cycle_intent SET state='FROZEN' WHERE intent_id='00000000-0000-0000-0000-0000000001a2'$$, '23514');
 RESET ROLE;
 
 DO $$
