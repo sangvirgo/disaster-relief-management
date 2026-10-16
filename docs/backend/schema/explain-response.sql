@@ -20,9 +20,11 @@ INSERT INTO incident_category_skill VALUES ('FLOOD','BOAT'),('FLOOD','ROPE'),('F
 INSERT INTO campaign (id,organization_id,region_code,name,status,created_by_user_id)
   SELECT gen_random_uuid(), '00000000-0000-0000-0000-0000000000d1', 'R1', 'Chiến dịch '||i, 'ACTIVE', gen_random_uuid() FROM generate_series(1,20) i;
 
--- ---------- requests (200k): 20% SUBMITTED/VERIFYING, 5% VERIFIED..RESOLVING (10k), 75% terminal; ~1% outside every region ----------
+-- ---------- requests (200k): exactly 10k scoped, confirmed/open heatmap rows in the 31-day window ----------
 CREATE TEMP TABLE seed AS
-SELECT i, gen_random_uuid() AS id, random() AS u, 105 + random()*3.03 AS lon, 10 + random() AS lat,
+SELECT i, gen_random_uuid() AS id, random() AS u,
+       CASE WHEN i<=10000 THEN 106.1+random()*0.1 ELSE 105+random()*3.03 END AS lon,
+       CASE WHEN i<=10000 THEN 10.1+random()*0.1 ELSE 10+random() END AS lat,
        random() AS ut, random() AS uc, random() AS uorg, random() AS ucat, random() AS uuser, random() AS ucamp
 FROM generate_series(1,200000) i;
 CREATE TEMP TABLE camp AS SELECT id, row_number() OVER (ORDER BY id) AS n FROM campaign;
@@ -30,22 +32,28 @@ CREATE TEMP TABLE camp AS SELECT id, row_number() OVER (ORDER BY id) AS n FROM c
 INSERT INTO assistance_request (id,tracking_code,campaign_id,incident_category_code,report_mode,reporter_user_id,reporter_contact_phone,
     source_ip_hash,organization_id,region_code,status,verifying_since,priority,priority_basis,reporter_declared_danger,resolved_at,received_at)
 SELECT s.id, upper(substr(md5(s.i::text),1,12)),
-       CASE WHEN s.ucamp < 0.3 THEN (SELECT id FROM camp WHERE n = 1 + (s.i % 20)) END,
-       CASE WHEN s.ucat < 0.4 THEN 'FLOOD' WHEN s.ucat < 0.6 THEN 'FIRE' WHEN s.ucat < 0.8 THEN 'MEDICAL' ELSE 'UNKNOWN' END,
+       CASE WHEN s.i <= 10000 THEN (SELECT id FROM camp WHERE n=1)
+            WHEN s.ucamp < 0.3 THEN (SELECT id FROM camp WHERE n=2 + (s.i % 19)) END,
+       CASE WHEN s.i <= 10000 THEN 'FLOOD'
+            WHEN s.ucat < 0.4 THEN 'FLOOD' WHEN s.ucat < 0.6 THEN 'FIRE' WHEN s.ucat < 0.8 THEN 'MEDICAL' ELSE 'UNKNOWN' END,
        'SELF',
        CASE WHEN s.uuser < 0.5 THEN ('00000000-0000-0000-0000-'||lpad((1 + (s.i % 2000))::text,12,'0'))::uuid END,
        CASE WHEN s.uc < 0.86 THEN '09'||lpad((s.i % 100000000)::text,8,'0') END,
        CASE WHEN s.i % 100 = 0 THEN 'v1:'||repeat('a',64) END,
-       CASE WHEN s.uorg < 0.9 THEN '00000000-0000-0000-0000-0000000000d1'::uuid ELSE '00000000-0000-0000-0000-0000000000d2'::uuid END,
-       CASE WHEN s.lon < 106 THEN 'R3' WHEN s.lon < 107 THEN 'R1' WHEN s.lon < 108 THEN 'R2' END,
+       CASE WHEN s.i <= 10000 THEN '00000000-0000-0000-0000-0000000000d1'::uuid
+            WHEN s.uorg < 0.9 THEN '00000000-0000-0000-0000-0000000000d1'::uuid ELSE '00000000-0000-0000-0000-0000000000d2'::uuid END,
+       CASE WHEN s.i <= 10000 THEN 'R1'
+            WHEN s.lon < 106 THEN 'R3' WHEN s.lon < 107 THEN 'R1' WHEN s.lon < 108 THEN 'R2' END,
        st, CASE WHEN st = 'VERIFYING' THEN now() - s.ut*interval '2 days' END,
        CASE WHEN st IN ('TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING','CLOSED') THEN 'P3' END,
        CASE WHEN st IN ('TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING','CLOSED') THEN 'COMPLETE' END,
        s.u < 0.02,
        CASE WHEN st = 'CLOSED' THEN now() - s.ut*interval '60 days' END,
-       CASE WHEN s.i % 100 = 0 THEN now() - random()*interval '30 seconds' ELSE now() - s.ut*interval '90 days' END
+       CASE WHEN s.i <= 10000 THEN now() - (s.i % 30 + 1)*interval '1 day'
+            WHEN s.i % 100 = 0 THEN now() - random()*interval '30 seconds' ELSE now() - s.ut*interval '90 days' END
 FROM seed s
 CROSS JOIN LATERAL (SELECT CASE
+   WHEN s.i <= 10000 THEN (ARRAY['VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING'])[1 + (s.i % 5)]
    WHEN s.u < 0.10 THEN 'SUBMITTED' WHEN s.u < 0.20 THEN 'VERIFYING'
    WHEN s.u < 0.23 THEN 'VERIFIED' WHEN s.u < 0.235 THEN 'TRIAGED' WHEN s.u < 0.24 THEN 'DISPATCHED' WHEN s.u < 0.245 THEN 'IN_PROGRESS' WHEN s.u < 0.25 THEN 'RESOLVING'
    WHEN s.u < 0.60 THEN 'CLOSED' WHEN s.u < 0.85 THEN 'REJECTED' ELSE 'CANCELLED' END) x(st);
@@ -54,8 +62,32 @@ UPDATE assistance_request d SET status='DUPLICATE', canonical_request_id=c.id
   FROM (SELECT a.id AS dup, b.id FROM (SELECT id, row_number() OVER () rn FROM assistance_request WHERE status='REJECTED' LIMIT 2000) a
         JOIN (SELECT id, row_number() OVER () rn FROM assistance_request WHERE status='CLOSED' LIMIT 2000) b USING (rn)) c
  WHERE d.id = c.dup;
+INSERT INTO verification_decision (request_id,outcome,basis,reviewer_user_id,decided_at)
+SELECT a.id,'VERIFIED','EVIDENCE_REVIEWED',gen_random_uuid(),a.received_at+interval '1 minute'
+  FROM assistance_request a JOIN seed s ON s.id=a.id
+ WHERE s.i<=10000 AND a.status IN ('VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING');
 INSERT INTO request_subject (request_id,people_affected,location,location_source)
 SELECT id, 1 + (i % 9), ST_SetSRID(ST_MakePoint(lon,lat),4326)::geography, 'MANUAL_PIN' FROM seed;
+DO $$
+DECLARE benchmark_count bigint; decision_count bigint;
+BEGIN
+  SELECT count(*) INTO benchmark_count
+    FROM assistance_request a JOIN seed s ON s.id=a.id JOIN camp c ON c.n=1
+   WHERE s.i<=10000 AND a.organization_id='00000000-0000-0000-0000-0000000000d1'
+     AND a.region_code='R1' AND a.campaign_id=c.id AND a.incident_category_code='FLOOD'
+     AND a.status IN ('VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING')
+     AND a.canonical_request_id IS NULL
+     AND a.received_at>=now()-interval '31 days' AND a.received_at<now();
+  IF benchmark_count<>10000 THEN
+    RAISE EXCEPTION 'Expected 10000 T10 confirmed benchmark requests, found %', benchmark_count;
+  END IF;
+  SELECT count(*) INTO decision_count
+    FROM verification_decision d JOIN seed s ON s.id=d.request_id
+   WHERE s.i<=10000 AND d.outcome='VERIFIED' AND d.basis='EVIDENCE_REVIEWED';
+  IF decision_count<>10000 THEN
+    RAISE EXCEPTION 'Expected 10000 T10 VERIFIED benchmark decisions, found %', decision_count;
+  END IF;
+END $$;
 SELECT a.id AS rid
   FROM assistance_request a JOIN request_subject s ON s.request_id=a.id
  WHERE a.status='VERIFIED' AND a.region_code='R1' AND a.incident_category_code='FLOOD'
@@ -114,7 +146,7 @@ SELECT a.id AS rid, a.organization_id AS oid, s.location AS rloc, a.received_at 
   FROM assistance_request a JOIN request_subject s ON s.request_id = a.id
  WHERE a.status = 'VERIFIED' AND a.region_code = 'R1' AND a.incident_category_code = 'FLOOD' AND a.organization_id = '00000000-0000-0000-0000-0000000000d1' AND a.received_at > now() - interval '20 days'
  ORDER BY a.id LIMIT 1 \gset
-SELECT campaign_id AS cid FROM assistance_request WHERE campaign_id IS NOT NULL GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT 1 \gset
+SELECT id AS cid FROM camp WHERE n=1 \gset
 SELECT reporter_user_id AS uid FROM assistance_request WHERE reporter_user_id IS NOT NULL GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT 1 \gset
 SELECT request_id AS tid FROM request_event GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT 1 \gset
 -- cursor = last row of page 1 (20 rows)
@@ -123,7 +155,7 @@ SELECT count(*) AS events_on_timeline_request FROM request_event WHERE request_i
 
 -- ---------- queries: stored as text with @token@ placeholders, substituted with quoted literals (so the planner sees constants) ----------
 CREATE TEMP TABLE params (k text PRIMARY KEY, v text);
-INSERT INTO params VALUES ('rid',:'rid'),('oid',:'oid'),('rloc',:'rloc'),('rts',:'rts'),('rcat',:'rcat'),('cid',:'cid'),('uid',:'uid'),('tid',:'tid'),('kts',:'kts'),('kid',:'kid'),('sourcehash','v1:'||repeat('a',64)),('team_region','R1'),('team_radius','10000');
+INSERT INTO params VALUES ('rid',:'rid'),('oid',:'oid'),('rloc',:'rloc'),('rts',:'rts'),('rcat','FLOOD'),('cid',:'cid'),('uid',:'uid'),('tid',:'tid'),('kts',:'kts'),('kid',:'kid'),('sourcehash','v1:'||repeat('a',64)),('team_region','R1'),('team_radius','10000'),('from',(now()-interval '31 days')::text),('to',now()::text),('overdue_minutes','10');
 CREATE TEMP TABLE q (n int PRIMARY KEY, label text, sql text);
 INSERT INTO q VALUES
 (1, 'i   candidate teams (10 km, fresh, AVAILABLE, no active mission, skills superset, band order)', $q$
@@ -144,13 +176,26 @@ ORDER BY (b.dist_m <= b.nearest_m + 2000) DESC,
          CASE WHEN b.dist_m <= b.nearest_m + 2000 THEN b.recent_missions END ASC NULLS LAST,
          b.dist_m, b.team_id
 LIMIT 20 $q$),
-(2, 'ii  heatmap 1 km grid, 30 days, region R1, org-scoped, verified open canonical', $q$
-SELECT ST_SnapToGrid(ST_Transform(s.location::geometry, 32648), 1000) AS cell, count(*) AS n
-  FROM assistance_request a JOIN request_subject s ON s.request_id = a.id
- WHERE a.organization_id = @oid@ AND a.region_code = 'R1'
-   AND a.status IN ('VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING') AND a.canonical_request_id IS NULL
-   AND a.received_at >= now() - interval '30 days'
- GROUP BY 1 $q$),
+(2, 'ii  heatmap current 1 km projection, 31-day region/org/campaign/category scope, confirmed canonical rows', $q$
+WITH located AS (
+  SELECT ST_SnapToGrid(ST_Transform(s.location::geometry, 32648), 1000::float8) AS center
+    FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
+   WHERE r.organization_id=@oid@
+     AND r.received_at>=@from@::timestamptz AND r.received_at<@to@::timestamptz
+     AND r.status IN ('VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING')
+     AND r.canonical_request_id IS NULL
+     AND r.region_code='R1' AND r.campaign_id=@cid@::uuid AND r.incident_category_code=@rcat@
+), cells AS (
+  SELECT center,COUNT(*)::int AS count FROM located GROUP BY center
+   ORDER BY ST_X(center),ST_Y(center) LIMIT 5001
+)
+SELECT ST_AsGeoJSON(ST_ForcePolygonCCW(ST_Transform(ST_MakeEnvelope(ST_X(center)-1000::float8/2,
+                                      ST_Y(center)-1000::float8/2,
+                                      ST_X(center)+1000::float8/2,
+                                      ST_Y(center)+1000::float8/2,
+                                      32648),4326))) AS cell,
+       ST_AsGeoJSON(ST_Transform(center,4326)) AS center,count
+  FROM cells ORDER BY ST_X(center),ST_Y(center) $q$),
 (3, 'iii duplicate candidates (same category, +-24 h, within 1 km)', $q$
 SELECT a.id, ST_Distance(s.location, @rloc@::geography) AS dist_m
   FROM assistance_request a JOIN request_subject s ON s.request_id = a.id
@@ -220,18 +265,72 @@ SELECT id,organization_id,operating_region_code,name,team_kind,reporting_mode,av
  WHERE position_team_id IS NULL
     OR captured_at < query_time-interval '30 minutes' OR captured_at > query_time
     OR (captured_at >= query_time-interval '30 minutes' AND captured_at <= query_time
-        AND ST_DWithin(request_location,position_location,@team_radius@::float8)) $q$);
+        AND ST_DWithin(request_location,position_location,@team_radius@::float8)) $q$),
+(10, 'x   Response ReportsService.summary, bounded organization/region/campaign scope', $q$
+WITH filtered_requests AS MATERIALIZED (
+  SELECT r.id,r.received_at,r.status::text AS status,r.priority::text AS priority
+    FROM assistance_request r
+   WHERE r.received_at>=@from@::timestamptz
+     AND r.received_at<@to@::timestamptz
+     AND r.organization_id=@oid@
+     AND r.region_code='R1'
+     AND r.campaign_id=@cid@::uuid
+), first_verified AS (
+  SELECT d.request_id,MIN(d.decided_at) AS decided_at
+    FROM verification_decision d JOIN filtered_requests f ON f.id=d.request_id
+   WHERE d.outcome='VERIFIED' GROUP BY d.request_id
+), first_mission_offer AS (
+  SELECT m.request_id,MIN(m.created_at) AS created_at
+    FROM mission m JOIN filtered_requests f ON f.id=m.request_id GROUP BY m.request_id
+)
+SELECT COALESCE((
+         SELECT jsonb_object_agg(status,total)
+           FROM (SELECT status,COUNT(*)::int AS total FROM filtered_requests GROUP BY status) counts
+       ),'{}'::jsonb) AS status_counts,
+       COALESCE((
+         SELECT jsonb_object_agg(priority,total)
+           FROM (SELECT priority,COUNT(*)::int AS total FROM filtered_requests WHERE priority IS NOT NULL GROUP BY priority) counts
+       ),'{}'::jsonb) AS priority_counts,
+       (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (v.decided_at-f.received_at)))
+          FROM filtered_requests f JOIN first_verified v ON v.request_id=f.id) AS median_verified_seconds,
+       (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (o.created_at-f.received_at)))
+          FROM filtered_requests f JOIN first_mission_offer o ON o.request_id=f.id) AS median_offered_seconds,
+       (SELECT COUNT(*)::int FROM mission m JOIN filtered_requests f ON f.id=m.request_id
+         WHERE m.status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE')) AS active_missions,
+       (SELECT COUNT(*)::int FROM mission m JOIN filtered_requests f ON f.id=m.request_id
+         WHERE m.status='OFFERED'
+           AND m.created_at<=statement_timestamp()-(@overdue_minutes@::int*interval '1 minute')) AS overdue_missions $q$);
+
+-- Match MapService's database statement timeout; EXPLAIN ANALYZE timing is not endpoint timing.
+DO $$
+DECLARE stmt text; p record; heatmap_cell_count bigint; timeout_before text;
+BEGIN
+  SELECT sql INTO stmt FROM q WHERE n=2;
+  FOR p IN SELECT * FROM params LOOP stmt:=replace(stmt,'@'||p.k||'@',quote_literal(p.v)); END LOOP;
+  timeout_before:=current_setting('statement_timeout');
+  PERFORM set_config('statement_timeout','5s',true);
+  EXECUTE 'SELECT count(*) FROM ('||stmt||') heatmap_cells' INTO heatmap_cell_count;
+  PERFORM set_config('statement_timeout',timeout_before,true);
+  IF heatmap_cell_count>5000 THEN
+    RAISE EXCEPTION 'Expected <=5000 T10 heatmap cells, found %', heatmap_cell_count;
+  END IF;
+END $$;
 
 CREATE FUNCTION run_explain(do_print boolean) RETURNS SETOF text LANGUAGE plpgsql AS $$
-DECLARE r record; stmt text; p record; line text;
+DECLARE r record; stmt text; p record; line text; timeout_before text;
 BEGIN
   FOR r IN SELECT * FROM q ORDER BY n LOOP
     stmt := r.sql;
     FOR p IN SELECT * FROM params LOOP stmt := replace(stmt, '@'||p.k||'@', quote_literal(p.v)); END LOOP;
     IF do_print THEN RETURN NEXT '=== ' || r.label; END IF;
+    IF r.n=2 THEN
+      timeout_before:=current_setting('statement_timeout');
+      PERFORM set_config('statement_timeout','5s',true);
+    END IF;
     FOR line IN EXECUTE 'EXPLAIN (ANALYZE, BUFFERS, COSTS OFF) ' || stmt LOOP
       IF do_print THEN RETURN NEXT line; END IF;
     END LOOP;
+    IF r.n=2 THEN PERFORM set_config('statement_timeout',timeout_before,true); END IF;
   END LOOP;
 END $$;
 SELECT count(*) AS warmup_lines FROM run_explain(false);
