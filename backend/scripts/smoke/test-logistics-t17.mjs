@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { cleanupT17TestUsers, registerAndLoginT17User } from './t17-test-users.mjs';
+import { assertFulfillmentReportPage } from './t17-fulfillment-report.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -593,18 +594,48 @@ async function main() {
     const now = new Date();
     const to = now.toISOString();
     const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1_000).toISOString();
-    const fulfillment = await call(
-      logisticsUrl,
-      `reports/fulfillment?region_code=${encodeURIComponent(warehouse.region_code)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&limit=5`,
-      { actor },
+    const fulfillmentLimit = 5;
+    const fulfillmentOracle = await logisticsDb.query(
+      `SELECT n.id AS need_id,c.request_id,c.id AS cycle_id,c.work_cycle,c.region_code,c.campaign_id,
+              n.item_id,i.name AS item_name,un.code AS unit_code,un.display_name AS unit_name,un.scale AS unit_scale,
+              n.original_quantity::text AS original,
+              GREATEST(n.original_quantity-n.requested_quantity,0)::text AS reduced,
+              COALESCE(n.cancelled_remaining,0)::text AS cancelled_remaining,
+              CASE WHEN n.status='CANCELLED' THEN '0'::numeric ELSE n.requested_quantity END::text AS active_requested,
+              COALESCE(SUM(cm.delivered_quantity),0)::text AS delivered,
+              CASE WHEN n.status='CANCELLED' THEN '0'::numeric
+                   ELSE GREATEST(n.requested_quantity-COALESCE(SUM(cm.delivered_quantity),0),0) END::text AS active_outstanding,
+              n.status
+         FROM relief_need n
+         JOIN fulfillment_cycle c ON c.id=n.cycle_id
+         JOIN item i ON i.id=n.item_id
+         JOIN unit un ON un.code=i.unit_code
+         LEFT JOIN commitment cm ON cm.relief_need_id=n.id
+        WHERE c.organization_id=$1 AND c.region_code=$2
+          AND n.created_at >= $3::timestamptz AND n.created_at < $4::timestamptz
+        GROUP BY n.id,c.id,i.id,un.code
+        ORDER BY n.id ASC`,
+      [warehouse.organization_id, warehouse.region_code, from, to],
     );
-    expectSuccess(fulfillment);
-    assert.equal(typeof fulfillment.value.generated_at, 'string');
-    for (const need of fulfillment.value.items) {
-      for (const key of ['original', 'reduced', 'cancelled_remaining', 'active_requested', 'delivered', 'active_outstanding']) {
-        assert.equal(typeof need[key], 'string');
-      }
-    }
+    let fulfillmentOffset = 0;
+    let fulfillmentCursor;
+    const fulfillmentCursors = new Set();
+    do {
+      const query = new URLSearchParams({
+        region_code: warehouse.region_code, from, to, limit: String(fulfillmentLimit),
+      });
+      if (fulfillmentCursor) query.set('cursor', fulfillmentCursor);
+      const fulfillment = await call(logisticsUrl, `reports/fulfillment?${query}`, { actor });
+      expectSuccess(fulfillment);
+      assert.equal(typeof fulfillment.value.generated_at, 'string');
+      assertFulfillmentReportPage(fulfillment.value, fulfillmentOracle.rows, fulfillmentOffset, fulfillmentLimit);
+      if (!fulfillment.value.more) break;
+      assert.ok(fulfillment.value.items.length > 0, 'fulfillment report cursor must advance');
+      assert.equal(fulfillmentCursors.has(fulfillment.value.cursor), false, 'fulfillment report cursor must advance');
+      fulfillmentCursors.add(fulfillment.value.cursor);
+      fulfillmentOffset += fulfillment.value.items.length;
+      fulfillmentCursor = fulfillment.value.cursor;
+    } while (true);
 
     const responseReport = await call(
       responseUrl,
