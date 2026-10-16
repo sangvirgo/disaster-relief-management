@@ -66,3 +66,20 @@ test('T17 fulfillment smoke compares report pages with the primary-row oracle', 
     /deep-equal/u,
   );
 });
+
+test('T17 chooses a warehouse with multiple balance rows for stock and reconciliation pagination', () => {
+  assert.equal(typeof helper?.selectReportWarehouse, 'function');
+  const needWarehouse = { id: 'fulfillment', balance_count: 1 };
+  const paginationWarehouse = { id: 'pagination', balance_count: '2' };
+
+  assert.equal(helper.selectReportWarehouse([needWarehouse, paginationWarehouse], needWarehouse), paginationWarehouse);
+  assert.equal(helper.selectReportWarehouse([needWarehouse], needWarehouse), needWarehouse);
+  assert.match(smokeSource, /const reportWarehouse = selectReportWarehouse\(reportWarehouseCandidates\.rows, warehouse\)/u);
+  assert.match(smokeSource, /reports\/stock-summary\?warehouse_id=\$\{reportWarehouse\.id\}.*actor: reportActor/u);
+  assert.match(smokeSource, /reconciliation\?warehouse_id=\$\{reportWarehouse\.id\}.*actor: reportActor/u);
+  assert.match(smokeSource, /reports\/stock-summary\?warehouse_id=\$\{reportWarehouse\.id\}&limit=1&cursor=/u);
+  assert.match(smokeSource, /reconciliation\?warehouse_id=\$\{reportWarehouse\.id\}&limit=1&cursor=/u);
+  assert.match(smokeSource, /const stockPage2 = await call\([\s\S]*?\{ actor: reportActor \}/u);
+  assert.match(smokeSource, /const reconciliationPage2 = await call\([\s\S]*?\{ actor: reportActor \}/u);
+  assert.match(smokeSource, /const reconciliationPage3 = await call\([\s\S]*?\{ actor: reportActor \}/u);
+});

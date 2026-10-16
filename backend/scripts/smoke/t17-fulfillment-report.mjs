@@ -20,6 +20,10 @@ function reportItem(row) {
   };
 }
 
+export function selectReportWarehouse(candidates, fallback) {
+  return candidates.find(({ balance_count }) => Number(balance_count) > 1) ?? fallback;
+}
+
 export function assertFulfillmentReportPage(report, oracleRows, offset, limit) {
   assert.ok(oracleRows.length > 0, 'T17 smoke requires populated fulfillment rows');
   assert.deepEqual(report.items, oracleRows.slice(offset, offset + limit).map(reportItem));

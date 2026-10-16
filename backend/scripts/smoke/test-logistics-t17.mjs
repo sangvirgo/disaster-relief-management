@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { cleanupT17TestUsers, registerAndLoginT17User } from './t17-test-users.mjs';
-import { assertFulfillmentReportPage } from './t17-fulfillment-report.mjs';
+import { assertFulfillmentReportPage, selectReportWarehouse } from './t17-fulfillment-report.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -378,17 +378,28 @@ async function main() {
     const warehouse = warehouses.rows[0];
     assert.ok(Number(warehouse?.fulfillment_need_count) > 0, 'T17 smoke requires a recent fulfillment need in a warehouse region');
     const organizationId = warehouse.organization_id;
+    const reportWarehouseCandidates = await logisticsDb.query(
+      `SELECT w.id,w.organization_id,count(b.id)::int AS balance_count
+         FROM warehouse w
+         JOIN stock_balance b ON b.warehouse_id=w.id
+        GROUP BY w.id,w.organization_id
+        ORDER BY balance_count DESC,w.id`,
+    );
+    const reportWarehouse = selectReportWarehouse(reportWarehouseCandidates.rows, warehouse);
 
     const actor = await loginSmokeActor(organizationId, cleanupUserIds, 'OPERATIONS_MANAGER');
+    const reportActor = reportWarehouse.organization_id === organizationId
+      ? actor
+      : await loginSmokeActor(reportWarehouse.organization_id, cleanupUserIds, 'OPERATIONS_MANAGER');
 
     const deniedActor = await loginSmokeActor(organizationId, cleanupUserIds);
-    const deniedReport = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${warehouse.id}`, { actor: deniedActor });
+    const deniedReport = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${reportWarehouse.id}`, { actor: deniedActor });
     expectVietnameseError(deniedReport, 403, 'FORBIDDEN');
 
-    const noSession = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${warehouse.id}`);
+    const noSession = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${reportWarehouse.id}`);
     expectVietnameseError(noSession, 401, 'UNAUTHENTICATED');
 
-    const stock = await call(logisticsUrl, `stock?warehouse_id=${warehouse.id}&limit=100`, { actor });
+    const stock = await call(logisticsUrl, `stock?warehouse_id=${reportWarehouse.id}&limit=100`, { actor: reportActor });
     expectSuccess(stock);
     const stockOracle = await logisticsDb.query(
       `WITH held AS MATERIALIZED (
@@ -415,9 +426,9 @@ async function main() {
          FROM inventory
          LEFT JOIN stock_balance balance ON balance.warehouse_id=$1 AND balance.item_id=inventory.item_id
         ORDER BY inventory.item_id`,
-      [warehouse.id],
+      [reportWarehouse.id],
     );
-    const stockReport = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${warehouse.id}&limit=1`, { actor });
+    const stockReport = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${reportWarehouse.id}&limit=1`, { actor: reportActor });
     expectSuccess(stockReport);
     assert.equal(typeof stockReport.value.generated_at, 'string');
     assert.equal(stockReport.value.items[0]?.item.id, stockOracle.rows[0]?.item_id);
@@ -442,8 +453,8 @@ async function main() {
       assert.equal(typeof stockReport.value.cursor, 'string');
       const stockPage2 = await call(
         logisticsUrl,
-        `reports/stock-summary?warehouse_id=${warehouse.id}&limit=1&cursor=${encodeURIComponent(stockReport.value.cursor)}`,
-        { actor },
+        `reports/stock-summary?warehouse_id=${reportWarehouse.id}&limit=1&cursor=${encodeURIComponent(stockReport.value.cursor)}`,
+        { actor: reportActor },
       );
       expectSuccess(stockPage2);
       assert.equal(stockPage2.value.items.length, 1);
@@ -456,7 +467,7 @@ async function main() {
       console.log('SKIP T17 stock page-2 assertion: selected warehouse has fewer than two report rows.');
     }
 
-    const reconciliation = await call(logisticsUrl, `reconciliation?warehouse_id=${warehouse.id}&limit=1`, { actor });
+    const reconciliation = await call(logisticsUrl, `reconciliation?warehouse_id=${reportWarehouse.id}&limit=1`, { actor: reportActor });
     expectSuccess(reconciliation);
     assert.equal(typeof reconciliation.value.generated_at, 'string');
     const reconciliationOracle = await logisticsDb.query(
@@ -535,7 +546,7 @@ async function main() {
          ) physical ON TRUE
         WHERE b.warehouse_id=$1::uuid
         ORDER BY b.id ASC LIMIT 101`,
-      [warehouse.id],
+      [reportWarehouse.id],
     );
     if (reconciliationOracle.rows.length === 0) {
       console.log('SKIP TC-REC-01 populated main-API evidence pending: no stock_balance rows in the primary logistics database; verified the empty reconciliation page.');
@@ -549,8 +560,8 @@ async function main() {
         assert.equal(typeof reconciliation.value.cursor, 'string');
         const reconciliationPage2 = await call(
           logisticsUrl,
-          `reconciliation?warehouse_id=${warehouse.id}&limit=1&cursor=${encodeURIComponent(reconciliation.value.cursor)}`,
-          { actor },
+          `reconciliation?warehouse_id=${reportWarehouse.id}&limit=1&cursor=${encodeURIComponent(reconciliation.value.cursor)}`,
+          { actor: reportActor },
         );
         expectSuccess(reconciliationPage2);
         const expectedPage2 = mapReconciliationItems(reconciliationOracle.rows.slice(1, 2));
@@ -565,8 +576,8 @@ async function main() {
           assert.equal(typeof reconciliationPage2.value.cursor, 'string');
           const reconciliationPage3 = await call(
             logisticsUrl,
-            `reconciliation?warehouse_id=${warehouse.id}&limit=1&cursor=${encodeURIComponent(reconciliationPage2.value.cursor)}`,
-            { actor },
+            `reconciliation?warehouse_id=${reportWarehouse.id}&limit=1&cursor=${encodeURIComponent(reconciliationPage2.value.cursor)}`,
+            { actor: reportActor },
           );
           expectSuccess(reconciliationPage3);
           assert.deepEqual(
@@ -665,7 +676,7 @@ async function main() {
     expectVietnameseError(invalidView, 400, 'VALIDATION_FAILED');
 
     console.log(
-      `T17 populated main-stack report checks passed: warehouse balances=${warehouse.balance_count}, ` +
+      `T17 populated main-stack report checks passed: stock report rows=${stockOracle.rows.length}, ` +
       `reconciliation rows=${reconciliationOracle.rows.length}.`,
     );
   } finally {
