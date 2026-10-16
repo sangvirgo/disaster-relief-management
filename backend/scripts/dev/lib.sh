@@ -1,7 +1,27 @@
-ROOT="$(cd -- "$(dirname -- "$0")/../../.." && pwd)"
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)"
 MAIN_COMPOSE_FILE="$ROOT/backend/infra/compose.yaml"
 main_compose() {
   docker compose -p c48 --env-file "$ROOT/backend/.env" -f "$MAIN_COMPOSE_FILE" "$@"
+}
+image_source() {
+  local source="${C48_IMAGE_SOURCE:-}"
+  if [[ -z "$source" ]]; then
+    source="$(awk -F= '$1 == "C48_IMAGE_SOURCE" { print $2; found = 1; exit } END { if (!found) print "local" }' "$ROOT/backend/.env")"
+  fi
+  case "$source" in
+    local|registry) printf '%s\n' "$source" ;;
+    *) printf 'C48_IMAGE_SOURCE must be local or registry.\n' >&2; return 2 ;;
+  esac
+}
+main_compose_prepare_images() {
+  if [[ "$(image_source)" == registry ]]; then main_compose pull "$@"; else main_compose build "$@"; fi
+}
+main_compose_up() {
+  local global_args=()
+  if [[ "${1:-}" == --profile ]]; then global_args=("$1" "$2"); shift 2; fi
+  local build_args=()
+  if [[ "$(image_source)" == registry ]]; then build_args+=(--no-build); fi
+  main_compose "${global_args[@]}" up "${build_args[@]}" "$@"
 }
 require_env_file() {
   if [[ ! -f "$ROOT/backend/.env" ]]; then

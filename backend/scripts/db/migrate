@@ -2,10 +2,10 @@
 set -euo pipefail
 source "$(dirname -- "$0")/../dev/lib.sh"
 require_env_file
-main_compose build identity-migrate response-migrate logistics-migrate
-main_compose up -d --wait postgres
-main_compose up -d db-init
+main_compose_prepare_images identity-migrate response-migrate logistics-migrate
+main_compose_up -d --wait postgres
+main_compose_up -d db-init
 for service in identity response logistics; do
   migrate_service="$service-migrate"
-  main_compose up --exit-code-from "$migrate_service" "$migrate_service"
+  main_compose_up --exit-code-from "$migrate_service" "$migrate_service"
 done

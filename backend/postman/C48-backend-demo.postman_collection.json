@@ -343,6 +343,12 @@
       "description": "Stock balance UUID from the stock list."
     },
     {
+      "key": "adjustmentId",
+      "value": "",
+      "type": "string",
+      "description": "Stock adjustment UUID returned by adjustment creation."
+    },
+    {
       "key": "publicCode",
       "value": "",
       "type": "string",
@@ -8447,7 +8453,7 @@
                     "value": "application/json"
                   }
                 ],
-                "url": "{{logisticsBaseUrl}}/stock/adjustments/{{balanceId}}/review",
+                "url": "{{logisticsBaseUrl}}/stock/adjustments/{{adjustmentId}}/review",
                 "description": "## Mục đích\nStockController.reviewAdjustment\n\n## Quyền và điều kiện\nCần access token phù hợp với tài khoản đang thao tác.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /stock/adjustments/{id}/review` · Operation: `logisticsStockReviewAdjustment` · Service: `logistics`.",
                 "body": {
                   "mode": "raw",
@@ -9206,6 +9212,7 @@
           "    if (meta.operationId === 'logisticsAssetsWarehouses' && body.items && body.items[0] && body.items[0].id) pm.collectionVariables.set('warehouseId', body.items[0].id);",
           "    if (meta.operationId === 'logisticsCatalogItems' && body.items && body.items[0] && body.items[0].id) pm.collectionVariables.set('itemId', body.items[0].id);",
           "    if (meta.operationId === 'logisticsStockBalances' && body.items && body.items[0]) pm.collectionVariables.set('balanceId', body.items[0].id || body.items[0].balance_id);",
+          "    if (meta.operationId === 'logisticsStockCreateAdjustment' && body.id) pm.collectionVariables.set('adjustmentId', body.id);",
           "    if (meta.operationId === 'logisticsDistributionsDetail' && body.lines && body.lines[0] && body.lines[0].id) pm.collectionVariables.set('distributionLineId', body.lines[0].id);",
           "  }",
           "}"

@@ -5,4 +5,5 @@ require_env_file
 if [[ $# -gt 0 && "$1" == "--reset" ]]; then
   exec "$ROOT/backend/scripts/db/reset-demo" --reset
 fi
-main_compose --profile seed up --exit-code-from seed seed
+main_compose_prepare_images seed response-migrate logistics-migrate
+main_compose_up --profile seed --exit-code-from seed seed

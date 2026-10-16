@@ -31,7 +31,7 @@ const expectedEnvironment = {
     'SOS_HARD_LIMIT_PER_IP', 'SOS_GLOBAL_PER_MIN', 'PROXY_OPEN_CAP', 'PROXY_DAILY_SOFT_LIMIT',
     'VERIFY_OVERDUE_MINUTES', 'OFFER_OVERDUE_MINUTES', 'TEAM_POSITION_FRESH_MINUTES', 'TEAM_SEARCH_RADIUS_M',
     'TEAM_BAND_TOLERANCE_M', 'TEAM_BAND_TOLERANCE_P2_M', 'TEAM_BAND_TOLERANCE_P1_M', 'SIGNED_URL_TTL_S',
-    'SCHEDULER_ENABLED', 'INTROSPECT_TIMEOUT_MS', 'DEMO_INTAKE_ORGANIZATION_ID',
+    'SCHEDULER_ENABLED', 'RESOLUTION_RECOVERY_ENABLED', 'INTROSPECT_TIMEOUT_MS', 'DEMO_INTAKE_ORGANIZATION_ID',
   ],
   'logistics-api': [
     'NODE_ENV', 'PORT', 'DATABASE_URL', 'DB_POOL_MAX', 'DB_LOCK_TIMEOUT_MS', 'DB_STATEMENT_TIMEOUT_MS', 'LOG_LEVEL', 'C48_SCHEMA_DIR',
@@ -58,6 +58,23 @@ for (const name of expectedServices) {
   assert.ok(!service.env_file, `${name} must not load a shared env_file`);
   assert.deepEqual(Object.keys(service.environment ?? {}).sort(), [...expectedEnvironment[name]].sort(), `${name} environment allow-list changed`);
   if (service.image) assert.doesNotMatch(service.image, /test/i, `${name} image name must not contain test`);
+}
+
+for (const [namespace, tag] of [['c48', 'local'], ['ghcr.io/sangvirgo', 'handoff-test']]) {
+  const configured = spawnSync('docker', args, {
+    encoding: 'utf8',
+    env: { ...process.env, C48_IMAGE_NAMESPACE: namespace, C48_IMAGE_TAG: tag },
+  });
+  if (configured.error) throw configured.error;
+  if (configured.status !== 0) throw new Error(`Compose image configuration failed (${configured.status}): ${configured.stderr.trim()}`);
+  const configuredServices = JSON.parse(configured.stdout).services;
+  for (const [service, imageName] of Object.entries({
+    'identity-migrate': 'identity-api', 'identity-api': 'identity-api', seed: 'identity-api',
+    'response-migrate': 'response-api', 'response-api': 'response-api',
+    'logistics-migrate': 'logistics-api', 'logistics-api': 'logistics-api',
+  })) {
+    assert.equal(configuredServices[service].image, `${namespace}/${imageName}:${tag}`, `${service} must use its configured image namespace and tag`);
+  }
 }
 
 for (const name of ['postgres', 'db-init', 'identity-migrate', 'response-migrate', 'logistics-migrate', 'identity-api', 'response-api', 'logistics-api', 'nginx']) {

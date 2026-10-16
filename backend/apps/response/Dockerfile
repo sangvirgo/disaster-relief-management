@@ -13,6 +13,7 @@ RUN npm ci --no-audit --no-fund && npm run build && npm prune --omit=dev
 
 FROM node:24.15.0-bookworm-slim AS runtime
 ENV NODE_ENV=production
+LABEL org.opencontainers.image.source="https://github.com/sangvirgo/disaster-relief-management"
 WORKDIR /workspace/backend
 COPY --from=build --chown=node:node /workspace/backend/node_modules ./node_modules
 COPY --from=build --chown=node:node /workspace/backend/package.json ./package.json

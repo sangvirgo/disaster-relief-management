@@ -44,6 +44,16 @@ test('catalog item uses the type and unit created by earlier requests', () => {
   assert.ok(items.indexOf(operation('logisticsCatalogCreateUnit')) < items.indexOf(operation('logisticsCatalogCreateItem')));
 });
 
+test('stock adjustment review uses the ID returned by adjustment creation', () => {
+  const script = collection.event.find((event) => event.listen === 'test').script.exec.join('\n');
+  const requestUrl = operation('logisticsStockReviewAdjustment').request.url;
+  const reviewUrl = typeof requestUrl === 'string' ? requestUrl : requestUrl.raw;
+
+  assert.match(script, /logisticsStockCreateAdjustment[\s\S]*pm\.collectionVariables\.set\('adjustmentId', body\.id\)/);
+  assert.match(reviewUrl, /\/stock\/adjustments\/\{\{adjustmentId\}\}\/review$/);
+  assert.ok(collection.variable.some((variable) => variable.key === 'adjustmentId'));
+});
+
 test('quick queue smoke uses a coordinator session', () => {
   const header = itemNamed('Queue điều phối theo quyền cán bộ').request.header.find((entry) => entry.key === 'Authorization');
   assert.equal(header?.value, 'Bearer {{coordinatorAccessToken}}');

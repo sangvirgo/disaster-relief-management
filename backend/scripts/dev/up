@@ -2,4 +2,5 @@
 set -euo pipefail
 source "$(dirname -- "$0")/lib.sh"
 require_env_file
-main_compose --profile storage up -d --build --wait --wait-timeout 180 minio-init nginx
+main_compose_prepare_images identity-api response-api logistics-api
+main_compose_up --profile storage -d --wait --wait-timeout 180 minio-init nginx

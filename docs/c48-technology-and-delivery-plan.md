@@ -2078,9 +2078,9 @@ These planned cases extend existing IDs without renumbering them. They are not e
 
 ### 22.7 Remaining decisions and current repository status
 
-The repository currently has documentation only. No NestJS workspace, migrations, OpenAPI artifacts, running services, or executed product tests are established by this plan edit. Section 22 fixes design inconsistencies and defines the implementation path; it is not evidence of a working backend.
+Historical baseline (2026-10-01): when this section was written, the repository contained documentation only and had no NestJS workspace, migrations, OpenAPI artifacts, running services, or executed product tests. This no longer describes the current repository: backend implementation T0–T19 and its contracts/tests are recorded in [the backend implementation pack](backend/README.md). Current verification and open acceptance gates are recorded in [the backend handoff](backend/HANDOFF.md). Section 22 remains the design baseline; it is not evidence of runtime behavior.
 
-Before setup, verify primary-source runtime/image/client compatibility and current AIStor package/license. Section 23 adopts authentication transport, resolution sealing, quantity rules, asset/media scope, file limits and numeric performance targets. Before integration, turn these decisions into versioned OpenAPI and migrations; before acceptance, record actual hardware and executed results. External map/push/email/LLM providers remain unselected. Official priority/SLA, retention, real-data privacy and disaster-authority policies need separate confirmation before real deployment. These limitations do not block independent synthetic-demo slices.
+At the time this baseline was written, runtime/provider verification and conversion of these decisions into OpenAPI and migrations were prerequisites to implementation. Backend contracts and migrations are now present; current verification and remaining acceptance evidence are tracked in [the backend handoff](backend/HANDOFF.md). The selected AIStor artifact/license and restore evidence remain open, as do hardware-recorded performance checks. External map/push/email/LLM providers remain unselected. Official priority/SLA, retention, real-data privacy and disaster-authority policies need separate confirmation before real deployment. These limitations do not block independent synthetic-demo slices.
 
 ## 23. Architecture review decisions — 2026-10-01
 
@@ -2623,7 +2623,7 @@ Use the recorded baseline for implementation. Revisit it when new evidence mater
 
 Section 26 records the latest feedback and Section 16/25 the reduced scope. Sections 22 and 23 retain the applicable safeguards from the earlier architecture review: three-service ownership, REST integration, multi-mission aggregation, single-team missions, campaign optionality/resume, mutually exclusive verification, partial fulfillment, stock accounting, revocation, and notification uniqueness. Do not reintroduce broker workflows without evidence meeting Section 4.4.
 
-Before implementing a slice, finish its OpenAPI schemas, database migration constraints/indexes, authorization cases, and executable acceptance cases. These concrete artifacts are not yet present in this documentation-only repository. Priority definitions, external providers, real-data retention, and operational SLA remain subject to domain review before real use. Ordinary reversible implementation choices may proceed under the documented demo defaults.
+The original implementation workflow required each slice to define OpenAPI schemas, database migration constraints/indexes, authorization cases, and executable acceptance cases before coding. Backend slices T0–T19 have since been implemented; see the backend handoff for current verification and remaining acceptance evidence. New slices should continue to follow that workflow. Priority definitions, external providers, real-data retention, and operational SLA remain subject to domain review before real use. Ordinary reversible implementation choices may proceed under the documented demo defaults.
 
 ### A.4 Implementation workflow for a future task
 
