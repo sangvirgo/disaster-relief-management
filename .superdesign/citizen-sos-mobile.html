@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>C48 Relief - Gửi Yêu Cầu SOS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            c48: {
+              bg: '#F7F8F5',
+              surface: '#FFFFFF',
+              primary: '#214C43',
+              secondary: '#2E6D67',
+              text: '#304350',
+              textMuted: '#637682',
+              border: '#DCE5E3',
+              info: '#3C6E9A',
+              caution: '#B77723',
+              danger: '#B94F4A',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="w-full h-screen flex flex-col bg-c48-bg text-c48-text font-sans">
+
+    <!-- Header (Fixed Top) -->
+    <header class="shrink-0 pt-14 pb-3 px-4 bg-c48-surface border-b border-c48-border flex items-center justify-between z-40">
+      <a href="#" id="nav-logo" class="flex items-center gap-2 text-c48-primary">
+        <iconify-icon icon="lucide:life-buoy" class="text-2xl"></iconify-icon>
+        <span class="font-bold text-lg tracking-tight">C48 RELIEF</span>
+      </a>
+      <button id="nav-login" class="flex items-center gap-2 text-sm text-c48-text font-medium min-h-[44px]">
+        <iconify-icon icon="lucide:user-circle" class="text-2xl text-c48-textMuted"></iconify-icon>
+      </button>
+    </header>
+
+    <!-- Main Scrollable Area -->
+    <main class="flex-1 overflow-y-auto">
+      <div class="p-4 flex flex-col gap-6 pb-8">
+
+        <!-- Title & Description -->
+        <div>
+          <h1 class="text-2xl font-bold text-c48-text mb-2">Gửi Yêu Cầu Cứu Hộ</h1>
+          <p class="text-c48-textMuted text-sm leading-relaxed">
+            Hãy cung cấp thông tin chính xác nhất có thể. Đội điều phối sẽ xác minh và ưu tiên các trường hợp khẩn cấp thực sự.
+          </p>
+        </div>
+
+        <!-- Mode Toggle -->
+        <div class="flex p-1 bg-c48-border/30 rounded-xl w-full">
+          <button class="flex-1 py-2.5 bg-c48-surface shadow-sm rounded-lg text-sm font-semibold text-c48-primary flex justify-center items-center gap-2 min-h-[44px]">
+            <iconify-icon icon="lucide:file-text" class="text-lg"></iconify-icon>
+            Điền biểu mẫu
+          </button>
+          <button class="flex-1 py-2.5 rounded-lg text-sm font-medium text-c48-textMuted flex justify-center items-center gap-1.5 min-h-[44px]">
+            <iconify-icon icon="lucide:message-square-plus" class="text-lg"></iconify-icon>
+            Tin nhắn nhanh
+          </button>
+        </div>
+
+        <!-- Form Sections Container -->
+        <div class="flex flex-col gap-5">
+
+          <!-- Section 1: Reporter -->
+          <section class="bg-c48-surface rounded-2xl border border-c48-border p-4">
+            <h2 class="text-base font-semibold text-c48-text mb-4 flex items-center gap-2">
+              <span class="bg-c48-bg text-c48-primary w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">1</span>
+              Người báo tin
+            </h2>
+
+            <div class="flex flex-col gap-3 mb-5">
+              <label class="flex items-start gap-3 p-3 border border-c48-border rounded-xl cursor-pointer bg-c48-bg/50">
+                <input type="radio" name="reporter_type" checked class="mt-1 text-c48-primary focus:ring-c48-primary w-4 h-4">
+                <div>
+                  <span class="block font-medium text-sm text-c48-text">Tôi là người đang gặp nạn</span>
+                  <span class="block text-xs text-c48-textMuted mt-0.5">Báo cáo cho chính vị trí của bạn</span>
+                </div>
+              </label>
+              <label class="flex items-start gap-3 p-3 border border-c48-border rounded-xl cursor-pointer">
+                <input type="radio" name="reporter_type" class="mt-1 text-c48-primary focus:ring-c48-primary w-4 h-4">
+                <div>
+                  <span class="block font-medium text-sm text-c48-text">Tôi báo hộ người thân / người khác</span>
+                  <span class="block text-xs text-c48-textMuted mt-1 leading-relaxed">
+                    <strong>Yêu cầu đăng nhập.</strong> Nếu chọn báo hộ, bạn sẽ cần cung cấp thêm: Mối quan hệ, nguồn tin, thời gian biết thông tin cuối, khả năng liên lạc và SĐT người bị nạn.
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            <div class="flex flex-col gap-4">
+              <div>
+                <label class="block text-sm font-medium text-c48-text mb-1.5">Họ và tên</label>
+                <input type="text" placeholder="Nguyễn Văn A" class="w-full px-4 py-3 rounded-xl border border-c48-border bg-white focus:outline-none focus:border-c48-primary focus:ring-1 focus:ring-c48-primary text-sm min-h-[44px]">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-c48-text mb-1.5">Số điện thoại liên hệ</label>
+                <input type="tel" placeholder="09xx xxx xxx" class="w-full px-4 py-3 rounded-xl border border-c48-border bg-white focus:outline-none focus:border-c48-primary focus:ring-1 focus:ring-c48-primary text-sm min-h-[44px]">
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 2: Location -->
+          <section class="bg-c48-surface rounded-2xl border border-c48-border p-4">
+            <h2 class="text-base font-semibold text-c48-text mb-4 flex items-center gap-2">
+              <span class="bg-c48-bg text-c48-primary w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">2</span>
+              Vị trí người gặp nạn
+            </h2>
+
+            <div class="flex flex-col gap-3 mb-4">
+              <button type="button" class="w-full px-4 py-3 bg-c48-bg border border-c48-border rounded-xl text-sm font-medium text-c48-text flex items-center justify-center gap-2 min-h-[44px]">
+                <iconify-icon icon="lucide:navigation" class="text-c48-primary text-lg"></iconify-icon>
+                Dùng vị trí hiện tại (GPS)
+              </button>
+              <button type="button" class="w-full px-4 py-3 bg-white border border-c48-border rounded-xl text-sm font-medium text-c48-text flex items-center justify-center gap-2 min-h-[44px]">
+                <iconify-icon icon="lucide:map-pin" class="text-c48-textMuted text-lg"></iconify-icon>
+                Chọn ghim trên bản đồ
+              </button>
+            </div>
+
+            <div class="p-4 rounded-xl border border-c48-border/50 bg-c48-bg/50 flex items-center justify-center text-center text-sm text-c48-textMuted">
+              Chưa có thông tin vị trí. Vui lòng chọn một phương thức trên.
+            </div>
+          </section>
+
+          <!-- Section 3: Situation -->
+          <section class="bg-c48-surface rounded-2xl border border-c48-border p-4">
+            <h2 class="text-base font-semibold text-c48-text mb-4 flex items-center gap-2">
+              <span class="bg-c48-bg text-c48-primary w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">3</span>
+              Tình huống hiện tại
+            </h2>
+
+            <div class="flex flex-col gap-5">
+
+              <!-- Incident Category -->
+              <div>
+                <label class="block text-sm font-medium text-c48-text mb-1.5">Loại sự cố</label>
+                <div class="relative">
+                  <select class="w-full px-4 py-3 rounded-xl border border-c48-border bg-white focus:outline-none focus:border-c48-primary focus:ring-1 focus:ring-c48-primary text-sm appearance-none min-h-[44px]">
+                    <option value="" disabled selected>-- Chọn loại sự cố --</option>
+                    <option value="flood">Ngập lụt / Lũ quét</option>
+                    <option value="landslide">Sạt lở đất</option>
+                    <option value="storm">Bão / Gió lốc</option>
+                    <option value="fire">Hỏa hoạn</option>
+                    <option value="other">Khác</option>
+                  </select>
+                  <iconify-icon icon="lucide:chevron-down" class="absolute right-4 top-1/2 -translate-y-1/2 text-c48-textMuted pointer-events-none"></iconify-icon>
+                </div>
+              </div>
+
+              <!-- Danger Checkbox -->
+              <div class="p-3.5 rounded-xl border border-c48-danger/30 bg-c48-danger/5">
+                <label class="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" class="mt-0.5 rounded text-c48-danger focus:ring-c48-danger border-c48-danger/50 w-4 h-4">
+                  <div>
+                    <span class="block font-semibold text-sm text-c48-danger">Đang nguy hiểm đến tính mạng</span>
+                    <span class="block text-xs text-c48-danger/80 mt-1">
+                      Đánh dấu nếu tình huống đe dọa sinh mạng ngay lập tức (ví dụ: nước cuốn, kẹt trong đống đổ nát).
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-c48-text mb-1.5">Mô tả chi tiết & Ghi chú địa chỉ</label>
+                <textarea rows="4" placeholder="Mô tả tình trạng, người bị thương. Cung cấp thêm chi tiết nhà cửa để dễ tìm thấy..." class="w-full px-4 py-3 rounded-xl border border-c48-border bg-white focus:outline-none focus:border-c48-primary focus:ring-1 focus:ring-c48-primary text-sm resize-none"></textarea>
+              </div>
+
+              <div class="flex flex-col gap-3">
+                <label class="block text-sm font-medium text-c48-text">Tổng số người cần cứu hộ</label>
+                <div class="flex items-center gap-4">
+                  <input type="number" min="1" placeholder="?" class="w-24 px-4 py-3 rounded-xl border border-c48-border bg-white focus:outline-none focus:border-c48-primary focus:ring-1 focus:ring-c48-primary text-sm min-h-[44px]">
+                  <label class="flex items-center gap-2 cursor-pointer min-h-[44px]">
+                    <input type="checkbox" class="rounded text-c48-primary focus:ring-c48-primary border-c48-border w-4 h-4">
+                    <span class="text-sm text-c48-textMuted">Không rõ</span>
+                  </label>
+                </div>
+              </div>
+
+            </div>
+          </section>
+        </div>
+
+        <!-- Emergency Contact (Aside Content Stacked) -->
+        <div class="bg-c48-surface rounded-2xl border border-c48-danger/20 p-4 shadow-sm mt-2">
+          <h3 class="text-sm font-bold text-c48-danger mb-2 flex items-center gap-2">
+            <iconify-icon icon="lucide:phone-call"></iconify-icon>
+            Trong trường hợp khẩn cấp
+          </h3>
+          <p class="text-sm text-c48-text mb-4 leading-relaxed">
+            Nếu có người bị thương nặng, nguy hiểm tính mạng, vui lòng gọi trực tiếp:
+          </p>
+          <div class="flex flex-col gap-2">
+            <a href="tel:114" id="call-114" class="flex items-center justify-between p-3.5 rounded-xl bg-c48-bg border border-c48-border min-h-[44px]">
+              <span class="font-medium text-sm text-c48-text">Cứu hỏa / Cứu nạn</span>
+              <span class="font-bold text-c48-primary text-lg">114</span>
+            </a>
+            <a href="tel:115" id="call-115" class="flex items-center justify-between p-3.5 rounded-xl bg-c48-bg border border-c48-border min-h-[44px]">
+              <span class="font-medium text-sm text-c48-text">Cấp cứu y tế</span>
+              <span class="font-bold text-c48-primary text-lg">115</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Quick Message Preview Hint -->
+        <div class="bg-c48-bg rounded-xl border border-c48-border/60 p-4">
+          <div class="flex gap-3">
+            <iconify-icon icon="lucide:lightbulb" class="text-c48-caution text-xl shrink-0 mt-0.5"></iconify-icon>
+            <div class="text-sm">
+              <p class="font-medium text-c48-text mb-1">Thử Viết tin nhắn nhanh?</p>
+              <p class="text-c48-textMuted leading-relaxed">
+                Gõ nội dung tự do, hệ thống tự động điền vào biểu mẫu. Bạn vẫn được kiểm tra trước khi gửi.
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Sticky Footer Actions -->
+    <footer class="shrink-0 bg-c48-surface border-t border-c48-border px-4 pt-3 pb-[34px] z-40">
+      <div class="flex flex-col gap-3">
+        <button type="button" id="btn-review" class="w-full py-3.5 rounded-xl bg-c48-primary text-white font-semibold text-sm flex items-center justify-center gap-2 min-h-[44px]">
+          Kiểm tra thông tin
+          <iconify-icon icon="lucide:arrow-right"></iconify-icon>
+        </button>
+        <button type="button" id="btn-draft" class="w-full py-3.5 rounded-xl border border-c48-border bg-white text-c48-text font-medium text-sm min-h-[44px]">
+          Lưu nháp
+        </button>
+      </div>
+    </footer>
+
+  </div>
+</body>
+</html>
