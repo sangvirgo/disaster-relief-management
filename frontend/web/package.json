@@ -10,10 +10,13 @@
     "dev": "vite --host localhost",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,html}\" index.html",
     "contracts:generate": "openapi-typescript ../../contracts/openapi/identity.json -o src/api/generated/identity.ts && openapi-typescript ../../contracts/openapi/response.json -o src/api/generated/response.ts && openapi-typescript ../../contracts/openapi/logistics.json -o src/api/generated/logistics.ts"
   },
   "dependencies": {
     "@googlemaps/js-api-loader": "^2.1.3",
+    "@types/leaflet": "^1.9.22",
+    "leaflet": "^1.9.4",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
