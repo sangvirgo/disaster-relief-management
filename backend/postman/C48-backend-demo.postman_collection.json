@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "b794aaf5-169e-470b-a0c4-9a2176a8c480",
     "name": "C48 Backend · Demo và API đầy đủ",
-    "description": "## Cách dùng\n\n1. Chọn `00 · Demo nhanh` và gửi từng request theo thứ tự; không chạy toàn bộ collection bằng Runner vì các POST tạo dữ liệu bền vững trong DB chính.\n2. Đăng ký công dân một lần. Điền `citizenPassword` ở Local Postman Environment trước khi gửi.\n3. Điền `staffUsername` và `staffPassword` cho báo cáo kho; điền `coordinatorUsername` cho hàng đợi điều phối. Mỗi tài khoản cần đúng vai trò và phạm vi. Collection không chứa tài khoản/mật khẩu/token dựng sẵn.\n4. Mặc định đăng nhập `NATIVE` qua loopback HTTP. Luồng `WEB` cần Identity qua HTTPS vì cookie phiên có cờ Secure: đặt `identityBaseUrl` thành `https://<host>/api/v1/identity` (đổi `identityOrigin` riêng nếu cần gọi health), đặt `webOrigin` thuộc allowlist `WEB_ALLOWED_ORIGINS`, chọn `clientKind=WEB`, gửi `GET /auth/csrf` rồi dùng `POST /auth/login` trong `01 · identity → Khác` (không dùng bước đăng nhập Native ở Demo nhanh). Postman phải giữ cookie jar; nhóm riêng chỉ bổ sung refresh WEB. Các route API còn lại trong collection dùng Bearer Native.\n5. Trước khi quay về Native trên cùng host HTTPS, xóa cookie Identity trong Postman cookie jar để tránh gửi đồng thời cookie WEB và Bearer token. Các ID và version được lưu khi response phù hợp trả về; refresh detail trước lệnh có `expected_version`. `POST /auth/refresh` trong danh mục dùng refresh token Native mới nhất và tự cập nhật token đã chọn.\n6. `01–03 · API đầy đủ` chứa toàn bộ route trong snapshots OpenAPI (198 operations). Các route tạo/sửa/xóa có thể ghi dữ liệu vào DB chính.\n7. Route evidence bị bỏ qua mặc định. Chọn file thật trong Postman và chuyển `aiStorAvailable` thành `true` chỉ khi AIStor chính đã sẵn sàng.\n8. Host mặc định dùng loopback: Identity 3001, Response 3002, Logistics 3003. Có thể đổi bằng collection variables.\n9. Sau khi gửi request, access/refresh/service tokens và capability secrets được lưu trong collection variables dạng text, không phải vault. Không chọn chia sẻ/sync các giá trị này, không lưu hoặc xuất collection đã chạy; xóa secret sau demo.\n\nMỗi request ghi mục đích, quyền/điều kiện, HTTP thành công mong đợi và tác động. Contract là nguồn chuẩn cho method/path/schema; test script kiểm tra HTTP status.",
+      "description": "## Cách dùng\n\n1. Chọn `00 · Demo nhanh` và gửi từng request theo thứ tự; không chạy toàn bộ collection bằng Runner vì các POST tạo dữ liệu bền vững trong DB chính.\n2. Request đăng ký tự sinh `citizenUsername`, `citizenPassword` và `demoSuffix` mới mỗi lần gửi; gửi đăng ký trước rồi mới đăng nhập.\n3. Điền `staffUsername` và `staffPassword` cho báo cáo kho; điền `coordinatorUsername` cho hàng đợi điều phối. Mỗi tài khoản cần đúng vai trò và phạm vi. Collection không chứa tài khoản/mật khẩu/token dựng sẵn.\n4. Mặc định đăng nhập `NATIVE` qua gateway loopback HTTP tại cổng 8080. Luồng `WEB` cần gateway Identity qua HTTPS vì cookie phiên có cờ Secure: đặt `identityBaseUrl` thành `https://<host>/api/v1/identity`, đặt `webOrigin` thuộc allowlist `WEB_ALLOWED_ORIGINS`, chọn `clientKind=WEB`, gửi `GET /auth/csrf` rồi dùng `POST /auth/login` trong `01 · identity → Khác` (không dùng bước đăng nhập Native ở Demo nhanh). Postman phải giữ cookie jar; nhóm riêng chỉ bổ sung refresh WEB. Các route API còn lại trong collection dùng Bearer Native.\n5. Trước khi quay về Native trên cùng host HTTPS, xóa cookie Identity trong Postman cookie jar để tránh gửi đồng thời cookie WEB và Bearer token. Các ID và version được lưu khi response phù hợp trả về; refresh detail trước lệnh có `expected_version`. `POST /auth/refresh` trong danh mục dùng refresh token Native mới nhất và tự cập nhật token đã chọn.\n6. `01–03 · API đầy đủ` chứa toàn bộ route trong snapshots OpenAPI (198 operations). Các route tạo/sửa/xóa có thể ghi dữ liệu vào DB chính.\n7. Route evidence bị bỏ qua mặc định. Chọn file thật trong Postman và chuyển `aiStorAvailable` thành `true` chỉ khi AIStor chính đã sẵn sàng.\n8. API nghiệp vụ mặc định đi qua gateway `http://127.0.0.1:8080`; health-check và các route `/internal` dùng cổng dịch vụ riêng vì Nginx chủ ý không công khai chúng.\n9. Sau khi gửi request, access/refresh/service tokens và capability secrets được lưu trong collection variables dạng text, không phải vault. Không chọn chia sẻ/sync các giá trị này, không lưu hoặc xuất collection đã chạy; xóa secret sau demo.\n\nMỗi request ghi mục đích, quyền/điều kiện, HTTP thành công mong đợi và tác động. Contract là nguồn chuẩn cho method/path/schema; test script kiểm tra HTTP status.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -10,37 +10,37 @@
       "key": "identityOrigin",
       "value": "http://127.0.0.1:3001",
       "type": "string",
-      "description": "Identity API host. Local demo uses port 3001."
+      "description": "Direct Identity API origin; used for health checks and non-public /internal routes blocked by Nginx."
     },
     {
       "key": "responseOrigin",
       "value": "http://127.0.0.1:3002",
       "type": "string",
-      "description": "Response API host. Local demo uses port 3002."
+      "description": "Direct Response API origin; used for health checks and non-public /internal routes blocked by Nginx."
     },
     {
       "key": "logisticsOrigin",
       "value": "http://127.0.0.1:3003",
       "type": "string",
-      "description": "Logistics API host. Local demo uses port 3003."
+      "description": "Direct Logistics API origin; used for health checks and non-public /internal routes blocked by Nginx."
     },
     {
       "key": "identityBaseUrl",
-      "value": "http://127.0.0.1:3001/api/v1/identity",
+      "value": "http://127.0.0.1:8080/api/v1/identity",
       "type": "string",
-      "description": "Identity API base path; set to https://<host>/api/v1/identity for WEB cookie flows."
+      "description": "Identity API gateway base path; set to https://<host>/api/v1/identity for WEB cookie flows."
     },
     {
       "key": "responseBaseUrl",
-      "value": "http://127.0.0.1:3002/api/v1/response",
+      "value": "http://127.0.0.1:8080/api/v1/response",
       "type": "string",
-      "description": "Response API base path."
+      "description": "Response API gateway base path."
     },
     {
       "key": "logisticsBaseUrl",
-      "value": "http://127.0.0.1:3003/api/v1/logistics",
+      "value": "http://127.0.0.1:8080/api/v1/logistics",
       "type": "string",
-      "description": "Logistics API base path."
+      "description": "Logistics API gateway base path."
     },
     {
       "key": "incidentCategoryCode",
@@ -52,13 +52,13 @@
       "key": "citizenUsername",
       "value": "",
       "type": "string",
-      "description": "Generated by the registration request on first use. Clear it manually only when creating another account."
+      "description": "Generated with a time-based random suffix whenever a registration request is sent."
     },
     {
       "key": "citizenPassword",
       "value": "",
       "type": "string",
-      "description": "Set locally before registering/logging in. Keep it out of exported/shared collections."
+      "description": "Generated with the registration username each time; keep the runtime value out of exported/shared collections."
     },
     {
       "key": "citizenAccessToken",
@@ -1248,7 +1248,7 @@
                     "value": "application/json"
                   }
                 ],
-                "url": "{{identityBaseUrl}}/internal/regions:lookup",
+                "url": "{{identityOrigin}}/api/v1/identity/internal/regions:lookup",
                 "description": "## Mục đích\nResolve region display names for Response campaigns\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /internal/regions:lookup` · Operation: `lookupIdentityRegions` · Service: `identity`.",
                 "body": {
                   "mode": "raw",
@@ -1294,7 +1294,7 @@
                     "value": "application/json"
                   }
                 ],
-                "url": "{{identityBaseUrl}}/internal/request-coordinators",
+                "url": "{{identityOrigin}}/api/v1/identity/internal/request-coordinators",
                 "description": "## Mục đích\nResolve active coordinator grants for Response notices and concurrence\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /internal/request-coordinators` · Operation: `listRequestCoordinatorGrants` · Service: `identity`.",
                 "body": {
                   "mode": "raw",
@@ -2317,7 +2317,7 @@
                     "value": "application/json"
                   }
                 ],
-                "url": "{{identityBaseUrl}}/internal/token",
+                "url": "{{identityOrigin}}/api/v1/identity/internal/token",
                 "description": "## Mục đích\nIssue a short-lived service token\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /internal/token` · Operation: `issueIdentityServiceToken` · Service: `identity`.",
                 "body": {
                   "mode": "raw",
@@ -2363,7 +2363,7 @@
                     "value": "application/json"
                   }
                 ],
-                "url": "{{identityBaseUrl}}/internal/introspect",
+                "url": "{{identityOrigin}}/api/v1/identity/internal/introspect",
                 "description": "## Mục đích\nCheck current session and grants\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /internal/introspect` · Operation: `introspectIdentitySession` · Service: `identity`.",
                 "body": {
                   "mode": "raw",
@@ -2409,7 +2409,7 @@
                     "value": "application/json"
                   }
                 ],
-                "url": "{{identityBaseUrl}}/internal/users:lookup",
+                "url": "{{identityOrigin}}/api/v1/identity/internal/users:lookup",
                 "description": "## Mục đích\nResolve user display names for service-owned records\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /internal/users:lookup` · Operation: `lookupIdentityUsers` · Service: `identity`.",
                 "body": {
                   "mode": "raw",
@@ -2447,7 +2447,7 @@
                     "value": "Bearer {{identityServiceToken}}"
                   }
                 ],
-                "url": "{{identityBaseUrl}}/internal/organizations/{{organizationId}}",
+                "url": "{{identityOrigin}}/api/v1/identity/internal/organizations/{{organizationId}}",
                 "description": "## Mục đích\nCheck organization existence and status\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /internal/organizations/{id}` · Operation: `getInternalIdentityOrganization` · Service: `identity`."
               },
               "event": [
@@ -2484,7 +2484,7 @@
                     "value": "application/json"
                   }
                 ],
-                "url": "{{identityBaseUrl}}/internal/team-leader-eligibility",
+                "url": "{{identityOrigin}}/api/v1/identity/internal/team-leader-eligibility",
                 "description": "## Mục đích\nInternalController.teamLeaderEligibility\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /internal/team-leader-eligibility` · Operation: `identityInternalTeamLeaderEligibility` · Service: `identity`.",
                 "body": {
                   "mode": "raw",
@@ -2530,7 +2530,7 @@
                     "value": "application/json"
                   }
                 ],
-                "url": "{{identityBaseUrl}}/internal/users:check-active",
+                "url": "{{identityOrigin}}/api/v1/identity/internal/users:check-active",
                 "description": "## Mục đích\nInternalController.activeUserCheck\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /internal/users:check-active` · Operation: `identityInternalActiveUserCheck` · Service: `identity`.",
                 "body": {
                   "mode": "raw",
@@ -2938,7 +2938,7 @@
                     "value": "Bearer {{responseServiceToken}}"
                   }
                 ],
-                "url": "{{responseBaseUrl}}/internal/campaigns/{{campaignId}}",
+                "url": "{{responseOrigin}}/api/v1/response/internal/campaigns/{{campaignId}}",
                 "description": "## Mục đích\nGet a campaign for an authorized service caller\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /internal/campaigns/{id}` · Operation: `getInternalCampaign` · Service: `response`."
               },
               "event": [
@@ -3521,7 +3521,7 @@
                     "value": "Bearer {{responseServiceToken}}"
                   }
                 ],
-                "url": "{{responseBaseUrl}}/internal/operations/{{operationId}}",
+                "url": "{{responseOrigin}}/api/v1/response/internal/operations/{{operationId}}",
                 "description": "## Mục đích\nRequestResolutionController.internalOperation\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /internal/operations/{intentId}` · Operation: `responseRequestResolutionInternalOperation` · Service: `response`."
               },
               "event": [
@@ -3558,7 +3558,7 @@
                     "value": "Bearer {{staffAccessToken}}"
                   }
                 ],
-                "url": "{{responseBaseUrl}}/internal/requests/{{requestId}}/cycles/{{cycle}}/admit",
+                "url": "{{responseOrigin}}/api/v1/response/internal/requests/{{requestId}}/cycles/{{cycle}}/admit",
                 "description": "## Mục đích\nRequestAdmissionController.admit\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /internal/requests/{id}/cycles/{work_cycle}/admit` · Operation: `responseRequestAdmissionAdmit` · Service: `response`."
               },
               "event": [
@@ -7032,7 +7032,7 @@
                     "value": "application/json"
                   }
                 ],
-                "url": "{{logisticsBaseUrl}}/internal/requests/{{requestId}}/cycles/{{cycle}}/freeze",
+                "url": "{{logisticsOrigin}}/api/v1/logistics/internal/requests/{{requestId}}/cycles/{{cycle}}/freeze",
                 "description": "## Mục đích\nFulfillmentCyclesController.freeze\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /internal/requests/{requestId}/cycles/{cycle}/freeze` · Operation: `logisticsFulfillmentCyclesFreeze` · Service: `logistics`.",
                 "body": {
                   "mode": "raw",
@@ -7078,7 +7078,7 @@
                     "value": "application/json"
                   }
                 ],
-                "url": "{{logisticsBaseUrl}}/internal/requests/{{requestId}}/cycles/{{cycle}}/seal",
+                "url": "{{logisticsOrigin}}/api/v1/logistics/internal/requests/{{requestId}}/cycles/{{cycle}}/seal",
                 "description": "## Mục đích\nFulfillmentCyclesController.seal\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /internal/requests/{requestId}/cycles/{cycle}/seal` · Operation: `logisticsFulfillmentCyclesSeal` · Service: `logistics`.",
                 "body": {
                   "mode": "raw",
@@ -7124,7 +7124,7 @@
                     "value": "application/json"
                   }
                 ],
-                "url": "{{logisticsBaseUrl}}/internal/requests/{{requestId}}/cycles/{{cycle}}/unseal",
+                "url": "{{logisticsOrigin}}/api/v1/logistics/internal/requests/{{requestId}}/cycles/{{cycle}}/unseal",
                 "description": "## Mục đích\nFulfillmentCyclesController.unseal\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /internal/requests/{requestId}/cycles/{cycle}/unseal` · Operation: `logisticsFulfillmentCyclesUnseal` · Service: `logistics`.",
                 "body": {
                   "mode": "raw",
@@ -7162,7 +7162,7 @@
                     "value": "Bearer {{logisticsServiceToken}}"
                   }
                 ],
-                "url": "{{logisticsBaseUrl}}/internal/requests/{{requestId}}/fulfillment",
+                "url": "{{logisticsOrigin}}/api/v1/logistics/internal/requests/{{requestId}}/fulfillment",
                 "description": "## Mục đích\nNeedsController.internalFulfillment\n\n## Quyền và điều kiện\nYêu cầu nội bộ giữa các dịch vụ; cần service token được cấp riêng.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /internal/requests/{requestId}/fulfillment` · Operation: `logisticsNeedsInternalFulfillment` · Service: `logistics`."
               },
               "event": [
@@ -9167,7 +9167,7 @@
           "const url = pm.request.url.toString(); const resolvedUrl = pm.variables.replaceIn(url); const method = pm.request.method;",
           "const makeSecret = () => CryptoJS.enc.Base64.stringify(CryptoJS.lib.WordArray.random(32)).replace(/=/g, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
           "if (method === 'POST' && url.endsWith('/auth/register') && pm.variables.get('skipCitizenRegistration') === 'true') { console.warn('Bỏ qua đăng ký do smoke đang dùng tài khoản công dân có sẵn.'); pm.execution.skipRequest(); }",
-          "if (method === 'POST' && url.endsWith('/auth/register') && !pm.collectionVariables.get('citizenUsername')) pm.collectionVariables.set('citizenUsername', 'c48_demo_' + pm.variables.replaceIn('{{$guid}}').replace(/-/g, '').slice(0, 16).toLowerCase());",
+          "if (method === 'POST' && url.endsWith('/auth/register') && pm.variables.get('skipCitizenRegistration') !== 'true') { const suffix = Date.now().toString(36) + pm.variables.replaceIn('{{$guid}}').replace(/-/g, '').slice(0, 8).toLowerCase(); pm.collectionVariables.set('citizenUsername', 'c48_demo_' + suffix); pm.collectionVariables.set('citizenPassword', 'C48-Demo-' + suffix + '!'); }",
           "if (pm.variables.get('clientKind') === 'WEB' && (url.endsWith('/auth/csrf') || url.endsWith('/auth/login') || url.endsWith('/auth/refresh'))) { const isCsrf = url.endsWith('/auth/csrf'); const origin = pm.variables.get('webOrigin'); const csrf = pm.variables.get('csrfToken'); if (!resolvedUrl.toLowerCase().startsWith('https://')) { console.warn('Bỏ qua request WEB; cookie Secure yêu cầu Identity qua HTTPS.'); pm.execution.skipRequest(); } else if (!origin || (!isCsrf && !csrf)) { console.warn('Bỏ qua request WEB; cần webOrigin được allowlist và CSRF lấy từ GET /auth/csrf.'); pm.execution.skipRequest(); } else { pm.request.headers.upsert({ key: 'Origin', value: origin }); if (!isCsrf) pm.request.headers.upsert({ key: 'X-CSRF-Token', value: csrf }); } }",
           "if (method === 'POST' && url.endsWith('/requests')) pm.collectionVariables.set('trackingSecret', makeSecret());",
           "if (method === 'POST' && url.includes('/public/donation-drives/') && url.endsWith('/deliveries')) pm.collectionVariables.set('donationSecret', makeSecret());",
