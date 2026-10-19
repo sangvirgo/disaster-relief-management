@@ -1,0 +1,440 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net" type="device" version="24.7.17">
+  <diagram id="c48-overall-use-cases" name="ReliefCare | Sơ đồ ca sử dụng tổng thể">
+    <mxGraphModel dx="3650" dy="2040" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="3650" pageHeight="2040">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="system" value="Hệ thống ReliefCare" style="rounded=0;whiteSpace=wrap;html=0;verticalAlign=top;align=center;spacingTop=18;fontStyle=1;fontSize=22;fillColor=#ffffff;strokeColor=#1f2937;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="280" y="105" width="3030" height="1785" as="geometry" />
+        </mxCell>
+        <mxCell id="diagram-title" value="ReliefCare — Sơ đồ ca sử dụng tổng thể" style="text;html=0;fontSize=30;fontStyle=1;align=left;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="24" y="10" width="2000" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-guest" value="Khách / người báo tin" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="40" y="365" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-citizen" value="Công dân" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="40" y="775" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-volunteer" value="Tình nguyện viên / thành viên đội" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1235" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-leader" value="Đội trưởng đang hoạt động" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1615" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-coordinator" value="Điều phối viên theo phạm vi" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="3410" y="190" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-campaign_manager" value="Quản lý chiến dịch" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="3410" y="435" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-operations_manager" value="Quản lý vận hành" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="3410" y="680" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-intake_staff" value="Nhân viên tiếp nhận" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="3410" y="925" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-reviewer" value="Người thẩm định" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="3410" y="1170" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-distribution_staff" value="Nhân viên phân phối" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="3410" y="1415" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-administrator" value="Quản trị viên" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="3410" y="1660" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="domain-identity" value="Định danh và quyền truy cập" style="text;html=0;fontSize=18;fontStyle=1;align=center;strokeColor=none;fillColor=none;fontColor=#374151;" vertex="1" parent="1">
+          <mxGeometry x="360" y="160" width="430" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="domain-public" value="Công dân và dịch vụ công khai" style="text;html=0;fontSize=18;fontStyle=1;align=center;strokeColor=none;fillColor=none;fontColor=#374151;" vertex="1" parent="1">
+          <mxGeometry x="850" y="160" width="430" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="domain-response" value="Ứng cứu và điều phối cứu hộ" style="text;html=0;fontSize=18;fontStyle=1;align=center;strokeColor=none;fillColor=none;fontColor=#374151;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="160" width="430" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="domain-campaign" value="Chiến dịch và quyên góp" style="text;html=0;fontSize=18;fontStyle=1;align=center;strokeColor=none;fillColor=none;fontColor=#374151;" vertex="1" parent="1">
+          <mxGeometry x="1830" y="160" width="430" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="domain-logistics" value="Vật tư và phân phối" style="text;html=0;fontSize=18;fontStyle=1;align=center;strokeColor=none;fillColor=none;fontColor=#374151;" vertex="1" parent="1">
+          <mxGeometry x="2320" y="160" width="430" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="domain-reporting" value="Báo cáo và giám sát" style="text;html=0;fontSize=18;fontStyle=1;align=center;strokeColor=none;fillColor=none;fontColor=#374151;" vertex="1" parent="1">
+          <mxGeometry x="2810" y="160" width="430" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-guest-session" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-guest" target="case-session">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-guest-self_request" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-guest" target="case-self_request">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-guest-track_request" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-guest" target="case-track_request">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-guest-browse_public" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-guest" target="case-browse_public">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-guest-declare_donation" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-guest" target="case-declare_donation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-guest-recover_donation" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-guest" target="case-recover_donation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-guest-evidence" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-guest" target="case-evidence">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-citizen-session" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-citizen" target="case-session">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-citizen-self_request" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-citizen" target="case-self_request">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-citizen-proxy_request" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-citizen" target="case-proxy_request">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-citizen-track_request" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-citizen" target="case-track_request">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-citizen-recover_request" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-citizen" target="case-recover_request">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-citizen-browse_public" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-citizen" target="case-browse_public">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-citizen-declare_donation" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-citizen" target="case-declare_donation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-citizen-recover_donation" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-citizen" target="case-recover_donation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-citizen-evidence" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-citizen" target="case-evidence">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-volunteer-mission_history" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-volunteer" target="case-mission_history">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-leader-mission_progress" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-leader" target="case-mission_progress">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-leader-team_profile" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-leader" target="case-team_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-leader-evidence" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-leader" target="case-evidence">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-coordinator-recover_request" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-coordinator" target="case-recover_request">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-coordinator-verify_request" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-coordinator" target="case-verify_request">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-coordinator-request_lifecycle" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-coordinator" target="case-request_lifecycle">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-coordinator-assign_mission" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-coordinator" target="case-assign_mission">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-coordinator-record_on_behalf" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-coordinator" target="case-record_on_behalf">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-coordinator-request_queue" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-coordinator" target="case-request_queue">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-coordinator-team_profile" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-coordinator" target="case-team_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-coordinator-campaign" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-coordinator" target="case-campaign">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-coordinator-needs" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-coordinator" target="case-needs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-coordinator-reports" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-coordinator" target="case-reports">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-campaign_manager-campaign" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-campaign_manager" target="case-campaign">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-campaign_manager-donation_drive" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-campaign_manager" target="case-donation_drive">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-campaign_manager-reports" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-campaign_manager" target="case-reports">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-operations_manager-request_queue" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-operations_manager" target="case-request_queue">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-operations_manager-campaign" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-operations_manager" target="case-campaign">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-operations_manager-donation_drive" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-operations_manager" target="case-donation_drive">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-operations_manager-needs" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-operations_manager" target="case-needs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-operations_manager-commitments" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-operations_manager" target="case-commitments">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-operations_manager-assets" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-operations_manager" target="case-assets">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-operations_manager-distribution" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-operations_manager" target="case-distribution">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-operations_manager-stock_adjustment" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-operations_manager" target="case-stock_adjustment">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-operations_manager-stocktake" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-operations_manager" target="case-stocktake">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-operations_manager-reports" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-operations_manager" target="case-reports">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-intake_staff-recover_donation" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-intake_staff" target="case-recover_donation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-intake_staff-receipt" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-intake_staff" target="case-receipt">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-intake_staff-receipt_revision" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-intake_staff" target="case-receipt_revision">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-intake_staff-distribution" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-intake_staff" target="case-distribution">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-intake_staff-handoff" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-intake_staff" target="case-handoff">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-intake_staff-stock_adjustment" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-intake_staff" target="case-stock_adjustment">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-reviewer-recover_donation" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-reviewer" target="case-recover_donation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-reviewer-receipt" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-reviewer" target="case-receipt">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-reviewer-receipt_revision" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-reviewer" target="case-receipt_revision">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-reviewer-distribution" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-reviewer" target="case-distribution">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-reviewer-stock_adjustment" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-reviewer" target="case-stock_adjustment">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-distribution_staff-distribution" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-distribution_staff" target="case-distribution">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-distribution_staff-handoff" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-distribution_staff" target="case-handoff">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-distribution_staff-stock_adjustment" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-distribution_staff" target="case-stock_adjustment">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-administrator-admin_access" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-administrator" target="case-admin_access">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-administrator-audit" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-administrator" target="case-audit">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="assoc-administrator-reports" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=none;strokeColor=#64748b;strokeWidth=1;opacity=30;" edge="1" parent="1" source="actor-administrator" target="case-reports">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-generalization-leader" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;startArrow=none;endArrow=block;endFill=0;strokeColor=#334155;strokeWidth=1.5;" edge="1" parent="1" source="actor-leader" target="actor-volunteer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-1" value="&lt;&lt;include&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-self_request" target="case-request_details">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-2" value="&lt;&lt;include&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-proxy_request" target="case-request_details">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-3" value="&lt;&lt;extend&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-evidence" target="case-self_request">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-4" value="&lt;&lt;extend&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-track_request" target="case-recover_request">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-5" value="&lt;&lt;include&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-verify_request" target="case-verification_details">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-6" value="&lt;&lt;extend&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-reject_duplicate" target="case-verify_request">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-7" value="&lt;&lt;extend&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-triage" target="case-verify_request">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-8" value="&lt;&lt;include&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-team_suggestions" target="case-assign_mission">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-9" value="&lt;&lt;extend&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-mission_progress" target="case-assign_mission">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-10" value="&lt;&lt;extend&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-record_on_behalf" target="case-mission_progress">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-11" value="&lt;&lt;extend&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-ai_priority" target="case-triage">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-12" value="&lt;&lt;extend&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-recover_donation" target="case-declare_donation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-13" value="&lt;&lt;extend&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-receipt_revision" target="case-receipt">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-14" value="&lt;&lt;include&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-commitments" target="case-needs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-15" value="&lt;&lt;include&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-handoff" target="case-distribution">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="relation-16" value="&lt;&lt;include&gt;&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;dashed=1;dashPattern=6 5;endArrow=open;endFill=0;strokeColor=#475569;fontSize=11;fontColor=#334155;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="case-report_details" target="case-reports">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="case-session" value="Đăng ký, đăng nhập, làm mới&#xa;và kết thúc phiên" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#eef0f8;strokeColor=#656b9b;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="360" y="220" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-admin_access" value="Quản lý tài khoản, tổ chức,&#xa;thành viên, quyền và khu vực" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#eef0f8;strokeColor=#656b9b;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="360" y="346" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-audit" value="Xem nhật ký kiểm toán&#xa;theo phạm vi" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#eef0f8;strokeColor=#656b9b;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="360" y="472" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-self_request" value="Gửi yêu cầu cứu trợ cho&#xa;bản thân (SELF)" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#fde2df;strokeColor=#bd6f69;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="850" y="220" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-proxy_request" value="Báo giúp hộ gia đình gặp nạn&#xa;(PROXY)" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#fde2df;strokeColor=#bd6f69;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="850" y="346" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-request_details" value="Cung cấp vị trí, liên hệ&#xa;và thông tin sự cố" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#fde2df;strokeColor=#bd6f69;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="850" y="472" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-evidence" value="Tải bằng chứng riêng tư&#xa;cho yêu cầu hoặc nhiệm vụ" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#fde2df;strokeColor=#bd6f69;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="850" y="598" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-track_request" value="Theo dõi trạng thái, sự kiện;&#xa;bổ sung thông tin yêu cầu" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#fde2df;strokeColor=#bd6f69;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="850" y="724" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-recover_request" value="Nhận hoặc khôi phục quyền truy cập&#xa;yêu cầu sau xác minh" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#fde2df;strokeColor=#bd6f69;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="850" y="850" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-browse_public" value="Xem chiến dịch và đợt&#xa;quyên góp đã công khai" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#fde2df;strokeColor=#bd6f69;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="850" y="976" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-declare_donation" value="Khai báo giao hàng hiện vật;&#xa;theo dõi khoản quyên góp riêng" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#fde2df;strokeColor=#bd6f69;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="850" y="1102" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-recover_donation" value="Khôi phục quyền truy cập quyên góp;&#xa;gửi hoặc xử lý tranh chấp" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#fde2df;strokeColor=#bd6f69;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="850" y="1228" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-verify_request" value="Xác minh yêu cầu và&#xa;ghi nhận kết quả" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#f8dedd;strokeColor=#c76761;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="220" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-verification_details" value="Ghi nhận liên hệ, bằng chứng&#xa;và kết quả xác minh" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#f8dedd;strokeColor=#c76761;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="346" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-reject_duplicate" value="Từ chối yêu cầu hoặc&#xa;liên kết yêu cầu trùng" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#f8dedd;strokeColor=#c76761;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="472" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-triage" value="Đặt mức ưu tiên do con người quyết định&#xa;và phân loại yêu cầu" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#f8dedd;strokeColor=#c76761;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="598" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-request_lifecycle" value="Hủy, giải quyết, đóng&#xa;hoặc mở lại yêu cầu" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#f8dedd;strokeColor=#c76761;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="724" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-assign_mission" value="Phân công đội cứu hộ&#xa;và quản lý nhiệm vụ" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#f8dedd;strokeColor=#c76761;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="850" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-team_suggestions" value="Xem đội đủ điều kiện&#xa;và gợi ý theo tải công việc" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#f8dedd;strokeColor=#c76761;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="976" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-mission_progress" value="Chấp nhận / từ chối nhiệm vụ;&#xa;cập nhật tiến độ và kết quả" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#f8dedd;strokeColor=#c76761;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="1102" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-record_on_behalf" value="Điều phối viên ghi tiến độ thay đội&#xa;chưa dùng ứng dụng (có lưu vết)" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#f8dedd;strokeColor=#c76761;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="1228" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-request_queue" value="Xem bản đồ nhiệt và hàng đợi&#xa;yêu cầu theo nhóm" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#f8dedd;strokeColor=#c76761;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="1354" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-mission_history" value="Xem nhiệm vụ được giao&#xa;và lịch sử nhiệm vụ" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#f8dedd;strokeColor=#c76761;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="1480" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-team_profile" value="Quản lý hồ sơ đội, kỹ năng,&#xa;trạng thái sẵn sàng và vị trí" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#f8dedd;strokeColor=#c76761;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="1606" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-ai_priority" value="Gợi ý ưu tiên bằng AI&#xa;(tùy chọn, chưa triển khai)" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#fff4d6;strokeColor=#b7791f;strokeWidth=2;dashed=1;dashPattern=6 4;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="1732" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-campaign" value="Tạo, công khai, tạm dừng, tiếp tục&#xa;và kết thúc chiến dịch cứu trợ" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#e6f2df;strokeColor=#6c9663;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1830" y="220" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-donation_drive" value="Quản lý đợt quyên góp&#xa;hiện vật" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#e6f2df;strokeColor=#6c9663;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1830" y="346" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-receipt" value="Kiểm đếm, thẩm định và ghi sổ&#xa;biên nhận quyên góp" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#e6f2df;strokeColor=#6c9663;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1830" y="472" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-receipt_revision" value="Điều chỉnh số lượng biên nhận&#xa;và xử lý tranh chấp" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#e6f2df;strokeColor=#6c9663;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1830" y="598" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-needs" value="Quản lý nhu cầu vật tư&#xa;và cam kết hỗ trợ" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#e6f2df;strokeColor=#6c9663;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1830" y="724" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-commitments" value="Dự trữ và tất toán cam kết&#xa;cho yêu cầu đã tiếp nhận" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#e6f2df;strokeColor=#6c9663;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1830" y="850" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-assets" value="Quản lý danh mục vật tư, kho,&#xa;phương tiện và điểm cứu trợ" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#fff0d2;strokeColor=#ba8b3e;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="2320" y="220" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-distribution" value="Chuẩn bị, phê duyệt, xuất kho&#xa;và đối soát phân phối" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#fff0d2;strokeColor=#ba8b3e;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="2320" y="346" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-handoff" value="Ghi nhận bàn giao tại hộ / điểm;&#xa;hàng trả hoặc thất lạc" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#fff0d2;strokeColor=#ba8b3e;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="2320" y="472" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-stock_adjustment" value="Yêu cầu và thẩm định độc lập&#xa;việc điều chỉnh tồn kho" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#fff0d2;strokeColor=#ba8b3e;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="2320" y="598" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-stocktake" value="Kiểm kê tồn kho&#xa;(hoãn triển khai)" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#edf0f3;strokeColor=#7a8491;strokeWidth=2;dashed=1;dashPattern=6 4;" vertex="1" parent="1">
+          <mxGeometry x="2320" y="724" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-reports" value="Xem bảng điều khiển và báo cáo&#xa;theo phạm vi" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#e2edfa;strokeColor=#6485ae;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="2810" y="220" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="case-report_details" value="Xem dữ liệu tổng hợp về yêu cầu,&#xa;quyên góp, kho, đáp ứng và đối soát" style="ellipse;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=15;fillColor=#e2edfa;strokeColor=#6485ae;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="2810" y="346" width="430" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-identity" value="Định danh / quyền truy cập" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=12;fillColor=#eef0f8;strokeColor=#656b9b;" vertex="1" parent="1">
+          <mxGeometry x="365" y="1810" width="170" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-public" value="Công dân / công khai" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=12;fillColor=#fde2df;strokeColor=#bd6f69;" vertex="1" parent="1">
+          <mxGeometry x="845" y="1810" width="170" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-response" value="Ứng cứu / cứu hộ" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=12;fillColor=#f8dedd;strokeColor=#c76761;" vertex="1" parent="1">
+          <mxGeometry x="1325" y="1810" width="170" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-campaign" value="Chiến dịch / quyên góp" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=12;fillColor=#e6f2df;strokeColor=#6c9663;" vertex="1" parent="1">
+          <mxGeometry x="1805" y="1810" width="170" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-logistics" value="Vật tư / phân phối" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=12;fillColor=#fff0d2;strokeColor=#ba8b3e;" vertex="1" parent="1">
+          <mxGeometry x="2285" y="1810" width="170" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-reporting" value="Báo cáo" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=12;fillColor=#e2edfa;strokeColor=#6485ae;" vertex="1" parent="1">
+          <mxGeometry x="2765" y="1810" width="170" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-optional" value="Tùy chọn / chưa triển khai" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=12;dashed=1;fillColor=#fff4d6;strokeColor=#b7791f;" vertex="1" parent="1">
+          <mxGeometry x="365" y="1848" width="210" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-deferred" value="Hoãn triển khai" style="rounded=1;whiteSpace=wrap;html=0;align=center;verticalAlign=middle;fontSize=12;dashed=1;fillColor=#edf0f3;strokeColor=#7a8491;" vertex="1" parent="1">
+          <mxGeometry x="590" y="1848" width="110" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="scope-note" value="Các đường nối biểu thị quyền năng; thao tác vẫn cần quyền được cấp, phạm vi, quyền sở hữu và quan hệ với đội. Sơ đồ mô tả API hiện có; chưa gồm giao diện web/di động và dịch vụ bản đồ, thời tiết, thanh toán, AI bên ngoài. «include»: luôn bao gồm; «extend»: mở rộng tùy điều kiện." style="text;html=0;fontSize=12;align=left;strokeColor=none;fillColor=none;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry x="720" y="1848" width="2400" height="28" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

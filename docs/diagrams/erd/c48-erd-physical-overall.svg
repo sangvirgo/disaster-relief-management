@@ -1,0 +1,2401 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="5450" height="2179" viewBox="0 0 5450 2179">
+<rect width="100%" height="100%" fill="#F4F7FB"/>
+<style>text{font-family:Arial,"Noto Sans",sans-serif}.title{font-size:27px;font-weight:700;fill:#172033}.subtitle{font-size:14px;fill:#526176}.service{font-size:19px;font-weight:700;fill:#172033}.group{font-size:12px;font-weight:700;fill:#40516A}.table{fill:#FFF4E5;stroke:#B87333;stroke-width:1}.header{font-size:13px;font-weight:700;fill:#5A3514}.field{font-size:10.5px;fill:#263448}.type{font-size:9.5px;fill:#718096}.marker{font-size:8.5px;font-weight:700;fill:#526176}.edge{fill:none;stroke-width:1.05;opacity:.66}.note{font-size:12px;fill:#36465C}</style>
+<defs><marker id="card-one" markerWidth="10" markerHeight="14" refX="2" refY="7" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M2 1 V13" fill="none" stroke="#526176" stroke-width="1.2"/></marker><marker id="card-zero-one" markerWidth="15" markerHeight="14" refX="2" refY="7" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><circle cx="5" cy="7" r="2.2" fill="#F4F7FB" stroke="#526176" stroke-width="1.1"/><path d="M11 1 V13" fill="none" stroke="#526176" stroke-width="1.2"/></marker><marker id="card-zero-many" markerWidth="19" markerHeight="14" refX="2" refY="7" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><circle cx="5" cy="7" r="2.2" fill="#F4F7FB" stroke="#526176" stroke-width="1.1"/><path d="M17 1 L9 7 L17 13 M17 7 H9" fill="none" stroke="#526176" stroke-width="1.2"/></marker></defs>
+<text x="44" y="40" class="title">ERD vật lý tổng thể ReliefCare — toàn bộ database</text>
+<text x="44" y="64" class="subtitle">65 bảng · 3 schema vật lý · đầy đủ cột, kiểu dữ liệu, PK/FK/UK và các khóa ngoại được khai báo trong SQL</text>
+<rect x="44" y="92" width="1062" height="2015" rx="7" fill="#FFFFFF" stroke="#3B82F6" stroke-width="1.6"/>
+<path d="M51,92 H1099 Q1106,92 1106,99 V130 H44 V99 Q44,92 51,92 Z" fill="#3B82F6" opacity=".14"/>
+<text x="58" y="118" class="service">Identity · c48_identity · 9 bảng</text>
+<rect x="1144" y="92" width="1762" height="2015" rx="7" fill="#FFFFFF" stroke="#A855F7" stroke-width="1.6"/>
+<path d="M1151,92 H2899 Q2906,92 2906,99 V130 H1144 V99 Q1144,92 1151,92 Z" fill="#A855F7" opacity=".14"/>
+<text x="1158" y="118" class="service">Response · c48_response · 22 bảng</text>
+<rect x="2944" y="92" width="2462" height="2015" rx="7" fill="#FFFFFF" stroke="#16A085" stroke-width="1.6"/>
+<path d="M2951,92 H5399 Q5406,92 5406,99 V130 H2944 V99 Q2944,92 2951,92 Z" fill="#16A085" opacity=".14"/>
+<text x="2958" y="118" class="service">Logistics · c48_logistics · 34 bảng</text>
+<text x="60" y="153" class="group">Danh mục / tài khoản</text>
+<text x="410" y="153" class="group">Membership / quyền</text>
+<text x="760" y="153" class="group">Phiên đăng nhập</text>
+<text x="60" y="677" class="group">Bảng không có quan hệ FK</text>
+<text x="1160" y="153" class="group">Danh mục / khu vực</text>
+<text x="1510" y="153" class="group">Yêu cầu</text>
+<text x="1860" y="153" class="group">Xác minh / lịch sử</text>
+<text x="2210" y="153" class="group">Đội cứu hộ</text>
+<text x="2560" y="153" class="group">Nhiệm vụ</text>
+<text x="1160" y="1272" class="group">Bảng không có quan hệ FK</text>
+<text x="2960" y="153" class="group">Danh mục / kho</text>
+<text x="3310" y="153" class="group">Đợt quyên góp</text>
+<text x="3660" y="153" class="group">Tiếp nhận</text>
+<text x="4010" y="153" class="group">Nhu cầu / tồn kho</text>
+<text x="4360" y="153" class="group">Điểm / phương tiện</text>
+<text x="4710" y="153" class="group">Phân phối / bàn giao</text>
+<text x="5060" y="153" class="group">Sổ kho</text>
+<text x="2960" y="1833" class="group">Bảng không có quan hệ FK</text>
+<path d="M 410.0 220.0 H 394.0 V 492.0 H 390.0" class="edge" stroke="#3B82F6" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 410.0 237.0 H 396.0 V 339.0 H 390.0" class="edge" stroke="#3B82F6" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 410.0 339.0 H 398.0 V 492.0 H 390.0" class="edge" stroke="#3B82F6" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 410.0 390.0 H 400.0 V 339.0 H 390.0" class="edge" stroke="#3B82F6" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 410.0 407.0 H 402.0 V 220.0 H 390.0" class="edge" stroke="#3B82F6" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 760.0 237.0 H 569.0 V 492.0 H 390.0" class="edge" stroke="#3B82F6" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 1090.0 424.0 H 1096.0 V 220.0 H 1090.0" class="edge" stroke="#3B82F6" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 1490.0 390.0 H 1496.0 V 220.0 H 1490.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 1490.0 407.0 H 1498.0 V 305.0 H 1490.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 1490.0 594.0 H 1500.0 V 475.0 H 1490.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 1510.0 271.0 H 1494.0 V 560.0 H 1490.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 1510.0 288.0 H 1496.0 V 220.0 H 1490.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 1840.0 305.0 H 1846.0 V 220.0 H 1840.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 1510.0 441.0 H 1498.0 V 475.0 H 1490.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 1840.0 432.5 H 1844.0 V 602.5 H 1860.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 1840.0 747.0 H 1848.0 V 220.0 H 1840.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-one)" marker-end="url(#card-one)"/>
+<path d="M 1860.0 237.0 H 1844.0 V 220.0 H 1840.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 1860.0 407.0 H 1846.0 V 220.0 H 1840.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 1860.0 611.0 H 1848.0 V 220.0 H 1840.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 1860.0 832.0 H 1850.0 V 220.0 H 1840.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 1860.0 1087.0 H 1852.0 V 220.0 H 1840.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 2210.0 254.0 H 1844.0 V 475.0 H 1490.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 2540.0 509.0 H 2546.0 V 220.0 H 2540.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 2540.0 628.0 H 2548.0 V 220.0 H 2540.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 2210.0 645.0 H 1846.0 V 305.0 H 1490.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 2540.0 713.0 H 2550.0 V 220.0 H 2540.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-one)" marker-end="url(#card-one)"/>
+<path d="M 2560.0 237.0 H 2194.0 V 220.0 H 1840.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 2560.0 254.0 H 2546.0 V 220.0 H 2540.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 2560.0 296.5 H 2373.0 V 602.5 H 2190.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 2890.0 475.0 H 2896.0 V 220.0 H 2890.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 2560.0 713.0 H 2200.0 V 220.0 H 1840.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 2890.0 730.0 H 2898.0 V 220.0 H 2890.0" class="edge" stroke="#A855F7" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 3290.0 424.0 H 3296.0 V 220.0 H 3290.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3290.0 441.0 H 3298.0 V 305.0 H 3290.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3310.0 296.5 H 3294.0 V 585.5 H 3290.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3640.0 492.0 H 3646.0 V 220.0 H 3640.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3310.0 509.0 H 3296.0 V 407.0 H 3290.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3640.0 653.5 H 3648.0 V 254.0 H 3640.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3660.0 220.0 H 3644.0 V 611.0 H 3640.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3660.0 390.0 H 3471.0 V 407.0 H 3290.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3990.0 364.5 H 3996.0 V 228.5 H 3990.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3660.0 492.0 H 3648.0 V 611.0 H 3640.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-one)" marker-end="url(#card-one)"/>
+<path d="M 3660.0 509.0 H 3475.0 V 577.0 H 3290.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3990.0 611.0 H 3998.0 V 475.0 H 3990.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3660.0 781.0 H 3477.0 V 407.0 H 3290.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3990.0 755.5 H 4000.0 V 619.5 H 3990.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3990.0 985.0 H 4002.0 V 619.5 H 3990.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3990.0 976.5 H 4004.0 V 483.5 H 3990.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3990.0 1002.0 H 3996.0 V 228.5 H 3990.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3660.0 1172.0 H 3654.0 V 611.0 H 3640.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3660.0 1393.0 H 3656.0 V 611.0 H 3640.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 3660.0 1614.0 H 3644.0 V 611.0 H 3640.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 3990.0 1631.0 H 3998.0 V 1155.0 H 3990.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 3990.0 1648.0 H 4344.0 V 747.0 H 4710.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 4010.0 237.0 H 3644.0 V 577.0 H 3290.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 4010.0 254.0 H 3646.0 V 407.0 H 3290.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 4340.0 577.0 H 4346.0 V 373.0 H 4340.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 4340.0 713.0 H 4348.0 V 373.0 H 4340.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 4010.0 730.0 H 3648.0 V 407.0 H 3290.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 4340.0 798.0 H 4344.0 V 220.0 H 4360.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 4010.0 968.0 H 3650.0 V 577.0 H 3290.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 4340.0 942.5 H 4350.0 V 713.0 H 4340.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 4360.0 543.0 H 3819.0 V 305.0 H 3290.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 4710.0 245.5 H 3994.0 V 585.5 H 3290.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 4710.0 262.5 H 4696.0 V 228.5 H 4690.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 4710.0 271.0 H 4698.0 V 449.5 H 4690.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 4710.0 611.0 H 4000.0 V 407.0 H 3290.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 5040.0 585.5 H 5046.0 V 228.5 H 5040.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 4710.0 611.0 H 4527.0 V 945.3 H 4340.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 5040.0 764.0 H 5048.0 V 220.0 H 5040.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 5040.0 968.0 H 5050.0 V 747.0 H 5040.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-one)" marker-end="url(#card-one)"/>
+<path d="M 5040.0 1129.5 H 5052.0 V 755.5 H 5040.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 5040.0 1146.5 H 5054.0 V 568.5 H 5040.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 5040.0 1163.5 H 5046.0 V 594.0 H 5040.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 5060.0 237.0 H 4694.0 V 917.0 H 4340.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 5060.0 228.5 H 5046.0 V 1138.0 H 5040.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 5060.0 356.0 H 4698.0 V 220.0 H 4340.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 5390.0 509.0 H 5396.0 V 577.0 H 5390.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 5060.0 594.0 H 4700.0 V 220.0 H 4340.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-one)"/>
+<path d="M 5060.0 662.0 H 4527.0 V 475.0 H 3990.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 5060.0 679.0 H 4704.0 V 917.0 H 4340.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 5060.0 696.0 H 5056.0 V 560.0 H 5040.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 5060.0 713.0 H 5044.0 V 1104.0 H 5040.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-many)" marker-end="url(#card-zero-one)"/>
+<path d="M 5390.0 730.0 H 5398.0 V 339.0 H 5390.0" class="edge" stroke="#16A085" marker-start="url(#card-zero-one)" marker-end="url(#card-zero-one)"/>
+<rect x="60" y="178" width="330" height="102" rx="3" class="table"/>
+<path d="M63,178 H387 Q390,178 390,181 V207 H60 V181 Q60,178 63,178 Z" fill="#F4B183"/>
+<text x="68" y="198" class="header">region</text>
+<text x="66" y="219" class="marker">PK</text>
+<text x="115" y="219" class="field">code</text>
+<text x="384" y="219" text-anchor="end" class="type">text</text>
+<line x1="60" y1="225" x2="390" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="236" class="marker"></text>
+<text x="115" y="236" class="field">name</text>
+<text x="384" y="236" text-anchor="end" class="type">text</text>
+<line x1="60" y1="242" x2="390" y2="242" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="253" class="marker"></text>
+<text x="115" y="253" class="field">status</text>
+<text x="384" y="253" text-anchor="end" class="type">text</text>
+<line x1="60" y1="259" x2="390" y2="259" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="270" class="marker"></text>
+<text x="115" y="270" class="field">version</text>
+<text x="384" y="270" text-anchor="end" class="type">int</text>
+<rect x="60" y="297" width="330" height="136" rx="3" class="table"/>
+<path d="M63,297 H387 Q390,297 390,300 V326 H60 V300 Q60,297 63,297 Z" fill="#F4B183"/>
+<text x="68" y="317" class="header">organization</text>
+<text x="66" y="338" class="marker">PK</text>
+<text x="115" y="338" class="field">id</text>
+<text x="384" y="338" text-anchor="end" class="type">uuid</text>
+<line x1="60" y1="344" x2="390" y2="344" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="355" class="marker"></text>
+<text x="115" y="355" class="field">name</text>
+<text x="384" y="355" text-anchor="end" class="type">text</text>
+<line x1="60" y1="361" x2="390" y2="361" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="372" class="marker"></text>
+<text x="115" y="372" class="field">organization_kind</text>
+<text x="384" y="372" text-anchor="end" class="type">text</text>
+<line x1="60" y1="378" x2="390" y2="378" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="389" class="marker"></text>
+<text x="115" y="389" class="field">status</text>
+<text x="384" y="389" text-anchor="end" class="type">text</text>
+<line x1="60" y1="395" x2="390" y2="395" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="406" class="marker"></text>
+<text x="115" y="406" class="field">created_at</text>
+<text x="384" y="406" text-anchor="end" class="type">timestamptz</text>
+<line x1="60" y1="412" x2="390" y2="412" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="423" class="marker"></text>
+<text x="115" y="423" class="field">version</text>
+<text x="384" y="423" text-anchor="end" class="type">int</text>
+<rect x="60" y="450" width="330" height="187" rx="3" class="table"/>
+<path d="M63,450 H387 Q390,450 390,453 V479 H60 V453 Q60,450 63,450 Z" fill="#F4B183"/>
+<text x="68" y="470" class="header">app_user</text>
+<text x="66" y="491" class="marker">PK</text>
+<text x="115" y="491" class="field">id</text>
+<text x="384" y="491" text-anchor="end" class="type">uuid</text>
+<line x1="60" y1="497" x2="390" y2="497" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="508" class="marker">UK</text>
+<text x="115" y="508" class="field">username</text>
+<text x="384" y="508" text-anchor="end" class="type">citext</text>
+<line x1="60" y1="514" x2="390" y2="514" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="525" class="marker"></text>
+<text x="115" y="525" class="field">display_name</text>
+<text x="384" y="525" text-anchor="end" class="type">text</text>
+<line x1="60" y1="531" x2="390" y2="531" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="542" class="marker"></text>
+<text x="115" y="542" class="field">password_hash</text>
+<text x="384" y="542" text-anchor="end" class="type">text</text>
+<line x1="60" y1="548" x2="390" y2="548" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="559" class="marker"></text>
+<text x="115" y="559" class="field">status</text>
+<text x="384" y="559" text-anchor="end" class="type">text</text>
+<line x1="60" y1="565" x2="390" y2="565" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="576" class="marker"></text>
+<text x="115" y="576" class="field">must_change_password</text>
+<text x="384" y="576" text-anchor="end" class="type">boolean</text>
+<line x1="60" y1="582" x2="390" y2="582" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="593" class="marker"></text>
+<text x="115" y="593" class="field">authz_version</text>
+<text x="384" y="593" text-anchor="end" class="type">int</text>
+<line x1="60" y1="599" x2="390" y2="599" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="610" class="marker"></text>
+<text x="115" y="610" class="field">created_at</text>
+<text x="384" y="610" text-anchor="end" class="type">timestamptz</text>
+<line x1="60" y1="616" x2="390" y2="616" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="627" class="marker"></text>
+<text x="115" y="627" class="field">version</text>
+<text x="384" y="627" text-anchor="end" class="type">int</text>
+<rect x="410" y="178" width="330" height="85" rx="3" class="table"/>
+<path d="M413,178 H737 Q740,178 740,181 V207 H410 V181 Q410,178 413,178 Z" fill="#F4B183"/>
+<text x="418" y="198" class="header">membership</text>
+<text x="416" y="219" class="marker">PK FK</text>
+<text x="465" y="219" class="field">user_id</text>
+<text x="734" y="219" text-anchor="end" class="type">uuid</text>
+<line x1="410" y1="225" x2="740" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="236" class="marker">PK FK</text>
+<text x="465" y="236" class="field">organization_id</text>
+<text x="734" y="236" text-anchor="end" class="type">uuid</text>
+<line x1="410" y1="242" x2="740" y2="242" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="253" class="marker"></text>
+<text x="465" y="253" class="field">status</text>
+<text x="734" y="253" text-anchor="end" class="type">text</text>
+<rect x="410" y="280" width="330" height="187" rx="3" class="table"/>
+<path d="M413,280 H737 Q740,280 740,283 V309 H410 V283 Q410,280 413,280 Z" fill="#F4B183"/>
+<text x="418" y="300" class="header">role_grant</text>
+<text x="416" y="321" class="marker">PK</text>
+<text x="465" y="321" class="field">id</text>
+<text x="734" y="321" text-anchor="end" class="type">uuid</text>
+<line x1="410" y1="327" x2="740" y2="327" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="338" class="marker">FK</text>
+<text x="465" y="338" class="field">user_id</text>
+<text x="734" y="338" text-anchor="end" class="type">uuid</text>
+<line x1="410" y1="344" x2="740" y2="344" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="355" class="marker"></text>
+<text x="465" y="355" class="field">role_code</text>
+<text x="734" y="355" text-anchor="end" class="type">text</text>
+<line x1="410" y1="361" x2="740" y2="361" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="372" class="marker"></text>
+<text x="465" y="372" class="field">scope_type</text>
+<text x="734" y="372" text-anchor="end" class="type">text</text>
+<line x1="410" y1="378" x2="740" y2="378" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="389" class="marker">FK?</text>
+<text x="465" y="389" class="field">organization_id</text>
+<text x="734" y="389" text-anchor="end" class="type">uuid</text>
+<line x1="410" y1="395" x2="740" y2="395" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="406" class="marker">FK?</text>
+<text x="465" y="406" class="field">region_code</text>
+<text x="734" y="406" text-anchor="end" class="type">text</text>
+<line x1="410" y1="412" x2="740" y2="412" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="423" class="marker">REF</text>
+<text x="465" y="423" class="field">campaign_id</text>
+<text x="734" y="423" text-anchor="end" class="type">uuid</text>
+<line x1="410" y1="429" x2="740" y2="429" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="440" class="marker"></text>
+<text x="465" y="440" class="field">created_at</text>
+<text x="734" y="440" text-anchor="end" class="type">timestamptz</text>
+<line x1="410" y1="446" x2="740" y2="446" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="457" class="marker"></text>
+<text x="465" y="457" class="field">revoked_at</text>
+<text x="734" y="457" text-anchor="end" class="type">timestamptz</text>
+<rect x="760" y="178" width="330" height="170" rx="3" class="table"/>
+<path d="M763,178 H1087 Q1090,178 1090,181 V207 H760 V181 Q760,178 763,178 Z" fill="#F4B183"/>
+<text x="768" y="198" class="header">session_family</text>
+<text x="766" y="219" class="marker">PK</text>
+<text x="815" y="219" class="field">id</text>
+<text x="1084" y="219" text-anchor="end" class="type">uuid</text>
+<line x1="760" y1="225" x2="1090" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="766" y="236" class="marker">FK</text>
+<text x="815" y="236" class="field">user_id</text>
+<text x="1084" y="236" text-anchor="end" class="type">uuid</text>
+<line x1="760" y1="242" x2="1090" y2="242" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="766" y="253" class="marker"></text>
+<text x="815" y="253" class="field">client_kind</text>
+<text x="1084" y="253" text-anchor="end" class="type">text</text>
+<line x1="760" y1="259" x2="1090" y2="259" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="766" y="270" class="marker"></text>
+<text x="815" y="270" class="field">authz_version</text>
+<text x="1084" y="270" text-anchor="end" class="type">int</text>
+<line x1="760" y1="276" x2="1090" y2="276" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="766" y="287" class="marker"></text>
+<text x="815" y="287" class="field">created_at</text>
+<text x="1084" y="287" text-anchor="end" class="type">timestamptz</text>
+<line x1="760" y1="293" x2="1090" y2="293" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="766" y="304" class="marker"></text>
+<text x="815" y="304" class="field">absolute_expires_at</text>
+<text x="1084" y="304" text-anchor="end" class="type">timestamptz</text>
+<line x1="760" y1="310" x2="1090" y2="310" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="766" y="321" class="marker"></text>
+<text x="815" y="321" class="field">revoked_at</text>
+<text x="1084" y="321" text-anchor="end" class="type">timestamptz</text>
+<line x1="760" y1="327" x2="1090" y2="327" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="766" y="338" class="marker"></text>
+<text x="815" y="338" class="field">revoke_reason</text>
+<text x="1084" y="338" text-anchor="end" class="type">text</text>
+<rect x="760" y="365" width="330" height="85" rx="3" class="table"/>
+<path d="M763,365 H1087 Q1090,365 1090,368 V394 H760 V368 Q760,365 763,365 Z" fill="#F4B183"/>
+<text x="768" y="385" class="header">refresh_session</text>
+<text x="766" y="406" class="marker">PK</text>
+<text x="815" y="406" class="field">token_hash</text>
+<text x="1084" y="406" text-anchor="end" class="type">text</text>
+<line x1="760" y1="412" x2="1090" y2="412" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="766" y="423" class="marker">FK</text>
+<text x="815" y="423" class="field">family_id</text>
+<text x="1084" y="423" text-anchor="end" class="type">uuid</text>
+<line x1="760" y1="429" x2="1090" y2="429" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="766" y="440" class="marker"></text>
+<text x="815" y="440" class="field">rotated_at</text>
+<text x="1084" y="440" text-anchor="end" class="type">timestamptz</text>
+<rect x="60" y="702" width="330" height="204" rx="3" class="table"/>
+<path d="M63,702 H387 Q390,702 390,705 V731 H60 V705 Q60,702 63,702 Z" fill="#F4B183"/>
+<text x="68" y="722" class="header">audit_log</text>
+<text x="66" y="743" class="marker">PK</text>
+<text x="115" y="743" class="field">id</text>
+<text x="384" y="743" text-anchor="end" class="type">bigint</text>
+<line x1="60" y1="749" x2="390" y2="749" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="760" class="marker">REF</text>
+<text x="115" y="760" class="field">actor_user_id</text>
+<text x="384" y="760" text-anchor="end" class="type">uuid</text>
+<line x1="60" y1="766" x2="390" y2="766" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="777" class="marker"></text>
+<text x="115" y="777" class="field">action</text>
+<text x="384" y="777" text-anchor="end" class="type">text</text>
+<line x1="60" y1="783" x2="390" y2="783" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="794" class="marker"></text>
+<text x="115" y="794" class="field">entity_type</text>
+<text x="384" y="794" text-anchor="end" class="type">text</text>
+<line x1="60" y1="800" x2="390" y2="800" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="811" class="marker"></text>
+<text x="115" y="811" class="field">entity_id</text>
+<text x="384" y="811" text-anchor="end" class="type">text</text>
+<line x1="60" y1="817" x2="390" y2="817" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="828" class="marker"></text>
+<text x="115" y="828" class="field">before_state</text>
+<text x="384" y="828" text-anchor="end" class="type">jsonb</text>
+<line x1="60" y1="834" x2="390" y2="834" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="845" class="marker"></text>
+<text x="115" y="845" class="field">after_state</text>
+<text x="384" y="845" text-anchor="end" class="type">jsonb</text>
+<line x1="60" y1="851" x2="390" y2="851" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="862" class="marker"></text>
+<text x="115" y="862" class="field">reason</text>
+<text x="384" y="862" text-anchor="end" class="type">text</text>
+<line x1="60" y1="868" x2="390" y2="868" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="879" class="marker"></text>
+<text x="115" y="879" class="field">correlation_id</text>
+<text x="384" y="879" text-anchor="end" class="type">uuid</text>
+<line x1="60" y1="885" x2="390" y2="885" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="66" y="896" class="marker"></text>
+<text x="115" y="896" class="field">created_at</text>
+<text x="384" y="896" text-anchor="end" class="type">timestamptz</text>
+<rect x="410" y="702" width="330" height="170" rx="3" class="table"/>
+<path d="M413,702 H737 Q740,702 740,705 V731 H410 V705 Q410,702 413,702 Z" fill="#F4B183"/>
+<text x="418" y="722" class="header">idempotency_record</text>
+<text x="416" y="743" class="marker">PK</text>
+<text x="465" y="743" class="field">scope_key</text>
+<text x="734" y="743" text-anchor="end" class="type">text</text>
+<line x1="410" y1="749" x2="740" y2="749" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="760" class="marker">PK</text>
+<text x="465" y="760" class="field">command</text>
+<text x="734" y="760" text-anchor="end" class="type">text</text>
+<line x1="410" y1="766" x2="740" y2="766" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="777" class="marker">PK</text>
+<text x="465" y="777" class="field">idempotency_key</text>
+<text x="734" y="777" text-anchor="end" class="type">uuid</text>
+<line x1="410" y1="783" x2="740" y2="783" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="794" class="marker"></text>
+<text x="465" y="794" class="field">request_hash</text>
+<text x="734" y="794" text-anchor="end" class="type">text</text>
+<line x1="410" y1="800" x2="740" y2="800" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="811" class="marker"></text>
+<text x="465" y="811" class="field">response_status</text>
+<text x="734" y="811" text-anchor="end" class="type">int</text>
+<line x1="410" y1="817" x2="740" y2="817" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="828" class="marker"></text>
+<text x="465" y="828" class="field">resource_type</text>
+<text x="734" y="828" text-anchor="end" class="type">text</text>
+<line x1="410" y1="834" x2="740" y2="834" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="845" class="marker"></text>
+<text x="465" y="845" class="field">resource_id</text>
+<text x="734" y="845" text-anchor="end" class="type">uuid</text>
+<line x1="410" y1="851" x2="740" y2="851" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="416" y="862" class="marker"></text>
+<text x="465" y="862" class="field">created_at</text>
+<text x="734" y="862" text-anchor="end" class="type">timestamptz</text>
+<rect x="1160" y="178" width="330" height="68" rx="3" class="table"/>
+<path d="M1163,178 H1487 Q1490,178 1490,181 V207 H1160 V181 Q1160,178 1163,178 Z" fill="#F4B183"/>
+<text x="1168" y="198" class="header">incident_category</text>
+<text x="1166" y="219" class="marker">PK</text>
+<text x="1215" y="219" class="field">code</text>
+<text x="1484" y="219" text-anchor="end" class="type">text</text>
+<line x1="1160" y1="225" x2="1490" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="236" class="marker"></text>
+<text x="1215" y="236" class="field">display_name</text>
+<text x="1484" y="236" text-anchor="end" class="type">text</text>
+<rect x="1160" y="263" width="330" height="68" rx="3" class="table"/>
+<path d="M1163,263 H1487 Q1490,263 1490,266 V292 H1160 V266 Q1160,263 1163,263 Z" fill="#F4B183"/>
+<text x="1168" y="283" class="header">skill</text>
+<text x="1166" y="304" class="marker">PK</text>
+<text x="1215" y="304" class="field">code</text>
+<text x="1484" y="304" text-anchor="end" class="type">text</text>
+<line x1="1160" y1="310" x2="1490" y2="310" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="321" class="marker"></text>
+<text x="1215" y="321" class="field">display_name</text>
+<text x="1484" y="321" text-anchor="end" class="type">text</text>
+<rect x="1160" y="348" width="330" height="68" rx="3" class="table"/>
+<path d="M1163,348 H1487 Q1490,348 1490,351 V377 H1160 V351 Q1160,348 1163,348 Z" fill="#F4B183"/>
+<text x="1168" y="368" class="header">incident_category_skill</text>
+<text x="1166" y="389" class="marker">PK FK</text>
+<text x="1215" y="389" class="field">category_code</text>
+<text x="1484" y="389" text-anchor="end" class="type">text</text>
+<line x1="1160" y1="395" x2="1490" y2="395" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="406" class="marker">PK FK</text>
+<text x="1215" y="406" class="field">skill_code</text>
+<text x="1484" y="406" text-anchor="end" class="type">text</text>
+<rect x="1160" y="433" width="330" height="68" rx="3" class="table"/>
+<path d="M1163,433 H1487 Q1490,433 1490,436 V462 H1160 V436 Q1160,433 1163,433 Z" fill="#F4B183"/>
+<text x="1168" y="453" class="header">region_boundary</text>
+<text x="1166" y="474" class="marker">PK REF</text>
+<text x="1215" y="474" class="field">region_code</text>
+<text x="1484" y="474" text-anchor="end" class="type">text</text>
+<line x1="1160" y1="480" x2="1490" y2="480" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="491" class="marker"></text>
+<text x="1215" y="491" class="field">geom</text>
+<text x="1484" y="491" text-anchor="end" class="type">geometry(MultiPolygon,4326)</text>
+<rect x="1160" y="518" width="330" height="221" rx="3" class="table"/>
+<path d="M1163,518 H1487 Q1490,518 1490,521 V547 H1160 V521 Q1160,518 1163,518 Z" fill="#F4B183"/>
+<text x="1168" y="538" class="header">campaign</text>
+<text x="1166" y="559" class="marker">PK</text>
+<text x="1215" y="559" class="field">id</text>
+<text x="1484" y="559" text-anchor="end" class="type">uuid</text>
+<line x1="1160" y1="565" x2="1490" y2="565" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="576" class="marker">REF</text>
+<text x="1215" y="576" class="field">organization_id</text>
+<text x="1484" y="576" text-anchor="end" class="type">uuid</text>
+<line x1="1160" y1="582" x2="1490" y2="582" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="593" class="marker">FK?</text>
+<text x="1215" y="593" class="field">region_code</text>
+<text x="1484" y="593" text-anchor="end" class="type">text</text>
+<line x1="1160" y1="599" x2="1490" y2="599" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="610" class="marker"></text>
+<text x="1215" y="610" class="field">name</text>
+<text x="1484" y="610" text-anchor="end" class="type">text</text>
+<line x1="1160" y1="616" x2="1490" y2="616" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="627" class="marker"></text>
+<text x="1215" y="627" class="field">objective</text>
+<text x="1484" y="627" text-anchor="end" class="type">text</text>
+<line x1="1160" y1="633" x2="1490" y2="633" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="644" class="marker"></text>
+<text x="1215" y="644" class="field">status</text>
+<text x="1484" y="644" text-anchor="end" class="type">text</text>
+<line x1="1160" y1="650" x2="1490" y2="650" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="661" class="marker"></text>
+<text x="1215" y="661" class="field">starts_at</text>
+<text x="1484" y="661" text-anchor="end" class="type">timestamptz</text>
+<line x1="1160" y1="667" x2="1490" y2="667" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="678" class="marker"></text>
+<text x="1215" y="678" class="field">ends_at</text>
+<text x="1484" y="678" text-anchor="end" class="type">timestamptz</text>
+<line x1="1160" y1="684" x2="1490" y2="684" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="695" class="marker">REF</text>
+<text x="1215" y="695" class="field">created_by_user_id</text>
+<text x="1484" y="695" text-anchor="end" class="type">uuid</text>
+<line x1="1160" y1="701" x2="1490" y2="701" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="712" class="marker"></text>
+<text x="1215" y="712" class="field">created_at</text>
+<text x="1484" y="712" text-anchor="end" class="type">timestamptz</text>
+<line x1="1160" y1="718" x2="1490" y2="718" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="729" class="marker"></text>
+<text x="1215" y="729" class="field">version</text>
+<text x="1484" y="729" text-anchor="end" class="type">int</text>
+<rect x="1510" y="178" width="330" height="510" rx="3" class="table"/>
+<path d="M1513,178 H1837 Q1840,178 1840,181 V207 H1510 V181 Q1510,178 1513,178 Z" fill="#F4B183"/>
+<text x="1518" y="198" class="header">assistance_request</text>
+<text x="1516" y="219" class="marker">PK FK</text>
+<text x="1565" y="219" class="field">id</text>
+<text x="1834" y="219" text-anchor="end" class="type">uuid</text>
+<line x1="1510" y1="225" x2="1840" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="236" class="marker">UK</text>
+<text x="1565" y="236" class="field">tracking_code</text>
+<text x="1834" y="236" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="242" x2="1840" y2="242" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="253" class="marker"></text>
+<text x="1565" y="253" class="field">tracking_secret_hash</text>
+<text x="1834" y="253" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="259" x2="1840" y2="259" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="270" class="marker">FK?</text>
+<text x="1565" y="270" class="field">campaign_id</text>
+<text x="1834" y="270" text-anchor="end" class="type">uuid</text>
+<line x1="1510" y1="276" x2="1840" y2="276" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="287" class="marker">FK</text>
+<text x="1565" y="287" class="field">incident_category_code</text>
+<text x="1834" y="287" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="293" x2="1840" y2="293" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="304" class="marker">FK?</text>
+<text x="1565" y="304" class="field">canonical_request_id</text>
+<text x="1834" y="304" text-anchor="end" class="type">uuid</text>
+<line x1="1510" y1="310" x2="1840" y2="310" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="321" class="marker"></text>
+<text x="1565" y="321" class="field">report_mode</text>
+<text x="1834" y="321" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="327" x2="1840" y2="327" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="338" class="marker">REF</text>
+<text x="1565" y="338" class="field">reporter_user_id</text>
+<text x="1834" y="338" text-anchor="end" class="type">uuid</text>
+<line x1="1510" y1="344" x2="1840" y2="344" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="355" class="marker"></text>
+<text x="1565" y="355" class="field">reporter_name</text>
+<text x="1834" y="355" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="361" x2="1840" y2="361" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="372" class="marker"></text>
+<text x="1565" y="372" class="field">reporter_contact_phone</text>
+<text x="1834" y="372" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="378" x2="1840" y2="378" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="389" class="marker"></text>
+<text x="1565" y="389" class="field">source_ip_hash</text>
+<text x="1834" y="389" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="395" x2="1840" y2="395" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="406" class="marker"></text>
+<text x="1565" y="406" class="field">description</text>
+<text x="1834" y="406" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="412" x2="1840" y2="412" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="423" class="marker">REF</text>
+<text x="1565" y="423" class="field">organization_id</text>
+<text x="1834" y="423" text-anchor="end" class="type">uuid</text>
+<line x1="1510" y1="429" x2="1840" y2="429" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="440" class="marker">FK?</text>
+<text x="1565" y="440" class="field">region_code</text>
+<text x="1834" y="440" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="446" x2="1840" y2="446" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="457" class="marker"></text>
+<text x="1565" y="457" class="field">status</text>
+<text x="1834" y="457" text-anchor="end" class="type">request_status</text>
+<line x1="1510" y1="463" x2="1840" y2="463" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="474" class="marker"></text>
+<text x="1565" y="474" class="field">verifying_since</text>
+<text x="1834" y="474" text-anchor="end" class="type">timestamptz</text>
+<line x1="1510" y1="480" x2="1840" y2="480" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="491" class="marker"></text>
+<text x="1565" y="491" class="field">review_lane</text>
+<text x="1834" y="491" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="497" x2="1840" y2="497" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="508" class="marker"></text>
+<text x="1565" y="508" class="field">priority</text>
+<text x="1834" y="508" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="514" x2="1840" y2="514" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="525" class="marker"></text>
+<text x="1565" y="525" class="field">priority_basis</text>
+<text x="1834" y="525" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="531" x2="1840" y2="531" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="542" class="marker"></text>
+<text x="1565" y="542" class="field">reporter_declared_danger</text>
+<text x="1834" y="542" text-anchor="end" class="type">boolean</text>
+<line x1="1510" y1="548" x2="1840" y2="548" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="559" class="marker"></text>
+<text x="1565" y="559" class="field">work_cycle</text>
+<text x="1834" y="559" text-anchor="end" class="type">int</text>
+<line x1="1510" y1="565" x2="1840" y2="565" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="576" class="marker"></text>
+<text x="1565" y="576" class="field">resolved_at</text>
+<text x="1834" y="576" text-anchor="end" class="type">timestamptz</text>
+<line x1="1510" y1="582" x2="1840" y2="582" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="593" class="marker">REF</text>
+<text x="1565" y="593" class="field">resolution_seal_id</text>
+<text x="1834" y="593" text-anchor="end" class="type">uuid</text>
+<line x1="1510" y1="599" x2="1840" y2="599" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="610" class="marker"></text>
+<text x="1565" y="610" class="field">attribution_locked_at</text>
+<text x="1834" y="610" text-anchor="end" class="type">timestamptz</text>
+<line x1="1510" y1="616" x2="1840" y2="616" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="627" class="marker"></text>
+<text x="1565" y="627" class="field">logistics_admitted_at</text>
+<text x="1834" y="627" text-anchor="end" class="type">timestamptz</text>
+<line x1="1510" y1="633" x2="1840" y2="633" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="644" class="marker">FK?</text>
+<text x="1565" y="644" class="field">verification_revision</text>
+<text x="1834" y="644" text-anchor="end" class="type">uuid</text>
+<line x1="1510" y1="650" x2="1840" y2="650" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="661" class="marker"></text>
+<text x="1565" y="661" class="field">received_at</text>
+<text x="1834" y="661" text-anchor="end" class="type">timestamptz</text>
+<line x1="1510" y1="667" x2="1840" y2="667" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="678" class="marker"></text>
+<text x="1565" y="678" class="field">version</text>
+<text x="1834" y="678" text-anchor="end" class="type">int</text>
+<rect x="1510" y="705" width="330" height="272" rx="3" class="table"/>
+<path d="M1513,705 H1837 Q1840,705 1840,708 V734 H1510 V708 Q1510,705 1513,705 Z" fill="#F4B183"/>
+<text x="1518" y="725" class="header">request_subject</text>
+<text x="1516" y="746" class="marker">PK FK</text>
+<text x="1565" y="746" class="field">request_id</text>
+<text x="1834" y="746" text-anchor="end" class="type">uuid</text>
+<line x1="1510" y1="752" x2="1840" y2="752" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="763" class="marker"></text>
+<text x="1565" y="763" class="field">people_affected</text>
+<text x="1834" y="763" text-anchor="end" class="type">int</text>
+<line x1="1510" y1="769" x2="1840" y2="769" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="780" class="marker"></text>
+<text x="1565" y="780" class="field">location</text>
+<text x="1834" y="780" text-anchor="end" class="type">geography(Point,4326)</text>
+<line x1="1510" y1="786" x2="1840" y2="786" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="797" class="marker"></text>
+<text x="1565" y="797" class="field">location_source</text>
+<text x="1834" y="797" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="803" x2="1840" y2="803" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="814" class="marker"></text>
+<text x="1565" y="814" class="field">location_accuracy_m</text>
+<text x="1834" y="814" text-anchor="end" class="type">numeric(8,1)</text>
+<line x1="1510" y1="820" x2="1840" y2="820" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="831" class="marker"></text>
+<text x="1565" y="831" class="field">location_captured_at</text>
+<text x="1834" y="831" text-anchor="end" class="type">timestamptz</text>
+<line x1="1510" y1="837" x2="1840" y2="837" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="848" class="marker"></text>
+<text x="1565" y="848" class="field">reporter_relationship</text>
+<text x="1834" y="848" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="854" x2="1840" y2="854" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="865" class="marker"></text>
+<text x="1565" y="865" class="field">beneficiary_contact_phone</text>
+<text x="1834" y="865" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="871" x2="1840" y2="871" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="882" class="marker"></text>
+<text x="1565" y="882" class="field">alternate_contact_name</text>
+<text x="1834" y="882" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="888" x2="1840" y2="888" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="899" class="marker"></text>
+<text x="1565" y="899" class="field">alternate_contact_phone</text>
+<text x="1834" y="899" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="905" x2="1840" y2="905" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="916" class="marker"></text>
+<text x="1565" y="916" class="field">information_source</text>
+<text x="1834" y="916" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="922" x2="1840" y2="922" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="933" class="marker"></text>
+<text x="1565" y="933" class="field">last_known_situation_at</text>
+<text x="1834" y="933" text-anchor="end" class="type">timestamptz</text>
+<line x1="1510" y1="939" x2="1840" y2="939" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="950" class="marker"></text>
+<text x="1565" y="950" class="field">contactability</text>
+<text x="1834" y="950" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="956" x2="1840" y2="956" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="967" class="marker"></text>
+<text x="1565" y="967" class="field">household_reference_note</text>
+<text x="1834" y="967" text-anchor="end" class="type">text</text>
+<rect x="1860" y="178" width="330" height="153" rx="3" class="table"/>
+<path d="M1863,178 H2187 Q2190,178 2190,181 V207 H1860 V181 Q1860,178 1863,178 Z" fill="#F4B183"/>
+<text x="1868" y="198" class="header">contact_attempt</text>
+<text x="1866" y="219" class="marker">PK</text>
+<text x="1915" y="219" class="field">id</text>
+<text x="2184" y="219" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="225" x2="2190" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="236" class="marker">FK</text>
+<text x="1915" y="236" class="field">request_id</text>
+<text x="2184" y="236" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="242" x2="2190" y2="242" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="253" class="marker">REF</text>
+<text x="1915" y="253" class="field">actor_user_id</text>
+<text x="2184" y="253" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="259" x2="2190" y2="259" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="270" class="marker"></text>
+<text x="1915" y="270" class="field">contact_target</text>
+<text x="2184" y="270" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="276" x2="2190" y2="276" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="287" class="marker"></text>
+<text x="1915" y="287" class="field">outcome</text>
+<text x="2184" y="287" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="293" x2="2190" y2="293" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="304" class="marker"></text>
+<text x="1915" y="304" class="field">note</text>
+<text x="2184" y="304" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="310" x2="2190" y2="310" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="321" class="marker"></text>
+<text x="1915" y="321" class="field">attempted_at</text>
+<text x="2184" y="321" text-anchor="end" class="type">timestamptz</text>
+<rect x="1860" y="348" width="330" height="187" rx="3" class="table"/>
+<path d="M1863,348 H2187 Q2190,348 2190,351 V377 H1860 V351 Q1860,348 1863,348 Z" fill="#F4B183"/>
+<text x="1868" y="368" class="header">verification_decision</text>
+<text x="1866" y="389" class="marker">PK</text>
+<text x="1915" y="389" class="field">id</text>
+<text x="2184" y="389" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="395" x2="2190" y2="395" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="406" class="marker">FK</text>
+<text x="1915" y="406" class="field">request_id</text>
+<text x="2184" y="406" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="412" x2="2190" y2="412" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="423" class="marker"></text>
+<text x="1915" y="423" class="field">outcome</text>
+<text x="2184" y="423" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="429" x2="2190" y2="429" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="440" class="marker"></text>
+<text x="1915" y="440" class="field">basis</text>
+<text x="2184" y="440" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="446" x2="2190" y2="446" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="457" class="marker">REF</text>
+<text x="1915" y="457" class="field">reviewer_user_id</text>
+<text x="2184" y="457" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="463" x2="2190" y2="463" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="474" class="marker">REF</text>
+<text x="1915" y="474" class="field">concurring_user_id</text>
+<text x="2184" y="474" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="480" x2="2190" y2="480" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="491" class="marker"></text>
+<text x="1915" y="491" class="field">reason</text>
+<text x="2184" y="491" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="497" x2="2190" y2="497" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="508" class="marker"></text>
+<text x="1915" y="508" class="field">reason_kind</text>
+<text x="2184" y="508" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="514" x2="2190" y2="514" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="525" class="marker"></text>
+<text x="1915" y="525" class="field">decided_at</text>
+<text x="2184" y="525" text-anchor="end" class="type">timestamptz</text>
+<rect x="1860" y="552" width="330" height="204" rx="3" class="table"/>
+<path d="M1863,552 H2187 Q2190,552 2190,555 V581 H1860 V555 Q1860,552 1863,552 Z" fill="#F4B183"/>
+<text x="1868" y="572" class="header">request_event</text>
+<text x="1866" y="593" class="marker">PK</text>
+<text x="1915" y="593" class="field">id</text>
+<text x="2184" y="593" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="599" x2="2190" y2="599" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="610" class="marker">FK UK*</text>
+<text x="1915" y="610" class="field">request_id</text>
+<text x="2184" y="610" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="616" x2="2190" y2="616" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="627" class="marker">REF</text>
+<text x="1915" y="627" class="field">actor_user_id</text>
+<text x="2184" y="627" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="633" x2="2190" y2="633" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="644" class="marker"></text>
+<text x="1915" y="644" class="field">event_type</text>
+<text x="2184" y="644" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="650" x2="2190" y2="650" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="661" class="marker"></text>
+<text x="1915" y="661" class="field">visibility</text>
+<text x="2184" y="661" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="667" x2="2190" y2="667" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="678" class="marker"></text>
+<text x="1915" y="678" class="field">from_status</text>
+<text x="2184" y="678" text-anchor="end" class="type">request_status</text>
+<line x1="1860" y1="684" x2="2190" y2="684" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="695" class="marker"></text>
+<text x="1915" y="695" class="field">to_status</text>
+<text x="2184" y="695" text-anchor="end" class="type">request_status</text>
+<line x1="1860" y1="701" x2="2190" y2="701" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="712" class="marker"></text>
+<text x="1915" y="712" class="field">reason</text>
+<text x="2184" y="712" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="718" x2="2190" y2="718" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="729" class="marker"></text>
+<text x="1915" y="729" class="field">payload</text>
+<text x="2184" y="729" text-anchor="end" class="type">jsonb</text>
+<line x1="1860" y1="735" x2="2190" y2="735" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="746" class="marker"></text>
+<text x="1915" y="746" class="field">occurred_at</text>
+<text x="2184" y="746" text-anchor="end" class="type">timestamptz</text>
+<rect x="1860" y="773" width="330" height="238" rx="3" class="table"/>
+<path d="M1863,773 H2187 Q2190,773 2190,776 V802 H1860 V776 Q1860,773 1863,773 Z" fill="#F4B183"/>
+<text x="1868" y="793" class="header">resolution_intent</text>
+<text x="1866" y="814" class="marker">PK</text>
+<text x="1915" y="814" class="field">id</text>
+<text x="2184" y="814" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="820" x2="2190" y2="820" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="831" class="marker">FK</text>
+<text x="1915" y="831" class="field">request_id</text>
+<text x="2184" y="831" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="837" x2="2190" y2="837" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="848" class="marker"></text>
+<text x="1915" y="848" class="field">work_cycle</text>
+<text x="2184" y="848" text-anchor="end" class="type">int</text>
+<line x1="1860" y1="854" x2="2190" y2="854" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="865" class="marker"></text>
+<text x="1915" y="865" class="field">kind</text>
+<text x="2184" y="865" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="871" x2="2190" y2="871" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="882" class="marker"></text>
+<text x="1915" y="882" class="field">state</text>
+<text x="2184" y="882" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="888" x2="2190" y2="888" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="899" class="marker">REF</text>
+<text x="1915" y="899" class="field">actor_user_id</text>
+<text x="2184" y="899" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="905" x2="2190" y2="905" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="916" class="marker"></text>
+<text x="1915" y="916" class="field">expected_request_version</text>
+<text x="2184" y="916" text-anchor="end" class="type">int</text>
+<line x1="1860" y1="922" x2="2190" y2="922" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="933" class="marker"></text>
+<text x="1915" y="933" class="field">previous_status</text>
+<text x="2184" y="933" text-anchor="end" class="type">request_status</text>
+<line x1="1860" y1="939" x2="2190" y2="939" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="950" class="marker"></text>
+<text x="1915" y="950" class="field">reason</text>
+<text x="2184" y="950" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="956" x2="2190" y2="956" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="967" class="marker"></text>
+<text x="1915" y="967" class="field">version</text>
+<text x="2184" y="967" text-anchor="end" class="type">int</text>
+<line x1="1860" y1="973" x2="2190" y2="973" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="984" class="marker"></text>
+<text x="1915" y="984" class="field">created_at</text>
+<text x="2184" y="984" text-anchor="end" class="type">timestamptz</text>
+<line x1="1860" y1="990" x2="2190" y2="990" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1001" class="marker"></text>
+<text x="1915" y="1001" class="field">updated_at</text>
+<text x="2184" y="1001" text-anchor="end" class="type">timestamptz</text>
+<rect x="1860" y="1028" width="330" height="204" rx="3" class="table"/>
+<path d="M1863,1028 H2187 Q2190,1028 2190,1031 V1057 H1860 V1031 Q1860,1028 1863,1028 Z" fill="#F4B183"/>
+<text x="1868" y="1048" class="header">capability_recovery</text>
+<text x="1866" y="1069" class="marker">PK</text>
+<text x="1915" y="1069" class="field">id</text>
+<text x="2184" y="1069" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="1075" x2="2190" y2="1075" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1086" class="marker">FK</text>
+<text x="1915" y="1086" class="field">request_id</text>
+<text x="2184" y="1086" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="1092" x2="2190" y2="1092" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1103" class="marker">UK</text>
+<text x="1915" y="1103" class="field">code_hash</text>
+<text x="2184" y="1103" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="1109" x2="2190" y2="1109" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1120" class="marker"></text>
+<text x="1915" y="1120" class="field">expires_at</text>
+<text x="2184" y="1120" text-anchor="end" class="type">timestamptz</text>
+<line x1="1860" y1="1126" x2="2190" y2="1126" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1137" class="marker">REF</text>
+<text x="1915" y="1137" class="field">issued_by_user_id</text>
+<text x="2184" y="1137" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="1143" x2="2190" y2="1143" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1154" class="marker"></text>
+<text x="1915" y="1154" class="field">basis</text>
+<text x="2184" y="1154" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="1160" x2="2190" y2="1160" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1171" class="marker"></text>
+<text x="1915" y="1171" class="field">source_note</text>
+<text x="2184" y="1171" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="1177" x2="2190" y2="1177" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1188" class="marker"></text>
+<text x="1915" y="1188" class="field">consumed_at</text>
+<text x="2184" y="1188" text-anchor="end" class="type">timestamptz</text>
+<line x1="1860" y1="1194" x2="2190" y2="1194" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1205" class="marker">REF</text>
+<text x="1915" y="1205" class="field">consumed_by_user_id</text>
+<text x="2184" y="1205" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="1211" x2="2190" y2="1211" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1222" class="marker"></text>
+<text x="1915" y="1222" class="field">created_at</text>
+<text x="2184" y="1222" text-anchor="end" class="type">timestamptz</text>
+<rect x="2210" y="178" width="330" height="272" rx="3" class="table"/>
+<path d="M2213,178 H2537 Q2540,178 2540,181 V207 H2210 V181 Q2210,178 2213,178 Z" fill="#F4B183"/>
+<text x="2218" y="198" class="header">rescue_team</text>
+<text x="2216" y="219" class="marker">PK</text>
+<text x="2265" y="219" class="field">id</text>
+<text x="2534" y="219" text-anchor="end" class="type">uuid</text>
+<line x1="2210" y1="225" x2="2540" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="236" class="marker">REF</text>
+<text x="2265" y="236" class="field">organization_id</text>
+<text x="2534" y="236" text-anchor="end" class="type">uuid</text>
+<line x1="2210" y1="242" x2="2540" y2="242" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="253" class="marker">FK</text>
+<text x="2265" y="253" class="field">operating_region_code</text>
+<text x="2534" y="253" text-anchor="end" class="type">text</text>
+<line x1="2210" y1="259" x2="2540" y2="259" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="270" class="marker"></text>
+<text x="2265" y="270" class="field">name</text>
+<text x="2534" y="270" text-anchor="end" class="type">text</text>
+<line x1="2210" y1="276" x2="2540" y2="276" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="287" class="marker"></text>
+<text x="2265" y="287" class="field">team_kind</text>
+<text x="2534" y="287" text-anchor="end" class="type">text</text>
+<line x1="2210" y1="293" x2="2540" y2="293" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="304" class="marker"></text>
+<text x="2265" y="304" class="field">reporting_mode</text>
+<text x="2534" y="304" text-anchor="end" class="type">text</text>
+<line x1="2210" y1="310" x2="2540" y2="310" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="321" class="marker"></text>
+<text x="2265" y="321" class="field">external_contact_note</text>
+<text x="2534" y="321" text-anchor="end" class="type">text</text>
+<line x1="2210" y1="327" x2="2540" y2="327" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="338" class="marker"></text>
+<text x="2265" y="338" class="field">readiness_required</text>
+<text x="2534" y="338" text-anchor="end" class="type">boolean</text>
+<line x1="2210" y1="344" x2="2540" y2="344" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="355" class="marker"></text>
+<text x="2265" y="355" class="field">affiliation_verified_at</text>
+<text x="2534" y="355" text-anchor="end" class="type">timestamptz</text>
+<line x1="2210" y1="361" x2="2540" y2="361" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="372" class="marker">REF</text>
+<text x="2265" y="372" class="field">affiliation_verified_by</text>
+<text x="2534" y="372" text-anchor="end" class="type">uuid</text>
+<line x1="2210" y1="378" x2="2540" y2="378" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="389" class="marker"></text>
+<text x="2265" y="389" class="field">availability</text>
+<text x="2534" y="389" text-anchor="end" class="type">text</text>
+<line x1="2210" y1="395" x2="2540" y2="395" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="406" class="marker"></text>
+<text x="2265" y="406" class="field">status</text>
+<text x="2534" y="406" text-anchor="end" class="type">text</text>
+<line x1="2210" y1="412" x2="2540" y2="412" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="423" class="marker"></text>
+<text x="2265" y="423" class="field">created_at</text>
+<text x="2534" y="423" text-anchor="end" class="type">timestamptz</text>
+<line x1="2210" y1="429" x2="2540" y2="429" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="440" class="marker"></text>
+<text x="2265" y="440" class="field">version</text>
+<text x="2534" y="440" text-anchor="end" class="type">int</text>
+<rect x="2210" y="467" width="330" height="102" rx="3" class="table"/>
+<path d="M2213,467 H2537 Q2540,467 2540,470 V496 H2210 V470 Q2210,467 2213,467 Z" fill="#F4B183"/>
+<text x="2218" y="487" class="header">team_member</text>
+<text x="2216" y="508" class="marker">PK FK</text>
+<text x="2265" y="508" class="field">team_id</text>
+<text x="2534" y="508" text-anchor="end" class="type">uuid</text>
+<line x1="2210" y1="514" x2="2540" y2="514" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="525" class="marker">PK REF</text>
+<text x="2265" y="525" class="field">user_id</text>
+<text x="2534" y="525" text-anchor="end" class="type">uuid</text>
+<line x1="2210" y1="531" x2="2540" y2="531" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="542" class="marker"></text>
+<text x="2265" y="542" class="field">member_role</text>
+<text x="2534" y="542" text-anchor="end" class="type">text</text>
+<line x1="2210" y1="548" x2="2540" y2="548" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="559" class="marker"></text>
+<text x="2265" y="559" class="field">left_at</text>
+<text x="2534" y="559" text-anchor="end" class="type">timestamptz</text>
+<rect x="2210" y="586" width="330" height="68" rx="3" class="table"/>
+<path d="M2213,586 H2537 Q2540,586 2540,589 V615 H2210 V589 Q2210,586 2213,586 Z" fill="#F4B183"/>
+<text x="2218" y="606" class="header">team_skill</text>
+<text x="2216" y="627" class="marker">PK FK</text>
+<text x="2265" y="627" class="field">team_id</text>
+<text x="2534" y="627" text-anchor="end" class="type">uuid</text>
+<line x1="2210" y1="633" x2="2540" y2="633" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="644" class="marker">PK FK</text>
+<text x="2265" y="644" class="field">skill_code</text>
+<text x="2534" y="644" text-anchor="end" class="type">text</text>
+<rect x="2210" y="671" width="330" height="136" rx="3" class="table"/>
+<path d="M2213,671 H2537 Q2540,671 2540,674 V700 H2210 V674 Q2210,671 2213,671 Z" fill="#F4B183"/>
+<text x="2218" y="691" class="header">team_position</text>
+<text x="2216" y="712" class="marker">PK FK</text>
+<text x="2265" y="712" class="field">team_id</text>
+<text x="2534" y="712" text-anchor="end" class="type">uuid</text>
+<line x1="2210" y1="718" x2="2540" y2="718" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="729" class="marker"></text>
+<text x="2265" y="729" class="field">location</text>
+<text x="2534" y="729" text-anchor="end" class="type">geography(Point,4326)</text>
+<line x1="2210" y1="735" x2="2540" y2="735" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="746" class="marker"></text>
+<text x="2265" y="746" class="field">accuracy_m</text>
+<text x="2534" y="746" text-anchor="end" class="type">numeric(8,1)</text>
+<line x1="2210" y1="752" x2="2540" y2="752" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="763" class="marker"></text>
+<text x="2265" y="763" class="field">captured_at</text>
+<text x="2534" y="763" text-anchor="end" class="type">timestamptz</text>
+<line x1="2210" y1="769" x2="2540" y2="769" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="780" class="marker"></text>
+<text x="2265" y="780" class="field">source</text>
+<text x="2534" y="780" text-anchor="end" class="type">text</text>
+<line x1="2210" y1="786" x2="2540" y2="786" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2216" y="797" class="marker">REF</text>
+<text x="2265" y="797" class="field">set_by_user_id</text>
+<text x="2534" y="797" text-anchor="end" class="type">uuid</text>
+<rect x="2560" y="178" width="330" height="221" rx="3" class="table"/>
+<path d="M2563,178 H2887 Q2890,178 2890,181 V207 H2560 V181 Q2560,178 2563,178 Z" fill="#F4B183"/>
+<text x="2568" y="198" class="header">mission</text>
+<text x="2566" y="219" class="marker">PK</text>
+<text x="2615" y="219" class="field">id</text>
+<text x="2884" y="219" text-anchor="end" class="type">uuid</text>
+<line x1="2560" y1="225" x2="2890" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="236" class="marker">FK</text>
+<text x="2615" y="236" class="field">request_id</text>
+<text x="2884" y="236" text-anchor="end" class="type">uuid</text>
+<line x1="2560" y1="242" x2="2890" y2="242" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="253" class="marker">FK</text>
+<text x="2615" y="253" class="field">team_id</text>
+<text x="2884" y="253" text-anchor="end" class="type">uuid</text>
+<line x1="2560" y1="259" x2="2890" y2="259" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="270" class="marker"></text>
+<text x="2615" y="270" class="field">work_cycle</text>
+<text x="2884" y="270" text-anchor="end" class="type">int</text>
+<line x1="2560" y1="276" x2="2890" y2="276" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="287" class="marker"></text>
+<text x="2615" y="287" class="field">status</text>
+<text x="2884" y="287" text-anchor="end" class="type">mission_status</text>
+<line x1="2560" y1="293" x2="2890" y2="293" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="304" class="marker">REF</text>
+<text x="2615" y="304" class="field">coordinator_user_id</text>
+<text x="2884" y="304" text-anchor="end" class="type">uuid</text>
+<line x1="2560" y1="310" x2="2890" y2="310" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="321" class="marker">REF</text>
+<text x="2615" y="321" class="field">suggested_team_id</text>
+<text x="2884" y="321" text-anchor="end" class="type">uuid</text>
+<line x1="2560" y1="327" x2="2890" y2="327" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="338" class="marker"></text>
+<text x="2615" y="338" class="field">override_reason</text>
+<text x="2884" y="338" text-anchor="end" class="type">text</text>
+<line x1="2560" y1="344" x2="2890" y2="344" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="355" class="marker">FK</text>
+<text x="2615" y="355" class="field">verification_revision</text>
+<text x="2884" y="355" text-anchor="end" class="type">uuid</text>
+<line x1="2560" y1="361" x2="2890" y2="361" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="372" class="marker"></text>
+<text x="2615" y="372" class="field">created_at</text>
+<text x="2884" y="372" text-anchor="end" class="type">timestamptz</text>
+<line x1="2560" y1="378" x2="2890" y2="378" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="389" class="marker"></text>
+<text x="2615" y="389" class="field">version</text>
+<text x="2884" y="389" text-anchor="end" class="type">int</text>
+<rect x="2560" y="416" width="330" height="221" rx="3" class="table"/>
+<path d="M2563,416 H2887 Q2890,416 2890,419 V445 H2560 V419 Q2560,416 2563,416 Z" fill="#F4B183"/>
+<text x="2568" y="436" class="header">mission_event</text>
+<text x="2566" y="457" class="marker">PK</text>
+<text x="2615" y="457" class="field">id</text>
+<text x="2884" y="457" text-anchor="end" class="type">uuid</text>
+<line x1="2560" y1="463" x2="2890" y2="463" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="474" class="marker">FK</text>
+<text x="2615" y="474" class="field">mission_id</text>
+<text x="2884" y="474" text-anchor="end" class="type">uuid</text>
+<line x1="2560" y1="480" x2="2890" y2="480" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="491" class="marker">REF</text>
+<text x="2615" y="491" class="field">actor_user_id</text>
+<text x="2884" y="491" text-anchor="end" class="type">uuid</text>
+<line x1="2560" y1="497" x2="2890" y2="497" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="508" class="marker"></text>
+<text x="2615" y="508" class="field">from_status</text>
+<text x="2884" y="508" text-anchor="end" class="type">mission_status</text>
+<line x1="2560" y1="514" x2="2890" y2="514" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="525" class="marker"></text>
+<text x="2615" y="525" class="field">to_status</text>
+<text x="2884" y="525" text-anchor="end" class="type">mission_status</text>
+<line x1="2560" y1="531" x2="2890" y2="531" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="542" class="marker"></text>
+<text x="2615" y="542" class="field">recorded_basis</text>
+<text x="2884" y="542" text-anchor="end" class="type">text</text>
+<line x1="2560" y1="548" x2="2890" y2="548" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="559" class="marker"></text>
+<text x="2615" y="559" class="field">reported_by</text>
+<text x="2884" y="559" text-anchor="end" class="type">text</text>
+<line x1="2560" y1="565" x2="2890" y2="565" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="576" class="marker"></text>
+<text x="2615" y="576" class="field">reason</text>
+<text x="2884" y="576" text-anchor="end" class="type">text</text>
+<line x1="2560" y1="582" x2="2890" y2="582" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="593" class="marker"></text>
+<text x="2615" y="593" class="field">outcome_note</text>
+<text x="2884" y="593" text-anchor="end" class="type">text</text>
+<line x1="2560" y1="599" x2="2890" y2="599" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="610" class="marker"></text>
+<text x="2615" y="610" class="field">occurred_at</text>
+<text x="2884" y="610" text-anchor="end" class="type">timestamptz</text>
+<line x1="2560" y1="616" x2="2890" y2="616" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="627" class="marker"></text>
+<text x="2615" y="627" class="field">recorded_at</text>
+<text x="2884" y="627" text-anchor="end" class="type">timestamptz</text>
+<rect x="2560" y="654" width="330" height="255" rx="3" class="table"/>
+<path d="M2563,654 H2887 Q2890,654 2890,657 V683 H2560 V657 Q2560,654 2563,654 Z" fill="#F4B183"/>
+<text x="2568" y="674" class="header">evidence_metadata</text>
+<text x="2566" y="695" class="marker">PK</text>
+<text x="2615" y="695" class="field">id</text>
+<text x="2884" y="695" text-anchor="end" class="type">uuid</text>
+<line x1="2560" y1="701" x2="2890" y2="701" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="712" class="marker">FK?</text>
+<text x="2615" y="712" class="field">request_id</text>
+<text x="2884" y="712" text-anchor="end" class="type">uuid</text>
+<line x1="2560" y1="718" x2="2890" y2="718" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="729" class="marker">FK?</text>
+<text x="2615" y="729" class="field">mission_id</text>
+<text x="2884" y="729" text-anchor="end" class="type">uuid</text>
+<line x1="2560" y1="735" x2="2890" y2="735" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="746" class="marker"></text>
+<text x="2615" y="746" class="field">object_key</text>
+<text x="2884" y="746" text-anchor="end" class="type">text</text>
+<line x1="2560" y1="752" x2="2890" y2="752" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="763" class="marker"></text>
+<text x="2615" y="763" class="field">state</text>
+<text x="2884" y="763" text-anchor="end" class="type">text</text>
+<line x1="2560" y1="769" x2="2890" y2="769" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="780" class="marker"></text>
+<text x="2615" y="780" class="field">declared_bytes</text>
+<text x="2884" y="780" text-anchor="end" class="type">bigint</text>
+<line x1="2560" y1="786" x2="2890" y2="786" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="797" class="marker"></text>
+<text x="2615" y="797" class="field">size_bytes</text>
+<text x="2884" y="797" text-anchor="end" class="type">bigint</text>
+<line x1="2560" y1="803" x2="2890" y2="803" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="814" class="marker"></text>
+<text x="2615" y="814" class="field">detected_mime</text>
+<text x="2884" y="814" text-anchor="end" class="type">text</text>
+<line x1="2560" y1="820" x2="2890" y2="820" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="831" class="marker"></text>
+<text x="2615" y="831" class="field">checksum</text>
+<text x="2884" y="831" text-anchor="end" class="type">text</text>
+<line x1="2560" y1="837" x2="2890" y2="837" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="848" class="marker">REF</text>
+<text x="2615" y="848" class="field">uploader_user_id</text>
+<text x="2884" y="848" text-anchor="end" class="type">uuid</text>
+<line x1="2560" y1="854" x2="2890" y2="854" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="865" class="marker"></text>
+<text x="2615" y="865" class="field">created_at</text>
+<text x="2884" y="865" text-anchor="end" class="type">timestamptz</text>
+<line x1="2560" y1="871" x2="2890" y2="871" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="882" class="marker"></text>
+<text x="2615" y="882" class="field">upload_source_ip_hash</text>
+<text x="2884" y="882" text-anchor="end" class="type">text</text>
+<line x1="2560" y1="888" x2="2890" y2="888" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2566" y="899" class="marker"></text>
+<text x="2615" y="899" class="field">cleanup_completed_at</text>
+<text x="2884" y="899" text-anchor="end" class="type">timestamptz</text>
+<rect x="1160" y="1297" width="330" height="170" rx="3" class="table"/>
+<path d="M1163,1297 H1487 Q1490,1297 1490,1300 V1326 H1160 V1300 Q1160,1297 1163,1297 Z" fill="#F4B183"/>
+<text x="1168" y="1317" class="header">notice</text>
+<text x="1166" y="1338" class="marker">PK</text>
+<text x="1215" y="1338" class="field">id</text>
+<text x="1484" y="1338" text-anchor="end" class="type">uuid</text>
+<line x1="1160" y1="1344" x2="1490" y2="1344" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="1355" class="marker">UK* REF</text>
+<text x="1215" y="1355" class="field">recipient_user_id</text>
+<text x="1484" y="1355" text-anchor="end" class="type">uuid</text>
+<line x1="1160" y1="1361" x2="1490" y2="1361" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="1372" class="marker">UK* REF</text>
+<text x="1215" y="1372" class="field">source_id</text>
+<text x="1484" y="1372" text-anchor="end" class="type">uuid</text>
+<line x1="1160" y1="1378" x2="1490" y2="1378" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="1389" class="marker">UK*</text>
+<text x="1215" y="1389" class="field">source_version</text>
+<text x="1484" y="1389" text-anchor="end" class="type">int</text>
+<line x1="1160" y1="1395" x2="1490" y2="1395" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="1406" class="marker">UK*</text>
+<text x="1215" y="1406" class="field">notice_type</text>
+<text x="1484" y="1406" text-anchor="end" class="type">text</text>
+<line x1="1160" y1="1412" x2="1490" y2="1412" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="1423" class="marker"></text>
+<text x="1215" y="1423" class="field">payload</text>
+<text x="1484" y="1423" text-anchor="end" class="type">jsonb</text>
+<line x1="1160" y1="1429" x2="1490" y2="1429" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="1440" class="marker"></text>
+<text x="1215" y="1440" class="field">created_at</text>
+<text x="1484" y="1440" text-anchor="end" class="type">timestamptz</text>
+<line x1="1160" y1="1446" x2="1490" y2="1446" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1166" y="1457" class="marker"></text>
+<text x="1215" y="1457" class="field">read_at</text>
+<text x="1484" y="1457" text-anchor="end" class="type">timestamptz</text>
+<rect x="1510" y="1297" width="330" height="204" rx="3" class="table"/>
+<path d="M1513,1297 H1837 Q1840,1297 1840,1300 V1326 H1510 V1300 Q1510,1297 1513,1297 Z" fill="#F4B183"/>
+<text x="1518" y="1317" class="header">audit_log</text>
+<text x="1516" y="1338" class="marker">PK</text>
+<text x="1565" y="1338" class="field">id</text>
+<text x="1834" y="1338" text-anchor="end" class="type">bigint</text>
+<line x1="1510" y1="1344" x2="1840" y2="1344" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="1355" class="marker">REF</text>
+<text x="1565" y="1355" class="field">actor_user_id</text>
+<text x="1834" y="1355" text-anchor="end" class="type">uuid</text>
+<line x1="1510" y1="1361" x2="1840" y2="1361" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="1372" class="marker"></text>
+<text x="1565" y="1372" class="field">action</text>
+<text x="1834" y="1372" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="1378" x2="1840" y2="1378" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="1389" class="marker"></text>
+<text x="1565" y="1389" class="field">entity_type</text>
+<text x="1834" y="1389" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="1395" x2="1840" y2="1395" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="1406" class="marker"></text>
+<text x="1565" y="1406" class="field">entity_id</text>
+<text x="1834" y="1406" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="1412" x2="1840" y2="1412" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="1423" class="marker"></text>
+<text x="1565" y="1423" class="field">before_state</text>
+<text x="1834" y="1423" text-anchor="end" class="type">jsonb</text>
+<line x1="1510" y1="1429" x2="1840" y2="1429" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="1440" class="marker"></text>
+<text x="1565" y="1440" class="field">after_state</text>
+<text x="1834" y="1440" text-anchor="end" class="type">jsonb</text>
+<line x1="1510" y1="1446" x2="1840" y2="1446" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="1457" class="marker"></text>
+<text x="1565" y="1457" class="field">reason</text>
+<text x="1834" y="1457" text-anchor="end" class="type">text</text>
+<line x1="1510" y1="1463" x2="1840" y2="1463" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="1474" class="marker"></text>
+<text x="1565" y="1474" class="field">correlation_id</text>
+<text x="1834" y="1474" text-anchor="end" class="type">uuid</text>
+<line x1="1510" y1="1480" x2="1840" y2="1480" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1516" y="1491" class="marker"></text>
+<text x="1565" y="1491" class="field">created_at</text>
+<text x="1834" y="1491" text-anchor="end" class="type">timestamptz</text>
+<rect x="1860" y="1297" width="330" height="170" rx="3" class="table"/>
+<path d="M1863,1297 H2187 Q2190,1297 2190,1300 V1326 H1860 V1300 Q1860,1297 1863,1297 Z" fill="#F4B183"/>
+<text x="1868" y="1317" class="header">idempotency_record</text>
+<text x="1866" y="1338" class="marker">PK</text>
+<text x="1915" y="1338" class="field">scope_key</text>
+<text x="2184" y="1338" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="1344" x2="2190" y2="1344" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1355" class="marker">PK</text>
+<text x="1915" y="1355" class="field">command</text>
+<text x="2184" y="1355" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="1361" x2="2190" y2="1361" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1372" class="marker">PK</text>
+<text x="1915" y="1372" class="field">idempotency_key</text>
+<text x="2184" y="1372" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="1378" x2="2190" y2="1378" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1389" class="marker"></text>
+<text x="1915" y="1389" class="field">request_hash</text>
+<text x="2184" y="1389" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="1395" x2="2190" y2="1395" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1406" class="marker"></text>
+<text x="1915" y="1406" class="field">response_status</text>
+<text x="2184" y="1406" text-anchor="end" class="type">int</text>
+<line x1="1860" y1="1412" x2="2190" y2="1412" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1423" class="marker"></text>
+<text x="1915" y="1423" class="field">resource_type</text>
+<text x="2184" y="1423" text-anchor="end" class="type">text</text>
+<line x1="1860" y1="1429" x2="2190" y2="1429" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1440" class="marker"></text>
+<text x="1915" y="1440" class="field">resource_id</text>
+<text x="2184" y="1440" text-anchor="end" class="type">uuid</text>
+<line x1="1860" y1="1446" x2="2190" y2="1446" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="1866" y="1457" class="marker"></text>
+<text x="1915" y="1457" class="field">created_at</text>
+<text x="2184" y="1457" text-anchor="end" class="type">timestamptz</text>
+<rect x="2960" y="178" width="330" height="68" rx="3" class="table"/>
+<path d="M2963,178 H3287 Q3290,178 3290,181 V207 H2960 V181 Q2960,178 2963,178 Z" fill="#F4B183"/>
+<text x="2968" y="198" class="header">item_type</text>
+<text x="2966" y="219" class="marker">PK</text>
+<text x="3015" y="219" class="field">code</text>
+<text x="3284" y="219" text-anchor="end" class="type">text</text>
+<line x1="2960" y1="225" x2="3290" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="236" class="marker"></text>
+<text x="3015" y="236" class="field">display_name</text>
+<text x="3284" y="236" text-anchor="end" class="type">text</text>
+<rect x="2960" y="263" width="330" height="85" rx="3" class="table"/>
+<path d="M2963,263 H3287 Q3290,263 3290,266 V292 H2960 V266 Q2960,263 2963,263 Z" fill="#F4B183"/>
+<text x="2968" y="283" class="header">unit</text>
+<text x="2966" y="304" class="marker">PK</text>
+<text x="3015" y="304" class="field">code</text>
+<text x="3284" y="304" text-anchor="end" class="type">text</text>
+<line x1="2960" y1="310" x2="3290" y2="310" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="321" class="marker"></text>
+<text x="3015" y="321" class="field">display_name</text>
+<text x="3284" y="321" text-anchor="end" class="type">text</text>
+<line x1="2960" y1="327" x2="3290" y2="327" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="338" class="marker"></text>
+<text x="3015" y="338" class="field">scale</text>
+<text x="3284" y="338" text-anchor="end" class="type">smallint</text>
+<rect x="2960" y="365" width="330" height="153" rx="3" class="table"/>
+<path d="M2963,365 H3287 Q3290,365 3290,368 V394 H2960 V368 Q2960,365 2963,365 Z" fill="#F4B183"/>
+<text x="2968" y="385" class="header">item</text>
+<text x="2966" y="406" class="marker">PK</text>
+<text x="3015" y="406" class="field">id</text>
+<text x="3284" y="406" text-anchor="end" class="type">uuid</text>
+<line x1="2960" y1="412" x2="3290" y2="412" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="423" class="marker">FK</text>
+<text x="3015" y="423" class="field">item_type_code</text>
+<text x="3284" y="423" text-anchor="end" class="type">text</text>
+<line x1="2960" y1="429" x2="3290" y2="429" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="440" class="marker">FK</text>
+<text x="3015" y="440" class="field">unit_code</text>
+<text x="3284" y="440" text-anchor="end" class="type">text</text>
+<line x1="2960" y1="446" x2="3290" y2="446" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="457" class="marker"></text>
+<text x="3015" y="457" class="field">name</text>
+<text x="3284" y="457" text-anchor="end" class="type">text</text>
+<line x1="2960" y1="463" x2="3290" y2="463" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="474" class="marker"></text>
+<text x="3015" y="474" class="field">status</text>
+<text x="3284" y="474" text-anchor="end" class="type">text</text>
+<line x1="2960" y1="480" x2="3290" y2="480" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="491" class="marker"></text>
+<text x="3015" y="491" class="field">created_at</text>
+<text x="3284" y="491" text-anchor="end" class="type">timestamptz</text>
+<line x1="2960" y1="497" x2="3290" y2="497" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="508" class="marker"></text>
+<text x="3015" y="508" class="field">version</text>
+<text x="3284" y="508" text-anchor="end" class="type">int</text>
+<rect x="2960" y="535" width="330" height="204" rx="3" class="table"/>
+<path d="M2963,535 H3287 Q3290,535 3290,538 V564 H2960 V538 Q2960,535 2963,535 Z" fill="#F4B183"/>
+<text x="2968" y="555" class="header">warehouse</text>
+<text x="2966" y="576" class="marker">PK</text>
+<text x="3015" y="576" class="field">id</text>
+<text x="3284" y="576" text-anchor="end" class="type">uuid</text>
+<line x1="2960" y1="582" x2="3290" y2="582" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="593" class="marker">UK* REF</text>
+<text x="3015" y="593" class="field">organization_id</text>
+<text x="3284" y="593" text-anchor="end" class="type">uuid</text>
+<line x1="2960" y1="599" x2="3290" y2="599" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="610" class="marker">REF</text>
+<text x="3015" y="610" class="field">region_code</text>
+<text x="3284" y="610" text-anchor="end" class="type">text</text>
+<line x1="2960" y1="616" x2="3290" y2="616" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="627" class="marker"></text>
+<text x="3015" y="627" class="field">name</text>
+<text x="3284" y="627" text-anchor="end" class="type">text</text>
+<line x1="2960" y1="633" x2="3290" y2="633" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="644" class="marker"></text>
+<text x="3015" y="644" class="field">address_note</text>
+<text x="3284" y="644" text-anchor="end" class="type">text</text>
+<line x1="2960" y1="650" x2="3290" y2="650" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="661" class="marker"></text>
+<text x="3015" y="661" class="field">location</text>
+<text x="3284" y="661" text-anchor="end" class="type">geography(Point,4326)</text>
+<line x1="2960" y1="667" x2="3290" y2="667" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="678" class="marker"></text>
+<text x="3015" y="678" class="field">location_public</text>
+<text x="3284" y="678" text-anchor="end" class="type">boolean</text>
+<line x1="2960" y1="684" x2="3290" y2="684" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="695" class="marker"></text>
+<text x="3015" y="695" class="field">status</text>
+<text x="3284" y="695" text-anchor="end" class="type">text</text>
+<line x1="2960" y1="701" x2="3290" y2="701" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="712" class="marker"></text>
+<text x="3015" y="712" class="field">created_at</text>
+<text x="3284" y="712" text-anchor="end" class="type">timestamptz</text>
+<line x1="2960" y1="718" x2="3290" y2="718" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="729" class="marker"></text>
+<text x="3015" y="729" class="field">version</text>
+<text x="3284" y="729" text-anchor="end" class="type">int</text>
+<rect x="3310" y="178" width="330" height="255" rx="3" class="table"/>
+<path d="M3313,178 H3637 Q3640,178 3640,181 V207 H3310 V181 Q3310,178 3313,178 Z" fill="#F4B183"/>
+<text x="3318" y="198" class="header">donation_drive</text>
+<text x="3316" y="219" class="marker">PK</text>
+<text x="3365" y="219" class="field">id</text>
+<text x="3634" y="219" text-anchor="end" class="type">uuid</text>
+<line x1="3310" y1="225" x2="3640" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="236" class="marker">REF</text>
+<text x="3365" y="236" class="field">campaign_id</text>
+<text x="3634" y="236" text-anchor="end" class="type">uuid</text>
+<line x1="3310" y1="242" x2="3640" y2="242" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="253" class="marker"></text>
+<text x="3365" y="253" class="field">campaign_status</text>
+<text x="3634" y="253" text-anchor="end" class="type">text</text>
+<line x1="3310" y1="259" x2="3640" y2="259" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="270" class="marker"></text>
+<text x="3365" y="270" class="field">campaign_status_at</text>
+<text x="3634" y="270" text-anchor="end" class="type">timestamptz</text>
+<line x1="3310" y1="276" x2="3640" y2="276" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="287" class="marker">FK UK*</text>
+<text x="3365" y="287" class="field">organization_id</text>
+<text x="3634" y="287" text-anchor="end" class="type">uuid</text>
+<line x1="3310" y1="293" x2="3640" y2="293" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="304" class="marker">FK</text>
+<text x="3365" y="304" class="field">intake_warehouse_id</text>
+<text x="3634" y="304" text-anchor="end" class="type">uuid</text>
+<line x1="3310" y1="310" x2="3640" y2="310" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="321" class="marker"></text>
+<text x="3365" y="321" class="field">title</text>
+<text x="3634" y="321" text-anchor="end" class="type">text</text>
+<line x1="3310" y1="327" x2="3640" y2="327" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="338" class="marker"></text>
+<text x="3365" y="338" class="field">description</text>
+<text x="3634" y="338" text-anchor="end" class="type">text</text>
+<line x1="3310" y1="344" x2="3640" y2="344" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="355" class="marker"></text>
+<text x="3365" y="355" class="field">status</text>
+<text x="3634" y="355" text-anchor="end" class="type">text</text>
+<line x1="3310" y1="361" x2="3640" y2="361" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="372" class="marker"></text>
+<text x="3365" y="372" class="field">opens_at</text>
+<text x="3634" y="372" text-anchor="end" class="type">timestamptz</text>
+<line x1="3310" y1="378" x2="3640" y2="378" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="389" class="marker"></text>
+<text x="3365" y="389" class="field">closes_at</text>
+<text x="3634" y="389" text-anchor="end" class="type">timestamptz</text>
+<line x1="3310" y1="395" x2="3640" y2="395" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="406" class="marker"></text>
+<text x="3365" y="406" class="field">created_at</text>
+<text x="3634" y="406" text-anchor="end" class="type">timestamptz</text>
+<line x1="3310" y1="412" x2="3640" y2="412" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="423" class="marker"></text>
+<text x="3365" y="423" class="field">version</text>
+<text x="3634" y="423" text-anchor="end" class="type">int</text>
+<rect x="3310" y="450" width="330" height="102" rx="3" class="table"/>
+<path d="M3313,450 H3637 Q3640,450 3640,453 V479 H3310 V453 Q3310,450 3313,450 Z" fill="#F4B183"/>
+<text x="3318" y="470" class="header">drive_item</text>
+<text x="3316" y="491" class="marker">PK FK</text>
+<text x="3365" y="491" class="field">drive_id</text>
+<text x="3634" y="491" text-anchor="end" class="type">uuid</text>
+<line x1="3310" y1="497" x2="3640" y2="497" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="508" class="marker">PK FK</text>
+<text x="3365" y="508" class="field">item_id</text>
+<text x="3634" y="508" text-anchor="end" class="type">uuid</text>
+<line x1="3310" y1="514" x2="3640" y2="514" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="525" class="marker"></text>
+<text x="3365" y="525" class="field">target_quantity</text>
+<text x="3634" y="525" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="3310" y1="531" x2="3640" y2="531" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="542" class="marker"></text>
+<text x="3365" y="542" class="field">acceptance_note</text>
+<text x="3634" y="542" text-anchor="end" class="type">text</text>
+<rect x="3310" y="569" width="330" height="221" rx="3" class="table"/>
+<path d="M3313,569 H3637 Q3640,569 3640,572 V598 H3310 V572 Q3310,569 3313,569 Z" fill="#F4B183"/>
+<text x="3318" y="589" class="header">donation_delivery</text>
+<text x="3316" y="610" class="marker">PK</text>
+<text x="3365" y="610" class="field">id</text>
+<text x="3634" y="610" text-anchor="end" class="type">uuid</text>
+<line x1="3310" y1="616" x2="3640" y2="616" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="627" class="marker">UK</text>
+<text x="3365" y="627" class="field">public_code</text>
+<text x="3634" y="627" text-anchor="end" class="type">text</text>
+<line x1="3310" y1="633" x2="3640" y2="633" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="644" class="marker">FK</text>
+<text x="3365" y="644" class="field">drive_id</text>
+<text x="3634" y="644" text-anchor="end" class="type">uuid</text>
+<line x1="3310" y1="650" x2="3640" y2="650" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="661" class="marker">FK UK*</text>
+<text x="3365" y="661" class="field">organization_id</text>
+<text x="3634" y="661" text-anchor="end" class="type">uuid</text>
+<line x1="3310" y1="667" x2="3640" y2="667" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="678" class="marker">REF</text>
+<text x="3365" y="678" class="field">donor_user_id</text>
+<text x="3634" y="678" text-anchor="end" class="type">uuid</text>
+<line x1="3310" y1="684" x2="3640" y2="684" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="695" class="marker"></text>
+<text x="3365" y="695" class="field">donor_name</text>
+<text x="3634" y="695" text-anchor="end" class="type">text</text>
+<line x1="3310" y1="701" x2="3640" y2="701" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="712" class="marker"></text>
+<text x="3365" y="712" class="field">donor_phone</text>
+<text x="3634" y="712" text-anchor="end" class="type">text</text>
+<line x1="3310" y1="718" x2="3640" y2="718" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="729" class="marker"></text>
+<text x="3365" y="729" class="field">capability_hash</text>
+<text x="3634" y="729" text-anchor="end" class="type">text</text>
+<line x1="3310" y1="735" x2="3640" y2="735" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="746" class="marker"></text>
+<text x="3365" y="746" class="field">status</text>
+<text x="3634" y="746" text-anchor="end" class="type">text</text>
+<line x1="3310" y1="752" x2="3640" y2="752" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="763" class="marker"></text>
+<text x="3365" y="763" class="field">created_at</text>
+<text x="3634" y="763" text-anchor="end" class="type">timestamptz</text>
+<line x1="3310" y1="769" x2="3640" y2="769" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="780" class="marker"></text>
+<text x="3365" y="780" class="field">version</text>
+<text x="3634" y="780" text-anchor="end" class="type">int</text>
+<rect x="3660" y="178" width="330" height="119" rx="3" class="table"/>
+<path d="M3663,178 H3987 Q3990,178 3990,181 V207 H3660 V181 Q3660,178 3663,178 Z" fill="#F4B183"/>
+<text x="3668" y="198" class="header">donation_declaration</text>
+<text x="3666" y="219" class="marker">PK FK</text>
+<text x="3715" y="219" class="field">delivery_id</text>
+<text x="3984" y="219" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="225" x2="3990" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="236" class="marker">PK</text>
+<text x="3715" y="236" class="field">revision</text>
+<text x="3984" y="236" text-anchor="end" class="type">int</text>
+<line x1="3660" y1="242" x2="3990" y2="242" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="253" class="marker"></text>
+<text x="3715" y="253" class="field">created_by_kind</text>
+<text x="3984" y="253" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="259" x2="3990" y2="259" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="270" class="marker">REF</text>
+<text x="3715" y="270" class="field">created_by_user_id</text>
+<text x="3984" y="270" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="276" x2="3990" y2="276" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="287" class="marker"></text>
+<text x="3715" y="287" class="field">created_at</text>
+<text x="3984" y="287" text-anchor="end" class="type">timestamptz</text>
+<rect x="3660" y="314" width="330" height="102" rx="3" class="table"/>
+<path d="M3663,314 H3987 Q3990,314 3990,317 V343 H3660 V317 Q3660,314 3663,314 Z" fill="#F4B183"/>
+<text x="3668" y="334" class="header">donation_line</text>
+<text x="3666" y="355" class="marker">PK FK</text>
+<text x="3715" y="355" class="field">delivery_id</text>
+<text x="3984" y="355" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="361" x2="3990" y2="361" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="372" class="marker">PK FK</text>
+<text x="3715" y="372" class="field">revision</text>
+<text x="3984" y="372" text-anchor="end" class="type">int</text>
+<line x1="3660" y1="378" x2="3990" y2="378" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="389" class="marker">PK FK</text>
+<text x="3715" y="389" class="field">item_id</text>
+<text x="3984" y="389" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="395" x2="3990" y2="395" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="406" class="marker"></text>
+<text x="3715" y="406" class="field">declared_quantity</text>
+<text x="3984" y="406" text-anchor="end" class="type">numeric(18,3)</text>
+<rect x="3660" y="433" width="330" height="119" rx="3" class="table"/>
+<path d="M3663,433 H3987 Q3990,433 3990,436 V462 H3660 V436 Q3660,433 3663,433 Z" fill="#F4B183"/>
+<text x="3668" y="453" class="header">donation_receipt</text>
+<text x="3666" y="474" class="marker">PK</text>
+<text x="3715" y="474" class="field">id</text>
+<text x="3984" y="474" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="480" x2="3990" y2="480" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="491" class="marker">FK UK</text>
+<text x="3715" y="491" class="field">delivery_id</text>
+<text x="3984" y="491" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="497" x2="3990" y2="497" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="508" class="marker">FK</text>
+<text x="3715" y="508" class="field">warehouse_id</text>
+<text x="3984" y="508" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="514" x2="3990" y2="514" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="525" class="marker"></text>
+<text x="3715" y="525" class="field">created_at</text>
+<text x="3984" y="525" text-anchor="end" class="type">timestamptz</text>
+<line x1="3660" y1="531" x2="3990" y2="531" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="542" class="marker"></text>
+<text x="3715" y="542" class="field">version</text>
+<text x="3984" y="542" text-anchor="end" class="type">int</text>
+<rect x="3660" y="569" width="330" height="119" rx="3" class="table"/>
+<path d="M3663,569 H3987 Q3990,569 3990,572 V598 H3660 V572 Q3660,569 3663,569 Z" fill="#F4B183"/>
+<text x="3668" y="589" class="header">receipt_count</text>
+<text x="3666" y="610" class="marker">PK FK</text>
+<text x="3715" y="610" class="field">receipt_id</text>
+<text x="3984" y="610" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="616" x2="3990" y2="616" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="627" class="marker">PK</text>
+<text x="3715" y="627" class="field">revision</text>
+<text x="3984" y="627" text-anchor="end" class="type">int</text>
+<line x1="3660" y1="633" x2="3990" y2="633" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="644" class="marker">REF</text>
+<text x="3715" y="644" class="field">counted_by_user_id</text>
+<text x="3984" y="644" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="650" x2="3990" y2="650" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="661" class="marker"></text>
+<text x="3715" y="661" class="field">counted_at</text>
+<text x="3984" y="661" text-anchor="end" class="type">timestamptz</text>
+<line x1="3660" y1="667" x2="3990" y2="667" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="678" class="marker"></text>
+<text x="3715" y="678" class="field">note</text>
+<text x="3984" y="678" text-anchor="end" class="type">text</text>
+<rect x="3660" y="705" width="330" height="187" rx="3" class="table"/>
+<path d="M3663,705 H3987 Q3990,705 3990,708 V734 H3660 V708 Q3660,705 3663,705 Z" fill="#F4B183"/>
+<text x="3668" y="725" class="header">receipt_count_line</text>
+<text x="3666" y="746" class="marker">PK FK</text>
+<text x="3715" y="746" class="field">receipt_id</text>
+<text x="3984" y="746" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="752" x2="3990" y2="752" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="763" class="marker">PK FK</text>
+<text x="3715" y="763" class="field">revision</text>
+<text x="3984" y="763" text-anchor="end" class="type">int</text>
+<line x1="3660" y1="769" x2="3990" y2="769" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="780" class="marker">PK FK</text>
+<text x="3715" y="780" class="field">item_id</text>
+<text x="3984" y="780" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="786" x2="3990" y2="786" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="797" class="marker"></text>
+<text x="3715" y="797" class="field">counted_quantity</text>
+<text x="3984" y="797" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="3660" y1="803" x2="3990" y2="803" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="814" class="marker"></text>
+<text x="3715" y="814" class="field">accepted_quantity</text>
+<text x="3984" y="814" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="3660" y1="820" x2="3990" y2="820" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="831" class="marker"></text>
+<text x="3715" y="831" class="field">held_quantity</text>
+<text x="3984" y="831" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="3660" y1="837" x2="3990" y2="837" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="848" class="marker"></text>
+<text x="3715" y="848" class="field">rejected_quantity</text>
+<text x="3984" y="848" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="3660" y1="854" x2="3990" y2="854" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="865" class="marker"></text>
+<text x="3715" y="865" class="field">condition_note</text>
+<text x="3984" y="865" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="871" x2="3990" y2="871" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="882" class="marker"></text>
+<text x="3715" y="882" class="field">expiry_date</text>
+<text x="3984" y="882" text-anchor="end" class="type">date</text>
+<rect x="3660" y="909" width="330" height="187" rx="3" class="table"/>
+<path d="M3663,909 H3987 Q3990,909 3990,912 V938 H3660 V912 Q3660,909 3663,909 Z" fill="#F4B183"/>
+<text x="3668" y="929" class="header">receipt_review</text>
+<text x="3666" y="950" class="marker">PK</text>
+<text x="3715" y="950" class="field">id</text>
+<text x="3984" y="950" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="956" x2="3990" y2="956" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="967" class="marker">FK</text>
+<text x="3715" y="967" class="field">receipt_id</text>
+<text x="3984" y="967" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="973" x2="3990" y2="973" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="984" class="marker">FK</text>
+<text x="3715" y="984" class="field">delivery_id</text>
+<text x="3984" y="984" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="990" x2="3990" y2="990" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1001" class="marker">FK</text>
+<text x="3715" y="1001" class="field">count_revision</text>
+<text x="3984" y="1001" text-anchor="end" class="type">int</text>
+<line x1="3660" y1="1007" x2="3990" y2="1007" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1018" class="marker">FK</text>
+<text x="3715" y="1018" class="field">declaration_revision</text>
+<text x="3984" y="1018" text-anchor="end" class="type">int</text>
+<line x1="3660" y1="1024" x2="3990" y2="1024" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1035" class="marker">REF</text>
+<text x="3715" y="1035" class="field">reviewer_user_id</text>
+<text x="3984" y="1035" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1041" x2="3990" y2="1041" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1052" class="marker"></text>
+<text x="3715" y="1052" class="field">decision</text>
+<text x="3984" y="1052" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1058" x2="3990" y2="1058" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1069" class="marker"></text>
+<text x="3715" y="1069" class="field">reason</text>
+<text x="3984" y="1069" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1075" x2="3990" y2="1075" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1086" class="marker"></text>
+<text x="3715" y="1086" class="field">reviewed_at</text>
+<text x="3984" y="1086" text-anchor="end" class="type">timestamptz</text>
+<rect x="3660" y="1113" width="330" height="204" rx="3" class="table"/>
+<path d="M3663,1113 H3987 Q3990,1113 3990,1116 V1142 H3660 V1116 Q3660,1113 3663,1113 Z" fill="#F4B183"/>
+<text x="3668" y="1133" class="header">donation_dispute</text>
+<text x="3666" y="1154" class="marker">PK</text>
+<text x="3715" y="1154" class="field">id</text>
+<text x="3984" y="1154" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1160" x2="3990" y2="1160" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1171" class="marker">FK</text>
+<text x="3715" y="1171" class="field">delivery_id</text>
+<text x="3984" y="1171" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1177" x2="3990" y2="1177" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1188" class="marker"></text>
+<text x="3715" y="1188" class="field">status</text>
+<text x="3984" y="1188" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1194" x2="3990" y2="1194" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1205" class="marker"></text>
+<text x="3715" y="1205" class="field">opened_by_kind</text>
+<text x="3984" y="1205" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1211" x2="3990" y2="1211" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1222" class="marker">REF</text>
+<text x="3715" y="1222" class="field">opened_by_user_id</text>
+<text x="3984" y="1222" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1228" x2="3990" y2="1228" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1239" class="marker"></text>
+<text x="3715" y="1239" class="field">reason</text>
+<text x="3984" y="1239" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1245" x2="3990" y2="1245" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1256" class="marker"></text>
+<text x="3715" y="1256" class="field">resolution_note</text>
+<text x="3984" y="1256" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1262" x2="3990" y2="1262" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1273" class="marker">REF</text>
+<text x="3715" y="1273" class="field">resolved_by_user_id</text>
+<text x="3984" y="1273" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1279" x2="3990" y2="1279" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1290" class="marker"></text>
+<text x="3715" y="1290" class="field">opened_at</text>
+<text x="3984" y="1290" text-anchor="end" class="type">timestamptz</text>
+<line x1="3660" y1="1296" x2="3990" y2="1296" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1307" class="marker"></text>
+<text x="3715" y="1307" class="field">resolved_at</text>
+<text x="3984" y="1307" text-anchor="end" class="type">timestamptz</text>
+<rect x="3660" y="1334" width="330" height="204" rx="3" class="table"/>
+<path d="M3663,1334 H3987 Q3990,1334 3990,1337 V1363 H3660 V1337 Q3660,1334 3663,1334 Z" fill="#F4B183"/>
+<text x="3668" y="1354" class="header">capability_recovery</text>
+<text x="3666" y="1375" class="marker">PK</text>
+<text x="3715" y="1375" class="field">id</text>
+<text x="3984" y="1375" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1381" x2="3990" y2="1381" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1392" class="marker">FK</text>
+<text x="3715" y="1392" class="field">delivery_id</text>
+<text x="3984" y="1392" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1398" x2="3990" y2="1398" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1409" class="marker">UK</text>
+<text x="3715" y="1409" class="field">code_hash</text>
+<text x="3984" y="1409" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1415" x2="3990" y2="1415" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1426" class="marker"></text>
+<text x="3715" y="1426" class="field">expires_at</text>
+<text x="3984" y="1426" text-anchor="end" class="type">timestamptz</text>
+<line x1="3660" y1="1432" x2="3990" y2="1432" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1443" class="marker">REF</text>
+<text x="3715" y="1443" class="field">issued_by_user_id</text>
+<text x="3984" y="1443" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1449" x2="3990" y2="1449" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1460" class="marker"></text>
+<text x="3715" y="1460" class="field">basis</text>
+<text x="3984" y="1460" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1466" x2="3990" y2="1466" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1477" class="marker"></text>
+<text x="3715" y="1477" class="field">source_note</text>
+<text x="3984" y="1477" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1483" x2="3990" y2="1483" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1494" class="marker"></text>
+<text x="3715" y="1494" class="field">consumed_at</text>
+<text x="3984" y="1494" text-anchor="end" class="type">timestamptz</text>
+<line x1="3660" y1="1500" x2="3990" y2="1500" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1511" class="marker">REF</text>
+<text x="3715" y="1511" class="field">consumed_by_user_id</text>
+<text x="3984" y="1511" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1517" x2="3990" y2="1517" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1528" class="marker"></text>
+<text x="3715" y="1528" class="field">created_at</text>
+<text x="3984" y="1528" text-anchor="end" class="type">timestamptz</text>
+<rect x="3660" y="1555" width="330" height="238" rx="3" class="table"/>
+<path d="M3663,1555 H3987 Q3990,1555 3990,1558 V1584 H3660 V1558 Q3660,1555 3663,1555 Z" fill="#F4B183"/>
+<text x="3668" y="1575" class="header">logistics_attachment</text>
+<text x="3666" y="1596" class="marker">PK</text>
+<text x="3715" y="1596" class="field">id</text>
+<text x="3984" y="1596" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1602" x2="3990" y2="1602" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1613" class="marker">FK?</text>
+<text x="3715" y="1613" class="field">delivery_id</text>
+<text x="3984" y="1613" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1619" x2="3990" y2="1619" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1630" class="marker">FK?</text>
+<text x="3715" y="1630" class="field">dispute_id</text>
+<text x="3984" y="1630" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1636" x2="3990" y2="1636" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1647" class="marker">FK?</text>
+<text x="3715" y="1647" class="field">handoff_id</text>
+<text x="3984" y="1647" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1653" x2="3990" y2="1653" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1664" class="marker">UK</text>
+<text x="3715" y="1664" class="field">object_key</text>
+<text x="3984" y="1664" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1670" x2="3990" y2="1670" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1681" class="marker"></text>
+<text x="3715" y="1681" class="field">state</text>
+<text x="3984" y="1681" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1687" x2="3990" y2="1687" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1698" class="marker"></text>
+<text x="3715" y="1698" class="field">declared_bytes</text>
+<text x="3984" y="1698" text-anchor="end" class="type">bigint</text>
+<line x1="3660" y1="1704" x2="3990" y2="1704" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1715" class="marker"></text>
+<text x="3715" y="1715" class="field">size_bytes</text>
+<text x="3984" y="1715" text-anchor="end" class="type">bigint</text>
+<line x1="3660" y1="1721" x2="3990" y2="1721" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1732" class="marker"></text>
+<text x="3715" y="1732" class="field">detected_mime</text>
+<text x="3984" y="1732" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1738" x2="3990" y2="1738" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1749" class="marker"></text>
+<text x="3715" y="1749" class="field">checksum</text>
+<text x="3984" y="1749" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1755" x2="3990" y2="1755" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1766" class="marker">REF</text>
+<text x="3715" y="1766" class="field">uploader_user_id</text>
+<text x="3984" y="1766" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1772" x2="3990" y2="1772" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1783" class="marker"></text>
+<text x="3715" y="1783" class="field">created_at</text>
+<text x="3984" y="1783" text-anchor="end" class="type">timestamptz</text>
+<rect x="4010" y="178" width="330" height="136" rx="3" class="table"/>
+<path d="M4013,178 H4337 Q4340,178 4340,181 V207 H4010 V181 Q4010,178 4013,178 Z" fill="#F4B183"/>
+<text x="4018" y="198" class="header">stock_balance</text>
+<text x="4016" y="219" class="marker">PK</text>
+<text x="4065" y="219" class="field">id</text>
+<text x="4334" y="219" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="225" x2="4340" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="236" class="marker">FK UK*</text>
+<text x="4065" y="236" class="field">warehouse_id</text>
+<text x="4334" y="236" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="242" x2="4340" y2="242" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="253" class="marker">FK UK*</text>
+<text x="4065" y="253" class="field">item_id</text>
+<text x="4334" y="253" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="259" x2="4340" y2="259" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="270" class="marker"></text>
+<text x="4065" y="270" class="field">on_hand</text>
+<text x="4334" y="270" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="4010" y1="276" x2="4340" y2="276" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="287" class="marker"></text>
+<text x="4065" y="287" class="field">reserved</text>
+<text x="4334" y="287" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="4010" y1="293" x2="4340" y2="293" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="304" class="marker"></text>
+<text x="4065" y="304" class="field">updated_at</text>
+<text x="4334" y="304" text-anchor="end" class="type">timestamptz</text>
+<rect x="4010" y="331" width="330" height="170" rx="3" class="table"/>
+<path d="M4013,331 H4337 Q4340,331 4340,334 V360 H4010 V334 Q4010,331 4013,331 Z" fill="#F4B183"/>
+<text x="4018" y="351" class="header">fulfillment_cycle</text>
+<text x="4016" y="372" class="marker">PK</text>
+<text x="4065" y="372" class="field">id</text>
+<text x="4334" y="372" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="378" x2="4340" y2="378" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="389" class="marker">UK* REF</text>
+<text x="4065" y="389" class="field">request_id</text>
+<text x="4334" y="389" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="395" x2="4340" y2="395" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="406" class="marker">UK*</text>
+<text x="4065" y="406" class="field">work_cycle</text>
+<text x="4334" y="406" text-anchor="end" class="type">int</text>
+<line x1="4010" y1="412" x2="4340" y2="412" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="423" class="marker">REF</text>
+<text x="4065" y="423" class="field">organization_id</text>
+<text x="4334" y="423" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="429" x2="4340" y2="429" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="440" class="marker">REF</text>
+<text x="4065" y="440" class="field">campaign_id</text>
+<text x="4334" y="440" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="446" x2="4340" y2="446" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="457" class="marker">REF</text>
+<text x="4065" y="457" class="field">region_code</text>
+<text x="4334" y="457" text-anchor="end" class="type">text</text>
+<line x1="4010" y1="463" x2="4340" y2="463" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="474" class="marker"></text>
+<text x="4065" y="474" class="field">state</text>
+<text x="4334" y="474" text-anchor="end" class="type">text</text>
+<line x1="4010" y1="480" x2="4340" y2="480" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="491" class="marker"></text>
+<text x="4065" y="491" class="field">created_at</text>
+<text x="4334" y="491" text-anchor="end" class="type">timestamptz</text>
+<rect x="4010" y="518" width="330" height="119" rx="3" class="table"/>
+<path d="M4013,518 H4337 Q4340,518 4340,521 V547 H4010 V521 Q4010,518 4013,518 Z" fill="#F4B183"/>
+<text x="4018" y="538" class="header">cycle_intent</text>
+<text x="4016" y="559" class="marker">PK</text>
+<text x="4065" y="559" class="field">intent_id</text>
+<text x="4334" y="559" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="565" x2="4340" y2="565" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="576" class="marker">FK</text>
+<text x="4065" y="576" class="field">cycle_id</text>
+<text x="4334" y="576" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="582" x2="4340" y2="582" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="593" class="marker"></text>
+<text x="4065" y="593" class="field">kind</text>
+<text x="4334" y="593" text-anchor="end" class="type">text</text>
+<line x1="4010" y1="599" x2="4340" y2="599" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="610" class="marker"></text>
+<text x="4065" y="610" class="field">state</text>
+<text x="4334" y="610" text-anchor="end" class="type">text</text>
+<line x1="4010" y1="616" x2="4340" y2="616" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="627" class="marker"></text>
+<text x="4065" y="627" class="field">created_at</text>
+<text x="4334" y="627" text-anchor="end" class="type">timestamptz</text>
+<rect x="4010" y="654" width="330" height="204" rx="3" class="table"/>
+<path d="M4013,654 H4337 Q4340,654 4340,657 V683 H4010 V657 Q4010,654 4013,654 Z" fill="#F4B183"/>
+<text x="4018" y="674" class="header">relief_need</text>
+<text x="4016" y="695" class="marker">PK</text>
+<text x="4065" y="695" class="field">id</text>
+<text x="4334" y="695" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="701" x2="4340" y2="701" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="712" class="marker">FK</text>
+<text x="4065" y="712" class="field">cycle_id</text>
+<text x="4334" y="712" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="718" x2="4340" y2="718" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="729" class="marker">FK UK*</text>
+<text x="4065" y="729" class="field">item_id</text>
+<text x="4334" y="729" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="735" x2="4340" y2="735" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="746" class="marker"></text>
+<text x="4065" y="746" class="field">original_quantity</text>
+<text x="4334" y="746" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="4010" y1="752" x2="4340" y2="752" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="763" class="marker"></text>
+<text x="4065" y="763" class="field">requested_quantity</text>
+<text x="4334" y="763" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="4010" y1="769" x2="4340" y2="769" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="780" class="marker"></text>
+<text x="4065" y="780" class="field">cancelled_remaining</text>
+<text x="4334" y="780" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="4010" y1="786" x2="4340" y2="786" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="797" class="marker">FK?</text>
+<text x="4065" y="797" class="field">designated_point_id</text>
+<text x="4334" y="797" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="803" x2="4340" y2="803" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="814" class="marker"></text>
+<text x="4065" y="814" class="field">status</text>
+<text x="4334" y="814" text-anchor="end" class="type">text</text>
+<line x1="4010" y1="820" x2="4340" y2="820" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="831" class="marker"></text>
+<text x="4065" y="831" class="field">created_at</text>
+<text x="4334" y="831" text-anchor="end" class="type">timestamptz</text>
+<line x1="4010" y1="837" x2="4340" y2="837" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="848" class="marker"></text>
+<text x="4065" y="848" class="field">version</text>
+<text x="4334" y="848" text-anchor="end" class="type">int</text>
+<rect x="4010" y="875" width="330" height="255" rx="3" class="table"/>
+<path d="M4013,875 H4337 Q4340,875 4340,878 V904 H4010 V878 Q4010,875 4013,875 Z" fill="#F4B183"/>
+<text x="4018" y="895" class="header">commitment</text>
+<text x="4016" y="916" class="marker">PK</text>
+<text x="4065" y="916" class="field">id</text>
+<text x="4334" y="916" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="922" x2="4340" y2="922" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="933" class="marker">FK</text>
+<text x="4065" y="933" class="field">relief_need_id</text>
+<text x="4334" y="933" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="939" x2="4340" y2="939" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="950" class="marker">FK UK*</text>
+<text x="4065" y="950" class="field">item_id</text>
+<text x="4334" y="950" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="956" x2="4340" y2="956" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="967" class="marker">FK UK*</text>
+<text x="4065" y="967" class="field">warehouse_id</text>
+<text x="4334" y="967" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="973" x2="4340" y2="973" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="984" class="marker"></text>
+<text x="4065" y="984" class="field">quantity</text>
+<text x="4334" y="984" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="4010" y1="990" x2="4340" y2="990" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="1001" class="marker"></text>
+<text x="4065" y="1001" class="field">released_quantity</text>
+<text x="4334" y="1001" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="4010" y1="1007" x2="4340" y2="1007" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="1018" class="marker"></text>
+<text x="4065" y="1018" class="field">issued_quantity</text>
+<text x="4334" y="1018" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="4010" y1="1024" x2="4340" y2="1024" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="1035" class="marker"></text>
+<text x="4065" y="1035" class="field">delivered_quantity</text>
+<text x="4334" y="1035" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="4010" y1="1041" x2="4340" y2="1041" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="1052" class="marker"></text>
+<text x="4065" y="1052" class="field">returned_quantity</text>
+<text x="4334" y="1052" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="4010" y1="1058" x2="4340" y2="1058" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="1069" class="marker"></text>
+<text x="4065" y="1069" class="field">lost_quantity</text>
+<text x="4334" y="1069" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="4010" y1="1075" x2="4340" y2="1075" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="1086" class="marker">REF</text>
+<text x="4065" y="1086" class="field">created_by_user_id</text>
+<text x="4334" y="1086" text-anchor="end" class="type">uuid</text>
+<line x1="4010" y1="1092" x2="4340" y2="1092" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="1103" class="marker"></text>
+<text x="4065" y="1103" class="field">created_at</text>
+<text x="4334" y="1103" text-anchor="end" class="type">timestamptz</text>
+<line x1="4010" y1="1109" x2="4340" y2="1109" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4016" y="1120" class="marker"></text>
+<text x="4065" y="1120" class="field">version</text>
+<text x="4334" y="1120" text-anchor="end" class="type">int</text>
+<rect x="4360" y="178" width="330" height="204" rx="3" class="table"/>
+<path d="M4363,178 H4687 Q4690,178 4690,181 V207 H4360 V181 Q4360,178 4363,178 Z" fill="#F4B183"/>
+<text x="4368" y="198" class="header">relief_point</text>
+<text x="4366" y="219" class="marker">PK</text>
+<text x="4415" y="219" class="field">id</text>
+<text x="4684" y="219" text-anchor="end" class="type">uuid</text>
+<line x1="4360" y1="225" x2="4690" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="236" class="marker">UK* REF</text>
+<text x="4415" y="236" class="field">organization_id</text>
+<text x="4684" y="236" text-anchor="end" class="type">uuid</text>
+<line x1="4360" y1="242" x2="4690" y2="242" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="253" class="marker">REF</text>
+<text x="4415" y="253" class="field">region_code</text>
+<text x="4684" y="253" text-anchor="end" class="type">text</text>
+<line x1="4360" y1="259" x2="4690" y2="259" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="270" class="marker"></text>
+<text x="4415" y="270" class="field">name</text>
+<text x="4684" y="270" text-anchor="end" class="type">text</text>
+<line x1="4360" y1="276" x2="4690" y2="276" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="287" class="marker"></text>
+<text x="4415" y="287" class="field">contact_note</text>
+<text x="4684" y="287" text-anchor="end" class="type">text</text>
+<line x1="4360" y1="293" x2="4690" y2="293" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="304" class="marker"></text>
+<text x="4415" y="304" class="field">operating_note</text>
+<text x="4684" y="304" text-anchor="end" class="type">text</text>
+<line x1="4360" y1="310" x2="4690" y2="310" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="321" class="marker"></text>
+<text x="4415" y="321" class="field">location</text>
+<text x="4684" y="321" text-anchor="end" class="type">geography(Point,4326)</text>
+<line x1="4360" y1="327" x2="4690" y2="327" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="338" class="marker"></text>
+<text x="4415" y="338" class="field">status</text>
+<text x="4684" y="338" text-anchor="end" class="type">text</text>
+<line x1="4360" y1="344" x2="4690" y2="344" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="355" class="marker"></text>
+<text x="4415" y="355" class="field">created_at</text>
+<text x="4684" y="355" text-anchor="end" class="type">timestamptz</text>
+<line x1="4360" y1="361" x2="4690" y2="361" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="372" class="marker"></text>
+<text x="4415" y="372" class="field">version</text>
+<text x="4684" y="372" text-anchor="end" class="type">int</text>
+<rect x="4360" y="399" width="330" height="204" rx="3" class="table"/>
+<path d="M4363,399 H4687 Q4690,399 4690,402 V428 H4360 V402 Q4360,399 4363,399 Z" fill="#F4B183"/>
+<text x="4368" y="419" class="header">vehicle</text>
+<text x="4366" y="440" class="marker">PK</text>
+<text x="4415" y="440" class="field">id</text>
+<text x="4684" y="440" text-anchor="end" class="type">uuid</text>
+<line x1="4360" y1="446" x2="4690" y2="446" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="457" class="marker">UK* REF</text>
+<text x="4415" y="457" class="field">organization_id</text>
+<text x="4684" y="457" text-anchor="end" class="type">uuid</text>
+<line x1="4360" y1="463" x2="4690" y2="463" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="474" class="marker">REF</text>
+<text x="4415" y="474" class="field">region_code</text>
+<text x="4684" y="474" text-anchor="end" class="type">text</text>
+<line x1="4360" y1="480" x2="4690" y2="480" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="491" class="marker"></text>
+<text x="4415" y="491" class="field">identifier</text>
+<text x="4684" y="491" text-anchor="end" class="type">text</text>
+<line x1="4360" y1="497" x2="4690" y2="497" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="508" class="marker"></text>
+<text x="4415" y="508" class="field">vehicle_type</text>
+<text x="4684" y="508" text-anchor="end" class="type">text</text>
+<line x1="4360" y1="514" x2="4690" y2="514" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="525" class="marker"></text>
+<text x="4415" y="525" class="field">capacity</text>
+<text x="4684" y="525" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="4360" y1="531" x2="4690" y2="531" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="542" class="marker">FK?</text>
+<text x="4415" y="542" class="field">capacity_unit</text>
+<text x="4684" y="542" text-anchor="end" class="type">text</text>
+<line x1="4360" y1="548" x2="4690" y2="548" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="559" class="marker"></text>
+<text x="4415" y="559" class="field">status</text>
+<text x="4684" y="559" text-anchor="end" class="type">text</text>
+<line x1="4360" y1="565" x2="4690" y2="565" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="576" class="marker"></text>
+<text x="4415" y="576" class="field">created_at</text>
+<text x="4684" y="576" text-anchor="end" class="type">timestamptz</text>
+<line x1="4360" y1="582" x2="4690" y2="582" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4366" y="593" class="marker"></text>
+<text x="4415" y="593" class="field">version</text>
+<text x="4684" y="593" text-anchor="end" class="type">int</text>
+<rect x="4710" y="178" width="330" height="323" rx="3" class="table"/>
+<path d="M4713,178 H5037 Q5040,178 5040,181 V207 H4710 V181 Q4710,178 4713,178 Z" fill="#F4B183"/>
+<text x="4718" y="198" class="header">distribution</text>
+<text x="4716" y="219" class="marker">PK</text>
+<text x="4765" y="219" class="field">id</text>
+<text x="5034" y="219" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="225" x2="5040" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="236" class="marker">FK UK*</text>
+<text x="4765" y="236" class="field">warehouse_id</text>
+<text x="5034" y="236" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="242" x2="5040" y2="242" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="253" class="marker">FK</text>
+<text x="4765" y="253" class="field">organization_id</text>
+<text x="5034" y="253" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="259" x2="5040" y2="259" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="270" class="marker">FK?</text>
+<text x="4765" y="270" class="field">relief_point_id</text>
+<text x="5034" y="270" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="276" x2="5040" y2="276" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="287" class="marker">FK?</text>
+<text x="4765" y="287" class="field">vehicle_id</text>
+<text x="5034" y="287" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="293" x2="5040" y2="293" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="304" class="marker">REF</text>
+<text x="4765" y="304" class="field">campaign_id</text>
+<text x="5034" y="304" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="310" x2="5040" y2="310" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="321" class="marker"></text>
+<text x="4765" y="321" class="field">purpose</text>
+<text x="5034" y="321" text-anchor="end" class="type">text</text>
+<line x1="4710" y1="327" x2="5040" y2="327" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="338" class="marker"></text>
+<text x="4765" y="338" class="field">status</text>
+<text x="5034" y="338" text-anchor="end" class="type">text</text>
+<line x1="4710" y1="344" x2="5040" y2="344" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="355" class="marker">REF</text>
+<text x="4765" y="355" class="field">preparer_user_id</text>
+<text x="5034" y="355" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="361" x2="5040" y2="361" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="372" class="marker">REF</text>
+<text x="4765" y="372" class="field">approver_user_id</text>
+<text x="5034" y="372" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="378" x2="5040" y2="378" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="389" class="marker"></text>
+<text x="4765" y="389" class="field">approved_version</text>
+<text x="5034" y="389" text-anchor="end" class="type">int</text>
+<line x1="4710" y1="395" x2="5040" y2="395" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="406" class="marker"></text>
+<text x="4765" y="406" class="field">approved_at</text>
+<text x="5034" y="406" text-anchor="end" class="type">timestamptz</text>
+<line x1="4710" y1="412" x2="5040" y2="412" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="423" class="marker">REF</text>
+<text x="4765" y="423" class="field">dispatch_actor_user_id</text>
+<text x="5034" y="423" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="429" x2="5040" y2="429" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="440" class="marker"></text>
+<text x="4765" y="440" class="field">dispatched_at</text>
+<text x="5034" y="440" text-anchor="end" class="type">timestamptz</text>
+<line x1="4710" y1="446" x2="5040" y2="446" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="457" class="marker"></text>
+<text x="4765" y="457" class="field">reconciled_at</text>
+<text x="5034" y="457" text-anchor="end" class="type">timestamptz</text>
+<line x1="4710" y1="463" x2="5040" y2="463" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="474" class="marker"></text>
+<text x="4765" y="474" class="field">created_at</text>
+<text x="5034" y="474" text-anchor="end" class="type">timestamptz</text>
+<line x1="4710" y1="480" x2="5040" y2="480" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="491" class="marker"></text>
+<text x="4765" y="491" class="field">version</text>
+<text x="5034" y="491" text-anchor="end" class="type">int</text>
+<rect x="4710" y="518" width="330" height="170" rx="3" class="table"/>
+<path d="M4713,518 H5037 Q5040,518 5040,521 V547 H4710 V521 Q4710,518 4713,518 Z" fill="#F4B183"/>
+<text x="4718" y="538" class="header">distribution_line</text>
+<text x="4716" y="559" class="marker">PK</text>
+<text x="4765" y="559" class="field">id</text>
+<text x="5034" y="559" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="565" x2="5040" y2="565" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="576" class="marker">FK UK*</text>
+<text x="4765" y="576" class="field">distribution_id</text>
+<text x="5034" y="576" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="582" x2="5040" y2="582" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="593" class="marker">FK</text>
+<text x="4765" y="593" class="field">warehouse_id</text>
+<text x="5034" y="593" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="599" x2="5040" y2="599" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="610" class="marker">FK</text>
+<text x="4765" y="610" class="field">item_id</text>
+<text x="5034" y="610" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="616" x2="5040" y2="616" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="627" class="marker">FK? UK*</text>
+<text x="4765" y="627" class="field">commitment_id</text>
+<text x="5034" y="627" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="633" x2="5040" y2="633" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="644" class="marker"></text>
+<text x="4765" y="644" class="field">quantity</text>
+<text x="5034" y="644" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="4710" y1="650" x2="5040" y2="650" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="661" class="marker"></text>
+<text x="4765" y="661" class="field">in_transit_quantity</text>
+<text x="5034" y="661" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="4710" y1="667" x2="5040" y2="667" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="678" class="marker"></text>
+<text x="4765" y="678" class="field">at_point_quantity</text>
+<text x="5034" y="678" text-anchor="end" class="type">numeric(18,3)</text>
+<rect x="4710" y="705" width="330" height="204" rx="3" class="table"/>
+<path d="M4713,705 H5037 Q5040,705 5040,708 V734 H4710 V708 Q4710,705 4713,705 Z" fill="#F4B183"/>
+<text x="4718" y="725" class="header">handoff_record</text>
+<text x="4716" y="746" class="marker">PK</text>
+<text x="4765" y="746" class="field">id</text>
+<text x="5034" y="746" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="752" x2="5040" y2="752" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="763" class="marker">FK UK*</text>
+<text x="4765" y="763" class="field">distribution_id</text>
+<text x="5034" y="763" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="769" x2="5040" y2="769" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="780" class="marker"></text>
+<text x="4765" y="780" class="field">handoff_kind</text>
+<text x="5034" y="780" text-anchor="end" class="type">text</text>
+<line x1="4710" y1="786" x2="5040" y2="786" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="797" class="marker"></text>
+<text x="4765" y="797" class="field">source_stage</text>
+<text x="5034" y="797" text-anchor="end" class="type">text</text>
+<line x1="4710" y1="803" x2="5040" y2="803" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="814" class="marker">REF</text>
+<text x="4765" y="814" class="field">receiver_user_id</text>
+<text x="5034" y="814" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="820" x2="5040" y2="820" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="831" class="marker"></text>
+<text x="4765" y="831" class="field">receiver_label</text>
+<text x="5034" y="831" text-anchor="end" class="type">text</text>
+<line x1="4710" y1="837" x2="5040" y2="837" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="848" class="marker">REF</text>
+<text x="4765" y="848" class="field">recorder_user_id</text>
+<text x="5034" y="848" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="854" x2="5040" y2="854" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="865" class="marker"></text>
+<text x="4765" y="865" class="field">confirmation_basis</text>
+<text x="5034" y="865" text-anchor="end" class="type">text</text>
+<line x1="4710" y1="871" x2="5040" y2="871" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="882" class="marker"></text>
+<text x="4765" y="882" class="field">occurred_at</text>
+<text x="5034" y="882" text-anchor="end" class="type">timestamptz</text>
+<line x1="4710" y1="888" x2="5040" y2="888" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="899" class="marker"></text>
+<text x="4765" y="899" class="field">created_at</text>
+<text x="5034" y="899" text-anchor="end" class="type">timestamptz</text>
+<rect x="4710" y="926" width="330" height="119" rx="3" class="table"/>
+<path d="M4713,926 H5037 Q5040,926 5040,929 V955 H4710 V929 Q4710,926 4713,926 Z" fill="#F4B183"/>
+<text x="4718" y="946" class="header">handoff_loss_review</text>
+<text x="4716" y="967" class="marker">PK FK</text>
+<text x="4765" y="967" class="field">handoff_id</text>
+<text x="5034" y="967" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="973" x2="5040" y2="973" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="984" class="marker">REF</text>
+<text x="4765" y="984" class="field">reviewer_user_id</text>
+<text x="5034" y="984" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="990" x2="5040" y2="990" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="1001" class="marker"></text>
+<text x="4765" y="1001" class="field">decision</text>
+<text x="5034" y="1001" text-anchor="end" class="type">text</text>
+<line x1="4710" y1="1007" x2="5040" y2="1007" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="1018" class="marker"></text>
+<text x="4765" y="1018" class="field">reason</text>
+<text x="5034" y="1018" text-anchor="end" class="type">text</text>
+<line x1="4710" y1="1024" x2="5040" y2="1024" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="1035" class="marker"></text>
+<text x="4765" y="1035" class="field">reviewed_at</text>
+<text x="5034" y="1035" text-anchor="end" class="type">timestamptz</text>
+<rect x="4710" y="1062" width="330" height="136" rx="3" class="table"/>
+<path d="M4713,1062 H5037 Q5040,1062 5040,1065 V1091 H4710 V1065 Q4710,1062 4713,1062 Z" fill="#F4B183"/>
+<text x="4718" y="1082" class="header">handoff_line</text>
+<text x="4716" y="1103" class="marker">PK</text>
+<text x="4765" y="1103" class="field">id</text>
+<text x="5034" y="1103" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="1109" x2="5040" y2="1109" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="1120" class="marker">FK UK*</text>
+<text x="4765" y="1120" class="field">handoff_id</text>
+<text x="5034" y="1120" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="1126" x2="5040" y2="1126" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="1137" class="marker">FK</text>
+<text x="4765" y="1137" class="field">distribution_id</text>
+<text x="5034" y="1137" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="1143" x2="5040" y2="1143" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="1154" class="marker">FK UK*</text>
+<text x="4765" y="1154" class="field">distribution_line_id</text>
+<text x="5034" y="1154" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="1160" x2="5040" y2="1160" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="1171" class="marker">FK? UK*</text>
+<text x="4765" y="1171" class="field">commitment_id</text>
+<text x="5034" y="1171" text-anchor="end" class="type">uuid</text>
+<line x1="4710" y1="1177" x2="5040" y2="1177" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="4716" y="1188" class="marker"></text>
+<text x="4765" y="1188" class="field">quantity</text>
+<text x="5034" y="1188" text-anchor="end" class="type">numeric(18,3)</text>
+<rect x="5060" y="178" width="330" height="102" rx="3" class="table"/>
+<path d="M5063,178 H5387 Q5390,178 5390,181 V207 H5060 V181 Q5060,178 5063,178 Z" fill="#F4B183"/>
+<text x="5068" y="198" class="header">issued_line_settlement</text>
+<text x="5066" y="219" class="marker">PK FK</text>
+<text x="5115" y="219" class="field">handoff_line_id</text>
+<text x="5384" y="219" text-anchor="end" class="type">uuid</text>
+<line x1="5060" y1="225" x2="5390" y2="225" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="236" class="marker">FK</text>
+<text x="5115" y="236" class="field">commitment_id</text>
+<text x="5384" y="236" text-anchor="end" class="type">uuid</text>
+<line x1="5060" y1="242" x2="5390" y2="242" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="253" class="marker"></text>
+<text x="5115" y="253" class="field">settlement_type</text>
+<text x="5384" y="253" text-anchor="end" class="type">text</text>
+<line x1="5060" y1="259" x2="5390" y2="259" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="270" class="marker"></text>
+<text x="5115" y="270" class="field">created_at</text>
+<text x="5384" y="270" text-anchor="end" class="type">timestamptz</text>
+<rect x="5060" y="297" width="330" height="221" rx="3" class="table"/>
+<path d="M5063,297 H5387 Q5390,297 5390,300 V326 H5060 V300 Q5060,297 5063,297 Z" fill="#F4B183"/>
+<text x="5068" y="317" class="header">stock_adjustment</text>
+<text x="5066" y="338" class="marker">PK</text>
+<text x="5115" y="338" class="field">id</text>
+<text x="5384" y="338" text-anchor="end" class="type">uuid</text>
+<line x1="5060" y1="344" x2="5390" y2="344" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="355" class="marker">FK</text>
+<text x="5115" y="355" class="field">balance_id</text>
+<text x="5384" y="355" text-anchor="end" class="type">uuid</text>
+<line x1="5060" y1="361" x2="5390" y2="361" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="372" class="marker"></text>
+<text x="5115" y="372" class="field">delta_on_hand</text>
+<text x="5384" y="372" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="5060" y1="378" x2="5390" y2="378" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="389" class="marker"></text>
+<text x="5115" y="389" class="field">reason</text>
+<text x="5384" y="389" text-anchor="end" class="type">text</text>
+<line x1="5060" y1="395" x2="5390" y2="395" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="406" class="marker"></text>
+<text x="5115" y="406" class="field">status</text>
+<text x="5384" y="406" text-anchor="end" class="type">text</text>
+<line x1="5060" y1="412" x2="5390" y2="412" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="423" class="marker">REF</text>
+<text x="5115" y="423" class="field">requested_by_user_id</text>
+<text x="5384" y="423" text-anchor="end" class="type">uuid</text>
+<line x1="5060" y1="429" x2="5390" y2="429" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="440" class="marker"></text>
+<text x="5115" y="440" class="field">requested_at</text>
+<text x="5384" y="440" text-anchor="end" class="type">timestamptz</text>
+<line x1="5060" y1="446" x2="5390" y2="446" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="457" class="marker">REF</text>
+<text x="5115" y="457" class="field">reviewed_by_user_id</text>
+<text x="5384" y="457" text-anchor="end" class="type">uuid</text>
+<line x1="5060" y1="463" x2="5390" y2="463" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="474" class="marker"></text>
+<text x="5115" y="474" class="field">reviewed_at</text>
+<text x="5384" y="474" text-anchor="end" class="type">timestamptz</text>
+<line x1="5060" y1="480" x2="5390" y2="480" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="491" class="marker"></text>
+<text x="5115" y="491" class="field">review_note</text>
+<text x="5384" y="491" text-anchor="end" class="type">text</text>
+<line x1="5060" y1="497" x2="5390" y2="497" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="508" class="marker">FK?</text>
+<text x="5115" y="508" class="field">compensates_movement_id</text>
+<text x="5384" y="508" text-anchor="end" class="type">uuid</text>
+<rect x="5060" y="535" width="330" height="272" rx="3" class="table"/>
+<path d="M5063,535 H5387 Q5390,535 5390,538 V564 H5060 V538 Q5060,535 5063,535 Z" fill="#F4B183"/>
+<text x="5068" y="555" class="header">stock_movement</text>
+<text x="5066" y="576" class="marker">PK</text>
+<text x="5115" y="576" class="field">id</text>
+<text x="5384" y="576" text-anchor="end" class="type">uuid</text>
+<line x1="5060" y1="582" x2="5390" y2="582" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="593" class="marker">FK</text>
+<text x="5115" y="593" class="field">balance_id</text>
+<text x="5384" y="593" text-anchor="end" class="type">uuid</text>
+<line x1="5060" y1="599" x2="5390" y2="599" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="610" class="marker"></text>
+<text x="5115" y="610" class="field">movement_type</text>
+<text x="5384" y="610" text-anchor="end" class="type">text</text>
+<line x1="5060" y1="616" x2="5390" y2="616" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="627" class="marker"></text>
+<text x="5115" y="627" class="field">delta_on_hand</text>
+<text x="5384" y="627" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="5060" y1="633" x2="5390" y2="633" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="644" class="marker"></text>
+<text x="5115" y="644" class="field">delta_reserved</text>
+<text x="5384" y="644" text-anchor="end" class="type">numeric(18,3)</text>
+<line x1="5060" y1="650" x2="5390" y2="650" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="661" class="marker">FK?</text>
+<text x="5115" y="661" class="field">receipt_id</text>
+<text x="5384" y="661" text-anchor="end" class="type">uuid</text>
+<line x1="5060" y1="667" x2="5390" y2="667" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="678" class="marker">FK?</text>
+<text x="5115" y="678" class="field">commitment_id</text>
+<text x="5384" y="678" text-anchor="end" class="type">uuid</text>
+<line x1="5060" y1="684" x2="5390" y2="684" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="695" class="marker">FK?</text>
+<text x="5115" y="695" class="field">distribution_line_id</text>
+<text x="5384" y="695" text-anchor="end" class="type">uuid</text>
+<line x1="5060" y1="701" x2="5390" y2="701" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="712" class="marker">FK?</text>
+<text x="5115" y="712" class="field">handoff_line_id</text>
+<text x="5384" y="712" text-anchor="end" class="type">uuid</text>
+<line x1="5060" y1="718" x2="5390" y2="718" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="729" class="marker">FK? UK</text>
+<text x="5115" y="729" class="field">adjustment_id</text>
+<text x="5384" y="729" text-anchor="end" class="type">uuid</text>
+<line x1="5060" y1="735" x2="5390" y2="735" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="746" class="marker">UK</text>
+<text x="5115" y="746" class="field">operation_ref</text>
+<text x="5384" y="746" text-anchor="end" class="type">text</text>
+<line x1="5060" y1="752" x2="5390" y2="752" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="763" class="marker">REF</text>
+<text x="5115" y="763" class="field">actor_user_id</text>
+<text x="5384" y="763" text-anchor="end" class="type">uuid</text>
+<line x1="5060" y1="769" x2="5390" y2="769" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="780" class="marker"></text>
+<text x="5115" y="780" class="field">reason</text>
+<text x="5384" y="780" text-anchor="end" class="type">text</text>
+<line x1="5060" y1="786" x2="5390" y2="786" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="5066" y="797" class="marker"></text>
+<text x="5115" y="797" class="field">created_at</text>
+<text x="5384" y="797" text-anchor="end" class="type">timestamptz</text>
+<rect x="2960" y="1858" width="330" height="170" rx="3" class="table"/>
+<path d="M2963,1858 H3287 Q3290,1858 3290,1861 V1887 H2960 V1861 Q2960,1858 2963,1858 Z" fill="#F4B183"/>
+<text x="2968" y="1878" class="header">notice</text>
+<text x="2966" y="1899" class="marker">PK</text>
+<text x="3015" y="1899" class="field">id</text>
+<text x="3284" y="1899" text-anchor="end" class="type">uuid</text>
+<line x1="2960" y1="1905" x2="3290" y2="1905" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="1916" class="marker">UK* REF</text>
+<text x="3015" y="1916" class="field">recipient_user_id</text>
+<text x="3284" y="1916" text-anchor="end" class="type">uuid</text>
+<line x1="2960" y1="1922" x2="3290" y2="1922" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="1933" class="marker">UK* REF</text>
+<text x="3015" y="1933" class="field">source_id</text>
+<text x="3284" y="1933" text-anchor="end" class="type">uuid</text>
+<line x1="2960" y1="1939" x2="3290" y2="1939" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="1950" class="marker">UK*</text>
+<text x="3015" y="1950" class="field">source_version</text>
+<text x="3284" y="1950" text-anchor="end" class="type">int</text>
+<line x1="2960" y1="1956" x2="3290" y2="1956" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="1967" class="marker">UK*</text>
+<text x="3015" y="1967" class="field">notice_type</text>
+<text x="3284" y="1967" text-anchor="end" class="type">text</text>
+<line x1="2960" y1="1973" x2="3290" y2="1973" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="1984" class="marker"></text>
+<text x="3015" y="1984" class="field">payload</text>
+<text x="3284" y="1984" text-anchor="end" class="type">jsonb</text>
+<line x1="2960" y1="1990" x2="3290" y2="1990" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="2001" class="marker"></text>
+<text x="3015" y="2001" class="field">created_at</text>
+<text x="3284" y="2001" text-anchor="end" class="type">timestamptz</text>
+<line x1="2960" y1="2007" x2="3290" y2="2007" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="2966" y="2018" class="marker"></text>
+<text x="3015" y="2018" class="field">read_at</text>
+<text x="3284" y="2018" text-anchor="end" class="type">timestamptz</text>
+<rect x="3310" y="1858" width="330" height="204" rx="3" class="table"/>
+<path d="M3313,1858 H3637 Q3640,1858 3640,1861 V1887 H3310 V1861 Q3310,1858 3313,1858 Z" fill="#F4B183"/>
+<text x="3318" y="1878" class="header">audit_log</text>
+<text x="3316" y="1899" class="marker">PK</text>
+<text x="3365" y="1899" class="field">id</text>
+<text x="3634" y="1899" text-anchor="end" class="type">bigint</text>
+<line x1="3310" y1="1905" x2="3640" y2="1905" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="1916" class="marker">REF</text>
+<text x="3365" y="1916" class="field">actor_user_id</text>
+<text x="3634" y="1916" text-anchor="end" class="type">uuid</text>
+<line x1="3310" y1="1922" x2="3640" y2="1922" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="1933" class="marker"></text>
+<text x="3365" y="1933" class="field">action</text>
+<text x="3634" y="1933" text-anchor="end" class="type">text</text>
+<line x1="3310" y1="1939" x2="3640" y2="1939" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="1950" class="marker"></text>
+<text x="3365" y="1950" class="field">entity_type</text>
+<text x="3634" y="1950" text-anchor="end" class="type">text</text>
+<line x1="3310" y1="1956" x2="3640" y2="1956" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="1967" class="marker"></text>
+<text x="3365" y="1967" class="field">entity_id</text>
+<text x="3634" y="1967" text-anchor="end" class="type">text</text>
+<line x1="3310" y1="1973" x2="3640" y2="1973" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="1984" class="marker"></text>
+<text x="3365" y="1984" class="field">before_state</text>
+<text x="3634" y="1984" text-anchor="end" class="type">jsonb</text>
+<line x1="3310" y1="1990" x2="3640" y2="1990" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="2001" class="marker"></text>
+<text x="3365" y="2001" class="field">after_state</text>
+<text x="3634" y="2001" text-anchor="end" class="type">jsonb</text>
+<line x1="3310" y1="2007" x2="3640" y2="2007" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="2018" class="marker"></text>
+<text x="3365" y="2018" class="field">reason</text>
+<text x="3634" y="2018" text-anchor="end" class="type">text</text>
+<line x1="3310" y1="2024" x2="3640" y2="2024" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="2035" class="marker"></text>
+<text x="3365" y="2035" class="field">correlation_id</text>
+<text x="3634" y="2035" text-anchor="end" class="type">uuid</text>
+<line x1="3310" y1="2041" x2="3640" y2="2041" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3316" y="2052" class="marker"></text>
+<text x="3365" y="2052" class="field">created_at</text>
+<text x="3634" y="2052" text-anchor="end" class="type">timestamptz</text>
+<rect x="3660" y="1858" width="330" height="170" rx="3" class="table"/>
+<path d="M3663,1858 H3987 Q3990,1858 3990,1861 V1887 H3660 V1861 Q3660,1858 3663,1858 Z" fill="#F4B183"/>
+<text x="3668" y="1878" class="header">idempotency_record</text>
+<text x="3666" y="1899" class="marker">PK</text>
+<text x="3715" y="1899" class="field">scope_key</text>
+<text x="3984" y="1899" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1905" x2="3990" y2="1905" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1916" class="marker">PK</text>
+<text x="3715" y="1916" class="field">command</text>
+<text x="3984" y="1916" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1922" x2="3990" y2="1922" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1933" class="marker">PK</text>
+<text x="3715" y="1933" class="field">idempotency_key</text>
+<text x="3984" y="1933" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="1939" x2="3990" y2="1939" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1950" class="marker"></text>
+<text x="3715" y="1950" class="field">request_hash</text>
+<text x="3984" y="1950" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1956" x2="3990" y2="1956" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1967" class="marker"></text>
+<text x="3715" y="1967" class="field">response_status</text>
+<text x="3984" y="1967" text-anchor="end" class="type">int</text>
+<line x1="3660" y1="1973" x2="3990" y2="1973" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="1984" class="marker"></text>
+<text x="3715" y="1984" class="field">resource_type</text>
+<text x="3984" y="1984" text-anchor="end" class="type">text</text>
+<line x1="3660" y1="1990" x2="3990" y2="1990" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="2001" class="marker"></text>
+<text x="3715" y="2001" class="field">resource_id</text>
+<text x="3984" y="2001" text-anchor="end" class="type">uuid</text>
+<line x1="3660" y1="2007" x2="3990" y2="2007" stroke="#E8EDF3" stroke-width=".55"/>
+<text x="3666" y="2018" class="marker"></text>
+<text x="3715" y="2018" class="field">created_at</text>
+<text x="3984" y="2018" text-anchor="end" class="type">timestamptz</text>
+<text x="44" y="2129" class="note">PK khóa chính · FK khóa ngoại SQL · FK? nullable · UK duy nhất · UK* thuộc khóa duy nhất tổ hợp · REF ID không có FK. Quan hệ nối từ bảng chứa FK tới bảng được tham chiếu; ký hiệu bội số suy ra từ NULL/NOT NULL và UNIQUE. Không có FK giữa các database.</text>
+</svg>

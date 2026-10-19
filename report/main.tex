@@ -1,0 +1,263 @@
+\documentclass[12pt,a4paper,oneside]{report}
+
+\usepackage[a4paper,top=2cm,bottom=2cm,left=3cm,right=2cm,headheight=14pt,headsep=1cm,footskip=1cm]{geometry}
+\usepackage{fontspec}
+\IfFontExistsTF{Times New Roman}{\setmainfont{Times New Roman}}{\setmainfont{Liberation Serif}}
+\usepackage{polyglossia}
+\setdefaultlanguage{vietnamese}
+\usepackage{setspace}
+\usepackage{ragged2e}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage[xetex]{graphicx}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{newfloat}
+\usepackage[hidelinks,unicode]{hyperref}
+
+\graphicspath{{images/}}
+\DeclareFloatingEnvironment[within=chapter,fileext=lod,listname={DANH MỤC SƠ ĐỒ},name={Sơ đồ}]{diagram}
+
+\setcounter{tocdepth}{3}
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{1.27cm}
+\setstretch{1.15}
+\justifying
+
+\titleformat{\chapter}[hang]
+  {\normalfont\bfseries\fontsize{14}{17}\selectfont}
+  {\MakeUppercase{\chaptername~\thechapter:}}
+  {0.6em}
+  {\MakeUppercase}
+\titleformat{\section}
+  {\normalfont\bfseries\fontsize{13}{16}\selectfont}
+  {\thesection}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\bfseries\fontsize{12}{15}\selectfont}
+  {\thesubsection}{0.6em}{}
+\titlespacing*{\chapter}{0pt}{0pt}{12pt}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Đồ án tốt nghiệp Đại học}
+\fancyhead[R]{\small\nouppercase{\leftmark}}
+\fancyfoot[L]{\small [Tên sinh viên] -- [Tên lớp]}
+\fancyfoot[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+\renewcommand{\chaptermark}[1]{\markboth{\ifnum\value{chapter}>0 CHƯƠNG~\thechapter: \MakeUppercase{#1}\else #1\fi}{}}
+\fancypagestyle{plain}{%
+  \fancyhf{}
+  \fancyhead[L]{\small Đồ án tốt nghiệp Đại học}
+  \fancyhead[R]{\small\nouppercase{\leftmark}}
+  \fancyfoot[L]{\small [Tên sinh viên] -- [Tên lớp]}
+  \fancyfoot[R]{\small\thepage}
+  \renewcommand{\headrulewidth}{0.4pt}
+}
+
+\captionsetup{font=normalsize,labelfont=bf}
+\hypersetup{pdftitle={Đồ án tốt nghiệp -- Hệ thống quản lý ứng phó khẩn cấp và cứu trợ thiên tai}}
+
+\newcommand{\projecttitle}{Hệ thống quản lý ứng phó khẩn cấp và cứu trợ thiên tai}
+\newcommand{\advisorname}{[Họ tên giảng viên hướng dẫn]}
+\newcommand{\reportyear}{2026}
+\newcommand{\frontchapter}[1]{%
+  \chapter*{#1}%
+  \addcontentsline{toc}{chapter}{#1}%
+  \markboth{#1}{}%
+}
+\newcommand{\makecover}{%
+  \begin{titlepage}
+    \thispagestyle{empty}
+    \begin{center}
+      {\bfseries BỘ KHOA HỌC VÀ CÔNG NGHỆ\par}
+      \vspace{0.3cm}
+      {\bfseries HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG\par}
+      \vspace{1.8cm}
+      {\bfseries\fontsize{36}{42}\selectfont ĐỒ ÁN\par}
+      \vspace{0.2cm}
+      {\bfseries\fontsize{24}{29}\selectfont TỐT NGHIỆP ĐẠI HỌC\par}
+      \vspace{1.0cm}
+      {\bfseries Đề tài:\par}
+      \vspace{0.3cm}
+      {\bfseries\fontsize{18}{23}\selectfont\MakeUppercase{\projecttitle}\par}
+      \vspace{1.0cm}
+      \begin{tabular}{@{}ll@{}}
+        \textbf{Giáo viên hướng dẫn:} & \advisorname \\
+        \textbf{Nhóm sinh viên thực hiện:} & [Tên nhóm hoặc đại diện nhóm] \\
+        \textbf{Mã SV -- Họ tên:} & [Mã SV] -- [Họ tên thành viên 1] \\
+        \textbf{Mã SV -- Họ tên:} & [Mã SV] -- [Họ tên thành viên 2] \\
+        \textbf{Mã SV -- Họ tên:} & [Mã SV] -- [Họ tên thành viên 3] \\
+      \end{tabular}
+      \vfill
+      {\bfseries TP. HỒ CHÍ MINH, NĂM \reportyear\par}
+    \end{center}
+  \end{titlepage}%
+}
+
+\begin{document}
+
+% Polyglossia sets Vietnamese caption names at document start; apply report names afterward.
+\renewcommand{\chaptername}{CHƯƠNG}
+\renewcommand{\contentsname}{MỤC LỤC}
+\renewcommand{\listtablename}{DANH MỤC BẢNG}
+\renewcommand{\listfigurename}{DANH MỤC HÌNH VẼ}
+\renewcommand{\bibname}{DANH MỤC TÀI LIỆU THAM KHẢO}
+
+% Bìa ngoài; trang lót để trắng theo quy định bản in; tiếp theo là bìa phụ.
+\makecover
+\null\thispagestyle{empty}\newpage
+\makecover
+
+\pagenumbering{roman}
+\frontchapter{PHÊ DUYỆT, GIAO NHIỆM VỤ ĐỀ TÀI}
+\noindent[Chèn trang giao nhiệm vụ đã được phê duyệt và ký xác nhận.]
+\vfill
+\noindent\begin{tabularx}{\textwidth}{X X}
+  \centering GIẢNG VIÊN HƯỚNG DẪN & \centering ĐẠI DIỆN NHÓM SINH VIÊN\tabularnewline
+  \centering (Ký và ghi rõ họ tên) & \centering (Ký và ghi rõ họ tên)
+\end{tabularx}
+
+\frontchapter{LỜI CẢM ƠN}
+[Viết lời cảm ơn ngắn gọn; thay nội dung này sau khi nhóm xác nhận.]
+
+\frontchapter{LỜI CAM ĐOAN}
+[Điền lời cam đoan theo mẫu chính thức. Chỉ ký sau khi các thành viên xác nhận nội dung.]
+\vfill
+\begin{flushright}
+  TP. Hồ Chí Minh, ngày [..] tháng [..] năm [....]\\[1cm]
+  \textbf{ĐẠI DIỆN NHÓM SINH VIÊN}\\
+  (Ký và ghi rõ họ tên)
+\end{flushright}
+
+\clearpage
+\addcontentsline{toc}{chapter}{MỤC LỤC}
+\tableofcontents
+
+\frontchapter{DANH MỤC CÁC KÝ HIỆU VÀ CHỮ VIẾT TẮT}
+\begin{tabularx}{\textwidth}{@{}l X X@{}}
+  \toprule
+  \textbf{Chữ viết tắt} & \textbf{Chữ đầy đủ} & \textbf{Nghĩa} \\
+  \midrule
+  AI & Artificial Intelligence & Trí tuệ nhân tạo \\
+  API & Application Programming Interface & Giao diện lập trình ứng dụng \\
+  FR & Functional Requirement & Yêu cầu chức năng \\
+  GPS & Global Positioning System & Hệ thống định vị toàn cầu \\
+  NFR & Non-functional Requirement & Yêu cầu phi chức năng \\
+  PostGIS & PostgreSQL Geographic Information Systems & Phần mở rộng không gian địa lý của PostgreSQL \\
+  RBAC & Role-Based Access Control & Kiểm soát truy cập dựa trên vai trò \\
+  SOS & Emergency assistance request & Yêu cầu trợ giúp khẩn cấp \\
+  TC & Test Case & Ca kiểm thử \\
+  UC & Use Case & Ca sử dụng \\
+  UR & User Requirement & Yêu cầu người dùng \\
+  \bottomrule
+\end{tabularx}
+
+\clearpage
+\addcontentsline{toc}{chapter}{\listtablename}
+\listoftables
+\clearpage
+\addcontentsline{toc}{chapter}{DANH MỤC SƠ ĐỒ}
+\listofdiagrams
+\clearpage
+\addcontentsline{toc}{chapter}{\listfigurename}
+\listoffigures
+
+\clearpage
+\pagenumbering{arabic}
+\frontchapter{MỞ ĐẦU}
+\section*{Lý do chọn đề tài}
+[Trình bày ngắn gọn bối cảnh, vấn đề và lý do chọn đề tài.]
+\section*{Mục tiêu nghiên cứu}
+[Nêu mục tiêu của đồ án.]
+\section*{Đối tượng, phạm vi và phương pháp nghiên cứu}
+[Nêu phạm vi và phương pháp; phân biệt yêu cầu của đề bài với đề xuất thiết kế.]
+\section*{Kết cấu báo cáo}
+[Tóm tắt nội dung từng chương.]
+
+\frontchapter{BẢNG PHÂN CÔNG NHIỆM VỤ NHÓM THỰC HIỆN}
+\begin{table}[htbp]
+  \centering
+  \caption{Phân công nhiệm vụ nhóm thực hiện}\label{tab:task-assignment}
+  \begin{tabularx}{\textwidth}{@{}l X X@{}}
+    \toprule
+    \textbf{Mã sinh viên} & \textbf{Họ tên} & \textbf{Nhiệm vụ đã xác nhận} \\
+    \midrule
+    \textit{Mã SV} & \textit{Thành viên 1} & \textit{Nhiệm vụ} \\
+    \textit{Mã SV} & \textit{Thành viên 2} & \textit{Nhiệm vụ} \\
+    \textit{Mã SV} & \textit{Thành viên 3} & \textit{Nhiệm vụ} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\chapter{GIỚI THIỆU ĐỀ TÀI}\label{ch:introduction}
+\section{Sự cần thiết của đề tài}
+[Mô tả bài toán ứng phó khẩn cấp và cứu trợ thiên tai bằng dữ liệu có nguồn.]
+\section{Mục tiêu của đề tài}
+[Nêu mục tiêu theo phạm vi được giao.]
+\section{Phạm vi và kết quả phải đạt}
+[Nêu phạm vi Web/Mobile, nhóm người dùng, sản phẩm và giới hạn.]
+
+\chapter{KHẢO SÁT HỆ THỐNG}\label{ch:survey}
+\section{Bối cảnh và quy trình nghiệp vụ}
+[Mô tả quy trình hiện tại dựa trên khảo sát; không trình bày giả định như sự thật.]
+\section{Các tác nhân}
+[Mô tả người dân, tình nguyện viên/đội cứu hộ, điều phối viên, quản lý vận hành và quản trị viên.]
+\section{Yêu cầu hệ thống}
+[Liệt kê UR, FR, NFR và liên kết với UC, TC tương ứng.]
+
+\chapter{NỘI DUNG THỰC HIỆN}\label{ch:solution}
+\section{Giải pháp đề xuất}
+[Phân biệt yêu cầu nguồn với quyết định thiết kế của C48.]
+\section{Kiến trúc hệ thống}
+[Trình bày kiến trúc và ranh giới sở hữu dữ liệu theo kế hoạch kỹ thuật.]
+\section{Quy trình và ca sử dụng}
+[Mô tả luồng SOS, xác minh, điều phối, nhiệm vụ cứu hộ và cứu trợ.]
+\section{Công nghệ sử dụng}
+[Giải thích lựa chọn theo tài liệu kế hoạch; xác minh thông tin phiên bản hiện hành trước khi chốt.]
+
+\chapter{TỔ CHỨC DỮ LIỆU}\label{ch:data}
+\section{Mô hình dữ liệu}
+[Chèn sơ đồ và mô tả dữ liệu; giữ nguyên mã UR/FR/UC/TC liên quan.]
+\section{Thiết kế cơ sở dữ liệu}
+[Trình bày bảng, ràng buộc và chỉ mục theo hợp đồng backend được duyệt.]
+
+\chapter{THIẾT KẾ PHẦN MỀM WEB VÀ BACKEND}\label{ch:web-backend}
+\section{Giao diện và chức năng Web}
+[Chèn ảnh màn hình đã xác nhận; đặt tệp ảnh trong thư mục images/.]
+\section{API và xử lý nghiệp vụ}
+[Mô tả hợp đồng API, quyền truy cập, trạng thái và lỗi bằng mã ổn định.]
+\section{Triển khai}
+[Mô tả cấu hình triển khai đã thực sự được thực hiện.]
+
+\chapter{THIẾT KẾ PHẦN MỀM DI ĐỘNG, KIỂM THỬ VÀ ĐÁNH GIÁ}\label{ch:mobile-testing}
+\section{Luồng và giao diện Mobile}
+[Mô tả quy trình người dân và tình nguyện viên; mọi nội dung giao diện dùng tiếng Việt.]
+\section{Kịch bản và kết quả kiểm thử}
+[Ghi mã TC, môi trường, lệnh và kết quả thực tế; không điền kết quả dự kiến như đã chạy.]
+\section{Đánh giá và giới hạn}
+[Đánh giá theo bằng chứng; nêu giới hạn demo và các chính sách còn mở.]
+
+\frontchapter{KẾT LUẬN, KIẾN NGHỊ}
+[Tóm tắt kết quả, hạn chế, kiến nghị và hướng phát triển đã được nhóm thống nhất.]
+
+\addcontentsline{toc}{chapter}{\bibname}
+\begin{thebibliography}{99}
+  \bibitem{placeholder}
+  [Bổ sung nguồn đã sử dụng; sắp xếp theo thứ tự chữ cái và đúng quy cách của quy định chính thức.]
+\end{thebibliography}
+
+\appendix
+\chapter{BẰNG CHỨNG VÀ MA TRẬN TRUY VẾT}
+[Bổ sung phụ lục cần thiết, chẳng hạn ma trận UR/FR/UC/TC hoặc bằng chứng demo đã được kiểm tra.]
+
+% Ví dụ: đặt tệp hình trong images/, caption và label để danh mục/cross-reference tự cập nhật.
+% \begin{figure}[htbp]
+%   \centering
+%   \includegraphics[width=0.85\textwidth]{ten-hinh.png}
+%   \caption{Mô tả hình và nguồn nếu có.}
+%   \label{fig:ten-hinh}
+% \end{figure}
+
+\end{document}
