@@ -281,7 +281,19 @@ This is the main workflow adaptation from Sahana ShaRe's partial commitments and
 |---|---|---|
 | Conceptual | Explain people, business objects and their relationships | Central overview and conceptual ERD; no SQL types, locks or credentials |
 | Logical | Define entities, keys, cardinalities and ownership | Separate ERDs below; association tables and local foreign keys; explicit opaque-reference register |
-| Physical | Implement storage constraints, indexes and migrations | Future per-slice artifacts; not claimed as a completed schema by this plan |
+| Physical | Implement storage constraints, indexes and migrations | Current per-service DDL, one full-system ERD and six readable detail views; the SQL remains authoritative |
+
+**Physical ERD (65 tables):** the editable full-system Draw.io source and SVG preview show every table, column, type, key and declared FK on one page. Six smaller editable views group the same tables by database ownership and workflow. Gray entities are local tables shown in detail on another page; `REF` fields are identifiers without a declared FK. Cross-service references are never drawn as database FKs.
+
+| ERD view | Editable source | Preview |
+|---|---|---|
+| Full system — all tables | [Draw.io](diagrams/erd/c48-erd-physical-overall.drawio) | [SVG](diagrams/erd/c48-erd-physical-overall.svg) |
+| Identity | [Draw.io](diagrams/erd/c48-erd-identity.drawio) | [SVG](diagrams/erd/c48-erd-identity.svg) |
+| Response — requests and verification | [Draw.io](diagrams/erd/c48-erd-response-requests.drawio) | [SVG](diagrams/erd/c48-erd-response-requests.svg) |
+| Response — teams and missions | [Draw.io](diagrams/erd/c48-erd-response-rescue.drawio) | [SVG](diagrams/erd/c48-erd-response-rescue.svg) |
+| Logistics — donations and intake | [Draw.io](diagrams/erd/c48-erd-logistics-donations.drawio) | [SVG](diagrams/erd/c48-erd-logistics-donations.svg) |
+| Logistics — needs and stock | [Draw.io](diagrams/erd/c48-erd-logistics-fulfillment.drawio) | [SVG](diagrams/erd/c48-erd-logistics-fulfillment.svg) |
+| Logistics — distribution and handoff | [Draw.io](diagrams/erd/c48-erd-logistics-handoff.drawio) | [SVG](diagrams/erd/c48-erd-logistics-handoff.svg) |
 
 Conceptual Reporter and Donor represent participant roles: one person may make several reports/handover declarations. Implementation stores their contact snapshots on each report/donation rather than maintaining global person registries. The Affected Household is a request-scoped subject snapshot, with exactly one subject per SOS; similar snapshots are not presumed to identify the same household. A household may be reported repeatedly, but identity is not deduced from phone/location. Detailed audit-log, notice, device and idempotency tables (FR-AUD-01, FR-NOT-01, Section 22.4) are cross-cutting per-service tables, intentionally omitted from the logical pictures and defined in the SDD data dictionary; mission history is shown because workload and overdue rules read it. Detailed audit, upload, notification and idempotency columns follow Sections 6.3, 10 and 22; they are omitted from overview pictures to keep them legible.
 
@@ -1109,47 +1121,26 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 ## 9. Main use cases
 
-### 9.0 Actor and use-case diagrams
+### 9.0 Sơ đồ tác nhân và ca sử dụng
 
-![Response use cases](diagrams/c48-response-use-cases.svg)
+![Sơ đồ ca sử dụng tổng thể ReliefCare](diagrams/c48-overall-use-cases.svg)
 
-[Editable response UML](diagrams/c48-response-use-cases.drawio). Actors are outside the system boundary, use cases are ellipses, associations are solid lines. UC-01 describes common SOS intake; UC-15 specializes it for remote PROXY and requires a signed-in citizen. It is not a mandatory substep of every SOS. Verification (UC-02) is a prerequisite for assignment, not a diagram arrow claiming automatic execution. Team leader specializes the team-member actor and inherits UC-17 read access; UC-18 (team profile, availability, position) is associated with the leader and, for app-less teams, the coordinator. UC-03 has one ellipse associated only with coordinator/active leader; membership alone cannot accept or advance missions.
+[Mở nguồn Draw.io để chỉnh sửa](diagrams/c48-overall-use-cases.drawio). Sơ đồ nhóm các luồng backend theo lĩnh vực; mỗi hình bầu dục ghi tên chức năng, không chèn mã UC. Gợi ý AI được đánh dấu tùy chọn, còn kiểm kê tồn kho được đánh dấu hoãn triển khai. Ba sơ đồ theo lĩnh vực bên dưới là các góc nhìn bổ trợ.
 
-![Donation and support use cases](diagrams/c48-donation-use-cases.svg)
+![Sơ đồ ca sử dụng ứng cứu](diagrams/c48-response-use-cases.svg)
 
-[Editable donation UML](diagrams/c48-donation-use-cases.drawio). A guest donor and an authenticated donor can perform UC-11; there is no include-login relationship. Intake and independent review are distinct participating actors in UC-12. Warehouse staff do not inherit campaign, verification, dispatch or account-administration permissions. UC-14 stocktakes and UC-07 AI are deferred extensions and are absent from core diagrams. UC-05 and UC-06 appear as support use cases; sensitive reports still require operational scope.
+[Mở nguồn Draw.io để chỉnh sửa](diagrams/c48-response-use-cases.drawio). Tác nhân nằm ngoài ranh giới hệ thống; ca sử dụng nằm trong hình bầu dục và được nối với tác nhân bằng đường liên kết. Luồng gửi cứu trợ thông thường không bắt buộc đăng nhập; báo giúp từ xa cần công dân đã đăng nhập. Yêu cầu phải được xác minh trước khi phân công. Đội trưởng kế thừa quyền xem nhiệm vụ của thành viên; chỉ điều phối viên hoặc đội trưởng đang hoạt động mới thực hiện thao tác nhiệm vụ. Quyền thực tế còn phụ thuộc phạm vi và quan hệ đội.
+
+![Sơ đồ ca sử dụng quyên góp và hỗ trợ](diagrams/c48-donation-use-cases.svg)
+
+[Mở nguồn Draw.io để chỉnh sửa](diagrams/c48-donation-use-cases.drawio). Khách và công dân đã đăng nhập đều có thể khai báo quyên góp; quy trình này không bắt buộc đăng nhập. Nhân viên tiếp nhận và người thẩm định độc lập là hai vai trò riêng. Nhân viên kho chỉ thực hiện thao tác vật tư đã được cấp quyền. Gợi ý AI và kiểm kê tồn kho được đánh dấu riêng trong sơ đồ tổng thể.
 
 
-![Management use cases](diagrams/c48-management-use-cases.svg)
+![Sơ đồ ca sử dụng chiến dịch, phân bổ và quản trị](diagrams/c48-management-use-cases.svg)
 
-[Editable management UML](diagrams/c48-management-use-cases.drawio). Completes core actor coverage for UC-04, UC-08 and UC-09, with UC-05/06 support. Supply staff execute scoped approved actions; campaign ownership and account administration remain distinct. All core use-case IDs are represented across the three actor views; optional UC-07 and deferred UC-14 remain in text only.
+[Mở nguồn Draw.io để chỉnh sửa](diagrams/c48-management-use-cases.drawio). Sơ đồ tập trung vào cam kết cứu trợ, chiến dịch, kho và điểm cứu trợ; báo cáo và quản lý quyền là các chức năng hỗ trợ riêng. Bộ ca sử dụng đã triển khai được tổng hợp trong sơ đồ tổng thể phía trên.
 
-#### Per-use-case diagrams
-
-Each use case has its own UML diagram (actors outside the boundary, «include»/«extend» sub-flows, neighbouring use cases dashed, key rules below) with an editable `.drawio` source in `diagrams/use-cases/`:
-
-| Use case | Diagram | Editable |
-|---|---|---|
-| UC-01 — Submit SOS | ![UC-01](diagrams/use-cases/UC-01.svg) | [UC-01.drawio](diagrams/use-cases/UC-01.drawio) |
-| UC-02 — Verify and triage | ![UC-02](diagrams/use-cases/UC-02.svg) | [UC-02.drawio](diagrams/use-cases/UC-02.drawio) |
-| UC-03 — Assign and accept mission | ![UC-03](diagrams/use-cases/UC-03.svg) | [UC-03.drawio](diagrams/use-cases/UC-03.drawio) |
-| UC-04 — Commit and partially fulfill need | ![UC-04](diagrams/use-cases/UC-04.svg) | [UC-04.drawio](diagrams/use-cases/UC-04.drawio) |
-| UC-05 — Dashboard and reports | ![UC-05](diagrams/use-cases/UC-05.svg) | [UC-05.drawio](diagrams/use-cases/UC-05.drawio) |
-| UC-06 — Accounts and permissions | ![UC-06](diagrams/use-cases/UC-06.svg) | [UC-06.drawio](diagrams/use-cases/UC-06.drawio) |
-| UC-07 — AI priority suggestion (optional) | ![UC-07](diagrams/use-cases/UC-07.svg) | [UC-07.drawio](diagrams/use-cases/UC-07.drawio) |
-| UC-08 — Relief campaign | ![UC-08](diagrams/use-cases/UC-08.svg) | [UC-08.drawio](diagrams/use-cases/UC-08.drawio) |
-| UC-09 — Vehicles and relief points | ![UC-09](diagrams/use-cases/UC-09.svg) | [UC-09.drawio](diagrams/use-cases/UC-09.drawio) |
-| UC-10 — Donation drive | ![UC-10](diagrams/use-cases/UC-10.svg) | [UC-10.drawio](diagrams/use-cases/UC-10.drawio) |
-| UC-11 — Declare handover and track | ![UC-11](diagrams/use-cases/UC-11.svg) | [UC-11.drawio](diagrams/use-cases/UC-11.drawio) |
-| UC-12 — Count, review and post receipt | ![UC-12](diagrams/use-cases/UC-12.svg) | [UC-12.drawio](diagrams/use-cases/UC-12.drawio) |
-| UC-13 — Distribution and handoff | ![UC-13](diagrams/use-cases/UC-13.svg) | [UC-13.drawio](diagrams/use-cases/UC-13.drawio) |
-| UC-14 — Stocktake (deferred) | ![UC-14](diagrams/use-cases/UC-14.svg) | [UC-14.drawio](diagrams/use-cases/UC-14.drawio) |
-| UC-15 — Report household remotely | ![UC-15](diagrams/use-cases/UC-15.svg) | [UC-15.drawio](diagrams/use-cases/UC-15.drawio) |
-| UC-16 — Heatmap and grouped queue | ![UC-16](diagrams/use-cases/UC-16.svg) | [UC-16.drawio](diagrams/use-cases/UC-16.drawio) |
-| UC-17 — View assigned missions | ![UC-17](diagrams/use-cases/UC-17.svg) | [UC-17.drawio](diagrams/use-cases/UC-17.drawio) |
-| UC-18 — Team profile and position | ![UC-18](diagrams/use-cases/UC-18.svg) | [UC-18.drawio](diagrams/use-cases/UC-18.drawio) |
-
-Sub-flows shown as «include»/«extend» ellipses are explanatory steps of the main flow in the text below, not additional requirement IDs. UC-07 is optional and UC-14 deferred.
+Các sơ đồ riêng lẻ theo từng mã UC đã được gộp vào sơ đồ tổng thể phía trên. Ba sơ đồ theo lĩnh vực giúp đọc rõ vai trò và kết nối; quyền thực tế vẫn do quyền được cấp, phạm vi, chủ sở hữu và quan hệ đội quyết định. Các sơ đồ mô tả API backend, không khẳng định các màn hình Web hoặc Mobile đã được triển khai.
 
 ### UC-01 — Submit an SOS/assistance request
 
@@ -2382,7 +2373,7 @@ Grouping is a saved/filterable view (region/category/time/status or canonical re
 
 ### 26.5 Diagram delivery and review conventions
 
-Six fixed-layout SVG figures with editable `.drawio` sources accompany this plan: system overview, container architecture, conceptual ERD, response actors/use cases, donation/support actors/use cases and campaign/allocation/administration actors/use cases. Use crisp flat shapes, aligned rectangles and right-angle paths; conceptual relationships show min/max cardinality, UML uses external actors/ellipses and solid associations. Technical labels are English; these are report figures, not product UI. Service-owned logical ERDs are editable Mermaid in Section 6 and cover account/grant, subject/provenance, team/skills/position, item/type/unit, receipt/review and delivery relationships.
+Six fixed-layout SVG figures with editable `.drawio` sources accompany this plan: system overview, container architecture, conceptual ERD, and three use-case views. Seven physical ERD views cover all 65 current service-owned tables: one full physical model and six detailed pages. Each has an editable Draw.io source and SVG preview in [the ERD diagram set](diagrams/erd/README.md). The full model is intentionally wide; open its Draw.io source to zoom into entities. These diagrams use Vietnamese headings and notes while preserving SQL table and column identifiers in English. Use the DDL for constraints, indexes, triggers, and any detail omitted from the figures.
 
 Review diagram-to-text consistency before using in SDD: no required donor login; no account for victim; SELF vs PROXY; volunteer/military same scoped authority; no automatic assignment; mission/priority/fulfillment distinct; no cross-service FK; warehouse staff not campaign owner; deferred entities absent from core diagrams. The diagrams show proposed design, not implemented behavior.
 
@@ -2410,7 +2401,7 @@ All above are planned. Do not record them as passing from a documentation edit. 
 
 ### 26.7 Diagram review findings
 
-The review follows each actor action through its use case, service owner, logical relationship and state transition. UML notation follows the [OMG UML 2.5.1 specification](https://www.omg.org/spec/UML/2.5.1); ERD line/cardinality notation follows the [Mermaid ER diagram reference](https://mermaid.js.org/syntax/entityRelationshipDiagram.html). Diagram associations show participation, not permission to execute every step of a multi-actor use case; backend grants and command guards remain authoritative.
+The review follows each actor action through its use case, service owner, logical relationship and state transition. UML notation follows the [OMG UML 2.5.1 specification](https://www.omg.org/spec/UML/2.5.1), the [PlantUML use-case diagram guide](https://plantuml.com/use-case-diagram), and the overall example in [a University of Extremadura thesis (Figure 2.16)](https://dehesa.unex.es/server/api/core/bitstreams/7cb90126-0d31-4047-ba72-c0c6dd5a7f85/content); ERD line/cardinality notation follows the [Mermaid ER diagram reference](https://mermaid.js.org/syntax/entityRelationshipDiagram.html). The figures use the system boundary, external actors, named use-case ellipses, and UML associations/relationships. Diagram associations show participation, not permission to execute every step of a multi-actor use case; backend grants and command guards remain authoritative.
 
 | Reviewed area | Correction incorporated | Remaining design limit |
 |---|---|---|

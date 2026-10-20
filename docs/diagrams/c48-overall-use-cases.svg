@@ -1,0 +1,267 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3650" height="2040" viewBox="0 0 3650 2040" role="img" aria-labelledby="title desc">
+<title id="title">ReliefCare — Sơ đồ ca sử dụng tổng thể</title>
+<desc id="desc">Sơ đồ ca sử dụng tổng thể cho các luồng API hiện có; các vai trò nằm ngoài ranh giới hệ thống.</desc>
+<defs><marker id="generalization" markerWidth="14" markerHeight="14" refX="7" refY="1" orient="auto"><path d="M1,1 L7,13 L13,1 Z" fill="white" stroke="#334155" stroke-width="1.4"/></marker><marker id="openArrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M1,1 L9,5 L1,9" fill="none" stroke="#475569" stroke-width="1.3"/></marker></defs>
+<rect width="100%" height="100%" fill="#fff"/>
+<text x="24" y="50" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="#111827">ReliefCare — Sơ đồ ca sử dụng tổng thể</text>
+<rect x="280" y="105" width="3030" height="1785" fill="#fff" stroke="#1f2937" stroke-width="2"/>
+<text x="1795" y="140" text-anchor="middle" font-family="Arial,sans-serif" font-size="23" font-weight="700" fill="#111827">Hệ thống ReliefCare</text>
+<text x="575.0" y="188" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#374151">Định danh và quyền truy cập</text>
+<path d="M378,198 H772" stroke="#656b9b" stroke-width="3"/>
+<text x="1065.0" y="188" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#374151">Công dân và dịch vụ công khai</text>
+<path d="M868,198 H1262" stroke="#bd6f69" stroke-width="3"/>
+<text x="1555.0" y="188" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#374151">Ứng cứu và điều phối cứu hộ</text>
+<path d="M1358,198 H1752" stroke="#c76761" stroke-width="3"/>
+<text x="2045.0" y="188" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#374151">Chiến dịch và quyên góp</text>
+<path d="M1848,198 H2242" stroke="#6c9663" stroke-width="3"/>
+<text x="2535.0" y="188" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#374151">Vật tư và phân phối</text>
+<path d="M2338,198 H2732" stroke="#ba8b3e" stroke-width="3"/>
+<text x="3025.0" y="188" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#374151">Báo cáo và giám sát</text>
+<path d="M2828,198 H3222" stroke="#6485ae" stroke-width="3"/>
+<path d="M154,432 C229,432 315,259.0 360,259.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,432 C229,432 805,259.0 850,259.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,432 C229,432 805,763.0 850,763.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,432 C229,432 805,1015.0 850,1015.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,432 C229,432 805,1141.0 850,1141.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,432 C229,432 805,1267.0 850,1267.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,432 C229,432 805,637.0 850,637.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,842 C229,842 315,259.0 360,259.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,842 C229,842 805,259.0 850,259.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,842 C229,842 805,385.0 850,385.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,842 C229,842 805,763.0 850,763.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,842 C229,842 805,889.0 850,889.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,842 C229,842 805,1015.0 850,1015.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,842 C229,842 805,1141.0 850,1141.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,842 C229,842 805,1267.0 850,1267.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,842 C229,842 805,637.0 850,637.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,1302 C229,1302 1295,1519.0 1340,1519.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,1682 C229,1682 1295,1141.0 1340,1141.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,1682 C229,1682 1295,1645.0 1340,1645.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M154,1682 C229,1682 805,637.0 850,637.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,257 C3401,257 1325,889.0 1280,889.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,257 C3401,257 1815,259.0 1770,259.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,257 C3401,257 1815,763.0 1770,763.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,257 C3401,257 1815,889.0 1770,889.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,257 C3401,257 1815,1267.0 1770,1267.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,257 C3401,257 1815,1393.0 1770,1393.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,257 C3401,257 1815,1645.0 1770,1645.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,257 C3401,257 2305,259.0 2260,259.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,257 C3401,257 2305,763.0 2260,763.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,257 C3401,257 3285,259.0 3240,259.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,502 C3401,502 2305,259.0 2260,259.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,502 C3401,502 2305,385.0 2260,385.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,502 C3401,502 3285,259.0 3240,259.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,747 C3401,747 1815,1393.0 1770,1393.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,747 C3401,747 2305,259.0 2260,259.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,747 C3401,747 2305,385.0 2260,385.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,747 C3401,747 2305,763.0 2260,763.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,747 C3401,747 2305,889.0 2260,889.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,747 C3401,747 2795,259.0 2750,259.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,747 C3401,747 2795,385.0 2750,385.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,747 C3401,747 2795,637.0 2750,637.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,747 C3401,747 2795,763.0 2750,763.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,747 C3401,747 3285,259.0 3240,259.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,992 C3401,992 1325,1267.0 1280,1267.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,992 C3401,992 2305,511.0 2260,511.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,992 C3401,992 2305,637.0 2260,637.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,992 C3401,992 2795,385.0 2750,385.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,992 C3401,992 2795,511.0 2750,511.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,992 C3401,992 2795,637.0 2750,637.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,1237 C3401,1237 1325,1267.0 1280,1267.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,1237 C3401,1237 2305,511.0 2260,511.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,1237 C3401,1237 2305,637.0 2260,637.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,1237 C3401,1237 2795,385.0 2750,385.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,1237 C3401,1237 2795,637.0 2750,637.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,1482 C3401,1482 2795,385.0 2750,385.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,1482 C3401,1482 2795,511.0 2750,511.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,1482 C3401,1482 2795,637.0 2750,637.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,1727 C3401,1727 835,385.0 790,385.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,1727 C3401,1727 835,511.0 790,511.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M3476,1727 C3401,1727 3285,259.0 3240,259.0" fill="none" stroke="#64748b" stroke-width="1.1" opacity="0.28"/>
+<path d="M1065.0,277.0 C1065.0,277.0 1065.0,493.0 1065.0,493.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="1065.0" y="380.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;include&gt;&gt;</text>
+<path d="M1065.0,403.0 C1065.0,403.0 1065.0,493.0 1065.0,493.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="1065.0" y="443.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;include&gt;&gt;</text>
+<path d="M1065.0,619.0 C1065.0,619.0 1065.0,277.0 1065.0,277.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="1065.0" y="443.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;extend&gt;&gt;</text>
+<path d="M1065.0,781.0 C1065.0,781.0 1065.0,871.0 1065.0,871.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="1065.0" y="821.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;extend&gt;&gt;</text>
+<path d="M1555.0,277.0 C1555.0,277.0 1555.0,367.0 1555.0,367.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="1555.0" y="317.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;include&gt;&gt;</text>
+<path d="M1555.0,493.0 C1555.0,493.0 1555.0,277.0 1555.0,277.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="1555.0" y="380.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;extend&gt;&gt;</text>
+<path d="M1555.0,619.0 C1555.0,619.0 1555.0,277.0 1555.0,277.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="1555.0" y="443.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;extend&gt;&gt;</text>
+<path d="M1555.0,997.0 C1555.0,997.0 1555.0,907.0 1555.0,907.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="1555.0" y="947.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;include&gt;&gt;</text>
+<path d="M1555.0,1123.0 C1555.0,1123.0 1555.0,907.0 1555.0,907.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="1555.0" y="1010.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;extend&gt;&gt;</text>
+<path d="M1555.0,1249.0 C1555.0,1249.0 1555.0,1159.0 1555.0,1159.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="1555.0" y="1199.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;extend&gt;&gt;</text>
+<path d="M1555.0,1753.0 C1555.0,1753.0 1555.0,655.0 1555.0,655.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="1555.0" y="1199.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;extend&gt;&gt;</text>
+<path d="M1065.0,1249.0 C1065.0,1249.0 1065.0,1159.0 1065.0,1159.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="1065.0" y="1199.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;extend&gt;&gt;</text>
+<path d="M2045.0,619.0 C2045.0,619.0 2045.0,529.0 2045.0,529.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="2045.0" y="569.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;extend&gt;&gt;</text>
+<path d="M2045.0,871.0 C2045.0,871.0 2045.0,781.0 2045.0,781.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="2045.0" y="821.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;include&gt;&gt;</text>
+<path d="M2535.0,493.0 C2535.0,493.0 2535.0,403.0 2535.0,403.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="2535.0" y="443.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;include&gt;&gt;</text>
+<path d="M3025.0,367.0 C3025.0,367.0 3025.0,277.0 3025.0,277.0" fill="none" stroke="#475569" stroke-width="1.25" stroke-dasharray="6 5" marker-end="url(#openArrow)"/>
+<text x="3025.0" y="317.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#334155" stroke="#fff" stroke-width="4" paint-order="stroke">&lt;&lt;include&gt;&gt;</text>
+<ellipse cx="575.0" cy="259.0" rx="215.0" ry="39.0" fill="#eef0f8" stroke="#656b9b" stroke-width="1.8"/>
+<text x="575.0" y="254.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Đăng ký, đăng nhập, làm mới</text>
+<text x="575.0" y="274.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">và kết thúc phiên</text>
+<ellipse cx="575.0" cy="385.0" rx="215.0" ry="39.0" fill="#eef0f8" stroke="#656b9b" stroke-width="1.8"/>
+<text x="575.0" y="380.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Quản lý tài khoản, tổ chức,</text>
+<text x="575.0" y="400.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">thành viên, quyền và khu vực</text>
+<ellipse cx="575.0" cy="511.0" rx="215.0" ry="39.0" fill="#eef0f8" stroke="#656b9b" stroke-width="1.8"/>
+<text x="575.0" y="506.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Xem nhật ký kiểm toán</text>
+<text x="575.0" y="526.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">theo phạm vi</text>
+<ellipse cx="1065.0" cy="259.0" rx="215.0" ry="39.0" fill="#fde2df" stroke="#bd6f69" stroke-width="1.8"/>
+<text x="1065.0" y="254.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Gửi yêu cầu cứu trợ cho</text>
+<text x="1065.0" y="274.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">bản thân (SELF)</text>
+<ellipse cx="1065.0" cy="385.0" rx="215.0" ry="39.0" fill="#fde2df" stroke="#bd6f69" stroke-width="1.8"/>
+<text x="1065.0" y="380.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Báo giúp hộ gia đình gặp nạn</text>
+<text x="1065.0" y="400.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">(PROXY)</text>
+<ellipse cx="1065.0" cy="511.0" rx="215.0" ry="39.0" fill="#fde2df" stroke="#bd6f69" stroke-width="1.8"/>
+<text x="1065.0" y="506.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Cung cấp vị trí, liên hệ</text>
+<text x="1065.0" y="526.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">và thông tin sự cố</text>
+<ellipse cx="1065.0" cy="637.0" rx="215.0" ry="39.0" fill="#fde2df" stroke="#bd6f69" stroke-width="1.8"/>
+<text x="1065.0" y="632.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Tải bằng chứng riêng tư</text>
+<text x="1065.0" y="652.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">cho yêu cầu hoặc nhiệm vụ</text>
+<ellipse cx="1065.0" cy="763.0" rx="215.0" ry="39.0" fill="#fde2df" stroke="#bd6f69" stroke-width="1.8"/>
+<text x="1065.0" y="758.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Theo dõi trạng thái, sự kiện;</text>
+<text x="1065.0" y="778.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">bổ sung thông tin yêu cầu</text>
+<ellipse cx="1065.0" cy="889.0" rx="215.0" ry="39.0" fill="#fde2df" stroke="#bd6f69" stroke-width="1.8"/>
+<text x="1065.0" y="884.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Nhận hoặc khôi phục quyền truy cập</text>
+<text x="1065.0" y="904.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">yêu cầu sau xác minh</text>
+<ellipse cx="1065.0" cy="1015.0" rx="215.0" ry="39.0" fill="#fde2df" stroke="#bd6f69" stroke-width="1.8"/>
+<text x="1065.0" y="1010.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Xem chiến dịch và đợt</text>
+<text x="1065.0" y="1030.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">quyên góp đã công khai</text>
+<ellipse cx="1065.0" cy="1141.0" rx="215.0" ry="39.0" fill="#fde2df" stroke="#bd6f69" stroke-width="1.8"/>
+<text x="1065.0" y="1136.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Khai báo giao hàng hiện vật;</text>
+<text x="1065.0" y="1156.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">theo dõi khoản quyên góp riêng</text>
+<ellipse cx="1065.0" cy="1267.0" rx="215.0" ry="39.0" fill="#fde2df" stroke="#bd6f69" stroke-width="1.8"/>
+<text x="1065.0" y="1262.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Khôi phục quyền truy cập quyên góp;</text>
+<text x="1065.0" y="1282.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">gửi hoặc xử lý tranh chấp</text>
+<ellipse cx="1555.0" cy="259.0" rx="215.0" ry="39.0" fill="#f8dedd" stroke="#c76761" stroke-width="1.8"/>
+<text x="1555.0" y="254.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Xác minh yêu cầu và</text>
+<text x="1555.0" y="274.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">ghi nhận kết quả</text>
+<ellipse cx="1555.0" cy="385.0" rx="215.0" ry="39.0" fill="#f8dedd" stroke="#c76761" stroke-width="1.8"/>
+<text x="1555.0" y="380.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Ghi nhận liên hệ, bằng chứng</text>
+<text x="1555.0" y="400.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">và kết quả xác minh</text>
+<ellipse cx="1555.0" cy="511.0" rx="215.0" ry="39.0" fill="#f8dedd" stroke="#c76761" stroke-width="1.8"/>
+<text x="1555.0" y="506.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Từ chối yêu cầu hoặc</text>
+<text x="1555.0" y="526.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">liên kết yêu cầu trùng</text>
+<ellipse cx="1555.0" cy="637.0" rx="215.0" ry="39.0" fill="#f8dedd" stroke="#c76761" stroke-width="1.8"/>
+<text x="1555.0" y="632.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Đặt mức ưu tiên do con người quyết định</text>
+<text x="1555.0" y="652.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">và phân loại yêu cầu</text>
+<ellipse cx="1555.0" cy="763.0" rx="215.0" ry="39.0" fill="#f8dedd" stroke="#c76761" stroke-width="1.8"/>
+<text x="1555.0" y="758.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Hủy, giải quyết, đóng</text>
+<text x="1555.0" y="778.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">hoặc mở lại yêu cầu</text>
+<ellipse cx="1555.0" cy="889.0" rx="215.0" ry="39.0" fill="#f8dedd" stroke="#c76761" stroke-width="1.8"/>
+<text x="1555.0" y="884.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Phân công đội cứu hộ</text>
+<text x="1555.0" y="904.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">và quản lý nhiệm vụ</text>
+<ellipse cx="1555.0" cy="1015.0" rx="215.0" ry="39.0" fill="#f8dedd" stroke="#c76761" stroke-width="1.8"/>
+<text x="1555.0" y="1010.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Xem đội đủ điều kiện</text>
+<text x="1555.0" y="1030.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">và gợi ý theo tải công việc</text>
+<ellipse cx="1555.0" cy="1141.0" rx="215.0" ry="39.0" fill="#f8dedd" stroke="#c76761" stroke-width="1.8"/>
+<text x="1555.0" y="1136.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Chấp nhận / từ chối nhiệm vụ;</text>
+<text x="1555.0" y="1156.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">cập nhật tiến độ và kết quả</text>
+<ellipse cx="1555.0" cy="1267.0" rx="215.0" ry="39.0" fill="#f8dedd" stroke="#c76761" stroke-width="1.8"/>
+<text x="1555.0" y="1262.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Điều phối viên ghi tiến độ thay đội</text>
+<text x="1555.0" y="1282.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">chưa dùng ứng dụng (có lưu vết)</text>
+<ellipse cx="1555.0" cy="1393.0" rx="215.0" ry="39.0" fill="#f8dedd" stroke="#c76761" stroke-width="1.8"/>
+<text x="1555.0" y="1388.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Xem bản đồ nhiệt và hàng đợi</text>
+<text x="1555.0" y="1408.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">yêu cầu theo nhóm</text>
+<ellipse cx="1555.0" cy="1519.0" rx="215.0" ry="39.0" fill="#f8dedd" stroke="#c76761" stroke-width="1.8"/>
+<text x="1555.0" y="1514.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Xem nhiệm vụ được giao</text>
+<text x="1555.0" y="1534.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">và lịch sử nhiệm vụ</text>
+<ellipse cx="1555.0" cy="1645.0" rx="215.0" ry="39.0" fill="#f8dedd" stroke="#c76761" stroke-width="1.8"/>
+<text x="1555.0" y="1640.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Quản lý hồ sơ đội, kỹ năng,</text>
+<text x="1555.0" y="1660.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">trạng thái sẵn sàng và vị trí</text>
+<ellipse cx="1555.0" cy="1771.0" rx="215.0" ry="39.0" fill="#fff4d6" stroke="#b7791f" stroke-width="1.8" stroke-dasharray="6 4"/>
+<text x="1555.0" y="1766.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Gợi ý ưu tiên bằng AI</text>
+<text x="1555.0" y="1786.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">(tùy chọn, chưa triển khai)</text>
+<ellipse cx="2045.0" cy="259.0" rx="215.0" ry="39.0" fill="#e6f2df" stroke="#6c9663" stroke-width="1.8"/>
+<text x="2045.0" y="254.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Tạo, công khai, tạm dừng, tiếp tục</text>
+<text x="2045.0" y="274.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">và kết thúc chiến dịch cứu trợ</text>
+<ellipse cx="2045.0" cy="385.0" rx="215.0" ry="39.0" fill="#e6f2df" stroke="#6c9663" stroke-width="1.8"/>
+<text x="2045.0" y="380.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Quản lý đợt quyên góp</text>
+<text x="2045.0" y="400.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">hiện vật</text>
+<ellipse cx="2045.0" cy="511.0" rx="215.0" ry="39.0" fill="#e6f2df" stroke="#6c9663" stroke-width="1.8"/>
+<text x="2045.0" y="506.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Kiểm đếm, thẩm định và ghi sổ</text>
+<text x="2045.0" y="526.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">biên nhận quyên góp</text>
+<ellipse cx="2045.0" cy="637.0" rx="215.0" ry="39.0" fill="#e6f2df" stroke="#6c9663" stroke-width="1.8"/>
+<text x="2045.0" y="632.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Điều chỉnh số lượng biên nhận</text>
+<text x="2045.0" y="652.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">và xử lý tranh chấp</text>
+<ellipse cx="2045.0" cy="763.0" rx="215.0" ry="39.0" fill="#e6f2df" stroke="#6c9663" stroke-width="1.8"/>
+<text x="2045.0" y="758.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Quản lý nhu cầu vật tư</text>
+<text x="2045.0" y="778.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">và cam kết hỗ trợ</text>
+<ellipse cx="2045.0" cy="889.0" rx="215.0" ry="39.0" fill="#e6f2df" stroke="#6c9663" stroke-width="1.8"/>
+<text x="2045.0" y="884.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Dự trữ và tất toán cam kết</text>
+<text x="2045.0" y="904.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">cho yêu cầu đã tiếp nhận</text>
+<ellipse cx="2535.0" cy="259.0" rx="215.0" ry="39.0" fill="#fff0d2" stroke="#ba8b3e" stroke-width="1.8"/>
+<text x="2535.0" y="254.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Quản lý danh mục vật tư, kho,</text>
+<text x="2535.0" y="274.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">phương tiện và điểm cứu trợ</text>
+<ellipse cx="2535.0" cy="385.0" rx="215.0" ry="39.0" fill="#fff0d2" stroke="#ba8b3e" stroke-width="1.8"/>
+<text x="2535.0" y="380.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Chuẩn bị, phê duyệt, xuất kho</text>
+<text x="2535.0" y="400.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">và đối soát phân phối</text>
+<ellipse cx="2535.0" cy="511.0" rx="215.0" ry="39.0" fill="#fff0d2" stroke="#ba8b3e" stroke-width="1.8"/>
+<text x="2535.0" y="506.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Ghi nhận bàn giao tại hộ / điểm;</text>
+<text x="2535.0" y="526.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">hàng trả hoặc thất lạc</text>
+<ellipse cx="2535.0" cy="637.0" rx="215.0" ry="39.0" fill="#fff0d2" stroke="#ba8b3e" stroke-width="1.8"/>
+<text x="2535.0" y="632.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Yêu cầu và thẩm định độc lập</text>
+<text x="2535.0" y="652.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">việc điều chỉnh tồn kho</text>
+<ellipse cx="2535.0" cy="763.0" rx="215.0" ry="39.0" fill="#edf0f3" stroke="#7a8491" stroke-width="1.8" stroke-dasharray="6 4"/>
+<text x="2535.0" y="758.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Kiểm kê tồn kho</text>
+<text x="2535.0" y="778.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">(hoãn triển khai)</text>
+<ellipse cx="3025.0" cy="259.0" rx="215.0" ry="39.0" fill="#e2edfa" stroke="#6485ae" stroke-width="1.8"/>
+<text x="3025.0" y="254.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Xem bảng điều khiển và báo cáo</text>
+<text x="3025.0" y="274.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">theo phạm vi</text>
+<ellipse cx="3025.0" cy="385.0" rx="215.0" ry="39.0" fill="#e2edfa" stroke="#6485ae" stroke-width="1.8"/>
+<text x="3025.0" y="380.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Xem dữ liệu tổng hợp về yêu cầu,</text>
+<text x="3025.0" y="400.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">quyên góp, kho, đáp ứng và đối soát</text>
+<path d="M130,1600 L130,1340" fill="none" stroke="#334155" stroke-width="1.6" marker-end="url(#generalization)"/>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="130" cy="394" r="11"/><path d="M130,405 V439 M107,419 H153 M130,439 L109,465 M130,439 L151,465"/></g>
+<text x="130" y="486" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#111827">Khách / người báo tin</text>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="130" cy="804" r="11"/><path d="M130,815 V849 M107,829 H153 M130,849 L109,875 M130,849 L151,875"/></g>
+<text x="130" y="896" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#111827">Công dân</text>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="130" cy="1264" r="11"/><path d="M130,1275 V1309 M107,1289 H153 M130,1309 L109,1335 M130,1309 L151,1335"/></g>
+<text x="130" y="1356" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#111827">Tình nguyện viên / thành viên đội</text>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="130" cy="1644" r="11"/><path d="M130,1655 V1689 M107,1669 H153 M130,1689 L109,1715 M130,1689 L151,1715"/></g>
+<text x="130" y="1736" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#111827">Đội trưởng đang hoạt động</text>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="3500" cy="219" r="11"/><path d="M3500,230 V264 M3477,244 H3523 M3500,264 L3479,290 M3500,264 L3521,290"/></g>
+<text x="3500" y="311" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#111827">Điều phối viên theo phạm vi</text>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="3500" cy="464" r="11"/><path d="M3500,475 V509 M3477,489 H3523 M3500,509 L3479,535 M3500,509 L3521,535"/></g>
+<text x="3500" y="556" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#111827">Quản lý chiến dịch</text>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="3500" cy="709" r="11"/><path d="M3500,720 V754 M3477,734 H3523 M3500,754 L3479,780 M3500,754 L3521,780"/></g>
+<text x="3500" y="801" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#111827">Quản lý vận hành</text>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="3500" cy="954" r="11"/><path d="M3500,965 V999 M3477,979 H3523 M3500,999 L3479,1025 M3500,999 L3521,1025"/></g>
+<text x="3500" y="1046" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#111827">Nhân viên tiếp nhận</text>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="3500" cy="1199" r="11"/><path d="M3500,1210 V1244 M3477,1224 H3523 M3500,1244 L3479,1270 M3500,1244 L3521,1270"/></g>
+<text x="3500" y="1291" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#111827">Người thẩm định</text>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="3500" cy="1444" r="11"/><path d="M3500,1455 V1489 M3477,1469 H3523 M3500,1489 L3479,1515 M3500,1489 L3521,1515"/></g>
+<text x="3500" y="1536" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#111827">Nhân viên phân phối</text>
+<g fill="none" stroke="#334155" stroke-width="2"><circle cx="3500" cy="1689" r="11"/><path d="M3500,1700 V1734 M3477,1714 H3523 M3500,1734 L3479,1760 M3500,1734 L3521,1760"/></g>
+<text x="3500" y="1781" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#111827">Quản trị viên</text>
+<rect x="365" y="1824" width="22" height="18" rx="3" fill="#eef0f8" stroke="#656b9b"/>
+<text x="395" y="1838" font-family="Arial,sans-serif" font-size="13" fill="#374151">Định danh / quyền truy cập</text>
+<rect x="845" y="1824" width="22" height="18" rx="3" fill="#fde2df" stroke="#bd6f69"/>
+<text x="875" y="1838" font-family="Arial,sans-serif" font-size="13" fill="#374151">Công dân / công khai</text>
+<rect x="1325" y="1824" width="22" height="18" rx="3" fill="#f8dedd" stroke="#c76761"/>
+<text x="1355" y="1838" font-family="Arial,sans-serif" font-size="13" fill="#374151">Ứng cứu / cứu hộ</text>
+<rect x="1805" y="1824" width="22" height="18" rx="3" fill="#e6f2df" stroke="#6c9663"/>
+<text x="1835" y="1838" font-family="Arial,sans-serif" font-size="13" fill="#374151">Chiến dịch / quyên góp</text>
+<rect x="2285" y="1824" width="22" height="18" rx="3" fill="#fff0d2" stroke="#ba8b3e"/>
+<text x="2315" y="1838" font-family="Arial,sans-serif" font-size="13" fill="#374151">Vật tư / phân phối</text>
+<rect x="2765" y="1824" width="22" height="18" rx="3" fill="#e2edfa" stroke="#6485ae"/>
+<text x="2795" y="1838" font-family="Arial,sans-serif" font-size="13" fill="#374151">Báo cáo</text>
+<rect x="365" y="1855" width="22" height="18" rx="3" fill="#fff4d6" stroke="#b7791f" stroke-dasharray="5 3"/>
+<text x="395" y="1869" font-family="Arial,sans-serif" font-size="13" fill="#374151">Tùy chọn / chưa triển khai</text>
+<rect x="700" y="1855" width="22" height="18" rx="3" fill="#edf0f3" stroke="#7a8491" stroke-dasharray="5 3"/>
+<text x="730" y="1869" font-family="Arial,sans-serif" font-size="13" fill="#374151">Hoãn triển khai</text>
+<text x="1795" y="1869" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" fill="#475569">Các đường nối biểu thị quyền năng; thao tác vẫn cần quyền được cấp, phạm vi, quyền sở hữu và quan hệ với đội. Sơ đồ mô tả API hiện có; chưa gồm giao diện web/di động và dịch vụ bản đồ, thời tiết, thanh toán, AI bên ngoài. «include»: luôn bao gồm; «extend»: mở rộng tùy điều kiện.</text>
+</svg>
