@@ -152,3 +152,131 @@ export const TIMELINE_EVENT_LABELS: Record<string, { title: string; desc: string
     desc: 'Hồ sơ cứu hộ đã được gắn chính thức vào tài khoản cá nhân của bạn.',
   },
 };
+
+// Hàm định dạng thông báo tiếng Việt thân thiện, loại bỏ hoàn toàn JSON kỹ thuật
+export function formatNoticeDisplay(notice: any): {
+  title: string;
+  message: string;
+  requestId?: string;
+  isUrgent?: boolean;
+} {
+  if (!notice) {
+    return { title: 'Thông Báo Cứu Trợ', message: 'Không có chi tiết thông báo.' };
+  }
+
+  const payload = notice.payload || {};
+  const code = (
+    payload.text_code ||
+    notice.notice_type ||
+    payload.event_type ||
+    notice.type ||
+    ''
+  ).toUpperCase();
+
+  const explicitTitle = typeof payload.title === 'string' && payload.title.trim() ? payload.title.trim() : '';
+  const explicitMessage = typeof payload.message === 'string' && payload.message.trim() ? payload.message.trim() : '';
+
+  const requestId = payload.request_id || payload.requestId || notice.request_id;
+  const shortId = requestId ? String(requestId).slice(0, 8).toUpperCase() : '';
+
+  const NOTICES_MAP: Record<string, { title: string; message: string; isUrgent?: boolean }> = {
+    REQUEST_SUBMITTED: {
+      title: 'Đã Tiếp Nhận Hồ Sơ Cứu Hộ',
+      message: 'Hệ thống đã tiếp nhận yêu cầu cứu trợ của bạn và chuyển đến trung tâm điều phối khu vực.',
+    },
+    REQUEST_VERIFYING: {
+      title: 'Điều Phối Viên Đang Xác Minh',
+      message: 'Hồ sơ đang được nhân sự điều phối thẩm định dữ kiện và kiểm tra liên lạc hiện trường.',
+    },
+    REQUEST_VERIFIED: {
+      title: 'Hồ Sơ Đã Được Xác Minh',
+      message: 'Hồ sơ cứu trợ của bạn đã được xác minh thành công và chuyển sang khâu xếp mức ưu tiên.',
+    },
+    REQUEST_TRIAGED: {
+      title: 'Đã Xếp Mức Độ Ưu Tiên Ứng Cứu',
+      message: 'Ban chỉ huy cứu trợ đã đánh giá mức độ khẩn cấp và đang sắp xếp đội cứu nạn cơ động phù hợp để triển khai.',
+    },
+    REQUEST_DISPATCHED: {
+      title: 'Đang Điều Phối Đội Cứu Nạn',
+      message: 'Lệnh điều động đã được phát đi. Đội cứu hộ gần vị trí của bạn nhất đang chuẩn bị xuất phát.',
+      isUrgent: true,
+    },
+    REQUEST_IN_PROGRESS: {
+      title: 'Đội Cứu Hộ Đang Đến Hiện Trường',
+      message: 'Lực lượng cứu hộ đang trên đường di chuyển và tiếp cận điểm cứu nạn của bạn. Vui lòng giữ liên lạc và tiết kiệm pin!',
+      isUrgent: true,
+    },
+    REQUEST_RESOLVED: {
+      title: 'Nhiệm Vụ Cứu Hộ Hoàn Tất',
+      message: 'Công tác ứng cứu và cứu trợ đối với hồ sơ của bạn đã được thực hiện thành công và hoàn tất an toàn.',
+    },
+    REQUEST_CLOSED: {
+      title: 'Hồ Sơ Cứu Hộ Đã Đóng',
+      message: 'Hồ sơ yêu cầu cứu nạn của bạn đã kết thúc toàn bộ quy trình xử lý trên hệ thống.',
+    },
+    REQUEST_REJECTED: {
+      title: 'Thông Báo Về Yêu Cầu Cứu Trợ',
+      message: 'Hồ sơ chưa đủ điều kiện tiếp nhận cứu nạn khẩn cấp hoặc không liên lạc được với người báo sau nhiều lần thử.',
+    },
+    REQUEST_OVERDUE: {
+      title: 'Cảnh Báo Quá Hạn Xử Lý',
+      message: 'Hồ sơ yêu cầu đang được đôn đốc chuyển tiếp để đội cứu hộ xử lý khẩn trương nhất.',
+      isUrgent: true,
+    },
+    MISSION_OFFERED: {
+      title: 'Nhiệm Vụ Cứu Hộ Mới',
+      message: 'Đội của bạn vừa nhận được lời mời tham gia nhiệm vụ cứu hộ khẩn cấp. Vui lòng phản hồi sớm.',
+      isUrgent: true,
+    },
+    MISSION_ASSIGNED: {
+      title: 'Phân Công Nhiệm Vụ Mới',
+      message: 'Ban điều phối đã chính thức phân công nhiệm vụ cứu trợ cho đội của bạn.',
+      isUrgent: true,
+    },
+    MISSION_ACCEPTED: {
+      title: 'Đội Cứu Hộ Đã Nhận Nhiệm Vụ',
+      message: 'Đội trưởng đội cứu trợ đã xác nhận tiếp nhận nhiệm vụ và bắt đầu triển khai phương án.',
+    },
+    MISSION_EN_ROUTE: {
+      title: 'Đội Cứu Hộ Đang Di Chuyển',
+      message: 'Phương tiện cứu trợ (xuồng máy/xe lội nước) đang trên lộ trình tiếp cận hiện trường.',
+      isUrgent: true,
+    },
+    MISSION_ON_SCENE: {
+      title: 'Đội Cứu Hộ Đã Đến Vị Trí',
+      message: 'Lực lượng cứu nạn đã có mặt tại điểm ghim và bắt đầu công tác ứng cứu trực tiếp.',
+      isUrgent: true,
+    },
+    MISSION_COMPLETED: {
+      title: 'Nhiệm Vụ Cứu Nạn Hoàn Thành',
+      message: 'Đội cứu hộ đã đưa nạn nhân đến vị trí an toàn hoặc cấp phát xong nhu yếu phẩm cần thiết.',
+    },
+    REPORTER_SUPPLEMENT: {
+      title: 'Ghi Nhận Thông Tin Bổ Sung',
+      message: 'Ghi chú và hình ảnh hiện trường mới của bạn đã được cập nhật thành công vào hồ sơ theo dõi.',
+    },
+  };
+
+  const matched = NOTICES_MAP[code];
+  const finalTitle = explicitTitle || matched?.title || 'Thông Báo Cứu Trợ';
+  let finalMessage = explicitMessage || matched?.message;
+
+  if (!finalMessage) {
+    if (code) {
+      finalMessage = `Hệ thống ghi nhận sự kiện cập nhật tiến độ: ${code}. Ban chỉ huy đang tiếp tục giám sát xử lý.`;
+    } else {
+      finalMessage = 'Bạn có thông báo mới từ trung tâm điều phối cứu trợ.';
+    }
+  }
+
+  if (shortId) {
+    finalMessage += `\n\n(Mã hồ sơ: #${shortId})`;
+  }
+
+  return {
+    title: finalTitle,
+    message: finalMessage,
+    requestId: requestId ? String(requestId) : undefined,
+    isUrgent: matched?.isUrgent || false,
+  };
+}

@@ -252,14 +252,17 @@ export const SOSTrackingScreen: React.FC = () => {
                     title: evt.public_text_code || evt.event_type,
                     desc: 'Hệ thống điều phối đã ghi nhận cập nhật tiến độ.',
                   };
-                const timeStr = evt.occurred_at
-                  ? new Date(evt.occurred_at).toLocaleTimeString('vi-VN', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      day: '2-digit',
-                      month: '2-digit',
-                    })
-                  : undefined;
+                let timeStr: string | undefined = undefined;
+                if (evt.occurred_at) {
+                  const d = new Date(evt.occurred_at);
+                  if (!isNaN(d.getTime())) {
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const mm = String(d.getMinutes()).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const mo = String(d.getMonth() + 1).padStart(2, '0');
+                    timeStr = `${hh}:${mm} · ${dd}/${mo}`;
+                  }
+                }
                 const isLastItem = idx === data.timeline.length - 1;
 
                 return (
@@ -279,7 +282,16 @@ export const SOSTrackingScreen: React.FC = () => {
                 <TimelineStep
                   title="1. Đã gửi yêu cầu đến trung tâm"
                   description="Hệ thống đã ghi nhận tọa độ GPS và thông tin ban đầu."
-                  timestamp={data.received_at ? new Date(data.received_at).toLocaleTimeString('vi-VN') : undefined}
+                  timestamp={
+                    data.received_at
+                      ? `${String(new Date(data.received_at).getHours()).padStart(2, '0')}:${String(
+                          new Date(data.received_at).getMinutes()
+                        ).padStart(2, '0')} · ${String(new Date(data.received_at).getDate()).padStart(
+                          2,
+                          '0'
+                        )}/${String(new Date(data.received_at).getMonth() + 1).padStart(2, '0')}`
+                      : undefined
+                  }
                   isCompleted={true}
                   isCurrent={data.status === 'SUBMITTED'}
                 />

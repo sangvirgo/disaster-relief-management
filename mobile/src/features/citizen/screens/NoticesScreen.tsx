@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { ResponseApi } from '../../../api/responseApi';
 import { NoticeItem } from '../../../types/api';
+import { formatNoticeDisplay } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
 import { Bell, AlertCircle, CheckCircle2, ChevronRight, RefreshCw, X } from 'lucide-react-native';
 
@@ -117,8 +118,9 @@ export const NoticesScreen: React.FC = () => {
         >
           {notices.map((item) => {
             const isUnread = !item.read_at;
-            const title = (item.payload?.title as string) || 'Thông báo điều phối cứu trợ';
-            const message = (item.payload?.message as string) || '';
+            const formatted = formatNoticeDisplay(item);
+            const title = formatted.title;
+            const message = formatted.message;
 
             return (
               <TouchableOpacity
@@ -171,44 +173,48 @@ export const NoticesScreen: React.FC = () => {
       {/* MODAL CHI TIẾT THÔNG BÁO */}
       <Modal visible={!!selectedNotice} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderLeft}>
-                <Bell size={22} color={THEME.colors.primary.main} />
-                <Text style={styles.modalTitle}>
-                  {(selectedNotice?.payload?.title as string) || 'Chi Tiết Thông Báo'}
+          {(() => {
+            const formatted = selectedNotice ? formatNoticeDisplay(selectedNotice) : null;
+            return (
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalHeaderLeft}>
+                    <Bell size={22} color={THEME.colors.primary.main} />
+                    <Text style={styles.modalTitle} numberOfLines={1}>
+                      {formatted?.title || 'Chi Tiết Thông Báo'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.closeBtn}
+                    onPress={() => setSelectedNotice(null)}
+                  >
+                    <X size={20} color={THEME.colors.text.secondary} />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.modalTime}>
+                  Thời gian:{' '}
+                  {selectedNotice?.created_at
+                    ? new Date(selectedNotice.created_at).toLocaleString('vi-VN')
+                    : ''}
                 </Text>
+
+                <ScrollView style={styles.modalBody}>
+                  <Text style={styles.modalMessageText}>
+                    {formatted?.message || 'Không có nội dung chi tiết.'}
+                  </Text>
+                </ScrollView>
+
+                <TouchableOpacity
+                  style={styles.modalCloseButton}
+                  onPress={() => setSelectedNotice(null)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.modalCloseButtonText}>Đã Hiểu</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={styles.closeBtn}
-                onPress={() => setSelectedNotice(null)}
-              >
-                <X size={20} color={THEME.colors.text.secondary} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalTime}>
-              Thời gian phát lệnh:{' '}
-              {selectedNotice?.created_at
-                ? new Date(selectedNotice.created_at).toLocaleString('vi-VN')
-                : ''}
-            </Text>
-
-            <ScrollView style={styles.modalBody}>
-              <Text style={styles.modalMessageText}>
-                {(selectedNotice?.payload?.message as string) ||
-                  JSON.stringify(selectedNotice?.payload, null, 2)}
-              </Text>
-            </ScrollView>
-
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setSelectedNotice(null)}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.modalCloseButtonText}>Đã Hiểu</Text>
-            </TouchableOpacity>
-          </View>
+            );
+          })()}
         </View>
       </Modal>
     </ScreenContainer>

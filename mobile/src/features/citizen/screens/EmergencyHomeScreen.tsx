@@ -7,6 +7,7 @@ import { THEME } from '../../../constants/theme';
 import { useAuthStore } from '../../../store/authStore';
 import { ResponseApi } from '../../../api/responseApi';
 import { NoticeItem } from '../../../types/api';
+import { formatNoticeDisplay } from '../../../constants/labels';
 import {
   PhoneCall,
   Search,
@@ -230,7 +231,8 @@ export const EmergencyHomeScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
           {notices.slice(0, 3).map((n) => {
-            const title = (n.payload?.title as string) || 'Thông báo cứu trợ';
+            const formatted = formatNoticeDisplay(n);
+            const title = formatted.title;
             const isUnread = !n.read_at;
             return (
               <TouchableOpacity
@@ -384,24 +386,26 @@ export const EmergencyHomeScreen: React.FC = () => {
       <Modal visible={!!selectedNotice} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.noticeModalContent}>
-            <View style={styles.noticeModalHeader}>
-              <Bell size={22} color={THEME.colors.primary.main} />
-              <Text style={styles.noticeModalTitle}>
-                {(selectedNotice?.payload?.title as string) || 'Thông Báo Cứu Trợ'}
-              </Text>
-            </View>
-            <Text style={styles.noticeModalTime}>
-              Thời gian:{' '}
-              {selectedNotice?.created_at
-                ? new Date(selectedNotice.created_at).toLocaleString('vi-VN')
-                : ''}
-            </Text>
-            <View style={styles.noticeModalBody}>
-              <Text style={styles.noticeModalText}>
-                {(selectedNotice?.payload?.message as string) ||
-                  JSON.stringify(selectedNotice?.payload || {})}
-              </Text>
-            </View>
+            {(() => {
+              const formatted = formatNoticeDisplay(selectedNotice);
+              return (
+                <>
+                  <View style={styles.noticeModalHeader}>
+                    <Bell size={22} color={THEME.colors.primary.main} />
+                    <Text style={styles.noticeModalTitle}>{formatted.title}</Text>
+                  </View>
+                  <Text style={styles.noticeModalTime}>
+                    Thời gian:{' '}
+                    {selectedNotice?.created_at
+                      ? new Date(selectedNotice.created_at).toLocaleString('vi-VN')
+                      : ''}
+                  </Text>
+                  <View style={styles.noticeModalBody}>
+                    <Text style={styles.noticeModalText}>{formatted.message}</Text>
+                  </View>
+                </>
+              );
+            })()}
             <TouchableOpacity
               style={styles.noticeModalCloseBtn}
               onPress={() => setSelectedNotice(null)}

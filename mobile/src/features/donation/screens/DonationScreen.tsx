@@ -333,6 +333,13 @@ export const DonationScreen: React.FC = () => {
     }
   };
 
+  const formatNumberVN = (val: number | string | undefined | null): string => {
+    if (val === undefined || val === null || val === '') return '0';
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    if (isNaN(num)) return '0';
+    return new Intl.NumberFormat('vi-VN').format(num);
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'DECLARED':
@@ -370,19 +377,76 @@ export const DonationScreen: React.FC = () => {
           </Text>
         </View>
 
-        {/* Danh mục hàng cứu trợ đang cần */}
+        {/* Danh mục hàng cứu trợ đang cần & tiến độ tiếp nhận */}
         <View style={styles.itemsSection}>
-          <Text style={styles.itemsHeader}>NHU YẾU PHẨM ĐANG KÊU GỌI:</Text>
+          <Text style={styles.itemsHeader}>TIẾN ĐỘ TIẾP NHẬN NHU YẾU PHẨM:</Text>
           {item.items &&
-            item.items.map((it) => (
-              <View key={it.item_id} style={styles.itemRow}>
-                <Package size={16} color={THEME.colors.primary.main} />
-                <Text style={styles.itemName}>{it.item_name || it.name}</Text>
-                <Text style={styles.itemQuantity}>
-                  Mục tiêu: {it.target_quantity} {it.unit_name || 'đơn vị'}
-                </Text>
-              </View>
-            ))}
+            item.items.map((it) => {
+              const target = Number(it.target_quantity) || 0;
+              const accepted = Number(it.accepted_total) || 0;
+              const remaining = Math.max(0, target - accepted);
+              const pct = target > 0 ? Math.min(100, Math.round((accepted / target) * 100)) : 0;
+              const unit = it.unit_name || 'đơn vị';
+              const isFulfilled = remaining === 0 && target > 0;
+
+              return (
+                <View key={it.item_id} style={styles.itemProgressCard}>
+                  <View style={styles.itemHeaderRow}>
+                    <View style={styles.itemNameWrapper}>
+                      <Package size={15} color={THEME.colors.primary.main} />
+                      <Text style={styles.itemName} numberOfLines={1}>
+                        {it.item_name || it.name}
+                      </Text>
+                    </View>
+                    <View style={[styles.itemPctBadge, isFulfilled ? styles.itemPctBadgeSuccess : null]}>
+                      <Text style={[styles.itemPctText, isFulfilled ? styles.itemPctTextSuccess : null]}>
+                        {isFulfilled ? 'Đã đủ 100%' : `${pct}%`}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Thanh tiến độ */}
+                  <View style={styles.progressBarTrack}>
+                    <View
+                      style={[
+                        styles.progressBarFill,
+                        { width: `${pct}%` },
+                        isFulfilled ? styles.progressBarFillSuccess : null,
+                      ]}
+                    />
+                  </View>
+
+                  {/* 3 cột chi tiết: Mục tiêu - Đã quyên góp - Còn thiếu */}
+                  <View style={styles.itemStatsRow}>
+                    <View style={styles.itemStatCol}>
+                      <Text style={styles.itemStatLabel}>Mục tiêu</Text>
+                      <Text style={styles.itemStatValue}>
+                        {formatNumberVN(target)} {unit}
+                      </Text>
+                    </View>
+
+                    <View style={styles.itemStatCol}>
+                      <Text style={styles.itemStatLabel}>Đã quyên góp</Text>
+                      <Text style={[styles.itemStatValue, styles.itemStatAccepted]}>
+                        {formatNumberVN(accepted)} {unit}
+                      </Text>
+                    </View>
+
+                    <View style={styles.itemStatCol}>
+                      <Text style={styles.itemStatLabel}>Còn thiếu</Text>
+                      <Text
+                        style={[
+                          styles.itemStatValue,
+                          remaining > 0 ? styles.itemStatRemaining : styles.itemStatDone,
+                        ]}
+                      >
+                        {remaining > 0 ? `${formatNumberVN(remaining)} ${unit}` : 'Đã đủ'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
         </View>
 
         <TouchableOpacity
@@ -762,21 +826,35 @@ export const DonationScreen: React.FC = () => {
 
             <Text style={[styles.inputLabel, { marginTop: 12 }]}>Số lượng từng loại hiện vật:</Text>
             {selectedDrive?.items &&
-              selectedDrive.items.map((it) => (
-                <View key={it.item_id} style={styles.modalItemRow}>
-                  <Text style={styles.modalItemName}>
-                    {it.item_name || it.name} ({it.unit_name || 'đơn vị'}):
-                  </Text>
-                  <TextInput
-                    style={styles.modalItemInput}
-                    placeholder="0"
-                    placeholderTextColor={THEME.colors.text.muted}
-                    keyboardType="numeric"
-                    value={quantities[it.item_id] || ''}
-                    onChangeText={(t) => handleQuantityChange(it.item_id, t)}
-                  />
-                </View>
-              ))}
+              selectedDrive.items.map((it) => {
+                const target = Number(it.target_quantity) || 0;
+                const accepted = Number(it.accepted_total) || 0;
+                const remaining = Math.max(0, target - accepted);
+                const unit = it.unit_name || 'đơn vị';
+
+                return (
+                  <View key={it.item_id} style={styles.modalItemRow}>
+                    <View style={{ flex: 1, marginRight: 10 }}>
+                      <Text style={styles.modalItemName}>
+                        {it.item_name || it.name} ({unit})
+                      </Text>
+                      <Text style={styles.modalItemRemaining}>
+                        {remaining > 0
+                          ? `Đang cần thêm: ${formatNumberVN(remaining)} ${unit}`
+                          : `Đã đủ mục tiêu (${formatNumberVN(target)} ${unit})`}
+                      </Text>
+                    </View>
+                    <TextInput
+                      style={styles.modalItemInput}
+                      placeholder="0"
+                      placeholderTextColor={THEME.colors.text.muted}
+                      keyboardType="numeric"
+                      value={quantities[it.item_id] || ''}
+                      onChangeText={(t) => handleQuantityChange(it.item_id, t)}
+                    />
+                  </View>
+                );
+              })}
 
             {/* ĐÍNH KÈM ẢNH KIỆN HÀNG */}
             <View style={styles.donationPhotoSection}>
@@ -977,28 +1055,112 @@ const styles = StyleSheet.create({
   itemsSection: {
     backgroundColor: THEME.colors.surface.background,
     padding: 12,
-    borderRadius: 10,
-    marginVertical: 6,
+    borderRadius: 12,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
   },
   itemsHeader: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
-    color: THEME.colors.text.muted,
-    marginBottom: 6,
+    color: THEME.colors.text.secondary,
+    marginBottom: 8,
     letterSpacing: 0.5,
+  },
+  itemProgressCard: {
+    backgroundColor: THEME.colors.surface.card,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+  },
+  itemHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  itemNameWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  itemName: {
+    fontSize: THEME.typography.fontSizes.xs + 1,
+    fontWeight: '700',
+    color: THEME.colors.text.primary,
+    marginLeft: 6,
+    flex: 1,
+  },
+  itemPctBadge: {
+    backgroundColor: THEME.colors.primary.bg,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: THEME.colors.primary.border,
+  },
+  itemPctBadgeSuccess: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#86EFAC',
+  },
+  itemPctText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: THEME.colors.primary.main,
+  },
+  itemPctTextSuccess: {
+    color: '#16A34A',
+  },
+  progressBarTrack: {
+    height: 6,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 3,
+    marginVertical: 8,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: THEME.colors.primary.main,
+    borderRadius: 3,
+  },
+  progressBarFillSuccess: {
+    backgroundColor: '#16A34A',
+  },
+  itemStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 2,
+  },
+  itemStatCol: {
+    flex: 1,
+  },
+  itemStatLabel: {
+    fontSize: 10,
+    color: THEME.colors.text.muted,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  itemStatValue: {
+    fontSize: 11,
+    color: THEME.colors.text.primary,
+    fontWeight: '700',
+  },
+  itemStatAccepted: {
+    color: '#16A34A',
+  },
+  itemStatRemaining: {
+    color: THEME.colors.emergency.main,
+  },
+  itemStatDone: {
+    color: THEME.colors.text.muted,
   },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 4,
-  },
-  itemName: {
-    fontSize: THEME.typography.fontSizes.xs,
-    fontWeight: '600',
-    color: THEME.colors.text.primary,
-    flex: 1,
-    marginLeft: 6,
   },
   itemQuantity: {
     fontSize: 11,
@@ -1338,8 +1500,13 @@ const styles = StyleSheet.create({
   modalItemName: {
     fontSize: THEME.typography.fontSizes.xs + 1,
     color: THEME.colors.text.primary,
+    fontWeight: '700',
+  },
+  modalItemRemaining: {
+    fontSize: 11,
+    color: THEME.colors.emergency.main,
+    marginTop: 2,
     fontWeight: '600',
-    flex: 1,
   },
   modalItemInput: {
     width: 90,

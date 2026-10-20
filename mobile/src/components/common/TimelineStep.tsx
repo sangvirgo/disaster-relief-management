@@ -87,16 +87,20 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
     paddingBottom: 20,
+    overflow: 'hidden',
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: 8,
   },
   title: {
+    flex: 1,
     fontSize: THEME.typography.fontSizes.sm,
     fontWeight: '600',
     color: THEME.colors.text.secondary,
+    lineHeight: 20,
   },
   activeTitle: {
     color: THEME.colors.primary.main,
@@ -109,6 +113,9 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 11,
     color: THEME.colors.text.muted,
+    flexShrink: 0,
+    marginTop: 2,
+    textAlign: 'right',
   },
   description: {
     fontSize: THEME.typography.fontSizes.xs,
