@@ -24,5 +24,6 @@ COPY --from=build --chown=node:node /workspace/backend/schema ./schema
 COPY --from=build --chown=node:node /workspace/backend/docs/backend/07-error-catalog.md ./docs/backend/07-error-catalog.md
 COPY --from=build --chown=node:node /workspace/backend/seed ./seed
 COPY --from=build --chown=node:node /workspace/backend/scripts ./scripts
+COPY --chown=node:node contracts/openapi/identity.json ./contracts/openapi/identity.json
 USER node
 CMD ["node", "dist/apps/identity/src/main.js"]

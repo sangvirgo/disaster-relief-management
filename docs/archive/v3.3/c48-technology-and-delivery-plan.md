@@ -1106,47 +1106,28 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 ## 9. Main use cases
 
-### 9.0 Actor and use-case diagrams
+### 9.0 Sơ đồ tác nhân và ca sử dụng
 
-![Response use cases](../../diagrams/c48-response-use-cases.svg)
+![Sơ đồ ca sử dụng ứng cứu](../../diagrams/c48-response-use-cases.svg)
 
-[Editable response UML](../../diagrams/c48-response-use-cases.drawio). Actors are outside the system boundary, use cases are ellipses, associations are solid lines. UC-01 describes common SOS intake; UC-15 specializes it for remote PROXY and requires a signed-in citizen. It is not a mandatory substep of every SOS. Verification (UC-02) is a prerequisite for assignment, not a diagram arrow claiming automatic execution. Team leader specializes the team-member actor and inherits UC-17 read access; UC-18 (team profile, availability, position) is associated with the leader and, for app-less teams, the coordinator. UC-03 has one ellipse associated only with coordinator/active leader; membership alone cannot accept or advance missions.
+[Mở nguồn Draw.io để chỉnh sửa](../../diagrams/c48-response-use-cases.drawio). Tác nhân nằm ngoài ranh giới hệ thống; ca sử dụng nằm trong hình bầu dục. Gửi cứu trợ thông thường không bắt buộc đăng nhập; báo giúp từ xa cần công dân đã đăng nhập. Yêu cầu phải được xác minh trước khi phân công. Chỉ điều phối viên hoặc đội trưởng đang hoạt động mới thực hiện thao tác nhiệm vụ.
 
-![Donation and support use cases](../../diagrams/c48-donation-use-cases.svg)
+![Sơ đồ ca sử dụng quyên góp và hỗ trợ](../../diagrams/c48-donation-use-cases.svg)
 
-[Editable donation UML](../../diagrams/c48-donation-use-cases.drawio). A guest donor and an authenticated donor can perform UC-11; there is no include-login relationship. Intake and independent review are distinct participating actors in UC-12. Warehouse staff do not inherit campaign, verification, dispatch or account-administration permissions. UC-14 stocktakes and UC-07 AI are deferred extensions and are absent from core diagrams. UC-05 and UC-06 appear as support use cases; sensitive reports still require operational scope.
+[Mở nguồn Draw.io để chỉnh sửa](../../diagrams/c48-donation-use-cases.drawio). Khách và công dân đã đăng nhập đều có thể khai báo quyên góp. Nhân viên tiếp nhận và người thẩm định độc lập là hai vai trò riêng; nhân viên kho chỉ thực hiện thao tác vật tư đã được cấp quyền.
 
 
-![Management use cases](../../diagrams/c48-management-use-cases.svg)
+![Sơ đồ ca sử dụng chiến dịch, phân bổ và quản trị](../../diagrams/c48-management-use-cases.svg)
 
-[Editable management UML](../../diagrams/c48-management-use-cases.drawio). Completes core actor coverage for UC-04, UC-08 and UC-09, with UC-05/06 support. Supply staff execute scoped approved actions; campaign ownership and account administration remain distinct. All core use-case IDs are represented across the three actor views; optional UC-07 and deferred UC-14 remain in text only.
+[Mở nguồn Draw.io để chỉnh sửa](../../diagrams/c48-management-use-cases.drawio). Sơ đồ tập trung vào cam kết cứu trợ, chiến dịch, kho và điểm cứu trợ; báo cáo và quản lý quyền là các chức năng hỗ trợ riêng.
 
-#### Per-use-case diagrams
+#### Sơ đồ ca sử dụng tổng thể
 
-Each use case has its own UML diagram (actors outside the boundary, «include»/«extend» sub-flows, neighbouring use cases dashed, key rules below) with an editable `.drawio` source in `diagrams/use-cases/`:
+Các sơ đồ riêng lẻ theo từng mã UC đã được gộp vào sơ đồ tổng thể bên dưới. Hình bầu dục ghi tên chức năng, không chèn mã yêu cầu. Gợi ý AI được đánh dấu tùy chọn; kiểm kê tồn kho được đánh dấu hoãn triển khai. Ba sơ đồ theo lĩnh vực phía trên là các góc nhìn bổ trợ.
 
-| Use case | Diagram | Editable |
-|---|---|---|
-| UC-01 — Submit SOS | ![UC-01](../../diagrams/use-cases/UC-01.svg) | [UC-01.drawio](../../diagrams/use-cases/UC-01.drawio) |
-| UC-02 — Verify and triage | ![UC-02](../../diagrams/use-cases/UC-02.svg) | [UC-02.drawio](../../diagrams/use-cases/UC-02.drawio) |
-| UC-03 — Assign and accept mission | ![UC-03](../../diagrams/use-cases/UC-03.svg) | [UC-03.drawio](../../diagrams/use-cases/UC-03.drawio) |
-| UC-04 — Commit and partially fulfill need | ![UC-04](../../diagrams/use-cases/UC-04.svg) | [UC-04.drawio](../../diagrams/use-cases/UC-04.drawio) |
-| UC-05 — Dashboard and reports | ![UC-05](../../diagrams/use-cases/UC-05.svg) | [UC-05.drawio](../../diagrams/use-cases/UC-05.drawio) |
-| UC-06 — Accounts and permissions | ![UC-06](../../diagrams/use-cases/UC-06.svg) | [UC-06.drawio](../../diagrams/use-cases/UC-06.drawio) |
-| UC-07 — AI priority suggestion (optional) | ![UC-07](../../diagrams/use-cases/UC-07.svg) | [UC-07.drawio](../../diagrams/use-cases/UC-07.drawio) |
-| UC-08 — Relief campaign | ![UC-08](../../diagrams/use-cases/UC-08.svg) | [UC-08.drawio](../../diagrams/use-cases/UC-08.drawio) |
-| UC-09 — Vehicles and relief points | ![UC-09](../../diagrams/use-cases/UC-09.svg) | [UC-09.drawio](../../diagrams/use-cases/UC-09.drawio) |
-| UC-10 — Donation drive | ![UC-10](../../diagrams/use-cases/UC-10.svg) | [UC-10.drawio](../../diagrams/use-cases/UC-10.drawio) |
-| UC-11 — Declare handover and track | ![UC-11](../../diagrams/use-cases/UC-11.svg) | [UC-11.drawio](../../diagrams/use-cases/UC-11.drawio) |
-| UC-12 — Count, review and post receipt | ![UC-12](../../diagrams/use-cases/UC-12.svg) | [UC-12.drawio](../../diagrams/use-cases/UC-12.drawio) |
-| UC-13 — Distribution and handoff | ![UC-13](../../diagrams/use-cases/UC-13.svg) | [UC-13.drawio](../../diagrams/use-cases/UC-13.drawio) |
-| UC-14 — Stocktake (deferred) | ![UC-14](../../diagrams/use-cases/UC-14.svg) | [UC-14.drawio](../../diagrams/use-cases/UC-14.drawio) |
-| UC-15 — Report household remotely | ![UC-15](../../diagrams/use-cases/UC-15.svg) | [UC-15.drawio](../../diagrams/use-cases/UC-15.drawio) |
-| UC-16 — Heatmap and grouped queue | ![UC-16](../../diagrams/use-cases/UC-16.svg) | [UC-16.drawio](../../diagrams/use-cases/UC-16.drawio) |
-| UC-17 — View assigned missions | ![UC-17](../../diagrams/use-cases/UC-17.svg) | [UC-17.drawio](../../diagrams/use-cases/UC-17.drawio) |
-| UC-18 — Team profile and position | ![UC-18](../../diagrams/use-cases/UC-18.svg) | [UC-18.drawio](../../diagrams/use-cases/UC-18.drawio) |
+![Sơ đồ ca sử dụng tổng thể ReliefCare](../../diagrams/c48-overall-use-cases.svg)
 
-Sub-flows shown as «include»/«extend» ellipses are explanatory steps of the main flow in the text below, not additional requirement IDs. UC-07 is optional and UC-14 deferred.
+[Mở nguồn Draw.io để chỉnh sửa](../../diagrams/c48-overall-use-cases.drawio).
 
 ### UC-01 — Submit an SOS/assistance request
 

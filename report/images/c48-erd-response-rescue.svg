@@ -1,0 +1,319 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1646" height="1174" viewBox="0 0 1646 1174">
+<rect width="100%" height="100%" fill="#F4F7FB"/>
+<style>text{font-family:Arial,"Noto Sans",sans-serif}.title{font-size:25px;font-weight:700;fill:#172033}.subtitle{font-size:14px;fill:#526176}.group{font-size:14px;font-weight:700;fill:#40516A}.table{fill:#FFFFFF;stroke:#B9C4D1;stroke-width:1.1}.stub{fill:#F1F4F8;stroke:#8A97A8;stroke-width:1.2;stroke-dasharray:5 3}.header{font-size:15px;font-weight:700;fill:#172033}.field{font-size:12px;fill:#263448}.type{font-size:11px;fill:#718096}.marker{font-size:9px;font-weight:700;fill:#526176}.note{font-size:12px;fill:#36465C}.edge{fill:none;stroke:#7B8798;stroke-width:1.25;opacity:.8}.edge-label{font-size:10px;font-weight:700;fill:#40516A}</style>
+<text x="48" y="43" class="title">ERD vật lý — Response: đội và nhiệm vụ</text>
+<text x="48" y="68" class="subtitle">Đội cứu hộ, thành viên, kỹ năng, vị trí, nhiệm vụ và bằng chứng</text>
+<text x="48" y="91" class="subtitle">Cơ sở dữ liệu: Response · 8 bảng chi tiết · quan hệ lấy từ khóa ngoại trong SQL</text>
+<text x="48" y="128" class="group">Bảng cùng service ở trang khác</text>
+<text x="443" y="128" class="group">Năng lực</text>
+<text x="838" y="128" class="group">Đội cứu hộ</text>
+<text x="1233" y="128" class="group">Nhiệm vụ và bằng chứng</text>
+<path d="M 1203.0 552.0 H 1211.0 V 196.0 H 1203.0" class="edge"/>
+<path d="M 1233.0 218.0 H 815.0 V 280.0 H 413.0" class="edge"/>
+<path d="M 1233.0 240.0 H 1214.0 V 196.0 H 1203.0" class="edge"/>
+<path d="M 1233.0 295.0 H 823.0 V 375.0 H 413.0" class="edge"/>
+<path d="M 838.0 240.0 H 617.5 V 196.0 H 413.0" class="edge"/>
+<path d="M 1233.0 804.0 H 827.0 V 280.0 H 413.0" class="edge"/>
+<path d="M 1598.0 826.0 H 1606.0 V 196.0 H 1598.0" class="edge"/>
+<path d="M 1598.0 511.0 H 1610.0 V 196.0 H 1598.0" class="edge"/>
+<path d="M 1203.0 802.0 H 1215.0 V 196.0 H 1203.0" class="edge"/>
+<path d="M 1203.0 698.0 H 1219.0 V 196.0 H 1203.0" class="edge"/>
+<path d="M 838.0 720.0 H 819.0 V 196.0 H 808.0" class="edge"/>
+<rect x="48" y="148" width="365" height="60" rx="4" class="stub"/>
+<path d="M52,148 H409 Q413,148 413,152 V184 H48 V152 Q48,148 52,148 Z" fill="#E6EBF2"/>
+<text x="58" y="171" class="header">region_boundary</text>
+<text x="58" y="183" class="type">Bảng chi tiết ở trang khác · khóa tham chiếu</text>
+<text x="56" y="196" class="marker">PK REF</text>
+<text x="108" y="196" class="field">region_code</text>
+<text x="405" y="196" text-anchor="end" class="type">text</text>
+<rect x="48" y="232" width="365" height="60" rx="4" class="stub"/>
+<path d="M52,232 H409 Q413,232 413,236 V268 H48 V236 Q48,232 52,232 Z" fill="#E6EBF2"/>
+<text x="58" y="255" class="header">assistance_request</text>
+<text x="58" y="267" class="type">Bảng chi tiết ở trang khác · khóa tham chiếu</text>
+<text x="56" y="280" class="marker">PK</text>
+<text x="108" y="280" class="field">id</text>
+<text x="405" y="280" text-anchor="end" class="type">uuid</text>
+<rect x="48" y="316" width="365" height="82" rx="4" class="stub"/>
+<path d="M52,316 H409 Q413,316 413,320 V352 H48 V320 Q48,316 52,316 Z" fill="#E6EBF2"/>
+<text x="58" y="339" class="header">request_event</text>
+<text x="58" y="351" class="type">Bảng chi tiết ở trang khác · khóa tham chiếu</text>
+<text x="56" y="364" class="marker">PK</text>
+<text x="108" y="364" class="field">id</text>
+<text x="405" y="364" text-anchor="end" class="type">uuid</text>
+<line x1="48" y1="374" x2="413" y2="374" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="56" y="386" class="marker">UK*</text>
+<text x="108" y="386" class="field">request_id</text>
+<text x="405" y="386" text-anchor="end" class="type">uuid</text>
+<rect x="443" y="148" width="365" height="80" rx="4" class="table"/>
+<path d="M447,148 H804 Q808,148 808,152 V184 H443 V152 Q443,148 447,148 Z" fill="#A855F722"/>
+<text x="453" y="171" class="header">skill</text>
+<text x="451" y="196" class="marker">PK</text>
+<text x="503" y="196" class="field">code</text>
+<text x="800" y="196" text-anchor="end" class="type">text</text>
+<line x1="443" y1="206" x2="808" y2="206" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="451" y="218" class="marker"></text>
+<text x="503" y="218" class="field">display_name</text>
+<text x="800" y="218" text-anchor="end" class="type">text</text>
+<rect x="838" y="148" width="365" height="332" rx="4" class="table"/>
+<path d="M842,148 H1199 Q1203,148 1203,152 V184 H838 V152 Q838,148 842,148 Z" fill="#A855F722"/>
+<text x="848" y="171" class="header">rescue_team</text>
+<text x="846" y="196" class="marker">PK</text>
+<text x="898" y="196" class="field">id</text>
+<text x="1195" y="196" text-anchor="end" class="type">uuid</text>
+<line x1="838" y1="206" x2="1203" y2="206" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="218" class="marker">REF</text>
+<text x="898" y="218" class="field">organization_id</text>
+<text x="1195" y="218" text-anchor="end" class="type">uuid</text>
+<line x1="838" y1="228" x2="1203" y2="228" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="240" class="marker">FK</text>
+<text x="898" y="240" class="field">operating_region_code</text>
+<text x="1195" y="240" text-anchor="end" class="type">text</text>
+<line x1="838" y1="250" x2="1203" y2="250" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="262" class="marker"></text>
+<text x="898" y="262" class="field">name</text>
+<text x="1195" y="262" text-anchor="end" class="type">text</text>
+<line x1="838" y1="272" x2="1203" y2="272" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="284" class="marker"></text>
+<text x="898" y="284" class="field">team_kind</text>
+<text x="1195" y="284" text-anchor="end" class="type">text</text>
+<line x1="838" y1="294" x2="1203" y2="294" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="306" class="marker"></text>
+<text x="898" y="306" class="field">reporting_mode</text>
+<text x="1195" y="306" text-anchor="end" class="type">text</text>
+<line x1="838" y1="316" x2="1203" y2="316" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="328" class="marker"></text>
+<text x="898" y="328" class="field">external_contact_note</text>
+<text x="1195" y="328" text-anchor="end" class="type">text</text>
+<line x1="838" y1="338" x2="1203" y2="338" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="350" class="marker"></text>
+<text x="898" y="350" class="field">readiness_required</text>
+<text x="1195" y="350" text-anchor="end" class="type">boolean</text>
+<line x1="838" y1="360" x2="1203" y2="360" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="372" class="marker"></text>
+<text x="898" y="372" class="field">affiliation_verified_at</text>
+<text x="1195" y="372" text-anchor="end" class="type">timestamptz</text>
+<line x1="838" y1="382" x2="1203" y2="382" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="394" class="marker">REF</text>
+<text x="898" y="394" class="field">affiliation_verified_by</text>
+<text x="1195" y="394" text-anchor="end" class="type">uuid</text>
+<line x1="838" y1="404" x2="1203" y2="404" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="416" class="marker"></text>
+<text x="898" y="416" class="field">availability</text>
+<text x="1195" y="416" text-anchor="end" class="type">text</text>
+<line x1="838" y1="426" x2="1203" y2="426" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="438" class="marker"></text>
+<text x="898" y="438" class="field">status</text>
+<text x="1195" y="438" text-anchor="end" class="type">text</text>
+<line x1="838" y1="448" x2="1203" y2="448" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="460" class="marker"></text>
+<text x="898" y="460" class="field">created_at</text>
+<text x="1195" y="460" text-anchor="end" class="type">timestamptz</text>
+<line x1="838" y1="470" x2="1203" y2="470" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="482" class="marker"></text>
+<text x="898" y="482" class="field">version</text>
+<text x="1195" y="482" text-anchor="end" class="type">int</text>
+<rect x="838" y="504" width="365" height="122" rx="4" class="table"/>
+<path d="M842,504 H1199 Q1203,504 1203,508 V540 H838 V508 Q838,504 842,504 Z" fill="#A855F722"/>
+<text x="848" y="527" class="header">team_member</text>
+<text x="846" y="552" class="marker">PK FK</text>
+<text x="898" y="552" class="field">team_id</text>
+<text x="1195" y="552" text-anchor="end" class="type">uuid</text>
+<line x1="838" y1="562" x2="1203" y2="562" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="574" class="marker">PK REF</text>
+<text x="898" y="574" class="field">user_id</text>
+<text x="1195" y="574" text-anchor="end" class="type">uuid</text>
+<line x1="838" y1="584" x2="1203" y2="584" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="596" class="marker"></text>
+<text x="898" y="596" class="field">member_role</text>
+<text x="1195" y="596" text-anchor="end" class="type">text</text>
+<line x1="838" y1="606" x2="1203" y2="606" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="618" class="marker"></text>
+<text x="898" y="618" class="field">left_at</text>
+<text x="1195" y="618" text-anchor="end" class="type">timestamptz</text>
+<rect x="838" y="650" width="365" height="80" rx="4" class="table"/>
+<path d="M842,650 H1199 Q1203,650 1203,654 V686 H838 V654 Q838,650 842,650 Z" fill="#A855F722"/>
+<text x="848" y="673" class="header">team_skill</text>
+<text x="846" y="698" class="marker">PK FK</text>
+<text x="898" y="698" class="field">team_id</text>
+<text x="1195" y="698" text-anchor="end" class="type">uuid</text>
+<line x1="838" y1="708" x2="1203" y2="708" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="720" class="marker">PK FK</text>
+<text x="898" y="720" class="field">skill_code</text>
+<text x="1195" y="720" text-anchor="end" class="type">text</text>
+<rect x="838" y="754" width="365" height="164" rx="4" class="table"/>
+<path d="M842,754 H1199 Q1203,754 1203,758 V790 H838 V758 Q838,754 842,754 Z" fill="#A855F722"/>
+<text x="848" y="777" class="header">team_position</text>
+<text x="846" y="802" class="marker">PK FK</text>
+<text x="898" y="802" class="field">team_id</text>
+<text x="1195" y="802" text-anchor="end" class="type">uuid</text>
+<line x1="838" y1="812" x2="1203" y2="812" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="824" class="marker"></text>
+<text x="898" y="824" class="field">location</text>
+<text x="1195" y="824" text-anchor="end" class="type">geography(Point,4326)</text>
+<line x1="838" y1="834" x2="1203" y2="834" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="846" class="marker"></text>
+<text x="898" y="846" class="field">accuracy_m</text>
+<text x="1195" y="846" text-anchor="end" class="type">numeric(8,1)</text>
+<line x1="838" y1="856" x2="1203" y2="856" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="868" class="marker"></text>
+<text x="898" y="868" class="field">captured_at</text>
+<text x="1195" y="868" text-anchor="end" class="type">timestamptz</text>
+<line x1="838" y1="878" x2="1203" y2="878" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="890" class="marker"></text>
+<text x="898" y="890" class="field">source</text>
+<text x="1195" y="890" text-anchor="end" class="type">text</text>
+<line x1="838" y1="900" x2="1203" y2="900" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="846" y="912" class="marker">REF</text>
+<text x="898" y="912" class="field">set_by_user_id</text>
+<text x="1195" y="912" text-anchor="end" class="type">uuid</text>
+<rect x="1233" y="148" width="365" height="269" rx="4" class="table"/>
+<path d="M1237,148 H1594 Q1598,148 1598,152 V184 H1233 V152 Q1233,148 1237,148 Z" fill="#A855F722"/>
+<text x="1243" y="171" class="header">mission</text>
+<text x="1241" y="196" class="marker">PK</text>
+<text x="1293" y="196" class="field">id</text>
+<text x="1590" y="196" text-anchor="end" class="type">uuid</text>
+<line x1="1233" y1="206" x2="1598" y2="206" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="218" class="marker">FK</text>
+<text x="1293" y="218" class="field">request_id</text>
+<text x="1590" y="218" text-anchor="end" class="type">uuid</text>
+<line x1="1233" y1="228" x2="1598" y2="228" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="240" class="marker">FK</text>
+<text x="1293" y="240" class="field">team_id</text>
+<text x="1590" y="240" text-anchor="end" class="type">uuid</text>
+<line x1="1233" y1="250" x2="1598" y2="250" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="262" class="marker"></text>
+<text x="1293" y="262" class="field">work_cycle</text>
+<text x="1590" y="262" text-anchor="end" class="type">int</text>
+<line x1="1233" y1="272" x2="1598" y2="272" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="284" class="marker"></text>
+<text x="1293" y="284" class="field">status</text>
+<text x="1590" y="284" text-anchor="end" class="type">mission_status</text>
+<line x1="1233" y1="294" x2="1598" y2="294" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="306" class="marker">REF</text>
+<text x="1293" y="306" class="field">coordinator_user_id</text>
+<text x="1590" y="306" text-anchor="end" class="type">uuid</text>
+<line x1="1233" y1="316" x2="1598" y2="316" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="328" class="marker">REF</text>
+<text x="1293" y="328" class="field">suggested_team_id</text>
+<text x="1590" y="328" text-anchor="end" class="type">uuid</text>
+<line x1="1233" y1="338" x2="1598" y2="338" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="350" class="marker"></text>
+<text x="1293" y="350" class="field">override_reason</text>
+<text x="1590" y="350" text-anchor="end" class="type">text</text>
+<line x1="1233" y1="360" x2="1598" y2="360" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="372" class="marker">FK</text>
+<text x="1293" y="372" class="field">verification_revision</text>
+<text x="1590" y="372" text-anchor="end" class="type">uuid</text>
+<line x1="1233" y1="382" x2="1598" y2="382" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="394" class="marker"></text>
+<text x="1293" y="394" class="field">created_at</text>
+<text x="1590" y="394" text-anchor="end" class="type">timestamptz</text>
+<line x1="1233" y1="404" x2="1598" y2="404" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="416" class="marker"></text>
+<text x="1293" y="416" class="field">version</text>
+<text x="1590" y="416" text-anchor="end" class="type">int</text>
+<rect x="1233" y="441" width="365" height="269" rx="4" class="table"/>
+<path d="M1237,441 H1594 Q1598,441 1598,445 V477 H1233 V445 Q1233,441 1237,441 Z" fill="#A855F722"/>
+<text x="1243" y="464" class="header">mission_event</text>
+<text x="1241" y="489" class="marker">PK</text>
+<text x="1293" y="489" class="field">id</text>
+<text x="1590" y="489" text-anchor="end" class="type">uuid</text>
+<line x1="1233" y1="499" x2="1598" y2="499" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="511" class="marker">FK</text>
+<text x="1293" y="511" class="field">mission_id</text>
+<text x="1590" y="511" text-anchor="end" class="type">uuid</text>
+<line x1="1233" y1="521" x2="1598" y2="521" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="533" class="marker">REF</text>
+<text x="1293" y="533" class="field">actor_user_id</text>
+<text x="1590" y="533" text-anchor="end" class="type">uuid</text>
+<line x1="1233" y1="543" x2="1598" y2="543" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="555" class="marker"></text>
+<text x="1293" y="555" class="field">from_status</text>
+<text x="1590" y="555" text-anchor="end" class="type">mission_status</text>
+<line x1="1233" y1="565" x2="1598" y2="565" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="577" class="marker"></text>
+<text x="1293" y="577" class="field">to_status</text>
+<text x="1590" y="577" text-anchor="end" class="type">mission_status</text>
+<line x1="1233" y1="587" x2="1598" y2="587" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="599" class="marker"></text>
+<text x="1293" y="599" class="field">recorded_basis</text>
+<text x="1590" y="599" text-anchor="end" class="type">text</text>
+<line x1="1233" y1="609" x2="1598" y2="609" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="621" class="marker"></text>
+<text x="1293" y="621" class="field">reported_by</text>
+<text x="1590" y="621" text-anchor="end" class="type">text</text>
+<line x1="1233" y1="631" x2="1598" y2="631" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="643" class="marker"></text>
+<text x="1293" y="643" class="field">reason</text>
+<text x="1590" y="643" text-anchor="end" class="type">text</text>
+<line x1="1233" y1="653" x2="1598" y2="653" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="665" class="marker"></text>
+<text x="1293" y="665" class="field">outcome_note</text>
+<text x="1590" y="665" text-anchor="end" class="type">text</text>
+<line x1="1233" y1="675" x2="1598" y2="675" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="687" class="marker"></text>
+<text x="1293" y="687" class="field">occurred_at</text>
+<text x="1590" y="687" text-anchor="end" class="type">timestamptz</text>
+<line x1="1233" y1="697" x2="1598" y2="697" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="709" class="marker"></text>
+<text x="1293" y="709" class="field">recorded_at</text>
+<text x="1590" y="709" text-anchor="end" class="type">timestamptz</text>
+<rect x="1233" y="734" width="365" height="311" rx="4" class="table"/>
+<path d="M1237,734 H1594 Q1598,734 1598,738 V770 H1233 V738 Q1233,734 1237,734 Z" fill="#A855F722"/>
+<text x="1243" y="757" class="header">evidence_metadata</text>
+<text x="1241" y="782" class="marker">PK</text>
+<text x="1293" y="782" class="field">id</text>
+<text x="1590" y="782" text-anchor="end" class="type">uuid</text>
+<line x1="1233" y1="792" x2="1598" y2="792" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="804" class="marker">FK?</text>
+<text x="1293" y="804" class="field">request_id</text>
+<text x="1590" y="804" text-anchor="end" class="type">uuid</text>
+<line x1="1233" y1="814" x2="1598" y2="814" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="826" class="marker">FK?</text>
+<text x="1293" y="826" class="field">mission_id</text>
+<text x="1590" y="826" text-anchor="end" class="type">uuid</text>
+<line x1="1233" y1="836" x2="1598" y2="836" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="848" class="marker"></text>
+<text x="1293" y="848" class="field">object_key</text>
+<text x="1590" y="848" text-anchor="end" class="type">text</text>
+<line x1="1233" y1="858" x2="1598" y2="858" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="870" class="marker"></text>
+<text x="1293" y="870" class="field">state</text>
+<text x="1590" y="870" text-anchor="end" class="type">text</text>
+<line x1="1233" y1="880" x2="1598" y2="880" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="892" class="marker"></text>
+<text x="1293" y="892" class="field">declared_bytes</text>
+<text x="1590" y="892" text-anchor="end" class="type">bigint</text>
+<line x1="1233" y1="902" x2="1598" y2="902" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="914" class="marker"></text>
+<text x="1293" y="914" class="field">size_bytes</text>
+<text x="1590" y="914" text-anchor="end" class="type">bigint</text>
+<line x1="1233" y1="924" x2="1598" y2="924" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="936" class="marker"></text>
+<text x="1293" y="936" class="field">detected_mime</text>
+<text x="1590" y="936" text-anchor="end" class="type">text</text>
+<line x1="1233" y1="946" x2="1598" y2="946" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="958" class="marker"></text>
+<text x="1293" y="958" class="field">checksum</text>
+<text x="1590" y="958" text-anchor="end" class="type">text</text>
+<line x1="1233" y1="968" x2="1598" y2="968" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="980" class="marker">REF</text>
+<text x="1293" y="980" class="field">uploader_user_id</text>
+<text x="1590" y="980" text-anchor="end" class="type">uuid</text>
+<line x1="1233" y1="990" x2="1598" y2="990" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="1002" class="marker"></text>
+<text x="1293" y="1002" class="field">created_at</text>
+<text x="1590" y="1002" text-anchor="end" class="type">timestamptz</text>
+<line x1="1233" y1="1012" x2="1598" y2="1012" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="1024" class="marker"></text>
+<text x="1293" y="1024" class="field">upload_source_ip_hash</text>
+<text x="1590" y="1024" text-anchor="end" class="type">text</text>
+<line x1="1233" y1="1034" x2="1598" y2="1034" stroke="#E8EDF3" stroke-width=".7"/>
+<text x="1241" y="1046" class="marker"></text>
+<text x="1293" y="1046" class="field">cleanup_completed_at</text>
+<text x="1590" y="1046" text-anchor="end" class="type">timestamptz</text>
+<line x1="48" y1="1085" x2="1598" y2="1085" stroke="#D4DCE6"/>
+<text x="48" y="1102" class="note">Ký hiệu: PK khóa chính · FK khóa ngoại SQL · FK? nullable · UK duy nhất · UK* thuộc khóa duy nhất tổ hợp · REF ID tham chiếu không có FK</text>
+<text x="48" y="1122" class="note">FK? là khóa ngoại nullable. FK đồng thời là PK/UK giới hạn quan hệ tối đa một bản ghi; FK thường cho phép nhiều bản ghi con. Ô xám là bảng cùng service ở trang khác.</text>
+<text x="48" y="1142" class="note">Các ID người dùng, tổ chức và đơn vị khu vực được tham chiếu qua service sở hữu. Đường nối tới yêu cầu/sự kiện trên trang khác vẫn là FK nội bộ Response.</text>
+</svg>

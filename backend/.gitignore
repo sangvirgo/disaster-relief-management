@@ -7,3 +7,4 @@ node_modules/
 dist/
 coverage/
 *.log
+/postman/C48-Local-Demo.postman_environment.json

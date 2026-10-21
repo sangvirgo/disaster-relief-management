@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, loadErrorCatalog, PinoNestLogger, validateEnvironment } from '../../../packages/technical/src';
+import { setupOpenApiDocs } from '../../../packages/technical/src/openapi-docs';
 import { AppModule } from './app.module';
 import { loadIdentityAuthConfig } from './auth/auth-security';
 
@@ -31,6 +32,7 @@ async function bootstrap(): Promise<void> {
       { path: 'health/ready', method: RequestMethod.GET },
     ],
   });
+  setupOpenApiDocs(app, 'identity');
   await app.listen(config.port, '0.0.0.0');
   const server = app.getHttpServer();
   server.requestTimeout = 15_000;

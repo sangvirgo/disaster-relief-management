@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, loadErrorCatalog, PinoNestLogger, validateEnvironment } from '../../../packages/technical/src';
+import { setupOpenApiDocs } from '../../../packages/technical/src/openapi-docs';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
@@ -17,6 +18,7 @@ async function bootstrap(): Promise<void> {
       { path: 'health/ready', method: RequestMethod.GET },
     ],
   });
+  setupOpenApiDocs(app, 'response');
   await app.listen(config.port, '0.0.0.0');
   const server = app.getHttpServer();
   server.requestTimeout = 90_000;
