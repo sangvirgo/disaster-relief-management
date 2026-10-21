@@ -8,7 +8,10 @@ import {
   Mission,
   MissionStatus,
   RescueTeam,
+  RescueTeamDetail,
   GeoLocation,
+  ReporterEventPage,
+  EvidenceDownload,
 } from '../types/api';
 import { generateUUID } from '../utils/secureStore';
 
@@ -321,6 +324,50 @@ export const ResponseApi = {
     const response = await apiClient.get<{ items: any[]; more: boolean }>('/response/public/campaigns', {
       params,
     });
+    return response.data;
+  },
+
+  // Lấy danh sách sự kiện chi tiết của Yêu cầu cứu hộ (GET /response/requests/:id/events)
+  async getRequestEvents(
+    requestId: string,
+    trackingCode?: string,
+    trackingSecret?: string,
+    cursor?: string,
+    limit = 50
+  ): Promise<ReporterEventPage> {
+    const headers: Record<string, string> = {};
+    if (trackingCode) headers['X-Tracking-Code'] = trackingCode;
+    if (trackingSecret) headers['X-Tracking-Secret'] = trackingSecret;
+
+    const params: Record<string, any> = { limit };
+    if (cursor) params.cursor = cursor;
+
+    const response = await apiClient.get<ReporterEventPage>(`/response/requests/${requestId}/events`, {
+      headers,
+      params,
+    });
+    return response.data;
+  },
+
+  // Lấy link tải / xem ảnh bằng chứng cứu hộ an toàn 60s (GET /response/evidence/:id/download)
+  async getEvidenceDownloadUrl(
+    evidenceId: string,
+    trackingCode?: string,
+    trackingSecret?: string
+  ): Promise<EvidenceDownload> {
+    const headers: Record<string, string> = {};
+    if (trackingCode) headers['X-Tracking-Code'] = trackingCode;
+    if (trackingSecret) headers['X-Tracking-Secret'] = trackingSecret;
+
+    const response = await apiClient.get<EvidenceDownload>(`/response/evidence/${evidenceId}/download`, {
+      headers,
+    });
+    return response.data;
+  },
+
+  // Lấy thông tin chi tiết đầy đủ của Đội cứu hộ (GET /response/teams/:id)
+  async getTeamDetail(teamId: string): Promise<RescueTeamDetail> {
+    const response = await apiClient.get<RescueTeamDetail>(`/response/teams/${teamId}`);
     return response.data;
   },
 };

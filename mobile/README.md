@@ -46,22 +46,9 @@ npx expo start
 ## ⚙️ 3. Cấu Hình Địa Chỉ API Backend
 
 Địa chỉ IP máy chủ API được cấu hình tại file `src/api/client.ts`:
-- **Chạy trên Android Emulator:** Dùng `http://10.0.2.2:8080/api/v1` (mặc định đã cấu hình sẵn).
-- **Chạy trên Thiết bị thật (Cùng mạng Wifi LAN):** Đổi thành `http://<IP_MÁY_TÍNH>:8080/api/v1` (Ví dụ: `http://192.168.1.15:8080/api/v1`).
-
----
-
-## ⚡ 4. Chế Độ Mô Phỏng Offline (Không Cần Bật Docker Backend)
-
-Ứng dụng đã tích hợp sẵn **Mock Backend Adapter** (`src/api/mockBackend.ts`), cho phép bạn và bạn bè trải nghiệm 100% giao diện, tính năng, bắt GPS, chụp ảnh, đăng ký/đăng nhập và chuyển bước nhiệm vụ cứu hộ mà **chưa cần khởi động Docker hay bật server Backend**.
-
-* **Bật/Tắt chế độ:** Mở file `src/api/mockBackend.ts`:
-  ```typescript
-  export const USE_MOCK_DATA = true; // Đang bật giả lập để code & test UI
-  // Khi bạn của bạn bật Docker xong, chỉ cần đổi thành:
-  export const USE_MOCK_DATA = false; // Kết nối trực tiếp vào Docker Backend thật
-  ```
-* **Tài khoản test sẵn có:**
+- **Chạy trên Android Emulator:** Dùng `http://10.0.2.2:8080/api/v1`.
+- **Chạy trên Thiết bị thật (Cùng mạng Wifi LAN):** Đổi thành `http://<IP_MÁY_TÍNH>:8080/api/v1` (Ví dụ: `http://192.168.1.2:8080/api/v1`).
+- **Tài khoản test sẵn có trên hệ thống:**
   - **Đội trưởng cứu hộ:** `leader1` / `Password123!` (vào bảng điều khiển đội cứu nạn, nhận nhiệm vụ).
   - **Công dân mẫu:** `citizen1` / `Password123!` (xem tin báo, gửi cứu trợ người thân).
   - Hoặc tự đăng ký tài khoản công dân mới ngay trên app!

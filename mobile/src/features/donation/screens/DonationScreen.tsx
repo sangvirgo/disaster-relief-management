@@ -14,7 +14,11 @@ import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { LogisticsApi } from '../../../api/logisticsApi';
-import { DonationDrive, DonationTrackingDetail } from '../../../types/api';
+import {
+  DonationDrive,
+  DonationTrackingDetail,
+  PublicDonationReportSummary,
+} from '../../../types/api';
 import { StorageService, generateRandomSecret } from '../../../utils/secureStore';
 import { useAuthStore } from '../../../store/authStore';
 import { THEME } from '../../../constants/theme';
@@ -34,6 +38,8 @@ import {
   X,
   BookmarkCheck,
   MessageSquareWarning,
+  BarChart3,
+  FileEdit,
 } from 'lucide-react-native';
 
 export const DonationScreen: React.FC = () => {
@@ -66,6 +72,19 @@ export const DonationScreen: React.FC = () => {
   const [showDisputeModal, setShowDisputeModal] = useState<boolean>(false);
   const [disputeReason, setDisputeReason] = useState<string>('');
   const [isSubmittingDispute, setIsSubmittingDispute] = useState<boolean>(false);
+
+  // Sửa bản khai quyên góp trước khi kiểm đếm
+  const [showReviseModal, setShowReviseModal] = useState<boolean>(false);
+  const [reviseQuantities, setReviseQuantities] = useState<Record<string, string>>({});
+  const [isSubmittingRevise, setIsSubmittingRevise] = useState<boolean>(false);
+
+  // Báo cáo minh bạch quyên góp
+  const [selectedReportDrive, setSelectedReportDrive] = useState<DonationDrive | null>(null);
+  const [reportLoading, setReportLoading] = useState<boolean>(false);
+  const [reportData, setReportData] = useState<PublicDonationReportSummary | null>(null);
+
+  // Xem ảnh phóng to
+  const [previewPhotoUri, setPreviewPhotoUri] = useState<string | null>(null);
 
   const [recentReceipts, setRecentReceipts] = useState<
     Array<{
@@ -333,6 +352,77 @@ export const DonationScreen: React.FC = () => {
     }
   };
 
+  const handleOpenReportModal = async (drive: DonationDrive) => {
+    setSelectedReportDrive(drive);
+    setReportLoading(true);
+    setReportData(null);
+    try {
+      const rep = await LogisticsApi.getPublicDonationReportSummary({ drive_id: drive.id });
+      setReportData(rep);
+    } catch {
+      Alert.alert('Báo cáo minh bạch', 'Chưa có dữ liệu báo cáo tổng hợp cho đợt quyên góp này.');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const handleOpenReviseModal = () => {
+    if (!trackingResult?.declaration?.lines) return;
+    const initial: Record<string, string> = {};
+    trackingResult.declaration.lines.forEach((line) => {
+      if (line.item_id) {
+        const num = parseFloat(line.declared_quantity || '0');
+        initial[line.item_id] = isNaN(num) ? '0' : String(num);
+      }
+    });
+    setReviseQuantities(initial);
+    setShowReviseModal(true);
+  };
+
+  const handleSubmitRevise = async () => {
+    if (!trackingResult) return;
+    const lines = Object.entries(reviseQuantities)
+      .filter(([_, q]) => Number(q) > 0)
+      .map(([item_id, declared_quantity]) => ({ item_id, declared_quantity }));
+
+    if (lines.length === 0) {
+      Alert.alert('Chưa có số lượng', 'Vui lòng nhập số lượng cho ít nhất một loại hiện vật.');
+      return;
+    }
+
+    setIsSubmittingRevise(true);
+    try {
+      let secret: string | undefined;
+      const saved = recentReceipts.find(
+        (r) => r.id === trackingResult.id || r.public_code === trackingResult.public_code
+      );
+      if (saved) secret = saved.secret;
+      if (!secret) secret = (await StorageService.getSecretForDonation(trackingResult.id)) || undefined;
+
+      await LogisticsApi.reviseDonationDeclaration(
+        trackingResult.id,
+        {
+          expected_version: trackingResult.declaration.revision || 1,
+          lines,
+        },
+        secret
+      );
+
+      Alert.alert('Thành công', 'Đã cập nhật lại bản khai số lượng hiện vật trước khi kiểm đếm.');
+      setShowReviseModal(false);
+      handleTrackDonation(trackingResult.id, secret);
+    } catch (err: any) {
+      Alert.alert(
+        'Lỗi cập nhật',
+        typeof err === 'string'
+          ? err
+          : 'Không thể cập nhật bản khai. Có thể thủ kho đã bắt đầu kiểm đếm.'
+      );
+    } finally {
+      setIsSubmittingRevise(false);
+    }
+  };
+
   const formatNumberVN = (val: number | string | undefined | null): string => {
     if (val === undefined || val === null || val === '') return '0';
     const num = typeof val === 'string' ? parseFloat(val) : val;
@@ -449,14 +539,25 @@ export const DonationScreen: React.FC = () => {
             })}
         </View>
 
-        <TouchableOpacity
-          style={styles.donateActionBtn}
-          onPress={() => handleOpenDonateModal(item)}
-          activeOpacity={0.85}
-        >
-          <Plus size={18} color="#FFFFFF" />
-          <Text style={styles.donateActionText}>Khai Báo Bàn Giao Hiện Vật</Text>
-        </TouchableOpacity>
+        <View style={styles.driveActionRow}>
+          <TouchableOpacity
+            style={styles.donateActionBtn}
+            onPress={() => handleOpenDonateModal(item)}
+            activeOpacity={0.85}
+          >
+            <Plus size={18} color="#FFFFFF" />
+            <Text style={styles.donateActionText}>Khai Báo Bàn Giao</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.transparencyActionBtn}
+            onPress={() => handleOpenReportModal(item)}
+            activeOpacity={0.85}
+          >
+            <BarChart3 size={17} color={THEME.colors.primary.main} />
+            <Text style={styles.transparencyActionText}>Minh Bạch</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -657,23 +758,25 @@ export const DonationScreen: React.FC = () => {
                         <View style={styles.lineStatsGrid}>
                           <View style={styles.lineStatItem}>
                             <Text style={styles.lineStatLabel}>Khai báo:</Text>
-                            <Text style={styles.lineStatVal}>{line.declared_quantity}</Text>
+                            <Text style={styles.lineStatVal}>{formatNumberVN(line.declared_quantity)}</Text>
                           </View>
                           <View style={styles.lineStatItem}>
                             <Text style={styles.lineStatLabel}>Kiểm đếm:</Text>
-                            <Text style={styles.lineStatVal}>{line.counted_quantity ?? '--'}</Text>
+                            <Text style={styles.lineStatVal}>
+                              {line.counted_quantity != null ? formatNumberVN(line.counted_quantity) : '--'}
+                            </Text>
                           </View>
                           <View style={styles.lineStatItem}>
                             <Text style={styles.lineStatLabel}>Nhập kho:</Text>
                             <Text style={[styles.lineStatVal, { color: THEME.colors.success.main }]}>
-                              {line.accepted_quantity ?? '--'}
+                              {line.accepted_quantity != null ? formatNumberVN(line.accepted_quantity) : '--'}
                             </Text>
                           </View>
                           {Number(line.rejected_quantity) > 0 ? (
                             <View style={styles.lineStatItem}>
                               <Text style={styles.lineStatLabel}>Từ chối:</Text>
                               <Text style={[styles.lineStatVal, { color: THEME.colors.emergency.main }]}>
-                                {line.rejected_quantity}
+                                {formatNumberVN(line.rejected_quantity)}
                               </Text>
                             </View>
                           ) : null}
@@ -702,7 +805,7 @@ export const DonationScreen: React.FC = () => {
                       <View style={styles.lineStatsGrid}>
                         <View style={styles.lineStatItem}>
                           <Text style={styles.lineStatLabel}>Khai báo:</Text>
-                          <Text style={styles.lineStatVal}>{line.declared_quantity}</Text>
+                          <Text style={styles.lineStatVal}>{formatNumberVN(line.declared_quantity)}</Text>
                         </View>
                         <View style={styles.lineStatItem}>
                           <Text style={styles.lineStatLabel}>Tình trạng:</Text>
@@ -751,6 +854,17 @@ export const DonationScreen: React.FC = () => {
 
               {/* HÀNG NÚT THAO TÁC BIÊN NHẬN */}
               <View style={styles.actionButtonsCol}>
+                {trackingResult.status === 'DECLARED' && (
+                  <TouchableOpacity
+                    style={styles.reviseBtn}
+                    onPress={handleOpenReviseModal}
+                    activeOpacity={0.8}
+                  >
+                    <FileEdit size={18} color={THEME.colors.primary.main} />
+                    <Text style={styles.reviseBtnText}>Sửa Số Lượng Khai Báo (Chưa Kiểm Đếm)</Text>
+                  </TouchableOpacity>
+                )}
+
                 {isAuthenticated && (
                   <TouchableOpacity
                     style={styles.claimBtn}
@@ -954,6 +1068,158 @@ export const DonationScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* MODAL SỬA BẢN KHAI HIỆN VẬT */}
+      <Modal visible={showReviseModal} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>SỬA SỐ LƯỢNG BẢN KHAI</Text>
+            <Text style={styles.modalSubtitle}>
+              Thủ kho chưa tiến hành kiểm đếm. Bạn có thể cập nhật lại số lượng hàng thực tế mang đến kho:
+            </Text>
+
+            {trackingResult?.declaration?.lines?.map((line, idx) => {
+              const itemId = line.item_id || String(idx);
+              const itemName = line.item_name || 'Hiện vật';
+              const unit = line.unit_name || 'đơn vị';
+
+              return (
+                <View key={itemId} style={styles.modalItemRow}>
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text style={styles.modalItemName}>{itemName}</Text>
+                    <Text style={styles.modalItemRemaining}>Đơn vị: {unit}</Text>
+                  </View>
+                  <TextInput
+                    style={styles.modalItemInput}
+                    placeholder="0"
+                    placeholderTextColor={THEME.colors.text.muted}
+                    keyboardType="numeric"
+                    value={reviseQuantities[itemId] || ''}
+                    onChangeText={(val) =>
+                      setReviseQuantities((prev) => ({ ...prev, [itemId]: val }))
+                    }
+                  />
+                </View>
+              );
+            })}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setShowReviseModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSubmitBtn}
+                onPress={handleSubmitRevise}
+                disabled={isSubmittingRevise}
+              >
+                {isSubmittingRevise ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Lưu Thay Đổi</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL BÁO CÁO MINH BẠCH QUYÊN GÓP */}
+      <Modal visible={!!selectedReportDrive} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '85%' }]}>
+            <View style={styles.reportModalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>BÁO CÁO MINH BẠCH TIẾP NHẬN</Text>
+                <Text style={styles.modalSubtitle} numberOfLines={1}>
+                  {selectedReportDrive?.title}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.closeIconBtn}
+                onPress={() => setSelectedReportDrive(null)}
+              >
+                <X size={20} color={THEME.colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+
+            {reportLoading ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={THEME.colors.primary.main} />
+                <Text style={{ marginTop: 10, fontSize: 12, color: THEME.colors.text.secondary }}>
+                  Đang tải dữ liệu minh bạch từ hệ thống kho...
+                </Text>
+              </View>
+            ) : reportData?.items && reportData.items.length > 0 ? (
+              <View style={{ marginVertical: 10 }}>
+                {reportData.items.map((it, idx) => (
+                  <View key={idx} style={styles.reportItemCard}>
+                    <View style={styles.reportItemHeader}>
+                      <Package size={15} color={THEME.colors.primary.main} />
+                      <Text style={styles.reportItemName}>
+                        {it.item?.name || 'Nhu yếu phẩm'} ({it.unit?.display_name || it.unit?.code || 'đơn vị'})
+                      </Text>
+                    </View>
+                    <View style={styles.reportStatsRow}>
+                      <View style={styles.reportStatBox}>
+                        <Text style={styles.reportStatLabel}>Đã tiếp nhận vào kho</Text>
+                        <Text style={[styles.reportStatValue, { color: THEME.colors.success.main }]}>
+                          {formatNumberVN(it.accepted)} {it.unit?.display_name || ''}
+                        </Text>
+                      </View>
+                      <View style={styles.reportStatBox}>
+                        <Text style={styles.reportStatLabel}>Đã phân phối cứu trợ</Text>
+                        <Text style={[styles.reportStatValue, { color: THEME.colors.primary.main }]}>
+                          {formatNumberVN(it.distributed)} {it.unit?.display_name || ''}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+
+                <Text style={styles.reportGeneratedAt}>
+                  Cập nhật lúc: {reportData.generated_at ? new Date(reportData.generated_at).toLocaleString('vi-VN') : ''}
+                </Text>
+              </View>
+            ) : (
+              <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, color: THEME.colors.text.muted }}>
+                  Chưa có số liệu tiếp nhận hoặc phân phối chính thức cho đợt này.
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.modalSubmitBtn, { marginTop: 12 }]}
+              onPress={() => setSelectedReportDrive(null)}
+            >
+              <Text style={styles.modalSubmitText}>Đã Hiểu & Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL XEM ẢNH PHÓNG TO */}
+      <Modal visible={!!previewPhotoUri} transparent={true} animationType="fade">
+        <View style={styles.imageViewerOverlay}>
+          <TouchableOpacity
+            style={styles.closeImageBtn}
+            onPress={() => setPreviewPhotoUri(null)}
+            activeOpacity={0.8}
+          >
+            <X size={26} color="#FFFFFF" />
+          </TouchableOpacity>
+          {previewPhotoUri && (
+            <Image
+              source={{ uri: previewPhotoUri }}
+              style={styles.fullPreviewImage}
+              resizeMode="contain"
+            />
+          )}
         </View>
       </Modal>
     </ScreenContainer>
@@ -1167,20 +1433,42 @@ const styles = StyleSheet.create({
     color: THEME.colors.primary.main,
     fontWeight: '700',
   },
+  driveActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
   donateActionBtn: {
+    flex: 1,
     flexDirection: 'row',
     backgroundColor: THEME.colors.primary.main,
     height: 44,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
   },
   donateActionText: {
     color: '#FFFFFF',
     fontWeight: '700',
     fontSize: THEME.typography.fontSizes.xs + 1,
     marginLeft: 6,
+  },
+  transparencyActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: THEME.colors.primary.bg,
+    borderWidth: 1,
+    borderColor: THEME.colors.primary.border,
+    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+  },
+  transparencyActionText: {
+    color: THEME.colors.primary.main,
+    fontWeight: '700',
+    fontSize: 12,
+    marginLeft: 4,
   },
   centerBox: {
     alignItems: 'center',
@@ -1693,5 +1981,98 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     fontSize: THEME.typography.fontSizes.sm,
     color: THEME.colors.text.primary,
+  },
+  reviseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 10,
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  reviseBtnText: {
+    color: THEME.colors.primary.main,
+    fontWeight: '700',
+    fontSize: 12,
+    marginLeft: 6,
+  },
+  reportModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  closeIconBtn: {
+    padding: 4,
+  },
+  reportItemCard: {
+    backgroundColor: THEME.colors.surface.background,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+  },
+  reportItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  reportItemName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: THEME.colors.text.primary,
+    marginLeft: 6,
+  },
+  reportStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  reportStatBox: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+  },
+  reportStatLabel: {
+    fontSize: 10,
+    color: THEME.colors.text.muted,
+    marginBottom: 2,
+  },
+  reportStatValue: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  reportGeneratedAt: {
+    fontSize: 10,
+    color: THEME.colors.text.muted,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  closeImageBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 20,
+    padding: 8,
+  },
+  fullPreviewImage: {
+    width: '100%',
+    height: '80%',
   },
 });

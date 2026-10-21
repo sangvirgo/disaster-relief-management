@@ -1,3 +1,20 @@
+// Phân loại lực lượng cứu hộ
+export const RESCUE_TEAM_KIND_LABELS: Record<string, string> = {
+  VOLUNTEER: 'Tình nguyện viên chuyên nghiệp',
+  MILITARY: 'Lực lượng vũ trang / Quân đội',
+  GOVERNMENT: 'Ban chỉ huy PCTT & TKCN',
+  OTHER: 'Lực lượng cứu nạn dân sự',
+};
+
+// Kỹ năng chuyên môn của đội cứu nạn
+export const RESCUE_SKILL_LABELS: Record<string, string> = {
+  BOAT: 'Điều khiển xuồng / thuyền cứu hộ',
+  FIRST_AID: 'Sơ cấp cứu y tế',
+  CLIMBING: 'Cứu hộ leo trèo / địa hình',
+  TRUCK_DRIVER: 'Lái xe tải vượt lũ',
+  RADIO: 'Thông tin liên lạc vô tuyến',
+};
+
 // Từ điển hiển thị tiếng Việt chuẩn hóa cho toàn bộ ứng dụng Mobile C48
 import { IncidentCategoryCode, RequestStatus, MissionStatus, PriorityLevel } from '../types/api';
 

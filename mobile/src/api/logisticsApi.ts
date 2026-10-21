@@ -1,5 +1,12 @@
 import { apiClient } from './client';
-import { DonationDrive, DonationDeclarationPayload, DonationTrackingDetail } from '../types/api';
+import {
+  DonationDrive,
+  DonationDeclarationPayload,
+  DonationTrackingDetail,
+  ReviseDonationDeclarationPayload,
+  PublicDonationReportSummary,
+  EvidenceDownload,
+} from '../types/api';
 import { generateUUID } from '../utils/secureStore';
 
 export const LogisticsApi = {
@@ -113,6 +120,58 @@ export const LogisticsApi = {
       { reason: reason.trim() },
       { headers }
     );
+    return response.data;
+  },
+
+  // Chỉnh sửa bản khai số lượng hiện vật trước khi thủ kho kiểm đếm (POST /logistics/public/donations/:id/declarations)
+  async reviseDonationDeclaration(
+    donationId: string,
+    payload: ReviseDonationDeclarationPayload,
+    donationSecret?: string
+  ): Promise<{ id: string; status: string; declaration_revision: number; version: number }> {
+    const headers: Record<string, string> = {
+      'Idempotency-Key': generateUUID(),
+    };
+    if (donationSecret) {
+      headers['X-Donation-Secret'] = donationSecret;
+    }
+
+    const response = await apiClient.post(
+      `/logistics/public/donations/${donationId}/declarations`,
+      payload,
+      { headers }
+    );
+    return response.data;
+  },
+
+  // Báo cáo tổng hợp quyên góp công khai (Minh bạch) (GET /logistics/public/donation-reports/summary)
+  async getPublicDonationReportSummary(filter: {
+    drive_id?: string;
+    campaign_id?: string;
+    warehouse_id?: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<PublicDonationReportSummary> {
+    const response = await apiClient.get<PublicDonationReportSummary>(
+      '/logistics/public/donation-reports/summary',
+      { params: filter }
+    );
+    return response.data;
+  },
+
+  // Lấy link tải / xem ảnh kiện hàng quyên góp đã upload (GET /logistics/evidence/:id/download)
+  async getDonationEvidenceDownloadUrl(
+    evidenceId: string,
+    donationSecret?: string
+  ): Promise<EvidenceDownload> {
+    const headers: Record<string, string> = {};
+    if (donationSecret) {
+      headers['X-Donation-Secret'] = donationSecret;
+    }
+
+    const response = await apiClient.get<EvidenceDownload>(`/logistics/evidence/${evidenceId}/download`, {
+      headers,
+    });
     return response.data;
   },
 };

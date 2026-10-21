@@ -282,3 +282,64 @@ export interface DonationTrackingDetail {
     resolution_note?: string | null;
   }>;
 }
+
+// Bằng chứng đa phương tiện (Ảnh / Video)
+export interface EvidenceDownload {
+  url: string;
+  expires_in: number;
+}
+
+// Nhật ký sự kiện chi tiết của Yêu cầu cứu hộ
+export interface ReporterEvent {
+  event_id: string;
+  event_type: string;
+  public_text_code: string;
+  occurred_at: string;
+  note?: string | null;
+  payload?: Record<string, any>;
+}
+
+export interface ReporterEventPage {
+  items: ReporterEvent[];
+  more: boolean;
+  cursor?: string;
+}
+
+// Báo cáo tổng hợp quyên góp công khai (Minh bạch)
+export interface PublicDonationSummaryItem {
+  item?: {
+    id: string;
+    name: string;
+  };
+  unit?: {
+    code: string;
+    display_name: string;
+    scale: number;
+  };
+  accepted?: string;
+  distributed?: string;
+}
+
+export interface PublicDonationReportSummary {
+  view: string;
+  filter_id: string;
+  items: PublicDonationSummaryItem[];
+  more: boolean;
+  cursor?: string;
+  generated_at: string;
+}
+
+// Cập nhật lại bản khai quyên góp
+export interface ReviseDonationDeclarationPayload {
+  expected_version: number;
+  lines: {
+    item_id: string;
+    declared_quantity: string;
+  }[];
+}
+
+// Chi tiết mở rộng của Đội cứu hộ
+export interface RescueTeamDetail extends RescueTeam {
+  readiness_required?: boolean;
+  organization_id?: string;
+}

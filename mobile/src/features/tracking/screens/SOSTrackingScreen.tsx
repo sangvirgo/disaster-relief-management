@@ -51,6 +51,7 @@ export const SOSTrackingScreen: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isSubmittingSupplement, setIsSubmittingSupplement] = useState<boolean>(false);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const pickImage = async () => {
     try {
@@ -103,6 +104,18 @@ export const SOSTrackingScreen: React.FC = () => {
 
       const result = await ResponseApi.trackRequest(trackingCode, secret);
       setData(result);
+
+      // Tải danh sách sự kiện chi tiết từ API chuyên biệt GET /requests/:id/events
+      if (result?.id) {
+        try {
+          const eventsRes = await ResponseApi.getRequestEvents(result.id, trackingCode, secret);
+          if (eventsRes?.items && eventsRes.items.length > 0) {
+            setData((prev) => (prev ? { ...prev, timeline: eventsRes.items as any } : prev));
+          }
+        } catch {
+          // Nếu không tải được events nâng cao, vẫn dùng timeline mặc định từ result
+        }
+      }
     } catch (err: any) {
       setErrorMsg(typeof err === 'string' ? err : 'Không thể tải thông tin. Vui lòng kiểm tra lại mã tra cứu.');
     } finally {
@@ -337,9 +350,14 @@ export const SOSTrackingScreen: React.FC = () => {
               </View>
               <View style={styles.uploadedImagesList}>
                 {uploadedImages.map((imgUri, index) => (
-                  <View key={index} style={styles.uploadedImageWrapper}>
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.uploadedImageWrapper}
+                    onPress={() => setPreviewImage(imgUri)}
+                    activeOpacity={0.8}
+                  >
                     <Image source={{ uri: imgUri }} style={styles.uploadedThumbnail} />
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </View>
             </View>
@@ -439,6 +457,25 @@ export const SOSTrackingScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+      </Modal>
+      {/* MODAL XEM ẢNH HIỆN TRƯỜNG PHÓNG TO */}
+      <Modal visible={!!previewImage} transparent={true} animationType="fade">
+        <View style={styles.imageViewerOverlay}>
+          <TouchableOpacity
+            style={styles.closeImageBtn}
+            onPress={() => setPreviewImage(null)}
+            activeOpacity={0.8}
+          >
+            <X size={26} color="#FFFFFF" />
+          </TouchableOpacity>
+          {previewImage && (
+            <Image
+              source={{ uri: previewImage }}
+              style={styles.fullPreviewImage}
+              resizeMode="contain"
+            />
+          )}
         </View>
       </Modal>
     </ScreenContainer>
@@ -781,5 +818,25 @@ const styles = StyleSheet.create({
     width: 76,
     height: 76,
     borderRadius: 8,
+  },
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  closeImageBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 20,
+    padding: 8,
+  },
+  fullPreviewImage: {
+    width: '100%',
+    height: '80%',
   },
 });

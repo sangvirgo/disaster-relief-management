@@ -1,7 +1,6 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { StorageService, generateUUID } from '../utils/secureStore';
 import { ApiErrorEnvelope } from '../types/api';
-import { USE_MOCK_DATA, handleMockRequest } from './mockBackend';
 
 // Cấu hình URL backend. Khi test trên Android Emulator: dùng 10.0.2.2, trên máy thật dùng IP LAN
 export const API_BASE_URL = 'http://192.168.1.2:8080/api/v1';
@@ -12,15 +11,6 @@ export const apiClient: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
-  },
-  adapter: async (config) => {
-    // Nếu chưa chạy Docker, tự động sử dụng Mock Backend giả lập đầy đủ dữ liệu
-    if (USE_MOCK_DATA) {
-      return handleMockRequest(config);
-    }
-    // Khi bật Docker thật, chuyển sang gọi mạng chuẩn
-    const realAdapter = axios.getAdapter(axios.defaults.adapter || ['xhr', 'http', 'fetch']);
-    return realAdapter(config);
   },
 });
 

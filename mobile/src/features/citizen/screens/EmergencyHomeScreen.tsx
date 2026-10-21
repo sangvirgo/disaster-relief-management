@@ -22,14 +22,12 @@ import {
   LogOut,
   ShieldCheck,
   ClipboardList,
-  Sparkles,
   Bell,
   AlertCircle,
   CheckCircle2,
   KeyRound,
   Flag,
 } from 'lucide-react-native';
-import { USE_MOCK_DATA } from '../../../api/mockBackend';
 
 export const EmergencyHomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -94,16 +92,6 @@ export const EmergencyHomeScreen: React.FC = () => {
 
   return (
     <ScreenContainer scrollable={true}>
-      {/* Banner chế độ giả lập offline khi chưa chạy Docker */}
-      {USE_MOCK_DATA && (
-        <View style={styles.mockBanner}>
-          <Sparkles size={14} color="#0F766E" style={{ marginRight: 6 }} />
-          <Text style={styles.mockBannerText}>
-            Chế độ mô phỏng Offline (Không cần chạy Docker)
-          </Text>
-        </View>
-      )}
-
       {/* Cảnh báo đường dây nóng cứu trợ */}
       <View style={styles.emergencyBanner}>
         <View style={styles.bannerIcon}>

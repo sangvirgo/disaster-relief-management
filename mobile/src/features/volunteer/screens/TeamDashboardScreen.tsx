@@ -13,8 +13,9 @@ import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { useAuthStore } from '../../../store/authStore';
 import { useLocation } from '../../../hooks/useLocation';
 import { ResponseApi } from '../../../api/responseApi';
-import { RescueTeam, Mission } from '../../../types/api';
+import { RescueTeam, RescueTeamDetail, Mission } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
+import { RESCUE_TEAM_KIND_LABELS, RESCUE_SKILL_LABELS } from '../../../constants/labels';
 import {
   Shield,
   Radio,
@@ -25,14 +26,16 @@ import {
   Clock,
   AlertTriangle,
   ChevronRight,
+  Sparkles,
+  Award,
 } from 'lucide-react-native';
 
 export const TeamDashboardScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { user, logout } = useAuthStore();
+  const { user, logout, getUserRoleName } = useAuthStore();
   const { location, loading: locationLoading, refreshLocation } = useLocation();
 
-  const [team, setTeam] = useState<RescueTeam | null>(null);
+  const [team, setTeam] = useState<RescueTeamDetail | null>(null);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isUpdatingPosition, setIsUpdatingPosition] = useState<boolean>(false);
@@ -47,8 +50,19 @@ export const TeamDashboardScreen: React.FC = () => {
       ]);
 
       if (teamsData.length > 0) {
-        setTeam(teamsData[0]);
-        setIsAvailable(teamsData[0].availability === 'AVAILABLE');
+        const firstTeam = teamsData[0];
+        setTeam(firstTeam);
+        setIsAvailable(firstTeam.availability === 'AVAILABLE');
+
+        // Lấy chi tiết kỹ năng và cấu hình đội từ GET /response/teams/:id
+        try {
+          const detail = await ResponseApi.getTeamDetail(firstTeam.id);
+          if (detail) {
+            setTeam(detail);
+          }
+        } catch {
+          // Dùng firstTeam cơ bản nếu API chi tiết không hỗ trợ
+        }
       }
       setMissions(missionsData);
     } catch (e) {
@@ -145,10 +159,43 @@ export const TeamDashboardScreen: React.FC = () => {
             <Shield size={26} color={THEME.colors.primary.main} />
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.teamName}>{team?.name || 'Đội Cứu Nạn Cơ Động Số 1'}</Text>
-            <Text style={styles.teamKind}>Lực lượng: Tình nguyện viên chuyên nghiệp</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={styles.teamName} numberOfLines={1}>
+                {team?.name || 'Đội Cứu Nạn Cơ Động'}
+              </Text>
+              <View style={styles.roleBadge}>
+                <Text style={styles.roleBadgeText}>{getUserRoleName()}</Text>
+              </View>
+            </View>
+            <Text style={styles.teamKind}>
+              Lực lượng: {RESCUE_TEAM_KIND_LABELS[team?.team_kind || 'VOLUNTEER']}
+            </Text>
           </View>
         </View>
+
+        {/* Danh sách kỹ năng chuyên môn của đội */}
+        {team?.skills && team.skills.length > 0 && (
+          <View style={styles.skillsSection}>
+            <View style={styles.skillsHeaderRow}>
+              <Award size={14} color={THEME.colors.primary.main} />
+              <Text style={styles.skillsTitle}>KỸ NĂNG TÁC CHIẾN CHUYÊN MÔN</Text>
+            </View>
+            <View style={styles.skillsList}>
+              {team.skills.map((skillItem, idx) => {
+                const code = typeof skillItem === 'string' ? skillItem : skillItem.code;
+                const label =
+                  typeof skillItem === 'string'
+                    ? RESCUE_SKILL_LABELS[code] || code
+                    : skillItem.name || RESCUE_SKILL_LABELS[code] || code;
+                return (
+                  <View key={idx} style={styles.skillChip}>
+                    <Text style={styles.skillChipText}>{label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         <View style={styles.availabilityRow}>
           <View style={{ flex: 1 }}>
@@ -270,6 +317,55 @@ const styles = StyleSheet.create({
     fontSize: THEME.typography.fontSizes.xs,
     color: THEME.colors.text.secondary,
     marginTop: 2,
+  },
+  roleBadge: {
+    backgroundColor: THEME.colors.primary.bg,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: THEME.colors.primary.border,
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: THEME.colors.primary.main,
+  },
+  skillsSection: {
+    marginTop: 10,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: THEME.colors.surface.border,
+  },
+  skillsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  skillsTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: THEME.colors.text.muted,
+    marginLeft: 6,
+    letterSpacing: 0.5,
+  },
+  skillsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  skillChip: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  skillChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1D4ED8',
   },
   availabilityRow: {
     flexDirection: 'row',
