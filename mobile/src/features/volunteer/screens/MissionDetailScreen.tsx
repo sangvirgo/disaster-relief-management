@@ -33,6 +33,8 @@ import {
   Camera,
   ImageIcon,
   X,
+  Shield,
+  Info,
 } from 'lucide-react-native';
 
 export const MissionDetailScreen: React.FC = () => {
@@ -251,6 +253,13 @@ export const MissionDetailScreen: React.FC = () => {
 
   const categoryInfo = INCIDENT_CATEGORIES[mission.category] || { label: 'Sự cố cứu hộ' };
 
+  // Xác định quyền hạn: Theo Swagger, backend chỉ trả về reporter_contact_phone hoặc alternate_contact cho Đội trưởng (LEADER)
+  const isLeader = Boolean(
+    'reporter_contact_phone' in mission ||
+      'alternate_contact' in mission ||
+      'beneficiary_contact_phone' in mission
+  );
+
   return (
     <ScreenContainer
       title="Chi Tiết Nhiệm Vụ Cứu Nạn"
@@ -318,116 +327,152 @@ export const MissionDetailScreen: React.FC = () => {
       {/* 3. LIÊN HỆ HIỆN TRƯỜNG */}
       <View style={styles.card}>
         <Text style={styles.cardSectionTitle}>LIÊN HỆ NẠN NHÂN / NGƯỜI BÁO TIN</Text>
-        {mission.reporter_contact_phone ? (
-          <View style={styles.contactRow}>
-            <View>
-              <Text style={styles.phoneText}>{mission.reporter_contact_phone}</Text>
-              <Text style={styles.phoneLabel}>Số điện thoại người báo cứu hộ</Text>
-            </View>
-            <TouchableOpacity style={styles.callBtn} onPress={callVictimPhone}>
-              <Phone size={18} color="#FFFFFF" />
-              <Text style={styles.callBtnText}>Gọi điện</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <Text style={styles.noContactText}>Nạn nhân chưa để lại số điện thoại hoặc đã mất sóng.</Text>
-        )}
+        {isLeader ? (
+          <>
+            {mission.reporter_contact_phone ? (
+              <View style={styles.contactRow}>
+                <View>
+                  <Text style={styles.phoneText}>{mission.reporter_contact_phone}</Text>
+                  <Text style={styles.phoneLabel}>Số điện thoại người báo cứu hộ</Text>
+                </View>
+                <TouchableOpacity style={styles.callBtn} onPress={callVictimPhone}>
+                  <Phone size={18} color="#FFFFFF" />
+                  <Text style={styles.callBtnText}>Gọi điện</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <Text style={styles.noContactText}>Nạn nhân chưa để lại số điện thoại hoặc đã mất sóng.</Text>
+            )}
 
-        {mission.alternate_contact ? (
-          <View style={[styles.contactRow, { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderColor: THEME.colors.surface.border }]}>
-            <View>
-              <Text style={styles.phoneText}>{mission.alternate_contact.phone || 'Chưa cung cấp SĐT'}</Text>
-              <Text style={styles.phoneLabel}>Người liên hệ phụ: {mission.alternate_contact.name}</Text>
-            </View>
-            {mission.alternate_contact.phone ? (
-              <TouchableOpacity
-                style={styles.callBtn}
-                onPress={() => Linking.openURL(`tel:${mission.alternate_contact!.phone}`)}
-              >
-                <Phone size={18} color="#FFFFFF" />
-                <Text style={styles.callBtnText}>Gọi điện</Text>
-              </TouchableOpacity>
+            {mission.alternate_contact ? (
+              <View style={[styles.contactRow, { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderColor: THEME.colors.surface.border }]}>
+                <View>
+                  <Text style={styles.phoneText}>{mission.alternate_contact.phone || 'Chưa cung cấp SĐT'}</Text>
+                  <Text style={styles.phoneLabel}>Người liên hệ phụ: {mission.alternate_contact.name}</Text>
+                </View>
+                {mission.alternate_contact.phone ? (
+                  <TouchableOpacity
+                    style={styles.callBtn}
+                    onPress={() => Linking.openURL(`tel:${mission.alternate_contact!.phone}`)}
+                  >
+                    <Phone size={18} color="#FFFFFF" />
+                    <Text style={styles.callBtnText}>Gọi điện</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             ) : null}
-          </View>
-        ) : null}
-      </View>
-
-      {/* 4. CÁC NÚT HÀNH ĐỘNG VẬN HÀNH (THEO STATE MACHINE) */}
-      <View style={styles.actionSection}>
-        {actionLoading && <ActivityIndicator size="small" color={THEME.colors.primary.main} style={{ marginBottom: 10 }} />}
-
-        {/* Khi mới nhận (OFFERED) */}
-        {mission.status === 'OFFERED' && (
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.declineBtn, actionLoading && { opacity: 0.6 }]}
-              onPress={() => setShowDeclineModal(true)}
-              disabled={actionLoading}
-            >
-              <XCircle size={18} color={THEME.colors.emergency.main} />
-              <Text style={styles.declineBtnText}>Từ Chối</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.acceptBtn, actionLoading && { opacity: 0.6 }]}
-              onPress={handleAccept}
-              disabled={actionLoading}
-            >
-              <CheckCircle2 size={18} color="#FFFFFF" />
-              <Text style={styles.acceptBtnText}>Tiếp Nhận Nhiệm Vụ</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Khi đã tiếp nhận (ACCEPTED) */}
-        {mission.status === 'ACCEPTED' && (
-          <TouchableOpacity
-            style={styles.primaryActionBtn}
-            onPress={() => handleTransition('EN_ROUTE', 'Đang trên đường di chuyển')}
-            disabled={actionLoading}
-          >
-            <Truck size={20} color="#FFFFFF" />
-            <Text style={styles.primaryActionText}>BẮT ĐẦU DI CHUYỂN (EN_ROUTE)</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Khi đang di chuyển (EN_ROUTE) */}
-        {mission.status === 'EN_ROUTE' && (
-          <TouchableOpacity
-            style={[styles.primaryActionBtn, { backgroundColor: '#7C3AED' }]}
-            onPress={() => handleTransition('ON_SCENE', 'Đã tiếp cận hiện trường')}
-            disabled={actionLoading}
-          >
-            <Flag size={20} color="#FFFFFF" />
-            <Text style={styles.primaryActionText}>ĐÃ ĐẾN HIỆN TRƯỜNG (ON_SCENE)</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Khi đã ở hiện trường (ON_SCENE) */}
-        {mission.status === 'ON_SCENE' && (
-          <View>
-            <TouchableOpacity
-              style={[styles.primaryActionBtn, { backgroundColor: THEME.colors.success.main }]}
-              onPress={() => setShowCompleteModal(true)}
-              disabled={actionLoading}
-            >
-              <FileCheck size={20} color="#FFFFFF" />
-              <Text style={styles.primaryActionText}>HOÀN THÀNH CỨU NẠN THÀNH CÔNG</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.failedBtn}
-              onPress={() => {
-                setDeclineReason('');
-                setShowDeclineModal(true);
-              }}
-              disabled={actionLoading}
-            >
-              <Text style={styles.failedBtnText}>Báo Trở Ngại Không Thể Tiếp Cận (FAILED)</Text>
-            </TouchableOpacity>
+          </>
+        ) : (
+          <View style={styles.privacyNoteBox}>
+            <Shield size={20} color={THEME.colors.primary.main} />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.privacyNoteTitle}>Thông tin liên hệ được bảo mật</Text>
+              <Text style={styles.privacyNoteDesc}>
+                Số điện thoại người báo cứu hộ được bảo vệ quyền riêng tư và chỉ cung cấp cho Đội trưởng để liên lạc tác chiến trực tiếp.
+              </Text>
+            </View>
           </View>
         )}
       </View>
+
+      {/* 4. CÁC NÚT HÀNH ĐỘNG VẬN HÀNH (THEO STATE MACHINE HOẶC VAI TRÒ THÀNH VIÊN) */}
+      {isLeader ? (
+        <View style={styles.actionSection}>
+          {actionLoading && <ActivityIndicator size="small" color={THEME.colors.primary.main} style={{ marginBottom: 10 }} />}
+
+          {/* Khi mới nhận (OFFERED) */}
+          {mission.status === 'OFFERED' && (
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.declineBtn, actionLoading && { opacity: 0.6 }]}
+                onPress={() => setShowDeclineModal(true)}
+                disabled={actionLoading}
+              >
+                <XCircle size={18} color={THEME.colors.emergency.main} />
+                <Text style={styles.declineBtnText}>Từ Chối</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.acceptBtn, actionLoading && { opacity: 0.6 }]}
+                onPress={handleAccept}
+                disabled={actionLoading}
+              >
+                <CheckCircle2 size={18} color="#FFFFFF" />
+                <Text style={styles.acceptBtnText}>Tiếp Nhận Nhiệm Vụ</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Khi đã tiếp nhận (ACCEPTED) */}
+          {mission.status === 'ACCEPTED' && (
+            <TouchableOpacity
+              style={styles.primaryActionBtn}
+              onPress={() => handleTransition('EN_ROUTE', 'Đang trên đường di chuyển')}
+              disabled={actionLoading}
+            >
+              <Truck size={20} color="#FFFFFF" />
+              <Text style={styles.primaryActionText}>BẮT ĐẦU DI CHUYỂN (EN_ROUTE)</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Khi đang di chuyển (EN_ROUTE) */}
+          {mission.status === 'EN_ROUTE' && (
+            <TouchableOpacity
+              style={[styles.primaryActionBtn, { backgroundColor: '#7C3AED' }]}
+              onPress={() => handleTransition('ON_SCENE', 'Đã tiếp cận hiện trường')}
+              disabled={actionLoading}
+            >
+              <Flag size={20} color="#FFFFFF" />
+              <Text style={styles.primaryActionText}>ĐÃ ĐẾN HIỆN TRƯỜNG (ON_SCENE)</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Khi đã ở hiện trường (ON_SCENE) */}
+          {mission.status === 'ON_SCENE' && (
+            <View>
+              <TouchableOpacity
+                style={[styles.primaryActionBtn, { backgroundColor: THEME.colors.success.main }]}
+                onPress={() => setShowCompleteModal(true)}
+                disabled={actionLoading}
+              >
+                <FileCheck size={20} color="#FFFFFF" />
+                <Text style={styles.primaryActionText}>HOÀN THÀNH CỨU NẠN THÀNH CÔNG</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.failedBtn}
+                onPress={() => {
+                  setDeclineReason('');
+                  setShowDeclineModal(true);
+                }}
+                disabled={actionLoading}
+              >
+                <Text style={styles.failedBtnText}>Báo Trở Ngại Không Thể Tiếp Cận (FAILED)</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      ) : (
+        <View style={styles.memberActionBanner}>
+          <View style={styles.memberActionHeader}>
+            <Shield size={18} color={THEME.colors.primary.main} />
+            <Text style={styles.memberActionTitle}>VAI TRÒ: THÀNH VIÊN TÁC CHIẾN ĐỘI</Text>
+          </View>
+          <Text style={styles.memberActionDesc}>
+            {mission.status === 'OFFERED' && '⏳ NHIỆM VỤ MỚI: Đang chờ Đội trưởng tiếp nhận điều động từ trung tâm.'}
+            {mission.status === 'ACCEPTED' && '🚀 ĐÃ TIẾP NHẬN: Đội trưởng đã nhận lệnh cứu hộ. Hãy chuẩn bị phương tiện cùng đội lên đường!'}
+            {mission.status === 'EN_ROUTE' && '🚚 ĐANG DI CHUYỂN: Đội đang trên đường tiếp cận mục tiêu. Mở bản đồ Google Maps bên trên để hành quân cùng đội.'}
+            {mission.status === 'ON_SCENE' && '🚩 ĐÃ ĐẾN HIỆN TRƯỜNG: Đã tiếp cận tọa độ nạn nhân. Triển khai phương án cứu nạn theo sự chỉ huy của Đội trưởng!'}
+            {mission.status === 'COMPLETED' && '✅ HOÀN TẤT XUẤT SẮC: Ca cứu hộ đã được Đội trưởng báo cáo hoàn thành thành công.'}
+            {mission.status === 'FAILED' && '⚠️ TẠM DỪNG TIẾP CẬN: Đội trưởng đã báo cáo trở ngại về trung tâm điều phối để xin chi viện.'}
+            {mission.status === 'DECLINED' && '⚪ TỪ CHỐI: Nhiệm vụ đã được Đội trưởng từ chối do ngoài khả năng tác chiến.'}
+            {mission.status === 'CANCELLED' && '⚪ ĐÃ HỦY: Ca cứu hộ đã bị trung tâm điều phối thu hồi.'}
+          </Text>
+          <Text style={styles.memberActionSub}>
+            * Quyền Tiếp nhận, Chuyển trạng thái và Báo cáo kết thúc ca cứu nạn do Đội trưởng điều hành.
+          </Text>
+        </View>
+      )}
 
       {/* MODAL HOÀN THÀNH NHIỆM VỤ */}
       <Modal visible={showCompleteModal} transparent={true} animationType="slide">
@@ -873,5 +918,59 @@ const styles = StyleSheet.create({
     height: 24,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  privacyNoteBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+  },
+  privacyNoteTitle: {
+    fontSize: THEME.typography.fontSizes.xs + 1,
+    fontWeight: '700',
+    color: THEME.colors.text.primary,
+  },
+  privacyNoteDesc: {
+    fontSize: 11,
+    color: THEME.colors.text.secondary,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  memberActionBanner: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    marginTop: 6,
+    marginBottom: 20,
+    ...THEME.shadows.sm,
+  },
+  memberActionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  memberActionTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1D4ED8',
+    marginLeft: 6,
+    letterSpacing: 0.5,
+  },
+  memberActionDesc: {
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '600',
+    color: '#1E3A8A',
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  memberActionSub: {
+    fontSize: 11,
+    color: '#3B82F6',
+    fontStyle: 'italic',
   },
 });

@@ -362,10 +362,10 @@ export const EmergencyHomeScreen: React.FC = () => {
         >
           <ShieldAlert size={26} color={THEME.colors.warning.main} />
           <Text style={styles.quickAccessTitle}>
-            {isAuthenticated && isVolunteerOrLeader() ? 'Bảng Đội Cứu Hộ' : 'Đội cứu hộ'}
+            {isAuthenticated && isVolunteerOrLeader() ? 'Cứu Hộ & TNV' : 'Đội cứu hộ'}
           </Text>
           <Text style={styles.quickAccessDesc}>
-            {isAuthenticated && isVolunteerOrLeader() ? 'Tác chiến cứu nạn' : 'Đăng nhập tác chiến'}
+            {isAuthenticated && isVolunteerOrLeader() ? 'Tác chiến & Hậu cần' : 'Đăng nhập tác chiến'}
           </Text>
         </TouchableOpacity>
       </View>
