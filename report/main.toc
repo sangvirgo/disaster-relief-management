@@ -1,10 +1,10 @@
 \contentsline {chapter}{LỜI CẢM ƠN}{i}{}%
 \contentsline {chapter}{LỜI CAM ĐOAN}{ii}{}%
 \contentsline {chapter}{MỤC LỤC}{iii}{}%
-\contentsline {chapter}{DANH MỤC CÁC KÝ HIỆU VÀ CHỮ VIẾT TẮT}{vi}{}%
-\contentsline {chapter}{DANH MỤC CÁC BẢNG}{vii}{}%
-\contentsline {chapter}{DANH MỤC SƠ ĐỒ}{viii}{}%
-\contentsline {chapter}{DANH MỤC HÌNH VẼ}{ix}{}%
+\contentsline {chapter}{DANH MỤC CÁC KÝ HIỆU VÀ CHỮ VIẾT TẮT}{v}{}%
+\contentsline {chapter}{DANH MỤC CÁC BẢNG}{vi}{}%
+\contentsline {chapter}{DANH MỤC SƠ ĐỒ}{vii}{}%
+\contentsline {chapter}{DANH MỤC HÌNH VẼ}{viii}{}%
 \contentsline {chapter}{MỞ ĐẦU}{1}{}%
 \contentsline {chapter}{BẢNG PHÂN CÔNG NHIỆM VỤ NHÓM THỰC HIỆN}{2}{}%
 \contentsline {chapter}{\numberline {1}GIỚI THIỆU ĐỀ TÀI}{3}{}%
@@ -26,50 +26,29 @@
 \contentsline {subsection}{\numberline {3.2.3}Xác minh, ưu tiên và điều phối}{7}{}%
 \contentsline {subsection}{\numberline {3.2.4}Tiếp nhận quyên góp hiện vật và phân phối}{8}{}%
 \contentsline {subsection}{\numberline {3.2.5}Bản đồ và báo cáo vận hành}{8}{}%
-\contentsline {section}{\numberline {3.3}Yêu cầu người dùng và chức năng}{9}{}%
-\contentsline {subsection}{\numberline {3.3.1}Yêu cầu người dùng (UR)}{9}{}%
+\contentsline {section}{\numberline {3.3}Yêu cầu người dùng và chức năng}{8}{}%
+\contentsline {subsection}{\numberline {3.3.1}Yêu cầu người dùng (UR)}{8}{}%
 \contentsline {subsection}{\numberline {3.3.2}Yêu cầu chức năng (FR)}{9}{}%
 \contentsline {subsection}{\numberline {3.3.3}Yêu cầu phi chức năng (NFR)}{11}{}%
 \contentsline {section}{\numberline {3.4}Ca sử dụng chính}{11}{}%
 \contentsline {section}{\numberline {3.5}Kiến trúc hệ thống}{11}{}%
-\contentsline {section}{\numberline {3.6}Kết quả xây dựng backend}{11}{}%
-\contentsline {section}{\numberline {3.7}Kiểm chứng và kết quả}{15}{}%
+\contentsline {section}{\numberline {3.6}Kết quả xây dựng backend}{14}{}%
+\contentsline {section}{\numberline {3.7}Kiểm chứng và kết quả}{14}{}%
 \contentsline {chapter}{\numberline {4}TỔ CHỨC DỮ LIỆU}{16}{}%
 \contentsline {section}{\numberline {4.1}Nguyên tắc tổ chức dữ liệu}{16}{}%
 \contentsline {section}{\numberline {4.2}Ràng buộc và tính toàn vẹn}{16}{}%
 \contentsline {section}{\numberline {4.3}Sơ đồ cơ sở dữ liệu vật lý}{16}{}%
 \contentsline {chapter}{\numberline {5}THIẾT KẾ GIAO DIỆN WEB}{23}{}%
-\contentsline {section}{\numberline {5.1}Mục tiêu và tổ chức giao diện}{23}{}%
-\contentsline {section}{\numberline {5.2}Luồng dữ liệu và kiểm soát truy cập trên Web}{23}{}%
-\contentsline {section}{\numberline {5.3}Đăng nhập và điều hướng theo quyền}{24}{}%
-\contentsline {section}{\numberline {5.4}Giao diện người dân}{25}{}%
-\contentsline {subsection}{\numberline {5.4.1}Gửi yêu cầu SOS}{25}{}%
-\contentsline {subsection}{\numberline {5.4.2}Xem đợt quyên góp hiện vật}{26}{}%
-\contentsline {section}{\numberline {5.5}Giao diện nghiệp vụ theo vai trò}{26}{}%
-\contentsline {subsection}{\numberline {5.5.1}Điều phối viên và đội cứu hộ}{26}{}%
-\contentsline {subsection}{\numberline {5.5.2}Vận hành cứu trợ và quản trị hệ thống}{28}{}%
-\contentsline {chapter}{\numberline {6}THIẾT KẾ ỨNG DỤNG DI ĐỘNG}{31}{}%
-\contentsline {section}{\numberline {6.1}Mục tiêu và cấu trúc ứng dụng}{31}{}%
-\contentsline {section}{\numberline {6.2}Xác thực và điều hướng theo vai trò}{32}{}%
-\contentsline {subsection}{\numberline {6.2.1}Giao diện đăng nhập}{32}{}%
-\contentsline {subsection}{\numberline {6.2.2}Giao diện đổi mật khẩu}{33}{}%
-\contentsline {section}{\numberline {6.3}Luồng SOS của người dân}{34}{}%
-\contentsline {subsection}{\numberline {6.3.1}Giao diện trang chủ và lựa chọn cách báo}{34}{}%
-\contentsline {subsection}{\numberline {6.3.2}Giao diện báo cứu nạn tại chỗ}{35}{}%
-\contentsline {subsection}{\numberline {6.3.3}Giao diện ghim vị trí cứu nạn trên bản đồ}{36}{}%
-\contentsline {subsection}{\numberline {6.3.4}Giao diện tra cứu tiến độ cứu hộ}{37}{}%
-\contentsline {subsection}{\numberline {6.3.5}Giao diện bổ sung tình hình và ảnh hiện trường}{38}{}%
-\contentsline {section}{\numberline {6.4}Quyên góp hiện vật trên Mobile}{39}{}%
-\contentsline {subsection}{\numberline {6.4.1}Giao diện quyên góp cứu trợ}{39}{}%
-\contentsline {subsection}{\numberline {6.4.2}Giao diện khai báo bàn giao hiện vật}{40}{}%
-\contentsline {section}{\numberline {6.5}Không gian đội trưởng và nhiệm vụ cứu hộ}{41}{}%
-\contentsline {subsection}{\numberline {6.5.1}Giao diện bảng điều khiển đội trưởng}{41}{}%
-\contentsline {subsection}{\numberline {6.5.2}Giao diện danh sách nhiệm vụ}{42}{}%
-\contentsline {subsection}{\numberline {6.5.3}Giao diện chi tiết nhiệm vụ}{43}{}%
-\contentsline {section}{\numberline {6.6}Giới hạn kiểm chứng và công việc tiếp theo}{43}{}%
-\contentsline {chapter}{\numberline {7}KẾT LUẬN VÀ KIẾN NGHỊ}{44}{}%
-\contentsline {section}{\numberline {7.1}Kết quả đạt được}{44}{}%
-\contentsline {section}{\numberline {7.2}Giới hạn còn lại}{44}{}%
-\contentsline {section}{\numberline {7.3}Kiến nghị}{44}{}%
-\contentsline {chapter}{DANH MỤC TÀI LIỆU THAM KHẢO}{45}{}%
-\contentsline {chapter}{\numberline {A}MA TRẬN TRUY VẾT YÊU CẦU}{46}{}%
+\contentsline {section}{\numberline {5.1}Mục tiêu và phạm vi giao diện}{23}{}%
+\contentsline {section}{\numberline {5.2}Bố cục trang vận hành}{23}{}%
+\contentsline {section}{\numberline {5.3}Nguyên tắc tương tác và trạng thái}{23}{}%
+\contentsline {chapter}{\numberline {6}THIẾT KẾ ỨNG DỤNG DI ĐỘNG}{25}{}%
+\contentsline {section}{\numberline {6.1}Mục tiêu ứng dụng}{25}{}%
+\contentsline {section}{\numberline {6.2}Luồng gửi yêu cầu và theo dõi}{25}{}%
+\contentsline {section}{\numberline {6.3}Giới hạn triển khai Mobile}{25}{}%
+\contentsline {chapter}{\numberline {7}KẾT LUẬN VÀ KIẾN NGHỊ}{26}{}%
+\contentsline {section}{\numberline {7.1}Kết quả đạt được}{26}{}%
+\contentsline {section}{\numberline {7.2}Giới hạn còn lại}{26}{}%
+\contentsline {section}{\numberline {7.3}Kiến nghị}{26}{}%
+\contentsline {chapter}{DANH MỤC TÀI LIỆU THAM KHẢO}{27}{}%
+\contentsline {chapter}{\numberline {A}MA TRẬN TRUY VẾT YÊU CẦU}{28}{}%
