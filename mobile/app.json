@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Cứu Trợ Thiên Tai C48",
+    "slug": "disaster-relief-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Ứng dụng cần quyền vị trí để gửi tọa độ cứu nạn khẩn cấp và định vị lực lượng cứu trợ.",
+        "NSCameraUsageDescription": "Ứng dụng cần quyền máy ảnh để chụp ảnh/video bằng chứng hiện trường thiên tai.",
+        "NSPhotoLibraryUsageDescription": "Ứng dụng cần quyền chọn ảnh từ thư viện để gửi minh chứng cứu hộ."
+      }
+    },
+    "android": {
+      "package": "com.disasterrelief.c48mobile",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#DC2626",
+        "foregroundImage": "./assets/icon.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-status-bar"
+    ]
+  }
+}

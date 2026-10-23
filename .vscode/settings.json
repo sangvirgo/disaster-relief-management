@@ -1,0 +1,23 @@
+{
+  "latex-workshop.latex.autoBuild.run": "onSave",
+  "latex-workshop.view.pdf.viewer": "tab",
+  "latex-workshop.latex.recipe.default": "first",
+  "latex-workshop.latex.recipes": [
+    {
+      "name": "C48: XeLaTeX hai lượt",
+      "tools": ["xelatex-c48", "xelatex-c48"]
+    }
+  ],
+  "latex-workshop.latex.tools": [
+    {
+      "name": "xelatex-c48",
+      "command": "xelatex",
+      "args": [
+        "-synctex=1",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "%DOC%"
+      ]
+    }
+  ]
+}

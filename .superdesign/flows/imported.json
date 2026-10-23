@@ -1,0 +1,306 @@
+{
+  "citizen-home": {
+    "draftId": "8a1d94cf-9a35-4569-8303-3b2a3c2b0003",
+    "title": "C48 Trang trợ giúp",
+    "currentVersion": 3,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-8a1d94cf-9a35-4569-8303-3b2a3c2b0003",
+    "previewUrl": "https://p.superdesign.dev/draft/8a1d94cf-9a35-4569-8303-3b2a3c2b0003"
+  },
+  "citizen-sos": {
+    "draftId": "0b44bd0c-a5ef-40b7-9419-8ac7a62068de",
+    "title": "C48 Relief - Gửi Yêu Cầu SOS",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-0b44bd0c-a5ef-40b7-9419-8ac7a62068de",
+    "previewUrl": "https://p.superdesign.dev/draft/0b44bd0c-a5ef-40b7-9419-8ac7a62068de"
+  },
+  "citizen-track": {
+    "draftId": "409a36d3-9721-4f77-b4ba-84a67dcc5790",
+    "title": "Người dân — Theo dõi SOS",
+    "currentVersion": 3,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-409a36d3-9721-4f77-b4ba-84a67dcc5790",
+    "previewUrl": "https://p.superdesign.dev/draft/409a36d3-9721-4f77-b4ba-84a67dcc5790"
+  },
+  "citizen-campaigns": {
+    "draftId": "93ffa88a-ea9c-4dc5-a764-52781588622d",
+    "title": "Chiến dịch cứu trợ",
+    "currentVersion": 3,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-93ffa88a-ea9c-4dc5-a764-52781588622d",
+    "previewUrl": "https://p.superdesign.dev/draft/93ffa88a-ea9c-4dc5-a764-52781588622d"
+  },
+  "citizen-drives": {
+    "draftId": "0d6cafa9-adc7-4799-a0df-98e71eda9cb6",
+    "title": "Danh sách đợt quyên góp vật phẩm",
+    "currentVersion": 3,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-0d6cafa9-adc7-4799-a0df-98e71eda9cb6",
+    "previewUrl": "https://p.superdesign.dev/draft/0d6cafa9-adc7-4799-a0df-98e71eda9cb6"
+  },
+  "citizen-declare": {
+    "draftId": "4a2fa7aa-25df-400e-b0a8-76680ce72fbf",
+    "title": "Khai báo vật phẩm",
+    "currentVersion": 3,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-4a2fa7aa-25df-400e-b0a8-76680ce72fbf",
+    "previewUrl": "https://p.superdesign.dev/draft/4a2fa7aa-25df-400e-b0a8-76680ce72fbf"
+  },
+  "citizen-donation": {
+    "draftId": "4693a2c6-abbb-4dbc-bc7f-da39ca40e9ec",
+    "title": "Người dân — Theo dõi đóng góp",
+    "currentVersion": 3,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-4693a2c6-abbb-4dbc-bc7f-da39ca40e9ec",
+    "previewUrl": "https://p.superdesign.dev/draft/4693a2c6-abbb-4dbc-bc7f-da39ca40e9ec"
+  },
+  "coordinator-queue": {
+    "draftId": "947aa3ad-53a8-4682-80de-594eeefcf01c",
+    "title": "Điều phối — Hàng đợi SOS",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-947aa3ad-53a8-4682-80de-594eeefcf01c",
+    "previewUrl": "https://p.superdesign.dev/draft/947aa3ad-53a8-4682-80de-594eeefcf01c"
+  },
+  "admin-audit": {
+    "draftId": "bf9af256-c6a1-4609-9263-964e0fffd2ce",
+    "title": "Nhật ký kiểm toán",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-bf9af256-c6a1-4609-9263-964e0fffd2ce",
+    "previewUrl": "https://p.superdesign.dev/draft/bf9af256-c6a1-4609-9263-964e0fffd2ce"
+  },
+  "admin-grants": {
+    "draftId": "8bf88983-28d4-4745-a99e-a3bb812c9316",
+    "title": "Phân quyền theo phạm vi",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-8bf88983-28d4-4745-a99e-a3bb812c9316",
+    "previewUrl": "https://p.superdesign.dev/draft/8bf88983-28d4-4745-a99e-a3bb812c9316"
+  },
+  "admin-organizations": {
+    "draftId": "32f0a52c-b3d0-4d1e-9d82-f8bbd830818d",
+    "title": "Tổ chức và thành viên",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-32f0a52c-b3d0-4d1e-9d82-f8bbd830818d",
+    "previewUrl": "https://p.superdesign.dev/draft/32f0a52c-b3d0-4d1e-9d82-f8bbd830818d"
+  },
+  "admin-regions": {
+    "draftId": "e2d1d111-a5b1-4083-8a33-e55c6264b644",
+    "title": "Danh mục khu vực",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-e2d1d111-a5b1-4083-8a33-e55c6264b644",
+    "previewUrl": "https://p.superdesign.dev/draft/e2d1d111-a5b1-4083-8a33-e55c6264b644"
+  },
+  "admin-users": {
+    "draftId": "360252a5-9a38-40f1-963c-38ca739a8c19",
+    "title": "Quản lý người dùng",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-360252a5-9a38-40f1-963c-38ca739a8c19",
+    "previewUrl": "https://p.superdesign.dev/draft/360252a5-9a38-40f1-963c-38ca739a8c19"
+  },
+  "coordinator-assign": {
+    "draftId": "d7819dd0-6943-461f-a866-9736d5e11e84",
+    "title": "Chọn đội và giao nhiệm vụ",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-d7819dd0-6943-461f-a866-9736d5e11e84",
+    "previewUrl": "https://p.superdesign.dev/draft/d7819dd0-6943-461f-a866-9736d5e11e84"
+  },
+  "coordinator-campaigns": {
+    "draftId": "3f3d9dda-f879-4926-9b51-afc8e96654f5",
+    "title": "Chiến dịch điều phối",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-3f3d9dda-f879-4926-9b51-afc8e96654f5",
+    "previewUrl": "https://p.superdesign.dev/draft/3f3d9dda-f879-4926-9b51-afc8e96654f5"
+  },
+  "coordinator-map": {
+    "draftId": "dfc266df-ad34-4c16-9431-98e6e165f2ef",
+    "title": "Bản đồ và nhiệm vụ",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-dfc266df-ad34-4c16-9431-98e6e165f2ef",
+    "previewUrl": "https://p.superdesign.dev/draft/dfc266df-ad34-4c16-9431-98e6e165f2ef"
+  },
+  "coordinator-reports": {
+    "draftId": "29d61559-ef21-43dc-90b7-6d8890c3b8a1",
+    "title": "Báo cáo ứng cứu",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-29d61559-ef21-43dc-90b7-6d8890c3b8a1",
+    "previewUrl": "https://p.superdesign.dev/draft/29d61559-ef21-43dc-90b7-6d8890c3b8a1"
+  },
+  "coordinator-triage": {
+    "draftId": "6198a6e1-5481-4c2d-b1ca-54265adf3e9b",
+    "title": "Quyết định mức ưu tiên",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-6198a6e1-5481-4c2d-b1ca-54265adf3e9b",
+    "previewUrl": "https://p.superdesign.dev/draft/6198a6e1-5481-4c2d-b1ca-54265adf3e9b"
+  },
+  "coordinator-verify": {
+    "draftId": "c89f7ec7-69bc-4101-90d9-97794adb033c",
+    "title": "Xác minh yêu cầu",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-c89f7ec7-69bc-4101-90d9-97794adb033c",
+    "previewUrl": "https://p.superdesign.dev/draft/c89f7ec7-69bc-4101-90d9-97794adb033c"
+  },
+  "operations-distribution": {
+    "draftId": "575ebbae-6ba7-4ec8-af91-99d96b01de62",
+    "title": "Chuẩn bị phân phối",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-575ebbae-6ba7-4ec8-af91-99d96b01de62",
+    "previewUrl": "https://p.superdesign.dev/draft/575ebbae-6ba7-4ec8-af91-99d96b01de62"
+  },
+  "operations-drives": {
+    "draftId": "0c5e0b7c-e2cd-45f7-9ebe-1ea9b47be877",
+    "title": "Quản lý đợt quyên góp",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-0c5e0b7c-e2cd-45f7-9ebe-1ea9b47be877",
+    "previewUrl": "https://p.superdesign.dev/draft/0c5e0b7c-e2cd-45f7-9ebe-1ea9b47be877"
+  },
+  "operations-handoff": {
+    "draftId": "87b58e80-c845-4c29-b8c9-f835e1ff9265",
+    "title": "Bàn giao và xác nhận",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-87b58e80-c845-4c29-b8c9-f835e1ff9265",
+    "previewUrl": "https://p.superdesign.dev/draft/87b58e80-c845-4c29-b8c9-f835e1ff9265"
+  },
+  "operations-intake": {
+    "draftId": "991d5812-8764-432f-ad91-abc07c6d5689",
+    "title": "Tiếp nhận và kiểm đếm",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-991d5812-8764-432f-ad91-abc07c6d5689",
+    "previewUrl": "https://p.superdesign.dev/draft/991d5812-8764-432f-ad91-abc07c6d5689"
+  },
+  "operations-needs": {
+    "draftId": "3999462b-82e4-4988-85e3-cba7214ef68e",
+    "title": "Nhu cầu và cam kết",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-3999462b-82e4-4988-85e3-cba7214ef68e",
+    "previewUrl": "https://p.superdesign.dev/draft/3999462b-82e4-4988-85e3-cba7214ef68e"
+  },
+  "operations-overview": {
+    "draftId": "823263e9-5fff-4af9-a6ad-6af876e23c5a",
+    "title": "Tổng quan vận hành cứu trợ",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-823263e9-5fff-4af9-a6ad-6af876e23c5a",
+    "previewUrl": "https://p.superdesign.dev/draft/823263e9-5fff-4af9-a6ad-6af876e23c5a"
+  },
+  "operations-reports": {
+    "draftId": "d18c2a03-4c77-4954-a84d-8fd316c5289e",
+    "title": "Đối soát và báo cáo",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-d18c2a03-4c77-4954-a84d-8fd316c5289e",
+    "previewUrl": "https://p.superdesign.dev/draft/d18c2a03-4c77-4954-a84d-8fd316c5289e"
+  },
+  "operations-review": {
+    "draftId": "1903e1bf-534f-4501-bdcd-2392c9f4772f",
+    "title": "Duyệt biên nhận",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-1903e1bf-534f-4501-bdcd-2392c9f4772f",
+    "previewUrl": "https://p.superdesign.dev/draft/1903e1bf-534f-4501-bdcd-2392c9f4772f"
+  },
+  "operations-stock": {
+    "draftId": "d3af80c0-40bd-4178-b25b-4636533cacd6",
+    "title": "Kho, vật phẩm và điểm cứu trợ",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-d3af80c0-40bd-4178-b25b-4636533cacd6",
+    "previewUrl": "https://p.superdesign.dev/draft/d3af80c0-40bd-4178-b25b-4636533cacd6"
+  },
+  "volunteer-missions": {
+    "draftId": "9c62dade-7aff-48ea-b758-eb7e584fa574",
+    "title": "Nhiệm vụ của đội",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-9c62dade-7aff-48ea-b758-eb7e584fa574",
+    "previewUrl": "https://p.superdesign.dev/draft/9c62dade-7aff-48ea-b758-eb7e584fa574"
+  },
+  "volunteer-overview": {
+    "draftId": "490aa10b-5406-4399-8687-fe294de10f93",
+    "title": "Tổng quan đội cứu hộ",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-490aa10b-5406-4399-8687-fe294de10f93",
+    "previewUrl": "https://p.superdesign.dev/draft/490aa10b-5406-4399-8687-fe294de10f93"
+  },
+  "volunteer-progress": {
+    "draftId": "c2841919-ad00-41a5-901a-cc9e3894288c",
+    "title": "Cập nhật tiến độ nhiệm vụ",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-c2841919-ad00-41a5-901a-cc9e3894288c",
+    "previewUrl": "https://p.superdesign.dev/draft/c2841919-ad00-41a5-901a-cc9e3894288c"
+  },
+  "volunteer-team": {
+    "draftId": "9d943809-b0f6-47f3-8c84-9569c8475951",
+    "title": "Hồ sơ và vị trí đội",
+    "currentVersion": 5,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-9d943809-b0f6-47f3-8c84-9569c8475951",
+    "previewUrl": "https://p.superdesign.dev/draft/9d943809-b0f6-47f3-8c84-9569c8475951"
+  },
+  "admin-overview": {
+    "draftId": "d0547cad-54d0-4a83-b514-70321904effa",
+    "title": "Tổng quan quản trị",
+    "currentVersion": 4,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-d0547cad-54d0-4a83-b514-70321904effa",
+    "previewUrl": "https://p.superdesign.dev/draft/d0547cad-54d0-4a83-b514-70321904effa"
+  },
+  "citizen-account": {
+    "draftId": "71004714-3a53-4632-a7d6-14c82945c8da",
+    "title": "Đăng nhập hoặc tạo tài khoản",
+    "currentVersion": 4,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-71004714-3a53-4632-a7d6-14c82945c8da",
+    "previewUrl": "https://p.superdesign.dev/draft/71004714-3a53-4632-a7d6-14c82945c8da"
+  },
+  "citizen-receipt": {
+    "draftId": "0dbec713-5cdf-4943-8698-05a7ef3f0ab1",
+    "title": "Yêu cầu đã được tiếp nhận",
+    "currentVersion": 4,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-0dbec713-5cdf-4943-8698-05a7ef3f0ab1",
+    "previewUrl": "https://p.superdesign.dev/draft/0dbec713-5cdf-4943-8698-05a7ef3f0ab1"
+  },
+  "coordinator-notices": {
+    "draftId": "8c611eda-4f07-41d8-8b3a-a3b4f29d7987",
+    "title": "Thông báo điều phối",
+    "currentVersion": 4,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-8c611eda-4f07-41d8-8b3a-a3b4f29d7987",
+    "previewUrl": "https://p.superdesign.dev/draft/8c611eda-4f07-41d8-8b3a-a3b4f29d7987"
+  },
+  "operations-assets": {
+    "draftId": "96346963-3955-4c2d-8c6c-03a207b70fee",
+    "title": "Điểm nhận và phương tiện",
+    "currentVersion": 4,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-96346963-3955-4c2d-8c6c-03a207b70fee",
+    "previewUrl": "https://p.superdesign.dev/draft/96346963-3955-4c2d-8c6c-03a207b70fee"
+  },
+  "volunteer-notices": {
+    "draftId": "84f8a966-6bae-4dcb-ae51-a1f41e1503ef",
+    "title": "Thông báo của đội",
+    "currentVersion": 4,
+    "projectUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9",
+    "nodeUrl": "https://superdesign.dev/teams/b004acb3-e22c-4dff-b18f-a07831aef849/projects/44bcd4b9-88e7-4731-a0fb-833c655183c9?node=draft-variant-84f8a966-6bae-4dcb-ae51-a1f41e1503ef",
+    "previewUrl": "https://p.superdesign.dev/draft/84f8a966-6bae-4dcb-ae51-a1f41e1503ef"
+  }
+}
