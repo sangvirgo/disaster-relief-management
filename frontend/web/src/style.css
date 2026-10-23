@@ -133,20 +133,20 @@ textarea:focus-visible {
 }
 
 .brand-mark {
+  position: relative;
   width: 44px;
   height: 44px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--color-emergency), var(--color-emergency-dark));
-  display: grid;
-  place-items: center;
-  box-shadow: var(--shadow-emergency);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .brand-mark img {
-  width: 24px;
-  height: 24px;
-  filter: brightness(0) invert(1);
+  position: absolute;
+  left: -22px;
+  top: -24px;
+  width: 88px;
+  height: 88px;
+  max-width: none;
 }
 
 .brand strong {
@@ -162,7 +162,7 @@ textarea:focus-visible {
   font-size: 10px;
   letter-spacing: 0.1em;
   font-weight: 700;
-  color: var(--color-emergency);
+  color: #047857;
   display: block;
   margin-top: 3px;
 }
@@ -918,6 +918,31 @@ textarea:focus-visible {
   }
   .heading h1 {
     font-size: 22px;
+  }
+}
+
+@media (max-width: 380px) {
+  .topbar {
+    gap: 6px;
+    padding: 0 8px;
+  }
+  .topbar-left,
+  .user-profile {
+    gap: 6px;
+    min-width: 0;
+  }
+  .top-actions {
+    gap: 4px;
+  }
+  .user-avatar {
+    display: none;
+  }
+  .breadcrumb-page {
+    font-size: 12px;
+  }
+  .user-profile .button {
+    font-size: 11px;
+    padding: 6px;
   }
 }
 

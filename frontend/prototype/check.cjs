@@ -5,34 +5,19 @@ const nodes = new Map();
 const document = {
   title: '',
   getElementById(id) {
-    if (!nodes.has(id))
-      nodes.set(id, { innerHTML: '', addEventListener() {}, classList: { toggle() {} } });
+    if (!nodes.has(id)) nodes.set(id, { innerHTML: '', addEventListener() {}, classList: { toggle() {} } });
     return nodes.get(id);
   },
-  querySelectorAll() {
-    return [];
-  },
+  querySelectorAll() { return []; },
 };
-const context = vm.createContext({
-  document,
-  location: { hash: '#citizen/home' },
-  window: { addEventListener() {} },
-  alert() {},
-});
+const context = vm.createContext({ document, location: { hash: '#citizen/home' }, window: { addEventListener() {} }, alert() {} });
 vm.runInContext(fs.readFileSync(require.resolve('./app.js'), 'utf8'), context);
-const routes = vm.runInContext(
-  'Object.entries(roles).flatMap(([role, data]) => data.items.map(([page]) => `${role}/${page}`))',
-  context,
-);
+const routes = vm.runInContext('Object.entries(roles).flatMap(([role, data]) => data.items.map(([page]) => `${role}/${page}`))', context);
 for (const route of routes) {
   context.location.hash = `#${route}`;
   vm.runInContext('render()', context);
   const output = nodes.get('app').innerHTML;
-  if (
-    !output.includes('<main class="content">') ||
-    output.includes('undefined') ||
-    output.includes('NaN')
-  ) {
+  if (!output.includes('<main class="content">') || output.includes('undefined') || output.includes('NaN')) {
     throw new Error(`Invalid render: ${route}`);
   }
   for (const [, icon] of output.matchAll(/src="assets\/icons\/([a-z-]+)\.svg"/g)) {

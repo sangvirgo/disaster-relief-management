@@ -5,6 +5,7 @@ import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { label, timeLabel } from '../../i18n/labels';
 import { ReceiptCountForm } from './ReceiptCountForm';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
+import { DetailCloseButton } from '../../components/DetailCloseButton';
 
 type Row = Record<string, unknown> & {
   id?: string;
@@ -49,6 +50,20 @@ const headings: Record<string, string> = {
 const string = (value: unknown) => (typeof value === 'string' ? value : '');
 const number = (value: unknown) => (typeof value === 'number' ? value : undefined);
 const quantity = (value: unknown) => (value == null ? '—' : String(value));
+const distributionPages = new Set(['distribution', 'handoff']);
+function recordTitle(page: string, item: Row): string {
+  if (distributionPages.has(page)) return string(item.purpose) ? label(item.purpose) : 'Phiếu phân phối';
+  if (page === 'intake') return string(item.donor_name) ? `Đóng góp của ${item.donor_name}` : 'Đóng góp chờ tiếp nhận';
+  return item.title || item.name || item.public_code || string(item.item_name) ||
+    string((item.item as Row | undefined)?.name) || item.id || 'Bản ghi';
+}
+function distributionItems(item: Row): string {
+  const lines = Array.isArray(item.lines) ? item.lines as Row[] : [];
+  if (!lines.length) return 'Chưa có vật phẩm';
+  const first = lines[0];
+  const name = string(first.item_name) || 'Vật phẩm';
+  return `${name} · ${quantity(first.quantity)}${lines.length > 1 ? ` · +${lines.length - 1} vật phẩm` : ''}`;
+}
 const fields = (entries: [string, string, boolean?][]) =>
   entries.map(([name, title, required]) => ({ name, label: title, required }));
 
@@ -210,7 +225,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     }),
   };
   return (
-    <div className="coordinator-layout">
+    <div className={`coordinator-layout ${page === 'stock' || (page === 'reports' && report === 'stock-summary') ? 'operations-table-layout' : ''}`}>
       <section className="card">
         <h2>{headings[page]}</h2>
         {page === 'assets' && (
@@ -320,7 +335,23 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         {!loading && ready && !error && !items.length && (
           <div className="empty">Chưa có bản ghi trong phạm vi được cấp quyền.</div>
         )}
-        <div className="record-list">
+        {(page === 'stock' || (page === 'reports' && report === 'stock-summary')) ? (
+          <><p className="table-swipe-hint">Vuốt ngang bảng để xem các cột số lượng.</p><div className="stock-table-scroll">
+            <table className="stock-table">
+              <thead><tr><th>Vật phẩm</th><th>Kho</th><th>Đơn vị</th><th className="numeric">Tồn thực tế</th><th className="numeric">Đã giữ</th><th className="numeric">Khả dụng</th></tr></thead>
+              <tbody>{items.map((item, index) => (
+                <tr key={string(item.id || item.balance_id) || index} className={selected === item ? 'selected' : ''}>
+                  <th scope="row"><button type="button" className="table-row-link" onClick={() => setSelected(item)}>{string((item.item as Row | undefined)?.name) || string(item.item_name) || item.name || 'Vật phẩm'}</button></th>
+                  <td>{string(item.warehouse_name) || string(item.warehouse_id).slice(0, 8) || '—'}</td>
+                  <td>{string((item.unit as Row | undefined)?.display_name) || string(item.unit_name) || '—'}</td>
+                  <td className="numeric">{quantity(item.on_hand)}</td>
+                  <td className="numeric">{quantity(item.reserved)}</td>
+                  <td className="numeric"><strong className="available-value">{quantity(item.available)}</strong></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div></>
+        ) : <div className="record-list">
           {items.map((item, index) => (
             <button
               type="button"
@@ -330,16 +361,12 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             >
               <span>
                 <strong>
-                  {item.title ||
-                    item.name ||
-                    item.public_code ||
-                    string(item.item_name) ||
-                    string((item.item as Row | undefined)?.name) ||
-                    item.id ||
-                    'Bản ghi'}
+                  {recordTitle(page, item)}
                 </strong>
+                {distributionPages.has(page) && <small>Phiếu phân phối · {distributionItems(item)}</small>}
+                {page === 'intake' && <small>{string(item.drive_title) || 'Đợt quyên góp'}{item.public_code ? ` · Mã ${item.public_code}` : ''}</small>}
                 <small>
-                  {item.donor_name ? `Người đóng góp: ${item.donor_name} · ` : ''}
+                  {page !== 'intake' && item.donor_name ? `Người đóng góp: ${item.donor_name} · ` : ''}
                   {item.created_at
                     ? timeLabel(item.created_at)
                     : string(item.warehouse_name) || string(item.region_code)}
@@ -373,14 +400,15 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               {item.status && <span className="chip">{label(item.status)}</span>}
             </button>
           ))}
-        </div>
+        </div>}
         {next && (
           <button className="button secondary" onClick={() => setCursor(next)}>
             Xem thêm
           </button>
         )}
       </section>
-      <section className="card">
+      <section className={`card detail-panel-card ${selected ? 'is-open' : ''}`}>
+        {selected && <DetailCloseButton onClick={() => { setSelected(null); setDetail(null); }} />}
         <h2>
           {selected
             ? 'Chi tiết và thao tác'
@@ -392,8 +420,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         {detail && (
           <>
             <div className="detail-grid">
+              {distributionPages.has(page) && Boolean(detail.purpose) && (
+                <p><strong>Mục đích phân phối</strong><br />{label(detail.purpose)}</p>
+              )}
               <p>
-                <strong>Mã bản ghi</strong>
+                <strong>{distributionPages.has(page) ? 'Mã phiếu phân phối' : page === 'intake' ? 'Mã tiếp nhận' : 'Mã bản ghi'}</strong>
                 <br />
                 {string(selected?.id || selected?.balance_id || selected?.warehouse_id) ||
                   'Không có mã riêng'}
@@ -790,18 +821,21 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       label: 'Loại bàn giao',
                       type: 'select',
                       required: true,
-                      options: detail.relief_point_id
-                        ? [
-                            ['POINT_RECEIPT', 'Điểm cứu trợ đã nhận'],
-                            ['HOUSEHOLD_HANDOUT', 'Đã giao cho hộ dân'],
-                            ['RETURN', 'Hoàn về kho'],
-                            ['LOSS', 'Ghi nhận thất thoát'],
-                          ].map(([value, title]) => ({ value, label: title }))
-                        : [
-                            ['DIRECT_HOUSEHOLD', 'Giao trực tiếp cho hộ dân'],
-                            ['RETURN', 'Hoàn về kho'],
-                            ['LOSS', 'Ghi nhận thất thoát'],
-                          ].map(([value, title]) => ({ value, label: title })),
+                      options: (rights.has('DISTRIBUTION_STAFF')
+                        ? detail.relief_point_id
+                          ? [
+                              ['POINT_RECEIPT', 'Điểm cứu trợ đã nhận'],
+                              ['HOUSEHOLD_HANDOUT', 'Đã giao cho hộ dân'],
+                              ['RETURN', 'Hoàn về kho'],
+                              ['LOSS', 'Ghi nhận thất thoát'],
+                            ]
+                          : [
+                              ['DIRECT_HOUSEHOLD', 'Giao trực tiếp cho hộ dân'],
+                              ['RETURN', 'Hoàn về kho'],
+                              ['LOSS', 'Ghi nhận thất thoát'],
+                            ]
+                        : [['RETURN', 'Hoàn về kho']]
+                      ).map(([value, title]) => ({ value, label: title })),
                     },
                     {
                       name: 'distribution_line_id',
@@ -837,7 +871,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   ],
                   build: (values) => ({
                     handoff_kind: values.handoff_kind,
-                    ...(values.source_stage ? { source_stage: values.source_stage } : {}),
+                    ...(['RETURN', 'LOSS'].includes(values.handoff_kind) && values.source_stage
+                      ? { source_stage: values.source_stage }
+                      : {}),
                     ...(values.handoff_kind !== 'LOSS' && values.receiver_label
                       ? { receiver_label: values.receiver_label }
                       : {}),
@@ -860,7 +896,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           page === 'drives' &&
           (rights.has('CAMPAIGN_MANAGER') || rights.has('OPERATIONS_MANAGER')) &&
           command(driveCreate)}
-        {!selected && page === 'needs' && rights.has('OPERATIONS_MANAGER') && command(needCreate)}
+        {!selected && page === 'needs' && (rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR')) && command(needCreate)}
         {!selected &&
           page === 'assets' &&
           rights.has('OPERATIONS_MANAGER') &&
@@ -963,17 +999,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             Chọn một dòng để xem số liệu trả về trong phạm vi kho hoặc khu vực được cấp quyền. Số
             lượng được giữ theo từng đơn vị vật phẩm.
           </p>
-        )}
-        {selected && (
-          <button
-            className="button secondary"
-            onClick={() => {
-              setSelected(null);
-              setDetail(null);
-            }}
-          >
-            Quay lại danh sách
-          </button>
         )}
       </section>
     </div>

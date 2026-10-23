@@ -20,10 +20,13 @@ import { Notices, Volunteer } from './features/volunteer/Volunteer';
 import { Admin } from './features/admin/Admin';
 import { Operations } from './features/operations/Operations';
 import { OperationsDashboard } from './features/operations/Dashboard';
+import { AnalyticsRegionField, useAnalyticsRegion } from './components/AnalyticsRegion';
+import { CitizenAccount } from './features/citizen/CitizenAccount';
 import type { components as ResponseComponents } from './api/generated/response';
 import './style.css';
 import './sos.css';
 import './workflow.css';
+import './refinements.css';
 
 type DataPage = {
   items?: Record<string, unknown>[];
@@ -32,9 +35,11 @@ type DataPage = {
   more?: boolean;
   generated_at?: string;
   status_counts?: Record<string, number>;
+  priority_counts?: Record<string, number>;
   active_missions?: number;
   overdue_missions?: number;
 };
+type SosReceipt = ResponseComponents['schemas']['CreatedSelfRequest'];
 const icon = (name: string) => <img src={`/icons/${name}.svg`} alt="" aria-hidden="true" />;
 const text = (value: unknown) => (typeof value === 'string' ? value : undefined);
 
@@ -47,14 +52,21 @@ function AuthModal({
   onClose: () => void;
   onReady: (user: Me) => void;
 }) {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'help'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
+    if (!isOpen) {
+      setMode('login');
+      setPassword('');
+      setShowPassword(false);
+      setMessage('');
+    }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose();
     }
@@ -100,22 +112,23 @@ function AuthModal({
       aria-modal="true"
       aria-labelledby="auth-modal-title"
     >
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card auth-modal-card" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close-button" onClick={onClose} aria-label="Đóng cửa sổ">
           ✕
         </button>
-        <div className="eyebrow">Tài khoản C48</div>
+        <div className="auth-brand" aria-hidden="true">
+          <span className="auth-logo-frame"><img src="/reliva-logo.png" alt="" /></span>
+          <span className="auth-brand-name">reliva</span>
+        </div>
         <h2 id="auth-modal-title">
-          {mode === 'login' ? 'Đăng nhập hệ thống' : 'Tạo tài khoản người dân'}
+          {mode === 'login' ? 'Đăng nhập' : mode === 'register' ? 'Tạo tài khoản' : 'Hỗ trợ mật khẩu'}
         </h2>
-        <p className="modal-desc">
-          {mode === 'login'
-            ? 'Đăng nhập để theo dõi yêu cầu, điều phối hoặc cập nhật nhiệm vụ.'
-            : 'Tài khoản người dân giúp quản lý và theo dõi các yêu cầu cứu trợ cá nhân.'}
-        </p>
-        <form onSubmit={submit} className="form-stack">
+        {mode === 'help' && <p className="modal-desc">
+          Nếu quên mật khẩu, hãy liên hệ quản trị viên của hệ thống để xác minh tài khoản và cấp mật khẩu tạm. Sau khi đăng nhập, bạn phải đổi mật khẩu tạm.
+        </p>}
+        {mode !== 'help' && <form onSubmit={submit} className="form-stack">
           {mode === 'register' && (
-            <label>
+            <label className="auth-field">
               Họ và tên
               <input
                 required
@@ -126,7 +139,7 @@ function AuthModal({
               />
             </label>
           )}
-          <label>
+          <label className="auth-field">
             Tên đăng nhập
             <input
               required
@@ -136,17 +149,22 @@ function AuthModal({
               placeholder="Nhập tên đăng nhập"
             />
           </label>
-          <label>
+          <label className="auth-field">
             Mật khẩu
-            <input
-              required
-              type="password"
-              minLength={mode === 'register' ? 10 : undefined}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              placeholder={mode === 'register' ? 'Tối thiểu 10 ký tự' : 'Nhập mật khẩu'}
-            />
+            <span className="auth-password-field">
+              <input
+                required
+                type={showPassword ? 'text' : 'password'}
+                minLength={mode === 'register' ? 10 : undefined}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                placeholder={mode === 'register' ? 'Tối thiểu 10 ký tự' : 'Nhập mật khẩu'}
+              />
+              <button type="button" className="auth-password-toggle" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
+                {showPassword ? 'Ẩn' : 'Hiện'}
+              </button>
+            </span>
           </label>
           {message && (
             <p
@@ -159,19 +177,25 @@ function AuthModal({
           <button disabled={busy} className="button" type="submit">
             {busy ? 'Đang xử lý…' : mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
           </button>
-        </form>
+        </form>}
         <div className="modal-footer">
+          {mode === 'login' && (
+            <button type="button" className="text-button" onClick={() => { setMode('help'); setShowPassword(false); setMessage(''); }}>
+              Quên mật khẩu?
+            </button>
+          )}
           <button
             type="button"
             className="text-button"
             onClick={() => {
               setMode(mode === 'login' ? 'register' : 'login');
+              setShowPassword(false);
               setMessage('');
             }}
           >
             {mode === 'login'
               ? 'Chưa có tài khoản? Đăng ký ngay'
-              : 'Đã có tài khoản? Quay lại đăng nhập'}
+              : 'Quay lại đăng nhập'}
           </button>
         </div>
       </div>
@@ -195,7 +219,7 @@ function AuthRequiredNotice({ onOpenAuth }: { onOpenAuth: () => void }) {
   );
 }
 
-function PasswordChange({ user, onChanged }: { user: Me; onChanged: (user: Me) => void }) {
+function PasswordChange({ onChanged, forced = false }: { onChanged: (user: Me) => void; forced?: boolean }) {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -215,18 +239,13 @@ function PasswordChange({ user, onChanged }: { user: Me; onChanged: (user: Me) =
     }
   }
 
-  function skipForDemo() {
-    onChanged({ ...user, must_change_password: false });
-  }
-
   return (
     <section className="card auth-card">
       <div className="eyebrow">Bảo mật tài khoản</div>
       <h2>Đổi mật khẩu tài khoản</h2>
-      <p>
-        Tài khoản vừa đăng nhập bằng mật khẩu tạm. Để đảm bảo an toàn, vui lòng cập nhật mật khẩu
-        mới.
-      </p>
+      <p>{forced
+        ? 'Tài khoản vừa đăng nhập bằng mật khẩu tạm. Vui lòng cập nhật mật khẩu mới để tiếp tục.'
+        : 'Nhập mật khẩu hiện tại và mật khẩu mới để bảo vệ tài khoản của bạn.'}</p>
 
       <div className="notice" style={{ fontSize: 13, marginBottom: 14 }}>
         💡 <strong>Quy chuẩn mật khẩu mới:</strong> Tối thiểu 10 ký tự, khác tên đăng nhập và khác
@@ -235,7 +254,7 @@ function PasswordChange({ user, onChanged }: { user: Me; onChanged: (user: Me) =
 
       <form className="form-stack" onSubmit={submit}>
         <label>
-          Mật khẩu hiện tại (mật khẩu tạm)
+          Mật khẩu hiện tại{forced ? ' (mật khẩu tạm)' : ''}
           <input
             type="password"
             required
@@ -266,51 +285,60 @@ function PasswordChange({ user, onChanged }: { user: Me; onChanged: (user: Me) =
           <button className="button" disabled={busy} type="submit" style={{ flex: 1 }}>
             {busy ? 'Đang cập nhật…' : 'Cập nhật mật khẩu'}
           </button>
-          <button
-            type="button"
-            className="button secondary"
-            onClick={skipForDemo}
-            title="Bỏ qua màn hình này để vào test các chức năng ngay"
-          >
-            Bỏ qua (để kiểm thử ngay)
-          </button>
         </div>
       </form>
     </section>
   );
 }
 
-function Tracking({ user }: { user: Me | null }) {
-  const [code, setCode] = useState('');
+function Tracking({ user, initialCode = '' }: { user: Me | null; initialCode?: string }) {
+  const [code, setCode] = useState(initialCode);
   const [secret, setSecret] = useState('');
   const [data, setData] = useState<ResponseComponents['schemas']['ReporterTracking'] | null>(null);
+  const [verified, setVerified] = useState<{ code: string; secret: string } | null>(null);
+  const lookupVersion = useRef(0);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
   const [recoveryMessage, setRecoveryMessage] = useState('');
   const recoveryKey = useRef<string | null>(null);
-  async function refreshTracking() {
-    setData(
-      await api('response', '/requests/track', {
+  async function refreshTracking(credentials = verified) {
+    if (!credentials) return;
+    const version = lookupVersion.current;
+    const result = await api<ResponseComponents['schemas']['ReporterTracking']>('response', '/requests/track', {
         headers: {
-          'X-Tracking-Code': code.trim(),
-          ...(secret.trim() ? { 'X-Tracking-Secret': secret.trim() } : {}),
+          'X-Tracking-Code': credentials.code,
+          ...(credentials.secret ? { 'X-Tracking-Secret': credentials.secret } : {}),
         },
-      })
-    );
+      });
+    if (version === lookupVersion.current) {
+      setVerified(credentials);
+      setData(result);
+    }
   }
   async function lookup(event: React.FormEvent) {
     event.preventDefault();
+    const version = ++lookupVersion.current;
+    const credentials = { code: code.trim(), secret: secret.trim() };
     setBusy(true);
     setError('');
     setData(null);
+    setVerified(null);
     try {
-      await refreshTracking();
+      await refreshTracking(credentials);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Không thể tra cứu.');
+      if (version === lookupVersion.current)
+        setError(cause instanceof Error ? cause.message : 'Không thể tra cứu.');
     } finally {
-      setBusy(false);
+      if (version === lookupVersion.current) setBusy(false);
     }
+  }
+  function invalidateLookup() {
+    lookupVersion.current += 1;
+    setBusy(false);
+    setData(null);
+    setVerified(null);
+    setError('');
   }
   async function recover(event: React.FormEvent) {
     event.preventDefault();
@@ -327,7 +355,7 @@ function Tracking({ user }: { user: Me | null }) {
       recoveryKey.current = null;
       setRecoveryCode('');
       setSecret('');
-      setData(null);
+      invalidateLookup();
       setRecoveryMessage('Yêu cầu đã được gắn với tài khoản. Hãy tra cứu lại bằng mã theo dõi.');
     } catch (cause) {
       setRecoveryMessage(cause instanceof Error ? cause.message : 'Chưa khôi phục được yêu cầu.');
@@ -339,14 +367,18 @@ function Tracking({ user }: { user: Me | null }) {
     <div className="grid-two">
       <section className="card">
         <h2>Tra cứu riêng tư</h2>
-        <p>Mã theo dõi và mã bảo mật không nằm trên đường dẫn hoặc được lưu trên trình duyệt.</p>
+        <p>Mã theo dõi được máy chủ cấp sau khi nhận SOS. Nếu gửi khi chưa đăng nhập, bạn còn nhận một mã bảo mật chỉ hiện một lần; hãy giữ riêng mã này để tra cứu. Nếu đã đăng nhập khi gửi, hãy dùng tài khoản của mình và mã theo dõi.</p>
         <form onSubmit={lookup} className="form-stack">
           <label>
             Mã theo dõi
             <input
               required
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => {
+                setCode(e.target.value);
+                recoveryKey.current = null;
+                invalidateLookup();
+              }}
               autoComplete="off"
             />
           </label>
@@ -356,7 +388,10 @@ function Tracking({ user }: { user: Me | null }) {
               required={!user}
               type="password"
               value={secret}
-              onChange={(e) => setSecret(e.target.value)}
+              onChange={(e) => {
+                setSecret(e.target.value);
+                invalidateLookup();
+              }}
               autoComplete="off"
             />
           </label>
@@ -416,12 +451,12 @@ function Tracking({ user }: { user: Me | null }) {
           </div>
         </section>
       )}
-      {data && (
+      {data && verified && (
         <TrackingActions
           key={data.id}
           tracking={data}
-          code={code}
-          secret={secret}
+          code={verified.code}
+          secret={verified.secret}
           canClaim={Boolean(user)}
           onUpdated={refreshTracking}
         />
@@ -628,6 +663,7 @@ function DetailPanel({
 }
 
 function LivePage({ page, user }: { page: Page; user: Me | null }) {
+  const { region, setRegion, regions, loading: regionLoading, error: regionError } = useAnalyticsRegion(page.path === '/reports/summary');
   const [data, setData] = useState<DataPage | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -649,13 +685,14 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
     (page.service === 'identity' && page.path === '/users');
   useEffect(() => {
     if (!page.service || !page.path) return;
+    if (page.path === '/reports/summary' && !region) return;
     let active = true;
     setLoading(true);
     setError('');
     setData(null);
     const reportPath =
       page.service === 'response' && page.path === '/reports/summary'
-        ? `/reports/summary?from=${encodeURIComponent(new Date(Date.now() - 7 * 86_400_000).toISOString())}&to=${encodeURIComponent(new Date().toISOString())}`
+        ? `/reports/summary?from=${encodeURIComponent(new Date(Date.now() - 7 * 86_400_000).toISOString())}&to=${encodeURIComponent(new Date().toISOString())}&region_code=${encodeURIComponent(region)}`
         : page.path;
     const path =
       reportPath +
@@ -673,7 +710,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
     return () => {
       active = false;
     };
-  }, [page, cursor, user]);
+  }, [page, cursor, user, region]);
   if (!page.service || !page.path)
     return (
       <div className="card">
@@ -682,12 +719,19 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
       </div>
     );
   return (
-    <section className="card">
+    <section className={`card ${page.path === '/reports/summary' ? 'report-card' : ''}`}>
       <div className="section-header">
-        <h2>{page.title}</h2>
-        <span className="eyebrow">Dữ liệu từ hệ thống</span>
+        <div><span className="eyebrow">Số liệu trực tiếp</span><h2>{page.path === '/reports/summary' ? 'Tổng quan ứng cứu' : page.title}</h2></div>
+        <span className="report-period">{page.path === '/reports/summary' ? '7 ngày gần đây' : 'Dữ liệu từ hệ thống'}</span>
       </div>
-      {page.note && <p>{page.note}</p>}
+      {page.note && page.path !== '/reports/summary' && <p>{page.note}</p>}
+      {page.path === '/reports/summary' && (
+        <>
+          <AnalyticsRegionField region={region} onChange={(value) => { setCursor(null); setRegion(value); }} regions={regions} />
+          {regionError && <p role="alert" className="notice error">{regionError}</p>}
+          {!region && !regionLoading && <p>Chọn hoặc nhập mã khu vực để xem báo cáo.</p>}
+        </>
+      )}
       {loading && <p role="status">Đang tải dữ liệu…</p>}
       {error && (
         <div role="alert" className="notice error">
@@ -714,18 +758,25 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
               <div className="empty">Chưa có bản ghi nào trong phạm vi của bạn.</div>
             )
           ) : 'status_counts' in data ? (
-            <div className="summary">
-              <h3>Yêu cầu theo trạng thái</h3>
-              {Object.entries(data.status_counts as Record<string, number>).map(([key, value]) => (
-                <p key={key}>
-                  {label(key)}: <strong>{value}</strong>
-                </p>
-              ))}
-              <h3>Nhiệm vụ</h3>
-              <p>
-                Đang hoạt động: {String(data.active_missions ?? 0)} · Quá hạn:{' '}
-                {String(data.overdue_missions ?? 0)}
-              </p>
+            <div className="report-content">
+              <div className="report-metrics">
+                <div className="metric-tile"><span>Nhiệm vụ đang hoạt động</span><strong>{data.active_missions ?? 0}</strong><small>Đội đang thực hiện</small></div>
+                <div className="metric-tile metric-tile-warning"><span>Nhiệm vụ quá hạn</span><strong>{data.overdue_missions ?? 0}</strong><small>Cần theo dõi</small></div>
+                <div className="metric-tile metric-tile-green"><span>Tổng yêu cầu</span><strong>{Object.values(data.status_counts || {}).reduce((sum, count) => sum + count, 0)}</strong><small>Trong khu vực đã chọn</small></div>
+              </div>
+              <div className="report-breakdown">
+                <h3>Yêu cầu theo trạng thái</h3>
+                <p>Mỗi trạng thái là một nhóm riêng trong báo cáo.</p>
+                <div className="report-status-grid">
+                  {Object.entries(data.status_counts || {}).map(([key, value]) => (
+                    <div className="report-status" key={key}><span>{label(key)}</span><strong>{value}</strong></div>
+                  ))}
+                </div>
+                {!Object.keys(data.status_counts || {}).length && <div className="empty">Chưa có yêu cầu trong khoảng thời gian này.</div>}
+              </div>
+              {Boolean(data.priority_counts && Object.keys(data.priority_counts).length) && (
+                <div className="report-breakdown"><h3>Mức ưu tiên đã quyết định</h3><div className="report-status-grid">{Object.entries(data.priority_counts || {}).map(([key, value]) => <div className="report-status" key={key}><span>{label(key)}</span><strong>{value}</strong></div>)}</div></div>
+              )}
             </div>
           ) : (
             <div className="summary">
@@ -787,6 +838,9 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutError, setLogoutError] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [latestReceipt, setLatestReceipt] = useState<SosReceipt | null>(null);
+  const [selectedTrackingCode, setSelectedTrackingCode] = useState('');
 
   useEffect(() => {
     me()
@@ -828,6 +882,7 @@ function App() {
     try {
       await logout();
       setUser(null);
+      setLatestReceipt(null);
       setSessionState('guest');
       changeWorkspace('citizen');
     } catch (cause) {
@@ -839,10 +894,10 @@ function App() {
     <div className="shell">
       <aside className={`sidebar ${menuOpen ? 'open' : ''}`} aria-label="Điều hướng chính">
         <div className="brand">
-          <span className="brand-mark">{icon('home')}</span>
+          <span className="brand-mark"><img src="/reliva-logo.png" alt="" aria-hidden="true" /></span>
           <div>
-            <strong>C48</strong>
-            <small>ỨNG PHÓ VÀ CỨU TRỢ</small>
+            <strong>Reliva</strong>
+            <small>CHUNG TAY CỨU TRỢ</small>
           </div>
         </div>
 
@@ -902,20 +957,20 @@ function App() {
 
           <div className="top-actions">
             {user ? (
-              <div className="user-profile">
-                <div className="user-avatar" title={user.display_name}>
+              <button
+                type="button"
+                className="user-profile profile-trigger"
+                onClick={() => { changeWorkspace('citizen'); setPageId('account'); }}
+                aria-label="Mở tài khoản của tôi"
+              >
+                <span className="user-avatar" aria-hidden="true">
                   {user.display_name ? user.display_name.trim().charAt(0).toUpperCase() : 'U'}
-                </div>
-                <div className="user-info">
+                </span>
+                <span className="user-info">
                   <span className="user-name">{user.display_name}</span>
-                  <span className="user-role-badge">
-                    {label(user.grants[0]?.role_code || 'CITIZEN')}
-                  </span>
-                </div>
-                <button className="button secondary" onClick={signOut}>
-                  Đăng xuất
-                </button>
-              </div>
+                  <span className="user-role-badge">{label(user.grants[0]?.role_code || 'CITIZEN')}</span>
+                </span>
+              </button>
             ) : (
               <div className="guest-actions">
                 <span className="guest-badge">Khách vãng lai</span>
@@ -930,7 +985,7 @@ function App() {
         <main className="content">
           <div className="heading">
             <div>
-              <span className="eyebrow">HỆ THỐNG C48</span>
+              <span className="eyebrow">HỆ THỐNG RELIVA</span>
               <h1>{selected.title}</h1>
               <p>
                 {selected.note ||
@@ -963,17 +1018,48 @@ function App() {
           )}
 
           {user?.must_change_password ? (
-            <PasswordChange user={user} onChanged={setUser} />
+            <PasswordChange forced onChanged={setUser} />
           ) : (
             sessionState !== 'loading' &&
             sessionState !== 'error' && (
               <>
-                {selected.id === 'account' && !user ? (
+                {workspace === 'citizen' && selected.id === 'home' ? (
+                  <section className="card">
+                    <h2>Bạn cần hỗ trợ?</h2>
+                    <p>Gửi yêu cầu SOS khi cần cứu hộ, giữ mã theo dõi sau khi máy chủ xác nhận và tra cứu tiến độ tại đây.</p>
+                    <div className="action-grid">
+                      <button className="button" onClick={() => changePage('sos')}>Gửi yêu cầu SOS</button>
+                      <button className="button secondary" onClick={() => changePage('track')}>Theo dõi SOS</button>
+                      <button className="button secondary" onClick={() => changePage('drives')}>Xem đợt quyên góp</button>
+                    </div>
+                  </section>
+                ) : workspace === 'citizen' && selected.id === 'receipt' ? (
+                  <section className="card" role="status">
+                    <h2>Xác nhận tiếp nhận SOS</h2>
+                    {latestReceipt ? (
+                      <>
+                        <p>Mã theo dõi: <strong>{latestReceipt.tracking_code}</strong></p>
+                        <p>Trạng thái: {label(latestReceipt.status)} · Thời điểm: {timeLabel(latestReceipt.received_at)}</p>
+                        <p>Mã bảo mật chỉ hiện một lần trên màn hình gửi SOS. Nếu đã rời màn hình đó, hãy dùng mã đã lưu để tra cứu.</p>
+                        <button className="button secondary" onClick={() => changePage('track')}>Theo dõi tiến độ</button>
+                      </>
+                    ) : (
+                      <p>Chưa có yêu cầu SOS nào được xác nhận trong phiên mở trang này. Hãy gửi yêu cầu hoặc tra cứu bằng mã theo dõi đã lưu.</p>
+                    )}
+                  </section>
+                ) : selected.id === 'account' && !user ? (
                   <AuthRequiredNotice onOpenAuth={() => setShowAuthModal(true)} />
+                ) : workspace === 'citizen' && selected.id === 'account' && user ? (
+                  <CitizenAccount
+                    user={user}
+                    onTrack={(code) => { setSelectedTrackingCode(code); changePage('track'); }}
+                    onChangePassword={() => setShowPasswordModal(true)}
+                    onLogout={signOut}
+                  />
                 ) : workspace === 'citizen' && selected.id === 'sos' ? (
-                  <SosForm user={user} />
+                  <SosForm user={user} onConfirmed={setLatestReceipt} />
                 ) : selected.id === 'track' ? (
-                  <Tracking user={user} />
+                  <Tracking key={selectedTrackingCode} user={user} initialCode={selectedTrackingCode} />
                 ) : workspace === 'citizen' &&
                   ['drives', 'declare', 'donation'].includes(selected.id) ? (
                   <Donations page={selected.id as 'drives' | 'declare' | 'donation'} user={user} />
@@ -982,6 +1068,8 @@ function App() {
                   <Coordinator key={selected.id} page={selected.id} />
                 ) : workspace === 'coordinator' && selected.id === 'map' ? (
                   <CoordinatorMap />
+                ) : workspace === 'coordinator' && selected.id === 'needs' && user ? (
+                  <Operations page="needs" user={user} />
                 ) : ['volunteer', 'coordinator'].includes(workspace) &&
                   selected.id === 'notices' ? (
                   <Notices />
@@ -1010,6 +1098,7 @@ function App() {
         onClose={() => setShowAuthModal(false)}
         onReady={(loggedInUser) => {
           setUser(loggedInUser);
+          setLatestReceipt(null);
           setSessionState('ready');
           const defaultWs = defaultWorkspaceForUser(loggedInUser);
           setWorkspace(defaultWs);
@@ -1017,6 +1106,14 @@ function App() {
           setShowAuthModal(false);
         }}
       />
+      {showPasswordModal && user && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Đổi mật khẩu" onClick={() => setShowPasswordModal(false)}>
+          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+            <button className="modal-close-button" aria-label="Đóng cửa sổ" onClick={() => setShowPasswordModal(false)}>✕</button>
+            <PasswordChange onChanged={(updatedUser) => { setUser(updatedUser); setShowPasswordModal(false); }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

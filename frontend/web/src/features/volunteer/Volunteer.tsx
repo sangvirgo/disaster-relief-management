@@ -509,7 +509,7 @@ export function Volunteer({ page }: { page: string }) {
             )}
             {selectedTeam && (
               <div className="form-stack">
-                <div className="detail-grid">
+                <div className="detail-grid mission-facts">
                   <p>
                     <strong>Tên đội</strong>
                     <br />
@@ -611,7 +611,7 @@ export function Volunteer({ page }: { page: string }) {
             {missionLoading && <p role="status">Đang tải hồ sơ nhiệm vụ…</p>}
             {activeMission && (
               <div className="form-stack">
-                <div className="detail-grid">
+                <div className="detail-grid mission-facts">
                   <p>
                     <strong>Đội thực hiện</strong>
                     <br />
@@ -757,7 +757,7 @@ export function Volunteer({ page }: { page: string }) {
                       disabled={busy}
                       onClick={() => transitionMission(activeMission, 'EN_ROUTE')}
                     >
-                      Bắt đầu di chuyển tới hiện trường (EN_ROUTE)
+                      Bắt đầu di chuyển tới hiện trường
                     </button>
                   </div>
                 )}
@@ -770,7 +770,7 @@ export function Volunteer({ page }: { page: string }) {
                       disabled={busy}
                       onClick={() => transitionMission(activeMission, 'ON_SCENE')}
                     >
-                      Đã tới hiện trường (ON_SCENE)
+                      Đã tới hiện trường
                     </button>
                   </div>
                 )}
@@ -855,7 +855,7 @@ export function Volunteer({ page }: { page: string }) {
                     className="form-stack command-form"
                     onSubmit={(e) => uploadMissionEvidence(e, activeMission.id)}
                   >
-                    <h4>Tải ảnh minh chứng hiện trường (MinIO)</h4>
+                    <h4>Tải minh chứng hiện trường</h4>
                     <p>
                       Hình ảnh giải cứu, tình hình nước ngập hoặc tài liệu hiện trường (JPEG, PNG,
                       MP4).
@@ -870,7 +870,7 @@ export function Volunteer({ page }: { page: string }) {
                       />
                     </label>
                     <button className="button secondary" disabled={busy || !evidenceFile}>
-                      {busy ? 'Đang tải lên MinIO…' : 'Tải minh chứng lên'}
+                      {busy ? 'Đang tải minh chứng…' : 'Tải minh chứng lên'}
                     </button>
                   </form>
                 )}

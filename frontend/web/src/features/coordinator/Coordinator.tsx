@@ -4,6 +4,7 @@ import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { label, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
+import { AnalyticsRegionField, useAnalyticsRegion } from '../../components/AnalyticsRegion';
 
 type QueueItem = {
   id: string;
@@ -670,6 +671,7 @@ export function Coordinator({ page }: { page: string }) {
 }
 
 export function CoordinatorMap() {
+  const { region, setRegion, regions, loading: regionLoading, error: regionError } = useAnalyticsRegion();
   const [layer, setLayer] = useState<'confirmed' | 'unverified'>('confirmed');
   const [data, setData] = useState<{
     items: { center: { coordinates: [number, number] }; count: number }[];
@@ -677,21 +679,29 @@ export function CoordinatorMap() {
   } | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
+    if (!region) return;
+    let active = true;
+    setData(null);
+    setError('');
     const now = new Date().toISOString();
     const from = new Date(Date.now() - 7 * 86_400_000).toISOString();
     api<typeof data>(
       'response',
-      `/map/heatmap?from=${encodeURIComponent(from)}&to=${encodeURIComponent(now)}&status_layer=${layer}`
+      `/map/heatmap?from=${encodeURIComponent(from)}&to=${encodeURIComponent(now)}&status_layer=${layer}&region_code=${encodeURIComponent(region)}`
     )
-      .then(setData)
-      .catch((cause) => setError(cause instanceof Error ? cause.message : 'Không thể tải bản đồ.'));
-  }, [layer]);
+      .then((value) => { if (active) setData(value); })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Không thể tải bản đồ.'); });
+    return () => { active = false; };
+  }, [layer, region]);
   return (
     <section className="card">
       <h2>Bản đồ tổng hợp theo ô</h2>
       <p>
         Chỉ hiển thị số lượng theo ô, không hiển thị vị trí hoặc liên hệ chính xác của người báo.
       </p>
+      <AnalyticsRegionField region={region} onChange={setRegion} regions={regions} />
+      {regionError && <p role="alert" className="notice error">{regionError}</p>}
+      {!region && !regionLoading && <p>Chọn hoặc nhập mã khu vực để tải bản đồ.</p>}
       <div className="tabs">
         <button
           className={layer === 'confirmed' ? 'active' : ''}

@@ -1,904 +1,125 @@
 /* Static design prototype. No API requests, persistence, or dispatch actions. */
 const roles = {
-  citizen: {
-    label: 'Người dân',
-    short: 'ND',
-    items: [
-      ['home', 'Trang trợ giúp', 'home'],
-      ['account', 'Tài khoản', 'account'],
-      ['sos', 'Gửi tín hiệu SOS', 'sos'],
-      ['receipt', 'Xác nhận đã gửi', 'receipt'],
-      ['track', 'Theo dõi SOS', 'track'],
-      ['campaigns', 'Chiến dịch', 'campaign'],
-      ['drives', 'Đợt quyên góp', 'drive'],
-      ['declare', 'Khai báo vật phẩm', 'declare'],
-      ['donation', 'Theo dõi đóng góp', 'donation'],
-    ],
-  },
-  volunteer: {
-    label: 'Đội cứu hộ',
-    short: 'ĐC',
-    items: [
-      ['overview', 'Tổng quan', 'home'],
-      ['missions', 'Nhiệm vụ', 'mission'],
-      ['progress', 'Cập nhật tiến độ', 'progress'],
-      ['team', 'Hồ sơ đội', 'team'],
-      ['notices', 'Thông báo', 'notice'],
-    ],
-  },
-  coordinator: {
-    label: 'Điều phối viên',
-    short: 'ĐP',
-    items: [
-      ['queue', 'Hàng đợi SOS', 'queue'],
-      ['verify', 'Xác minh', 'verify'],
-      ['triage', 'Quyết định ưu tiên', 'priority'],
-      ['assign', 'Chọn đội cứu hộ', 'assign'],
-      ['map', 'Bản đồ và nhiệm vụ', 'map'],
-      ['notices', 'Thông báo', 'notice'],
-      ['campaigns', 'Chiến dịch', 'campaign'],
-      ['reports', 'Báo cáo', 'report'],
-    ],
-  },
-  operations: {
-    label: 'Quản lý vận hành',
-    short: 'VH',
-    items: [
-      ['overview', 'Tổng quan', 'home'],
-      ['drives', 'Đợt quyên góp', 'drive'],
-      ['intake', 'Tiếp nhận', 'intake'],
-      ['review', 'Duyệt biên nhận', 'review'],
-      ['stock', 'Kho và danh mục', 'stock'],
-      ['assets', 'Điểm nhận và phương tiện', 'assets'],
-      ['needs', 'Nhu cầu và cam kết', 'needs'],
-      ['distribution', 'Phân phối', 'distribution'],
-      ['handoff', 'Bàn giao', 'handoff'],
-      ['reports', 'Đối soát, báo cáo', 'report'],
-    ],
-  },
-  admin: {
-    label: 'Quản trị viên',
-    short: 'QT',
-    items: [
-      ['overview', 'Tổng quan quản trị', 'home'],
-      ['users', 'Người dùng', 'users'],
-      ['organizations', 'Tổ chức, thành viên', 'organization'],
-      ['grants', 'Phân quyền', 'grants'],
-      ['regions', 'Khu vực', 'regions'],
-      ['audit', 'Nhật ký kiểm toán', 'audit'],
-    ],
-  },
+  citizen: { label: 'Người dân', short: 'ND', items: [
+    ['home','Trang trợ giúp','home'],['account','Tài khoản','account'],['sos','Gửi tín hiệu SOS','sos'],['receipt','Xác nhận đã gửi','receipt'],['track','Theo dõi SOS','track'],['campaigns','Chiến dịch','campaign'],['drives','Đợt quyên góp','drive'],['declare','Khai báo vật phẩm','declare'],['donation','Theo dõi đóng góp','donation']
+  ]},
+  volunteer: { label: 'Đội cứu hộ', short: 'ĐC', items: [
+    ['overview','Tổng quan','home'],['missions','Nhiệm vụ','mission'],['progress','Cập nhật tiến độ','progress'],['team','Hồ sơ đội','team'],['notices','Thông báo','notice']
+  ]},
+  coordinator: { label: 'Điều phối viên', short: 'ĐP', items: [
+    ['queue','Hàng đợi SOS','queue'],['verify','Xác minh','verify'],['triage','Quyết định ưu tiên','priority'],['assign','Chọn đội cứu hộ','assign'],['map','Bản đồ và nhiệm vụ','map'],['notices','Thông báo','notice'],['campaigns','Chiến dịch','campaign'],['reports','Báo cáo','report']
+  ]},
+  operations: { label: 'Quản lý vận hành', short: 'VH', items: [
+    ['overview','Tổng quan','home'],['drives','Đợt quyên góp','drive'],['intake','Tiếp nhận','intake'],['review','Duyệt biên nhận','review'],['stock','Kho và danh mục','stock'],['assets','Điểm nhận và phương tiện','assets'],['needs','Nhu cầu và cam kết','needs'],['distribution','Phân phối','distribution'],['handoff','Bàn giao','handoff'],['reports','Đối soát, báo cáo','report']
+  ]},
+  admin: { label: 'Quản trị viên', short: 'QT', items: [
+    ['overview','Tổng quan quản trị','home'],['users','Người dùng','users'],['organizations','Tổ chức, thành viên','organization'],['grants','Phân quyền','grants'],['regions','Khu vực','regions'],['audit','Nhật ký kiểm toán','audit']
+  ]}
 };
 
 const scenes = {
   citizen: {
-    home: {
-      title: 'Khi cần giúp đỡ, bạn có thể bắt đầu tại đây',
-      desc: 'Gửi thông tin khẩn cấp, theo dõi yêu cầu hoặc tìm điểm tiếp nhận vật phẩm cứu trợ.',
-      type: 'home',
-    },
-    account: {
-      title: 'Đăng nhập hoặc tạo tài khoản',
-      desc: 'Dùng tài khoản để báo hộ, theo dõi yêu cầu của mình và quản lý thông tin liên hệ.',
-      type: 'account',
-    },
-    sos: {
-      title: 'Gửi tín hiệu SOS',
-      desc: 'Cho chúng tôi biết ai đang cần giúp đỡ và vị trí của họ. Thông tin chỉ được ghi nhận khi máy chủ xác nhận.',
-      type: 'sos',
-    },
-    receipt: {
-      title: 'Yêu cầu đã được tiếp nhận',
-      desc: 'Màn này chỉ xuất hiện sau khi API gửi SOS trả về thành công và cấp mã theo dõi.',
-      type: 'receipt',
-    },
-    track: {
-      title: 'Theo dõi yêu cầu SOS',
-      desc: 'Dùng mã theo dõi riêng tư được cấp sau khi gửi thành công để xem tiến độ và bổ sung tình hình.',
-      type: 'track',
-    },
-    campaigns: {
-      title: 'Chiến dịch cứu trợ',
-      desc: 'Tìm các chiến dịch đang hoạt động theo khu vực và xem nhu cầu đã được công bố.',
-      type: 'directory',
-      kind: 'campaign',
-    },
-    drives: {
-      title: 'Đợt quyên góp vật phẩm',
-      desc: 'Xem vật phẩm cần thiết, địa điểm tiếp nhận và thời gian của từng đợt.',
-      type: 'directory',
-      kind: 'drive',
-    },
-    declare: {
-      title: 'Khai báo vật phẩm đóng góp',
-      desc: 'Bạn có thể khai báo khi chưa có tài khoản. Nhân viên sẽ kiểm đếm khi nhận vật phẩm thực tế.',
-      type: 'declare',
-    },
-    donation: {
-      title: 'Theo dõi đóng góp',
-      desc: 'Đối chiếu số lượng đã khai báo, đã kiểm đếm và đã được duyệt theo mã riêng tư.',
-      type: 'donation',
-    },
+    home: { title:'Khi cần giúp đỡ, bạn có thể bắt đầu tại đây', desc:'Gửi thông tin khẩn cấp, theo dõi yêu cầu hoặc tìm điểm tiếp nhận vật phẩm cứu trợ.', type:'home' },
+    account: { title:'Đăng nhập hoặc tạo tài khoản', desc:'Dùng tài khoản để báo hộ, theo dõi yêu cầu của mình và quản lý thông tin liên hệ.', type:'account' },
+    sos: { title:'Gửi tín hiệu SOS', desc:'Cho chúng tôi biết ai đang cần giúp đỡ và vị trí của họ. Thông tin chỉ được ghi nhận khi máy chủ xác nhận.', type:'sos' },
+    receipt: { title:'Yêu cầu đã được tiếp nhận', desc:'Màn này chỉ xuất hiện sau khi API gửi SOS trả về thành công và cấp mã theo dõi.', type:'receipt' },
+    track: { title:'Theo dõi yêu cầu SOS', desc:'Dùng mã theo dõi riêng tư được cấp sau khi gửi thành công để xem tiến độ và bổ sung tình hình.', type:'track' },
+    campaigns: { title:'Chiến dịch cứu trợ', desc:'Tìm các chiến dịch đang hoạt động theo khu vực và xem nhu cầu đã được công bố.', type:'directory', kind:'campaign' },
+    drives: { title:'Đợt quyên góp vật phẩm', desc:'Xem vật phẩm cần thiết, địa điểm tiếp nhận và thời gian của từng đợt.', type:'directory', kind:'drive' },
+    declare: { title:'Khai báo vật phẩm đóng góp', desc:'Bạn có thể khai báo khi chưa có tài khoản. Nhân viên sẽ kiểm đếm khi nhận vật phẩm thực tế.', type:'declare' },
+    donation: { title:'Theo dõi đóng góp', desc:'Đối chiếu số lượng đã khai báo, đã kiểm đếm và đã được duyệt theo mã riêng tư.', type:'donation' }
   },
   volunteer: {
-    overview: {
-      title: 'Tổng quan đội cứu hộ',
-      desc: 'Theo dõi lời mời nhiệm vụ, việc đang thực hiện và tình trạng sẵn sàng của đội.',
-      type: 'dashboard',
-      metrics: [
-        ['02', 'Lời mời cần phản hồi'],
-        ['01', 'Nhiệm vụ đang thực hiện'],
-        ['04', 'Thành viên sẵn sàng'],
-        ['18 phút', 'Từ lần cập nhật vị trí'],
-      ],
-      rows: [
-        ['NV-2408', 'Cứu hộ tại khu dân cư ven sông', 'Chờ phản hồi', '12 phút trước'],
-        ['NV-2396', 'Vận chuyển người đến điểm an toàn', 'Đang thực hiện', '08:40 hôm nay'],
-      ],
-    },
-    missions: {
-      title: 'Nhiệm vụ của đội',
-      desc: 'Xem dữ kiện được cấp cho đội và phản hồi lời mời trong thời hạn.',
-      type: 'detail',
-      subject: 'NV-2408 · Khu dân cư ven sông',
-      status: 'Chờ phản hồi',
-      facts: [
-        ['Địa điểm', 'Phường Hòa An, TP. Đà Nẵng'],
-        ['Tình huống', 'Nước dâng, hai hộ cần hỗ trợ di chuyển'],
-        ['Số người', 'Chưa xác nhận'],
-        ['Thời hạn phản hồi', '15 phút'],
-        ['Người điều phối', 'Trung tâm điều phối khu vực'],
-      ],
-      actions: ['Nhận nhiệm vụ', 'Từ chối và nêu lý do'],
-      note: 'Chỉ trưởng đội có quyền xác nhận hoặc từ chối. Thành viên chỉ xem dữ kiện trong phạm vi nhiệm vụ được giao.',
-    },
-    progress: {
-      title: 'Cập nhật tiến độ nhiệm vụ',
-      desc: 'Ghi nhận tiến độ, quan sát và bằng chứng để điều phối viên nắm tình hình.',
-      type: 'form',
-      fields: [
-        ['Tình trạng hiện tại', 'select', 'Đang di chuyển|Đã đến hiện trường|Đang hỗ trợ|Hoàn tất'],
-        ['Thời điểm quan sát', 'text', '18/10/2026 09:25'],
-        ['Diễn biến thực tế', 'textarea', 'Mô tả tình hình và việc đã thực hiện'],
-        ['Bằng chứng', 'file', ''],
-      ],
-      note: 'Bản nháp trên màn hình chưa phải cập nhật đã được máy chủ ghi nhận. Chỉ gửi chuyển trạng thái hợp lệ của nhiệm vụ.',
-      action: 'Kiểm tra và gửi cập nhật',
-    },
-    team: {
-      title: 'Hồ sơ và vị trí đội',
-      desc: 'Quản lý năng lực, thành viên, trạng thái sẵn sàng và vị trí đã báo gần nhất.',
-      type: 'detail',
-      subject: 'Đội cứu hộ Sông Hàn 02',
-      status: 'Sẵn sàng',
-      facts: [
-        ['Thành viên', '06 người · 04 sẵn sàng'],
-        ['Năng lực', 'Sơ cứu, xuồng nhỏ, hỗ trợ di chuyển'],
-        ['Sức chứa', '06 người'],
-        ['Vị trí gần nhất', 'Phường Hòa Cường · 18 phút trước'],
-        ['Nguồn vị trí', 'Đội chủ động cập nhật'],
-      ],
-      actions: ['Cập nhật trạng thái', 'Cập nhật vị trí'],
-      note: 'Ứng dụng Web chỉ dùng vị trí khi người dùng chủ động cho phép. Vị trí cũ được đánh dấu rõ, không trình bày như đang theo dõi trực tiếp.',
-    },
-    notices: {
-      title: 'Thông báo của đội',
-      desc: 'Các lời mời và cập nhật nhiệm vụ trong phạm vi đội của bạn.',
-      type: 'notices',
-    },
+    overview: { title:'Tổng quan đội cứu hộ', desc:'Theo dõi lời mời nhiệm vụ, việc đang thực hiện và tình trạng sẵn sàng của đội.', type:'dashboard', metrics:[['02','Lời mời cần phản hồi'],['01','Nhiệm vụ đang thực hiện'],['04','Thành viên sẵn sàng'],['18 phút','Từ lần cập nhật vị trí']], rows:[['NV-2408','Cứu hộ tại khu dân cư ven sông','Chờ phản hồi','12 phút trước'],['NV-2396','Vận chuyển người đến điểm an toàn','Đang thực hiện','08:40 hôm nay']] },
+    missions: { title:'Nhiệm vụ của đội', desc:'Xem dữ kiện được cấp cho đội và phản hồi lời mời trong thời hạn.', type:'detail', subject:'NV-2408 · Khu dân cư ven sông', status:'Chờ phản hồi', facts:[['Địa điểm','Phường Hòa An, TP. Đà Nẵng'],['Tình huống','Nước dâng, hai hộ cần hỗ trợ di chuyển'],['Số người','Chưa xác nhận'],['Thời hạn phản hồi','15 phút'],['Người điều phối','Trung tâm điều phối khu vực']], actions:['Nhận nhiệm vụ','Từ chối và nêu lý do'], note:'Chỉ trưởng đội có quyền xác nhận hoặc từ chối. Thành viên chỉ xem dữ kiện trong phạm vi nhiệm vụ được giao.' },
+    progress: { title:'Cập nhật tiến độ nhiệm vụ', desc:'Ghi nhận tiến độ, quan sát và bằng chứng để điều phối viên nắm tình hình.', type:'form', fields:[['Tình trạng hiện tại','select','Đang di chuyển|Đã đến hiện trường|Đang hỗ trợ|Hoàn tất'],['Thời điểm quan sát','text','18/10/2026 09:25'],['Diễn biến thực tế','textarea','Mô tả tình hình và việc đã thực hiện'],['Bằng chứng','file','']], note:'Bản nháp trên màn hình chưa phải cập nhật đã được máy chủ ghi nhận. Chỉ gửi chuyển trạng thái hợp lệ của nhiệm vụ.', action:'Kiểm tra và gửi cập nhật' },
+    team: { title:'Hồ sơ và vị trí đội', desc:'Quản lý năng lực, thành viên, trạng thái sẵn sàng và vị trí đã báo gần nhất.', type:'detail', subject:'Đội cứu hộ Sông Hàn 02', status:'Sẵn sàng', facts:[['Thành viên','06 người · 04 sẵn sàng'],['Năng lực','Sơ cứu, xuồng nhỏ, hỗ trợ di chuyển'],['Sức chứa','06 người'],['Vị trí gần nhất','Phường Hòa Cường · 18 phút trước'],['Nguồn vị trí','Đội chủ động cập nhật']], actions:['Cập nhật trạng thái','Cập nhật vị trí'], note:'Ứng dụng Web chỉ dùng vị trí khi người dùng chủ động cho phép. Vị trí cũ được đánh dấu rõ, không trình bày như đang theo dõi trực tiếp.' },
+    notices: { title:'Thông báo của đội', desc:'Các lời mời và cập nhật nhiệm vụ trong phạm vi đội của bạn.', type:'notices' }
   },
   coordinator: {
-    queue: {
-      title: 'Hàng đợi yêu cầu SOS',
-      desc: 'Xem yêu cầu theo phạm vi phụ trách, xác minh dữ kiện trước khi quyết định ưu tiên và giao đội.',
-      type: 'queue',
-    },
-    verify: {
-      title: 'Xác minh yêu cầu',
-      desc: 'Đối chiếu người báo, vị trí, bằng chứng, liên hệ và dấu hiệu trùng lặp.',
-      type: 'detail',
-      subject: 'SOS-4821 · Phường Hòa An',
-      status: 'Chờ xác minh',
-      facts: [
-        ['Người gặp nạn', 'Hộ gia đình được người thân báo hộ'],
-        ['Vị trí', 'Ghim thủ công · cần xác nhận'],
-        ['Người báo', 'Nguyễn T. M. · quan hệ người thân'],
-        ['Liên hệ gần nhất', '09:15 · chưa bắt máy'],
-        ['Bằng chứng', '02 ảnh · chỉ nhân sự có quyền xem'],
-        ['Tín hiệu trùng lặp', '01 yêu cầu cần đối chiếu'],
-      ],
-      actions: ['Ghi nhận liên hệ', 'Xác minh yêu cầu', 'Đánh dấu trùng lặp'],
-      note: 'Ghi rõ nguồn dữ kiện và lý do quyết định. Không xác minh tự động từ bản nháp hay gợi ý AI.',
-    },
-    triage: {
-      title: 'Quyết định mức ưu tiên',
-      desc: 'Điều phối viên chọn mức P1–P4 và ghi lý do sau khi yêu cầu đã được xác minh.',
-      type: 'triage',
-    },
-    assign: {
-      title: 'Chọn đội và giao nhiệm vụ',
-      desc: 'So sánh đội đủ năng lực theo vị trí gần nhất, sức chứa và khối lượng công việc.',
-      type: 'assign',
-    },
-    map: {
-      title: 'Bản đồ và nhiệm vụ',
-      desc: 'Quan sát khu vực phụ trách, điểm SOS và nhiệm vụ theo dữ liệu có thời điểm cập nhật.',
-      type: 'map',
-    },
-    notices: {
-      title: 'Thông báo điều phối',
-      desc: 'Theo dõi quá hạn phản hồi, cập nhật nhiệm vụ và yêu cầu cần xử lý tiếp.',
-      type: 'notices',
-    },
-    campaigns: {
-      title: 'Chiến dịch điều phối',
-      desc: 'Xem chiến dịch, địa bàn và yêu cầu SOS liên quan trong phạm vi được cấp.',
-      type: 'directory',
-      kind: 'campaignStaff',
-    },
-    reports: {
-      title: 'Báo cáo ứng cứu',
-      desc: 'Theo dõi số yêu cầu, xác minh và kết quả nhiệm vụ; các tổng hợp hỗ trợ giám sát vận hành.',
-      type: 'report',
-      metrics: [
-        ['48', 'Yêu cầu tiếp nhận'],
-        ['31', 'Đã xác minh'],
-        ['16', 'Nhiệm vụ đang mở'],
-        ['11', 'Đã hoàn tất'],
-      ],
-    },
+    queue: { title:'Hàng đợi yêu cầu SOS', desc:'Xem yêu cầu theo phạm vi phụ trách, xác minh dữ kiện trước khi quyết định ưu tiên và giao đội.', type:'queue' },
+    verify: { title:'Xác minh yêu cầu', desc:'Đối chiếu người báo, vị trí, bằng chứng, liên hệ và dấu hiệu trùng lặp.', type:'detail', subject:'SOS-4821 · Phường Hòa An', status:'Chờ xác minh', facts:[['Người gặp nạn','Hộ gia đình được người thân báo hộ'],['Vị trí','Ghim thủ công · cần xác nhận'],['Người báo','Nguyễn T. M. · quan hệ người thân'],['Liên hệ gần nhất','09:15 · chưa bắt máy'],['Bằng chứng','02 ảnh · chỉ nhân sự có quyền xem'],['Tín hiệu trùng lặp','01 yêu cầu cần đối chiếu']], actions:['Ghi nhận liên hệ','Xác minh yêu cầu','Đánh dấu trùng lặp'], note:'Ghi rõ nguồn dữ kiện và lý do quyết định. Không xác minh tự động từ bản nháp hay gợi ý AI.' },
+    triage: { title:'Quyết định mức ưu tiên', desc:'Điều phối viên chọn mức P1–P4 và ghi lý do sau khi yêu cầu đã được xác minh.', type:'triage' },
+    assign: { title:'Chọn đội và giao nhiệm vụ', desc:'So sánh đội đủ năng lực theo vị trí gần nhất, sức chứa và khối lượng công việc.', type:'assign' },
+    map: { title:'Bản đồ và nhiệm vụ', desc:'Quan sát khu vực phụ trách, điểm SOS và nhiệm vụ theo dữ liệu có thời điểm cập nhật.', type:'map' },
+    notices: { title:'Thông báo điều phối', desc:'Theo dõi quá hạn phản hồi, cập nhật nhiệm vụ và yêu cầu cần xử lý tiếp.', type:'notices' },
+    campaigns: { title:'Chiến dịch điều phối', desc:'Xem chiến dịch, địa bàn và yêu cầu SOS liên quan trong phạm vi được cấp.', type:'directory', kind:'campaignStaff' },
+    reports: { title:'Báo cáo ứng cứu', desc:'Theo dõi số yêu cầu, xác minh và kết quả nhiệm vụ; các tổng hợp hỗ trợ giám sát vận hành.', type:'report', metrics:[['48','Yêu cầu tiếp nhận'],['31','Đã xác minh'],['16','Nhiệm vụ đang mở'],['11','Đã hoàn tất']] }
   },
   operations: {
-    overview: {
-      title: 'Tổng quan vận hành cứu trợ',
-      desc: 'Theo dõi đợt quyên góp, tiếp nhận, kho và phân phối theo quyền được cấp.',
-      type: 'dashboard',
-      metrics: [
-        ['04', 'Đợt đang mở'],
-        ['12', 'Chờ kiểm đếm'],
-        ['06', 'Chờ duyệt độc lập'],
-        ['03', 'Cần đối soát'],
-      ],
-      rows: [
-        ['ĐG-1024', 'Nước uống và thực phẩm khô', 'Đang nhận', 'Hôm nay'],
-        ['BN-0831', 'Biên nhận có chênh lệch', 'Chờ duyệt', '09:20'],
-        ['PP-0216', 'Phân phối đến điểm Hòa An', 'Đang vận chuyển', '08:45'],
-      ],
-    },
-    drives: {
-      title: 'Quản lý đợt quyên góp',
-      desc: 'Công bố nhu cầu vật phẩm và điểm nhận; số lượng khai báo chưa được tính vào kho.',
-      type: 'directory',
-      kind: 'driveStaff',
-    },
-    intake: {
-      title: 'Tiếp nhận và kiểm đếm',
-      desc: 'Đếm vật phẩm đã giao thực tế, ghi tình trạng và chuyển cho người duyệt độc lập.',
-      type: 'intake',
-    },
-    review: {
-      title: 'Duyệt biên nhận',
-      desc: 'So sánh bản khai và số kiểm đếm, xử lý chênh lệch trước khi ghi sổ kho.',
-      type: 'review',
-    },
-    stock: {
-      title: 'Kho và danh mục vật phẩm',
-      desc: 'Xem số dư theo kho, vật phẩm, lô và lịch sử biến động trong phạm vi được cấp.',
-      type: 'stock',
-    },
-    assets: {
-      title: 'Điểm nhận và phương tiện',
-      desc: 'Quản lý danh mục điểm cứu trợ, kho và phương tiện phục vụ tiếp nhận, phân phối.',
-      type: 'assets',
-    },
-    needs: {
-      title: 'Nhu cầu và cam kết',
-      desc: 'Theo dõi nhu cầu theo khu vực, phần đã cam kết và phần còn thiếu.',
-      type: 'needs',
-    },
-    distribution: {
-      title: 'Chuẩn bị phân phối',
-      desc: 'Chọn vật phẩm có sẵn, xác nhận số lượng và chuyển qua các bước phê duyệt, xuất kho.',
-      type: 'distribution',
-    },
-    handoff: {
-      title: 'Bàn giao và xác nhận',
-      desc: 'Theo dõi hành trình, chứng cứ bàn giao và lượng thực nhận tại điểm cứu trợ.',
-      type: 'handoff',
-    },
-    reports: {
-      title: 'Đối soát và báo cáo',
-      desc: 'So khớp vật phẩm đã duyệt, biến động kho và lượng phân phối; đánh dấu chênh lệch để con người kiểm tra.',
-      type: 'report',
-      metrics: [
-        ['1.240', 'Vật phẩm được duyệt'],
-        ['980', 'Đã xuất kho'],
-        ['824', 'Đã bàn giao'],
-        ['03', 'Cờ đối soát'],
-      ],
-    },
+    overview: { title:'Tổng quan vận hành cứu trợ', desc:'Theo dõi đợt quyên góp, tiếp nhận, kho và phân phối theo quyền được cấp.', type:'dashboard', metrics:[['04','Đợt đang mở'],['12','Chờ kiểm đếm'],['06','Chờ duyệt độc lập'],['03','Cần đối soát']], rows:[['ĐG-1024','Nước uống và thực phẩm khô','Đang nhận','Hôm nay'],['BN-0831','Biên nhận có chênh lệch','Chờ duyệt','09:20'],['PP-0216','Phân phối đến điểm Hòa An','Đang vận chuyển','08:45']] },
+    drives: { title:'Quản lý đợt quyên góp', desc:'Công bố nhu cầu vật phẩm và điểm nhận; số lượng khai báo chưa được tính vào kho.', type:'directory', kind:'driveStaff' },
+    intake: { title:'Tiếp nhận và kiểm đếm', desc:'Đếm vật phẩm đã giao thực tế, ghi tình trạng và chuyển cho người duyệt độc lập.', type:'intake' },
+    review: { title:'Duyệt biên nhận', desc:'So sánh bản khai và số kiểm đếm, xử lý chênh lệch trước khi ghi sổ kho.', type:'review' },
+    stock: { title:'Kho và danh mục vật phẩm', desc:'Xem số dư theo kho, vật phẩm, lô và lịch sử biến động trong phạm vi được cấp.', type:'stock' },
+    assets: { title:'Điểm nhận và phương tiện', desc:'Quản lý danh mục điểm cứu trợ, kho và phương tiện phục vụ tiếp nhận, phân phối.', type:'assets' },
+    needs: { title:'Nhu cầu và cam kết', desc:'Theo dõi nhu cầu theo khu vực, phần đã cam kết và phần còn thiếu.', type:'needs' },
+    distribution: { title:'Chuẩn bị phân phối', desc:'Chọn vật phẩm có sẵn, xác nhận số lượng và chuyển qua các bước phê duyệt, xuất kho.', type:'distribution' },
+    handoff: { title:'Bàn giao và xác nhận', desc:'Theo dõi hành trình, chứng cứ bàn giao và lượng thực nhận tại điểm cứu trợ.', type:'handoff' },
+    reports: { title:'Đối soát và báo cáo', desc:'So khớp vật phẩm đã duyệt, biến động kho và lượng phân phối; đánh dấu chênh lệch để con người kiểm tra.', type:'report', metrics:[['1.240','Vật phẩm được duyệt'],['980','Đã xuất kho'],['824','Đã bàn giao'],['03','Cờ đối soát']] }
   },
   admin: {
-    overview: {
-      title: 'Tổng quan quản trị',
-      desc: 'Xem tình trạng tài khoản, tổ chức, phân quyền và hoạt động hệ thống ở mức tổng hợp.',
-      type: 'adminOverview',
-    },
-    users: {
-      title: 'Quản lý người dùng',
-      desc: 'Tìm tài khoản, xem trạng thái và quản lý quyền truy cập trong phạm vi quản trị.',
-      type: 'adminList',
-      kind: 'users',
-    },
-    organizations: {
-      title: 'Tổ chức và thành viên',
-      desc: 'Quản lý tổ chức, tư cách thành viên và người đại diện.',
-      type: 'adminList',
-      kind: 'organizations',
-    },
-    grants: {
-      title: 'Phân quyền theo phạm vi',
-      desc: 'Cấp hoặc thu hồi quyền theo vai trò, tổ chức và khu vực với bước xác nhận rõ ràng.',
-      type: 'grants',
-    },
-    regions: {
-      title: 'Danh mục khu vực',
-      desc: 'Tra cứu khu vực, ranh giới phụ trách và trạng thái phân quyền.',
-      type: 'adminList',
-      kind: 'regions',
-    },
-    audit: {
-      title: 'Nhật ký kiểm toán',
-      desc: 'Tra cứu ai đã thực hiện thao tác nào, khi nào và với đối tượng nào.',
-      type: 'adminList',
-      kind: 'audit',
-    },
-  },
+    overview: { title:'Tổng quan quản trị', desc:'Xem tình trạng tài khoản, tổ chức, phân quyền và hoạt động hệ thống ở mức tổng hợp.', type:'adminOverview' },
+    users: { title:'Quản lý người dùng', desc:'Tìm tài khoản, xem trạng thái và quản lý quyền truy cập trong phạm vi quản trị.', type:'adminList', kind:'users' },
+    organizations: { title:'Tổ chức và thành viên', desc:'Quản lý tổ chức, tư cách thành viên và người đại diện.', type:'adminList', kind:'organizations' },
+    grants: { title:'Phân quyền theo phạm vi', desc:'Cấp hoặc thu hồi quyền theo vai trò, tổ chức và khu vực với bước xác nhận rõ ràng.', type:'grants' },
+    regions: { title:'Danh mục khu vực', desc:'Tra cứu khu vực, ranh giới phụ trách và trạng thái phân quyền.', type:'adminList', kind:'regions' },
+    audit: { title:'Nhật ký kiểm toán', desc:'Tra cứu ai đã thực hiện thao tác nào, khi nào và với đối tượng nào.', type:'adminList', kind:'audit' }
+  }
 };
 
 const href = (role, page) => `#${role}/${page}`;
-const linkButton = (label, role, page, secondary = false) =>
-  `<a class="btn${secondary ? ' secondary' : ''}" href="${href(role, page)}">${label}<span aria-hidden="true">→</span></a>`;
-const tag = (text) =>
-  `<span class="chip ${/P1|khẩn|chênh|quá hạn/i.test(text) ? 'red' : /chờ|cần/i.test(text) ? 'amber' : /đang/i.test(text) ? 'blue' : 'green'}">${text}</span>`;
-const card = (title, body, extra = '') =>
-  `<section class="card"><h2>${title}</h2>${body}${extra}</section>`;
-const metric = ([number, label]) =>
-  `<div class="card metric"><div class="number">${number}</div><p>${label}</p><div class="delta">Dữ liệu minh họa</div></div>`;
-const rows = (items, role, target) =>
-  `<div class="list">${items.map(([id, name, status, time]) => `<div class="list-row"><div><strong>${id}</strong><small>${name}</small></div><span>${tag(status)}</span><span>${time}</span>${linkButton('Xem', role, target, true)}</div>`).join('')}</div>`;
-const field = ([label, type, placeholder]) =>
-  `<label class="field${type === 'textarea' ? ' wide' : ''}"><span>${label}</span>${
-    type === 'textarea'
-      ? `<textarea placeholder="${placeholder}"></textarea>`
-      : type === 'select'
-        ? `<select><option value="">Chọn</option>${placeholder
-            .split('|')
-            .map((x) => `<option>${x}</option>`)
-            .join('')}</select>`
-        : `<input type="${type}" placeholder="${placeholder || ''}">`
-  }</label>`;
-const timeLine = (items) =>
-  `<div class="timeline">${items.map(([title, detail]) => `<div class="event"><b>${title}</b><small>${detail}</small></div>`).join('')}</div>`;
-const info = (label, body, kind = '') =>
-  `<div class="notice ${kind}"><strong>${label}</strong> ${body}</div>`;
-const demoAction = (label, secondary = false) =>
-  `<button class="btn${secondary ? ' secondary' : ''}" type="button" data-demo="1">${label}</button>`;
+const linkButton = (label, role, page, secondary=false) => `<a class="btn${secondary?' secondary':''}" href="${href(role,page)}">${label}<span aria-hidden="true">→</span></a>`;
+const tag = (text) => `<span class="chip ${/P1|khẩn|chênh|quá hạn/i.test(text)?'red':/chờ|cần/i.test(text)?'amber':/đang/i.test(text)?'blue':'green'}">${text}</span>`;
+const card = (title, body, extra='') => `<section class="card"><h2>${title}</h2>${body}${extra}</section>`;
+const metric = ([number,label]) => `<div class="card metric"><div class="number">${number}</div><p>${label}</p><div class="delta">Dữ liệu minh họa</div></div>`;
+const rows = (items, role, target) => `<div class="list">${items.map(([id,name,status,time])=>`<div class="list-row"><div><strong>${id}</strong><small>${name}</small></div><span>${tag(status)}</span><span>${time}</span>${linkButton('Xem',role,target,true)}</div>`).join('')}</div>`;
+const field = ([label,type,placeholder]) => `<label class="field${type==='textarea'?' wide':''}"><span>${label}</span>${type==='textarea'?`<textarea placeholder="${placeholder}"></textarea>`:type==='select'?`<select><option value="">Chọn</option>${placeholder.split('|').map(x=>`<option>${x}</option>`).join('')}</select>`:`<input type="${type}" placeholder="${placeholder||''}">`}</label>`;
+const timeLine = (items) => `<div class="timeline">${items.map(([title,detail])=>`<div class="event"><b>${title}</b><small>${detail}</small></div>`).join('')}</div>`;
+const info = (label,body,kind='') => `<div class="notice ${kind}"><strong>${label}</strong> ${body}</div>`;
+const demoAction = (label,secondary=false) => `<button class="btn${secondary?' secondary':''}" type="button" data-demo="1">${label}</button>`;
 
-function renderHome() {
-  return `<div class="grid cols-2"><section class="card feature"><span class="eyebrow">Khi cần hỗ trợ</span><h2>Gửi thông tin SOS</h2><p>Điền tình huống và vị trí của người gặp nạn. Bạn cũng có thể báo hộ nếu đã đăng nhập.</p>${linkButton('Bắt đầu gửi SOS', 'citizen', 'sos')}</section><section class="card"><h2>Yêu cầu đã gửi</h2><p>Dùng mã riêng tư để theo dõi tiến độ và bổ sung tình hình khi có thay đổi.</p><div style="margin-top:18px">${linkButton('Theo dõi SOS', 'citizen', 'track', true)}</div><hr><h2>Đóng góp vật phẩm</h2><p>Chọn đợt đang nhận hàng, khai báo vật phẩm và theo dõi kết quả kiểm đếm.</p>${linkButton('Xem đợt quyên góp', 'citizen', 'drives', true)}</section></div><div class="section">${info('Trong tình huống nguy hiểm ngay lúc này:', 'hãy liên hệ lực lượng khẩn cấp qua 113, 114 hoặc 115. Trang Web này không thay thế cuộc gọi cấp cứu.', 'warn')}</div><div class="section"><div class="section-title"><h2>Chiến dịch đang hoạt động</h2>${linkButton('Xem tất cả', 'citizen', 'campaigns', true)}</div><div class="grid cols-3">${['Hỗ trợ khu vực ven sông', 'Nước sạch sau mưa lũ', 'Vật phẩm cho điểm sơ tán'].map((x, i) => card(x, `<p>${['Đà Nẵng', 'Quảng Nam', 'Huế'][i]} · Đang hoạt động</p><p>Thông tin nhu cầu và điểm tiếp nhận được cập nhật theo chiến dịch.</p>`)).join('')}</div></div>`;
-}
-function renderSos() {
-  return `${info('Bản thiết kế giao diện:', 'biểu mẫu dưới đây chưa gửi dữ liệu tới backend. Khi triển khai, chỉ hiển thị “Đã tiếp nhận” sau phản hồi thành công từ API.')}<div class="steps"><span class="step current"><b>1</b> Tình huống</span><span class="step"><b>2</b> Vị trí</span><span class="step"><b>3</b> Liên hệ</span><span class="step"><b>4</b> Kiểm tra</span></div><div class="split"><section class="card"><h2>Ai đang cần giúp đỡ?</h2><div class="choice"><label><input type="radio" name="report" checked> Tôi cần giúp đỡ</label><label><input type="radio" name="report"> Tôi báo hộ người thân</label></div><p style="margin:14px 0 18px">Báo hộ hiện yêu cầu đăng nhập. Vị trí cần khai là nơi người gặp nạn, không phải nơi người báo đang đứng.</p><div class="field-grid">${field(['Loại sự cố', 'select', 'Ngập lụt|Sạt lở|Bão|Khác'])}${field(['Số người cần hỗ trợ', 'number', 'Có thể để trống nếu chưa rõ'])}${field(['Mô tả tình huống', 'textarea', 'Cho biết điều đang xảy ra và nhu cầu cấp thiết'])}${field(['Địa chỉ hoặc mốc dễ nhận biết', 'text', 'Ví dụ: gần trường học, ngã ba...'])}</div><div class="section">${card('Vị trí người gặp nạn', `<div class="map"><span class="pin one">1</span><span class="map-caption">Ghim vị trí cần xác nhận</span></div><div class="heading-actions" style="margin-top:14px">${demoAction('Dùng vị trí hiện tại', true)}${demoAction('Chọn ghim thủ công', true)}</div><p>GPS chỉ phù hợp khi bạn ở cùng người gặp nạn. Nếu báo hộ, hãy ghim vị trí của họ.</p>`)}</div><div class="section field-grid">${field(['Tên người báo', 'text', 'Tên của bạn'])}${field(['Số điện thoại liên hệ', 'tel', 'Số có thể gọi lại'])}</div><div class="section"><label class="choice"><input type="checkbox"> Tôi biết có nguy hiểm đến tính mạng</label></div><div class="heading-actions" style="margin-top:20px">${demoAction('Kiểm tra thông tin')}</div></section><aside class="grid">${card('Hai cách nhập thông tin', `<p><b>Biểu mẫu:</b> có thể dùng ngay với API hiện tại.</p><p><b>Tin nhắn nhanh:</b> bước trích xuất bằng LLM chưa có API; chỉ là thiết kế dự kiến.</p>`)}${card('Quyết định ưu tiên', `<p>Yêu cầu sau khi tiếp nhận sẽ được nhân sự xác minh. Điều phối viên mới quyết định P1–P4 và giao đội.</p>`)}${info('Không chắc một chi tiết?', 'Hãy để trống hoặc ghi rõ là ước lượng. Không cần tự điền thông tin chưa biết.', 'warn')}</aside></div>`;
-}
-function renderTrack() {
-  return `<div class="split">${card('Tra cứu bằng mã riêng tư', `<div class="field-grid">${field(['Mã theo dõi', 'text', 'Ví dụ: SOS-••••••'])}${field(['Mã xác thực (nếu có)', 'text', 'Nhập mã được cấp khi gửi'])}</div><div style="margin-top:17px">${demoAction('Xem tiến độ')}</div><p>Giữ mã riêng tư. Chỉ người có quyền truy cập mới xem được thông tin chi tiết.</p>`)}${card(
-    'Tiến độ minh họa',
-    timeLine([
-      ['Đã tiếp nhận', '09:12 · Máy chủ ghi nhận yêu cầu'],
-      ['Chờ xác minh', '09:18 · Điều phối viên đang rà soát'],
-      ['Chưa giao nhiệm vụ', 'Không có thông tin xác nhận giao đội'],
-    ]) + `<div style="margin-top:15px">${demoAction('Bổ sung tình hình', true)}</div>`,
-  )}</div><div class="section">${info('Mã không hợp lệ hoặc hết quyền truy cập?', 'Kiểm tra lại mã đã lưu hoặc dùng luồng khôi phục được cung cấp sau khi gửi. Không chia sẻ mã trên mạng xã hội.', 'warn')}</div>`;
-}
-function renderDirectory(kind, role) {
-  const isCampaign = kind.toLowerCase().includes('campaign');
-  const staff = kind.endsWith('Staff');
-  const title = isCampaign ? 'Chiến dịch' : 'Đợt quyên góp';
-  const items = isCampaign
-    ? ['Hỗ trợ khu vực ven sông', 'Khắc phục hậu quả mưa lớn', 'Điểm sơ tán an toàn']
-    : ['Nước uống và thực phẩm khô', 'Bộ vệ sinh gia đình', 'Chăn và áo mưa'];
-  return `<div class="grid cols-3">${items.map((name, i) => `<section class="card"><div class="section-title">${tag(i === 2 ? 'Sắp mở' : 'Đang hoạt động')}<span>${['Đà Nẵng', 'Quảng Nam', 'Huế'][i]}</span></div><h2>${name}</h2><p>${isCampaign ? 'Hỗ trợ các hộ gia đình trong khu vực bị ảnh hưởng.' : 'Tiếp nhận vật phẩm tại điểm cứu trợ theo danh mục công bố.'}</p><p><b>${isCampaign ? 'Khu vực:' : 'Điểm nhận:'}</b> ${['Hòa An', 'Điện Bàn', 'Thuận Hòa'][i]}</p><p><b>Cập nhật:</b> 18/10/2026</p><div style="margin-top:18px">${staff ? demoAction('Xem và quản lý', true) : linkButton(isCampaign ? 'Xem chiến dịch' : 'Khai báo vật phẩm', role, isCampaign ? 'drives' : 'declare', true)}</div></section>`).join('')}</div><div class="section">${info('Số liệu minh họa:', `màn ${title.toLowerCase()} sẽ lấy dữ liệu công khai hoặc theo phạm vi quyền từ backend; không nhận đóng góp tiền.`)}</div>`;
-}
-function renderDeclare() {
-  return `<div class="split">${card('Thông tin người đóng góp', `<div class="field-grid">${field(['Họ và tên', 'text', 'Tên người mang vật phẩm'])}${field(['Số điện thoại', 'tel', 'Số để liên hệ khi tiếp nhận'])}${field(['Đợt quyên góp', 'select', 'Nước uống và thực phẩm khô|Bộ vệ sinh gia đình'])}${field(['Vật phẩm', 'select', 'Nước đóng chai (thùng)|Mì ăn liền (thùng)|Bộ vệ sinh'])}${field(['Số lượng dự kiến', 'number', 'Ví dụ: 5'])}${field(['Ghi chú', 'text', 'Nếu cần'])}</div><div class="section">${demoAction('Kiểm tra bản khai')}</div>`)}${card(
-    'Quy trình tiếp nhận',
-    timeLine([
-      ['Bạn khai báo', 'Nhận mã theo dõi riêng tư'],
-      ['Nhân viên kiểm đếm', 'Số thực nhận có thể khác bản khai'],
-      ['Người khác duyệt', 'Chấp nhận, giữ lại hoặc từ chối với lý do'],
-      ['Ghi sổ kho', 'Chỉ số được duyệt và ghi sổ mới tăng tồn kho'],
-    ]),
-  )}</div>`;
-}
-function renderDonation() {
-  return `<div class="split">${card('Tra cứu đóng góp', `<div class="field-grid">${field(['Mã theo dõi riêng tư', 'text', 'Nhập mã được cấp sau khai báo'])}${field(['Số điện thoại xác nhận', 'tel', 'Số đã dùng khi khai báo'])}</div><div style="margin-top:16px">${demoAction('Xem kết quả')}</div>`)}${card(
-    'Kết quả minh họa',
-    `<div class="grid cols-3">${metric(['10', 'Đã khai báo'])}${metric(['9', 'Đã kiểm đếm'])}${metric(['8', 'Đã duyệt'])}</div><div class="section">${timeLine(
-      [
-        ['Đã khai báo', '08:10 · 10 thùng nước'],
-        ['Đã kiểm đếm', '09:20 · 9 thùng thực nhận'],
-        ['Đang đối soát', '1 thùng cần làm rõ tình trạng'],
-      ],
-    )}</div><div style="margin-top:15px">${demoAction('Gửi yêu cầu làm rõ', true)}</div>`,
-  )}</div>`;
-}
-function renderDashboard(s, role) {
-  const target = role === 'volunteer' ? 'missions' : 'intake';
-  return `<div class="grid cols-4">${s.metrics.map(metric).join('')}</div><div class="section grid cols-2">${card(role === 'volunteer' ? 'Nhiệm vụ gần đây' : 'Việc cần xử lý', rows(s.rows, role, target))}${card('Lưu ý khi thao tác', `<p>${role === 'volunteer' ? 'Chỉ trưởng đội được nhận hoặc từ chối nhiệm vụ. Thành viên xem phần việc thuộc phạm vi đội.' : 'Các quyền tiếp nhận, duyệt độc lập và phân phối được cấp riêng. Không dùng cùng một tài khoản để tự đếm rồi tự duyệt.'}</p><div style="margin-top:16px">${linkButton('Mở công việc', role, target, true)}</div>`)}</div>`;
-}
-function renderDetail(s) {
-  return `<div class="split">${card(s.subject, `<div style="margin-bottom:16px">${tag(s.status)}</div><div class="list">${s.facts.map(([a, b]) => `<div class="list-row" style="grid-template-columns:150px 1fr"><strong>${a}</strong><span>${b}</span></div>`).join('')}</div><div class="heading-actions" style="margin-top:20px">${s.actions.map((x, i) => demoAction(x, i > 0)).join('')}</div>`)}<aside>${card(
-    'Lịch sử xử lý',
-    timeLine([
-      ['Tiếp nhận', '18/10/2026 · 09:12'],
-      ['Cập nhật gần nhất', '18/10/2026 · 09:20'],
-      ['Bước tiếp theo', 'Chờ người có quyền xác nhận'],
-    ]),
-  )}<div class="section">${info('Quyền và dữ liệu:', s.note)}</div></aside></div>`;
-}
-function renderForm(s) {
-  return `<div class="split">${card('Thông tin cập nhật', `<div class="field-grid">${s.fields.map(field).join('')}</div><div class="heading-actions" style="margin-top:20px">${demoAction(s.action)}</div>`)}${card(
-    'Dòng thời gian',
-    timeLine([
-      ['Đội nhận nhiệm vụ', '09:02 · Đã xác nhận'],
-      ['Bắt đầu di chuyển', '09:10 · Đã ghi nhận'],
-      ['Cập nhật mới', 'Chưa gửi'],
-    ]),
-  )}</div><div class="section">${info('Lưu ý:', s.note, 'warn')}</div>`;
-}
-function renderQueue() {
-  return `<div class="grid cols-4">${[
-    ['12', 'Chờ xác minh'],
-    ['04', 'Cần liên hệ lại'],
-    ['03', 'Cần đối chiếu trùng'],
-    ['07', 'Đang thực hiện'],
-  ]
-    .map(metric)
-    .join(
-      '',
-    )}</div><div class="section"><div class="tabs"><button class="active">Tất cả</button><button>Chờ xác minh</button><button>Báo hộ</button><button>Cần làm rõ</button><button>Đã giao đội</button></div></div><div class="section split">${card(
-    'Yêu cầu mới',
-    rows(
-      [
-        ['SOS-4821', 'Phường Hòa An · Báo hộ', 'Chờ xác minh', '09:12'],
-        ['SOS-4819', 'Phường Điện Ngọc · Ngập lụt', 'Cần liên hệ', '08:58'],
-        ['SOS-4817', 'Phường Thanh Bình · Di chuyển', 'Đã xác minh', '08:42'],
-      ],
-      'coordinator',
-      'verify',
-    ),
-  )}${card('Yêu cầu đang chọn', `<div class="map"><span class="pin two">1</span><span class="map-caption">Vị trí ghim thủ công · 09:12</span></div><h2 style="margin-top:16px">SOS-4821 · Phường Hòa An</h2><p>Người thân báo hộ; vị trí và số người cần xác minh.</p><div style="margin-top:17px">${linkButton('Mở hồ sơ xác minh', 'coordinator', 'verify')}</div>`)}</div>`;
-}
-function renderTriage() {
-  return `<div class="split">${card(
-    'Dữ kiện đã xác minh',
-    `<div class="list">${[
-      ['Sự cố', 'Ngập lụt, nước dâng nhanh'],
-      ['Vị trí', 'Đã xác minh qua liên hệ'],
-      ['Số người', '03 · theo cuộc gọi'],
-      ['Nguy hiểm tính mạng', 'Người báo cho biết có'],
-      ['Bằng chứng', 'Ảnh hiện trường, cuộc gọi'],
-    ]
-      .map(
-        ([a, b]) =>
-          `<div class="list-row" style="grid-template-columns:170px 1fr"><strong>${a}</strong><span>${b}</span></div>`,
-      )
-      .join('')}</div>`,
-  )}${card('Chọn mức ưu tiên', `<div class="choice" style="display:grid">${['P1 · Cần xử lý ngay', 'P2 · Khẩn cấp', 'P3 · Cần hỗ trợ', 'P4 · Theo dõi'].map((x, i) => `<label><input type="radio" name="priority" ${i === 1 ? 'checked' : ''}> ${x}</label>`).join('')}</div><div class="section">${field(['Lý do quyết định', 'textarea', 'Ghi dữ kiện và lý do chọn mức'])}</div><div class="section">${demoAction('Xác nhận ưu tiên')}</div>`)}</div><div class="section">${info('Quyết định của con người:', 'P1–P4 chỉ do điều phối viên có quyền ghi sau xác minh. Không có điểm AI chính thức hay tự giao đội trong thiết kế này.')}</div>`;
-}
-function renderAssign() {
-  return `<div class="grid cols-3">${[
-    ['Đội Sông Hàn 02', '2,4 km', '04 / 06', '01 nhiệm vụ'],
-    ['Đội Hòa Xuân 01', '3,8 km', '05 / 08', '02 nhiệm vụ'],
-    ['Đội Thanh Khê 03', '5,1 km', '03 / 05', '00 nhiệm vụ'],
-  ]
-    .map(([name, distance, ready, load], i) =>
-      card(
-        name,
-        `<div style="margin-bottom:10px">${tag(i === 0 ? 'Sẵn sàng' : 'Cần kiểm tra')}</div><p>Vị trí gần nhất: ${distance} · cập nhật ${i + 8} phút trước</p><p>Nhân lực sẵn sàng: ${ready}</p><p>Khối lượng: ${load}</p><p>Năng lực: sơ cứu, xuồng nhỏ</p><div style="margin-top:16px">${demoAction('Chọn đội', true)}</div>`,
-      ),
-    )
-    .join(
-      '',
-    )}</div><div class="section grid cols-2">${card('Nhiệm vụ dự kiến', `<p><b>SOS-4821</b> · Phường Hòa An</p><p>Ưu tiên đã được điều phối viên xác nhận: P2.</p>${field(['Ghi chú cho đội', 'textarea', 'Chỉ gửi dữ kiện cần cho nhiệm vụ'])}<div style="margin-top:16px">${demoAction('Kiểm tra trước khi giao')}</div>`)}${info('So sánh hỗ trợ lựa chọn:', 'Khoảng cách tính từ vị trí báo gần nhất và có thể đã cũ. Điều phối viên xác nhận đội và giao nhiệm vụ.')}</div>`;
-}
-function renderMap() {
-  return `<div class="grid cols-4">${[
-    ['14', 'Yêu cầu trong vùng'],
-    ['06', 'Đang xác minh'],
-    ['05', 'Nhiệm vụ đang chạy'],
-    ['02', 'Thông báo quá hạn'],
-  ]
-    .map(metric)
-    .join(
-      '',
-    )}</div><div class="section split">${card('Bản đồ khu vực', `<div class="map" style="min-height:430px"><span class="pin one">3</span><span class="pin two">2</span><span class="pin three">5</span><span class="map-caption">Các điểm là dữ liệu minh họa · không phải vị trí trực tiếp</span></div>`)}${card(
-    'Nhiệm vụ cần chú ý',
-    rows(
-      [
-        ['NV-2408', 'Đội Sông Hàn 02 · Hòa An', 'Đang di chuyển', '09:10'],
-        ['NV-2404', 'Đội Hòa Xuân 01 · Ngũ Hành Sơn', 'Quá hạn', '08:30'],
-        ['NV-2396', 'Đội Thanh Khê 03 · Thanh Bình', 'Đang hỗ trợ', '08:12'],
-      ],
-      'coordinator',
-      'queue',
-    ),
-  )}</div>`;
-}
-function renderIntake() {
-  return `<div class="split">${card(
-    'Biên nhận BN-0831',
-    `<div class="list">${[
-      ['Vật phẩm', 'Bản khai', 'Kiểm đếm'],
-      ['Nước uống (thùng)', '10', '9'],
-      ['Mì ăn liền (thùng)', '6', '6'],
-      ['Bộ vệ sinh', '4', '3'],
-    ]
-      .map(
-        ([a, b, c]) =>
-          `<div class="list-row" style="grid-template-columns:1fr 100px 100px"><strong>${a}</strong><span>${b}</span><span>${c}</span></div>`,
-      )
-      .join(
-        '',
-      )}</div><div class="section field-grid">${field(['Tình trạng vật phẩm', 'select', 'Tốt|Cần kiểm tra|Hư hỏng'])}${field(['Hạn sử dụng', 'date', ''])}${field(['Ghi chú chênh lệch', 'textarea', 'Ghi lại số thực nhận và tình trạng'])}</div><div class="heading-actions" style="margin-top:17px">${demoAction('Lưu bản kiểm đếm')}${demoAction('Chuyển duyệt độc lập', true)}</div>`,
-  )}${card(
-    'Các bước',
-    timeLine([
-      ['Người dân khai báo', '10 thùng nước, 6 thùng mì, 4 bộ vệ sinh'],
-      ['Nhân viên kiểm đếm', 'Đang ghi số thực nhận'],
-      ['Người khác duyệt', 'Chưa thực hiện'],
-      ['Ghi sổ kho', 'Chưa thực hiện'],
-    ]),
-  )}</div>`;
-}
-function renderReview() {
-  return `<div class="split">${card(
-    'So sánh và quyết định',
-    `<div class="list">${[
-      ['Nước uống', '10 khai báo', '9 đếm'],
-      ['Mì ăn liền', '6 khai báo', '6 đếm'],
-      ['Bộ vệ sinh', '4 khai báo', '3 đếm'],
-    ]
-      .map(
-        ([a, b, c]) =>
-          `<div class="list-row" style="grid-template-columns:1fr 120px 100px"><strong>${a}</strong><span>${b}</span><span>${c}</span></div>`,
-      )
-      .join(
-        '',
-      )}</div><div class="section field-grid">${field(['Kết quả rà soát', 'select', 'Chấp nhận|Giữ lại để làm rõ|Từ chối'])}${field(['Số lượng được duyệt', 'number', 'Nhập số không vượt số kiểm đếm'])}${field(['Lý do', 'textarea', 'Bắt buộc khi có chênh lệch hoặc từ chối'])}</div><div class="section">${demoAction('Xác nhận kết quả duyệt')}</div>`,
-  )}${card(
-    'Kiểm soát độc lập',
-    `${info('Khác người kiểm đếm:', 'người tự đếm không tự duyệt cùng biên nhận. Số lượng chỉ tăng trong kho sau khi duyệt và ghi sổ.')}${timeLine(
-      [
-        ['Bản khai', 'Đã nhận'],
-        ['Kiểm đếm', 'Nhân viên tiếp nhận đã gửi'],
-        ['Duyệt độc lập', 'Đang chờ quyết định'],
-      ],
-    )}`,
-  )}</div>`;
-}
-function renderStock() {
-  return `<div class="grid cols-4">${[
-    ['03', 'Kho đang hoạt động'],
-    ['24', 'Loại vật phẩm'],
-    ['08', 'Lô cần kiểm tra'],
-    ['02', 'Điểm cứu trợ'],
-  ]
-    .map(metric)
-    .join('')}</div><div class="section">${card(
-    'Số dư theo kho',
-    rows(
-      [
-        ['Kho Hòa Cường', 'Nước uống · 320 thùng', 'Khả dụng', 'Cập nhật 09:30'],
-        ['Kho Điện Bàn', 'Mì ăn liền · 185 thùng', 'Khả dụng', 'Cập nhật 09:14'],
-        ['Kho Thuận Hòa', 'Bộ vệ sinh · 42 bộ', 'Cần kiểm tra', 'Cập nhật 08:40'],
-      ],
-      'operations',
-      'needs',
-    ),
-  )}</div><div class="section">${info('Sổ kho:', 'số tồn phải đến từ biên nhận đã duyệt, giao dịch kho và chứng từ phân phối. Bản khai của người dân không làm tăng tồn kho.')}</div>`;
-}
-function renderNeeds() {
-  return `<div class="grid cols-3">${[
-    ['Nước uống', '500 thùng', '320 đã cam kết'],
-    ['Bộ vệ sinh', '140 bộ', '82 đã cam kết'],
-    ['Mì ăn liền', '300 thùng', '185 đã cam kết'],
-  ]
-    .map(([a, b, c]) =>
-      card(
-        a,
-        `<p><b>Nhu cầu:</b> ${b}</p><p><b>Đã cam kết:</b> ${c}</p><div style="margin-top:15px">${demoAction('Xem nhu cầu', true)}</div>`,
-      ),
-    )
-    .join('')}</div><div class="section">${card(
-    'Nhu cầu theo địa bàn',
-    rows(
-      [
-        ['NC-104', 'Điểm Hòa An · nước uống', 'Còn thiếu', '18/10'],
-        ['NC-101', 'Điểm Điện Bàn · bộ vệ sinh', 'Một phần', '18/10'],
-        ['NC-099', 'Điểm Thuận Hòa · thực phẩm', 'Đã cam kết', '17/10'],
-      ],
-      'operations',
-      'distribution',
-    ),
-  )}</div>`;
-}
-function renderDistribution() {
-  return `<div class="split">${card('Phiếu phân phối PP-0216', `<div class="field-grid">${field(['Nhu cầu', 'select', 'NC-104 · Điểm Hòa An'])}${field(['Kho xuất', 'select', 'Kho Hòa Cường'])}${field(['Vật phẩm', 'select', 'Nước uống (thùng)|Bộ vệ sinh'])}${field(['Số lượng', 'number', 'Tối đa theo tồn khả dụng'])}${field(['Phương tiện', 'select', 'Xe tải 02|Xe bán tải 04'])}${field(['Người vận chuyển', 'text', 'Tên người nhận vận chuyển'])}</div><div class="heading-actions" style="margin-top:18px">${demoAction('Lưu phiếu dự thảo')}${demoAction('Gửi phê duyệt', true)}</div>`)}${card(
-    'Trạng thái phân phối',
-    timeLine([
-      ['Chuẩn bị', 'Kiểm tra tồn khả dụng'],
-      ['Phê duyệt', 'Người có quyền xác nhận'],
-      ['Xuất kho', 'Ghi biến động kho'],
-      ['Bàn giao', 'Xác nhận lượng thực nhận'],
-    ]),
-  )}</div>`;
-}
-function renderHandoff() {
-  return `<div class="split">${card(
-    'Bàn giao PP-0216',
-    `<div class="list">${[
-      ['Xuất kho', '120 thùng nước'],
-      ['Vận chuyển', 'Xe tải 02 · 08:45'],
-      ['Đến điểm nhận', 'Điểm Hòa An · 09:25'],
-      ['Thực nhận', 'Chờ xác nhận'],
-    ]
-      .map(
-        ([a, b]) =>
-          `<div class="list-row" style="grid-template-columns:160px 1fr"><strong>${a}</strong><span>${b}</span></div>`,
-      )
-      .join(
-        '',
-      )}</div><div class="section field-grid">${field(['Số thực nhận', 'number', 'Nhập sau khi kiểm tra'])}${field(['Người nhận', 'text', 'Tên đại diện điểm nhận'])}${field(['Ghi chú chênh lệch', 'textarea', 'Mô tả nếu có sai khác'])}${field(['Bằng chứng bàn giao', 'file', ''])}</div><div class="section">${demoAction('Xác nhận bàn giao')}</div>`,
-  )}${card(
-    'Ranh giới trạng thái',
-    `${info('Đã xuất kho không có nghĩa đã phát đến người dân.', 'Bàn giao tại điểm cứu trợ là một mốc riêng. Lượng thực nhận và chứng cứ phải được lưu rõ.', 'warn')}${timeLine(
-      [
-        ['Đã xuất kho', '08:30 · 120 thùng'],
-        ['Đang vận chuyển', '08:45 · Xe tải 02'],
-        ['Chờ bàn giao', 'Chưa có xác nhận thực nhận'],
-      ],
-    )}`,
-  )}</div>`;
-}
-function renderReport(s, role) {
-  return `<div class="grid cols-4">${s.metrics.map(metric).join('')}</div><div class="section grid cols-2">${card('Bộ lọc báo cáo', `<div class="field-grid">${field(['Từ ngày', 'date', ''])}${field(['Đến ngày', 'date', ''])}${field(['Khu vực hoặc kho', 'select', 'Tất cả|Hòa An|Điện Bàn'])}${field(['Trạng thái', 'select', 'Tất cả|Đang xử lý|Hoàn tất'])}</div><div class="heading-actions" style="margin-top:18px">${demoAction('Áp dụng bộ lọc')}${demoAction('Xuất báo cáo', true)}</div>`)}${card(
-    role === 'operations' ? 'Các mục cần đối soát' : 'Diễn biến theo thời gian',
-    rows(
-      role === 'operations'
-        ? [
-            ['DS-028', 'Bàn giao thiếu 2 thùng', 'Cần kiểm tra', '18/10'],
-            ['DS-021', 'Biên nhận giữ lại 1 thùng', 'Đang xử lý', '17/10'],
-          ]
-        : [
-            ['BC-104', 'SOS đã xác minh', 'Hoàn tất', '18/10'],
-            ['BC-101', 'Nhiệm vụ trong vùng', 'Đang xử lý', '18/10'],
-          ],
-      role,
-      role === 'operations' ? 'review' : 'queue',
-    ),
-  )}</div><div class="section">${info('Thời điểm tạo báo cáo:', '18/10/2026 09:30 · Dữ liệu và số liệu trên bản thiết kế là minh họa; báo cáo thực cần đọc từ API theo phạm vi quyền.')}</div>`;
-}
-function renderAdminList(kind) {
-  let data = {
-    users: [
-      ['USR-028', 'Trần Minh An · điều phối viên', 'Hoạt động', 'Đà Nẵng'],
-      ['USR-031', 'Lê Thị Bình · nhân viên kho', 'Hoạt động', 'Quảng Nam'],
-      ['USR-044', 'Phạm Quốc Cường · đội cứu hộ', 'Tạm khóa', 'Huế'],
-    ],
-    organizations: [
-      ['ORG-012', 'Trung tâm ứng cứu Đà Nẵng', 'Hoạt động', '24 thành viên'],
-      ['ORG-017', 'Nhóm cứu hộ Sông Hàn', 'Hoạt động', '06 thành viên'],
-    ],
-    regions: [
-      ['REG-004', 'Quận Hải Châu', 'Hoạt động', 'Đà Nẵng'],
-      ['REG-008', 'Thị xã Điện Bàn', 'Hoạt động', 'Quảng Nam'],
-    ],
-    audit: [
-      ['AUD-1048', 'Cấp quyền điều phối · USR-028', 'Hoàn tất', '09:23'],
-      ['AUD-1044', 'Duyệt biên nhận · BN-0831', 'Hoàn tất', '09:12'],
-      ['AUD-1041', 'Vô hiệu tài khoản · USR-044', 'Hoàn tất', '08:46'],
-    ],
-  };
-  return `${card('Danh sách và bộ lọc', `<div class="field-grid">${field(['Tìm kiếm', 'text', 'Tên, mã hoặc hành động'])}${field(['Trạng thái / khu vực', 'select', 'Tất cả|Đang hoạt động|Tạm khóa'])}</div><div class="section">${rows(data[kind], 'admin', kind)}</div>`)}<div class="section">${info('Quyền riêng tư:', 'Quản trị viên không tự động được xem chi tiết SOS, thông tin người gặp nạn hoặc người đóng góp. Nhật ký lý do có thể chứa dữ liệu nhạy cảm và chỉ hiện cho quyền phù hợp.')}</div>`;
-}
-function renderGrants() {
-  return `<div class="split">${card('Cấp quyền theo phạm vi', `<div class="field-grid">${field(['Người dùng', 'text', 'Tìm theo tên hoặc mã'])}${field(['Vai trò', 'select', 'Điều phối viên|Quản lý chiến dịch|Nhân viên tiếp nhận|Người duyệt|Nhân viên phân phối'])}${field(['Tổ chức', 'select', 'Trung tâm Đà Nẵng|Nhóm cứu hộ Sông Hàn'])}${field(['Khu vực', 'select', 'Quận Hải Châu|Thị xã Điện Bàn'])}${field(['Hiệu lực từ', 'date', ''])}${field(['Hiệu lực đến', 'date', ''])}</div><div class="section">${demoAction('Kiểm tra quyền trước khi cấp')}</div>`)}${card(
-    'Quyền hiện có',
-    rows(
-      [
-        ['USR-028', 'Điều phối viên · Hải Châu', 'Hoạt động', 'Đến 31/12'],
-        ['USR-031', 'Nhân viên tiếp nhận · Hòa Cường', 'Hoạt động', 'Đến 31/12'],
-      ],
-      'admin',
-      'users',
-    ) +
-      `<div class="section">${info('Phạm vi hiệu lực:', 'vai trò và grant cần khớp đối tượng, tổ chức hoặc khu vực. Tên vai trò không tự cấp quyền trên toàn hệ thống.', 'warn')}</div>`,
-  )}</div>`;
-}
+function renderHome(){return `<div class="grid cols-2"><section class="card feature"><span class="eyebrow">Khi cần hỗ trợ</span><h2>Gửi thông tin SOS</h2><p>Điền tình huống và vị trí của người gặp nạn. Bạn cũng có thể báo hộ nếu đã đăng nhập.</p>${linkButton('Bắt đầu gửi SOS','citizen','sos')}</section><section class="card"><h2>Yêu cầu đã gửi</h2><p>Dùng mã riêng tư để theo dõi tiến độ và bổ sung tình hình khi có thay đổi.</p><div style="margin-top:18px">${linkButton('Theo dõi SOS','citizen','track',true)}</div><hr><h2>Đóng góp vật phẩm</h2><p>Chọn đợt đang nhận hàng, khai báo vật phẩm và theo dõi kết quả kiểm đếm.</p>${linkButton('Xem đợt quyên góp','citizen','drives',true)}</section></div><div class="section">${info('Trong tình huống nguy hiểm ngay lúc này:', 'hãy liên hệ lực lượng khẩn cấp qua 113, 114 hoặc 115. Trang Web này không thay thế cuộc gọi cấp cứu.','warn')}</div><div class="section"><div class="section-title"><h2>Chiến dịch đang hoạt động</h2>${linkButton('Xem tất cả','citizen','campaigns',true)}</div><div class="grid cols-3">${['Hỗ trợ khu vực ven sông','Nước sạch sau mưa lũ','Vật phẩm cho điểm sơ tán'].map((x,i)=>card(x,`<p>${['Đà Nẵng','Quảng Nam','Huế'][i]} · Đang hoạt động</p><p>Thông tin nhu cầu và điểm tiếp nhận được cập nhật theo chiến dịch.</p>`)).join('')}</div></div>`}
+function renderSos(){return `${info('Bản thiết kế giao diện:', 'biểu mẫu dưới đây chưa gửi dữ liệu tới backend. Khi triển khai, chỉ hiển thị “Đã tiếp nhận” sau phản hồi thành công từ API.')}<div class="steps"><span class="step current"><b>1</b> Tình huống</span><span class="step"><b>2</b> Vị trí</span><span class="step"><b>3</b> Liên hệ</span><span class="step"><b>4</b> Kiểm tra</span></div><div class="split"><section class="card"><h2>Ai đang cần giúp đỡ?</h2><div class="choice"><label><input type="radio" name="report" checked> Tôi cần giúp đỡ</label><label><input type="radio" name="report"> Tôi báo hộ người thân</label></div><p style="margin:14px 0 18px">Báo hộ hiện yêu cầu đăng nhập. Vị trí cần khai là nơi người gặp nạn, không phải nơi người báo đang đứng.</p><div class="field-grid">${field(['Loại sự cố','select','Ngập lụt|Sạt lở|Bão|Khác'])}${field(['Số người cần hỗ trợ','number','Có thể để trống nếu chưa rõ'])}${field(['Mô tả tình huống','textarea','Cho biết điều đang xảy ra và nhu cầu cấp thiết'])}${field(['Địa chỉ hoặc mốc dễ nhận biết','text','Ví dụ: gần trường học, ngã ba...'])}</div><div class="section">${card('Vị trí người gặp nạn',`<div class="map"><span class="pin one">1</span><span class="map-caption">Ghim vị trí cần xác nhận</span></div><div class="heading-actions" style="margin-top:14px">${demoAction('Dùng vị trí hiện tại',true)}${demoAction('Chọn ghim thủ công',true)}</div><p>GPS chỉ phù hợp khi bạn ở cùng người gặp nạn. Nếu báo hộ, hãy ghim vị trí của họ.</p>`)}</div><div class="section field-grid">${field(['Tên người báo','text','Tên của bạn'])}${field(['Số điện thoại liên hệ','tel','Số có thể gọi lại'])}</div><div class="section"><label class="choice"><input type="checkbox"> Tôi biết có nguy hiểm đến tính mạng</label></div><div class="heading-actions" style="margin-top:20px">${demoAction('Kiểm tra thông tin')}</div></section><aside class="grid">${card('Hai cách nhập thông tin',`<p><b>Biểu mẫu:</b> có thể dùng ngay với API hiện tại.</p><p><b>Tin nhắn nhanh:</b> bước trích xuất bằng LLM chưa có API; chỉ là thiết kế dự kiến.</p>`)}${card('Quyết định ưu tiên',`<p>Yêu cầu sau khi tiếp nhận sẽ được nhân sự xác minh. Điều phối viên mới quyết định P1–P4 và giao đội.</p>`)}${info('Không chắc một chi tiết?', 'Hãy để trống hoặc ghi rõ là ước lượng. Không cần tự điền thông tin chưa biết.','warn')}</aside></div>`}
+function renderTrack(){return `<div class="split">${card('Tra cứu bằng mã riêng tư',`<div class="field-grid">${field(['Mã theo dõi','text','Ví dụ: SOS-••••••'])}${field(['Mã xác thực (nếu có)','text','Nhập mã được cấp khi gửi'])}</div><div style="margin-top:17px">${demoAction('Xem tiến độ')}</div><p>Giữ mã riêng tư. Chỉ người có quyền truy cập mới xem được thông tin chi tiết.</p>`)}${card('Tiến độ minh họa',timeLine([['Đã tiếp nhận','09:12 · Máy chủ ghi nhận yêu cầu'],['Chờ xác minh','09:18 · Điều phối viên đang rà soát'],['Chưa giao nhiệm vụ','Không có thông tin xác nhận giao đội']])+`<div style="margin-top:15px">${demoAction('Bổ sung tình hình',true)}</div>`)}</div><div class="section">${info('Mã không hợp lệ hoặc hết quyền truy cập?', 'Kiểm tra lại mã đã lưu hoặc dùng luồng khôi phục được cung cấp sau khi gửi. Không chia sẻ mã trên mạng xã hội.','warn')}</div>`}
+function renderDirectory(kind,role){const isCampaign=kind.toLowerCase().includes('campaign');const staff=kind.endsWith('Staff');const title=isCampaign?'Chiến dịch':'Đợt quyên góp';const items=isCampaign?['Hỗ trợ khu vực ven sông','Khắc phục hậu quả mưa lớn','Điểm sơ tán an toàn']:['Nước uống và thực phẩm khô','Bộ vệ sinh gia đình','Chăn và áo mưa'];return `<div class="grid cols-3">${items.map((name,i)=>`<section class="card"><div class="section-title">${tag(i===2?'Sắp mở':'Đang hoạt động')}<span>${['Đà Nẵng','Quảng Nam','Huế'][i]}</span></div><h2>${name}</h2><p>${isCampaign?'Hỗ trợ các hộ gia đình trong khu vực bị ảnh hưởng.':'Tiếp nhận vật phẩm tại điểm cứu trợ theo danh mục công bố.'}</p><p><b>${isCampaign?'Khu vực:':'Điểm nhận:'}</b> ${['Hòa An','Điện Bàn','Thuận Hòa'][i]}</p><p><b>Cập nhật:</b> 18/10/2026</p><div style="margin-top:18px">${staff?demoAction('Xem và quản lý',true):linkButton(isCampaign?'Xem chiến dịch':'Khai báo vật phẩm',role,isCampaign?'drives':'declare',true)}</div></section>`).join('')}</div><div class="section">${info('Số liệu minh họa:',`màn ${title.toLowerCase()} sẽ lấy dữ liệu công khai hoặc theo phạm vi quyền từ backend; không nhận đóng góp tiền.`)}</div>`}
+function renderDeclare(){return `<div class="split">${card('Thông tin người đóng góp',`<div class="field-grid">${field(['Họ và tên','text','Tên người mang vật phẩm'])}${field(['Số điện thoại','tel','Số để liên hệ khi tiếp nhận'])}${field(['Đợt quyên góp','select','Nước uống và thực phẩm khô|Bộ vệ sinh gia đình'])}${field(['Vật phẩm','select','Nước đóng chai (thùng)|Mì ăn liền (thùng)|Bộ vệ sinh'])}${field(['Số lượng dự kiến','number','Ví dụ: 5'])}${field(['Ghi chú','text','Nếu cần'])}</div><div class="section">${demoAction('Kiểm tra bản khai')}</div>`)}${card('Quy trình tiếp nhận',timeLine([['Bạn khai báo','Nhận mã theo dõi riêng tư'],['Nhân viên kiểm đếm','Số thực nhận có thể khác bản khai'],['Người khác duyệt','Chấp nhận, giữ lại hoặc từ chối với lý do'],['Ghi sổ kho','Chỉ số được duyệt và ghi sổ mới tăng tồn kho']]))}</div>`}
+function renderDonation(){return `<div class="split">${card('Tra cứu đóng góp',`<div class="field-grid">${field(['Mã theo dõi riêng tư','text','Nhập mã được cấp sau khai báo'])}${field(['Số điện thoại xác nhận','tel','Số đã dùng khi khai báo'])}</div><div style="margin-top:16px">${demoAction('Xem kết quả')}</div>`)}${card('Kết quả minh họa',`<div class="grid cols-3">${metric(['10','Đã khai báo'])}${metric(['9','Đã kiểm đếm'])}${metric(['8','Đã duyệt'])}</div><div class="section">${timeLine([['Đã khai báo','08:10 · 10 thùng nước'],['Đã kiểm đếm','09:20 · 9 thùng thực nhận'],['Đang đối soát','1 thùng cần làm rõ tình trạng']])}</div><div style="margin-top:15px">${demoAction('Gửi yêu cầu làm rõ',true)}</div>`)}</div>`}
+function renderDashboard(s,role){const target=role==='volunteer'?'missions':'intake';return `<div class="grid cols-4">${s.metrics.map(metric).join('')}</div><div class="section grid cols-2">${card(role==='volunteer'?'Nhiệm vụ gần đây':'Việc cần xử lý',rows(s.rows,role,target))}${card('Lưu ý khi thao tác',`<p>${role==='volunteer'?'Chỉ trưởng đội được nhận hoặc từ chối nhiệm vụ. Thành viên xem phần việc thuộc phạm vi đội.':'Các quyền tiếp nhận, duyệt độc lập và phân phối được cấp riêng. Không dùng cùng một tài khoản để tự đếm rồi tự duyệt.'}</p><div style="margin-top:16px">${linkButton('Mở công việc',role,target,true)}</div>`)}</div>`}
+function renderDetail(s){return `<div class="split">${card(s.subject,`<div style="margin-bottom:16px">${tag(s.status)}</div><div class="list">${s.facts.map(([a,b])=>`<div class="list-row" style="grid-template-columns:150px 1fr"><strong>${a}</strong><span>${b}</span></div>`).join('')}</div><div class="heading-actions" style="margin-top:20px">${s.actions.map((x,i)=>demoAction(x,i>0)).join('')}</div>`)}<aside>${card('Lịch sử xử lý',timeLine([['Tiếp nhận','18/10/2026 · 09:12'],['Cập nhật gần nhất','18/10/2026 · 09:20'],['Bước tiếp theo','Chờ người có quyền xác nhận']]))}<div class="section">${info('Quyền và dữ liệu:',s.note)}</div></aside></div>`}
+function renderForm(s){return `<div class="split">${card('Thông tin cập nhật',`<div class="field-grid">${s.fields.map(field).join('')}</div><div class="heading-actions" style="margin-top:20px">${demoAction(s.action)}</div>`)}${card('Dòng thời gian',timeLine([['Đội nhận nhiệm vụ','09:02 · Đã xác nhận'],['Bắt đầu di chuyển','09:10 · Đã ghi nhận'],['Cập nhật mới','Chưa gửi']]))}</div><div class="section">${info('Lưu ý:',s.note,'warn')}</div>`}
+function renderQueue(){return `<div class="grid cols-4">${[['12','Chờ xác minh'],['04','Cần liên hệ lại'],['03','Cần đối chiếu trùng'],['07','Đang thực hiện']].map(metric).join('')}</div><div class="section"><div class="tabs"><button class="active">Tất cả</button><button>Chờ xác minh</button><button>Báo hộ</button><button>Cần làm rõ</button><button>Đã giao đội</button></div></div><div class="section split">${card('Yêu cầu mới',rows([['SOS-4821','Phường Hòa An · Báo hộ','Chờ xác minh','09:12'],['SOS-4819','Phường Điện Ngọc · Ngập lụt','Cần liên hệ','08:58'],['SOS-4817','Phường Thanh Bình · Di chuyển','Đã xác minh','08:42']],'coordinator','verify'))}${card('Yêu cầu đang chọn',`<div class="map"><span class="pin two">1</span><span class="map-caption">Vị trí ghim thủ công · 09:12</span></div><h2 style="margin-top:16px">SOS-4821 · Phường Hòa An</h2><p>Người thân báo hộ; vị trí và số người cần xác minh.</p><div style="margin-top:17px">${linkButton('Mở hồ sơ xác minh','coordinator','verify')}</div>`)}</div>`}
+function renderTriage(){return `<div class="split">${card('Dữ kiện đã xác minh',`<div class="list">${[['Sự cố','Ngập lụt, nước dâng nhanh'],['Vị trí','Đã xác minh qua liên hệ'],['Số người','03 · theo cuộc gọi'],['Nguy hiểm tính mạng','Người báo cho biết có'],['Bằng chứng','Ảnh hiện trường, cuộc gọi']].map(([a,b])=>`<div class="list-row" style="grid-template-columns:170px 1fr"><strong>${a}</strong><span>${b}</span></div>`).join('')}</div>`)}${card('Chọn mức ưu tiên',`<div class="choice" style="display:grid">${['P1 · Cần xử lý ngay','P2 · Khẩn cấp','P3 · Cần hỗ trợ','P4 · Theo dõi'].map((x,i)=>`<label><input type="radio" name="priority" ${i===1?'checked':''}> ${x}</label>`).join('')}</div><div class="section">${field(['Lý do quyết định','textarea','Ghi dữ kiện và lý do chọn mức'])}</div><div class="section">${demoAction('Xác nhận ưu tiên')}</div>`)}</div><div class="section">${info('Quyết định của con người:', 'P1–P4 chỉ do điều phối viên có quyền ghi sau xác minh. Không có điểm AI chính thức hay tự giao đội trong thiết kế này.')}</div>`}
+function renderAssign(){return `<div class="grid cols-3">${[['Đội Sông Hàn 02','2,4 km','04 / 06','01 nhiệm vụ'],['Đội Hòa Xuân 01','3,8 km','05 / 08','02 nhiệm vụ'],['Đội Thanh Khê 03','5,1 km','03 / 05','00 nhiệm vụ']].map(([name,distance,ready,load],i)=>card(name,`<div style="margin-bottom:10px">${tag(i===0?'Sẵn sàng':'Cần kiểm tra')}</div><p>Vị trí gần nhất: ${distance} · cập nhật ${i+8} phút trước</p><p>Nhân lực sẵn sàng: ${ready}</p><p>Khối lượng: ${load}</p><p>Năng lực: sơ cứu, xuồng nhỏ</p><div style="margin-top:16px">${demoAction('Chọn đội',true)}</div>`)).join('')}</div><div class="section grid cols-2">${card('Nhiệm vụ dự kiến',`<p><b>SOS-4821</b> · Phường Hòa An</p><p>Ưu tiên đã được điều phối viên xác nhận: P2.</p>${field(['Ghi chú cho đội','textarea','Chỉ gửi dữ kiện cần cho nhiệm vụ'])}<div style="margin-top:16px">${demoAction('Kiểm tra trước khi giao')}</div>`)}${info('So sánh hỗ trợ lựa chọn:', 'Khoảng cách tính từ vị trí báo gần nhất và có thể đã cũ. Điều phối viên xác nhận đội và giao nhiệm vụ.')}</div>`}
+function renderMap(){return `<div class="grid cols-4">${[['14','Yêu cầu trong vùng'],['06','Đang xác minh'],['05','Nhiệm vụ đang chạy'],['02','Thông báo quá hạn']].map(metric).join('')}</div><div class="section split">${card('Bản đồ khu vực',`<div class="map" style="min-height:430px"><span class="pin one">3</span><span class="pin two">2</span><span class="pin three">5</span><span class="map-caption">Các điểm là dữ liệu minh họa · không phải vị trí trực tiếp</span></div>`)}${card('Nhiệm vụ cần chú ý',rows([['NV-2408','Đội Sông Hàn 02 · Hòa An','Đang di chuyển','09:10'],['NV-2404','Đội Hòa Xuân 01 · Ngũ Hành Sơn','Quá hạn','08:30'],['NV-2396','Đội Thanh Khê 03 · Thanh Bình','Đang hỗ trợ','08:12']],'coordinator','queue'))}</div>`}
+function renderIntake(){return `<div class="split">${card('Biên nhận BN-0831',`<div class="list">${[['Vật phẩm','Bản khai','Kiểm đếm'],['Nước uống (thùng)','10','9'],['Mì ăn liền (thùng)','6','6'],['Bộ vệ sinh','4','3']].map(([a,b,c])=>`<div class="list-row" style="grid-template-columns:1fr 100px 100px"><strong>${a}</strong><span>${b}</span><span>${c}</span></div>`).join('')}</div><div class="section field-grid">${field(['Tình trạng vật phẩm','select','Tốt|Cần kiểm tra|Hư hỏng'])}${field(['Hạn sử dụng','date',''])}${field(['Ghi chú chênh lệch','textarea','Ghi lại số thực nhận và tình trạng'])}</div><div class="heading-actions" style="margin-top:17px">${demoAction('Lưu bản kiểm đếm')}${demoAction('Chuyển duyệt độc lập',true)}</div>`)}${card('Các bước',timeLine([['Người dân khai báo','10 thùng nước, 6 thùng mì, 4 bộ vệ sinh'],['Nhân viên kiểm đếm','Đang ghi số thực nhận'],['Người khác duyệt','Chưa thực hiện'],['Ghi sổ kho','Chưa thực hiện']]))}</div>`}
+function renderReview(){return `<div class="split">${card('So sánh và quyết định',`<div class="list">${[['Nước uống','10 khai báo','9 đếm'],['Mì ăn liền','6 khai báo','6 đếm'],['Bộ vệ sinh','4 khai báo','3 đếm']].map(([a,b,c])=>`<div class="list-row" style="grid-template-columns:1fr 120px 100px"><strong>${a}</strong><span>${b}</span><span>${c}</span></div>`).join('')}</div><div class="section field-grid">${field(['Kết quả rà soát','select','Chấp nhận|Giữ lại để làm rõ|Từ chối'])}${field(['Số lượng được duyệt','number','Nhập số không vượt số kiểm đếm'])}${field(['Lý do','textarea','Bắt buộc khi có chênh lệch hoặc từ chối'])}</div><div class="section">${demoAction('Xác nhận kết quả duyệt')}</div>`)}${card('Kiểm soát độc lập',`${info('Khác người kiểm đếm:', 'người tự đếm không tự duyệt cùng biên nhận. Số lượng chỉ tăng trong kho sau khi duyệt và ghi sổ.')}${timeLine([['Bản khai','Đã nhận'],['Kiểm đếm','Nhân viên tiếp nhận đã gửi'],['Duyệt độc lập','Đang chờ quyết định']])}`)}</div>`}
+function renderStock(){return `<div class="grid cols-4">${[['03','Kho đang hoạt động'],['24','Loại vật phẩm'],['08','Lô cần kiểm tra'],['02','Điểm cứu trợ']].map(metric).join('')}</div><div class="section">${card('Số dư theo kho',rows([['Kho Hòa Cường','Nước uống · 320 thùng','Khả dụng','Cập nhật 09:30'],['Kho Điện Bàn','Mì ăn liền · 185 thùng','Khả dụng','Cập nhật 09:14'],['Kho Thuận Hòa','Bộ vệ sinh · 42 bộ','Cần kiểm tra','Cập nhật 08:40']],'operations','needs'))}</div><div class="section">${info('Sổ kho:', 'số tồn phải đến từ biên nhận đã duyệt, giao dịch kho và chứng từ phân phối. Bản khai của người dân không làm tăng tồn kho.')}</div>`}
+function renderNeeds(){return `<div class="grid cols-3">${[['Nước uống','500 thùng','320 đã cam kết'],['Bộ vệ sinh','140 bộ','82 đã cam kết'],['Mì ăn liền','300 thùng','185 đã cam kết']].map(([a,b,c])=>card(a,`<p><b>Nhu cầu:</b> ${b}</p><p><b>Đã cam kết:</b> ${c}</p><div style="margin-top:15px">${demoAction('Xem nhu cầu',true)}</div>`)).join('')}</div><div class="section">${card('Nhu cầu theo địa bàn',rows([['NC-104','Điểm Hòa An · nước uống','Còn thiếu','18/10'],['NC-101','Điểm Điện Bàn · bộ vệ sinh','Một phần','18/10'],['NC-099','Điểm Thuận Hòa · thực phẩm','Đã cam kết','17/10']],'operations','distribution'))}</div>`}
+function renderDistribution(){return `<div class="split">${card('Phiếu phân phối PP-0216',`<div class="field-grid">${field(['Nhu cầu','select','NC-104 · Điểm Hòa An'])}${field(['Kho xuất','select','Kho Hòa Cường'])}${field(['Vật phẩm','select','Nước uống (thùng)|Bộ vệ sinh'])}${field(['Số lượng','number','Tối đa theo tồn khả dụng'])}${field(['Phương tiện','select','Xe tải 02|Xe bán tải 04'])}${field(['Người vận chuyển','text','Tên người nhận vận chuyển'])}</div><div class="heading-actions" style="margin-top:18px">${demoAction('Lưu phiếu dự thảo')}${demoAction('Gửi phê duyệt',true)}</div>`)}${card('Trạng thái phân phối',timeLine([['Chuẩn bị','Kiểm tra tồn khả dụng'],['Phê duyệt','Người có quyền xác nhận'],['Xuất kho','Ghi biến động kho'],['Bàn giao','Xác nhận lượng thực nhận']]))}</div>`}
+function renderHandoff(){return `<div class="split">${card('Bàn giao PP-0216',`<div class="list">${[['Xuất kho','120 thùng nước'],['Vận chuyển','Xe tải 02 · 08:45'],['Đến điểm nhận','Điểm Hòa An · 09:25'],['Thực nhận','Chờ xác nhận']].map(([a,b])=>`<div class="list-row" style="grid-template-columns:160px 1fr"><strong>${a}</strong><span>${b}</span></div>`).join('')}</div><div class="section field-grid">${field(['Số thực nhận','number','Nhập sau khi kiểm tra'])}${field(['Người nhận','text','Tên đại diện điểm nhận'])}${field(['Ghi chú chênh lệch','textarea','Mô tả nếu có sai khác'])}${field(['Bằng chứng bàn giao','file',''])}</div><div class="section">${demoAction('Xác nhận bàn giao')}</div>`)}${card('Ranh giới trạng thái',`${info('Đã xuất kho không có nghĩa đã phát đến người dân.', 'Bàn giao tại điểm cứu trợ là một mốc riêng. Lượng thực nhận và chứng cứ phải được lưu rõ.','warn')}${timeLine([['Đã xuất kho','08:30 · 120 thùng'],['Đang vận chuyển','08:45 · Xe tải 02'],['Chờ bàn giao','Chưa có xác nhận thực nhận']])}`)}</div>`}
+function renderReport(s,role){return `<div class="grid cols-4">${s.metrics.map(metric).join('')}</div><div class="section grid cols-2">${card('Bộ lọc báo cáo',`<div class="field-grid">${field(['Từ ngày','date',''])}${field(['Đến ngày','date',''])}${field(['Khu vực hoặc kho','select','Tất cả|Hòa An|Điện Bàn'])}${field(['Trạng thái','select','Tất cả|Đang xử lý|Hoàn tất'])}</div><div class="heading-actions" style="margin-top:18px">${demoAction('Áp dụng bộ lọc')}${demoAction('Xuất báo cáo',true)}</div>`)}${card(role==='operations'?'Các mục cần đối soát':'Diễn biến theo thời gian',rows(role==='operations'?[['DS-028','Bàn giao thiếu 2 thùng','Cần kiểm tra','18/10'],['DS-021','Biên nhận giữ lại 1 thùng','Đang xử lý','17/10']]:[['BC-104','SOS đã xác minh','Hoàn tất','18/10'],['BC-101','Nhiệm vụ trong vùng','Đang xử lý','18/10']],role,role==='operations'?'review':'queue'))}</div><div class="section">${info('Thời điểm tạo báo cáo:', '18/10/2026 09:30 · Dữ liệu và số liệu trên bản thiết kế là minh họa; báo cáo thực cần đọc từ API theo phạm vi quyền.')}</div>`}
+function renderAdminList(kind){let data={users:[['USR-028','Trần Minh An · điều phối viên','Hoạt động','Đà Nẵng'],['USR-031','Lê Thị Bình · nhân viên kho','Hoạt động','Quảng Nam'],['USR-044','Phạm Quốc Cường · đội cứu hộ','Tạm khóa','Huế']],organizations:[['ORG-012','Trung tâm ứng cứu Đà Nẵng','Hoạt động','24 thành viên'],['ORG-017','Nhóm cứu hộ Sông Hàn','Hoạt động','06 thành viên']],regions:[['REG-004','Quận Hải Châu','Hoạt động','Đà Nẵng'],['REG-008','Thị xã Điện Bàn','Hoạt động','Quảng Nam']],audit:[['AUD-1048','Cấp quyền điều phối · USR-028','Hoàn tất','09:23'],['AUD-1044','Duyệt biên nhận · BN-0831','Hoàn tất','09:12'],['AUD-1041','Vô hiệu tài khoản · USR-044','Hoàn tất','08:46']]};return `${card('Danh sách và bộ lọc',`<div class="field-grid">${field(['Tìm kiếm','text','Tên, mã hoặc hành động'])}${field(['Trạng thái / khu vực','select','Tất cả|Đang hoạt động|Tạm khóa'])}</div><div class="section">${rows(data[kind],'admin',kind)}</div>`)}<div class="section">${info('Quyền riêng tư:', 'Quản trị viên không tự động được xem chi tiết SOS, thông tin người gặp nạn hoặc người đóng góp. Nhật ký lý do có thể chứa dữ liệu nhạy cảm và chỉ hiện cho quyền phù hợp.')}</div>`}
+function renderGrants(){return `<div class="split">${card('Cấp quyền theo phạm vi',`<div class="field-grid">${field(['Người dùng','text','Tìm theo tên hoặc mã'])}${field(['Vai trò','select','Điều phối viên|Quản lý chiến dịch|Nhân viên tiếp nhận|Người duyệt|Nhân viên phân phối'])}${field(['Tổ chức','select','Trung tâm Đà Nẵng|Nhóm cứu hộ Sông Hàn'])}${field(['Khu vực','select','Quận Hải Châu|Thị xã Điện Bàn'])}${field(['Hiệu lực từ','date',''])}${field(['Hiệu lực đến','date',''])}</div><div class="section">${demoAction('Kiểm tra quyền trước khi cấp')}</div>`)}${card('Quyền hiện có',rows([['USR-028','Điều phối viên · Hải Châu','Hoạt động','Đến 31/12'],['USR-031','Nhân viên tiếp nhận · Hòa Cường','Hoạt động','Đến 31/12']],'admin','users')+`<div class="section">${info('Phạm vi hiệu lực:', 'vai trò và grant cần khớp đối tượng, tổ chức hoặc khu vực. Tên vai trò không tự cấp quyền trên toàn hệ thống.','warn')}</div>`)}</div>`}
 
-function renderAccount() {
-  return `<div class="split">${card('Đăng nhập', `<div class="field-grid">${field(['Số điện thoại hoặc email', 'text', 'Thông tin đã đăng ký'])}${field(['Mật khẩu', 'password', 'Nhập mật khẩu'])}</div><div class="heading-actions" style="margin-top:20px">${demoAction('Đăng nhập')}</div><p>Quên mật khẩu? Dùng luồng khôi phục tài khoản được hệ thống cung cấp.</p>`)}${card('Tạo tài khoản', `<p>Tài khoản giúp báo hộ người thân và xem những yêu cầu thuộc quyền của bạn.</p><div class="field-grid" style="margin-top:18px">${field(['Họ và tên', 'text', 'Tên của bạn'])}${field(['Số điện thoại', 'tel', 'Số đang sử dụng'])}${field(['Email (nếu có)', 'email', 'Địa chỉ email'])}${field(['Mật khẩu', 'password', 'Tạo mật khẩu'])}</div><div style="margin-top:18px">${demoAction('Tạo tài khoản', true)}</div>`)}</div><div class="section">${info('Cần gửi SOS ngay?', 'Bạn có thể gửi yêu cầu cho chính mình mà chưa đăng nhập. Báo hộ yêu cầu tài khoản đang hoạt động.')}</div>`;
+function renderAccount(){return `<div class="split">${card('Đăng nhập',`<div class="field-grid">${field(['Số điện thoại hoặc email','text','Thông tin đã đăng ký'])}${field(['Mật khẩu','password','Nhập mật khẩu'])}</div><div class="heading-actions" style="margin-top:20px">${demoAction('Đăng nhập')}</div><p>Quên mật khẩu? Dùng luồng khôi phục tài khoản được hệ thống cung cấp.</p>`)}${card('Tạo tài khoản',`<p>Tài khoản giúp báo hộ người thân và xem những yêu cầu thuộc quyền của bạn.</p><div class="field-grid" style="margin-top:18px">${field(['Họ và tên','text','Tên của bạn'])}${field(['Số điện thoại','tel','Số đang sử dụng'])}${field(['Email (nếu có)','email','Địa chỉ email'])}${field(['Mật khẩu','password','Tạo mật khẩu'])}</div><div style="margin-top:18px">${demoAction('Tạo tài khoản',true)}</div>`)}</div><div class="section">${info('Cần gửi SOS ngay?', 'Bạn có thể gửi yêu cầu cho chính mình mà chưa đăng nhập. Báo hộ yêu cầu tài khoản đang hoạt động.')}</div>`}
+function renderReceipt(){return `<div class="grid cols-2"><section class="card feature"><span class="eyebrow">Máy chủ đã xác nhận · Minh họa</span><h2>Đã tiếp nhận yêu cầu</h2><p>Mã theo dõi: <strong>SOS-4821-MẪU</strong></p><p>Hãy lưu mã riêng tư để xem tiến độ và bổ sung tình hình. Trên sản phẩm thật, mã này chỉ hiện sau phản hồi thành công từ API.</p>${linkButton('Theo dõi yêu cầu','citizen','track')}</section>${card('Điều gì diễn ra tiếp theo?',timeLine([['Nhân sự tiếp nhận','Kiểm tra thông tin và liên hệ nếu cần'],['Điều phối viên xác minh','Đối chiếu dữ kiện, vị trí và khả năng hỗ trợ'],['Quyết định xử lý','Chọn ưu tiên và giao đội theo quy trình']]))}</div><div class="section">${info('Nếu tình huống nguy hiểm ngay:', 'gọi 113, 114 hoặc 115. Mã theo dõi không chứng minh đã có đội được giao.','warn')}</div>`}
+function renderNotices(role){const data=role==='volunteer'?[['Lời mời nhiệm vụ NV-2408','Cần trưởng đội phản hồi trong 15 phút','Chờ phản hồi','09:12'],['Nhiệm vụ NV-2396 đã cập nhật','Điều phối viên gửi thêm thông tin địa điểm','Đã đọc','08:42']]:[['Nhiệm vụ NV-2404 quá hạn','Đội chưa phản hồi trong thời hạn','Cần kiểm tra','09:21'],['SOS-4821 có bổ sung mới','Người báo cập nhật tình hình và ảnh','Chưa đọc','09:15']];return `<div class="grid cols-2">${card('Thông báo gần đây',rows(data,role,role==='volunteer'?'missions':'queue'))}${card('Bộ lọc và trạng thái',`<div class="tabs"><button class="active">Tất cả</button><button>Chưa đọc</button><button>Cần xử lý</button></div><div class="section">${info('Thông báo trong ứng dụng:', 'thời điểm và nội dung được lấy từ sự kiện backend; bản thiết kế chưa gửi thông báo đẩy hoặc tự xác nhận đã đọc.')}</div>`)}</div>`}
+function renderAssets(){return `<div class="grid cols-3">${card('Điểm cứu trợ',`<p><b>Điểm Hòa An</b> · Đang hoạt động</p><p>Tiếp nhận, bàn giao và cập nhật lượng thực nhận.</p><div style="margin-top:15px">${demoAction('Xem điểm',true)}</div>`)}${card('Kho',`<p><b>Kho Hòa Cường</b> · Đang hoạt động</p><p>Vật phẩm, số dư và lịch sử biến động.</p><div style="margin-top:15px">${linkButton('Xem kho','operations','stock',true)}</div>`)}${card('Phương tiện',`<p><b>Xe tải 02</b> · Sẵn sàng</p><p>Phân công vận chuyển và lịch sử sử dụng trong phiếu phân phối.</p><div style="margin-top:15px">${demoAction('Xem phương tiện',true)}</div>`)}</div><div class="section">${info('Phạm vi quản lý:', 'chỉ hiển thị điểm, kho và phương tiện thuộc khu vực hoặc tổ chức mà tài khoản có quyền.')}</div>`}
+function renderAdminOverview(){return `<div class="grid cols-4">${[['138','Tài khoản hoạt động'],['12','Tổ chức'],['47','Quyền đang hiệu lực'],['09','Khu vực']].map(metric).join('')}</div><div class="section grid cols-2">${card('Truy cập nhanh',`<div class="grid">${linkButton('Quản lý người dùng','admin','users',true)}${linkButton('Xem phân quyền','admin','grants',true)}${linkButton('Xem nhật ký','admin','audit',true)}</div>`)}${card('Hoạt động gần đây',rows([['AUD-1048','Cấp quyền điều phối','Hoàn tất','09:23'],['AUD-1041','Vô hiệu tài khoản','Hoàn tất','08:46']],'admin','audit'))}</div><div class="section">${info('Giới hạn truy cập:', 'bảng này chỉ hiển thị số liệu quản trị. Quyền ADMIN không tự cấp quyền đọc chi tiết người gặp nạn hoặc người đóng góp.')}</div>`}
+function renderSosWithProxy(){
+  const proxy = `<div class="section card"><h2>Nếu bạn báo hộ người khác</h2><p>Trong sản phẩm, nhóm trường này chỉ hiện khi chọn báo hộ và đã đăng nhập. Chỉ khai những điều bạn biết; mô tả độ chắc chắn của vị trí.</p><div class="field-grid" style="margin-top:14px">${field(['Quan hệ với người gặp nạn','select','Người thân|Hàng xóm|Người quen|Khác'])}${field(['Nguồn thông tin','select','Trực tiếp quan sát|Cuộc gọi|Tin nhắn|Người khác báo'])}${field(['Lần cuối liên hệ','text','Thời gian và cách liên hệ, nếu biết'])}${field(['Số liên lạc tại hiện trường','tel','Để trống nếu chưa biết'])}</div></div>`;
+  return renderSos().replace('<div class="section"><label class="choice"><input type="checkbox">', `${proxy}<div class="section"><label class="choice"><input type="checkbox">`);
 }
-function renderReceipt() {
-  return `<div class="grid cols-2"><section class="card feature"><span class="eyebrow">Máy chủ đã xác nhận · Minh họa</span><h2>Đã tiếp nhận yêu cầu</h2><p>Mã theo dõi: <strong>SOS-4821-MẪU</strong></p><p>Hãy lưu mã riêng tư để xem tiến độ và bổ sung tình hình. Trên sản phẩm thật, mã này chỉ hiện sau phản hồi thành công từ API.</p>${linkButton('Theo dõi yêu cầu', 'citizen', 'track')}</section>${card(
-    'Điều gì diễn ra tiếp theo?',
-    timeLine([
-      ['Nhân sự tiếp nhận', 'Kiểm tra thông tin và liên hệ nếu cần'],
-      ['Điều phối viên xác minh', 'Đối chiếu dữ kiện, vị trí và khả năng hỗ trợ'],
-      ['Quyết định xử lý', 'Chọn ưu tiên và giao đội theo quy trình'],
-    ]),
-  )}</div><div class="section">${info('Nếu tình huống nguy hiểm ngay:', 'gọi 113, 114 hoặc 115. Mã theo dõi không chứng minh đã có đội được giao.', 'warn')}</div>`;
+function bodyFor(role,scene){switch(scene.type){case'home':return renderHome();case'account':return renderAccount();case'sos':return renderSosWithProxy();case'receipt':return renderReceipt();case'track':return renderTrack();case'directory':return renderDirectory(scene.kind,role);case'declare':return renderDeclare();case'donation':return renderDonation();case'dashboard':return renderDashboard(scene,role);case'detail':return renderDetail(scene);case'form':return renderForm(scene);case'queue':return renderQueue();case'triage':return renderTriage();case'assign':return renderAssign();case'map':return renderMap();case'notices':return renderNotices(role);case'intake':return renderIntake();case'review':return renderReview();case'stock':return renderStock();case'assets':return renderAssets();case'needs':return renderNeeds();case'distribution':return renderDistribution();case'handoff':return renderHandoff();case'report':return renderReport(scene,role);case'adminOverview':return renderAdminOverview();case'adminList':return renderAdminList(scene.kind);case'grants':return renderGrants();default:return '<div class="empty">Chưa có màn hình.</div>'}}
+function route(){const [wantedRole,wantedPage]=(location.hash.slice(1)||'citizen/home').split('/');const role=roles[wantedRole]?wantedRole:'citizen';const page=scenes[role][wantedPage]?wantedPage:roles[role].items[0][0];return {role,page}}
+function render(){
+  const {role,page}=route(), r=roles[role], scene=scenes[role][page];
+  document.title=`${scene.title} — C48 Web`;
+  const navigation=r.items.map(([id,label,icon])=>`<a class="${id===page?'active':''}" href="${href(role,id)}" ${id===page?'aria-current="page"':''}><span class="nav-icon" aria-hidden="true"><img src="assets/icons/${icon}.svg" alt=""></span><span>${label}</span></a>`).join('');
+  document.getElementById('app').innerHTML=`<div class="shell"><aside class="sidebar" id="sidebar"><a class="brand" href="${href('citizen','home')}"><span class="brand-mark"><img src="assets/icons/sos.svg" alt=""></span><span><b>C48 Cứu trợ</b><small>HỆ THỐNG CỨU TRỢ</small></span></a><div><div class="nav-label">${r.label}</div><nav class="nav" aria-label="Điều hướng ${r.label}">${navigation}</nav></div><div class="side-bottom"><strong>Bản thiết kế Web responsive</strong>5 không gian giao diện · dữ liệu minh họa<br>Chưa kết nối hoặc ghi dữ liệu lên backend.</div></aside><div class="main"><header class="topbar"><button class="mobile-menu" id="menu" type="button" aria-label="Mở menu">☰</button><span class="crumb">C48 / ${r.label} / ${scene.title}</span><div class="top-actions"><span class="mock">BẢN MẪU</span><select class="role-select" id="role" aria-label="Chuyển vai trò xem thiết kế">${Object.entries(roles).map(([id,x])=>`<option value="${id}" ${id===role?'selected':''}>${x.label}</option>`).join('')}</select><span class="avatar" aria-hidden="true">${r.short}</span></div></header><main class="content"><div class="heading"><div><div class="eyebrow">${r.label} · Thiết kế Web</div><h1>${scene.title}</h1><p>${scene.desc}</p></div><div class="heading-actions">${role==='citizen'&&page!=='sos'?linkButton('Gửi SOS','citizen','sos'):role==='coordinator'&&page!=='queue'?linkButton('Hàng đợi SOS','coordinator','queue',true):''}</div></div>${bodyFor(role,scene)}<p class="footer-note">Thiết kế tham khảo cho việc xây dựng frontend. Tất cả tên, số liệu, thời gian và thao tác trên màn là dữ liệu minh họa. API backend và quyền thực tế sẽ quyết định kết quả khi triển khai.</p></main></div></div>`;
+  document.getElementById('role').addEventListener('change',e=>location.hash=href(e.target.value,roles[e.target.value].items[0][0]));
+  document.getElementById('menu').addEventListener('click',()=>document.getElementById('sidebar').classList.toggle('open'));
+  document.querySelectorAll('[data-demo]').forEach(b=>b.addEventListener('click',()=>alert('Đây là bản thiết kế giao diện. Thao tác này chưa gửi dữ liệu tới backend.')));
 }
-function renderNotices(role) {
-  const data =
-    role === 'volunteer'
-      ? [
-          [
-            'Lời mời nhiệm vụ NV-2408',
-            'Cần trưởng đội phản hồi trong 15 phút',
-            'Chờ phản hồi',
-            '09:12',
-          ],
-          [
-            'Nhiệm vụ NV-2396 đã cập nhật',
-            'Điều phối viên gửi thêm thông tin địa điểm',
-            'Đã đọc',
-            '08:42',
-          ],
-        ]
-      : [
-          ['Nhiệm vụ NV-2404 quá hạn', 'Đội chưa phản hồi trong thời hạn', 'Cần kiểm tra', '09:21'],
-          ['SOS-4821 có bổ sung mới', 'Người báo cập nhật tình hình và ảnh', 'Chưa đọc', '09:15'],
-        ];
-  return `<div class="grid cols-2">${card('Thông báo gần đây', rows(data, role, role === 'volunteer' ? 'missions' : 'queue'))}${card('Bộ lọc và trạng thái', `<div class="tabs"><button class="active">Tất cả</button><button>Chưa đọc</button><button>Cần xử lý</button></div><div class="section">${info('Thông báo trong ứng dụng:', 'thời điểm và nội dung được lấy từ sự kiện backend; bản thiết kế chưa gửi thông báo đẩy hoặc tự xác nhận đã đọc.')}</div>`)}</div>`;
-}
-function renderAssets() {
-  return `<div class="grid cols-3">${card('Điểm cứu trợ', `<p><b>Điểm Hòa An</b> · Đang hoạt động</p><p>Tiếp nhận, bàn giao và cập nhật lượng thực nhận.</p><div style="margin-top:15px">${demoAction('Xem điểm', true)}</div>`)}${card('Kho', `<p><b>Kho Hòa Cường</b> · Đang hoạt động</p><p>Vật phẩm, số dư và lịch sử biến động.</p><div style="margin-top:15px">${linkButton('Xem kho', 'operations', 'stock', true)}</div>`)}${card('Phương tiện', `<p><b>Xe tải 02</b> · Sẵn sàng</p><p>Phân công vận chuyển và lịch sử sử dụng trong phiếu phân phối.</p><div style="margin-top:15px">${demoAction('Xem phương tiện', true)}</div>`)}</div><div class="section">${info('Phạm vi quản lý:', 'chỉ hiển thị điểm, kho và phương tiện thuộc khu vực hoặc tổ chức mà tài khoản có quyền.')}</div>`;
-}
-function renderAdminOverview() {
-  return `<div class="grid cols-4">${[
-    ['138', 'Tài khoản hoạt động'],
-    ['12', 'Tổ chức'],
-    ['47', 'Quyền đang hiệu lực'],
-    ['09', 'Khu vực'],
-  ]
-    .map(metric)
-    .join(
-      '',
-    )}</div><div class="section grid cols-2">${card('Truy cập nhanh', `<div class="grid">${linkButton('Quản lý người dùng', 'admin', 'users', true)}${linkButton('Xem phân quyền', 'admin', 'grants', true)}${linkButton('Xem nhật ký', 'admin', 'audit', true)}</div>`)}${card(
-    'Hoạt động gần đây',
-    rows(
-      [
-        ['AUD-1048', 'Cấp quyền điều phối', 'Hoàn tất', '09:23'],
-        ['AUD-1041', 'Vô hiệu tài khoản', 'Hoàn tất', '08:46'],
-      ],
-      'admin',
-      'audit',
-    ),
-  )}</div><div class="section">${info('Giới hạn truy cập:', 'bảng này chỉ hiển thị số liệu quản trị. Quyền ADMIN không tự cấp quyền đọc chi tiết người gặp nạn hoặc người đóng góp.')}</div>`;
-}
-function renderSosWithProxy() {
-  const proxy = `<div class="section card"><h2>Nếu bạn báo hộ người khác</h2><p>Trong sản phẩm, nhóm trường này chỉ hiện khi chọn báo hộ và đã đăng nhập. Chỉ khai những điều bạn biết; mô tả độ chắc chắn của vị trí.</p><div class="field-grid" style="margin-top:14px">${field(['Quan hệ với người gặp nạn', 'select', 'Người thân|Hàng xóm|Người quen|Khác'])}${field(['Nguồn thông tin', 'select', 'Trực tiếp quan sát|Cuộc gọi|Tin nhắn|Người khác báo'])}${field(['Lần cuối liên hệ', 'text', 'Thời gian và cách liên hệ, nếu biết'])}${field(['Số liên lạc tại hiện trường', 'tel', 'Để trống nếu chưa biết'])}</div></div>`;
-  return renderSos().replace(
-    '<div class="section"><label class="choice"><input type="checkbox">',
-    `${proxy}<div class="section"><label class="choice"><input type="checkbox">`,
-  );
-}
-function bodyFor(role, scene) {
-  switch (scene.type) {
-    case 'home':
-      return renderHome();
-    case 'account':
-      return renderAccount();
-    case 'sos':
-      return renderSosWithProxy();
-    case 'receipt':
-      return renderReceipt();
-    case 'track':
-      return renderTrack();
-    case 'directory':
-      return renderDirectory(scene.kind, role);
-    case 'declare':
-      return renderDeclare();
-    case 'donation':
-      return renderDonation();
-    case 'dashboard':
-      return renderDashboard(scene, role);
-    case 'detail':
-      return renderDetail(scene);
-    case 'form':
-      return renderForm(scene);
-    case 'queue':
-      return renderQueue();
-    case 'triage':
-      return renderTriage();
-    case 'assign':
-      return renderAssign();
-    case 'map':
-      return renderMap();
-    case 'notices':
-      return renderNotices(role);
-    case 'intake':
-      return renderIntake();
-    case 'review':
-      return renderReview();
-    case 'stock':
-      return renderStock();
-    case 'assets':
-      return renderAssets();
-    case 'needs':
-      return renderNeeds();
-    case 'distribution':
-      return renderDistribution();
-    case 'handoff':
-      return renderHandoff();
-    case 'report':
-      return renderReport(scene, role);
-    case 'adminOverview':
-      return renderAdminOverview();
-    case 'adminList':
-      return renderAdminList(scene.kind);
-    case 'grants':
-      return renderGrants();
-    default:
-      return '<div class="empty">Chưa có màn hình.</div>';
-  }
-}
-function route() {
-  const [wantedRole, wantedPage] = (location.hash.slice(1) || 'citizen/home').split('/');
-  const role = roles[wantedRole] ? wantedRole : 'citizen';
-  const page = scenes[role][wantedPage] ? wantedPage : roles[role].items[0][0];
-  return { role, page };
-}
-function render() {
-  const { role, page } = route(),
-    r = roles[role],
-    scene = scenes[role][page];
-  document.title = `${scene.title} — C48 Web`;
-  const navigation = r.items
-    .map(
-      ([id, label, icon]) =>
-        `<a class="${id === page ? 'active' : ''}" href="${href(role, id)}" ${id === page ? 'aria-current="page"' : ''}><span class="nav-icon" aria-hidden="true"><img src="assets/icons/${icon}.svg" alt=""></span><span>${label}</span></a>`,
-    )
-    .join('');
-  document.getElementById('app').innerHTML =
-    `<div class="shell"><aside class="sidebar" id="sidebar"><a class="brand" href="${href('citizen', 'home')}"><span class="brand-mark"><img src="assets/icons/sos.svg" alt=""></span><span><b>C48 Cứu trợ</b><small>HỆ THỐNG CỨU TRỢ</small></span></a><div><div class="nav-label">${r.label}</div><nav class="nav" aria-label="Điều hướng ${r.label}">${navigation}</nav></div><div class="side-bottom"><strong>Bản thiết kế Web responsive</strong>5 không gian giao diện · dữ liệu minh họa<br>Chưa kết nối hoặc ghi dữ liệu lên backend.</div></aside><div class="main"><header class="topbar"><button class="mobile-menu" id="menu" type="button" aria-label="Mở menu">☰</button><span class="crumb">C48 / ${r.label} / ${scene.title}</span><div class="top-actions"><span class="mock">BẢN MẪU</span><select class="role-select" id="role" aria-label="Chuyển vai trò xem thiết kế">${Object.entries(
-      roles,
-    )
-      .map(
-        ([id, x]) => `<option value="${id}" ${id === role ? 'selected' : ''}>${x.label}</option>`,
-      )
-      .join(
-        '',
-      )}</select><span class="avatar" aria-hidden="true">${r.short}</span></div></header><main class="content"><div class="heading"><div><div class="eyebrow">${r.label} · Thiết kế Web</div><h1>${scene.title}</h1><p>${scene.desc}</p></div><div class="heading-actions">${role === 'citizen' && page !== 'sos' ? linkButton('Gửi SOS', 'citizen', 'sos') : role === 'coordinator' && page !== 'queue' ? linkButton('Hàng đợi SOS', 'coordinator', 'queue', true) : ''}</div></div>${bodyFor(role, scene)}<p class="footer-note">Thiết kế tham khảo cho việc xây dựng frontend. Tất cả tên, số liệu, thời gian và thao tác trên màn là dữ liệu minh họa. API backend và quyền thực tế sẽ quyết định kết quả khi triển khai.</p></main></div></div>`;
-  document
-    .getElementById('role')
-    .addEventListener(
-      'change',
-      (e) => (location.hash = href(e.target.value, roles[e.target.value].items[0][0])),
-    );
-  document
-    .getElementById('menu')
-    .addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
-  document
-    .querySelectorAll('[data-demo]')
-    .forEach((b) =>
-      b.addEventListener('click', () =>
-        alert('Đây là bản thiết kế giao diện. Thao tác này chưa gửi dữ liệu tới backend.'),
-      ),
-    );
-}
-window.addEventListener('hashchange', render);
-render();
+window.addEventListener('hashchange',render);render();

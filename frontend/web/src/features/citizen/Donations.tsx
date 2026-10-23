@@ -67,6 +67,8 @@ export function Donations({
   const [trackId, setTrackId] = useState('');
   const [trackSecret, setTrackSecret] = useState('');
   const [tracking, setTracking] = useState<Tracking | null>(null);
+  const [verifiedSecret, setVerifiedSecret] = useState('');
+  const lookupVersion = useRef(0);
   const [disputeReason, setDisputeReason] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [actionMessage, setActionMessage] = useState('');
@@ -79,6 +81,9 @@ export function Donations({
   const [createdFile, setCreatedFile] = useState<File | null>(null);
   const [createdUploadMessage, setCreatedUploadMessage] = useState('');
   const pending = useRef<Pending | null>(null);
+  const guestCredentials = user ? 'include' as const : 'omit' as const;
+  const [showCreatedTracking, setShowCreatedTracking] = useState(false);
+  useEffect(() => setShowCreatedTracking(false), [page]);
   async function attachCreated(event: FormEvent) {
     event.preventDefault();
     if (!created || !createdFile) return;
@@ -91,6 +96,7 @@ export function Donations({
         createdFile,
         {
           idempotencyKey: newCommandKey(),
+          credentials: guestCredentials,
           headers: createdSecret ? { 'X-Donation-Secret': createdSecret } : {},
         }
       );
@@ -164,6 +170,7 @@ export function Donations({
           body: command.body,
           idempotencyKey: command.key,
           headers: command.secret ? { 'X-Donation-Secret': command.secret } : {},
+          credentials: guestCredentials,
         }
       );
       setCreated(result);
@@ -177,22 +184,38 @@ export function Donations({
   }
   async function track(event: FormEvent) {
     event.preventDefault();
+    const version = ++lookupVersion.current;
+    const id = trackId.trim();
+    const secret = trackSecret.trim();
     setLoading(true);
     setError('');
     setTracking(null);
     try {
-      setTracking(
-        await api<Tracking>(
+      const result = await api<Tracking>(
           'logistics',
-          `/public/donations/${encodeURIComponent(trackId.trim())}`,
-          { headers: trackSecret ? { 'X-Donation-Secret': trackSecret.trim() } : {} }
-        )
-      );
+          `/public/donations/${encodeURIComponent(id)}`,
+          { headers: secret ? { 'X-Donation-Secret': secret } : {}, credentials: guestCredentials }
+        );
+      if (version === lookupVersion.current) {
+        setVerifiedSecret(secret);
+        setTracking(result);
+      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Không thể tra cứu đóng góp.');
+      if (version === lookupVersion.current)
+        setError(cause instanceof Error ? cause.message : 'Không thể tra cứu đóng góp.');
     } finally {
-      setLoading(false);
+      if (version === lookupVersion.current) setLoading(false);
     }
+  }
+  function invalidateTracking() {
+    lookupVersion.current += 1;
+    setLoading(false);
+    setTracking(null);
+    setVerifiedSecret('');
+    setError('');
+    setActionMessage('');
+    disputeKey.current = null;
+    uploadKey.current = null;
   }
   async function dispute(event: FormEvent) {
     event.preventDefault();
@@ -205,16 +228,20 @@ export function Donations({
         method: 'POST',
         body: { reason: disputeReason.trim() },
         idempotencyKey: disputeKey.current,
-        headers: trackSecret ? { 'X-Donation-Secret': trackSecret.trim() } : {},
+        headers: verifiedSecret ? { 'X-Donation-Secret': verifiedSecret } : {},
+        credentials: guestCredentials,
       });
       disputeKey.current = null;
       setDisputeReason('');
-      setTracking(
-        await api('logistics', `/public/donations/${encodeURIComponent(tracking.id)}`, {
-          headers: trackSecret ? { 'X-Donation-Secret': trackSecret.trim() } : {},
-        })
-      );
       setActionMessage('Máy chủ đã tiếp nhận khiếu nại của bạn.');
+      try {
+        setTracking(await api('logistics', `/public/donations/${encodeURIComponent(tracking.id)}`, {
+          headers: verifiedSecret ? { 'X-Donation-Secret': verifiedSecret } : {},
+          credentials: guestCredentials,
+        }));
+      } catch {
+        setActionMessage('Máy chủ đã tiếp nhận khiếu nại. Hãy tra cứu lại để xem trạng thái mới.');
+      }
     } catch (cause) {
       setActionMessage(cause instanceof Error ? cause.message : 'Chưa xác nhận được khiếu nại.');
     } finally {
@@ -234,7 +261,8 @@ export function Donations({
         file,
         {
           idempotencyKey: uploadKey.current,
-          headers: trackSecret ? { 'X-Donation-Secret': trackSecret.trim() } : {},
+          headers: verifiedSecret ? { 'X-Donation-Secret': verifiedSecret } : {},
+          credentials: guestCredentials,
         }
       );
       uploadKey.current = null;
@@ -254,7 +282,7 @@ export function Donations({
     if (
       !tracking ||
       !user ||
-      !trackSecret ||
+      !verifiedSecret ||
       !window.confirm(
         'Gắn bản khai này với tài khoản đang đăng nhập? Mã bảo mật cũ sẽ hết hiệu lực.'
       )
@@ -266,9 +294,10 @@ export function Donations({
       await api('logistics', `/public/donations/${encodeURIComponent(tracking.id)}/claim`, {
         method: 'POST',
         idempotencyKey: newCommandKey(),
-        headers: { 'X-Donation-Secret': trackSecret.trim() },
+        headers: { 'X-Donation-Secret': verifiedSecret },
       });
       setTrackSecret('');
+      setVerifiedSecret('');
       setActionMessage('Bản khai đã được gắn với tài khoản của bạn.');
     } catch (cause) {
       setActionMessage(cause instanceof Error ? cause.message : 'Chưa gắn được bản khai.');
@@ -299,7 +328,7 @@ export function Donations({
       setLoading(false);
     }
   }
-  if (page === 'donation')
+  if (page === 'donation' || showCreatedTracking)
     return (
       <div className="grid-two">
         <section className="card">
@@ -310,8 +339,12 @@ export function Donations({
               Định danh bản khai
               <input
                 required
+                disabled={loading}
                 value={trackId}
-                onChange={(e) => setTrackId(e.target.value)}
+                onChange={(e) => {
+                  setTrackId(e.target.value);
+                  invalidateTracking();
+                }}
                 autoComplete="off"
               />
             </label>
@@ -319,8 +352,12 @@ export function Donations({
               Mã bảo mật (nếu khai với tư cách khách)
               <input
                 type="password"
+                disabled={loading}
                 value={trackSecret}
-                onChange={(e) => setTrackSecret(e.target.value)}
+                onChange={(e) => {
+                  setTrackSecret(e.target.value);
+                  invalidateTracking();
+                }}
                 autoComplete="off"
               />
             </label>
@@ -439,7 +476,7 @@ export function Donations({
                 Tải minh chứng lên
               </button>
             </form>
-            {user && trackSecret && (
+            {user && verifiedSecret && (
               <button className="button secondary" onClick={claim} disabled={loading}>
                 Gắn bản khai với tài khoản
               </button>
@@ -506,6 +543,7 @@ export function Donations({
               setTrackSecret(createdSecret);
               setCreated(null);
               setCreatedSecret('');
+              setShowCreatedTracking(true);
             }}
           >
             Chuyển đến màn hình tra cứu đóng góp này

@@ -121,6 +121,7 @@ export const pages: Record<Workspace, Page[]> = {
       note: 'Bản đồ chỉ hiển thị dữ liệu đã tổng hợp theo quyền truy cập; không hiển thị vị trí nạn nhân công khai.',
     },
     { id: 'notices', title: 'Thông báo', icon: 'notice', service: 'response', path: '/notices' },
+    { id: 'needs', title: 'Nhu cầu vật tư', icon: 'needs', service: 'logistics', path: '/needs' },
     {
       id: 'campaigns',
       title: 'Chiến dịch',

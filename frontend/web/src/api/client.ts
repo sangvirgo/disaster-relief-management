@@ -91,6 +91,7 @@ export interface RequestOptions {
   headers?: Record<string, string>;
   idempotencyKey?: string;
   retryAuth?: boolean;
+  credentials?: RequestCredentials;
 }
 export async function api<T>(
   service: Service,
@@ -98,16 +99,17 @@ export async function api<T>(
   options: RequestOptions = {}
 ): Promise<T> {
   const method = options.method || 'GET';
-  if (method !== 'GET' && !csrfToken) await csrf();
+  const credentials = options.credentials || 'include';
+  if (method !== 'GET' && credentials !== 'omit' && !csrfToken) await csrf();
   const headers: Record<string, string> = { ...options.headers };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
-  if (method !== 'GET') headers['X-CSRF-Token'] = csrfToken!;
+  if (method !== 'GET' && credentials !== 'omit') headers['X-CSRF-Token'] = csrfToken!;
   if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
   let response: Response;
   try {
     response = await fetch(`/api/v1/${service}${path}`, {
       method,
-      credentials: 'include',
+      credentials,
       cache: 'no-store',
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
@@ -121,6 +123,7 @@ export async function api<T>(
   }
   if (
     response.status === 401 &&
+    credentials !== 'omit' &&
     options.retryAuth !== false &&
     path !== '/auth/login' &&
     path !== '/auth/refresh'
@@ -151,23 +154,24 @@ export async function upload<T>(
   service: Service,
   path: string,
   file: File,
-  options: { headers?: Record<string, string>; idempotencyKey: string },
+  options: { headers?: Record<string, string>; idempotencyKey: string; credentials?: RequestCredentials },
   retryAuth = true
 ): Promise<T> {
-  if (!csrfToken) await csrf();
+  const credentials = options.credentials || 'include';
+  if (credentials !== 'omit' && !csrfToken) await csrf();
   const body = new FormData();
   body.append('file', file);
   let response: Response;
   try {
     response = await fetch(`/api/v1/${service}${path}`, {
       method: 'POST',
-      credentials: 'include',
+      credentials,
       cache: 'no-store',
       body,
       headers: {
         ...options.headers,
         'Idempotency-Key': options.idempotencyKey,
-        'X-CSRF-Token': csrfToken!,
+        ...(credentials !== 'omit' ? { 'X-CSRF-Token': csrfToken! } : {}),
       },
     });
   } catch {
@@ -177,7 +181,7 @@ export async function upload<T>(
       'Không thể tải tệp lên. Chưa có xác nhận từ máy chủ.'
     );
   }
-  if (response.status === 401 && retryAuth) {
+  if (response.status === 401 && retryAuth && credentials !== 'omit') {
     try {
       await refresh();
       return upload<T>(service, path, file, options, false);

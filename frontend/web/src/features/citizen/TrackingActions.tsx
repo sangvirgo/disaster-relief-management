@@ -74,8 +74,12 @@ export function TrackingActions({
       setSupplementPoint(null);
       setGpsAccuracy(null);
       setGpsCapturedAt(null);
-      await onUpdated();
       setMessage('Thông tin bổ sung đã được máy chủ tiếp nhận.');
+      try {
+        await onUpdated();
+      } catch {
+        setMessage('Máy chủ đã tiếp nhận thông tin bổ sung. Hãy tra cứu lại để xem trạng thái mới.');
+      }
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Chưa xác nhận được thông tin bổ sung.');
     } finally {

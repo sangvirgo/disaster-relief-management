@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
+import { DetailCloseButton } from '../../components/DetailCloseButton';
 import { label, timeLabel } from '../../i18n/labels';
 
 type Row = Record<string, unknown> & {
@@ -233,7 +234,8 @@ export function Admin({ page }: { page: string }) {
           </button>
         )}
       </section>
-      <section className="card">
+      <section className={`card detail-panel-card ${selected ? 'is-open' : ''}`}>
+        {selected && <DetailCloseButton onClick={() => { setSelected(null); setDetail(null); }} />}
         <h2>
           {selected
             ? 'Chi tiết và thao tác'
@@ -402,17 +404,6 @@ export function Admin({ page }: { page: string }) {
             Danh sách người dùng trong phạm vi được cấp quyền. Chọn một tài khoản để xem trạng thái
             và quyền hiện tại.
           </p>
-        )}
-        {selected && (
-          <button
-            className="button secondary"
-            onClick={() => {
-              setSelected(null);
-              setDetail(null);
-            }}
-          >
-            Quay lại danh sách
-          </button>
         )}
       </section>
     </div>

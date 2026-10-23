@@ -43,13 +43,7 @@ export function LocationPicker({
   onSelect: (point: Point | null) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [customKey, setCustomKey] = useState(
-    () => localStorage.getItem('C48_GOOGLE_MAPS_API_KEY') || ''
-  );
-  const [showKeyInput, setShowKeyInput] = useState(false);
-  const [keyDraft, setKeyDraft] = useState('');
-
-  const activeGoogleKey = customKey || envApiKey;
+  const activeGoogleKey = envApiKey;
   const [mapEngine, setMapEngine] = useState<'osm' | 'google'>(() =>
     activeGoogleKey ? 'google' : 'osm'
   );
@@ -304,19 +298,6 @@ export function LocationPicker({
     }
   }
 
-  function saveCustomGoogleKey(e?: React.SyntheticEvent) {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    const key = keyDraft.trim();
-    localStorage.setItem('C48_GOOGLE_MAPS_API_KEY', key);
-    setCustomKey(key);
-    setShowKeyInput(false);
-    if (key) setMapEngine('google');
-    else setMapEngine('osm');
-  }
-
   return (
     <div className="location-picker">
       <button
@@ -335,10 +316,10 @@ export function LocationPicker({
               <p style={{ margin: 0, fontWeight: 700, color: 'var(--color-primary-dark)' }}>
                 {mapEngine === 'google'
                   ? 'Đang dùng Google Maps'
-                  : 'Đang dùng Bản đồ Mở (OpenStreetMap) sẵn sàng 100%'}
+                  : 'Đang dùng OpenStreetMap'}
               </p>
               <small style={{ color: 'var(--color-text-secondary)' }}>
-                Chạm hoặc click bất kỳ điểm nào trên bản đồ để ghim đúng nơi cần hỗ trợ
+                Chạm hoặc nhấp vào vị trí trên bản đồ để ghim đúng nơi cần hỗ trợ
               </small>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -360,64 +341,8 @@ export function LocationPicker({
               >
                 Bản đồ Mở (OSM)
               </button>
-              <button
-                type="button"
-                className="text-button"
-                style={{ fontSize: 11, padding: '4px 6px' }}
-                onClick={() => setShowKeyInput(!showKeyInput)}
-              >
-                {activeGoogleKey ? 'Đổi khóa Google' : 'Thêm khóa Google'}
-              </button>
             </div>
           </div>
-
-          {showKeyInput && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <input
-                type="text"
-                placeholder="Dán Google Maps API Key tại đây..."
-                value={keyDraft}
-                onChange={(e) => setKeyDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    saveCustomGoogleKey(e);
-                  }
-                }}
-                style={{
-                  flex: 1,
-                  border: '1px solid var(--color-surface-divider)',
-                  borderRadius: 8,
-                  padding: '6px 10px',
-                  fontSize: 13,
-                }}
-              />
-              <button
-                type="button"
-                className="button"
-                style={{ minHeight: 34, padding: '6px 12px', fontSize: 13 }}
-                onClick={(e) => saveCustomGoogleKey(e)}
-              >
-                Lưu khóa
-              </button>
-              {customKey && (
-                <button
-                  type="button"
-                  className="button secondary"
-                  style={{ minHeight: 34, padding: '6px 10px', fontSize: 13 }}
-                  onClick={() => {
-                    localStorage.removeItem('C48_GOOGLE_MAPS_API_KEY');
-                    setCustomKey('');
-                    setKeyDraft('');
-                    setMapEngine('osm');
-                  }}
-                >
-                  Xóa
-                </button>
-              )}
-            </div>
-          )}
 
           {/* Ô tìm kiếm cho OpenStreetMap (Nominatim) */}
           {mapEngine === 'osm' && (

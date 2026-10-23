@@ -33,7 +33,7 @@ function secret32(): string {
     .replaceAll('=', '');
 }
 
-export function SosForm({ user }: { user: Me | null }) {
+export function SosForm({ user, onConfirmed }: { user: Me | null; onConfirmed?: (receipt: Created) => void }) {
   const [mode, setMode] = useState<'SELF' | 'PROXY'>('SELF');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -154,6 +154,7 @@ export function SosForm({ user }: { user: Me | null }) {
       });
       setAckSecret(command.secret);
       setCreated(result);
+      onConfirmed?.(result);
       pending.current = null;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Chưa gửi được yêu cầu. Vui lòng thử lại.');
