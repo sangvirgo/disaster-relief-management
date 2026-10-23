@@ -1,38 +1,54 @@
-\xpg@aux {}{vietnamese}
-\contentsline {chapter}{PHÊ DUYỆT, GIAO NHIỆM VỤ ĐỀ TÀI}{i}{chapter*.1}%
-\contentsline {chapter}{LỜI CẢM ƠN}{ii}{chapter*.2}%
-\contentsline {chapter}{LỜI CAM ĐOAN}{iii}{chapter*.3}%
-\contentsline {chapter}{MỤC LỤC}{iv}{chapter*.3}%
-\contentsline {chapter}{DANH MỤC CÁC KÝ HIỆU VÀ CHỮ VIẾT TẮT}{vi}{chapter*.5}%
-\contentsline {chapter}{DANH MỤC BẢNG}{vii}{chapter*.5}%
-\contentsline {chapter}{DANH MỤC SƠ ĐỒ}{viii}{chapter*.6}%
-\contentsline {chapter}{DANH MỤC HÌNH VẼ}{ix}{chapter*.7}%
-\contentsline {chapter}{MỞ ĐẦU}{1}{chapter*.9}%
-\contentsline {chapter}{BẢNG PHÂN CÔNG NHIỆM VỤ NHÓM THỰC HIỆN}{2}{chapter*.10}%
-\contentsline {chapter}{\numberline {1}GIỚI THIỆU ĐỀ TÀI}{3}{chapter.1}%
-\contentsline {section}{\numberline {1.1}Sự cần thiết của đề tài}{3}{section.1.1}%
-\contentsline {section}{\numberline {1.2}Mục tiêu của đề tài}{3}{section.1.2}%
-\contentsline {section}{\numberline {1.3}Phạm vi và kết quả phải đạt}{3}{section.1.3}%
-\contentsline {chapter}{\numberline {2}KHẢO SÁT HỆ THỐNG}{4}{chapter.2}%
-\contentsline {section}{\numberline {2.1}Bối cảnh và quy trình nghiệp vụ}{4}{section.2.1}%
-\contentsline {section}{\numberline {2.2}Các tác nhân}{4}{section.2.2}%
-\contentsline {section}{\numberline {2.3}Yêu cầu hệ thống}{4}{section.2.3}%
-\contentsline {chapter}{\numberline {3}NỘI DUNG THỰC HIỆN}{5}{chapter.3}%
-\contentsline {section}{\numberline {3.1}Giải pháp đề xuất}{5}{section.3.1}%
-\contentsline {section}{\numberline {3.2}Kiến trúc hệ thống}{5}{section.3.2}%
-\contentsline {section}{\numberline {3.3}Quy trình và ca sử dụng}{5}{section.3.3}%
-\contentsline {section}{\numberline {3.4}Công nghệ sử dụng}{5}{section.3.4}%
-\contentsline {chapter}{\numberline {4}TỔ CHỨC DỮ LIỆU}{6}{chapter.4}%
-\contentsline {section}{\numberline {4.1}Mô hình dữ liệu}{6}{section.4.1}%
-\contentsline {section}{\numberline {4.2}Thiết kế cơ sở dữ liệu}{6}{section.4.2}%
-\contentsline {chapter}{\numberline {5}THIẾT KẾ PHẦN MỀM WEB VÀ BACKEND}{7}{chapter.5}%
-\contentsline {section}{\numberline {5.1}Giao diện và chức năng Web}{7}{section.5.1}%
-\contentsline {section}{\numberline {5.2}API và xử lý nghiệp vụ}{7}{section.5.2}%
-\contentsline {section}{\numberline {5.3}Triển khai}{7}{section.5.3}%
-\contentsline {chapter}{\numberline {6}THIẾT KẾ PHẦN MỀM DI ĐỘNG, KIỂM THỬ VÀ ĐÁNH GIÁ}{8}{chapter.6}%
-\contentsline {section}{\numberline {6.1}Luồng và giao diện Mobile}{8}{section.6.1}%
-\contentsline {section}{\numberline {6.2}Kịch bản và kết quả kiểm thử}{8}{section.6.2}%
-\contentsline {section}{\numberline {6.3}Đánh giá và giới hạn}{8}{section.6.3}%
-\contentsline {chapter}{KẾT LUẬN, KIẾN NGHỊ}{9}{chapter*.12}%
-\contentsline {chapter}{DANH MỤC TÀI LIỆU THAM KHẢO}{9}{chapter*.12}%
-\contentsline {chapter}{\numberline {A}BẰNG CHỨNG VÀ MA TRẬN TRUY VẾT}{11}{appendix.A}%
+\contentsline {chapter}{LỜI CẢM ƠN}{i}{}%
+\contentsline {chapter}{LỜI CAM ĐOAN}{ii}{}%
+\contentsline {chapter}{MỤC LỤC}{iii}{}%
+\contentsline {chapter}{DANH MỤC CÁC KÝ HIỆU VÀ CHỮ VIẾT TẮT}{v}{}%
+\contentsline {chapter}{DANH MỤC CÁC BẢNG}{vi}{}%
+\contentsline {chapter}{DANH MỤC SƠ ĐỒ}{vii}{}%
+\contentsline {chapter}{DANH MỤC HÌNH VẼ}{viii}{}%
+\contentsline {chapter}{MỞ ĐẦU}{1}{}%
+\contentsline {chapter}{BẢNG PHÂN CÔNG NHIỆM VỤ NHÓM THỰC HIỆN}{2}{}%
+\contentsline {chapter}{\numberline {1}GIỚI THIỆU ĐỀ TÀI}{3}{}%
+\contentsline {section}{\numberline {1.1}Sự cần thiết của đề tài}{3}{}%
+\contentsline {section}{\numberline {1.2}Mục tiêu của đề tài}{3}{}%
+\contentsline {section}{\numberline {1.3}Mục tiêu sản phẩm và phạm vi báo cáo}{4}{}%
+\contentsline {section}{\numberline {1.4}Đối tượng và phương pháp nghiên cứu}{4}{}%
+\contentsline {chapter}{\numberline {2}KHẢO SÁT HỆ THỐNG}{5}{}%
+\contentsline {section}{\numberline {2.1}Bối cảnh và vấn đề cần khảo sát}{5}{}%
+\contentsline {section}{\numberline {2.2}Mục tiêu khảo sát}{5}{}%
+\contentsline {section}{\numberline {2.3}Các tác nhân của hệ thống}{5}{}%
+\contentsline {section}{\numberline {2.4}Phạm vi hệ thống và ranh giới}{6}{}%
+\contentsline {section}{\numberline {2.5}Hiện trạng xây dựng sản phẩm}{6}{}%
+\contentsline {chapter}{\numberline {3}PHÂN TÍCH, THIẾT KẾ VÀ XÂY DỰNG HỆ THỐNG}{7}{}%
+\contentsline {section}{\numberline {3.1}Nguyên tắc và giải pháp đề xuất}{7}{}%
+\contentsline {section}{\numberline {3.2}Quy trình nghiệp vụ mục tiêu}{7}{}%
+\contentsline {subsection}{\numberline {3.2.1}Tiếp nhận SOS SELF}{7}{}%
+\contentsline {subsection}{\numberline {3.2.2}Báo giúp hộ gia đình từ xa (PROXY)}{7}{}%
+\contentsline {subsection}{\numberline {3.2.3}Xác minh, ưu tiên và điều phối}{7}{}%
+\contentsline {subsection}{\numberline {3.2.4}Tiếp nhận quyên góp hiện vật và phân phối}{8}{}%
+\contentsline {subsection}{\numberline {3.2.5}Bản đồ và báo cáo vận hành}{8}{}%
+\contentsline {section}{\numberline {3.3}Yêu cầu người dùng và chức năng}{8}{}%
+\contentsline {subsection}{\numberline {3.3.1}Yêu cầu người dùng (UR)}{8}{}%
+\contentsline {subsection}{\numberline {3.3.2}Yêu cầu chức năng (FR)}{9}{}%
+\contentsline {subsection}{\numberline {3.3.3}Yêu cầu phi chức năng (NFR)}{11}{}%
+\contentsline {section}{\numberline {3.4}Ca sử dụng chính}{11}{}%
+\contentsline {section}{\numberline {3.5}Kiến trúc hệ thống}{11}{}%
+\contentsline {section}{\numberline {3.6}Kết quả xây dựng backend}{14}{}%
+\contentsline {section}{\numberline {3.7}Kiểm chứng và kết quả}{14}{}%
+\contentsline {chapter}{\numberline {4}TỔ CHỨC DỮ LIỆU}{16}{}%
+\contentsline {section}{\numberline {4.1}Nguyên tắc tổ chức dữ liệu}{16}{}%
+\contentsline {section}{\numberline {4.2}Ràng buộc và tính toàn vẹn}{16}{}%
+\contentsline {section}{\numberline {4.3}Sơ đồ cơ sở dữ liệu vật lý}{16}{}%
+\contentsline {chapter}{\numberline {5}THIẾT KẾ GIAO DIỆN WEB}{23}{}%
+\contentsline {section}{\numberline {5.1}Mục tiêu và phạm vi giao diện}{23}{}%
+\contentsline {section}{\numberline {5.2}Bố cục trang vận hành}{23}{}%
+\contentsline {section}{\numberline {5.3}Nguyên tắc tương tác và trạng thái}{23}{}%
+\contentsline {chapter}{\numberline {6}THIẾT KẾ ỨNG DỤNG DI ĐỘNG}{25}{}%
+\contentsline {section}{\numberline {6.1}Mục tiêu ứng dụng}{25}{}%
+\contentsline {section}{\numberline {6.2}Luồng gửi yêu cầu và theo dõi}{25}{}%
+\contentsline {section}{\numberline {6.3}Giới hạn triển khai Mobile}{25}{}%
+\contentsline {chapter}{\numberline {7}KẾT LUẬN VÀ KIẾN NGHỊ}{26}{}%
+\contentsline {section}{\numberline {7.1}Kết quả đạt được}{26}{}%
+\contentsline {section}{\numberline {7.2}Giới hạn còn lại}{26}{}%
+\contentsline {section}{\numberline {7.3}Kiến nghị}{26}{}%
+\contentsline {chapter}{DANH MỤC TÀI LIỆU THAM KHẢO}{27}{}%
+\contentsline {chapter}{\numberline {A}MA TRẬN TRUY VẾT YÊU CẦU}{28}{}%
