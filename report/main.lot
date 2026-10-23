@@ -1,8 +1,22 @@
-\contentsline {table}{\numberline {1}{\ignorespaces \xpg@aux {}{vietnamese}\ignorespaces Phân công nhiệm vụ nhóm thực hiện}}{2}{table.caption.11}%
+\contentsline {table}{\numberline {1}{\ignorespaces Phân công nhiệm vụ của nhóm thực hiện}}{2}{}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {1.1}{\ignorespaces Phạm vi chức năng của sản phẩm}}{4}{}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces Tác nhân và nhu cầu thông tin chính}}{5}{}%
+\contentsline {table}{\numberline {2.2}{\ignorespaces Hiện trạng các hạng mục chính}}{6}{}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces Danh sách yêu cầu người dùng}}{9}{}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Nhóm yêu cầu chức năng chính và mã truy vết}}{10}{}%
+\contentsline {table}{\numberline {3.3}{\ignorespaces Yêu cầu phi chức năng và trạng thái xác nhận}}{12}{}%
+\contentsline {table}{\numberline {3.4}{\ignorespaces Tóm tắt các ca sử dụng chính}}{13}{}%
+\contentsline {table}{\numberline {3.5}{\ignorespaces Ranh giới sở hữu dữ liệu và công nghệ mục tiêu}}{14}{}%
+\contentsline {table}{\numberline {3.6}{\ignorespaces Các chức năng backend đã xây dựng}}{15}{}%
+\contentsline {table}{\numberline {3.7}{\ignorespaces Các nội dung cần hoàn thiện trước khi nghiệm thu}}{15}{}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {4.1}{\ignorespaces Phạm vi dữ liệu và số bảng theo cơ sở dữ liệu}}{16}{}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {5.1}{\ignorespaces Không gian làm việc Web theo tác nhân và chức năng chính}}{23}{}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\addvspace {10\p@ }
-\addvspace {10\p@ }
-\addvspace {10\p@ }
-\addvspace {10\p@ }
+\contentsline {table}{\numberline {A.1}{\ignorespaces Ma trận truy vết yêu cầu}}{34}{}%

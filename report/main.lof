@@ -2,6 +2,21 @@
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }
+\contentsline {figure}{\numberline {4.1}{\ignorespaces ERD vật lý của cơ sở dữ liệu Identity}}{17}{}%
+\contentsline {figure}{\numberline {4.2}{\ignorespaces ERD vật lý Response: tiếp nhận và theo dõi yêu cầu}}{18}{}%
+\contentsline {figure}{\numberline {4.3}{\ignorespaces ERD vật lý Response: đội và hoạt động ứng cứu}}{19}{}%
+\contentsline {figure}{\numberline {4.4}{\ignorespaces ERD vật lý Logistics: đợt nhận và quyên góp hiện vật}}{20}{}%
+\contentsline {figure}{\numberline {4.5}{\ignorespaces ERD vật lý Logistics: nhu cầu và đáp ứng cứu trợ}}{21}{}%
+\contentsline {figure}{\numberline {4.6}{\ignorespaces ERD vật lý Logistics: phân phối và bàn giao}}{22}{}%
 \addvspace {10\p@ }
+\contentsline {figure}{\numberline {5.1}{\ignorespaces Hộp đăng nhập của ứng dụng Web}}{24}{}%
+\contentsline {figure}{\numberline {5.2}{\ignorespaces Biểu mẫu gửi SOS công khai trên Web}}{25}{}%
+\contentsline {figure}{\numberline {5.3}{\ignorespaces Đợt quyên góp và thông tin vật phẩm trên Web}}{26}{}%
+\contentsline {figure}{\numberline {5.4}{\ignorespaces Hàng đợi SOS của điều phối viên từ phiên đăng nhập demo}}{27}{}%
+\contentsline {figure}{\numberline {5.5}{\ignorespaces Danh sách nhiệm vụ của đội trưởng cứu hộ trên Web}}{28}{}%
+\contentsline {figure}{\numberline {5.6}{\ignorespaces Bảng tồn kho trong không gian vận hành cứu trợ}}{29}{}%
+\contentsline {figure}{\numberline {5.7}{\ignorespaces Danh sách và biểu mẫu tài khoản của quản trị viên}}{30}{}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {6.1}{\ignorespaces Ứng dụng Mobile: biểu mẫu SOS, ghim vị trí và trạng thái xác nhận gửi (ảnh giao diện sẽ được bổ sung)}}{31}{}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }

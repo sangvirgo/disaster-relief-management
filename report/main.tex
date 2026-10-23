@@ -13,6 +13,7 @@
 \usepackage{array}
 \usepackage{booktabs}
 \usepackage{caption}
+\usepackage{float}
 \usepackage{newfloat}
 
 \DeclareFloatingEnvironment[within=chapter,fileext=lod,listname={DANH MỤC SƠ ĐỒ},name={Sơ đồ}]{diagram}
@@ -267,7 +268,7 @@ Mục tiêu tổng quát là xây dựng một hệ thống Web/Mobile quản l�
 AI, thông báo đẩy và các chức năng ngoại tuyến sâu là phần mở rộng có điều kiện. Nếu có gợi ý AI, quyết định ưu tiên, xác minh và điều phối vẫn do người có thẩm quyền thực hiện; phần lõi phải dùng được khi AI tắt.\cite{plan}
 
 \section{Mục tiêu sản phẩm và phạm vi báo cáo}
-Phạm vi đề tài gồm sản phẩm Web/Mobile và các tài liệu SRS, SDD, ca kiểm thử, hướng dẫn người dùng, hướng dẫn cài đặt. Backend đã có các chức năng quản lý tài khoản và quyền, tiếp nhận và điều phối yêu cầu, quản lý đội ứng cứu, chiến dịch, hàng cứu trợ, tồn kho và phân phối. Phần Web/Mobile trong báo cáo tập trung mô tả luồng và nguyên tắc giao diện; các khung hình ở Chương 5 và Chương 6 sẽ được thay bằng ảnh chụp sản phẩm sau khi tích hợp.\cite{context,backend-status}
+Phạm vi đề tài gồm sản phẩm Web/Mobile và các tài liệu SRS, SDD, ca kiểm thử, hướng dẫn người dùng, hướng dẫn cài đặt. Backend đã có các chức năng quản lý tài khoản và quyền, tiếp nhận và điều phối yêu cầu, quản lý đội ứng cứu, chiến dịch, hàng cứu trợ, tồn kho và phân phối. Giao diện Web đã tích hợp các luồng chính với API và được trình bày cùng ảnh chụp từ hệ thống demo ở Chương~\ref{ch:web}. Phần Mobile tiếp tục mô tả luồng và nguyên tắc giao diện; ảnh thiết bị thực tế còn cần bổ sung ở Chương~\ref{ch:mobile}.\cite{context,backend-status,web-audit}
 
 Một số nội dung vận hành vẫn cần được hoàn thiện hoặc kiểm chứng, gồm quyền truy cập tệp riêng tư, sao lưu và khôi phục, tác vụ định kỳ, hiệu năng trên dữ liệu đại diện, cùng các tài liệu bàn giao độc lập.\cite{handoff}
 
@@ -337,12 +338,12 @@ Bảng~\ref{tab:project-status} tóm tắt những chức năng đã xây dựng
     \textbf{Hạng mục} & \textbf{Đã xây dựng} & \textbf{Cần hoàn thiện} \\
     \midrule
     Backend & Các dịch vụ quản lý tài khoản, yêu cầu SOS, xác minh, điều phối đội, chiến dịch, hàng hóa, tồn kho và phân phối. & Hoàn tất kiểm chứng lưu trữ tệp, sao lưu/khôi phục, tác vụ định kỳ và hiệu năng. \\
-    Web/Mobile & Yêu cầu và luồng màn hình đã được xác định. & Hoàn thiện giao diện, tích hợp API, kiểm thử khả năng tiếp cận và bổ sung ảnh thực tế. \\
+    Web/Mobile & Web đã tích hợp các luồng chính và có kiểm tra trình duyệt giới hạn; Mobile đã có các màn hình chính. & Kiểm chứng đầy đủ thao tác theo vai trò, tệp và khả năng tiếp cận; bổ sung ảnh Mobile từ thiết bị. \\
     Kiểm thử & Đã thực hiện kiểm thử tự động và kiểm tra một số luồng backend. & Bổ sung kiểm chứng đầu cuối, khôi phục dữ liệu, tải đại diện và giao diện người dùng. \\
     Tài liệu & Báo cáo trình bày yêu cầu, thiết kế, dữ liệu và kết quả xây dựng. & Hoàn thiện riêng SRS, SDD, bộ ca kiểm thử, hướng dẫn cài đặt và hướng dẫn người dùng. \\
     \bottomrule
   \end{tabularx}
-  \par\small\textit{Nguồn:} Nhóm thực hiện tổng hợp từ kết quả xây dựng backend, tài liệu truy vết và các nội dung còn cần kiểm chứng.\cite{backend-status,handoff,traceability}
+  \par\small\textit{Nguồn:} Nhóm thực hiện tổng hợp từ kết quả xây dựng backend, kiểm tra Web, tài liệu truy vết và các nội dung còn cần kiểm chứng.\cite{backend-status,handoff,traceability,web-audit}
 \end{table}
 
 \chapter{PHÂN TÍCH, THIẾT KẾ VÀ XÂY DỰNG HỆ THỐNG}\label{ch:solution}
@@ -572,7 +573,7 @@ Backend được chia thành ba dịch vụ theo trách nhiệm dữ liệu. Ide
 \end{table}
 
 \section{Kiểm chứng và kết quả}
-Nhóm đã chạy kiểm thử tự động cho nhiều thao tác của ba dịch vụ và kiểm tra một số luồng tích hợp trên môi trường chạy. Các kiểm tra tập trung vào quản lý tài khoản và quyền, tiếp nhận và xác minh yêu cầu, điều phối nhiệm vụ, kiểm đếm hàng cứu trợ và cập nhật tồn kho. Việc lưu trữ, tải lại và khôi phục tệp, tác vụ định kỳ, hiệu năng trên dữ liệu lớn, khả năng tiếp cận và trải nghiệm Web/Mobile vẫn cần được kiểm tra trước khi nghiệm thu toàn bộ sản phẩm.\cite{handoff,traceability}
+Nhóm đã chạy kiểm thử tự động cho nhiều thao tác của ba dịch vụ và kiểm tra một số luồng tích hợp trên môi trường chạy. Các kiểm tra tập trung vào quản lý tài khoản và quyền, tiếp nhận và xác minh yêu cầu, điều phối nhiệm vụ, kiểm đếm hàng cứu trợ và cập nhật tồn kho. Phía Web đã có kiểm tra trình duyệt cho một số luồng công khai, đăng nhập, SOS và quyên góp. Ngày 23/10/2026, nhóm đăng nhập trực tiếp qua Web bằng bốn tài khoản demo thuộc vai trò điều phối, vận hành, quản trị và đội trưởng cứu hộ; các không gian và màn hình đọc dữ liệu tương ứng đã mở với API thật. Đây là bằng chứng cho việc xác thực, điều hướng và tải dữ liệu ở các màn hình được chụp, chưa phải bằng chứng cho toàn bộ thao tác ghi của các vai trò. Các kiểm tra bố cục trước đó có sử dụng phản hồi chặn tại trình duyệt nên cũng không được tính là kiểm thử nghiệp vụ đầu cuối. Việc lưu trữ, tải lại và khôi phục tệp, tác vụ định kỳ, hiệu năng trên dữ liệu lớn và khả năng tiếp cận vẫn cần được kiểm tra trước khi nghiệm thu toàn bộ sản phẩm.\cite{handoff,traceability,web-audit}
 
 \begin{table}[htbp]
   \centering
@@ -586,7 +587,7 @@ Nhóm đã chạy kiểm thử tự động cho nhiều thao tác của ba dịc
     Tác vụ định kỳ & Hoàn thiện và kiểm tra các tác vụ tự động, gồm cập nhật thông báo quá hạn khi phù hợp. \\
     Hiệu năng & Đo thời gian phản hồi của bản đồ và báo cáo với dữ liệu đại diện cho môi trường sử dụng. \\
     Vận hành & Kiểm tra tải hệ thống, sao lưu và khôi phục dữ liệu trên môi trường mục tiêu. \\
-    Giao diện & Hoàn thiện Web/Mobile, tích hợp các API, kiểm thử khả năng tiếp cận và chụp ảnh màn hình thực tế. \\
+    Giao diện & Kiểm chứng thao tác ghi Web theo từng vai trò với API thật; kiểm thử khả năng tiếp cận và chụp ảnh Mobile trên thiết bị. \\
     Tài liệu & Hoàn thiện SRS, SDD, bộ ca kiểm thử, hướng dẫn cài đặt và hướng dẫn người dùng. \\
     \bottomrule
   \end{tabularx}
@@ -668,37 +669,99 @@ Các Hình~\ref{fig:erd-identity}--\ref{fig:erd-logistics-handoff} trình bày m
 \end{figure}
 
 \chapter{THIẾT KẾ GIAO DIỆN WEB}\label{ch:web}
-\section{Mục tiêu và phạm vi giao diện}
-Web phục vụ hai nhóm nhu cầu: người dân gửi và theo dõi yêu cầu hoặc xem thông tin chiến dịch; nhân viên điều phối, quản lý vận hành và quản trị viên xử lý nghiệp vụ theo quyền được cấp. Backend đã có API cho các luồng này. Phần dưới đây trình bày bố cục và nguyên tắc giao diện; ảnh thực tế sẽ được bổ sung sau khi các màn hình được tích hợp.\cite{plan,traceability}
+\section{Mục tiêu và tổ chức giao diện}
+Ứng dụng Web dùng React, TypeScript và Vite, kết nối ba dịch vụ Identity, Response và Logistics qua cùng cổng API. Giao diện có không gian làm việc công khai cho người dân và các không gian theo quyền cho tình nguyện viên, điều phối viên, nhân viên vận hành và quản trị viên. Việc ẩn chức năng trên Web giúp người dùng tập trung vào nhiệm vụ, còn API tiếp tục là nơi quyết định quyền đối với từng đối tượng và thao tác. Nội dung hiển thị cho người dùng được viết bằng tiếng Việt; mã đường dẫn, trường dữ liệu và mã lỗi giữ ổn định theo hợp đồng kỹ thuật.\cite{plan,web-audit}
 
 \begin{table}[htbp]
   \centering
-  \caption{Các nhóm màn hình Web theo tác nhân và API hỗ trợ}\label{tab:web-screens}
+  \caption{Không gian làm việc Web theo tác nhân và chức năng chính}\label{tab:web-screens}
   \small
-  \begin{tabularx}{\textwidth}{@{}L{3.1cm}Y Y@{}}
+  \begin{tabularx}{\textwidth}{@{}L{2.6cm}Y Y@{}}
     \toprule
-    \textbf{Nhóm màn hình} & \textbf{Nội dung dự kiến} & \textbf{Nguyên tắc giao diện} \\
+    \textbf{Tác nhân} & \textbf{Màn hình chính} & \textbf{Ràng buộc thể hiện trên giao diện} \\
     \midrule
-    Cổng công khai & Hướng dẫn gửi yêu cầu, thông tin chiến dịch/đợt nhận và trạng thái gửi. & Không hiển thị dữ liệu nhạy cảm; thông báo rõ yêu cầu đã được máy chủ nhận hay chưa. \\
-    Hàng đợi điều phối & Lọc yêu cầu theo trạng thái, vùng, thời gian và mức ưu tiên; mở chi tiết, xác minh, xử lý trùng và giao đội. & Quyền được kiểm tra tại API; lý do và lịch sử thao tác được thể hiện rõ. \\
-    Bản đồ vận hành & Tổng hợp yêu cầu theo vùng/trạng thái; hiển thị đội và gợi ý đủ điều kiện. & Phân biệt dữ liệu xác minh và chưa xác minh; không tự đổi ưu tiên hoặc giao đội. \\
-    Logistics và báo cáo & Đợt tiếp nhận, khai báo, kiểm đếm, duyệt độc lập, tồn kho, nhu cầu, phân phối và đối soát. & Tách người khai báo, người kiểm đếm và người duyệt; báo thời điểm sinh dữ liệu. \\
-    Quản trị & Tài khoản, tổ chức, thành viên, quyền và nhật ký. & Tách quyền quản trị hệ thống khỏi quyền nghiệp vụ; hiển thị trạng thái bằng tiếng Việt. \\
+    Người dân & Tổng quan, SOS, theo dõi, chiến dịch và quyên góp hiện vật. & Chỉ báo đã tiếp nhận sau phản hồi máy chủ; mã theo dõi khách được giữ riêng. \\
+    Tình nguyện viên & Nhiệm vụ, tiến độ, đội cứu hộ và thông báo. & Dữ liệu nhiệm vụ theo đội và quyền thành viên; API kiểm tra thao tác của đội trưởng. \\
+    Điều phối viên & Hàng đợi, xác minh, ưu tiên, giao đội, bản đồ và báo cáo. & Quyết định xác minh, ưu tiên và phân công do con người thực hiện. \\
+    Vận hành & Đợt nhận, kiểm đếm, duyệt, tồn kho, phân phối và đối soát. & Tách bước khai báo, kiểm đếm, duyệt và bàn giao. \\
+    Quản trị viên & Tài khoản, tổ chức, quyền, khu vực và nhật ký. & Quyền quản trị và phạm vi dữ liệu do Identity/API kiểm soát. \\
     \bottomrule
   \end{tabularx}
-  \par\small\textit{Nguồn:} Nhóm thực hiện đề xuất các nhóm màn hình theo tác nhân và chức năng của hệ thống.\cite{plan,traceability}
+  \par\small\textit{Nguồn:} Nhóm thực hiện đối chiếu mã giao diện với tài liệu kiểm tra tích hợp Web.\cite{web-audit}
 \end{table}
 
-\section{Bố cục trang vận hành}
-Trang vận hành cần ưu tiên hàng đợi công việc và trạng thái cần xử lý, sau đó mới tới biểu đồ tổng hợp. Mỗi bảng/biểu đồ cần thể hiện bộ lọc, phạm vi dữ liệu và thời điểm cập nhật. Bản đồ chỉ hiển thị thông tin theo quyền; thao tác xác minh, chọn ưu tiên và giao đội luôn là quyết định của người dùng có thẩm quyền.\cite{plan}
+\section{Luồng dữ liệu và kiểm soát truy cập trên Web}
+Danh mục màn hình xác định các không gian và trang tương ứng cho năm nhóm người dùng. Sau đăng nhập, Web đọc hồ sơ và quyền hiện hành để lập điều hướng; nội dung của từng trang gọi API thuộc Identity, Response hoặc Logistics qua tiền tố \texttt{/api/v1}. Những thông tin công khai như đợt quyên góp có thể đọc khi chưa đăng nhập; dữ liệu hàng đợi SOS, nhiệm vụ, tồn kho và tài khoản chỉ được tải trong phạm vi quyền do API trả về. Việc ẩn trang ở giao diện không thay thế kiểm tra quyền tại máy chủ.\cite{web-audit}
 
-% Lưu ảnh tương lai trong images/web-operations-board.png.
-\feplaceholder{Bảng điều phối Web: hàng đợi yêu cầu, bộ lọc và số liệu có thời điểm cập nhật}{fig:web-board}
-% Lưu ảnh tương lai trong images/web-map-and-team-selection.png.
-\feplaceholder{Bản đồ vận hành Web: lớp dữ liệu theo trạng thái và thông tin lựa chọn đội}{fig:web-map}
+Các lệnh thay đổi dữ liệu đi qua lớp gọi API chung, gửi cookie phiên và mã CSRF khi cần, dùng khóa idempotency cho lệnh có nguy cơ gửi lặp và chuyển mã lỗi thành thông báo tiếng Việt. Với biểu mẫu SOS, Web chỉ hiện mã theo dõi sau phản hồi xác nhận từ Response; với quyên góp hiện vật, bản khai của người tặng và số hàng được nhập kho là hai bước khác nhau. Thiết kế này giúp người dùng phân biệt dữ liệu tự khai với dữ liệu đã được nhân viên kiểm đếm, duyệt và ghi sổ.\cite{plan,web-audit}
 
-\section{Nguyên tắc tương tác và trạng thái}
-Các biểu mẫu cần kiểm tra dữ liệu đầu vào và mô tả lỗi bằng tiếng Việt. Nội dung cần phân biệt rõ trạng thái đang chờ, gặp lỗi, chưa có dữ liệu, đã gửi thành công và dữ liệu chưa cập nhật; người dùng không nên hiểu nhầm bản lưu nháp hoặc mất kết nối là máy chủ đã nhận yêu cầu. Các thao tác với dữ liệu nhạy cảm cần thông báo kết quả theo mã lỗi ổn định của API. Khả năng tiếp cận và cách hoạt động trên trình duyệt sẽ được kiểm tra sau khi tích hợp giao diện.\cite{backend-status,traceability}
+\clearpage
+\section{Đăng nhập và điều hướng theo quyền}
+Hộp đăng nhập ở Hình~\ref{fig:web-login} nhận tên đăng nhập và mật khẩu; phần trợ giúp mật khẩu dẫn người dùng tới quy trình cấp mật khẩu tạm bởi quản trị viên, phù hợp API hiện có. Sau khi đăng nhập, Web lấy quyền hiện hành từ Identity để hiển thị các không gian làm việc phù hợp. Phiên Web sử dụng cookie HttpOnly và cơ chế CSRF của dịch vụ Identity, không lưu access token trong bộ nhớ lưu trữ của trình duyệt. Người dùng phải đổi mật khẩu tạm trước khi vào khu vực nghiệp vụ.\cite{web-audit}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.57\textwidth,height=0.55\textheight,keepaspectratio]{images/web-login.png}
+  \caption{Hộp đăng nhập của ứng dụng Web}\label{fig:web-login}
+  \par\small\textit{Nguồn:} Ảnh chụp giao diện C48 do nhóm thực hiện trên môi trường demo, ngày 23/10/2026.
+\end{figure}
+
+\clearpage
+\section{Giao diện người dân}
+\subsection{Gửi yêu cầu SOS}
+Biểu mẫu tại Hình~\ref{fig:web-sos} cho phép khách hoặc người dùng đã đăng nhập mô tả tình huống, chọn loại sự cố, khai báo số người cần hỗ trợ nếu biết và chỉ rõ vị trí. Vị trí có thể lấy từ trình duyệt hoặc nhập/chọn thủ công; địa điểm được gửi phải là nơi cần hỗ trợ. Nút gửi không tự tạo xác nhận tại máy khách: mã theo dõi chỉ xuất hiện sau khi API Response chấp nhận yêu cầu. Trường liên hệ có thể để trống khi người báo không có thông tin.\cite{plan,web-audit}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth,height=0.72\textheight,keepaspectratio]{images/web-citizen-sos.png}
+  \caption{Biểu mẫu gửi SOS công khai trên Web}\label{fig:web-sos}
+  \par\small\textit{Nguồn:} Ảnh chụp giao diện C48 do nhóm thực hiện trên môi trường demo, ngày 23/10/2026; biểu mẫu chưa được gửi trong ảnh.
+\end{figure}
+
+\clearpage
+\subsection{Xem đợt quyên góp hiện vật}
+Hình~\ref{fig:web-drive} cho thấy danh sách đợt nhận và phần chi tiết vật phẩm từ API Logistics. Người dân có thể xem điểm tiếp nhận, nhóm hàng và số lượng đã được chấp nhận so với mục tiêu. Số liệu trên ảnh là dữ liệu demo, không đại diện cho một chiến dịch cứu trợ thực tế. Bản khai của người tặng không trực tiếp cộng vào tồn kho; nhân viên kiểm đếm và người duyệt độc lập quyết định số lượng được tiếp nhận.\cite{plan,web-audit}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.94\textwidth,height=0.43\textheight,keepaspectratio]{images/web-donation-drive.png}
+  \caption{Đợt quyên góp và thông tin vật phẩm trên Web}\label{fig:web-drive}
+  \par\small\textit{Nguồn:} Ảnh chụp giao diện C48 kết nối API Logistics với dữ liệu demo, ngày 23/10/2026.
+\end{figure}
+
+\section{Giao diện nghiệp vụ theo vai trò}
+\subsection{Điều phối viên và đội cứu hộ}
+Hàng đợi điều phối ở Hình~\ref{fig:web-coordinator} giữ thứ tự tiếp nhận, có bộ lọc rà soát và hiển thị trạng thái từng yêu cầu. Người điều phối mở hồ sơ để đối chiếu thông tin, xác minh, rà soát trùng, chọn mức ưu tiên và giao đội theo quyền được cấp. Bản đồ và gợi ý đội hỗ trợ quyết định; chúng không tự thay đổi mức ưu tiên hay giao nhiệm vụ. Ảnh ghi nhận danh sách từ API Response, chưa thực hiện lệnh xác minh hoặc giao đội.\cite{plan,web-audit}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.94\textwidth,height=0.49\textheight,keepaspectratio]{images/web-coordinator-queue.png}
+  \caption{Hàng đợi SOS của điều phối viên từ phiên đăng nhập demo}\label{fig:web-coordinator}
+  \par\small\textit{Nguồn:} Ảnh chụp Web kết nối API Response với tài khoản điều phối demo, ngày 23/10/2026.
+\end{figure}
+
+Đội trưởng cứu hộ có không gian riêng để xem nhiệm vụ của đội và đi tới các thao tác điều hành, tiến độ, thành viên và thông báo. Hình~\ref{fig:web-volunteer} cho thấy nhiệm vụ đã nhận trong dữ liệu demo. Một giới hạn hiện tại là dữ liệu chiếu nhiệm vụ chưa phân biệt rõ đội trưởng với thành viên để ẩn chính xác mọi nút chỉ dành cho đội trưởng; API Response vẫn kiểm tra quyền khi nhận lệnh.\cite{web-audit}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth,height=0.45\textheight,keepaspectratio]{images/web-volunteer-missions.png}
+  \caption{Danh sách nhiệm vụ của đội trưởng cứu hộ trên Web}\label{fig:web-volunteer}
+  \par\small\textit{Nguồn:} Ảnh chụp Web kết nối API Response với tài khoản đội trưởng demo, ngày 23/10/2026.
+\end{figure}
+
+\subsection{Vận hành cứu trợ và quản trị hệ thống}
+Không gian vận hành tổ chức việc tiếp nhận hàng, kiểm đếm, duyệt biên nhận, tồn kho, nhu cầu và phân phối thành các điểm đến riêng. Bảng tồn kho ở Hình~\ref{fig:web-stock} tách tồn thực tế, số đã giữ và số khả dụng để người vận hành không nhầm lượng có trong kho với lượng có thể phân bổ. Ảnh chỉ chứng minh thao tác đọc dữ liệu; các bước nhập, duyệt và xuất hàng cần được kiểm tra theo từng quyền nghiệp vụ.\cite{web-audit}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.94\textwidth,height=0.49\textheight,keepaspectratio]{images/web-operations-stock.png}
+  \caption{Bảng tồn kho trong không gian vận hành cứu trợ}\label{fig:web-stock}
+  \par\small\textit{Nguồn:} Ảnh chụp Web kết nối API Logistics với tài khoản vận hành và dữ liệu demo, ngày 23/10/2026.
+\end{figure}
+
+Không gian quản trị có các trang tài khoản, tổ chức, phân quyền, khu vực và nhật ký. Hình~\ref{fig:web-admin} thể hiện danh sách tài khoản và biểu mẫu tạo tài khoản; thao tác tạo không được thực hiện khi chụp ảnh. Các lệnh quản trị tiếp tục chịu kiểm tra quyền tại Identity.\cite{web-audit}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.94\textwidth,height=0.49\textheight,keepaspectratio]{images/web-admin-users.png}
+  \caption{Danh sách và biểu mẫu tài khoản của quản trị viên}\label{fig:web-admin}
+  \par\small\textit{Nguồn:} Ảnh chụp Web kết nối API Identity với tài khoản quản trị và dữ liệu demo, ngày 23/10/2026.
+\end{figure}
+
+\noindent\textbf{Giới hạn kiểm chứng.} Ảnh chương này ghi lại các trang công khai và bốn màn hình nội bộ sau đăng nhập thật trên môi trường demo. Chúng chứng minh màn hình đã tải và đọc dữ liệu theo vai trò, không chứng minh các lệnh xác minh, điều phối, kiểm đếm, duyệt hoặc quản trị đã hoàn tất. Việc kiểm chứng thao tác ghi, tệp, quyền đội trưởng và khả năng tiếp cận vẫn cần thực hiện.\cite{web-audit}
 
 \chapter{THIẾT KẾ ỨNG DỤNG DI ĐỘNG}\label{ch:mobile}
 \section{Mục tiêu ứng dụng}
@@ -715,14 +778,14 @@ Biểu mẫu SOS cần thu thập loại tình huống, mô tả, số người 
 
 \chapter{KẾT LUẬN VÀ KIẾN NGHỊ}\label{ch:conclusion}
 \section{Kết quả đạt được}
-Nhóm đã phân tích nhu cầu của các tác nhân, xác định yêu cầu, xây dựng kiến trúc ba dịch vụ và mô hình dữ liệu cho các nghiệp vụ chính. Backend hiện thực các chức năng quản lý tài khoản và quyền, tiếp nhận và điều phối yêu cầu SOS, theo dõi nhiệm vụ ứng cứu, quản lý chiến dịch, tiếp nhận hàng cứu trợ, kiểm đếm, tồn kho và phân phối. Các thao tác quan trọng được lưu lại để hỗ trợ kiểm tra và đối soát.\cite{plan,backend-status,handoff,traceability}
+Nhóm đã phân tích nhu cầu của các tác nhân, xác định yêu cầu, xây dựng kiến trúc ba dịch vụ và mô hình dữ liệu cho các nghiệp vụ chính. Backend hiện thực các chức năng quản lý tài khoản và quyền, tiếp nhận và điều phối yêu cầu SOS, theo dõi nhiệm vụ ứng cứu, quản lý chiến dịch, tiếp nhận hàng cứu trợ, kiểm đếm, tồn kho và phân phối. Web đã tích hợp các luồng chính theo vai trò, với kiểm tra trình duyệt giới hạn cho một số luồng công khai và tài khoản. Các thao tác quan trọng được lưu lại để hỗ trợ kiểm tra và đối soát.\cite{plan,backend-status,handoff,traceability,web-audit}
 
 \section{Giới hạn còn lại}
-Phần hoàn thiện hiện tập trung ở backend; các giao diện Web/Mobile chưa được tích hợp và ghi nhận bằng ảnh thực tế trong báo cáo. Việc kiểm tra khả năng tiếp cận, lưu trữ tệp riêng tư, sao lưu và khôi phục, tác vụ định kỳ, cùng hiệu năng trên dữ liệu đại diện vẫn cần được thực hiện. Các tài liệu SRS, SDD, bộ ca kiểm thử, hướng dẫn cài đặt và hướng dẫn người dùng cũng cần được hoàn thiện để bàn giao đầy đủ.\cite{handoff,traceability}
+Ảnh Web đã bao phủ màn hình công khai và một màn hình đọc dữ liệu của mỗi vai trò nội bộ chính; ảnh Mobile từ thiết bị thật còn cần bổ sung. Kiểm tra thao tác ghi theo từng vai trò, khả năng tiếp cận, lưu trữ tệp riêng tư, sao lưu và khôi phục, tác vụ định kỳ, cùng hiệu năng trên dữ liệu đại diện vẫn cần được thực hiện. Các tài liệu SRS, SDD, bộ ca kiểm thử, hướng dẫn cài đặt và hướng dẫn người dùng cũng cần được hoàn thiện để bàn giao đầy đủ.\cite{handoff,traceability,web-audit}
 
 \section{Kiến nghị}
 \begin{enumerate}
-  \item Hoàn thiện Web/Mobile theo các API hiện có; bổ sung ảnh chụp thực tế và kiểm tra giao diện trong các tình huống bình thường, lỗi và mất kết nối.
+  \item Kiểm chứng các thao tác ghi Web còn lại với API thật, bổ sung ảnh Mobile từ thiết bị; kiểm tra tình huống bình thường, lỗi và mất kết nối.
   \item Kiểm tra quyền truy cập tệp, sao lưu và khôi phục, tác vụ định kỳ, cũng như hiệu năng của API và báo cáo trên dữ liệu đại diện.
   \item Hoàn thiện SRS, SDD, bộ ca kiểm thử, hướng dẫn cài đặt và hướng dẫn người dùng; duy trì mã UR/FR/NFR/UC/TC để đối chiếu yêu cầu với kết quả.
   \item Trao đổi với giảng viên hướng dẫn và đơn vị nghiệp vụ để xác nhận các quy tắc ưu tiên, quyền xem vị trí và thời hạn lưu dữ liệu trước khi dùng với tình huống thực tế.
@@ -752,6 +815,9 @@ Phần hoàn thiện hiện tập trung ở backend; các giao diện Web/Mobile
 
   \bibitem{handoff}
   Nhóm thực hiện, \textit{Tổng hợp kiểm chứng backend}, kết quả kiểm tra và các nội dung còn cần hoàn thiện.
+
+  \bibitem{web-audit}
+  Nhóm thực hiện, \textit{Kiểm tra tích hợp giao diện Web ngày 21/10/2026}, tài liệu nội bộ \texttt{docs/frontend-web-audit-2026-10-21.md} và mã nguồn Web hiện hành.
 
   \item[]\textbf{Danh mục website tham khảo}
 
