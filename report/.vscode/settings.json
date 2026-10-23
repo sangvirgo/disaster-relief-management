@@ -17,13 +17,7 @@
         "-interaction=nonstopmode",
         "-halt-on-error",
         "%DOC%"
-      ],
-      "env": {
-        "TEXMFHOME": "/tmp/c48-texmf",
-        "TEXMFVAR": "/tmp/c48-texmf-var",
-        "TEXMFCONFIG": "/tmp/c48-texmf-config",
-        "TEXMFOUTPUT": "/tmp/c48-build"
-      }
+      ]
     }
   ]
 }

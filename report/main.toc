@@ -1,10 +1,10 @@
 \contentsline {chapter}{LỜI CẢM ƠN}{i}{}%
 \contentsline {chapter}{LỜI CAM ĐOAN}{ii}{}%
 \contentsline {chapter}{MỤC LỤC}{iii}{}%
-\contentsline {chapter}{DANH MỤC CÁC KÝ HIỆU VÀ CHỮ VIẾT TẮT}{v}{}%
-\contentsline {chapter}{DANH MỤC CÁC BẢNG}{vi}{}%
-\contentsline {chapter}{DANH MỤC SƠ ĐỒ}{vii}{}%
-\contentsline {chapter}{DANH MỤC HÌNH VẼ}{viii}{}%
+\contentsline {chapter}{DANH MỤC CÁC KÝ HIỆU VÀ CHỮ VIẾT TẮT}{vi}{}%
+\contentsline {chapter}{DANH MỤC CÁC BẢNG}{vii}{}%
+\contentsline {chapter}{DANH MỤC SƠ ĐỒ}{viii}{}%
+\contentsline {chapter}{DANH MỤC HÌNH VẼ}{ix}{}%
 \contentsline {chapter}{MỞ ĐẦU}{1}{}%
 \contentsline {chapter}{BẢNG PHÂN CÔNG NHIỆM VỤ NHÓM THỰC HIỆN}{2}{}%
 \contentsline {chapter}{\numberline {1}GIỚI THIỆU ĐỀ TÀI}{3}{}%
@@ -49,12 +49,27 @@
 \contentsline {subsection}{\numberline {5.5.1}Điều phối viên và đội cứu hộ}{26}{}%
 \contentsline {subsection}{\numberline {5.5.2}Vận hành cứu trợ và quản trị hệ thống}{28}{}%
 \contentsline {chapter}{\numberline {6}THIẾT KẾ ỨNG DỤNG DI ĐỘNG}{31}{}%
-\contentsline {section}{\numberline {6.1}Mục tiêu ứng dụng}{31}{}%
-\contentsline {section}{\numberline {6.2}Luồng gửi yêu cầu và theo dõi}{31}{}%
-\contentsline {section}{\numberline {6.3}Giới hạn triển khai Mobile}{31}{}%
-\contentsline {chapter}{\numberline {7}KẾT LUẬN VÀ KIẾN NGHỊ}{32}{}%
-\contentsline {section}{\numberline {7.1}Kết quả đạt được}{32}{}%
-\contentsline {section}{\numberline {7.2}Giới hạn còn lại}{32}{}%
-\contentsline {section}{\numberline {7.3}Kiến nghị}{32}{}%
-\contentsline {chapter}{DANH MỤC TÀI LIỆU THAM KHẢO}{33}{}%
-\contentsline {chapter}{\numberline {A}MA TRẬN TRUY VẾT YÊU CẦU}{34}{}%
+\contentsline {section}{\numberline {6.1}Mục tiêu và cấu trúc ứng dụng}{31}{}%
+\contentsline {section}{\numberline {6.2}Xác thực và điều hướng theo vai trò}{32}{}%
+\contentsline {subsection}{\numberline {6.2.1}Giao diện đăng nhập}{32}{}%
+\contentsline {subsection}{\numberline {6.2.2}Giao diện đổi mật khẩu}{33}{}%
+\contentsline {section}{\numberline {6.3}Luồng SOS của người dân}{34}{}%
+\contentsline {subsection}{\numberline {6.3.1}Giao diện trang chủ và lựa chọn cách báo}{34}{}%
+\contentsline {subsection}{\numberline {6.3.2}Giao diện báo cứu nạn tại chỗ}{35}{}%
+\contentsline {subsection}{\numberline {6.3.3}Giao diện ghim vị trí cứu nạn trên bản đồ}{36}{}%
+\contentsline {subsection}{\numberline {6.3.4}Giao diện tra cứu tiến độ cứu hộ}{37}{}%
+\contentsline {subsection}{\numberline {6.3.5}Giao diện bổ sung tình hình và ảnh hiện trường}{38}{}%
+\contentsline {section}{\numberline {6.4}Quyên góp hiện vật trên Mobile}{39}{}%
+\contentsline {subsection}{\numberline {6.4.1}Giao diện quyên góp cứu trợ}{39}{}%
+\contentsline {subsection}{\numberline {6.4.2}Giao diện khai báo bàn giao hiện vật}{40}{}%
+\contentsline {section}{\numberline {6.5}Không gian đội trưởng và nhiệm vụ cứu hộ}{41}{}%
+\contentsline {subsection}{\numberline {6.5.1}Giao diện bảng điều khiển đội trưởng}{41}{}%
+\contentsline {subsection}{\numberline {6.5.2}Giao diện danh sách nhiệm vụ}{42}{}%
+\contentsline {subsection}{\numberline {6.5.3}Giao diện chi tiết nhiệm vụ}{43}{}%
+\contentsline {section}{\numberline {6.6}Giới hạn kiểm chứng và công việc tiếp theo}{43}{}%
+\contentsline {chapter}{\numberline {7}KẾT LUẬN VÀ KIẾN NGHỊ}{44}{}%
+\contentsline {section}{\numberline {7.1}Kết quả đạt được}{44}{}%
+\contentsline {section}{\numberline {7.2}Giới hạn còn lại}{44}{}%
+\contentsline {section}{\numberline {7.3}Kiến nghị}{44}{}%
+\contentsline {chapter}{DANH MỤC TÀI LIỆU THAM KHẢO}{45}{}%
+\contentsline {chapter}{\numberline {A}MA TRẬN TRUY VẾT YÊU CẦU}{46}{}%

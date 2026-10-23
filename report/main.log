@@ -1,14 +1,14 @@
-This is XeTeX, Version 3.141592653-2.6-0.999997 (MiKTeX 25.12) (preloaded format=xelatex 2026.10.23)  23 OCT 2026 16:55
+This is XeTeX, Version 3.141592653-2.6-0.999997 (MiKTeX 25.12) (preloaded format=xelatex 2026.10.23)  23 OCT 2026 21:33
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
-**./main.tex
-(main.tex
+**e:/disaster-relief-management/report/main.tex
+(e:/disaster-relief-management/report/main.tex
 LaTeX2e <2025-11-01>
 L3 programming layer <2025-12-24>
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/base\report.cls
+(E:\mkitex\tex/latex/base\report.cls
 Document Class: report 2025/01/22 v1.4n Standard LaTeX document class
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/base\size12.clo
+(E:\mkitex\tex/latex/base\size12.clo
 File: size12.clo 2025/01/22 v1.4n Standard LaTeX file (size option)
 )
 \c@part=\count271
@@ -24,17 +24,16 @@ File: size12.clo 2025/01/22 v1.4n Standard LaTeX file (size option)
 \belowcaptionskip=\skip50
 \bibindent=\dimen148
 )
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/geometry\geometry.sty
+(E:\mkitex\tex/latex/geometry\geometry.sty
 Package: geometry 2026/03/07 v6.0 Page Geometry
 
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/graphics\keyval.sty
+(E:\mkitex\tex/latex/graphics\keyval.sty
 Package: keyval 2022/05/29 v1.15 key=value parser (DPC)
 \KV@toks@=\toks17
 )
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/generic/iftex\ifvtex.sty
+(E:\mkitex\tex/generic/iftex\ifvtex.sty
 Package: ifvtex 2019/10/25 v1.7 ifvtex legacy package. Use iftex instead.
-
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/generic/iftex\iftex.sty
+ (E:\mkitex\tex/generic/iftex\iftex.sty
 Package: iftex 2024/12/12 v1.0g TeX engine tests
 ))
 \Gm@cnth=\count280
@@ -49,16 +48,13 @@ Package: iftex 2024/12/12 v1.0g TeX engine tests
 \Gm@layouthoffset=\dimen155
 \Gm@layoutvoffset=\dimen156
 \Gm@dimlist=\toks18
-
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/geometry\geometry.cfg))
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/fontspec\fontspec.sty
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/l3packages/xparse\xpars
-e.sty
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/l3kernel\expl3.sty
+ (E:\mkitex\tex/latex/geometry\geometry.cfg))
+(E:\mkitex\tex/latex/fontspec\fontspec.sty
+(E:\mkitex\tex/latex/l3packages/xparse\xparse.sty
+(E:\mkitex\tex/latex/l3kernel\expl3.sty
 Package: expl3 2025-12-24 L3 programming layer (loader) 
 
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/l3backend\l3backend-xet
-ex.def
+(E:\mkitex\tex/latex/l3backend\l3backend-xetex.def
 File: l3backend-xetex.def 2025-10-09 L3 backend support: XeTeX
 \g__graphics_track_int=\count283
 \g__pdfannot_backend_int=\count284
@@ -68,8 +64,7 @@ Package: xparse 2025-10-09 L3 Experimental document command parser
 )
 Package: fontspec 2025/09/29 v2.9g Font selection for XeLaTeX and LuaLaTeX
 
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/fontspec\fontspec-xetex
-.sty
+(E:\mkitex\tex/latex/fontspec\fontspec-xetex.sty
 Package: fontspec-xetex 2025/09/29 v2.9g Font selection for XeLaTeX and LuaLaTe
 X
 \l__fontspec_script_int=\count286
@@ -86,11 +81,11 @@ X
 \l__fontspec_tmpa_dim=\dimen157
 \l__fontspec_tmpb_dim=\dimen158
 \l__fontspec_tmpc_dim=\dimen159
- (C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/base\fontenc.sty
+
+(E:\mkitex\tex/latex/base\fontenc.sty
 Package: fontenc 2025/07/18 v2.1d Standard LaTeX package
 )
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/fontspec\fontspec.cfg))
-)
+(E:\mkitex\tex/latex/fontspec\fontspec.cfg)))
 
 Package fontspec Info: 
 (fontspec)             Font family 'TimesNewRoman(0)' created for font 'Times
@@ -124,9 +119,11 @@ ext;"
 (fontspec)             Roman/BI/OT:script=latn;language=dflt;+smcp;mapping=tex-
 text;"
 
- (C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/setspace\setspace.sty
+
+(E:\mkitex\tex/latex/setspace\setspace.sty
 Package: setspace 2022/12/04 v6.7b set line spacing
-) (C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/ragged2e\ragged2e.sty
+)
+(E:\mkitex\tex/latex/ragged2e\ragged2e.sty
 Package: ragged2e 2023/06/22 v3.6 ragged2e Package
 \CenteringLeftskip=\skip51
 \RaggedLeftLeftskip=\skip52
@@ -142,7 +139,8 @@ Package: ragged2e 2023/06/22 v3.6 ragged2e Package
 \RaggedLeftParindent=\skip62
 \RaggedRightParindent=\skip63
 \JustifyingParindent=\skip64
-) (C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/titlesec\titlesec.sty
+)
+(E:\mkitex\tex/latex/titlesec\titlesec.sty
 Package: titlesec 2025/01/04 v2.17 Sectioning titles
 \ttl@box=\box53
 \beforetitleunit=\skip65
@@ -153,7 +151,8 @@ Package: titlesec 2025/01/04 v2.17 Sectioning titles
 \titlewidth=\dimen162
 \titlewidthlast=\dimen163
 \titlewidthfirst=\dimen164
-) (C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/fancyhdr\fancyhdr.sty
+)
+(E:\mkitex\tex/latex/fancyhdr\fancyhdr.sty
 Package: fancyhdr 2025/02/07 v5.2 Extensive control of page headers and footers
 
 \f@nch@headwidth=\skip67
@@ -171,29 +170,30 @@ Package: fancyhdr 2025/02/07 v5.2 Extensive control of page headers and footers
 \f@nch@widthC=\skip79
 \f@nch@widthR=\skip80
 \@temptokenb=\toks20
-) (C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/graphics\graphicx.sty
+)
+(E:\mkitex\tex/latex/graphics\graphicx.sty
 Package: graphicx 2024/12/31 v1.2e Enhanced LaTeX Graphics (DPC,SPQR)
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/graphics\graphics.sty
+
+(E:\mkitex\tex/latex/graphics\graphics.sty
 Package: graphics 2024/08/06 v1.4g Standard LaTeX Graphics (DPC,SPQR)
 
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/graphics\trig.sty
+(E:\mkitex\tex/latex/graphics\trig.sty
 Package: trig 2023/12/02 v1.11 sin cos tan (DPC)
 )
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/graphics-cfg\graphics.c
-fg
+(E:\mkitex\tex/latex/graphics-cfg\graphics.cfg
 File: graphics.cfg 2016/06/04 v1.11 sample graphics configuration
 )
 Package graphics Info: Driver file: xetex.def on input line 106.
 
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/graphics-def\xetex.def
+(E:\mkitex\tex/latex/graphics-def\xetex.def
 File: xetex.def 2025/11/01 v5.0p Graphics/color driver for xetex
 ))
 \Gin@req@height=\dimen165
 \Gin@req@width=\dimen166
-) (C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/tools\tabularx.sty
+)
+(E:\mkitex\tex/latex/tools\tabularx.sty
 Package: tabularx 2023/12/11 v2.12a `tabularx' package (DPC)
-
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/tools\array.sty
+ (E:\mkitex\tex/latex/tools\array.sty
 Package: array 2025/09/25 v2.6n Tabular extension package (FMi)
 \col@sep=\dimen167
 \ar@mcellbox=\box54
@@ -211,7 +211,7 @@ Package: array 2025/09/25 v2.6n Tabular extension package (FMi)
 \TX@cols=\count297
 \TX@ftn=\toks22
 )
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/tools\longtable.sty
+(E:\mkitex\tex/latex/tools\longtable.sty
 Package: longtable 2025-10-13 v4.24 Multi-page Table package (DPC)
 \LTleft=\skip83
 \LTright=\skip84
@@ -230,7 +230,7 @@ Package: longtable 2025-10-13 v4.24 Multi-page Table package (DPC)
 \c@LT@chunks=\count302
 \LT@p@ftn=\toks23
 )
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/booktabs\booktabs.sty
+(E:\mkitex\tex/latex/booktabs\booktabs.sty
 Package: booktabs 2020/01/12 v1.61803398 Publication quality tables
 \heavyrulewidth=\dimen175
 \lightrulewidth=\dimen176
@@ -250,10 +250,10 @@ Package: booktabs 2020/01/12 v1.61803398 Publication quality tables
 \@lastruleclass=\count306
 \@thisrulewidth=\dimen187
 )
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/caption\caption.sty
+(E:\mkitex\tex/latex/caption\caption.sty
 Package: caption 2023/08/05 v3.6o Customizing captions (AR)
 
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/caption\caption3.sty
+(E:\mkitex\tex/latex/caption\caption3.sty
 Package: caption3 2023/07/31 v2.4d caption3 kernel (AR)
 \caption@tempdima=\dimen188
 \captionmargin=\dimen189
@@ -269,9 +269,10 @@ Package caption Info: Standard document class detected.
 \c@continuedfloat=\count308
 Package caption Info: longtable package is loaded.
 
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/caption\ltcaption.sty
+(E:\mkitex\tex/latex/caption\ltcaption.sty
 Package: ltcaption 2021/01/08 v1.4c longtable captions (AR)
-)) (C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/float\float.sty
+))
+(E:\mkitex\tex/latex/float\float.sty
 Package: float 2001/11/08 v1.3d Float enhancements (AL)
 \c@float@type=\count309
 \float@exts=\toks24
@@ -279,7 +280,7 @@ Package: float 2001/11/08 v1.3d Float enhancements (AL)
 \@float@everytoks=\toks25
 \@floatcapt=\box62
 )
-(C:\Users\sonvt\AppData\Local\Programs\MiKTeX\tex/latex/newfloat\newfloat.sty
+(E:\mkitex\tex/latex/newfloat\newfloat.sty
 Package: newfloat 2023/10/01 v1.2 Defining new floating environments (AR)
 Package newfloat Info: Document class `report' detected (original).
 )
@@ -287,26 +288,25 @@ Package newfloat Info: New float `diagram' with options `within=chapter,fileext
 =lod,listname={DANH MỤC SƠ ĐỒ},name={Sơ đồ}' on input line 19.
 \c@diagram=\count310
 Package newfloat Info: float type `diagram'=4 on input line 19.
-
-(main.aux)
+ (main.aux)
 \openout1 = `main.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 122.
-LaTeX Font Info:    ... okay on input line 122.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 122.
-LaTeX Font Info:    ... okay on input line 122.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 122.
-LaTeX Font Info:    ... okay on input line 122.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 122.
-LaTeX Font Info:    ... okay on input line 122.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 122.
-LaTeX Font Info:    ... okay on input line 122.
-LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 122.
-LaTeX Font Info:    ... okay on input line 122.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 122.
-LaTeX Font Info:    ... okay on input line 122.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 122.
-LaTeX Font Info:    ... okay on input line 122.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 117.
+LaTeX Font Info:    ... okay on input line 117.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 117.
+LaTeX Font Info:    ... okay on input line 117.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 117.
+LaTeX Font Info:    ... okay on input line 117.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 117.
+LaTeX Font Info:    ... okay on input line 117.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 117.
+LaTeX Font Info:    ... okay on input line 117.
+LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 117.
+LaTeX Font Info:    ... okay on input line 117.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 117.
+LaTeX Font Info:    ... okay on input line 117.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 117.
+LaTeX Font Info:    ... okay on input line 117.
 
 *geometry* driver: auto-detecting
 *geometry* detected driver: xetex
@@ -349,65 +349,65 @@ Package fontspec Info:
 
 \symlegacymaths=\mathgroup4
 LaTeX Font Info:    Overwriting symbol font `legacymaths' in version `bold'
-(Font)                  OT1/cmr/m/n --> OT1/cmr/bx/n on input line 122.
-LaTeX Font Info:    Redeclaring math accent \acute on input line 122.
-LaTeX Font Info:    Redeclaring math accent \grave on input line 122.
-LaTeX Font Info:    Redeclaring math accent \ddot on input line 122.
-LaTeX Font Info:    Redeclaring math accent \tilde on input line 122.
-LaTeX Font Info:    Redeclaring math accent \bar on input line 122.
-LaTeX Font Info:    Redeclaring math accent \breve on input line 122.
-LaTeX Font Info:    Redeclaring math accent \check on input line 122.
-LaTeX Font Info:    Redeclaring math accent \hat on input line 122.
-LaTeX Font Info:    Redeclaring math accent \dot on input line 122.
-LaTeX Font Info:    Redeclaring math accent \mathring on input line 122.
-LaTeX Font Info:    Redeclaring math symbol \colon on input line 122.
-LaTeX Font Info:    Redeclaring math symbol \Gamma on input line 122.
-LaTeX Font Info:    Redeclaring math symbol \Delta on input line 122.
-LaTeX Font Info:    Redeclaring math symbol \Theta on input line 122.
-LaTeX Font Info:    Redeclaring math symbol \Lambda on input line 122.
-LaTeX Font Info:    Redeclaring math symbol \Xi on input line 122.
-LaTeX Font Info:    Redeclaring math symbol \Pi on input line 122.
-LaTeX Font Info:    Redeclaring math symbol \Sigma on input line 122.
-LaTeX Font Info:    Redeclaring math symbol \Upsilon on input line 122.
-LaTeX Font Info:    Redeclaring math symbol \Phi on input line 122.
-LaTeX Font Info:    Redeclaring math symbol \Psi on input line 122.
-LaTeX Font Info:    Redeclaring math symbol \Omega on input line 122.
-LaTeX Font Info:    Redeclaring math symbol \mathdollar on input line 122.
-LaTeX Font Info:    Redeclaring symbol font `operators' on input line 122.
+(Font)                  OT1/cmr/m/n --> OT1/cmr/bx/n on input line 117.
+LaTeX Font Info:    Redeclaring math accent \acute on input line 117.
+LaTeX Font Info:    Redeclaring math accent \grave on input line 117.
+LaTeX Font Info:    Redeclaring math accent \ddot on input line 117.
+LaTeX Font Info:    Redeclaring math accent \tilde on input line 117.
+LaTeX Font Info:    Redeclaring math accent \bar on input line 117.
+LaTeX Font Info:    Redeclaring math accent \breve on input line 117.
+LaTeX Font Info:    Redeclaring math accent \check on input line 117.
+LaTeX Font Info:    Redeclaring math accent \hat on input line 117.
+LaTeX Font Info:    Redeclaring math accent \dot on input line 117.
+LaTeX Font Info:    Redeclaring math accent \mathring on input line 117.
+LaTeX Font Info:    Redeclaring math symbol \colon on input line 117.
+LaTeX Font Info:    Redeclaring math symbol \Gamma on input line 117.
+LaTeX Font Info:    Redeclaring math symbol \Delta on input line 117.
+LaTeX Font Info:    Redeclaring math symbol \Theta on input line 117.
+LaTeX Font Info:    Redeclaring math symbol \Lambda on input line 117.
+LaTeX Font Info:    Redeclaring math symbol \Xi on input line 117.
+LaTeX Font Info:    Redeclaring math symbol \Pi on input line 117.
+LaTeX Font Info:    Redeclaring math symbol \Sigma on input line 117.
+LaTeX Font Info:    Redeclaring math symbol \Upsilon on input line 117.
+LaTeX Font Info:    Redeclaring math symbol \Phi on input line 117.
+LaTeX Font Info:    Redeclaring math symbol \Psi on input line 117.
+LaTeX Font Info:    Redeclaring math symbol \Omega on input line 117.
+LaTeX Font Info:    Redeclaring math symbol \mathdollar on input line 117.
+LaTeX Font Info:    Redeclaring symbol font `operators' on input line 117.
 LaTeX Font Info:    Encoding `OT1' has changed to `TU' for symbol font
-(Font)              `operators' in the math version `normal' on input line 122.
+(Font)              `operators' in the math version `normal' on input line 117.
 
 LaTeX Font Info:    Overwriting symbol font `operators' in version `normal'
 (Font)                  OT1/cmr/m/n --> TU/TimesNewRoman(0)/m/n on input line 1
-22.
+17.
 LaTeX Font Info:    Encoding `OT1' has changed to `TU' for symbol font
-(Font)              `operators' in the math version `bold' on input line 122.
+(Font)              `operators' in the math version `bold' on input line 117.
 LaTeX Font Info:    Overwriting symbol font `operators' in version `bold'
 (Font)                  OT1/cmr/bx/n --> TU/TimesNewRoman(0)/m/n on input line 
-122.
+117.
 LaTeX Font Info:    Overwriting symbol font `operators' in version `normal'
 (Font)                  TU/TimesNewRoman(0)/m/n --> TU/TimesNewRoman(0)/m/n on 
-input line 122.
+input line 117.
 LaTeX Font Info:    Overwriting math alphabet `\mathit' in version `normal'
 (Font)                  OT1/cmr/m/it --> TU/TimesNewRoman(0)/m/it on input line
- 122.
+ 117.
 LaTeX Font Info:    Overwriting math alphabet `\mathbf' in version `normal'
 (Font)                  OT1/cmr/bx/n --> TU/TimesNewRoman(0)/b/n on input line 
-122.
+117.
 LaTeX Font Info:    Overwriting math alphabet `\mathsf' in version `normal'
-(Font)                  OT1/cmss/m/n --> TU/lmss/m/n on input line 122.
+(Font)                  OT1/cmss/m/n --> TU/lmss/m/n on input line 117.
 LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `normal'
-(Font)                  OT1/cmtt/m/n --> TU/lmtt/m/n on input line 122.
+(Font)                  OT1/cmtt/m/n --> TU/lmtt/m/n on input line 117.
 LaTeX Font Info:    Overwriting symbol font `operators' in version `bold'
 (Font)                  TU/TimesNewRoman(0)/m/n --> TU/TimesNewRoman(0)/b/n on 
-input line 122.
+input line 117.
 LaTeX Font Info:    Overwriting math alphabet `\mathit' in version `bold'
 (Font)                  OT1/cmr/bx/it --> TU/TimesNewRoman(0)/b/it on input lin
-e 122.
+e 117.
 LaTeX Font Info:    Overwriting math alphabet `\mathsf' in version `bold'
-(Font)                  OT1/cmss/bx/n --> TU/lmss/b/n on input line 122.
+(Font)                  OT1/cmss/bx/n --> TU/lmss/b/n on input line 117.
 LaTeX Font Info:    Overwriting math alphabet `\mathtt' in version `bold'
-(Font)                  OT1/cmtt/m/n --> TU/lmtt/b/n on input line 122.
+(Font)                  OT1/cmtt/m/n --> TU/lmtt/b/n on input line 117.
 Package caption Info: Begin \AtBeginDocument code.
 Package caption Info: float package is loaded.
 Package caption Info: End \AtBeginDocument code.
@@ -415,11 +415,11 @@ Package newfloat Info: `float' package detected.
 File: images/ptit-logo.jpg Graphic file (type bmp)
 <images/ptit-logo.jpg>
 LaTeX Font Info:    External font `cmex10' loaded for size
-(Font)              <12> on input line 133.
+(Font)              <12> on input line 128.
 LaTeX Font Info:    External font `cmex10' loaded for size
-(Font)              <8> on input line 133.
+(Font)              <8> on input line 128.
 LaTeX Font Info:    External font `cmex10' loaded for size
-(Font)              <6> on input line 133.
+(Font)              <6> on input line 128.
 [1
 
 ] [1]
@@ -430,146 +430,3 @@ File: images/ptit-logo.jpg Graphic file (type bmp)
 ] [1
 
 
-] [2
-
-] (main.toc [3
-
-
-])
-\tf@toc=\write3
-\openout3 = `main.toc'.
-
- [4] [5
-
-] (main.lot)
-\tf@lot=\write4
-\openout4 = `main.lot'.
-
- [6
-
-
-] (main.lod)
-\tf@lod=\write5
-\openout5 = `main.lod'.
-
-
-[7
-
-
-] (main.lof)
-\tf@lof=\write6
-\openout6 = `main.lof'.
-
- [8
-
-
-] [1
-
-
-] [2
-
-]
-CHƯƠNG 1.
-[3
-
-] [4]
-CHƯƠNG 2.
-[5
-
-] [6]
-CHƯƠNG 3.
-[7
-
-] [8] [9]
-ignored error: Infinite glue shrinkage found in box being split [10] [11]
-[12] [13] [14] [15]
-CHƯƠNG 4.
-File: images/c48-erd-identity.pdf Graphic file (type pdf)
-<use images/c48-erd-identity.pdf>
-[16
-
-] [17]
-File: images/c48-erd-response-requests.pdf Graphic file (type pdf)
-<use images/c48-erd-response-requests.pdf>
- [18]
-File: images/c48-erd-response-rescue.pdf Graphic file (type pdf)
-<use images/c48-erd-response-rescue.pdf>
- [19]
-File: images/c48-erd-logistics-donations.pdf Graphic file (type pdf)
-<use images/c48-erd-logistics-donations.pdf>
- [20]
-File: images/c48-erd-logistics-fulfillment.pdf Graphic file (type pdf)
-<use images/c48-erd-logistics-fulfillment.pdf>
- [21]
-File: images/c48-erd-logistics-handoff.pdf Graphic file (type pdf)
-<use images/c48-erd-logistics-handoff.pdf>
- [22]
-CHƯƠNG 5.
-[23
-
-
-
-
-
-
-]
-File: images/web-login.png Graphic file (type bmp)
-<images/web-login.png>
- [24
-
-]
-File: images/web-citizen-sos.png Graphic file (type bmp)
-<images/web-citizen-sos.png>
- [25
-
-]
-File: images/web-donation-drive.png Graphic file (type bmp)
-<images/web-donation-drive.png>
-File: images/web-coordinator-queue.png Graphic file (type bmp)
-<images/web-coordinator-queue.png>
- [26
-
-]
-File: images/web-volunteer-missions.png Graphic file (type bmp)
-<images/web-volunteer-missions.png>
- [27]
-File: images/web-operations-stock.png Graphic file (type bmp)
-<images/web-operations-stock.png>
- [28]
-File: images/web-admin-users.png Graphic file (type bmp)
-<images/web-admin-users.png>
- [29] [30]
-CHƯƠNG 6.
-[31
-
-]
-CHƯƠNG 7.
-[32
-
-] [33
-
-]
-PHỤ LỤC A.
-[34
-
-] (main.aux)
- ***********
-LaTeX2e <2025-11-01>
-L3 programming layer <2025-12-24>
- ***********
-
-
-LaTeX Font Warning: Size substitutions with differences
-(Font)              up to 1.0pt have occurred.
-
- ) 
-Here is how much of TeX's memory you used:
- 6979 strings out of 402987
- 168655 string characters out of 5448523
- 644685 words of memory out of 5000000
- 35594 multiletter control sequences out of 15000+600000
- 632541 words of font info for 87 fonts, out of 8000000 for 9000
- 1348 hyphenation exceptions out of 8191
- 73i,13n,103p,1083b,481s stack positions out of 10000i,1000n,20000p,200000b,200000s
-
-Output written on main.pdf (46 pages).
