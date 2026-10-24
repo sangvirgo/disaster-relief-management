@@ -1,0 +1,14 @@
+# LaTeX build artifacts (main.pdf stays tracked)
+*.aux
+*.lod
+*.lof
+*.lot
+*.toc
+*.log
+*.out
+*.fls
+*.fdb_latexmk
+*.xdv
+*.synctex.gz
+*.synctex(busy)
+*.synctex
