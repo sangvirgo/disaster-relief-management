@@ -5,7 +5,10 @@
   "latex-workshop.latex.recipes": [
     {
       "name": "XeLaTeX (2 lượt để cập nhật danh mục)",
-      "tools": ["xelatex-report", "xelatex-report"]
+      "tools": [
+        "xelatex-report",
+        "xelatex-report"
+      ]
     }
   ],
   "latex-workshop.latex.tools": [
@@ -17,7 +20,12 @@
         "-interaction=nonstopmode",
         "-halt-on-error",
         "%DOC%"
-      ]
+      ],
+      "env": {
+        "TEXMFHOME": "/home/soang/.local/share/c48-tex/texmf",
+        "TEXMFVAR": "/home/soang/.local/share/c48-tex/texmf-var",
+        "TEXMFCONFIG": "/home/soang/.local/share/c48-tex/texmf-config"
+      }
     }
   ]
 }
