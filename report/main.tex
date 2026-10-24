@@ -1262,41 +1262,42 @@ Các quan hệ trong phạm vi một dịch vụ được bảo vệ bằng khó
 Response lưu điểm địa lý và vùng trong cùng phạm vi dữ liệu, đồng thời chỉ tự gán vùng khi vị trí nằm trong đúng một ranh giới. Bản đồ tổng hợp không cấp quyền xem vị trí chính xác. Thời hạn lưu dữ liệu và chính sách chia sẻ vị trí cần được thống nhất trước khi sử dụng dữ liệu thật.
 
 \section{Sơ đồ cơ sở dữ liệu vật lý}
-Sơ đồ ERD được tách theo từng dịch vụ và từng nhóm nghiệp vụ, mỗi sơ đồ đặt ngang một trang để giữ cỡ chữ đọc được. Mã tham chiếu sang dịch vụ khác chỉ là một cột dữ liệu, không vẽ thành quan hệ khóa ngoại.
+Sơ đồ ERD được tách theo từng dịch vụ và từng nhóm nghiệp vụ, mỗi sơ đồ được bố trí riêng trên một trang đứng để giữ cỡ chữ đọc được. Mã tham chiếu sang dịch vụ khác chỉ là một cột dữ liệu, không vẽ thành quan hệ khóa ngoại.
 
-\begin{figure}[p]
+\clearpage
+\begin{figure}[H]
   \centering
-  \includegraphics[width=0.84\textheight,height=\textwidth,keepaspectratio,angle=90]{images/c48-erd-identity.pdf}
+  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-identity.pdf}
   \caption{ERD vật lý của cơ sở dữ liệu Identity}\label{fig:erd-identity}
 \end{figure}
 \clearpage
-\begin{figure}[p]
+\begin{figure}[H]
   \centering
-  \includegraphics[width=0.84\textheight,height=\textwidth,keepaspectratio,angle=90]{images/c48-erd-response-requests.pdf}
+  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-response-requests.pdf}
   \caption{ERD vật lý Response: tiếp nhận và theo dõi yêu cầu}\label{fig:erd-response-requests}
 \end{figure}
 \clearpage
-\begin{figure}[p]
+\begin{figure}[H]
   \centering
-  \includegraphics[width=0.84\textheight,height=\textwidth,keepaspectratio,angle=90]{images/c48-erd-response-rescue.pdf}
+  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-response-rescue.pdf}
   \caption{ERD vật lý Response: đội và hoạt động ứng cứu}\label{fig:erd-response-rescue}
 \end{figure}
 \clearpage
-\begin{figure}[p]
+\begin{figure}[H]
   \centering
-  \includegraphics[width=0.84\textheight,height=\textwidth,keepaspectratio,angle=90]{images/c48-erd-logistics-donations.pdf}
+  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-logistics-donations.pdf}
   \caption{ERD vật lý Logistics: đợt nhận và quyên góp hiện vật}\label{fig:erd-logistics-donations}
 \end{figure}
 \clearpage
-\begin{figure}[p]
+\begin{figure}[H]
   \centering
-  \includegraphics[width=0.84\textheight,height=\textwidth,keepaspectratio,angle=90]{images/c48-erd-logistics-fulfillment.pdf}
+  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-logistics-fulfillment.pdf}
   \caption{ERD vật lý Logistics: nhu cầu và đáp ứng cứu trợ}\label{fig:erd-logistics-fulfillment}
 \end{figure}
 \clearpage
-\begin{figure}[p]
+\begin{figure}[H]
   \centering
-  \includegraphics[width=0.84\textheight,height=\textwidth,keepaspectratio,angle=90]{images/c48-erd-logistics-handoff.pdf}
+  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-logistics-handoff.pdf}
   \caption{ERD vật lý Logistics: phân phối và bàn giao}\label{fig:erd-logistics-handoff}
 \end{figure}
 

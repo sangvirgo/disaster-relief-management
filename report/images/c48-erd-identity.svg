@@ -1,280 +1,286 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1646" height="838" viewBox="0 0 1646 838">
-<rect width="100%" height="100%" fill="#F4F7FB"/>
-<style>text{font-family:Arial,"Noto Sans",sans-serif}.title{font-size:25px;font-weight:700;fill:#172033}.subtitle{font-size:14px;fill:#526176}.group{font-size:14px;font-weight:700;fill:#40516A}.table{fill:#FFFFFF;stroke:#B9C4D1;stroke-width:1.1}.stub{fill:#F1F4F8;stroke:#8A97A8;stroke-width:1.2;stroke-dasharray:5 3}.header{font-size:15px;font-weight:700;fill:#172033}.field{font-size:12px;fill:#263448}.type{font-size:11px;fill:#718096}.marker{font-size:9px;font-weight:700;fill:#526176}.note{font-size:12px;fill:#36465C}.edge{fill:none;stroke:#7B8798;stroke-width:1.25;opacity:.8}.edge-label{font-size:10px;font-weight:700;fill:#40516A}</style>
-<text x="48" y="43" class="title">ERD vật lý — Identity</text>
-<text x="48" y="68" class="subtitle">Tài khoản, tổ chức, phân quyền và phiên đăng nhập</text>
-<text x="48" y="91" class="subtitle">Cơ sở dữ liệu: Identity · 9 bảng chi tiết · quan hệ lấy từ khóa ngoại trong SQL</text>
-<text x="48" y="128" class="group">Danh mục và chủ thể</text>
-<text x="443" y="128" class="group">Tổ chức và quyền</text>
-<text x="838" y="128" class="group">Phiên đăng nhập</text>
-<text x="1233" y="128" class="group">Vận hành</text>
-<path d="M 1203.0 448.0 H 1211.0 V 196.0 H 1203.0" class="edge"/>
-<path d="M 838.0 218.0 H 617.5 V 530.0 H 413.0" class="edge"/>
-<path d="M 443.0 343.0 H 420.0 V 530.0 H 413.0" class="edge"/>
-<path d="M 443.0 409.0 H 424.0 V 342.0 H 413.0" class="edge"/>
-<path d="M 443.0 431.0 H 428.0 V 196.0 H 413.0" class="edge"/>
-<path d="M 443.0 196.0 H 432.0 V 530.0 H 413.0" class="edge"/>
-<path d="M 443.0 218.0 H 436.0 V 342.0 H 413.0" class="edge"/>
-<rect x="48" y="148" width="365" height="122" rx="4" class="table"/>
-<path d="M52,148 H409 Q413,148 413,152 V184 H48 V152 Q48,148 52,148 Z" fill="#3B82F622"/>
-<text x="58" y="171" class="header">region</text>
-<text x="56" y="196" class="marker">PK</text>
-<text x="108" y="196" class="field">code</text>
-<text x="405" y="196" text-anchor="end" class="type">text</text>
-<line x1="48" y1="206" x2="413" y2="206" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="218" class="marker"></text>
-<text x="108" y="218" class="field">name</text>
-<text x="405" y="218" text-anchor="end" class="type">text</text>
-<line x1="48" y1="228" x2="413" y2="228" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="240" class="marker"></text>
-<text x="108" y="240" class="field">status</text>
-<text x="405" y="240" text-anchor="end" class="type">text</text>
-<line x1="48" y1="250" x2="413" y2="250" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="262" class="marker"></text>
-<text x="108" y="262" class="field">version</text>
-<text x="405" y="262" text-anchor="end" class="type">int</text>
-<rect x="48" y="294" width="365" height="164" rx="4" class="table"/>
-<path d="M52,294 H409 Q413,294 413,298 V330 H48 V298 Q48,294 52,294 Z" fill="#3B82F622"/>
-<text x="58" y="317" class="header">organization</text>
-<text x="56" y="342" class="marker">PK</text>
-<text x="108" y="342" class="field">id</text>
-<text x="405" y="342" text-anchor="end" class="type">uuid</text>
-<line x1="48" y1="352" x2="413" y2="352" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="364" class="marker"></text>
-<text x="108" y="364" class="field">name</text>
-<text x="405" y="364" text-anchor="end" class="type">text</text>
-<line x1="48" y1="374" x2="413" y2="374" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="386" class="marker"></text>
-<text x="108" y="386" class="field">organization_kind</text>
-<text x="405" y="386" text-anchor="end" class="type">text</text>
-<line x1="48" y1="396" x2="413" y2="396" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="408" class="marker"></text>
-<text x="108" y="408" class="field">status</text>
-<text x="405" y="408" text-anchor="end" class="type">text</text>
-<line x1="48" y1="418" x2="413" y2="418" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="430" class="marker"></text>
-<text x="108" y="430" class="field">created_at</text>
-<text x="405" y="430" text-anchor="end" class="type">timestamptz</text>
-<line x1="48" y1="440" x2="413" y2="440" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="452" class="marker"></text>
-<text x="108" y="452" class="field">version</text>
-<text x="405" y="452" text-anchor="end" class="type">int</text>
-<rect x="48" y="482" width="365" height="227" rx="4" class="table"/>
-<path d="M52,482 H409 Q413,482 413,486 V518 H48 V486 Q48,482 52,482 Z" fill="#3B82F622"/>
-<text x="58" y="505" class="header">app_user</text>
-<text x="56" y="530" class="marker">PK</text>
-<text x="108" y="530" class="field">id</text>
-<text x="405" y="530" text-anchor="end" class="type">uuid</text>
-<line x1="48" y1="540" x2="413" y2="540" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="552" class="marker">UK</text>
-<text x="108" y="552" class="field">username</text>
-<text x="405" y="552" text-anchor="end" class="type">citext</text>
-<line x1="48" y1="562" x2="413" y2="562" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="574" class="marker"></text>
-<text x="108" y="574" class="field">display_name</text>
-<text x="405" y="574" text-anchor="end" class="type">text</text>
-<line x1="48" y1="584" x2="413" y2="584" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="596" class="marker"></text>
-<text x="108" y="596" class="field">password_hash</text>
-<text x="405" y="596" text-anchor="end" class="type">text</text>
-<line x1="48" y1="606" x2="413" y2="606" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="618" class="marker"></text>
-<text x="108" y="618" class="field">status</text>
-<text x="405" y="618" text-anchor="end" class="type">text</text>
-<line x1="48" y1="628" x2="413" y2="628" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="640" class="marker"></text>
-<text x="108" y="640" class="field">must_change_password</text>
-<text x="405" y="640" text-anchor="end" class="type">boolean</text>
-<line x1="48" y1="650" x2="413" y2="650" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="662" class="marker"></text>
-<text x="108" y="662" class="field">authz_version</text>
-<text x="405" y="662" text-anchor="end" class="type">int</text>
-<line x1="48" y1="672" x2="413" y2="672" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="684" class="marker"></text>
-<text x="108" y="684" class="field">created_at</text>
-<text x="405" y="684" text-anchor="end" class="type">timestamptz</text>
-<line x1="48" y1="694" x2="413" y2="694" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="706" class="marker"></text>
-<text x="108" y="706" class="field">version</text>
-<text x="405" y="706" text-anchor="end" class="type">int</text>
-<rect x="443" y="148" width="365" height="101" rx="4" class="table"/>
-<path d="M447,148 H804 Q808,148 808,152 V184 H443 V152 Q443,148 447,148 Z" fill="#3B82F622"/>
-<text x="453" y="171" class="header">membership</text>
-<text x="451" y="196" class="marker">PK FK</text>
-<text x="503" y="196" class="field">user_id</text>
-<text x="800" y="196" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="206" x2="808" y2="206" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="218" class="marker">PK FK</text>
-<text x="503" y="218" class="field">organization_id</text>
-<text x="800" y="218" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="228" x2="808" y2="228" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="240" class="marker"></text>
-<text x="503" y="240" class="field">status</text>
-<text x="800" y="240" text-anchor="end" class="type">text</text>
-<rect x="443" y="273" width="365" height="227" rx="4" class="table"/>
-<path d="M447,273 H804 Q808,273 808,277 V309 H443 V277 Q443,273 447,273 Z" fill="#3B82F622"/>
-<text x="453" y="296" class="header">role_grant</text>
-<text x="451" y="321" class="marker">PK</text>
-<text x="503" y="321" class="field">id</text>
-<text x="800" y="321" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="331" x2="808" y2="331" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="343" class="marker">FK</text>
-<text x="503" y="343" class="field">user_id</text>
-<text x="800" y="343" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="353" x2="808" y2="353" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="365" class="marker"></text>
-<text x="503" y="365" class="field">role_code</text>
-<text x="800" y="365" text-anchor="end" class="type">text</text>
-<line x1="443" y1="375" x2="808" y2="375" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="387" class="marker"></text>
-<text x="503" y="387" class="field">scope_type</text>
-<text x="800" y="387" text-anchor="end" class="type">text</text>
-<line x1="443" y1="397" x2="808" y2="397" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="409" class="marker">FK?</text>
-<text x="503" y="409" class="field">organization_id</text>
-<text x="800" y="409" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="419" x2="808" y2="419" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="431" class="marker">FK?</text>
-<text x="503" y="431" class="field">region_code</text>
-<text x="800" y="431" text-anchor="end" class="type">text</text>
-<line x1="443" y1="441" x2="808" y2="441" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="453" class="marker">REF</text>
-<text x="503" y="453" class="field">campaign_id</text>
-<text x="800" y="453" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="463" x2="808" y2="463" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="475" class="marker"></text>
-<text x="503" y="475" class="field">created_at</text>
-<text x="800" y="475" text-anchor="end" class="type">timestamptz</text>
-<line x1="443" y1="485" x2="808" y2="485" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="497" class="marker"></text>
-<text x="503" y="497" class="field">revoked_at</text>
-<text x="800" y="497" text-anchor="end" class="type">timestamptz</text>
-<rect x="838" y="148" width="365" height="206" rx="4" class="table"/>
-<path d="M842,148 H1199 Q1203,148 1203,152 V184 H838 V152 Q838,148 842,148 Z" fill="#3B82F622"/>
-<text x="848" y="171" class="header">session_family</text>
-<text x="846" y="196" class="marker">PK</text>
-<text x="898" y="196" class="field">id</text>
-<text x="1195" y="196" text-anchor="end" class="type">uuid</text>
-<line x1="838" y1="206" x2="1203" y2="206" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="218" class="marker">FK</text>
-<text x="898" y="218" class="field">user_id</text>
-<text x="1195" y="218" text-anchor="end" class="type">uuid</text>
-<line x1="838" y1="228" x2="1203" y2="228" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="240" class="marker"></text>
-<text x="898" y="240" class="field">client_kind</text>
-<text x="1195" y="240" text-anchor="end" class="type">text</text>
-<line x1="838" y1="250" x2="1203" y2="250" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="262" class="marker"></text>
-<text x="898" y="262" class="field">authz_version</text>
-<text x="1195" y="262" text-anchor="end" class="type">int</text>
-<line x1="838" y1="272" x2="1203" y2="272" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="284" class="marker"></text>
-<text x="898" y="284" class="field">created_at</text>
-<text x="1195" y="284" text-anchor="end" class="type">timestamptz</text>
-<line x1="838" y1="294" x2="1203" y2="294" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="306" class="marker"></text>
-<text x="898" y="306" class="field">absolute_expires_at</text>
-<text x="1195" y="306" text-anchor="end" class="type">timestamptz</text>
-<line x1="838" y1="316" x2="1203" y2="316" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="328" class="marker"></text>
-<text x="898" y="328" class="field">revoked_at</text>
-<text x="1195" y="328" text-anchor="end" class="type">timestamptz</text>
-<line x1="838" y1="338" x2="1203" y2="338" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="350" class="marker"></text>
-<text x="898" y="350" class="field">revoke_reason</text>
-<text x="1195" y="350" text-anchor="end" class="type">text</text>
-<rect x="838" y="378" width="365" height="101" rx="4" class="table"/>
-<path d="M842,378 H1199 Q1203,378 1203,382 V414 H838 V382 Q838,378 842,378 Z" fill="#3B82F622"/>
-<text x="848" y="401" class="header">refresh_session</text>
-<text x="846" y="426" class="marker">PK</text>
-<text x="898" y="426" class="field">token_hash</text>
-<text x="1195" y="426" text-anchor="end" class="type">text</text>
-<line x1="838" y1="436" x2="1203" y2="436" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="448" class="marker">FK</text>
-<text x="898" y="448" class="field">family_id</text>
-<text x="1195" y="448" text-anchor="end" class="type">uuid</text>
-<line x1="838" y1="458" x2="1203" y2="458" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="470" class="marker"></text>
-<text x="898" y="470" class="field">rotated_at</text>
-<text x="1195" y="470" text-anchor="end" class="type">timestamptz</text>
-<rect x="1233" y="148" width="365" height="248" rx="4" class="table"/>
-<path d="M1237,148 H1594 Q1598,148 1598,152 V184 H1233 V152 Q1233,148 1237,148 Z" fill="#3B82F622"/>
-<text x="1243" y="171" class="header">audit_log</text>
-<text x="1241" y="196" class="marker">PK</text>
-<text x="1293" y="196" class="field">id</text>
-<text x="1590" y="196" text-anchor="end" class="type">bigint</text>
-<line x1="1233" y1="206" x2="1598" y2="206" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="218" class="marker">REF</text>
-<text x="1293" y="218" class="field">actor_user_id</text>
-<text x="1590" y="218" text-anchor="end" class="type">uuid</text>
-<line x1="1233" y1="228" x2="1598" y2="228" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="240" class="marker"></text>
-<text x="1293" y="240" class="field">action</text>
-<text x="1590" y="240" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="250" x2="1598" y2="250" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="262" class="marker"></text>
-<text x="1293" y="262" class="field">entity_type</text>
-<text x="1590" y="262" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="272" x2="1598" y2="272" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="284" class="marker"></text>
-<text x="1293" y="284" class="field">entity_id</text>
-<text x="1590" y="284" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="294" x2="1598" y2="294" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="306" class="marker"></text>
-<text x="1293" y="306" class="field">before_state</text>
-<text x="1590" y="306" text-anchor="end" class="type">jsonb</text>
-<line x1="1233" y1="316" x2="1598" y2="316" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="328" class="marker"></text>
-<text x="1293" y="328" class="field">after_state</text>
-<text x="1590" y="328" text-anchor="end" class="type">jsonb</text>
-<line x1="1233" y1="338" x2="1598" y2="338" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="350" class="marker"></text>
-<text x="1293" y="350" class="field">reason</text>
-<text x="1590" y="350" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="360" x2="1598" y2="360" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="372" class="marker"></text>
-<text x="1293" y="372" class="field">correlation_id</text>
-<text x="1590" y="372" text-anchor="end" class="type">uuid</text>
-<line x1="1233" y1="382" x2="1598" y2="382" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="394" class="marker"></text>
-<text x="1293" y="394" class="field">created_at</text>
-<text x="1590" y="394" text-anchor="end" class="type">timestamptz</text>
-<rect x="1233" y="420" width="365" height="206" rx="4" class="table"/>
-<path d="M1237,420 H1594 Q1598,420 1598,424 V456 H1233 V424 Q1233,420 1237,420 Z" fill="#3B82F622"/>
-<text x="1243" y="443" class="header">idempotency_record</text>
-<text x="1241" y="468" class="marker">PK</text>
-<text x="1293" y="468" class="field">scope_key</text>
-<text x="1590" y="468" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="478" x2="1598" y2="478" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="490" class="marker">PK</text>
-<text x="1293" y="490" class="field">command</text>
-<text x="1590" y="490" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="500" x2="1598" y2="500" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="512" class="marker">PK</text>
-<text x="1293" y="512" class="field">idempotency_key</text>
-<text x="1590" y="512" text-anchor="end" class="type">uuid</text>
-<line x1="1233" y1="522" x2="1598" y2="522" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="534" class="marker"></text>
-<text x="1293" y="534" class="field">request_hash</text>
-<text x="1590" y="534" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="544" x2="1598" y2="544" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="556" class="marker"></text>
-<text x="1293" y="556" class="field">response_status</text>
-<text x="1590" y="556" text-anchor="end" class="type">int</text>
-<line x1="1233" y1="566" x2="1598" y2="566" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="578" class="marker"></text>
-<text x="1293" y="578" class="field">resource_type</text>
-<text x="1590" y="578" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="588" x2="1598" y2="588" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="600" class="marker"></text>
-<text x="1293" y="600" class="field">resource_id</text>
-<text x="1590" y="600" text-anchor="end" class="type">uuid</text>
-<line x1="1233" y1="610" x2="1598" y2="610" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="622" class="marker"></text>
-<text x="1293" y="622" class="field">created_at</text>
-<text x="1590" y="622" text-anchor="end" class="type">timestamptz</text>
-<line x1="48" y1="749" x2="1598" y2="749" stroke="#D4DCE6"/>
-<text x="48" y="766" class="note">Ký hiệu: PK khóa chính · FK khóa ngoại SQL · FK? nullable · UK duy nhất · UK* thuộc khóa duy nhất tổ hợp · REF ID tham chiếu không có FK</text>
-<text x="48" y="786" class="note">FK? là khóa ngoại nullable. FK đồng thời là PK/UK giới hạn quan hệ tối đa một bản ghi; FK thường cho phép nhiều bản ghi con. Ô xám là bảng cùng service ở trang khác.</text>
-<text x="48" y="806" class="note">Role và permission là danh mục mã cố định trong ứng dụng, không phải bảng SQL. campaign_id trong role_grant là ID tham chiếu sang Response, không có khóa ngoại liên service.</text>
-</svg>
+<ns0:svg xmlns:ns0="http://www.w3.org/2000/svg" width="858" height="945" viewBox="0 0 858 945">
+  <ns0:style>text{font-family:Arial,"Noto Sans",sans-serif}.title{font-size:25px;font-weight:700;fill:#172033}.subtitle{font-size:14px;fill:#526176}.group{font-size:14px;font-weight:700;fill:#40516A}.table{fill:#FFFFFF;stroke:#B9C4D1;stroke-width:1.1}.stub{fill:#F1F4F8;stroke:#8A97A8;stroke-width:1.2;stroke-dasharray:5 3}.header{font-size:15px;font-weight:700;fill:#172033}.field{font-size:12px;fill:#263448}.type{font-size:11px;fill:#718096}.marker{font-size:9px;font-weight:700;fill:#526176}.note{font-size:12px;fill:#36465C}.edge{fill:none;stroke:#7B8798;stroke-width:1.25;opacity:.8}.edge-label{font-size:10px;font-weight:700;fill:#40516A}</ns0:style>
+  <ns0:path d="M 651.5 262 V 222" class="edge" />
+  <ns0:path d="M 469 119 H 460 V 451.5 H 389" class="edge" />
+  <ns0:path d="M 389 815.5 H 400 V 520 H 389" class="edge" />
+  <ns0:path d="M 389 780 H 410 V 245 H 389" class="edge" />
+  <ns0:path d="M 389 745 H 420 V 100 H 389" class="edge" />
+  <ns0:path d="M 389 633.5 H 430 V 451.5 H 389" class="edge" />
+  <ns0:path d="M 389 660 H 440 V 280 H 389" class="edge" />
+  <ns0:g transform="translate(-24 -132)">
+    <ns0:rect x="48" y="148" width="365" height="122" rx="4" class="table" />
+    <ns0:path d="M52,148 H409 Q413,148 413,152 V184 H48 V152 Q48,148 52,148 Z" fill="#3B82F622" />
+    <ns0:text x="58" y="171" class="header">region</ns0:text>
+    <ns0:text x="56" y="196" class="marker">PK</ns0:text>
+    <ns0:text x="108" y="196" class="field">code</ns0:text>
+    <ns0:text x="405" y="196" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="48" y1="206" x2="413" y2="206" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="218" class="marker" />
+    <ns0:text x="108" y="218" class="field">name</ns0:text>
+    <ns0:text x="405" y="218" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="48" y1="228" x2="413" y2="228" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="240" class="marker" />
+    <ns0:text x="108" y="240" class="field">status</ns0:text>
+    <ns0:text x="405" y="240" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="48" y1="250" x2="413" y2="250" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="262" class="marker" />
+    <ns0:text x="108" y="262" class="field">version</ns0:text>
+    <ns0:text x="405" y="262" text-anchor="end" class="type">int</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(-24 -138)">
+    <ns0:rect x="48" y="294" width="365" height="164" rx="4" class="table" />
+    <ns0:path d="M52,294 H409 Q413,294 413,298 V330 H48 V298 Q48,294 52,294 Z" fill="#3B82F622" />
+    <ns0:text x="58" y="317" class="header">organization</ns0:text>
+    <ns0:text x="56" y="342" class="marker">PK</ns0:text>
+    <ns0:text x="108" y="342" class="field">id</ns0:text>
+    <ns0:text x="405" y="342" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="48" y1="352" x2="413" y2="352" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="364" class="marker" />
+    <ns0:text x="108" y="364" class="field">name</ns0:text>
+    <ns0:text x="405" y="364" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="48" y1="374" x2="413" y2="374" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="386" class="marker" />
+    <ns0:text x="108" y="386" class="field">organization_kind</ns0:text>
+    <ns0:text x="405" y="386" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="48" y1="396" x2="413" y2="396" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="408" class="marker" />
+    <ns0:text x="108" y="408" class="field">status</ns0:text>
+    <ns0:text x="405" y="408" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="48" y1="418" x2="413" y2="418" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="430" class="marker" />
+    <ns0:text x="108" y="430" class="field">created_at</ns0:text>
+    <ns0:text x="405" y="430" text-anchor="end" class="type">timestamptz</ns0:text>
+    <ns0:line x1="48" y1="440" x2="413" y2="440" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="452" class="marker" />
+    <ns0:text x="108" y="452" class="field">version</ns0:text>
+    <ns0:text x="405" y="452" text-anchor="end" class="type">int</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(-24 -144)">
+    <ns0:rect x="48" y="482" width="365" height="227" rx="4" class="table" />
+    <ns0:path d="M52,482 H409 Q413,482 413,486 V518 H48 V486 Q48,482 52,482 Z" fill="#3B82F622" />
+    <ns0:text x="58" y="505" class="header">app_user</ns0:text>
+    <ns0:text x="56" y="530" class="marker">PK</ns0:text>
+    <ns0:text x="108" y="530" class="field">id</ns0:text>
+    <ns0:text x="405" y="530" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="48" y1="540" x2="413" y2="540" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="552" class="marker">UK</ns0:text>
+    <ns0:text x="108" y="552" class="field">username</ns0:text>
+    <ns0:text x="405" y="552" text-anchor="end" class="type">citext</ns0:text>
+    <ns0:line x1="48" y1="562" x2="413" y2="562" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="574" class="marker" />
+    <ns0:text x="108" y="574" class="field">display_name</ns0:text>
+    <ns0:text x="405" y="574" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="48" y1="584" x2="413" y2="584" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="596" class="marker" />
+    <ns0:text x="108" y="596" class="field">password_hash</ns0:text>
+    <ns0:text x="405" y="596" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="48" y1="606" x2="413" y2="606" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="618" class="marker" />
+    <ns0:text x="108" y="618" class="field">status</ns0:text>
+    <ns0:text x="405" y="618" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="48" y1="628" x2="413" y2="628" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="640" class="marker" />
+    <ns0:text x="108" y="640" class="field">must_change_password</ns0:text>
+    <ns0:text x="405" y="640" text-anchor="end" class="type">boolean</ns0:text>
+    <ns0:line x1="48" y1="650" x2="413" y2="650" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="662" class="marker" />
+    <ns0:text x="108" y="662" class="field">authz_version</ns0:text>
+    <ns0:text x="405" y="662" text-anchor="end" class="type">int</ns0:text>
+    <ns0:line x1="48" y1="672" x2="413" y2="672" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="684" class="marker" />
+    <ns0:text x="108" y="684" class="field">created_at</ns0:text>
+    <ns0:text x="405" y="684" text-anchor="end" class="type">timestamptz</ns0:text>
+    <ns0:line x1="48" y1="694" x2="413" y2="694" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="706" class="marker" />
+    <ns0:text x="108" y="706" class="field">version</ns0:text>
+    <ns0:text x="405" y="706" text-anchor="end" class="type">int</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(-419 435)">
+    <ns0:rect x="443" y="148" width="365" height="101" rx="4" class="table" />
+    <ns0:path d="M447,148 H804 Q808,148 808,152 V184 H443 V152 Q443,148 447,148 Z" fill="#3B82F622" />
+    <ns0:text x="453" y="171" class="header">membership</ns0:text>
+    <ns0:text x="451" y="196" class="marker">PK FK</ns0:text>
+    <ns0:text x="503" y="196" class="field">user_id</ns0:text>
+    <ns0:text x="800" y="196" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="206" x2="808" y2="206" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="218" class="marker">PK FK</ns0:text>
+    <ns0:text x="503" y="218" class="field">organization_id</ns0:text>
+    <ns0:text x="800" y="218" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="228" x2="808" y2="228" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="240" class="marker" />
+    <ns0:text x="503" y="240" class="field">status</ns0:text>
+    <ns0:text x="800" y="240" text-anchor="end" class="type">text</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(-419 429)">
+    <ns0:rect x="443" y="273" width="365" height="227" rx="4" class="table" />
+    <ns0:path d="M447,273 H804 Q808,273 808,277 V309 H443 V277 Q443,273 447,273 Z" fill="#3B82F622" />
+    <ns0:text x="453" y="296" class="header">role_grant</ns0:text>
+    <ns0:text x="451" y="321" class="marker">PK</ns0:text>
+    <ns0:text x="503" y="321" class="field">id</ns0:text>
+    <ns0:text x="800" y="321" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="331" x2="808" y2="331" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="343" class="marker">FK</ns0:text>
+    <ns0:text x="503" y="343" class="field">user_id</ns0:text>
+    <ns0:text x="800" y="343" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="353" x2="808" y2="353" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="365" class="marker" />
+    <ns0:text x="503" y="365" class="field">role_code</ns0:text>
+    <ns0:text x="800" y="365" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="443" y1="375" x2="808" y2="375" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="387" class="marker" />
+    <ns0:text x="503" y="387" class="field">scope_type</ns0:text>
+    <ns0:text x="800" y="387" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="443" y1="397" x2="808" y2="397" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="409" class="marker">FK?</ns0:text>
+    <ns0:text x="503" y="409" class="field">organization_id</ns0:text>
+    <ns0:text x="800" y="409" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="419" x2="808" y2="419" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="431" class="marker">FK?</ns0:text>
+    <ns0:text x="503" y="431" class="field">region_code</ns0:text>
+    <ns0:text x="800" y="431" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="443" y1="441" x2="808" y2="441" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="453" class="marker">REF</ns0:text>
+    <ns0:text x="503" y="453" class="field">campaign_id</ns0:text>
+    <ns0:text x="800" y="453" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="463" x2="808" y2="463" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="475" class="marker" />
+    <ns0:text x="503" y="475" class="field">created_at</ns0:text>
+    <ns0:text x="800" y="475" text-anchor="end" class="type">timestamptz</ns0:text>
+    <ns0:line x1="443" y1="485" x2="808" y2="485" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="497" class="marker" />
+    <ns0:text x="503" y="497" class="field">revoked_at</ns0:text>
+    <ns0:text x="800" y="497" text-anchor="end" class="type">timestamptz</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(-369 -132)">
+    <ns0:rect x="838" y="148" width="365" height="206" rx="4" class="table" />
+    <ns0:path d="M842,148 H1199 Q1203,148 1203,152 V184 H838 V152 Q838,148 842,148 Z" fill="#3B82F622" />
+    <ns0:text x="848" y="171" class="header">session_family</ns0:text>
+    <ns0:text x="846" y="196" class="marker">PK</ns0:text>
+    <ns0:text x="898" y="196" class="field">id</ns0:text>
+    <ns0:text x="1195" y="196" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="838" y1="206" x2="1203" y2="206" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="218" class="marker">FK</ns0:text>
+    <ns0:text x="898" y="218" class="field">user_id</ns0:text>
+    <ns0:text x="1195" y="218" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="838" y1="228" x2="1203" y2="228" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="240" class="marker" />
+    <ns0:text x="898" y="240" class="field">client_kind</ns0:text>
+    <ns0:text x="1195" y="240" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="838" y1="250" x2="1203" y2="250" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="262" class="marker" />
+    <ns0:text x="898" y="262" class="field">authz_version</ns0:text>
+    <ns0:text x="1195" y="262" text-anchor="end" class="type">int</ns0:text>
+    <ns0:line x1="838" y1="272" x2="1203" y2="272" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="284" class="marker" />
+    <ns0:text x="898" y="284" class="field">created_at</ns0:text>
+    <ns0:text x="1195" y="284" text-anchor="end" class="type">timestamptz</ns0:text>
+    <ns0:line x1="838" y1="294" x2="1203" y2="294" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="306" class="marker" />
+    <ns0:text x="898" y="306" class="field">absolute_expires_at</ns0:text>
+    <ns0:text x="1195" y="306" text-anchor="end" class="type">timestamptz</ns0:text>
+    <ns0:line x1="838" y1="316" x2="1203" y2="316" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="328" class="marker" />
+    <ns0:text x="898" y="328" class="field">revoked_at</ns0:text>
+    <ns0:text x="1195" y="328" text-anchor="end" class="type">timestamptz</ns0:text>
+    <ns0:line x1="838" y1="338" x2="1203" y2="338" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="350" class="marker" />
+    <ns0:text x="898" y="350" class="field">revoke_reason</ns0:text>
+    <ns0:text x="1195" y="350" text-anchor="end" class="type">text</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(-369 -116)">
+    <ns0:rect x="838" y="378" width="365" height="101" rx="4" class="table" />
+    <ns0:path d="M842,378 H1199 Q1203,378 1203,382 V414 H838 V382 Q838,378 842,378 Z" fill="#3B82F622" />
+    <ns0:text x="848" y="401" class="header">refresh_session</ns0:text>
+    <ns0:text x="846" y="426" class="marker">PK</ns0:text>
+    <ns0:text x="898" y="426" class="field">token_hash</ns0:text>
+    <ns0:text x="1195" y="426" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="838" y1="436" x2="1203" y2="436" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="448" class="marker">FK</ns0:text>
+    <ns0:text x="898" y="448" class="field">family_id</ns0:text>
+    <ns0:text x="1195" y="448" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="838" y1="458" x2="1203" y2="458" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="470" class="marker" />
+    <ns0:text x="898" y="470" class="field">rotated_at</ns0:text>
+    <ns0:text x="1195" y="470" text-anchor="end" class="type">timestamptz</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(-764 255)">
+    <ns0:rect x="1233" y="148" width="365" height="248" rx="4" class="table" />
+    <ns0:path d="M1237,148 H1594 Q1598,148 1598,152 V184 H1233 V152 Q1233,148 1237,148 Z" fill="#3B82F622" />
+    <ns0:text x="1243" y="171" class="header">audit_log</ns0:text>
+    <ns0:text x="1241" y="196" class="marker">PK</ns0:text>
+    <ns0:text x="1293" y="196" class="field">id</ns0:text>
+    <ns0:text x="1590" y="196" text-anchor="end" class="type">bigint</ns0:text>
+    <ns0:line x1="1233" y1="206" x2="1598" y2="206" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="218" class="marker">REF</ns0:text>
+    <ns0:text x="1293" y="218" class="field">actor_user_id</ns0:text>
+    <ns0:text x="1590" y="218" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="1233" y1="228" x2="1598" y2="228" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="240" class="marker" />
+    <ns0:text x="1293" y="240" class="field">action</ns0:text>
+    <ns0:text x="1590" y="240" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="250" x2="1598" y2="250" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="262" class="marker" />
+    <ns0:text x="1293" y="262" class="field">entity_type</ns0:text>
+    <ns0:text x="1590" y="262" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="272" x2="1598" y2="272" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="284" class="marker" />
+    <ns0:text x="1293" y="284" class="field">entity_id</ns0:text>
+    <ns0:text x="1590" y="284" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="294" x2="1598" y2="294" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="306" class="marker" />
+    <ns0:text x="1293" y="306" class="field">before_state</ns0:text>
+    <ns0:text x="1590" y="306" text-anchor="end" class="type">jsonb</ns0:text>
+    <ns0:line x1="1233" y1="316" x2="1598" y2="316" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="328" class="marker" />
+    <ns0:text x="1293" y="328" class="field">after_state</ns0:text>
+    <ns0:text x="1590" y="328" text-anchor="end" class="type">jsonb</ns0:text>
+    <ns0:line x1="1233" y1="338" x2="1598" y2="338" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="350" class="marker" />
+    <ns0:text x="1293" y="350" class="field">reason</ns0:text>
+    <ns0:text x="1590" y="350" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="360" x2="1598" y2="360" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="372" class="marker" />
+    <ns0:text x="1293" y="372" class="field">correlation_id</ns0:text>
+    <ns0:text x="1590" y="372" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="1233" y1="382" x2="1598" y2="382" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="394" class="marker" />
+    <ns0:text x="1293" y="394" class="field">created_at</ns0:text>
+    <ns0:text x="1590" y="394" text-anchor="end" class="type">timestamptz</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(-764 271)">
+    <ns0:rect x="1233" y="420" width="365" height="206" rx="4" class="table" />
+    <ns0:path d="M1237,420 H1594 Q1598,420 1598,424 V456 H1233 V424 Q1233,420 1237,420 Z" fill="#3B82F622" />
+    <ns0:text x="1243" y="443" class="header">idempotency_record</ns0:text>
+    <ns0:text x="1241" y="468" class="marker">PK</ns0:text>
+    <ns0:text x="1293" y="468" class="field">scope_key</ns0:text>
+    <ns0:text x="1590" y="468" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="478" x2="1598" y2="478" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="490" class="marker">PK</ns0:text>
+    <ns0:text x="1293" y="490" class="field">command</ns0:text>
+    <ns0:text x="1590" y="490" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="500" x2="1598" y2="500" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="512" class="marker">PK</ns0:text>
+    <ns0:text x="1293" y="512" class="field">idempotency_key</ns0:text>
+    <ns0:text x="1590" y="512" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="1233" y1="522" x2="1598" y2="522" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="534" class="marker" />
+    <ns0:text x="1293" y="534" class="field">request_hash</ns0:text>
+    <ns0:text x="1590" y="534" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="544" x2="1598" y2="544" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="556" class="marker" />
+    <ns0:text x="1293" y="556" class="field">response_status</ns0:text>
+    <ns0:text x="1590" y="556" text-anchor="end" class="type">int</ns0:text>
+    <ns0:line x1="1233" y1="566" x2="1598" y2="566" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="578" class="marker" />
+    <ns0:text x="1293" y="578" class="field">resource_type</ns0:text>
+    <ns0:text x="1590" y="578" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="588" x2="1598" y2="588" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="600" class="marker" />
+    <ns0:text x="1293" y="600" class="field">resource_id</ns0:text>
+    <ns0:text x="1590" y="600" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="1233" y1="610" x2="1598" y2="610" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="622" class="marker" />
+    <ns0:text x="1293" y="622" class="field">created_at</ns0:text>
+    <ns0:text x="1590" y="622" text-anchor="end" class="type">timestamptz</ns0:text>
+  </ns0:g>
+</ns0:svg>

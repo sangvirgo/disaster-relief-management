@@ -1,311 +1,316 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1646" height="922" viewBox="0 0 1646 922">
-<rect width="100%" height="100%" fill="#F4F7FB"/>
-<style>text{font-family:Arial,"Noto Sans",sans-serif}.title{font-size:25px;font-weight:700;fill:#172033}.subtitle{font-size:14px;fill:#526176}.group{font-size:14px;font-weight:700;fill:#40516A}.table{fill:#FFFFFF;stroke:#B9C4D1;stroke-width:1.1}.stub{fill:#F1F4F8;stroke:#8A97A8;stroke-width:1.2;stroke-dasharray:5 3}.header{font-size:15px;font-weight:700;fill:#172033}.field{font-size:12px;fill:#263448}.type{font-size:11px;fill:#718096}.marker{font-size:9px;font-weight:700;fill:#526176}.note{font-size:12px;fill:#36465C}.edge{fill:none;stroke:#7B8798;stroke-width:1.25;opacity:.8}.edge-label{font-size:10px;font-weight:700;fill:#40516A}</style>
-<text x="48" y="43" class="title">ERD vật lý — Logistics: nhu cầu và tồn kho</text>
-<text x="48" y="68" class="subtitle">Chu kỳ đáp ứng, ý định đóng băng, nhu cầu, cam kết và số dư kho</text>
-<text x="48" y="91" class="subtitle">Cơ sở dữ liệu: Logistics · 7 bảng chi tiết · quan hệ lấy từ khóa ngoại trong SQL</text>
-<text x="48" y="128" class="group">Bảng cùng service ở trang khác</text>
-<text x="443" y="128" class="group">Chu kỳ và nhu cầu</text>
-<text x="838" y="128" class="group">Cam kết và số dư</text>
-<text x="1233" y="128" class="group">Điểm và phương tiện</text>
-<path d="M 838.0 553.0 H 617.5 V 280.0 H 413.0" class="edge"/>
-<path d="M 838.0 575.0 H 621.5 V 196.0 H 413.0" class="edge"/>
-<path d="M 838.0 262.0 H 625.5 V 280.0 H 413.0" class="edge"/>
-<path d="M 838.0 229.0 H 827.0 V 615.0 H 808.0" class="edge"/>
-<path d="M 808.0 615.0 H 816.0 V 196.0 H 808.0" class="edge"/>
-<path d="M 443.0 637.0 H 420.0 V 196.0 H 413.0" class="edge"/>
-<path d="M 808.0 725.0 H 1012.5 V 196.0 H 1233.0" class="edge"/>
-<path d="M 808.0 448.0 H 820.0 V 196.0 H 808.0" class="edge"/>
-<path d="M 1233.0 600.0 H 815.0 V 386.0 H 413.0" class="edge"/>
-<rect x="48" y="148" width="365" height="60" rx="4" class="stub"/>
-<path d="M52,148 H409 Q413,148 413,152 V184 H48 V152 Q48,148 52,148 Z" fill="#E6EBF2"/>
-<text x="58" y="171" class="header">item</text>
-<text x="58" y="183" class="type">Bảng chi tiết ở trang khác · khóa tham chiếu</text>
-<text x="56" y="196" class="marker">PK</text>
-<text x="108" y="196" class="field">id</text>
-<text x="405" y="196" text-anchor="end" class="type">uuid</text>
-<rect x="48" y="232" width="365" height="82" rx="4" class="stub"/>
-<path d="M52,232 H409 Q413,232 413,236 V268 H48 V236 Q48,232 52,232 Z" fill="#E6EBF2"/>
-<text x="58" y="255" class="header">warehouse</text>
-<text x="58" y="267" class="type">Bảng chi tiết ở trang khác · khóa tham chiếu</text>
-<text x="56" y="280" class="marker">PK</text>
-<text x="108" y="280" class="field">id</text>
-<text x="405" y="280" text-anchor="end" class="type">uuid</text>
-<line x1="48" y1="290" x2="413" y2="290" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="56" y="302" class="marker">UK* REF</text>
-<text x="108" y="302" class="field">organization_id</text>
-<text x="405" y="302" text-anchor="end" class="type">uuid</text>
-<rect x="48" y="338" width="365" height="60" rx="4" class="stub"/>
-<path d="M52,338 H409 Q413,338 413,342 V374 H48 V342 Q48,338 52,338 Z" fill="#E6EBF2"/>
-<text x="58" y="361" class="header">unit</text>
-<text x="58" y="373" class="type">Bảng chi tiết ở trang khác · khóa tham chiếu</text>
-<text x="56" y="386" class="marker">PK</text>
-<text x="108" y="386" class="field">code</text>
-<text x="405" y="386" text-anchor="end" class="type">text</text>
-<rect x="443" y="148" width="365" height="206" rx="4" class="table"/>
-<path d="M447,148 H804 Q808,148 808,152 V184 H443 V152 Q443,148 447,148 Z" fill="#16A08522"/>
-<text x="453" y="171" class="header">fulfillment_cycle</text>
-<text x="451" y="196" class="marker">PK</text>
-<text x="503" y="196" class="field">id</text>
-<text x="800" y="196" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="206" x2="808" y2="206" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="218" class="marker">UK* REF</text>
-<text x="503" y="218" class="field">request_id</text>
-<text x="800" y="218" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="228" x2="808" y2="228" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="240" class="marker">UK*</text>
-<text x="503" y="240" class="field">work_cycle</text>
-<text x="800" y="240" text-anchor="end" class="type">int</text>
-<line x1="443" y1="250" x2="808" y2="250" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="262" class="marker">REF</text>
-<text x="503" y="262" class="field">organization_id</text>
-<text x="800" y="262" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="272" x2="808" y2="272" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="284" class="marker">REF</text>
-<text x="503" y="284" class="field">campaign_id</text>
-<text x="800" y="284" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="294" x2="808" y2="294" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="306" class="marker">REF</text>
-<text x="503" y="306" class="field">region_code</text>
-<text x="800" y="306" text-anchor="end" class="type">text</text>
-<line x1="443" y1="316" x2="808" y2="316" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="328" class="marker"></text>
-<text x="503" y="328" class="field">state</text>
-<text x="800" y="328" text-anchor="end" class="type">text</text>
-<line x1="443" y1="338" x2="808" y2="338" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="350" class="marker"></text>
-<text x="503" y="350" class="field">created_at</text>
-<text x="800" y="350" text-anchor="end" class="type">timestamptz</text>
-<rect x="443" y="378" width="365" height="143" rx="4" class="table"/>
-<path d="M447,378 H804 Q808,378 808,382 V414 H443 V382 Q443,378 447,378 Z" fill="#16A08522"/>
-<text x="453" y="401" class="header">cycle_intent</text>
-<text x="451" y="426" class="marker">PK</text>
-<text x="503" y="426" class="field">intent_id</text>
-<text x="800" y="426" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="436" x2="808" y2="436" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="448" class="marker">FK</text>
-<text x="503" y="448" class="field">cycle_id</text>
-<text x="800" y="448" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="458" x2="808" y2="458" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="470" class="marker"></text>
-<text x="503" y="470" class="field">kind</text>
-<text x="800" y="470" text-anchor="end" class="type">text</text>
-<line x1="443" y1="480" x2="808" y2="480" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="492" class="marker"></text>
-<text x="503" y="492" class="field">state</text>
-<text x="800" y="492" text-anchor="end" class="type">text</text>
-<line x1="443" y1="502" x2="808" y2="502" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="514" class="marker"></text>
-<text x="503" y="514" class="field">created_at</text>
-<text x="800" y="514" text-anchor="end" class="type">timestamptz</text>
-<rect x="443" y="545" width="365" height="248" rx="4" class="table"/>
-<path d="M447,545 H804 Q808,545 808,549 V581 H443 V549 Q443,545 447,545 Z" fill="#16A08522"/>
-<text x="453" y="568" class="header">relief_need</text>
-<text x="451" y="593" class="marker">PK</text>
-<text x="503" y="593" class="field">id</text>
-<text x="800" y="593" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="603" x2="808" y2="603" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="615" class="marker">FK</text>
-<text x="503" y="615" class="field">cycle_id</text>
-<text x="800" y="615" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="625" x2="808" y2="625" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="637" class="marker">FK UK*</text>
-<text x="503" y="637" class="field">item_id</text>
-<text x="800" y="637" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="647" x2="808" y2="647" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="659" class="marker"></text>
-<text x="503" y="659" class="field">original_quantity</text>
-<text x="800" y="659" text-anchor="end" class="type">numeric(18,3)</text>
-<line x1="443" y1="669" x2="808" y2="669" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="681" class="marker"></text>
-<text x="503" y="681" class="field">requested_quantity</text>
-<text x="800" y="681" text-anchor="end" class="type">numeric(18,3)</text>
-<line x1="443" y1="691" x2="808" y2="691" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="703" class="marker"></text>
-<text x="503" y="703" class="field">cancelled_remaining</text>
-<text x="800" y="703" text-anchor="end" class="type">numeric(18,3)</text>
-<line x1="443" y1="713" x2="808" y2="713" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="725" class="marker">FK?</text>
-<text x="503" y="725" class="field">designated_point_id</text>
-<text x="800" y="725" text-anchor="end" class="type">uuid</text>
-<line x1="443" y1="735" x2="808" y2="735" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="747" class="marker"></text>
-<text x="503" y="747" class="field">status</text>
-<text x="800" y="747" text-anchor="end" class="type">text</text>
-<line x1="443" y1="757" x2="808" y2="757" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="769" class="marker"></text>
-<text x="503" y="769" class="field">created_at</text>
-<text x="800" y="769" text-anchor="end" class="type">timestamptz</text>
-<line x1="443" y1="779" x2="808" y2="779" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="451" y="791" class="marker"></text>
-<text x="503" y="791" class="field">version</text>
-<text x="800" y="791" text-anchor="end" class="type">int</text>
-<rect x="838" y="148" width="365" height="311" rx="4" class="table"/>
-<path d="M842,148 H1199 Q1203,148 1203,152 V184 H838 V152 Q838,148 842,148 Z" fill="#16A08522"/>
-<text x="848" y="171" class="header">commitment</text>
-<text x="846" y="196" class="marker">PK</text>
-<text x="898" y="196" class="field">id</text>
-<text x="1195" y="196" text-anchor="end" class="type">uuid</text>
-<line x1="838" y1="206" x2="1203" y2="206" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="218" class="marker">FK</text>
-<text x="898" y="218" class="field">relief_need_id</text>
-<text x="1195" y="218" text-anchor="end" class="type">uuid</text>
-<line x1="838" y1="228" x2="1203" y2="228" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="240" class="marker">FK UK*</text>
-<text x="898" y="240" class="field">item_id</text>
-<text x="1195" y="240" text-anchor="end" class="type">uuid</text>
-<line x1="838" y1="250" x2="1203" y2="250" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="262" class="marker">FK UK*</text>
-<text x="898" y="262" class="field">warehouse_id</text>
-<text x="1195" y="262" text-anchor="end" class="type">uuid</text>
-<line x1="838" y1="272" x2="1203" y2="272" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="284" class="marker"></text>
-<text x="898" y="284" class="field">quantity</text>
-<text x="1195" y="284" text-anchor="end" class="type">numeric(18,3)</text>
-<line x1="838" y1="294" x2="1203" y2="294" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="306" class="marker"></text>
-<text x="898" y="306" class="field">released_quantity</text>
-<text x="1195" y="306" text-anchor="end" class="type">numeric(18,3)</text>
-<line x1="838" y1="316" x2="1203" y2="316" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="328" class="marker"></text>
-<text x="898" y="328" class="field">issued_quantity</text>
-<text x="1195" y="328" text-anchor="end" class="type">numeric(18,3)</text>
-<line x1="838" y1="338" x2="1203" y2="338" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="350" class="marker"></text>
-<text x="898" y="350" class="field">delivered_quantity</text>
-<text x="1195" y="350" text-anchor="end" class="type">numeric(18,3)</text>
-<line x1="838" y1="360" x2="1203" y2="360" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="372" class="marker"></text>
-<text x="898" y="372" class="field">returned_quantity</text>
-<text x="1195" y="372" text-anchor="end" class="type">numeric(18,3)</text>
-<line x1="838" y1="382" x2="1203" y2="382" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="394" class="marker"></text>
-<text x="898" y="394" class="field">lost_quantity</text>
-<text x="1195" y="394" text-anchor="end" class="type">numeric(18,3)</text>
-<line x1="838" y1="404" x2="1203" y2="404" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="416" class="marker">REF</text>
-<text x="898" y="416" class="field">created_by_user_id</text>
-<text x="1195" y="416" text-anchor="end" class="type">uuid</text>
-<line x1="838" y1="426" x2="1203" y2="426" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="438" class="marker"></text>
-<text x="898" y="438" class="field">created_at</text>
-<text x="1195" y="438" text-anchor="end" class="type">timestamptz</text>
-<line x1="838" y1="448" x2="1203" y2="448" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="460" class="marker"></text>
-<text x="898" y="460" class="field">version</text>
-<text x="1195" y="460" text-anchor="end" class="type">int</text>
-<rect x="838" y="483" width="365" height="164" rx="4" class="table"/>
-<path d="M842,483 H1199 Q1203,483 1203,487 V519 H838 V487 Q838,483 842,483 Z" fill="#16A08522"/>
-<text x="848" y="506" class="header">stock_balance</text>
-<text x="846" y="531" class="marker">PK</text>
-<text x="898" y="531" class="field">id</text>
-<text x="1195" y="531" text-anchor="end" class="type">uuid</text>
-<line x1="838" y1="541" x2="1203" y2="541" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="553" class="marker">FK UK*</text>
-<text x="898" y="553" class="field">warehouse_id</text>
-<text x="1195" y="553" text-anchor="end" class="type">uuid</text>
-<line x1="838" y1="563" x2="1203" y2="563" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="575" class="marker">FK UK*</text>
-<text x="898" y="575" class="field">item_id</text>
-<text x="1195" y="575" text-anchor="end" class="type">uuid</text>
-<line x1="838" y1="585" x2="1203" y2="585" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="597" class="marker"></text>
-<text x="898" y="597" class="field">on_hand</text>
-<text x="1195" y="597" text-anchor="end" class="type">numeric(18,3)</text>
-<line x1="838" y1="607" x2="1203" y2="607" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="619" class="marker"></text>
-<text x="898" y="619" class="field">reserved</text>
-<text x="1195" y="619" text-anchor="end" class="type">numeric(18,3)</text>
-<line x1="838" y1="629" x2="1203" y2="629" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="846" y="641" class="marker"></text>
-<text x="898" y="641" class="field">updated_at</text>
-<text x="1195" y="641" text-anchor="end" class="type">timestamptz</text>
-<rect x="1233" y="148" width="365" height="248" rx="4" class="table"/>
-<path d="M1237,148 H1594 Q1598,148 1598,152 V184 H1233 V152 Q1233,148 1237,148 Z" fill="#16A08522"/>
-<text x="1243" y="171" class="header">relief_point</text>
-<text x="1241" y="196" class="marker">PK</text>
-<text x="1293" y="196" class="field">id</text>
-<text x="1590" y="196" text-anchor="end" class="type">uuid</text>
-<line x1="1233" y1="206" x2="1598" y2="206" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="218" class="marker">UK* REF</text>
-<text x="1293" y="218" class="field">organization_id</text>
-<text x="1590" y="218" text-anchor="end" class="type">uuid</text>
-<line x1="1233" y1="228" x2="1598" y2="228" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="240" class="marker">REF</text>
-<text x="1293" y="240" class="field">region_code</text>
-<text x="1590" y="240" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="250" x2="1598" y2="250" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="262" class="marker"></text>
-<text x="1293" y="262" class="field">name</text>
-<text x="1590" y="262" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="272" x2="1598" y2="272" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="284" class="marker"></text>
-<text x="1293" y="284" class="field">contact_note</text>
-<text x="1590" y="284" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="294" x2="1598" y2="294" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="306" class="marker"></text>
-<text x="1293" y="306" class="field">operating_note</text>
-<text x="1590" y="306" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="316" x2="1598" y2="316" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="328" class="marker"></text>
-<text x="1293" y="328" class="field">location</text>
-<text x="1590" y="328" text-anchor="end" class="type">geography(Point,4326)</text>
-<line x1="1233" y1="338" x2="1598" y2="338" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="350" class="marker"></text>
-<text x="1293" y="350" class="field">status</text>
-<text x="1590" y="350" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="360" x2="1598" y2="360" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="372" class="marker"></text>
-<text x="1293" y="372" class="field">created_at</text>
-<text x="1590" y="372" text-anchor="end" class="type">timestamptz</text>
-<line x1="1233" y1="382" x2="1598" y2="382" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="394" class="marker"></text>
-<text x="1293" y="394" class="field">version</text>
-<text x="1590" y="394" text-anchor="end" class="type">int</text>
-<rect x="1233" y="420" width="365" height="248" rx="4" class="table"/>
-<path d="M1237,420 H1594 Q1598,420 1598,424 V456 H1233 V424 Q1233,420 1237,420 Z" fill="#16A08522"/>
-<text x="1243" y="443" class="header">vehicle</text>
-<text x="1241" y="468" class="marker">PK</text>
-<text x="1293" y="468" class="field">id</text>
-<text x="1590" y="468" text-anchor="end" class="type">uuid</text>
-<line x1="1233" y1="478" x2="1598" y2="478" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="490" class="marker">UK* REF</text>
-<text x="1293" y="490" class="field">organization_id</text>
-<text x="1590" y="490" text-anchor="end" class="type">uuid</text>
-<line x1="1233" y1="500" x2="1598" y2="500" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="512" class="marker">REF</text>
-<text x="1293" y="512" class="field">region_code</text>
-<text x="1590" y="512" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="522" x2="1598" y2="522" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="534" class="marker"></text>
-<text x="1293" y="534" class="field">identifier</text>
-<text x="1590" y="534" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="544" x2="1598" y2="544" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="556" class="marker"></text>
-<text x="1293" y="556" class="field">vehicle_type</text>
-<text x="1590" y="556" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="566" x2="1598" y2="566" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="578" class="marker"></text>
-<text x="1293" y="578" class="field">capacity</text>
-<text x="1590" y="578" text-anchor="end" class="type">numeric(18,3)</text>
-<line x1="1233" y1="588" x2="1598" y2="588" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="600" class="marker">FK?</text>
-<text x="1293" y="600" class="field">capacity_unit</text>
-<text x="1590" y="600" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="610" x2="1598" y2="610" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="622" class="marker"></text>
-<text x="1293" y="622" class="field">status</text>
-<text x="1590" y="622" text-anchor="end" class="type">text</text>
-<line x1="1233" y1="632" x2="1598" y2="632" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="644" class="marker"></text>
-<text x="1293" y="644" class="field">created_at</text>
-<text x="1590" y="644" text-anchor="end" class="type">timestamptz</text>
-<line x1="1233" y1="654" x2="1598" y2="654" stroke="#E8EDF3" stroke-width=".7"/>
-<text x="1241" y="666" class="marker"></text>
-<text x="1293" y="666" class="field">version</text>
-<text x="1590" y="666" text-anchor="end" class="type">int</text>
-<line x1="48" y1="833" x2="1598" y2="833" stroke="#D4DCE6"/>
-<text x="48" y="850" class="note">Ký hiệu: PK khóa chính · FK khóa ngoại SQL · FK? nullable · UK duy nhất · UK* thuộc khóa duy nhất tổ hợp · REF ID tham chiếu không có FK</text>
-<text x="48" y="870" class="note">FK? là khóa ngoại nullable. FK đồng thời là PK/UK giới hạn quan hệ tối đa một bản ghi; FK thường cho phép nhiều bản ghi con. Ô xám là bảng cùng service ở trang khác.</text>
-<text x="48" y="890" class="note">Các bảng item, unit và warehouse được thể hiện dạng ô tham chiếu từ trang khác. request_id, campaign_id, organization_id và region_code là ID tham chiếu liên service.</text>
-</svg>
+<ns0:svg xmlns:ns0="http://www.w3.org/2000/svg" width="862" height="1176" viewBox="0 0 862 1176">
+  <ns0:style>text{font-family:Arial,"Noto Sans",sans-serif}.title{font-size:25px;font-weight:700;fill:#172033}.subtitle{font-size:14px;fill:#526176}.group{font-size:14px;font-weight:700;fill:#40516A}.table{fill:#FFFFFF;stroke:#B9C4D1;stroke-width:1.1}.header{font-size:15px;font-weight:700;fill:#172033}.field{font-size:12px;fill:#263448}.type{font-size:11px;fill:#718096}.marker{font-size:9px;font-weight:700;fill:#526176}.note{font-size:12px;fill:#36465C}.edge{fill:none;stroke:#7B8798;stroke-width:1.25;opacity:.8}.edge-label{font-size:10px;font-weight:700;fill:#40516A}</ns0:style>
+  <ns0:path d="M 481 1050.67 H 421 V 121.33 H 381" class="edge" id="e10" />
+  <ns0:path d="M 481 1105.33 H 391 V 36 H 381" class="edge" id="e11" />
+  <ns0:path d="M 481 770.67 H 431 V 148.67 H 381" class="edge" id="e12" />
+  <ns0:path d="M 481 874.33 H 471 V 450.6 H 481" class="edge" id="e13" />
+  <ns0:path d="M 481 500.2 H 411 V 84.67 H 481" class="edge" id="e14" />
+  <ns0:path d="M 481 549.8 H 401 V 56 H 381" class="edge" id="e15" />
+  <ns0:path d="M 481 599.4 H 461 V 396 H 381" class="edge" id="e16" />
+  <ns0:path d="M 481 311.5 H 441 V 153.33 H 481" class="edge" id="e17" />
+  <ns0:path d="M 381 662 H 451 V 224 H 381" class="edge" id="e18" />
+  <ns0:g transform="translate(-32 -132)">
+    <ns0:rect x="48" y="148" width="365" height="60" rx="4" class="table" />
+    <ns0:path d="M52,148 H409 Q413,148 413,152 V184 H48 V152 Q48,148 52,148 Z" fill="#16A08522" />
+    <ns0:text x="58" y="171" class="header">item</ns0:text>
+    <ns0:text x="56" y="196" class="marker">PK</ns0:text>
+    <ns0:text x="108" y="196" class="field">id</ns0:text>
+    <ns0:text x="405" y="196" text-anchor="end" class="type">uuid</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(-32 -138)">
+    <ns0:rect x="48" y="232" width="365" height="82" rx="4" class="table" />
+    <ns0:path d="M52,232 H409 Q413,232 413,236 V268 H48 V236 Q48,232 52,232 Z" fill="#16A08522" />
+    <ns0:text x="58" y="255" class="header">warehouse</ns0:text>
+    <ns0:text x="56" y="280" class="marker">PK</ns0:text>
+    <ns0:text x="108" y="280" class="field">id</ns0:text>
+    <ns0:text x="405" y="280" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="48" y1="290" x2="413" y2="290" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="56" y="302" class="marker">UK* REF</ns0:text>
+    <ns0:text x="108" y="302" class="field">organization_id</ns0:text>
+    <ns0:text x="405" y="302" text-anchor="end" class="type">uuid</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(-32 -144)">
+    <ns0:rect x="48" y="338" width="365" height="60" rx="4" class="table" />
+    <ns0:path d="M52,338 H409 Q413,338 413,342 V374 H48 V342 Q48,338 52,338 Z" fill="#16A08522" />
+    <ns0:text x="58" y="361" class="header">unit</ns0:text>
+    <ns0:text x="56" y="386" class="marker">PK</ns0:text>
+    <ns0:text x="108" y="386" class="field">code</ns0:text>
+    <ns0:text x="405" y="386" text-anchor="end" class="type">text</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(38 -132)">
+    <ns0:rect x="443" y="148" width="365" height="206" rx="4" class="table" />
+    <ns0:path d="M447,148 H804 Q808,148 808,152 V184 H443 V152 Q443,148 447,148 Z" fill="#16A08522" />
+    <ns0:text x="453" y="171" class="header">fulfillment_cycle</ns0:text>
+    <ns0:text x="451" y="196" class="marker">PK</ns0:text>
+    <ns0:text x="503" y="196" class="field">id</ns0:text>
+    <ns0:text x="800" y="196" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="206" x2="808" y2="206" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="218" class="marker">UK* REF</ns0:text>
+    <ns0:text x="503" y="218" class="field">request_id</ns0:text>
+    <ns0:text x="800" y="218" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="228" x2="808" y2="228" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="240" class="marker">UK*</ns0:text>
+    <ns0:text x="503" y="240" class="field">work_cycle</ns0:text>
+    <ns0:text x="800" y="240" text-anchor="end" class="type">int</ns0:text>
+    <ns0:line x1="443" y1="250" x2="808" y2="250" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="262" class="marker">REF</ns0:text>
+    <ns0:text x="503" y="262" class="field">organization_id</ns0:text>
+    <ns0:text x="800" y="262" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="272" x2="808" y2="272" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="284" class="marker">REF</ns0:text>
+    <ns0:text x="503" y="284" class="field">campaign_id</ns0:text>
+    <ns0:text x="800" y="284" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="294" x2="808" y2="294" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="306" class="marker">REF</ns0:text>
+    <ns0:text x="503" y="306" class="field">region_code</ns0:text>
+    <ns0:text x="800" y="306" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="443" y1="316" x2="808" y2="316" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="328" class="marker" />
+    <ns0:text x="503" y="328" class="field">state</ns0:text>
+    <ns0:text x="800" y="328" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="443" y1="338" x2="808" y2="338" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="350" class="marker" />
+    <ns0:text x="503" y="350" class="field">created_at</ns0:text>
+    <ns0:text x="800" y="350" text-anchor="end" class="type">timestamptz</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(38 -138)">
+    <ns0:rect x="443" y="378" width="365" height="143" rx="4" class="table" />
+    <ns0:path d="M447,378 H804 Q808,378 808,382 V414 H443 V382 Q443,378 447,378 Z" fill="#16A08522" />
+    <ns0:text x="453" y="401" class="header">cycle_intent</ns0:text>
+    <ns0:text x="451" y="426" class="marker">PK</ns0:text>
+    <ns0:text x="503" y="426" class="field">intent_id</ns0:text>
+    <ns0:text x="800" y="426" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="436" x2="808" y2="436" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="448" class="marker">FK</ns0:text>
+    <ns0:text x="503" y="448" class="field">cycle_id</ns0:text>
+    <ns0:text x="800" y="448" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="458" x2="808" y2="458" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="470" class="marker" />
+    <ns0:text x="503" y="470" class="field">kind</ns0:text>
+    <ns0:text x="800" y="470" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="443" y1="480" x2="808" y2="480" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="492" class="marker" />
+    <ns0:text x="503" y="492" class="field">state</ns0:text>
+    <ns0:text x="800" y="492" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="443" y1="502" x2="808" y2="502" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="514" class="marker" />
+    <ns0:text x="503" y="514" class="field">created_at</ns0:text>
+    <ns0:text x="800" y="514" text-anchor="end" class="type">timestamptz</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(38 -144)">
+    <ns0:rect x="443" y="545" width="365" height="248" rx="4" class="table" />
+    <ns0:path d="M447,545 H804 Q808,545 808,549 V581 H443 V549 Q443,545 447,545 Z" fill="#16A08522" />
+    <ns0:text x="453" y="568" class="header">relief_need</ns0:text>
+    <ns0:text x="451" y="593" class="marker">PK</ns0:text>
+    <ns0:text x="503" y="593" class="field">id</ns0:text>
+    <ns0:text x="800" y="593" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="603" x2="808" y2="603" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="615" class="marker">FK</ns0:text>
+    <ns0:text x="503" y="615" class="field">cycle_id</ns0:text>
+    <ns0:text x="800" y="615" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="625" x2="808" y2="625" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="637" class="marker">FK UK*</ns0:text>
+    <ns0:text x="503" y="637" class="field">item_id</ns0:text>
+    <ns0:text x="800" y="637" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="647" x2="808" y2="647" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="659" class="marker" />
+    <ns0:text x="503" y="659" class="field">original_quantity</ns0:text>
+    <ns0:text x="800" y="659" text-anchor="end" class="type">numeric(18,3)</ns0:text>
+    <ns0:line x1="443" y1="669" x2="808" y2="669" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="681" class="marker" />
+    <ns0:text x="503" y="681" class="field">requested_quantity</ns0:text>
+    <ns0:text x="800" y="681" text-anchor="end" class="type">numeric(18,3)</ns0:text>
+    <ns0:line x1="443" y1="691" x2="808" y2="691" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="703" class="marker" />
+    <ns0:text x="503" y="703" class="field">cancelled_remaining</ns0:text>
+    <ns0:text x="800" y="703" text-anchor="end" class="type">numeric(18,3)</ns0:text>
+    <ns0:line x1="443" y1="713" x2="808" y2="713" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="725" class="marker">FK?</ns0:text>
+    <ns0:text x="503" y="725" class="field">designated_point_id</ns0:text>
+    <ns0:text x="800" y="725" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="443" y1="735" x2="808" y2="735" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="747" class="marker" />
+    <ns0:text x="503" y="747" class="field">status</ns0:text>
+    <ns0:text x="800" y="747" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="443" y1="757" x2="808" y2="757" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="769" class="marker" />
+    <ns0:text x="503" y="769" class="field">created_at</ns0:text>
+    <ns0:text x="800" y="769" text-anchor="end" class="type">timestamptz</ns0:text>
+    <ns0:line x1="443" y1="779" x2="808" y2="779" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="451" y="791" class="marker" />
+    <ns0:text x="503" y="791" class="field">version</ns0:text>
+    <ns0:text x="800" y="791" text-anchor="end" class="type">int</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(-357 519)">
+    <ns0:rect x="838" y="148" width="365" height="311" rx="4" class="table" />
+    <ns0:path d="M842,148 H1199 Q1203,148 1203,152 V184 H838 V152 Q838,148 842,148 Z" fill="#16A08522" />
+    <ns0:text x="848" y="171" class="header">commitment</ns0:text>
+    <ns0:text x="846" y="196" class="marker">PK</ns0:text>
+    <ns0:text x="898" y="196" class="field">id</ns0:text>
+    <ns0:text x="1195" y="196" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="838" y1="206" x2="1203" y2="206" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="218" class="marker">FK</ns0:text>
+    <ns0:text x="898" y="218" class="field">relief_need_id</ns0:text>
+    <ns0:text x="1195" y="218" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="838" y1="228" x2="1203" y2="228" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="240" class="marker">FK UK*</ns0:text>
+    <ns0:text x="898" y="240" class="field">item_id</ns0:text>
+    <ns0:text x="1195" y="240" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="838" y1="250" x2="1203" y2="250" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="262" class="marker">FK UK*</ns0:text>
+    <ns0:text x="898" y="262" class="field">warehouse_id</ns0:text>
+    <ns0:text x="1195" y="262" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="838" y1="272" x2="1203" y2="272" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="284" class="marker" />
+    <ns0:text x="898" y="284" class="field">quantity</ns0:text>
+    <ns0:text x="1195" y="284" text-anchor="end" class="type">numeric(18,3)</ns0:text>
+    <ns0:line x1="838" y1="294" x2="1203" y2="294" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="306" class="marker" />
+    <ns0:text x="898" y="306" class="field">released_quantity</ns0:text>
+    <ns0:text x="1195" y="306" text-anchor="end" class="type">numeric(18,3)</ns0:text>
+    <ns0:line x1="838" y1="316" x2="1203" y2="316" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="328" class="marker" />
+    <ns0:text x="898" y="328" class="field">issued_quantity</ns0:text>
+    <ns0:text x="1195" y="328" text-anchor="end" class="type">numeric(18,3)</ns0:text>
+    <ns0:line x1="838" y1="338" x2="1203" y2="338" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="350" class="marker" />
+    <ns0:text x="898" y="350" class="field">delivered_quantity</ns0:text>
+    <ns0:text x="1195" y="350" text-anchor="end" class="type">numeric(18,3)</ns0:text>
+    <ns0:line x1="838" y1="360" x2="1203" y2="360" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="372" class="marker" />
+    <ns0:text x="898" y="372" class="field">returned_quantity</ns0:text>
+    <ns0:text x="1195" y="372" text-anchor="end" class="type">numeric(18,3)</ns0:text>
+    <ns0:line x1="838" y1="382" x2="1203" y2="382" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="394" class="marker" />
+    <ns0:text x="898" y="394" class="field">lost_quantity</ns0:text>
+    <ns0:text x="1195" y="394" text-anchor="end" class="type">numeric(18,3)</ns0:text>
+    <ns0:line x1="838" y1="404" x2="1203" y2="404" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="416" class="marker">REF</ns0:text>
+    <ns0:text x="898" y="416" class="field">created_by_user_id</ns0:text>
+    <ns0:text x="1195" y="416" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="838" y1="426" x2="1203" y2="426" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="438" class="marker" />
+    <ns0:text x="898" y="438" class="field">created_at</ns0:text>
+    <ns0:text x="1195" y="438" text-anchor="end" class="type">timestamptz</ns0:text>
+    <ns0:line x1="838" y1="448" x2="1203" y2="448" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="460" class="marker" />
+    <ns0:text x="898" y="460" class="field">version</ns0:text>
+    <ns0:text x="1195" y="460" text-anchor="end" class="type">int</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(-357 513)">
+    <ns0:rect x="838" y="483" width="365" height="164" rx="4" class="table" />
+    <ns0:path d="M842,483 H1199 Q1203,483 1203,487 V519 H838 V487 Q838,483 842,483 Z" fill="#16A08522" />
+    <ns0:text x="848" y="506" class="header">stock_balance</ns0:text>
+    <ns0:text x="846" y="531" class="marker">PK</ns0:text>
+    <ns0:text x="898" y="531" class="field">id</ns0:text>
+    <ns0:text x="1195" y="531" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="838" y1="541" x2="1203" y2="541" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="553" class="marker">FK UK*</ns0:text>
+    <ns0:text x="898" y="553" class="field">warehouse_id</ns0:text>
+    <ns0:text x="1195" y="553" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="838" y1="563" x2="1203" y2="563" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="575" class="marker">FK UK*</ns0:text>
+    <ns0:text x="898" y="575" class="field">item_id</ns0:text>
+    <ns0:text x="1195" y="575" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="838" y1="585" x2="1203" y2="585" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="597" class="marker" />
+    <ns0:text x="898" y="597" class="field">on_hand</ns0:text>
+    <ns0:text x="1195" y="597" text-anchor="end" class="type">numeric(18,3)</ns0:text>
+    <ns0:line x1="838" y1="607" x2="1203" y2="607" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="619" class="marker" />
+    <ns0:text x="898" y="619" class="field">reserved</ns0:text>
+    <ns0:text x="1195" y="619" text-anchor="end" class="type">numeric(18,3)</ns0:text>
+    <ns0:line x1="838" y1="629" x2="1203" y2="629" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="846" y="641" class="marker" />
+    <ns0:text x="898" y="641" class="field">updated_at</ns0:text>
+    <ns0:text x="1195" y="641" text-anchor="end" class="type">timestamptz</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(-1217 124)">
+    <ns0:rect x="1233" y="148" width="365" height="248" rx="4" class="table" />
+    <ns0:path d="M1237,148 H1594 Q1598,148 1598,152 V184 H1233 V152 Q1233,148 1237,148 Z" fill="#16A08522" />
+    <ns0:text x="1243" y="171" class="header">relief_point</ns0:text>
+    <ns0:text x="1241" y="196" class="marker">PK</ns0:text>
+    <ns0:text x="1293" y="196" class="field">id</ns0:text>
+    <ns0:text x="1590" y="196" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="1233" y1="206" x2="1598" y2="206" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="218" class="marker">UK* REF</ns0:text>
+    <ns0:text x="1293" y="218" class="field">organization_id</ns0:text>
+    <ns0:text x="1590" y="218" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="1233" y1="228" x2="1598" y2="228" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="240" class="marker">REF</ns0:text>
+    <ns0:text x="1293" y="240" class="field">region_code</ns0:text>
+    <ns0:text x="1590" y="240" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="250" x2="1598" y2="250" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="262" class="marker" />
+    <ns0:text x="1293" y="262" class="field">name</ns0:text>
+    <ns0:text x="1590" y="262" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="272" x2="1598" y2="272" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="284" class="marker" />
+    <ns0:text x="1293" y="284" class="field">contact_note</ns0:text>
+    <ns0:text x="1590" y="284" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="294" x2="1598" y2="294" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="306" class="marker" />
+    <ns0:text x="1293" y="306" class="field">operating_note</ns0:text>
+    <ns0:text x="1590" y="306" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="316" x2="1598" y2="316" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="328" class="marker" />
+    <ns0:text x="1293" y="328" class="field">location</ns0:text>
+    <ns0:text x="1590" y="328" text-anchor="end" class="type">geography(Point,4326)</ns0:text>
+    <ns0:line x1="1233" y1="338" x2="1598" y2="338" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="350" class="marker" />
+    <ns0:text x="1293" y="350" class="field">status</ns0:text>
+    <ns0:text x="1590" y="350" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="360" x2="1598" y2="360" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="372" class="marker" />
+    <ns0:text x="1293" y="372" class="field">created_at</ns0:text>
+    <ns0:text x="1590" y="372" text-anchor="end" class="type">timestamptz</ns0:text>
+    <ns0:line x1="1233" y1="382" x2="1598" y2="382" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="394" class="marker" />
+    <ns0:text x="1293" y="394" class="field">version</ns0:text>
+    <ns0:text x="1590" y="394" text-anchor="end" class="type">int</ns0:text>
+  </ns0:g>
+  <ns0:g transform="translate(-1217 118)">
+    <ns0:rect x="1233" y="420" width="365" height="248" rx="4" class="table" />
+    <ns0:path d="M1237,420 H1594 Q1598,420 1598,424 V456 H1233 V424 Q1233,420 1237,420 Z" fill="#16A08522" />
+    <ns0:text x="1243" y="443" class="header">vehicle</ns0:text>
+    <ns0:text x="1241" y="468" class="marker">PK</ns0:text>
+    <ns0:text x="1293" y="468" class="field">id</ns0:text>
+    <ns0:text x="1590" y="468" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="1233" y1="478" x2="1598" y2="478" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="490" class="marker">UK* REF</ns0:text>
+    <ns0:text x="1293" y="490" class="field">organization_id</ns0:text>
+    <ns0:text x="1590" y="490" text-anchor="end" class="type">uuid</ns0:text>
+    <ns0:line x1="1233" y1="500" x2="1598" y2="500" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="512" class="marker">REF</ns0:text>
+    <ns0:text x="1293" y="512" class="field">region_code</ns0:text>
+    <ns0:text x="1590" y="512" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="522" x2="1598" y2="522" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="534" class="marker" />
+    <ns0:text x="1293" y="534" class="field">identifier</ns0:text>
+    <ns0:text x="1590" y="534" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="544" x2="1598" y2="544" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="556" class="marker" />
+    <ns0:text x="1293" y="556" class="field">vehicle_type</ns0:text>
+    <ns0:text x="1590" y="556" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="566" x2="1598" y2="566" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="578" class="marker" />
+    <ns0:text x="1293" y="578" class="field">capacity</ns0:text>
+    <ns0:text x="1590" y="578" text-anchor="end" class="type">numeric(18,3)</ns0:text>
+    <ns0:line x1="1233" y1="588" x2="1598" y2="588" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="600" class="marker">FK?</ns0:text>
+    <ns0:text x="1293" y="600" class="field">capacity_unit</ns0:text>
+    <ns0:text x="1590" y="600" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="610" x2="1598" y2="610" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="622" class="marker" />
+    <ns0:text x="1293" y="622" class="field">status</ns0:text>
+    <ns0:text x="1590" y="622" text-anchor="end" class="type">text</ns0:text>
+    <ns0:line x1="1233" y1="632" x2="1598" y2="632" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="644" class="marker" />
+    <ns0:text x="1293" y="644" class="field">created_at</ns0:text>
+    <ns0:text x="1590" y="644" text-anchor="end" class="type">timestamptz</ns0:text>
+    <ns0:line x1="1233" y1="654" x2="1598" y2="654" stroke="#E8EDF3" stroke-width=".7" />
+    <ns0:text x="1241" y="666" class="marker" />
+    <ns0:text x="1293" y="666" class="field">version</ns0:text>
+    <ns0:text x="1590" y="666" text-anchor="end" class="type">int</ns0:text>
+  </ns0:g>
+</ns0:svg>
