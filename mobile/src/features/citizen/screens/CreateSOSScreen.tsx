@@ -47,7 +47,11 @@ export const CreateSOSScreen: React.FC = () => {
 
   const [selectedCategory, setSelectedCategory] = useState<IncidentCategoryCode>('FLOOD');
   const [peopleAffected, setPeopleAffected] = useState<string>('');
+  const [childrenCount, setChildrenCount] = useState<string>('');
+  const [elderlyCount, setElderlyCount] = useState<string>('');
   const [declaredDanger, setDeclaredDanger] = useState<boolean>(false);
+  const [needsRescue, setNeedsRescue] = useState(true);
+  const [needsRelief, setNeedsRelief] = useState(false);
   const [reporterName, setReporterName] = useState<string>('');
   const [reporterPhone, setReporterPhone] = useState<string>('');
   const [description, setDescription] = useState<string>('');
@@ -69,7 +73,11 @@ export const CreateSOSScreen: React.FC = () => {
         setPendingCommand(pending);
         setSelectedCategory(pending.payload.incident_category_code);
         setPeopleAffected(pending.payload.people_affected == null ? '' : String(pending.payload.people_affected));
+        setChildrenCount(pending.payload.children_count == null ? '' : String(pending.payload.children_count));
+        setElderlyCount(pending.payload.elderly_count == null ? '' : String(pending.payload.elderly_count));
         setDeclaredDanger(Boolean(pending.payload.reporter_declared_danger));
+        setNeedsRescue(pending.payload.needs_rescue ?? true);
+        setNeedsRelief(Boolean(pending.payload.needs_relief_supplies));
         setReporterName(pending.payload.reporter_name || '');
         setReporterPhone(pending.payload.reporter_contact_phone || '');
         setDescription(pending.payload.description || '');
@@ -104,7 +112,11 @@ export const CreateSOSScreen: React.FC = () => {
               setPendingCommand(null);
               setSelectedCategory('FLOOD');
               setPeopleAffected('');
+              setChildrenCount('');
+              setElderlyCount('');
               setDeclaredDanger(false);
+              setNeedsRescue(true);
+              setNeedsRelief(false);
               setReporterName('');
               setReporterPhone('');
               setDescription('');
@@ -138,6 +150,20 @@ export const CreateSOSScreen: React.FC = () => {
       Alert.alert('Thông tin chưa hợp lệ', 'Số người cần hỗ trợ phải là số nguyên từ 1 đến 10.000; để trống nếu chưa rõ.');
       return;
     }
+    const children = childrenCount === '' ? null : Number(childrenCount);
+    const elderly = elderlyCount === '' ? null : Number(elderlyCount);
+    if ([children, elderly].some((value) => value !== null && (!Number.isInteger(value) || value < 0 || value > 10000))) {
+      Alert.alert('Thông tin chưa hợp lệ', 'Số trẻ em và người cao tuổi phải là số nguyên từ 0 đến 10.000.');
+      return;
+    }
+    if (headcount !== null && (children ?? 0) + (elderly ?? 0) > headcount) {
+      Alert.alert('Thông tin chưa hợp lệ', 'Tổng số trẻ em và người cao tuổi không được lớn hơn tổng số người.');
+      return;
+    }
+    if (!needsRescue && !needsRelief) {
+      Alert.alert('Chưa chọn nhu cầu', 'Hãy chọn cần cứu hộ, cần hàng cứu trợ hoặc cả hai.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -147,9 +173,13 @@ export const CreateSOSScreen: React.FC = () => {
         incident_category_code: selectedCategory,
         description: combinedDescription || undefined,
         people_affected: headcount,
+        ...(children === null ? {} : { children_count: children }),
+        ...(elderly === null ? {} : { elderly_count: elderly }),
         reporter_name: reporterName.trim() || undefined,
         reporter_contact_phone: reporterPhone.trim() || undefined,
         reporter_declared_danger: declaredDanger,
+        needs_rescue: needsRescue,
+        needs_relief_supplies: needsRelief,
         location: location!,
       };
 
@@ -358,6 +388,60 @@ export const CreateSOSScreen: React.FC = () => {
             keyboardType="number-pad"
             maxLength={4}
           />
+        </View>
+
+        <View style={styles.formRow}>
+          <View style={styles.labelWithIcon}>
+            <Users size={18} color={THEME.colors.text.secondary} />
+            <Text style={styles.inputLabel}>Trẻ em:</Text>
+          </View>
+          <TextInput
+            style={styles.numberInput}
+            value={childrenCount}
+            onChangeText={setChildrenCount}
+            keyboardType="number-pad"
+            maxLength={4}
+            placeholder="Chưa rõ"
+            placeholderTextColor={THEME.colors.text.muted}
+          />
+        </View>
+
+        <View style={styles.formRow}>
+          <View style={styles.labelWithIcon}>
+            <Users size={18} color={THEME.colors.text.secondary} />
+            <Text style={styles.inputLabel}>Người cao tuổi:</Text>
+          </View>
+          <TextInput
+            style={styles.numberInput}
+            value={elderlyCount}
+            onChangeText={setElderlyCount}
+            keyboardType="number-pad"
+            maxLength={4}
+            placeholder="Chưa rõ"
+            placeholderTextColor={THEME.colors.text.muted}
+          />
+        </View>
+
+        <View style={styles.dangerToggleRow}>
+          <View style={styles.dangerLabelBox}>
+            <AlertTriangle size={20} color={THEME.colors.emergency.main} />
+            <View style={{ marginLeft: 8, flex: 1 }}>
+              <Text style={styles.dangerTitle}>Cần đội cứu hộ</Text>
+              <Text style={styles.dangerSubtitle}>Đang được chọn mặc định</Text>
+            </View>
+          </View>
+          <Switch value={needsRescue} onValueChange={setNeedsRescue} />
+        </View>
+
+        <View style={styles.dangerToggleRow}>
+          <View style={styles.dangerLabelBox}>
+            <AlertCircle size={20} color={THEME.colors.primary.main} />
+            <View style={{ marginLeft: 8, flex: 1 }}>
+              <Text style={styles.dangerTitle}>Cần hàng cứu trợ</Text>
+              <Text style={styles.dangerSubtitle}>Chọn thêm nếu cần thực phẩm, nước hoặc vật tư</Text>
+            </View>
+          </View>
+          <Switch value={needsRelief} onValueChange={setNeedsRelief} />
         </View>
 
         {/* Nút bật cờ nguy hiểm tính mạng */}

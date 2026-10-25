@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Matches, MaxLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class RequestLocationDto {
   @IsString() @IsIn(['Point'])
@@ -25,8 +25,14 @@ export class CreateSelfRequestDto {
   @IsOptional() @IsString() @MaxLength(2000)
   description?: string | null;
 
-  @IsOptional() @IsInt()
+  @IsOptional() @IsInt() @Min(1) @Max(10000)
   people_affected?: number | null;
+
+  @IsOptional() @IsInt() @Min(0) @Max(10000)
+  children_count?: number | null;
+
+  @IsOptional() @IsInt() @Min(0) @Max(10000)
+  elderly_count?: number | null;
 
   @IsOptional() @IsString() @MaxLength(200) @Matches(/\S/u)
   reporter_name?: string | null;
@@ -36,6 +42,12 @@ export class CreateSelfRequestDto {
 
   @IsOptional() @IsBoolean()
   reporter_declared_danger?: boolean;
+
+  @IsOptional() @IsBoolean()
+  needs_rescue?: boolean;
+
+  @IsOptional() @IsBoolean()
+  needs_relief_supplies?: boolean;
 
   @IsObject() @ValidateNested() @Type(() => RequestLocationDto)
   location!: RequestLocationDto;

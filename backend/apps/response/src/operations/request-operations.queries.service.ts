@@ -113,9 +113,9 @@ export class RequestOperationsQueriesService {
   async detail(requestId: string, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     const row = await this.persistence.staffRequest(this.dataSource, requestId, session, 'REQUEST_DETAIL_READ');
-    const [subjectRows, eventPage, attempts, decisionRows, missionRows, evidenceRows, canonicalRows, duplicateRows] = await Promise.all([
+    const [subjectRows, eventPage, attempts, decisionRows, missionRows, missionHistory, evidenceRows, canonicalRows, duplicateRows, advisoryRows] = await Promise.all([
       this.dataSource.query(
-        `SELECT people_affected,location_source,location_accuracy_m,location_captured_at,
+        `SELECT people_affected,children_count,elderly_count,location_source,location_accuracy_m,location_captured_at,
                 ST_X(location::geometry) AS longitude,ST_Y(location::geometry) AS latitude,
                 reporter_relationship,beneficiary_contact_phone,alternate_contact_name,alternate_contact_phone,
                 information_source,last_known_situation_at,contactability,household_reference_note
@@ -128,13 +128,24 @@ export class RequestOperationsQueriesService {
            FROM verification_decision WHERE request_id=$1 ORDER BY decided_at DESC,id DESC LIMIT 1`, [row.id],
       ) as Promise<Array<Record<string, unknown>>>,
       this.dataSource.query(
-        `SELECT id,status,created_at,team_id FROM mission WHERE request_id=$1 AND status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE') ORDER BY created_at,id LIMIT 6`, [row.id],
+        `SELECT id,status,mission_kind,created_at,team_id FROM mission WHERE request_id=$1 AND status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE') ORDER BY created_at,id LIMIT 6`, [row.id],
+      ) as Promise<Array<Record<string, unknown>>>,
+      this.dataSource.query(
+        `SELECT m.id,m.status,m.mission_kind,m.created_at,m.team_id,t.name AS team_name,m.suggested_team_id,m.override_reason,
+                e.to_status AS last_status,e.occurred_at AS last_occurred_at,e.recorded_basis,e.reported_by
+           FROM mission m JOIN rescue_team t ON t.id=m.team_id
+           LEFT JOIN LATERAL (SELECT to_status,occurred_at,recorded_basis,reported_by FROM mission_event WHERE mission_id=m.id ORDER BY occurred_at DESC,id DESC LIMIT 1) e ON true
+          WHERE m.request_id=$1 ORDER BY m.created_at DESC,m.id DESC LIMIT 21`, [row.id],
       ) as Promise<Array<Record<string, unknown>>>,
       this.dataSource.query(
         `SELECT id,state,size_bytes,detected_mime,checksum,created_at FROM evidence_metadata WHERE request_id=$1 AND state='READY' ORDER BY created_at DESC,id DESC LIMIT 6`, [row.id],
       ) as Promise<Array<Record<string, unknown>>>,
       row.canonical_request_id ? this.scopedRequestSummary(row.canonical_request_id, session) : Promise.resolve([]),
       this.duplicatesPage(this.dataSource, row.id, undefined, 20, session),
+      this.dataSource.query(
+        `SELECT id,model,status,risk_score,reason_codes,extracted_json,review_status,review_by_user_id,review_at,review_note,error_code,created_at
+           FROM ai_advisory WHERE request_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1`, [row.id],
+      ) as Promise<Array<Record<string, unknown>>>,
     ]);
     const subject = subjectRows[0];
     if (!subject) throw new AppError('INTERNAL_ERROR', { status: 500 });
@@ -154,9 +165,11 @@ export class RequestOperationsQueriesService {
       category: row.incident_category_code, description: row.description,
       region_code: row.region_code, campaign_id: row.campaign_id, received_at: toIso(row.received_at),
       declared_danger: row.reporter_declared_danger,
+      needs_rescue: row.needs_rescue, needs_relief_supplies: row.needs_relief_supplies,
       reporter: { user_id: row.reporter_user_id, name: row.reporter_name, contact_phone: row.reporter_contact_phone },
       subject: {
         people_affected: subject.people_affected,
+        children_count: subject.children_count, elderly_count: subject.elderly_count,
         location: { type: 'Point', coordinates: [Number(subject.longitude), Number(subject.latitude)], source: subject.location_source, accuracy_m: subject.location_accuracy_m, captured_at: subject.location_captured_at == null ? null : toIso(subject.location_captured_at as Date | string) },
         reporter_relationship: subject.reporter_relationship, beneficiary_contact_phone: subject.beneficiary_contact_phone,
         alternate_contact: { name: subject.alternate_contact_name, phone: subject.alternate_contact_phone },
@@ -169,6 +182,12 @@ export class RequestOperationsQueriesService {
       contact_attempts: { items: attempts.items, more: attempts.more },
       verification_decision: decisionRows[0] ? decisionView(decisionRows[0]) : null,
       active_missions: { items: missionRows.slice(0, 5).map((mission) => ({ ...mission, created_at: toIso(mission.created_at as Date | string) })), more: missionRows.length > 5 },
+      mission_history: { items: missionHistory.slice(0, 20).map((mission) => ({ ...mission, created_at: toIso(mission.created_at as Date | string), last_occurred_at: mission.last_occurred_at == null ? null : toIso(mission.last_occurred_at as Date | string) })), more: missionHistory.length > 20 },
+      ai_advisory: advisoryRows[0] ? {
+        ...advisoryRows[0], created_at: toIso(advisoryRows[0].created_at as Date | string),
+        review_at: advisoryRows[0].review_at == null ? null : toIso(advisoryRows[0].review_at as Date | string),
+        human_review_required: true,
+      } : null,
       evidence: { items: evidenceRows.slice(0, 5).map((evidence) => ({ ...evidence, created_at: toIso(evidence.created_at as Date | string) })), more: evidenceRows.length > 5 },
       canonical: canonicalRows[0] ?? null,
       duplicates: { items: duplicateRows.items, more: duplicateRows.more },

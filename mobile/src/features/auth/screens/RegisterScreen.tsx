@@ -13,21 +13,34 @@ import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { useAuthStore } from '../../../store/authStore';
+import { IdentityApi } from '../../../api/identityApi';
 import { getApiErrorMessage } from '../../../api/client';
 import { THEME } from '../../../constants/theme';
 import { User, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, UserCheck } from 'lucide-react-native';
 
 export const RegisterScreen: React.FC = () => {
   const router = useRouter();
-  const { register, isLoading } = useAuthStore();
+  const { register, login, isLoading } = useAuthStore();
 
+  const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [challengeId, setChallengeId] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+
+  const finishLogin = () => router.replace('/');
 
   const handleRegister = async () => {
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      Alert.alert('Email không hợp lệ', 'Vui lòng nhập địa chỉ email để nhận mã xác minh.');
+      return;
+    }
     const trimmedDisplayName = displayName.trim().normalize('NFC');
     const trimmedUsername = username.trim().toLowerCase();
     const cleanPassword = password;
@@ -70,28 +83,55 @@ export const RegisterScreen: React.FC = () => {
     }
 
     try {
-      await register(trimmedUsername, cleanPassword, trimmedDisplayName);
-      Alert.alert(
-        'Đăng ký thành công',
-        `Chào mừng công dân ${trimmedDisplayName}! Tài khoản của bạn đã được thiết lập thành công.`,
-        [
-          {
-            text: 'Bắt đầu sử dụng',
-            onPress: () => {
-              // Chuyển về màn hình cứu hộ chính
-              router.replace('/');
-            },
-          },
-        ]
-      );
+      const result = await register(email.trim().toLowerCase(), trimmedUsername, cleanPassword, trimmedDisplayName);
+      setChallengeId(result.verification.challenge_id);
+      setEmailSent(result.email_sent);
+      Alert.alert('Đã tạo tài khoản chờ xác minh', result.email_sent
+        ? `Mã xác minh đã được gửi đến ${email.trim()}.`
+        : 'Chưa gửi được email. Hãy kiểm tra cấu hình email hoặc thử gửi lại sau.');
     } catch (err: any) {
       const errorMsg = getApiErrorMessage(err, 'Không thể tạo tài khoản. Vui lòng thử lại sau.');
       Alert.alert('Đăng ký thất bại', errorMsg);
     }
   };
 
+  const handleVerifyEmail = async () => {
+    if (!/^\d{6}$/.test(verificationCode.trim())) {
+      Alert.alert('Mã xác minh không hợp lệ', 'Vui lòng nhập mã gồm 6 chữ số trong email.');
+      return;
+    }
+    setIsVerifying(true);
+    try {
+      await IdentityApi.verifyEmail(challengeId, verificationCode.trim());
+      await login(username.trim().toLowerCase(), password);
+      Alert.alert('Xác minh thành công', 'Email đã được xác minh và tài khoản đã kích hoạt.', [
+        { text: 'Tiếp tục', onPress: finishLogin },
+      ]);
+    } catch (err: unknown) {
+      Alert.alert('Xác minh thất bại', getApiErrorMessage(err, 'Không thể xác minh email. Vui lòng thử lại.'));
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setIsResending(true);
+    try {
+      const result = await IdentityApi.resendEmailOtp(challengeId);
+      if (result.challenge_id) setChallengeId(result.challenge_id);
+      setEmailSent(result.email_sent);
+      Alert.alert('Gửi mã xác minh', result.email_sent
+        ? `Mã mới đã được gửi đến ${email.trim()}.`
+        : 'Chưa gửi được email. Vui lòng kiểm tra cấu hình email hoặc thử lại sau.');
+    } catch (err: unknown) {
+      Alert.alert('Chưa gửi được mã', getApiErrorMessage(err, 'Chưa thể gửi lại mã xác minh.'));
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   return (
-    <ScreenContainer title="Đăng Ký Tài Khoản Công Dân" onBack={() => goBackOrHome(router)} scrollable={true}>
+    <ScreenContainer title={challengeId ? 'Xác Minh Email' : 'Đăng Ký Tài Khoản Công Dân'} onBack={() => goBackOrHome(router)} scrollable={true}>
       <View style={styles.headerBox}>
         <View style={styles.logoFrame}>
           <Image
@@ -101,13 +141,33 @@ export const RegisterScreen: React.FC = () => {
           />
         </View>
         <Text style={styles.brandTitle}>Reliva</Text>
-        <Text style={styles.title}>TÀI KHOẢN CÔNG DÂN</Text>
+        <Text style={styles.title}>{challengeId ? 'XÁC MINH ĐỊA CHỈ EMAIL' : 'TÀI KHOẢN CÔNG DÂN'}</Text>
         <Text style={styles.subtitle}>
-          Đăng ký tài khoản để quản lý yêu cầu cứu trợ người thân (PROXY), theo dõi tiến độ cứu hộ và đồng bộ thông tin khẩn cấp.
+          {challengeId
+            ? `Nhập mã 6 chữ số được gửi đến ${email.trim()} để kích hoạt tài khoản.`
+            : 'Đăng ký tài khoản để quản lý yêu cầu cứu trợ người thân, theo dõi tiến độ cứu hộ và đồng bộ thông tin khẩn cấp.'}
         </Text>
       </View>
 
-      <View style={styles.card}>
+      {!challengeId ? <View style={styles.card}>
+        <View style={styles.inputGroup}>
+          <View style={styles.labelRow}>
+            <User size={16} color={THEME.colors.text.secondary} />
+            <Text style={styles.inputLabel}>Email nhận mã xác minh *</Text>
+          </View>
+          <TextInput
+            style={styles.textInput}
+            placeholder="ban@example.com"
+            placeholderTextColor={THEME.colors.text.muted}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Text style={styles.helperText}>Tài khoản chỉ được kích hoạt sau khi xác minh email</Text>
+        </View>
+
         {/* Họ và tên */}
         <View style={styles.inputGroup}>
           <View style={styles.labelRow}>
@@ -195,7 +255,7 @@ export const RegisterScreen: React.FC = () => {
         <View style={styles.policyBox}>
           <ShieldCheck size={20} color={THEME.colors.success.main} style={{ marginRight: 8, marginTop: 2 }} />
           <Text style={styles.policyText}>
-            Tài khoản công dân được tự động kích hoạt ngay sau khi đăng ký và cấp quyền khai báo cứu trợ khẩn cấp.
+            Tài khoản công dân được kích hoạt sau khi xác minh email và cấp quyền khai báo cứu trợ khẩn cấp.
           </Text>
         </View>
 
@@ -210,7 +270,7 @@ export const RegisterScreen: React.FC = () => {
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <>
-              <Text style={styles.registerButtonText}>ĐĂNG KÝ TÀI KHOẢN NGAY</Text>
+              <Text style={styles.registerButtonText}>GỬI MÃ XÁC MINH</Text>
               <ArrowRight size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
             </>
           )}
@@ -223,7 +283,37 @@ export const RegisterScreen: React.FC = () => {
             <Text style={styles.switchAuthLink}> Đăng nhập ngay</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </View> : <View style={styles.card}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Mã xác minh email</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Nhập mã 6 chữ số"
+            placeholderTextColor={THEME.colors.text.muted}
+            value={verificationCode}
+            onChangeText={(value) => setVerificationCode(value.replace(/\D/g, '').slice(0, 6))}
+            keyboardType="number-pad"
+            maxLength={6}
+          />
+          <Text style={styles.helperText}>{emailSent ? 'Kiểm tra hộp thư đến và thư rác.' : 'Email chưa được gửi; bạn có thể thử gửi lại khi dịch vụ email sẵn sàng.'}</Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.registerButton, isVerifying && styles.registerButtonDisabled]}
+          onPress={handleVerifyEmail}
+          disabled={isVerifying}
+          activeOpacity={0.85}
+        >
+          {isVerifying ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.registerButtonText}>XÁC MINH VÀ KÍCH HOẠT</Text>}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.resendButton}
+          onPress={handleResend}
+          disabled={isResending}
+          activeOpacity={0.7}
+        >
+          {isResending ? <ActivityIndicator size="small" color={THEME.colors.primary.main} /> : <Text style={styles.switchAuthLink}>Gửi lại mã xác minh</Text>}
+        </TouchableOpacity>
+      </View>}
     </ScreenContainer>
   );
 };
@@ -353,6 +443,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...THEME.shadows.md,
+  },
+  resendButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
   },
   registerButtonDisabled: {
     opacity: 0.6,

@@ -43,11 +43,23 @@ export class SupplementRequestDto {
   @IsOptional() @IsInt() @Min(1) @Max(10000)
   declare people_affected?: number | null;
 
+  @IsOptional() @IsInt() @Min(0) @Max(10000)
+  declare children_count?: number | null;
+
+  @IsOptional() @IsInt() @Min(0) @Max(10000)
+  declare elderly_count?: number | null;
+
   @IsOptional() @IsObject() @ValidateNested() @Type(() => RequestLocationDto)
   declare location?: RequestLocationDto;
 
   @IsOptional() @IsBoolean()
   declare reporter_declared_danger?: boolean;
+
+  @IsOptional() @IsBoolean()
+  declare needs_rescue?: boolean;
+
+  @IsOptional() @IsBoolean()
+  declare needs_relief_supplies?: boolean;
 }
 
 export class RecoverRequestDto {

@@ -8,8 +8,12 @@ interface AuthState {
   grants: RoleGrant[];
   isLoading: boolean;
   isAuthenticated: boolean;
-  register: (username: string, password: string, displayName: string) => Promise<void>;
+  register: (email: string, username: string, password: string, displayName: string) => Promise<{
+    verification: { challenge_id: string };
+    email_sent: boolean;
+  }>;
   login: (username: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
   restoreSession: () => Promise<void>;
   isVolunteerOrLeader: () => boolean;
@@ -44,6 +48,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isAuthenticated: true,
           isLoading: false,
         });
+      }
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  loginWithGoogle: async (idToken: string) => {
+    set({ isLoading: true });
+    try {
+      const response = await IdentityApi.googleLogin(idToken);
+      try {
+        const me = await IdentityApi.getMe();
+        set({ user: me.user, grants: me.grants, isAuthenticated: true, isLoading: false });
+      } catch {
+        set({ user: response.user, grants: [], isAuthenticated: true, isLoading: false });
       }
     } catch (error) {
       set({ isLoading: false });
@@ -86,16 +106,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  register: async (username: string, password: string, displayName: string) => {
+  register: async (email: string, username: string, password: string, displayName: string) => {
     set({ isLoading: true });
     try {
-      // 1. Gửi lệnh tạo tài khoản công dân mới lên backend (POST /identity/auth/register)
-      await IdentityApi.register(username, password, displayName);
-      // 2. Tự động đăng nhập luôn để lấy Access/Refresh token và thiết lập phiên
-      await get().login(username, password);
+      return await IdentityApi.register(email, username, password, displayName);
     } catch (error) {
       set({ isLoading: false });
       throw error;
+    } finally {
+      set({ isLoading: false });
     }
   },
 

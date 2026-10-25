@@ -93,6 +93,38 @@ export const ResponseApi = {
     return response.data;
   },
 
+  // Replace editable SOS facts before verification (PUT /requests/:id/report).
+  async updateReport(
+    requestId: string,
+    payload: {
+      expected_version: number;
+      description?: string | null;
+      household_reference_note?: string | null;
+      people_affected?: number | null;
+      children_count?: number | null;
+      elderly_count?: number | null;
+      location?: GeoLocation;
+      reporter_declared_danger?: boolean;
+      needs_rescue?: boolean;
+      needs_relief_supplies?: boolean;
+    },
+    trackingCode?: string,
+    trackingSecret?: string,
+    idempotencyKey?: string,
+  ): Promise<{ id: string; version: number }> {
+    const headers: Record<string, string> = {
+      'Idempotency-Key': idempotencyKey || generateUUID(),
+    };
+    if (trackingCode) headers['X-Tracking-Code'] = trackingCode;
+    if (trackingSecret) headers['X-Tracking-Secret'] = trackingSecret;
+    const response = await apiClient.put<{ id: string; version: number }>(
+      `/response/requests/${requestId}/report`,
+      payload,
+      { headers },
+    );
+    return response.data;
+  },
+
   // Danh sách các yêu cầu cứu trợ của tài khoản đã đăng nhập (GET /response/requests/mine)
   async getMyRequests(limit = 50, cursor?: string): Promise<{ items: MyRequestItem[]; more: boolean; cursor?: string }> {
     const params: Record<string, any> = { limit };

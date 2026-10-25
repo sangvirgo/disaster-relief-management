@@ -12,7 +12,7 @@
 --   f2 R2  PROXY by citizen1, VERIFYING, alternate contact, 2 NO_ANSWER attempts (aged: overdue)
 --   f3 R3  VERIFIED (CONTACT_CONFIRMED), campaign-linked          f4 R4  DUPLICATE of R3
 --   f5 R5  IN_PROGRESS P2, Logistics-admitted, ACCEPTED mission team 1 (+ earlier FAILED team B mission with EN_ROUTE history)
---   f6 R6  P1 with OFFERED mission to COORDINATOR-mode team 'Đại đội cơ động (demo)'
+--   f6 R6  P1 flood report: declared danger, children + elderly, rescue + supplies, AI suggestion reviewed by a coordinator
 --   f7 R7  unassigned: region NULL, point lon 105.0 lat 21.0 (deliberately outside DEMO_A and DEMO_B boundaries)
 --   f8 R8  RATE_LIMITED_REVIEW lane        f9 R9  declared danger, SUBMITTED, 45 min old (overdue)
 --   fa R10 REJECTED with reason            fb R11 PROXY in PROXY_QUOTA_REVIEW lane
@@ -186,6 +186,39 @@ INSERT INTO request_subject (request_id, people_affected, location, location_sou
   (pg_temp.u('fc'), 1,    pg_temp.pt(106.71, 10.77), 'GPS', 12.0, now() - interval '22 hours', NULL, '0900000012', NULL, NULL, NULL, 'REACHABLE'),
   (pg_temp.u('fd'), 2,    pg_temp.pt(106.69, 10.79), 'MANUAL_PIN', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'UNKNOWN');
 
+-- Varied assistance needs and vulnerable-person facts for coordinator and scoring scenarios.
+UPDATE assistance_request AS r
+   SET needs_rescue = facts.needs_rescue,
+       needs_relief_supplies = facts.needs_relief_supplies
+  FROM (VALUES
+    ('f2', true, true), ('f3', false, true), ('f5', true, true), ('f6', true, true),
+    ('f9', true, false), ('fb', false, true), ('fc', true, false), ('fd', true, false)
+  ) AS facts(request_suffix, needs_rescue, needs_relief_supplies)
+ WHERE r.id = pg_temp.u(facts.request_suffix);
+
+UPDATE request_subject AS s
+   SET children_count = facts.children_count,
+       elderly_count = facts.elderly_count
+  FROM (VALUES
+    ('f2', 1, 1), ('f3', 1, 0), ('f5', 2, 1), ('f6', 1, 1),
+    ('f9', 2, 1), ('fb', 4, 3), ('fc', 0, 0), ('fd', 0, 0)
+  ) AS facts(request_suffix, children_count, elderly_count)
+ WHERE s.request_id = pg_temp.u(facts.request_suffix);
+
+-- These completed advisories are synthetic UI examples; they never dispatch or set official priority.
+INSERT INTO ai_advisory (id, request_id, request_version, input_hash, model, prompt_version, schema_version,
+                         status, attempts, extracted_json, risk_score, reason_codes, review_status,
+                         review_by_user_id, review_at, review_note, created_at, completed_at) VALUES
+  (pg_temp.u('af1'), pg_temp.u('f9'), 1, 'demo-ai-f9-v1', 'gemini-3.1-flash-lite', 'v1', 'v1',
+   'COMPLETED', 1,
+   '{"summary":"Cháy lan gần khu dân cư; người báo cho biết có nguy hiểm tính mạng.","indicators":["Có nguy cơ cháy lan","Cần xác minh tình trạng người trong khu vực"],"facts":{"people_affected":6,"children_count":2,"elderly_count":1,"life_threat":true,"needs_rescue":true,"needs_relief_supplies":false},"confidence":0.86}'::jsonb,
+   78, ARRAY['DECLARED_LIFE_DANGER','CHILDREN_PRESENT'], NULL, NULL, NULL, NULL, now() - interval '42 minutes', now() - interval '41 minutes'),
+  (pg_temp.u('af2'), pg_temp.u('f6'), 5, 'demo-ai-f6-v1', 'gemini-3.1-flash-lite', 'v1', 'v1',
+   'COMPLETED', 1,
+   '{"summary":"Có người cao tuổi và trẻ nhỏ mắc kẹt; nước đang lên nhanh.","indicators":["Ngập lụt","Có người dễ bị tổn thương","Cần cứu hộ và hàng cứu trợ"],"facts":{"people_affected":3,"children_count":1,"elderly_count":1,"life_threat":true,"needs_rescue":true,"needs_relief_supplies":true},"confidence":0.93}'::jsonb,
+   94, ARRAY['DECLARED_LIFE_DANGER','FLOOD_OR_TRAPPED','CHILDREN_PRESENT','ELDERLY_PRESENT'],
+   'ACCEPTED', pg_temp.u('102'), now() - interval '44 minutes', NULL, now() - interval '52 minutes', now() - interval '51 minutes');
+
 -- ---------- timeline events (REPORTER-visible submission + staff events) ----------
 -- event id scheme: 'e' + request suffix (1-2 hex) + 2-digit sequence, e.g. request f5 -> e5xx, request fc -> ecxx
 INSERT INTO request_event (id, request_id, actor_user_id, event_type, visibility, from_status, to_status, reason, payload, occurred_at) VALUES
@@ -212,6 +245,7 @@ INSERT INTO request_event (id, request_id, actor_user_id, event_type, visibility
      '{"public_text_code":"VERIFIED","snapshot":{"incident_category_code":"TRAPPED","people_affected":3,"region_code":"DEMO_A"}}', now() - interval '100 minutes'),
   (pg_temp.u('e603'), pg_temp.u('f6'), pg_temp.u('102'),   'TRIAGED', 'STAFF', 'VERIFIED', 'TRIAGED', 'Ưu tiên P1: nguy hiểm đến tính mạng.', '{"priority":"P1"}', now() - interval '60 minutes'),
   (pg_temp.u('e604'), pg_temp.u('f6'), pg_temp.u('102'),   'MISSION_OFFERED', 'STAFF', 'TRIAGED', 'DISPATCHED', NULL, '{"mission_id":"00000000-0000-4000-8000-0000000000b3","team_id":"00000000-0000-4000-8000-0000000000a3"}', now() - interval '50 minutes'),
+  (pg_temp.u('e605'), pg_temp.u('f6'), pg_temp.u('102'),   'AI_ADVISORY_REVIEW', 'STAFF', NULL, NULL, NULL, '{"advisory_id":"00000000-0000-4000-8000-0000000000af2","decision":"ACCEPTED","note":null}', now() - interval '44 minutes'),
   (pg_temp.u('e701'), pg_temp.u('f7'), NULL,               'REQUEST_SUBMITTED', 'REPORTER', NULL, 'SUBMITTED', NULL, '{"public_text_code":"RECEIVED"}', now() - interval '8 minutes'),
   (pg_temp.u('e801'), pg_temp.u('f8'), NULL,               'REQUEST_SUBMITTED', 'REPORTER', NULL, 'SUBMITTED', NULL, '{"public_text_code":"RECEIVED"}', now() - interval '12 minutes'),
   (pg_temp.u('e901'), pg_temp.u('f9'), NULL,               'REQUEST_SUBMITTED', 'REPORTER', NULL, 'SUBMITTED', NULL, '{"public_text_code":"RECEIVED"}', now() - interval '45 minutes'),
@@ -252,11 +286,11 @@ INSERT INTO verification_decision (id, request_id, outcome, basis, reviewer_user
 
 -- ---------- missions ----------
 -- Capacity-one: team 1 holds an active mission (R5), team 3 an offer (R6); B's two missions are historical, C/D have none.
-INSERT INTO mission (id, request_id, team_id, work_cycle, status, coordinator_user_id, suggested_team_id, verification_revision, created_at, version) VALUES
-  (pg_temp.u('b2'), pg_temp.u('f5'), pg_temp.u('a6'), 1, 'FAILED',    pg_temp.u('102'), pg_temp.u('a6'), pg_temp.u('e502'), now() - interval '300 minutes', 4),
-  (pg_temp.u('b4'), pg_temp.u('fc'), pg_temp.u('a6'), 1, 'COMPLETED', pg_temp.u('103'), pg_temp.u('a6'), pg_temp.u('ec02'), now() - interval '20 hours', 5),
-  (pg_temp.u('b1'), pg_temp.u('f5'), pg_temp.u('a1'), 1, 'ACCEPTED',  pg_temp.u('102'), pg_temp.u('a1'), pg_temp.u('e502'), now() - interval '230 minutes', 2),
-  (pg_temp.u('b3'), pg_temp.u('f6'), pg_temp.u('a3'), 1, 'OFFERED',   pg_temp.u('102'), pg_temp.u('a3'), pg_temp.u('e602'), now() - interval '50 minutes', 1);
+INSERT INTO mission (id, request_id, team_id, work_cycle, status, mission_kind, coordinator_user_id, suggested_team_id, verification_revision, created_at, version) VALUES
+  (pg_temp.u('b2'), pg_temp.u('f5'), pg_temp.u('a6'), 1, 'FAILED',    'COMBINED', pg_temp.u('102'), pg_temp.u('a6'), pg_temp.u('e502'), now() - interval '300 minutes', 4),
+  (pg_temp.u('b4'), pg_temp.u('fc'), pg_temp.u('a6'), 1, 'COMPLETED', 'RESCUE',   pg_temp.u('103'), pg_temp.u('a6'), pg_temp.u('ec02'), now() - interval '20 hours', 5),
+  (pg_temp.u('b1'), pg_temp.u('f5'), pg_temp.u('a1'), 1, 'ACCEPTED',  'COMBINED', pg_temp.u('102'), pg_temp.u('a1'), pg_temp.u('e502'), now() - interval '230 minutes', 2),
+  (pg_temp.u('b3'), pg_temp.u('f6'), pg_temp.u('a3'), 1, 'OFFERED',   'COMBINED', pg_temp.u('102'), pg_temp.u('a3'), pg_temp.u('e602'), now() - interval '50 minutes', 1);
 
 INSERT INTO mission_event (id, mission_id, actor_user_id, from_status, to_status, reason, outcome_note, occurred_at, recorded_at) VALUES
   -- b2: earlier failed attempt on R5 (EN_ROUTE history)
@@ -309,6 +343,19 @@ $$ BEGIN IF ok IS NOT TRUE THEN RAISE EXCEPTION 'SEED ASSERTION FAILED: %', labe
 
 SELECT pg_temp.must('13 requests', (SELECT count(*) FROM assistance_request) = 13);
 SELECT pg_temp.must('every request has exactly one subject', (SELECT count(*) FROM request_subject) = 13);
+SELECT pg_temp.must('rescue and supply needs are both represented',
+  (SELECT count(*) FROM assistance_request WHERE needs_rescue) > 0
+  AND (SELECT count(*) FROM assistance_request WHERE needs_relief_supplies) > 0
+  AND (SELECT count(*) FROM assistance_request WHERE NOT needs_rescue AND needs_relief_supplies) > 0);
+SELECT pg_temp.must('vulnerable-person counts are represented',
+  (SELECT children_count = 1 AND elderly_count = 1 FROM request_subject WHERE request_id = pg_temp.u('f6')));
+SELECT pg_temp.must('combined and rescue-only missions are represented',
+  (SELECT count(*) FROM mission WHERE mission_kind = 'COMBINED') > 0
+  AND (SELECT count(*) FROM mission WHERE mission_kind = 'RESCUE') > 0);
+SELECT pg_temp.must('AI advisory review states are represented',
+  (SELECT count(*) FROM ai_advisory) = 2
+  AND (SELECT count(*) FROM ai_advisory WHERE review_status IS NULL) = 1
+  AND (SELECT count(*) FROM ai_advisory WHERE review_status = 'ACCEPTED') = 1);
 SELECT pg_temp.must('statuses covered: SUBMITTED VERIFYING VERIFIED DUPLICATE REJECTED TRIAGED DISPATCHED IN_PROGRESS RESOLVED',
   (SELECT count(DISTINCT status) FROM assistance_request WHERE status IN ('SUBMITTED','VERIFYING','VERIFIED','DUPLICATE','REJECTED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVED')) = 9);
 SELECT pg_temp.must('one request per non-NORMAL lane',

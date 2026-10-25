@@ -1387,6 +1387,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/requests/{id}/ai-advisories/{advisoryId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a human decision on an AI advisory.
+         * @description Accepts, adjusts or rejects a completed advisory and appends a staff timeline event. It does not modify SOS facts, official priority, or team assignment. An ADJUSTED decision requires a note.
+         */
+        post: operations["responseRequestOperationsReviewAiAdvisory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/{id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update editable facts on an SOS report before verification.
+         * @description Uses expected_version for concurrency control. Omitted facts retain their current values. The request must be owned by the signed-in reporter or accompanied by valid tracking credentials.
+         */
+        put: operations["responseTrackingUpdateReport"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1417,6 +1457,12 @@ export interface components {
             /** @default false */
             reporter_declared_danger: boolean;
             location: components["schemas"]["RequestLocation"];
+            children_count?: number | null;
+            elderly_count?: number | null;
+            /** @default true */
+            needs_rescue: boolean;
+            /** @default false */
+            needs_relief_supplies: boolean;
         };
         CreateProxyRequest: {
             incident_category_code: string;
@@ -1441,6 +1487,12 @@ export interface components {
             last_known_situation_at: string;
             /** @enum {string} */
             contactability: "REACHABLE" | "UNREACHABLE" | "UNKNOWN";
+            children_count?: number | null;
+            elderly_count?: number | null;
+            /** @default true */
+            needs_rescue: boolean;
+            /** @default false */
+            needs_relief_supplies: boolean;
         };
         CreatedSelfRequest: {
             /** Format: uuid */
@@ -1618,6 +1670,20 @@ export interface components {
             };
             /** @description Scoped staff-only exact location and contact details. */
             subject: {
+                people_affected?: number | null;
+                children_count?: number | null;
+                elderly_count?: number | null;
+                reporter_relationship?: string | null;
+                beneficiary_contact_phone?: string | null;
+                alternate_contact?: {
+                    name?: string | null;
+                    phone?: string | null;
+                };
+                information_source?: string | null;
+                last_known_situation_at?: string | null;
+                contactability?: string | null;
+                household_reference_note?: string | null;
+            } & {
                 [key: string]: unknown;
             };
             timeline: {
@@ -1643,6 +1709,52 @@ export interface components {
             } | null;
             duplicates?: {
                 [key: string]: unknown;
+            };
+            report_mode?: string;
+            category?: string;
+            description?: string | null;
+            /** Format: date-time */
+            received_at?: string;
+            declared_danger?: boolean;
+            needs_rescue?: boolean;
+            needs_relief_supplies?: boolean;
+            mission_history?: {
+                items: {
+                    /** Format: uuid */
+                    id?: string;
+                    status?: string;
+                    /** @enum {string} */
+                    mission_kind?: "RESCUE" | "DELIVERY" | "COMBINED";
+                    /** Format: date-time */
+                    created_at?: string;
+                    /** Format: uuid */
+                    team_id?: string;
+                    team_name?: string;
+                    suggested_team_id?: string | null;
+                    override_reason?: string | null;
+                    last_status?: string | null;
+                    last_occurred_at?: string | null;
+                    recorded_basis?: string | null;
+                    reported_by?: string | null;
+                }[];
+                more: boolean;
+            };
+            ai_advisory?: null | {
+                /** Format: uuid */
+                id: string;
+                model: string;
+                /** @enum {string} */
+                status: "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED" | "SKIPPED";
+                risk_score?: number | null;
+                reason_codes: string[];
+                extracted_json?: {
+                    [key: string]: unknown;
+                } | null;
+                review_status?: ("ACCEPTED" | "ADJUSTED" | "REJECTED") | null;
+                review_note?: string | null;
+                error_code?: string | null;
+                /** @constant */
+                human_review_required: true;
             };
         } & {
             [key: string]: unknown;
@@ -1832,6 +1944,20 @@ export interface components {
             has_active_work: false;
             in_band: boolean;
             suggested: boolean;
+            recent_missions_7d: number;
+            recent_history: {
+                /** Format: uuid */
+                id?: string;
+                status?: string;
+                /** @enum {string} */
+                mission_kind?: "RESCUE" | "DELIVERY" | "COMBINED";
+                /** Format: date-time */
+                created_at?: string;
+                last_status?: string | null;
+                last_occurred_at?: string | null;
+                recorded_basis?: string | null;
+                reported_by?: string | null;
+            }[];
         };
         UnknownPositionTeamCandidate: {
             team: components["schemas"]["CandidateTeam"];
@@ -1845,6 +1971,20 @@ export interface components {
             in_band: false;
             /** @constant */
             suggested: false;
+            recent_missions_7d: number;
+            recent_history: {
+                /** Format: uuid */
+                id?: string;
+                status?: string;
+                /** @enum {string} */
+                mission_kind?: "RESCUE" | "DELIVERY" | "COMBINED";
+                /** Format: date-time */
+                created_at?: string;
+                last_status?: string | null;
+                last_occurred_at?: string | null;
+                recorded_basis?: string | null;
+                reported_by?: string | null;
+            }[];
         };
         TeamCandidateParameters: {
             radius_m: number;
@@ -7058,6 +7198,179 @@ export interface operations {
                         version: number;
                         region_code: string | null;
                         campaign_id: string | null;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseRequestOperationsReviewAiAdvisory: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["RequestId"];
+                advisoryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "ACCEPTED" | "ADJUSTED" | "REJECTED";
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        request_id: string;
+                        /** Format: uuid */
+                        advisory_id: string;
+                        /** @enum {string} */
+                        decision: "ACCEPTED" | "ADJUSTED" | "REJECTED";
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseTrackingUpdateReport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["RequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                    description?: string | null;
+                    household_reference_note?: string | null;
+                    people_affected?: number | null;
+                    children_count?: number | null;
+                    elderly_count?: number | null;
+                    location?: components["schemas"]["RequestLocation"];
+                    reporter_declared_danger?: boolean;
+                    needs_rescue?: boolean;
+                    needs_relief_supplies?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated SOS request identifier and new version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        version: number;
                     };
                 };
             };

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
+  Switch,
   Alert,
   ActivityIndicator,
   Modal,
@@ -57,6 +58,11 @@ export const ProxySOSScreen: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<IncidentCategoryCode>('FLOOD');
   const [relationship, setRelationship] = useState<string>('');
   const [peopleAffected, setPeopleAffected] = useState<string>('');
+  const [childrenCount, setChildrenCount] = useState<string>('');
+  const [elderlyCount, setElderlyCount] = useState<string>('');
+  const [declaredDanger, setDeclaredDanger] = useState(false);
+  const [needsRescue, setNeedsRescue] = useState(true);
+  const [needsRelief, setNeedsRelief] = useState(false);
   const [householdLng, setHouseholdLng] = useState<string>('');
   const [householdLat, setHouseholdLat] = useState<string>('');
   const [householdLocation, setHouseholdLocation] = useState<GeoLocation | null>(null);
@@ -85,6 +91,11 @@ export const ProxySOSScreen: React.FC = () => {
         setSelectedCategory(payload.incident_category_code);
         setRelationship(payload.relationship);
         setPeopleAffected(payload.people_affected == null ? '' : String(payload.people_affected));
+        setChildrenCount(payload.children_count == null ? '' : String(payload.children_count));
+        setElderlyCount(payload.elderly_count == null ? '' : String(payload.elderly_count));
+        setDeclaredDanger(Boolean(payload.reporter_declared_danger));
+        setNeedsRescue(payload.needs_rescue ?? true);
+        setNeedsRelief(Boolean(payload.needs_relief_supplies));
         setHouseholdLocation(payload.location);
         setHouseholdLng(String(payload.location.coordinates[0]));
         setHouseholdLat(String(payload.location.coordinates[1]));
@@ -136,6 +147,11 @@ export const ProxySOSScreen: React.FC = () => {
               setSelectedCategory('FLOOD');
               setRelationship('');
               setPeopleAffected('');
+              setChildrenCount('');
+              setElderlyCount('');
+              setDeclaredDanger(false);
+              setNeedsRescue(true);
+              setNeedsRelief(false);
               setHouseholdLng('');
               setHouseholdLat('');
               setHouseholdLocation(null);
@@ -189,6 +205,20 @@ export const ProxySOSScreen: React.FC = () => {
       Alert.alert('Số lượng chưa hợp lệ', 'Nhập số nguyên từ 1 đến 10.000; để trống nếu chưa rõ.');
       return;
     }
+    const children = childrenCount === '' ? null : Number(childrenCount);
+    const elderly = elderlyCount === '' ? null : Number(elderlyCount);
+    if ([children, elderly].some((value) => value !== null && (!Number.isInteger(value) || value < 0 || value > 10000))) {
+      Alert.alert('Số lượng chưa hợp lệ', 'Số trẻ em và người cao tuổi phải là số nguyên từ 0 đến 10.000.');
+      return;
+    }
+    if (headcount !== null && (children ?? 0) + (elderly ?? 0) > headcount) {
+      Alert.alert('Số lượng chưa hợp lệ', 'Tổng số trẻ em và người cao tuổi không được lớn hơn tổng số người trong nhà.');
+      return;
+    }
+    if (!pendingCommand && !needsRescue && !needsRelief) {
+      Alert.alert('Chưa chọn nhu cầu', 'Hãy chọn cần cứu hộ, cần hàng cứu trợ hoặc cả hai.');
+      return;
+    }
     if (!pendingCommand && (!relationship.trim() || !informationSource.trim() || !lastKnownSituationAt.trim())) {
       Alert.alert('Thiếu thông tin nguồn tin', 'Hãy nhập mối quan hệ, nguồn nhận tin và chọn thời điểm gần nhất biết tình hình.');
       return;
@@ -209,6 +239,11 @@ export const ProxySOSScreen: React.FC = () => {
         incident_category_code: selectedCategory,
         description: [householdAddressNote.trim() ? `Địa chỉ tham chiếu do người báo cung cấp: ${householdAddressNote.trim()}` : '', description.trim()].filter(Boolean).join('\n') || undefined,
         people_affected: headcount,
+        ...(children === null ? {} : { children_count: children }),
+        ...(elderly === null ? {} : { elderly_count: elderly }),
+        reporter_declared_danger: declaredDanger,
+        needs_rescue: needsRescue,
+        needs_relief_supplies: needsRelief,
         location: householdLocation!,
         relationship: relationship.trim(),
         information_source: informationSource.trim(),
@@ -531,6 +566,51 @@ export const ProxySOSScreen: React.FC = () => {
             placeholderTextColor={THEME.colors.text.muted}
             keyboardType="number-pad"
           />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Trẻ em:</Text>
+          <TextInput
+            style={styles.textInput}
+            value={childrenCount}
+            onChangeText={setChildrenCount}
+            placeholder="Để trống nếu chưa rõ"
+            placeholderTextColor={THEME.colors.text.muted}
+            keyboardType="number-pad"
+            maxLength={4}
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Người cao tuổi:</Text>
+          <TextInput
+            style={styles.textInput}
+            value={elderlyCount}
+            onChangeText={setElderlyCount}
+            placeholder="Để trống nếu chưa rõ"
+            placeholderTextColor={THEME.colors.text.muted}
+            keyboardType="number-pad"
+            maxLength={4}
+          />
+        </View>
+
+        <View style={styles.switchRow}>
+          <Text style={styles.inputLabel}>Có nguy cơ đe dọa tính mạng</Text>
+          <Switch value={declaredDanger} onValueChange={setDeclaredDanger} />
+        </View>
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={styles.inputLabel}>Cần đội cứu hộ</Text>
+            <Text style={styles.fieldHint}>Mặc định đã chọn cho yêu cầu báo hộ.</Text>
+          </View>
+          <Switch value={needsRescue} onValueChange={setNeedsRescue} />
+        </View>
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={styles.inputLabel}>Cần hàng cứu trợ</Text>
+            <Text style={styles.fieldHint}>Chọn thêm nếu hộ gia đình cần thực phẩm, nước hoặc vật tư.</Text>
+          </View>
+          <Switch value={needsRelief} onValueChange={setNeedsRelief} />
         </View>
 
         <View style={styles.inputGroup}>
@@ -951,6 +1031,12 @@ const styles = StyleSheet.create({
   },
   contactOptionRow: {
     marginTop: 4,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
   },
   contactOptBtn: {
     padding: 10,

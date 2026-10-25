@@ -28,8 +28,10 @@ CREATE TABLE app_user (
   id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   username             citext NOT NULL UNIQUE CHECK (username::text ~ '^[A-Za-z0-9._-]{3,64}$'),
   display_name         text NOT NULL CHECK (is_clean_text(display_name)),
-  password_hash        text NOT NULL,
-  status               text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','DISABLED')),
+  email                text,
+  email_verified_at    timestamptz,
+  password_hash        text,
+  status               text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('PENDING_EMAIL','ACTIVE','DISABLED')),
   must_change_password boolean NOT NULL DEFAULT false,
   authz_version        int NOT NULL DEFAULT 1,   -- bumped on disable / reset / any grant change: revoke-all barrier + introspection cache key
   created_at           timestamptz NOT NULL DEFAULT now(),   -- GET /users keyset
@@ -38,6 +40,36 @@ CREATE TABLE app_user (
 CREATE INDEX app_user_created_idx ON app_user (created_at DESC, id DESC);                          -- GET /users keyset
 CREATE INDEX app_user_username_prefix_idx ON app_user (lower(username::text) text_pattern_ops); -- ?query= is a case-insensitive PREFIX match
 CREATE INDEX app_user_display_prefix_idx ON app_user (lower(display_name) text_pattern_ops);
+CREATE UNIQUE INDEX app_user_email_lower_uq ON app_user (lower(email)) WHERE email IS NOT NULL;
+CREATE INDEX app_user_pending_email_idx ON app_user (created_at) WHERE status='PENDING_EMAIL';
+
+CREATE TABLE external_identity (
+  provider       text NOT NULL CHECK (provider IN ('GOOGLE')),
+  subject        text NOT NULL CHECK (btrim(subject) <> ''),
+  user_id        uuid NOT NULL REFERENCES app_user(id),
+  email_at_link  text,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (provider, subject),
+  UNIQUE (user_id, provider)
+);
+CREATE INDEX external_identity_user_idx ON external_identity (user_id);
+
+CREATE TABLE email_verification_challenge (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        uuid NOT NULL REFERENCES app_user(id),
+  email          text NOT NULL,
+  code_hash      text NOT NULL,
+  attempts       int NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 5),
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  expires_at     timestamptz NOT NULL,
+  consumed_at    timestamptz,
+  CONSTRAINT email_challenge_expiry CHECK (expires_at > created_at),
+  CONSTRAINT email_challenge_consumed CHECK (consumed_at IS NULL OR consumed_at >= created_at)
+);
+CREATE INDEX email_challenge_user_live_idx ON email_verification_challenge (user_id, created_at DESC)
+  WHERE consumed_at IS NULL;
+CREATE INDEX email_challenge_expiry_idx ON email_verification_challenge (expires_at)
+  WHERE consumed_at IS NULL;
 
 -- organization roster and the ORGANIZATION_IN_USE guard; endpoints address a membership by (organization, user), so the pair is the key
 CREATE TABLE membership (
@@ -150,7 +182,8 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE CREATE ON SCHEMA public FROM c48_identity_app;
 GRANT USAGE ON SCHEMA public TO c48_identity_app;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO c48_identity_app;
-GRANT INSERT, UPDATE ON region, organization, app_user, membership, role_grant, session_family, refresh_session, idempotency_record TO c48_identity_app;
+GRANT INSERT, UPDATE ON region, organization, app_user, membership, role_grant, session_family, refresh_session, idempotency_record, email_verification_challenge TO c48_identity_app;
+GRANT INSERT ON external_identity TO c48_identity_app;
 GRANT INSERT ON audit_log TO c48_identity_app;                          -- append-only: no UPDATE, DELETE or TRUNCATE
 GRANT DELETE ON refresh_session, session_family, idempotency_record TO c48_identity_app;   -- retention cleanup only (children before family)
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO c48_identity_app;       -- audit_log identity

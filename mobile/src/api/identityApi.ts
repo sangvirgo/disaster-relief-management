@@ -4,12 +4,37 @@ import { StorageService } from '../utils/secureStore';
 
 export const IdentityApi = {
   // Đăng ký tài khoản công dân mới (POST /identity/auth/register)
-  async register(username: string, password: string, displayName: string): Promise<{ user: { id: string; username: string; display_name: string } }> {
-    const response = await apiClient.post<{ user: { id: string; username: string; display_name: string } }>('/identity/auth/register', {
+  async register(email: string, username: string, password: string, displayName: string): Promise<{
+    user: { id: string; username: string; display_name: string };
+    verification: { challenge_id: string };
+    email_sent: boolean;
+  }> {
+    const response = await apiClient.post<{
+      user: { id: string; username: string; display_name: string };
+      verification: { challenge_id: string };
+      email_sent: boolean;
+    }>('/identity/auth/register', {
       username: username.trim(),
       password,
       display_name: displayName.trim().normalize('NFC'),
+      email: email.trim().toLowerCase(),
     });
+    return response.data;
+  },
+
+  async verifyEmail(challengeId: string, code: string): Promise<{ verified: true }> {
+    const response = await apiClient.post<{ verified: true }>('/identity/auth/email/verify', {
+      challenge_id: challengeId,
+      code: code.trim(),
+    });
+    return response.data;
+  },
+
+  async resendEmailOtp(challengeId: string): Promise<{ challenge_id: string | null; email_sent: boolean }> {
+    const response = await apiClient.post<{ challenge_id: string | null; email_sent: boolean }>(
+      '/identity/auth/email/resend',
+      { challenge_id: challengeId },
+    );
     return response.data;
   },
 
@@ -25,6 +50,17 @@ export const IdentityApi = {
     await StorageService.saveTokens(data.access_token, data.refresh_token);
     await StorageService.saveUser(data.user);
 
+    return data;
+  },
+
+  async googleLogin(idToken: string): Promise<NativeLoginResponse> {
+    const response = await apiClient.post<NativeLoginResponse>('/identity/auth/google', {
+      id_token: idToken,
+      client_kind: 'NATIVE',
+    });
+    const data = response.data;
+    await StorageService.saveTokens(data.access_token, data.refresh_token);
+    await StorageService.saveUser(data.user);
     return data;
   },
 

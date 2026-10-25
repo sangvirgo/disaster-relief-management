@@ -15,7 +15,7 @@ import type { Request, Response } from 'express';
 import { randomBytes } from 'node:crypto';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
-import { ChangePasswordDto, LoginDto, RefreshDto, RegisterDto } from './auth.dto';
+import { ChangePasswordDto, GoogleLinkDto, GoogleLoginDto, LoginDto, RefreshDto, RegisterDto, ResendEmailOtpDto, VerifyEmailDto } from './auth.dto';
 import { AuthTransportGuard, IDENTITY_AUTH_CONFIG, IdentityRequest, IdentitySessionGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { createCsrfToken, IdentityAuthConfig, parseCookies } from './auth-security';
@@ -94,11 +94,48 @@ export class AuthController {
     @Body() dto: RegisterDto,
     @Req() request: IdentityRequest,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<{ user: { id: string; username: string; display_name: string } }> {
+  ): Promise<{ user: { id: string; username: string; display_name: string }; verification: { challenge_id: string }; email_sent: boolean }> {
     cachePrivate(response);
     const result = await this.authService.register(dto, request.idempotencyKey!, requestIp(request));
     if (result.replay) response.setHeader('Idempotent-Replay', 'true');
     return result.value;
+  }
+
+  @Post('auth/email/verify')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthTransportGuard)
+  async verifyEmail(@Body() dto: VerifyEmailDto, @Req() request: Request, @Res({ passthrough: true }) response: Response): Promise<Record<string, unknown>> {
+    cachePrivate(response);
+    return this.authService.verifyEmail(dto.challenge_id, dto.code, requestIp(request));
+  }
+
+  @Post('auth/email/resend')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthTransportGuard)
+  async resendEmailOtp(@Body() dto: ResendEmailOtpDto, @Req() request: Request, @Res({ passthrough: true }) response: Response): Promise<Record<string, unknown>> {
+    cachePrivate(response);
+    return this.authService.resendEmailOtp(dto.challenge_id, requestIp(request));
+  }
+
+  @Post('auth/google')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthTransportGuard)
+  async googleLogin(@Body() dto: GoogleLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response): Promise<Record<string, unknown>> {
+    cachePrivate(response);
+    const session = await this.authService.googleLogin(dto, requestIp(request));
+    if (dto.client_kind === 'WEB') {
+      setSessionCookies(response, this.config, session.accessToken, session.refreshToken, session.accessExpiresIn, session.absoluteExpiresAt);
+      return { user: session.user, session: { expires_at: session.absoluteExpiresAt.toISOString() }, must_change_password: false };
+    }
+    return { user: session.user, access_token: session.accessToken, refresh_token: session.refreshToken, expires_in: session.accessExpiresIn, must_change_password: false };
+  }
+
+  @Post('auth/google/link')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(IdentitySessionGuard, AuthTransportGuard)
+  async linkGoogle(@Body() dto: GoogleLinkDto, @Req() request: IdentityRequest, @Res({ passthrough: true }) response: Response): Promise<Record<string, unknown>> {
+    cachePrivate(response);
+    return this.authService.linkGoogleIdentity(request.auth!, dto.id_token);
   }
 
   @Post('auth/login')

@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { IdempotencyService } from '../../../../packages/technical/src/idempotency/idempotency';
 import { loadIdentityAuthConfig } from './auth-security';
 import { IDENTITY_SERVICE_TOKEN_CONFIG, loadServiceTokenConfig } from './service-tokens';
+import { EmailSenderService } from './email-sender.service';
 
 @Module({
   controllers: [AuthController],
@@ -12,6 +13,7 @@ import { IDENTITY_SERVICE_TOKEN_CONFIG, loadServiceTokenConfig } from './service
     { provide: IDENTITY_AUTH_CONFIG, useFactory: () => loadIdentityAuthConfig() },
     { provide: IDENTITY_SERVICE_TOKEN_CONFIG, useFactory: () => loadServiceTokenConfig(loadIdentityAuthConfig()) },
     AuthService,
+    EmailSenderService,
     AuthTransportGuard,
     IdentitySessionGuard,
     IdempotencyService,

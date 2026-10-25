@@ -3,6 +3,8 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AiAdvisoryReviewDto } from './request-operations.dto';
+import { RequestOperationsAiAdvisoryService } from './request-operations.ai-advisory.service';
 import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
 import {
   AuthorityReferralDto, ContactAttemptDto, ConcurRequestDto, CorrectRegionDto, DuplicateRequestDto,
@@ -26,7 +28,7 @@ function replay(response: Response, isReplay: boolean): void {
 
 @Controller()
 export class RequestOperationsController {
-  constructor(private readonly operations: RequestOperationsService) {}
+  constructor(private readonly operations: RequestOperationsService, private readonly aiAdvisory: RequestOperationsAiAdvisoryService) {}
 
   @Get('requests')
   async queue(@Query() query: RequestQueueQueryDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
@@ -86,6 +88,22 @@ export class RequestOperationsController {
   async detail(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     noStore(response);
     return this.operations.detail(id, request);
+  }
+
+  @Post('requests/:id/ai-advisories/:advisoryId/review')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async reviewAiAdvisory(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Param('advisoryId', new ParseUUIDPipe({ version: 'all' })) advisoryId: string,
+    @Body() dto: AiAdvisoryReviewDto,
+    @Req() request: OperationRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.aiAdvisory.review(id, advisoryId, dto, key(request), request);
+    replay(response, result.replay);
+    return result.value;
   }
 
   @Post('requests/:id/start-verification')

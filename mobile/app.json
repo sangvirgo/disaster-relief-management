@@ -2,11 +2,13 @@
   "expo": {
     "name": "Cứu Trợ Thiên Tai C48",
     "slug": "disaster-relief-mobile",
+    "scheme": "com.disasterrelief.c48mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "com.disasterrelief.c48mobile",
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Ứng dụng cần quyền vị trí để gửi tọa độ cứu nạn khẩn cấp và định vị lực lượng cứu trợ.",

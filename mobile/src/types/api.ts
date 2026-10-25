@@ -80,9 +80,13 @@ export interface CreateSOSPayload {
   incident_category_code: IncidentCategoryCode;
   description?: string;
   people_affected?: number | null;
+  children_count?: number | null;
+  elderly_count?: number | null;
   reporter_name?: string;
   reporter_contact_phone?: string;
   reporter_declared_danger?: boolean;
+  needs_rescue: boolean;
+  needs_relief_supplies: boolean;
   location: GeoLocation;
 }
 

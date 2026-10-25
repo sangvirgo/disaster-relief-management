@@ -12267,6 +12267,501 @@
             }
           }
         }
+    },
+    "/requests/{id}/ai-advisories/{advisoryId}/review": {
+      "post": {
+        "operationId": "responseRequestOperationsReviewAiAdvisory",
+        "summary": "Record a human decision on an AI advisory.",
+        "description": "Accepts, adjusts or rejects a completed advisory and appends a staff timeline event. It does not modify SOS facts, official priority, or team assignment. An ADJUSTED decision requires a note.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "name": "advisoryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Documented response shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "request_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "advisory_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "decision": {
+                      "type": "string",
+                      "enum": [
+                        "ACCEPTED",
+                        "ADJUSTED",
+                        "REJECTED"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "advisory_id",
+                    "decision"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "VALIDATION_FAILED",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "IDEMPOTENCY_KEY_INVALID": {
+                    "summary": "IDEMPOTENCY_KEY_INVALID",
+                    "value": {
+                      "code": "IDEMPOTENCY_KEY_INVALID",
+                      "message": "Mã yêu cầu không hợp lệ.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "CSRF_INVALID": {
+                    "summary": "CSRF_INVALID",
+                    "value": {
+                      "code": "CSRF_INVALID",
+                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "NOT_FOUND": {
+                    "summary": "NOT_FOUND",
+                    "value": {
+                      "code": "NOT_FOUND",
+                      "message": "Không tìm thấy dữ liệu yêu cầu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "STATE_TRANSITION_INVALID": {
+                    "summary": "STATE_TRANSITION_INVALID",
+                    "value": {
+                      "code": "STATE_TRANSITION_INVALID",
+                      "message": "Trạng thái hiện tại không cho phép thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "IDEMPOTENCY_KEY_REUSED": {
+                    "summary": "IDEMPOTENCY_KEY_REUSED",
+                    "value": {
+                      "code": "IDEMPOTENCY_KEY_REUSED",
+                      "message": "Mã yêu cầu đã được dùng cho nội dung khác.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/03-response-api.md",
+        "x-c48-controller-source": "backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.reviewAiAdvisory",
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "ACCEPTED",
+                      "ADJUSTED",
+                      "REJECTED"
+                    ]
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "decision"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/requests/{id}/report": {
+      "put": {
+        "operationId": "responseTrackingUpdateReport",
+        "summary": "Update editable facts on an SOS report before verification.",
+        "description": "Uses expected_version for concurrency control. Omitted facts retain their current values. The request must be owned by the signed-in reporter or accompanied by valid tracking credentials.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated SOS request identifier and new version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "version": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "VALIDATION_FAILED",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "IDEMPOTENCY_KEY_INVALID": {
+                    "summary": "IDEMPOTENCY_KEY_INVALID",
+                    "value": {
+                      "code": "IDEMPOTENCY_KEY_INVALID",
+                      "message": "Mã yêu cầu không hợp lệ.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "CSRF_INVALID": {
+                    "summary": "CSRF_INVALID",
+                    "value": {
+                      "code": "CSRF_INVALID",
+                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "NOT_FOUND": {
+                    "summary": "NOT_FOUND",
+                    "value": {
+                      "code": "NOT_FOUND",
+                      "message": "Không tìm thấy dữ liệu yêu cầu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "STATE_TRANSITION_INVALID": {
+                    "summary": "STATE_TRANSITION_INVALID",
+                    "value": {
+                      "code": "STATE_TRANSITION_INVALID",
+                      "message": "Trạng thái hiện tại không cho phép thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "VERSION_CONFLICT": {
+                    "summary": "VERSION_CONFLICT",
+                    "value": {
+                      "code": "VERSION_CONFLICT",
+                      "message": "Dữ liệu đã được cập nhật. Vui lòng tải lại trước khi tiếp tục.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "IDEMPOTENCY_KEY_REUSED": {
+                    "summary": "IDEMPOTENCY_KEY_REUSED",
+                    "value": {
+                      "code": "IDEMPOTENCY_KEY_REUSED",
+                      "message": "Mã yêu cầu đã được dùng cho nội dung khác.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/03-response-api.md",
+        "x-c48-controller-source": "backend/apps/response/src/tracking/tracking.controller.ts#TrackingController.updateReport",
+        "security": [
+          {
+            "TrackingSecret": [],
+            "TrackingCode": []
+          },
+          {
+            "NativeBearer": [],
+            "TrackingCode": []
+          },
+          {
+            "WebAccessCookie": [],
+            "CsrfToken": [],
+            "TrackingCode": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expected_version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 2000
+                  },
+                  "household_reference_note": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500
+                  },
+                  "people_affected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 10000
+                  },
+                  "children_count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "elderly_count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "location": {
+                    "$ref": "#/components/schemas/RequestLocation"
+                  },
+                  "reporter_declared_danger": {
+                    "type": "boolean"
+                  },
+                  "needs_rescue": {
+                    "type": "boolean"
+                  },
+                  "needs_relief_supplies": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "expected_version"
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -12478,47 +12973,212 @@
         ]
       },
       "CreateSelfRequest": {
-        "type": "object",
-        "required": ["incident_category_code", "location"],
-        "properties": {
-          "incident_category_code": { "type": "string", "pattern": "^[A-Z0-9_]{2,40}$" },
-          "description": { "type": ["string", "null"], "maxLength": 2000 },
-          "people_affected": { "type": ["integer", "null"], "minimum": 1, "maximum": 10000 },
-          "reporter_name": { "type": ["string", "null"], "maxLength": 200 },
-          "reporter_contact_phone": { "type": ["string", "null"], "maxLength": 32 },
-          "reporter_declared_danger": { "type": "boolean", "default": false },
-          "location": { "$ref": "#/components/schemas/RequestLocation" }
-        },
-        "additionalProperties": false
-      },
+                             "type": "object",
+                             "required": [
+                               "incident_category_code",
+                               "location"
+                             ],
+                             "properties": {
+                               "incident_category_code": {
+                                 "type": "string",
+                                 "pattern": "^[A-Z0-9_]{2,40}$"
+                               },
+                               "description": {
+                                 "type": [
+                                   "string",
+                                   "null"
+                                 ],
+                                 "maxLength": 2000
+                               },
+                               "people_affected": {
+                                 "type": [
+                                   "integer",
+                                   "null"
+                                 ],
+                                 "minimum": 1,
+                                 "maximum": 10000
+                               },
+                               "reporter_name": {
+                                 "type": [
+                                   "string",
+                                   "null"
+                                 ],
+                                 "maxLength": 200
+                               },
+                               "reporter_contact_phone": {
+                                 "type": [
+                                   "string",
+                                   "null"
+                                 ],
+                                 "maxLength": 32
+                               },
+                               "reporter_declared_danger": {
+                                 "type": "boolean",
+                                 "default": false
+                               },
+                               "location": {
+                                 "$ref": "#/components/schemas/RequestLocation"
+                               },
+                               "children_count": {
+                                 "type": [
+                                   "integer",
+                                   "null"
+                                 ],
+                                 "minimum": 0,
+                                 "maximum": 10000
+                               },
+                               "elderly_count": {
+                                 "type": [
+                                   "integer",
+                                   "null"
+                                 ],
+                                 "minimum": 0,
+                                 "maximum": 10000
+                               },
+                               "needs_rescue": {
+                                 "type": "boolean",
+                                 "default": true
+                               },
+                               "needs_relief_supplies": {
+                                 "type": "boolean",
+                                 "default": false
+                               }
+                             },
+                             "additionalProperties": false
+                           },
       "CreateProxyRequest": {
-        "type": "object",
-        "required": ["incident_category_code", "location", "relationship", "information_source", "last_known_situation_at", "contactability"],
-        "properties": {
-          "incident_category_code": { "type": "string", "pattern": "^[A-Z0-9_]{2,40}$" },
-          "description": { "type": ["string", "null"], "maxLength": 2000 },
-          "people_affected": { "type": ["integer", "null"], "minimum": 1, "maximum": 10000 },
-          "reporter_name": { "type": ["string", "null"], "maxLength": 200 },
-          "reporter_contact_phone": { "type": ["string", "null"], "maxLength": 32 },
-          "reporter_declared_danger": { "type": "boolean", "default": false },
-          "location": { "$ref": "#/components/schemas/RequestLocation" },
-          "relationship": { "type": "string", "minLength": 1, "maxLength": 100 },
-          "beneficiary_contact_phone": { "type": ["string", "null"], "maxLength": 32 },
-          "alternate_contact": {
-            "type": ["object", "null"],
-            "required": ["name"],
-            "properties": {
-              "name": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "phone": { "type": ["string", "null"], "maxLength": 32 }
-            },
-            "additionalProperties": false
-          },
-          "information_source": { "type": "string", "minLength": 1, "maxLength": 500 },
-          "last_known_situation_at": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$", "example": "2026-10-11T08:30:00Z" },
-          "contactability": { "type": "string", "enum": ["REACHABLE", "UNREACHABLE", "UNKNOWN"] }
-        },
-        "additionalProperties": false
-      },
+                              "type": "object",
+                              "required": [
+                                "incident_category_code",
+                                "location",
+                                "relationship",
+                                "information_source",
+                                "last_known_situation_at",
+                                "contactability"
+                              ],
+                              "properties": {
+                                "incident_category_code": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z0-9_]{2,40}$"
+                                },
+                                "description": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "maxLength": 2000
+                                },
+                                "people_affected": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ],
+                                  "minimum": 1,
+                                  "maximum": 10000
+                                },
+                                "reporter_name": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "maxLength": 200
+                                },
+                                "reporter_contact_phone": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "maxLength": 32
+                                },
+                                "reporter_declared_danger": {
+                                  "type": "boolean",
+                                  "default": false
+                                },
+                                "location": {
+                                  "$ref": "#/components/schemas/RequestLocation"
+                                },
+                                "relationship": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 100
+                                },
+                                "beneficiary_contact_phone": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "maxLength": 32
+                                },
+                                "alternate_contact": {
+                                  "type": [
+                                    "object",
+                                    "null"
+                                  ],
+                                  "required": [
+                                    "name"
+                                  ],
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 200
+                                    },
+                                    "phone": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ],
+                                      "maxLength": 32
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "information_source": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "last_known_situation_at": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$",
+                                  "example": "2026-10-11T08:30:00Z"
+                                },
+                                "contactability": {
+                                  "type": "string",
+                                  "enum": [
+                                    "REACHABLE",
+                                    "UNREACHABLE",
+                                    "UNKNOWN"
+                                  ]
+                                },
+                                "children_count": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ],
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "elderly_count": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ],
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "needs_rescue": {
+                                  "type": "boolean",
+                                  "default": true
+                                },
+                                "needs_relief_supplies": {
+                                  "type": "boolean",
+                                  "default": false
+                                }
+                              },
+                              "additionalProperties": false
+                            },
       "CreatedSelfRequest": {
         "type": "object",
         "required": ["id", "tracking_code", "status", "received_at", "review_lane"],
@@ -12865,105 +13525,458 @@
         "additionalProperties": false
       },
       "StaffRequestDetail": {
-        "type": "object",
-        "required": [
-          "id",
-          "status",
-          "version",
-          "reporter",
-          "subject",
-          "timeline",
-          "contact_attempts",
-          "proxy_activity_flags"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "status": {
-            "type": "string"
-          },
-          "version": {
-            "type": "integer"
-          },
-          "work_cycle": {
-            "type": "integer"
-          },
-          "reporter": {
-            "type": "object",
-            "properties": {
-              "user_id": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "uuid"
-              },
-              "name": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "contact_phone": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
-            },
-            "additionalProperties": true
-          },
-          "subject": {
-            "type": "object",
-            "description": "Scoped staff-only exact location and contact details.",
-            "additionalProperties": true
-          },
-          "timeline": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "contact_attempts": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "verification_decision": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "additionalProperties": true
-          },
-          "proxy_activity_flags": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": true
-            }
-          },
-          "active_missions": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "evidence": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "canonical": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "additionalProperties": true
-          },
-          "duplicates": {
-            "type": "object",
-            "additionalProperties": true
-          }
-        },
-        "additionalProperties": true
-      },
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "status",
+                                "version",
+                                "reporter",
+                                "subject",
+                                "timeline",
+                                "contact_attempts",
+                                "proxy_activity_flags"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "status": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer"
+                                },
+                                "work_cycle": {
+                                  "type": "integer"
+                                },
+                                "reporter": {
+                                  "type": "object",
+                                  "properties": {
+                                    "user_id": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ],
+                                      "format": "uuid"
+                                    },
+                                    "name": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "contact_phone": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    }
+                                  },
+                                  "additionalProperties": true
+                                },
+                                "subject": {
+                                  "type": "object",
+                                  "description": "Scoped staff-only exact location and contact details.",
+                                  "additionalProperties": true,
+                                  "properties": {
+                                    "people_affected": {
+                                      "anyOf": [
+                                        {
+                                          "type": "integer"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "children_count": {
+                                      "type": [
+                                        "integer",
+                                        "null"
+                                      ],
+                                      "minimum": 0,
+                                      "maximum": 10000
+                                    },
+                                    "elderly_count": {
+                                      "type": [
+                                        "integer",
+                                        "null"
+                                      ],
+                                      "minimum": 0,
+                                      "maximum": 10000
+                                    },
+                                    "reporter_relationship": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "beneficiary_contact_phone": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "alternate_contact": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "phone": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    },
+                                    "information_source": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "last_known_situation_at": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "contactability": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "household_reference_note": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "timeline": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                },
+                                "contact_attempts": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                },
+                                "verification_decision": {
+                                  "type": [
+                                    "object",
+                                    "null"
+                                  ],
+                                  "additionalProperties": true
+                                },
+                                "proxy_activity_flags": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                  }
+                                },
+                                "active_missions": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                },
+                                "evidence": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                },
+                                "canonical": {
+                                  "type": [
+                                    "object",
+                                    "null"
+                                  ],
+                                  "additionalProperties": true
+                                },
+                                "duplicates": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                },
+                                "report_mode": {
+                                  "type": "string"
+                                },
+                                "category": {
+                                  "type": "string"
+                                },
+                                "description": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "received_at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "declared_danger": {
+                                  "type": "boolean"
+                                },
+                                "needs_rescue": {
+                                  "type": "boolean"
+                                },
+                                "needs_relief_supplies": {
+                                  "type": "boolean"
+                                },
+                                "mission_history": {
+                                  "type": "object",
+                                  "properties": {
+                                    "items": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                          },
+                                          "status": {
+                                            "type": "string"
+                                          },
+                                          "mission_kind": {
+                                            "type": "string",
+                                            "enum": [
+                                              "RESCUE",
+                                              "DELIVERY",
+                                              "COMBINED"
+                                            ]
+                                          },
+                                          "created_at": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                          },
+                                          "team_id": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                          },
+                                          "team_name": {
+                                            "type": "string"
+                                          },
+                                          "suggested_team_id": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "format": "uuid"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "override_reason": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "last_status": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "last_occurred_at": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "format": "date-time"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "recorded_basis": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "reported_by": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "more": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "items",
+                                    "more"
+                                  ]
+                                },
+                                "ai_advisory": {
+                                  "anyOf": [
+                                    {
+                                      "type": "null"
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "format": "uuid"
+                                        },
+                                        "model": {
+                                          "type": "string"
+                                        },
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "QUEUED",
+                                            "PROCESSING",
+                                            "COMPLETED",
+                                            "FAILED",
+                                            "SKIPPED"
+                                          ]
+                                        },
+                                        "risk_score": {
+                                          "anyOf": [
+                                            {
+                                              "type": "integer"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "reason_codes": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "extracted_json": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "additionalProperties": true
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "review_status": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "enum": [
+                                                "ACCEPTED",
+                                                "ADJUSTED",
+                                                "REJECTED"
+                                              ]
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "review_note": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "error_code": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "human_review_required": {
+                                          "type": "boolean",
+                                          "const": true
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "model",
+                                        "status",
+                                        "reason_codes",
+                                        "human_review_required"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              },
+                              "additionalProperties": true
+                            },
       "StaffEventPage": {
         "type": "object",
         "required": [
@@ -13527,35 +14540,247 @@
         "additionalProperties": false
       },
       "TeamCandidate": {
-        "type": "object",
-        "required": ["team", "distance_m", "position_age_s", "accuracy_m", "recent_missions_24h", "has_active_work", "in_band", "suggested"],
-        "properties": {
-          "team": { "$ref": "#/components/schemas/CandidateTeam" },
-          "distance_m": { "type": "number", "minimum": 0 },
-          "position_age_s": { "type": "integer", "minimum": 0, "maximum": 1800 },
-          "accuracy_m": { "type": ["number", "null"] },
-          "recent_missions_24h": { "type": "integer", "minimum": 0 },
-          "has_active_work": { "const": false },
-          "in_band": { "type": "boolean" },
-          "suggested": { "type": "boolean" }
-        },
-        "additionalProperties": false
-      },
+                         "type": "object",
+                         "required": [
+                           "team",
+                           "distance_m",
+                           "position_age_s",
+                           "accuracy_m",
+                           "recent_missions_24h",
+                           "has_active_work",
+                           "in_band",
+                           "suggested",
+                           "recent_missions_7d",
+                           "recent_history"
+                         ],
+                         "properties": {
+                           "team": {
+                             "$ref": "#/components/schemas/CandidateTeam"
+                           },
+                           "distance_m": {
+                             "type": "number",
+                             "minimum": 0
+                           },
+                           "position_age_s": {
+                             "type": "integer",
+                             "minimum": 0,
+                             "maximum": 1800
+                           },
+                           "accuracy_m": {
+                             "type": [
+                               "number",
+                               "null"
+                             ]
+                           },
+                           "recent_missions_24h": {
+                             "type": "integer",
+                             "minimum": 0
+                           },
+                           "has_active_work": {
+                             "const": false
+                           },
+                           "in_band": {
+                             "type": "boolean"
+                           },
+                           "suggested": {
+                             "type": "boolean"
+                           },
+                           "recent_missions_7d": {
+                             "type": "integer",
+                             "minimum": 0
+                           },
+                           "recent_history": {
+                             "type": "array",
+                             "items": {
+                               "type": "object",
+                               "properties": {
+                                 "id": {
+                                   "type": "string",
+                                   "format": "uuid"
+                                 },
+                                 "status": {
+                                   "type": "string"
+                                 },
+                                 "mission_kind": {
+                                   "type": "string",
+                                   "enum": [
+                                     "RESCUE",
+                                     "DELIVERY",
+                                     "COMBINED"
+                                   ]
+                                 },
+                                 "created_at": {
+                                   "type": "string",
+                                   "format": "date-time"
+                                 },
+                                 "last_status": {
+                                   "anyOf": [
+                                     {
+                                       "type": "string"
+                                     },
+                                     {
+                                       "type": "null"
+                                     }
+                                   ]
+                                 },
+                                 "last_occurred_at": {
+                                   "anyOf": [
+                                     {
+                                       "type": "string",
+                                       "format": "date-time"
+                                     },
+                                     {
+                                       "type": "null"
+                                     }
+                                   ]
+                                 },
+                                 "recorded_basis": {
+                                   "anyOf": [
+                                     {
+                                       "type": "string"
+                                     },
+                                     {
+                                       "type": "null"
+                                     }
+                                   ]
+                                 },
+                                 "reported_by": {
+                                   "anyOf": [
+                                     {
+                                       "type": "string"
+                                     },
+                                     {
+                                       "type": "null"
+                                     }
+                                   ]
+                                 }
+                               }
+                             }
+                           }
+                         },
+                         "additionalProperties": false
+                       },
       "UnknownPositionTeamCandidate": {
-        "type": "object",
-        "required": ["team", "distance_m", "position_age_s", "accuracy_m", "recent_missions_24h", "has_active_work", "in_band", "suggested"],
-        "properties": {
-          "team": { "$ref": "#/components/schemas/CandidateTeam" },
-          "distance_m": { "type": "null" },
-          "position_age_s": { "type": ["integer", "null"] },
-          "accuracy_m": { "type": ["number", "null"] },
-          "recent_missions_24h": { "type": "integer", "minimum": 0 },
-          "has_active_work": { "const": false },
-          "in_band": { "const": false },
-          "suggested": { "const": false }
-        },
-        "additionalProperties": false
-      },
+                                        "type": "object",
+                                        "required": [
+                                          "team",
+                                          "distance_m",
+                                          "position_age_s",
+                                          "accuracy_m",
+                                          "recent_missions_24h",
+                                          "has_active_work",
+                                          "in_band",
+                                          "suggested",
+                                          "recent_missions_7d",
+                                          "recent_history"
+                                        ],
+                                        "properties": {
+                                          "team": {
+                                            "$ref": "#/components/schemas/CandidateTeam"
+                                          },
+                                          "distance_m": {
+                                            "type": "null"
+                                          },
+                                          "position_age_s": {
+                                            "type": [
+                                              "integer",
+                                              "null"
+                                            ]
+                                          },
+                                          "accuracy_m": {
+                                            "type": [
+                                              "number",
+                                              "null"
+                                            ]
+                                          },
+                                          "recent_missions_24h": {
+                                            "type": "integer",
+                                            "minimum": 0
+                                          },
+                                          "has_active_work": {
+                                            "const": false
+                                          },
+                                          "in_band": {
+                                            "const": false
+                                          },
+                                          "suggested": {
+                                            "const": false
+                                          },
+                                          "recent_missions_7d": {
+                                            "type": "integer",
+                                            "minimum": 0
+                                          },
+                                          "recent_history": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "id": {
+                                                  "type": "string",
+                                                  "format": "uuid"
+                                                },
+                                                "status": {
+                                                  "type": "string"
+                                                },
+                                                "mission_kind": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "RESCUE",
+                                                    "DELIVERY",
+                                                    "COMBINED"
+                                                  ]
+                                                },
+                                                "created_at": {
+                                                  "type": "string",
+                                                  "format": "date-time"
+                                                },
+                                                "last_status": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                },
+                                                "last_occurred_at": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string",
+                                                      "format": "date-time"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                },
+                                                "recorded_basis": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                },
+                                                "reported_by": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
       "TeamCandidateParameters": {
         "type": "object",
         "required": ["radius_m", "position_max_age_s", "priority", "distance_tolerance_m"],

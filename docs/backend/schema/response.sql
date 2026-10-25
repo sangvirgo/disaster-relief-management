@@ -67,6 +67,8 @@ CREATE TABLE assistance_request (
   priority                text CHECK (priority IN ('P1','P2','P3','P4')),
   priority_basis          text CHECK (priority_basis IN ('COMPLETE','INCOMPLETE_INFO')),
   reporter_declared_danger boolean NOT NULL DEFAULT false,
+  needs_rescue            boolean NOT NULL DEFAULT true,
+  needs_relief_supplies   boolean NOT NULL DEFAULT false,
   work_cycle              int NOT NULL DEFAULT 1 CHECK (work_cycle >= 1),
   resolved_at             timestamptz,
   resolution_seal_id      uuid,                                  -- opaque Logistics seal id (= sealing cycle_intent id); NULL allowed only while logistics_admitted_at IS NULL
@@ -84,6 +86,7 @@ CREATE TABLE assistance_request (
   CONSTRAINT admitted_implies_locked CHECK (logistics_admitted_at IS NULL OR attribution_locked_at IS NOT NULL),
   CONSTRAINT resolved_status CHECK (status NOT IN ('RESOLVED','CLOSED') OR resolved_at IS NOT NULL),       -- reopen must clear both columns
   CONSTRAINT priority_pair CHECK ((priority IS NULL) = (priority_basis IS NULL)),
+  CONSTRAINT request_has_need CHECK (needs_rescue OR needs_relief_supplies),
   CONSTRAINT triaged_has_priority CHECK (status NOT IN ('TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING','RESOLVED','CLOSED') OR priority IS NOT NULL),
   CONSTRAINT verifying_since_set CHECK (status <> 'VERIFYING' OR verifying_since IS NOT NULL)
 ) WITH (fillfactor = 85);
@@ -108,6 +111,8 @@ CREATE INDEX request_campaign_idx ON assistance_request (campaign_id, received_a
 CREATE TABLE request_subject (
   request_id               uuid PRIMARY KEY,
   people_affected          int CHECK (people_affected BETWEEN 1 AND 10000),
+  children_count           int CHECK (children_count BETWEEN 0 AND 10000),
+  elderly_count            int CHECK (elderly_count BETWEEN 0 AND 10000),
   location                 geography(Point, 4326) NOT NULL,
   location_source          text NOT NULL CHECK (location_source IN ('GPS','MANUAL_PIN')),
   location_accuracy_m      numeric(8,1) CHECK (location_accuracy_m >= 0),   -- NULL for manual pin (never fabricated)
@@ -123,7 +128,8 @@ CREATE TABLE request_subject (
   FOREIGN KEY (request_id) REFERENCES assistance_request(id),
   CONSTRAINT location_source_shape CHECK (
     (location_source = 'GPS' AND location_accuracy_m IS NOT NULL AND location_captured_at IS NOT NULL) OR
-    (location_source = 'MANUAL_PIN' AND location_accuracy_m IS NULL))
+    (location_source = 'MANUAL_PIN' AND location_accuracy_m IS NULL)),
+  CONSTRAINT vulnerable_count_within_total CHECK (people_affected IS NULL OR coalesce(children_count,0) + coalesce(elderly_count,0) <= people_affected)
 );
 -- PROXY reports need a relationship and a declared contactability; SELF reports may leave both NULL. report_mode lives only on assistance_request.
 CREATE FUNCTION request_subject_proxy_rules() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -255,6 +261,8 @@ CREATE TABLE mission (
   team_id            uuid NOT NULL REFERENCES rescue_team(id),
   work_cycle         int NOT NULL CHECK (work_cycle >= 1),
   status             mission_status NOT NULL DEFAULT 'OFFERED',
+  mission_kind       text NOT NULL DEFAULT 'RESCUE' CHECK (mission_kind IN ('RESCUE','DELIVERY','COMBINED')),
+  distribution_id    uuid,                                  -- opaque Logistics reference; Logistics owns stock and handoff
   coordinator_user_id uuid NOT NULL,
   suggested_team_id  uuid,                                  -- what the candidate list suggested at offer time
   override_reason    text CHECK (override_reason IS NULL OR btrim(override_reason) <> ''),
@@ -268,6 +276,40 @@ CREATE TABLE mission (
 CREATE UNIQUE INDEX mission_team_one_active_uq ON mission (team_id) WHERE status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE');
 CREATE INDEX mission_request_idx ON mission (request_id, status);
 CREATE INDEX mission_team_recent_idx ON mission (team_id, created_at DESC);                         -- 24 h workload count
+CREATE INDEX mission_request_history_idx ON mission (request_id, created_at DESC, id DESC);
+
+CREATE TABLE ai_advisory (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id         uuid NOT NULL REFERENCES assistance_request(id),
+  request_version    int NOT NULL,
+  input_hash         text NOT NULL,
+  model              text NOT NULL,
+  prompt_version     text NOT NULL,
+  schema_version     text NOT NULL,
+  status             text NOT NULL DEFAULT 'QUEUED' CHECK (status IN ('QUEUED','PROCESSING','COMPLETED','FAILED','SKIPPED')),
+  attempts           int NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 1),
+  lease_until        timestamptz,
+  extracted_json     jsonb,
+  risk_score         int CHECK (risk_score BETWEEN 0 AND 100),
+  reason_codes       text[] NOT NULL DEFAULT '{}',
+  review_status      text CHECK (review_status IN ('ACCEPTED','ADJUSTED','REJECTED')),
+  review_by_user_id  uuid,
+  review_at          timestamptz,
+  review_note        text,
+  error_code         text CHECK (error_code IS NULL OR error_code IN ('AI_DISABLED','AI_DAILY_LIMIT','AI_PROVIDER_ERROR','AI_INVALID_OUTPUT')),
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  completed_at       timestamptz,
+  UNIQUE (request_id, input_hash),
+  CONSTRAINT ai_review_pair CHECK ((review_status IS NULL) = (review_at IS NULL) AND (review_at IS NULL) = (review_by_user_id IS NULL))
+);
+CREATE INDEX ai_advisory_queue_idx ON ai_advisory (created_at, id) WHERE status IN ('QUEUED','PROCESSING');
+CREATE INDEX ai_advisory_request_idx ON ai_advisory (request_id, created_at DESC, id DESC);
+
+CREATE TABLE ai_daily_usage (
+  usage_date date PRIMARY KEY,
+  calls int NOT NULL CHECK (calls BETWEEN 0 AND 500),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
 
 CREATE TABLE mission_event (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -376,7 +418,7 @@ GRANT USAGE ON SCHEMA public TO c48_response_app;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO c48_response_app;
 -- mutable tables: INSERT + UPDATE (catalogs and region_boundary are seed data owned by the migration role: SELECT only)
 GRANT INSERT, UPDATE ON campaign, assistance_request, request_subject, resolution_intent, rescue_team, team_member, team_skill, team_position,
-  mission, evidence_metadata, notice, idempotency_record, capability_recovery TO c48_response_app;
+  mission, evidence_metadata, notice, idempotency_record, capability_recovery, ai_advisory, ai_daily_usage TO c48_response_app;
 -- append-only tables (same list as the trigger block above): INSERT only, no UPDATE, DELETE or TRUNCATE
 GRANT INSERT ON audit_log, request_event, mission_event, verification_decision, contact_attempt TO c48_response_app;
 -- cleanup tables: retention purge (idempotency_record, notice) and reconciler removal of FAILED/PENDING evidence rows

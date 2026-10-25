@@ -107,8 +107,8 @@ export async function approvedFacts(
   manager: EntityManager, requestId: string, reported?: Record<string, unknown>, regionOverride?: string | null,
 ): Promise<Record<string, unknown>> {
   const rows = await manager.query(
-    `SELECT r.report_mode,r.description,r.reporter_name,r.reporter_contact_phone,r.reporter_declared_danger,
-            r.region_code,r.campaign_id,r.incident_category_code,s.people_affected,s.location_source,
+    `SELECT r.report_mode,r.description,r.reporter_name,r.reporter_contact_phone,r.reporter_declared_danger,r.needs_rescue,r.needs_relief_supplies,
+            r.region_code,r.campaign_id,r.incident_category_code,s.people_affected,s.children_count,s.elderly_count,s.location_source,
             s.location_accuracy_m,s.location_captured_at,ST_X(s.location::geometry) AS longitude,
             ST_Y(s.location::geometry) AS latitude,s.reporter_relationship,s.beneficiary_contact_phone,
             s.alternate_contact_name,s.alternate_contact_phone,s.information_source,s.last_known_situation_at,
@@ -120,8 +120,9 @@ export async function approvedFacts(
   const facts: Record<string, unknown> = {
     report_mode: row.report_mode, incident_category_code: row.incident_category_code,
     description: row.description, reporter_name: row.reporter_name, reporter_contact_phone: row.reporter_contact_phone,
-    reporter_declared_danger: row.reporter_declared_danger, region_code: regionOverride === undefined ? row.region_code : regionOverride,
-    campaign_id: row.campaign_id, people_affected: row.people_affected,
+    reporter_declared_danger: row.reporter_declared_danger, needs_rescue: row.needs_rescue, needs_relief_supplies: row.needs_relief_supplies,
+    region_code: regionOverride === undefined ? row.region_code : regionOverride,
+    campaign_id: row.campaign_id, people_affected: row.people_affected, children_count: row.children_count, elderly_count: row.elderly_count,
     location: { type: 'Point', coordinates: [Number(row.longitude), Number(row.latitude)], source: row.location_source,
       accuracy_m: row.location_accuracy_m, captured_at: row.location_captured_at == null ? null : toIso(row.location_captured_at as Date | string) },
     reporter_relationship: row.reporter_relationship, beneficiary_contact_phone: row.beneficiary_contact_phone,
@@ -131,7 +132,7 @@ export async function approvedFacts(
     contactability: row.contactability, household_reference_note: row.household_reference_note,
   };
   if (reported) {
-    for (const field of ['description', 'reporter_declared_danger', 'people_affected', 'household_reference_note']) {
+    for (const field of ['description', 'reporter_declared_danger', 'needs_rescue', 'needs_relief_supplies', 'people_affected', 'children_count', 'elderly_count', 'household_reference_note']) {
       if (Object.hasOwn(reported, field)) facts[field] = reported[field];
     }
     if (reported.location !== undefined) facts.location = reported.location;

@@ -34,6 +34,15 @@ Every error the API can return has one row here. The implementation loads this t
 | `PASSWORD_WEAK` | 400 | Identity | Mật khẩu chưa đủ mạnh (tối thiểu 10 ký tự, không phổ biến). |
 | `SCOPE_INVALID` | 400 | Identity | Phạm vi quyền không hợp lệ. |
 | `USERNAME_TAKEN` | 409 | Identity | Tên đăng nhập đã được sử dụng. |
+| `EMAIL_TAKEN` | 409 | Identity | Địa chỉ email đã được sử dụng. |
+| `EMAIL_OTP_INVALID` | 400 | Identity | Mã xác minh email không hợp lệ hoặc đã hết hạn. |
+| `EMAIL_OTP_UNAVAILABLE` | 503 | Identity | Dịch vụ xác minh email tạm thời chưa sẵn sàng. Vui lòng thử lại sau. |
+| `GOOGLE_LOGIN_UNAVAILABLE` | 503 | Identity | Đăng nhập Google chưa được cấu hình. Vui lòng thử bằng tài khoản và mật khẩu. |
+| `GOOGLE_TOKEN_INVALID` | 401 | Identity | Phiên xác thực Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại. |
+| `GOOGLE_ACCOUNT_LINK_REQUIRED` | 409 | Identity | Email này đã có tài khoản. Hãy đăng nhập bằng tài khoản hiện có rồi liên kết Google trong phần bảo mật. |
+| `GOOGLE_IDENTITY_IN_USE` | 409 | Identity | Tài khoản Google này đã được liên kết với người dùng khác. |
+| `GOOGLE_ALREADY_LINKED` | 409 | Identity | Tài khoản đã có một tài khoản Google được liên kết. |
+| `SESSION_REAUTH_REQUIRED` | 403 | Identity | Vui lòng đăng nhập lại trước khi liên kết Google. |
 | `LAST_ADMIN` | 409 | Identity | Không thể thực hiện vì đây là quản trị viên cuối cùng. |
 | `GRANT_EXISTS` | 409 | Identity | Quyền này đã được cấp cho người dùng. |
 | `ORGANIZATION_NAME_TAKEN` | 409 | Identity | Tên tổ chức đã tồn tại. |
@@ -42,6 +51,8 @@ Every error the API can return has one row here. The implementation loads this t
 | `COORDINATES_OUT_OF_RANGE` | 400 | Response | Tọa độ không hợp lệ. |
 | `ACCURACY_REQUIRED` | 400 | Response | Vị trí GPS cần có độ chính xác và thời điểm ghi nhận. |
 | `PEOPLE_AFFECTED_OUT_OF_RANGE` | 400 | Response | Số người cần hỗ trợ không hợp lệ. |
+| `AT_LEAST_ONE_NEED_REQUIRED` | 400 | Response | Hãy chọn cần cứu hộ, cần hàng cứu trợ hoặc cả hai. |
+| `VULNERABLE_COUNT_EXCEEDS_TOTAL` | 400 | Response | Tổng số trẻ em và người cao tuổi không được lớn hơn tổng số người cần hỗ trợ. |
 | `PHONE_INVALID` | 400 | Response | Số điện thoại không hợp lệ. |
 | `CATEGORY_UNKNOWN` | 400 | Response | Loại sự cố không hợp lệ. |
 | `RELATIONSHIP_REQUIRED` | 400 | Response | Vui lòng cho biết mối quan hệ với người cần hỗ trợ. |

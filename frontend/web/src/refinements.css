@@ -52,6 +52,7 @@
 .auth-modal-card h2 { font-size: 26px; margin: 4px 0 22px; }
 .auth-modal-card .modal-desc { margin-top: -8px; }
 .auth-modal-card .form-stack { gap: 16px; }
+.google-auth-button { display: flex; justify-content: center; margin: 14px 0 2px; }
 .auth-modal-card .auth-field { gap: 8px; transition: color .18s ease; }
 .auth-modal-card .auth-field:focus-within { color: #1d4ed8; }
 .auth-modal-card .auth-field input {

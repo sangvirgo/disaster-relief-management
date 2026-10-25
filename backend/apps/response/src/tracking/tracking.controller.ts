@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, Res, UseInterceptors,
+  Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query, Req, Res, UseInterceptors,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
@@ -101,6 +101,24 @@ export class TrackingController {
     const result = await this.tracking.supplement(
       id, dto, idempotencyKey(request), headerValue(request.headers['x-tracking-code']),
       headerValue(request.headers['x-tracking-secret']), request,
+    );
+    replayHeader(response, result.replay);
+    return result.value;
+  }
+
+  @Put(':id/report')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async updateReport(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Body() dto: SupplementRequestDto,
+    @Req() request: TrackingRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.tracking.supplement(
+      id, dto, idempotencyKey(request), headerValue(request.headers['x-tracking-code']),
+      headerValue(request.headers['x-tracking-secret']), request, 'PUT',
     );
     replayHeader(response, result.replay);
     return result.value;

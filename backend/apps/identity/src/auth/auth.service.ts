@@ -1,20 +1,22 @@
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import argon2 from 'argon2';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '../../../../packages/technical/src/idempotency/idempotency';
 import { hashPurposeBoundSecret } from '../../../../packages/technical/src/security/secret-hash';
-import { LoginDto, RegisterDto, ChangePasswordDto } from './auth.dto';
+import { LoginDto, RegisterDto, ChangePasswordDto, GoogleLoginDto } from './auth.dto';
 import { IDENTITY_AUTH_CONFIG, AuthContext } from './auth.guard';
 import { IdentityAuthConfig, assertStrongPassword, issueAccessToken, WindowRateLimiter } from './auth-security';
+import { EmailSenderService } from './email-sender.service';
 
 interface UserRow {
   id: string;
   username: string;
   display_name: string;
-  password_hash: string;
+  password_hash: string | null;
   status: string;
   must_change_password: boolean;
   authz_version: number;
@@ -53,44 +55,135 @@ export class AuthService implements OnModuleInit {
   private dummyPasswordHash = '';
   private readonly rateLimiter = new WindowRateLimiter();
   private activeArgonOperations = 0;
+  private readonly googleClient = new OAuth2Client();
 
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly idempotency: IdempotencyService,
     @Inject(IDENTITY_AUTH_CONFIG) private readonly config: IdentityAuthConfig,
+    @Optional() private readonly emailSender?: EmailSenderService,
   ) {}
 
   async onModuleInit(): Promise<void> {
     this.dummyPasswordHash = await this.hashPassword(randomBytes(32).toString('base64url'));
   }
 
-  async register(dto: RegisterDto, idempotencyKey: string, ip: string): Promise<IdempotentResult<{ user: { id: string; username: string; display_name: string } }>> {
+  async register(dto: RegisterDto, idempotencyKey: string, ip: string): Promise<IdempotentResult<{ user: { id: string; username: string; display_name: string }; verification: { challenge_id: string }; email_sent: boolean }>> {
     this.consumeRate(`register:${ip}`, 3, 60 * 60_000);
+    if (!this.config.emailOtpPepper) throw new AppError('EMAIL_OTP_UNAVAILABLE', { status: 503 });
     if (!dto.display_name.trim() || dto.display_name !== dto.display_name.normalize('NFC')) {
       throw new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: { display_name: ['VALIDATION_FAILED'] } });
     }
     assertStrongPassword(dto.password, dto.username);
+    const email = dto.email.trim().normalize('NFC').toLowerCase();
+    this.consumeRate(`register-email:${email}`, 3, 60 * 60_000);
     const passwordHash = await this.hashPassword(dto.password);
+    const challengeId = randomUUID();
+    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const codeHash = this.emailOtpHash(challengeId, code);
     const passwordBinding = hashPurposeBoundSecret(dto.password, 'identity-register-idempotency', this.config.refreshPeppers, this.config.currentRefreshPepperVersion);
-    const result = await this.idempotency.execute<{ user: { id: string; username: string; display_name: string } }>(this.dataSource, {
+    const result = await this.idempotency.execute<{ user: { id: string; username: string; display_name: string }; verification: { challenge_id: string }; email_sent: boolean }>(this.dataSource, {
       scopeKey: 'anon:register',
       command: 'identity.auth.register',
       key: idempotencyKey,
-      requestHash: canonicalRequestHash({ username: dto.username, display_name: dto.display_name, password_binding: passwordBinding }),
-      databaseErrorMappings: { unique: { app_user_username_key: 'USERNAME_TAKEN' } },
+      requestHash: canonicalRequestHash({ username: dto.username, display_name: dto.display_name, email, password_binding: passwordBinding }),
+      databaseErrorMappings: { unique: { app_user_username_key: 'USERNAME_TAKEN', app_user_email_lower_uq: 'EMAIL_TAKEN' } },
       execute: async (manager) => {
         const rows = await manager.query(
-          'INSERT INTO app_user (username, display_name, password_hash) VALUES ($1, $2, $3) RETURNING id, username, display_name',
-          [dto.username, dto.display_name, passwordHash],
+          "INSERT INTO app_user (username, display_name, email, password_hash, status) VALUES ($1, $2, $3, $4, 'PENDING_EMAIL') RETURNING id, username, display_name",
+          [dto.username, dto.display_name, email, passwordHash],
         ) as Array<{ id: string; username: string; display_name: string }>;
         const user = rows[0];
         if (!user) throw new AppError('INTERNAL_ERROR', { status: 500 });
-        await manager.query("INSERT INTO role_grant (user_id, role_code, scope_type) VALUES ($1, 'CITIZEN', 'SYSTEM')", [user.id]);
-        return { status: 201, value: { user }, resource: { type: 'app_user', id: user.id } };
+        await manager.query(
+          'INSERT INTO email_verification_challenge (id, user_id, email, code_hash, expires_at) VALUES ($1,$2,$3,$4,now()+interval \'5 minutes\')',
+          [challengeId, user.id, email, codeHash],
+        );
+        return { status: 201, value: { user, verification: { challenge_id: challengeId }, email_sent: false }, resource: { type: 'app_user', id: user.id } };
       },
-      replay: async (manager, resource) => ({ user: await this.readRegisteredUser(manager, resource) }),
+      replay: async (manager, resource) => {
+        const user = await this.readRegisteredUser(manager, resource);
+        const rows = await manager.query('SELECT id FROM email_verification_challenge WHERE user_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1', [user.id]) as Array<{ id: string }>;
+        if (!rows[0]) throw new AppError('INTERNAL_ERROR', { status: 500 });
+        return { user, verification: { challenge_id: rows[0].id }, email_sent: false };
+      },
     });
-    return result;
+    if (result.replay) return result;
+    const emailSent = await this.emailSender?.sendVerificationCode(email, code) ?? false;
+    return { ...result, value: { ...result.value, email_sent: emailSent } };
+  }
+
+  async verifyEmail(challengeId: string, code: string, ip: string): Promise<{ verified: true; user: { id: string; username: string; display_name: string } }> {
+    this.consumeRate(`email-otp-verify:${ip}`, 10, 60_000);
+    if (!this.config.emailOtpPepper) throw new AppError('EMAIL_OTP_UNAVAILABLE', { status: 503 });
+    const result = await this.dataSource.transaction(async (manager) => {
+      const rows = await manager.query(
+        `SELECT c.id,c.user_id,c.email,c.code_hash,c.attempts,c.expires_at,c.consumed_at,
+                u.username,u.display_name,u.status,u.email_verified_at
+           FROM email_verification_challenge c JOIN app_user u ON u.id=c.user_id
+          WHERE c.id=$1 FOR UPDATE OF c,u`, [challengeId],
+      ) as Array<{ id: string; user_id: string; email: string; code_hash: string; attempts: number; expires_at: Date; consumed_at: Date | null; username: string; display_name: string; status: string; email_verified_at: Date | null }>;
+      const challenge = rows[0];
+      if (!challenge) return undefined;
+      if (challenge.status === 'ACTIVE' && challenge.email_verified_at && challenge.consumed_at) {
+        return { id: challenge.user_id, username: challenge.username, display_name: challenge.display_name };
+      }
+      if (challenge.status !== 'PENDING_EMAIL' || challenge.consumed_at || new Date(challenge.expires_at).getTime() <= Date.now() || Number(challenge.attempts) >= 5) {
+        if (!challenge.consumed_at) await manager.query('UPDATE email_verification_challenge SET consumed_at=now() WHERE id=$1', [challenge.id]);
+        return undefined;
+      }
+      const actual = Buffer.from(this.emailOtpHash(challenge.id, code));
+      const expected = Buffer.from(challenge.code_hash);
+      const valid = actual.length === expected.length && timingSafeEqual(actual, expected);
+      if (!valid) {
+        await manager.query(
+          'UPDATE email_verification_challenge SET attempts=attempts+1, consumed_at=CASE WHEN attempts+1>=5 THEN now() ELSE consumed_at END WHERE id=$1',
+          [challenge.id],
+        );
+        return undefined;
+      }
+      await manager.query('UPDATE email_verification_challenge SET consumed_at=now() WHERE id=$1', [challenge.id]);
+      const activated = await manager.query(
+        "UPDATE app_user SET status='ACTIVE',email_verified_at=coalesce(email_verified_at,now()),version=version+1 WHERE id=$1 AND status='PENDING_EMAIL' AND email=$2 RETURNING id",
+        [challenge.user_id, challenge.email],
+      ) as Array<{ id: string }>;
+      if (activated.length !== 1) return undefined;
+      await manager.query("INSERT INTO role_grant (user_id,role_code,scope_type) VALUES ($1,'CITIZEN','SYSTEM') ON CONFLICT DO NOTHING", [challenge.user_id]);
+      return { id: challenge.user_id, username: challenge.username, display_name: challenge.display_name };
+    });
+    if (!result) throw new AppError('EMAIL_OTP_INVALID', { status: 400 });
+    return { verified: true, user: result };
+  }
+
+  async resendEmailOtp(challengeId: string, ip: string): Promise<{ challenge_id: string | null; email_sent: boolean }> {
+    this.consumeRate(`email-otp-resend:${ip}`, 6, 60 * 60_000);
+    if (!this.config.emailOtpPepper) throw new AppError('EMAIL_OTP_UNAVAILABLE', { status: 503 });
+    const nextId = randomUUID();
+    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const outcome = await this.dataSource.transaction(async (manager) => {
+      const rows = await manager.query(
+        `SELECT c.user_id,
+                (SELECT latest.created_at FROM email_verification_challenge latest
+                  WHERE latest.user_id=c.user_id ORDER BY latest.created_at DESC,latest.id DESC LIMIT 1) AS latest_created_at,
+                u.email,u.status
+           FROM email_verification_challenge c JOIN app_user u ON u.id=c.user_id
+          WHERE c.id=$1 FOR UPDATE OF c,u`, [challengeId],
+      ) as Array<{ user_id: string; latest_created_at: Date; email: string; status: string }>;
+      const row = rows[0];
+      if (!row || row.status !== 'PENDING_EMAIL') return undefined;
+      const seconds = Math.ceil((60_000 - (Date.now() - new Date(row.latest_created_at).getTime())) / 1_000);
+      if (seconds > 0) return { retryAfter: seconds };
+      await manager.query('UPDATE email_verification_challenge SET consumed_at=coalesce(consumed_at,now()) WHERE user_id=$1 AND consumed_at IS NULL', [row.user_id]);
+      await manager.query(
+        'INSERT INTO email_verification_challenge (id,user_id,email,code_hash,expires_at) VALUES ($1,$2,$3,$4,now()+interval \'5 minutes\')',
+        [nextId, row.user_id, row.email, this.emailOtpHash(nextId, code)],
+      );
+      return { email: row.email };
+    });
+    if (outcome && 'retryAfter' in outcome) throw new AppError('RATE_LIMITED', { status: 429, retryAfterSeconds: outcome.retryAfter });
+    if (!outcome) return { challenge_id: null, email_sent: false };
+    const emailSent = await this.emailSender?.sendVerificationCode(outcome.email, code) ?? false;
+    return { challenge_id: nextId, email_sent: emailSent };
   }
 
   async login(dto: LoginDto, ip: string): Promise<IssuedSession> {
@@ -103,7 +196,7 @@ export class AuthService implements OnModuleInit {
       [dto.username],
     ) as UserRow[];
     const user = users[0];
-    const candidateHash = user?.status === 'ACTIVE' ? user.password_hash : this.dummyPasswordHash;
+    const candidateHash = user?.status === 'ACTIVE' && user.password_hash ? user.password_hash : this.dummyPasswordHash;
     const validPassword = await this.verifyPassword(candidateHash, dto.password);
     if (!user || user.status !== 'ACTIVE' || !validPassword) throw new AppError('INVALID_CREDENTIALS', { status: 401 });
 
@@ -127,6 +220,63 @@ export class AuthService implements OnModuleInit {
     });
     if (!family) throw new AppError('INVALID_CREDENTIALS', { status: 401 });
     return this.issueSession(user, familyId, dto.client_kind, refreshToken, family);
+  }
+
+  async googleLogin(dto: GoogleLoginDto, ip: string): Promise<IssuedSession> {
+    this.consumeRate(`google-login:${ip}`, 20, 60_000);
+    const identity = await this.verifiedGoogleIdentity(dto.id_token);
+    const user = await this.dataSource.transaction(async (manager) => {
+      const linked = await manager.query(
+        `SELECT u.id,u.username,u.display_name,u.status,u.must_change_password,u.authz_version
+           FROM external_identity e JOIN app_user u ON u.id=e.user_id
+          WHERE e.provider='GOOGLE' AND e.subject=$1 FOR UPDATE OF u`, [identity.subject],
+      ) as Array<Omit<UserRow, 'password_hash'> & { password_hash?: null }>;
+      if (linked[0]) {
+        if (linked[0].status !== 'ACTIVE') throw new AppError('INVALID_CREDENTIALS', { status: 401 });
+        return { ...linked[0], password_hash: null } as UserRow;
+      }
+      const owner = await manager.query('SELECT id FROM app_user WHERE lower(email)=lower($1) LIMIT 1', [identity.email]) as Array<{ id: string }>;
+      if (owner[0]) throw new AppError('GOOGLE_ACCOUNT_LINK_REQUIRED', { status: 409 });
+      const username = dto.first_time_username ?? `g_${createHash('sha256').update(identity.subject).digest('hex').slice(0, 24)}`;
+      const displayName = [...(identity.name || identity.email.split('@')[0] || username).normalize('NFC').trim()].slice(0, 200).join('');
+      const created = await manager.query(
+        `INSERT INTO app_user (username,display_name,email,email_verified_at,password_hash,status)
+         VALUES ($1,$2,$3,now(),NULL,'ACTIVE') ON CONFLICT DO NOTHING
+         RETURNING id,username,display_name,status,must_change_password,authz_version`,
+        [username, displayName || username, identity.email],
+      ) as Array<Omit<UserRow, 'password_hash'> & { password_hash?: null }>;
+      if (!created[0]) {
+        const emailOwner = await manager.query('SELECT 1 FROM app_user WHERE lower(email)=lower($1)', [identity.email]) as unknown[];
+        if (emailOwner.length) throw new AppError('GOOGLE_ACCOUNT_LINK_REQUIRED', { status: 409 });
+        throw new AppError('USERNAME_TAKEN', { status: 409 });
+      }
+      await manager.query("INSERT INTO external_identity (provider,subject,user_id,email_at_link) VALUES ('GOOGLE',$1,$2,$3)", [identity.subject, created[0].id, identity.email]);
+      await manager.query("INSERT INTO role_grant (user_id,role_code,scope_type) VALUES ($1,'CITIZEN','SYSTEM') ON CONFLICT DO NOTHING", [created[0].id]);
+      return { ...created[0], password_hash: null } as UserRow;
+    });
+    return this.startSession(user, dto.client_kind);
+  }
+
+  async linkGoogleIdentity(auth: AuthContext, idToken: string): Promise<{ linked: true }> {
+    const recent = await this.dataSource.query(
+      "SELECT 1 FROM session_family WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL AND created_at >= now()-interval '15 minutes'",
+      [auth.sessionId, auth.userId],
+    ) as unknown[];
+    if (!recent.length) throw new AppError('SESSION_REAUTH_REQUIRED', { status: 403 });
+    const identity = await this.verifiedGoogleIdentity(idToken);
+    await this.dataSource.transaction(async (manager) => {
+      const existing = await manager.query("SELECT user_id FROM external_identity WHERE provider='GOOGLE' AND subject=$1 FOR UPDATE", [identity.subject]) as Array<{ user_id: string }>;
+      if (existing[0]) {
+        if (existing[0].user_id !== auth.userId) throw new AppError('GOOGLE_IDENTITY_IN_USE', { status: 409 });
+        return;
+      }
+      const account = await manager.query("SELECT 1 FROM app_user WHERE id=$1 AND status='ACTIVE' FOR UPDATE", [auth.userId]) as unknown[];
+      if (!account.length) throw new AppError('SESSION_EXPIRED', { status: 401 });
+      const alreadyLinked = await manager.query("SELECT 1 FROM external_identity WHERE user_id=$1 AND provider='GOOGLE'", [auth.userId]) as unknown[];
+      if (alreadyLinked.length) throw new AppError('GOOGLE_ALREADY_LINKED', { status: 409 });
+      await manager.query("INSERT INTO external_identity (provider,subject,user_id,email_at_link) VALUES ('GOOGLE',$1,$2,$3)", [identity.subject, auth.userId, identity.email]);
+    });
+    return { linked: true };
   }
 
   async refresh(rawToken: string | undefined, clientKind: 'WEB' | 'NATIVE'): Promise<IssuedSession> {
@@ -231,7 +381,7 @@ export class AuthService implements OnModuleInit {
     const user = users[0];
     assertStrongPassword(dto.new_password, user?.username ?? '');
     if (dto.new_password === dto.current_password) throw new AppError('PASSWORD_WEAK', { status: 400 });
-    const candidateHash = user?.status === 'ACTIVE' ? user.password_hash : this.dummyPasswordHash;
+    const candidateHash = user?.status === 'ACTIVE' && user.password_hash ? user.password_hash : this.dummyPasswordHash;
     const currentPasswordValid = await this.verifyPassword(candidateHash, dto.current_password);
     const nextPasswordHash = await this.hashPassword(dto.new_password);
     const currentBinding = hashPurposeBoundSecret(dto.current_password, 'identity-password-change-current', this.config.refreshPeppers, this.config.currentRefreshPepperVersion);
@@ -270,9 +420,9 @@ export class AuthService implements OnModuleInit {
 
   async me(userId: string): Promise<Record<string, unknown>> {
     const users = await this.dataSource.query(
-      'SELECT id, username, display_name, must_change_password FROM app_user WHERE id = $1 AND status = \'ACTIVE\'',
+      'SELECT id, username, display_name, email, email_verified_at, must_change_password FROM app_user WHERE id = $1 AND status = \'ACTIVE\'',
       [userId],
-    ) as Array<{ id: string; username: string; display_name: string; must_change_password: boolean }>;
+    ) as Array<{ id: string; username: string; display_name: string; email: string | null; email_verified_at: Date | null; must_change_password: boolean }>;
     const user = users[0];
     if (!user) throw new AppError('SESSION_EXPIRED', { status: 401 });
     const grants = await this.dataSource.query(
@@ -298,6 +448,40 @@ export class AuthService implements OnModuleInit {
     const rows = await manager.query('SELECT id, username, display_name FROM app_user WHERE id = $1', [resource.id]) as Array<{ id: string; username: string; display_name: string }>;
     if (!rows[0]) throw new AppError('INTERNAL_ERROR', { status: 500 });
     return rows[0];
+  }
+
+  private async startSession(user: UserRow, clientKind: 'WEB' | 'NATIVE'): Promise<IssuedSession> {
+    const familyId = randomUUID();
+    const refreshToken = randomBytes(32).toString('base64url');
+    const family = await this.dataSource.transaction(async (manager) => {
+      const current = await manager.query('SELECT status,authz_version FROM app_user WHERE id=$1 FOR SHARE', [user.id]) as Array<{ status: string; authz_version: number }>;
+      if (current[0]?.status !== 'ACTIVE' || Number(current[0].authz_version) !== Number(user.authz_version)) return undefined;
+      const rows = await manager.query(
+        'INSERT INTO session_family (id,user_id,client_kind,authz_version,absolute_expires_at) VALUES ($1,$2,$3,$4,now()+interval \'7 days\') RETURNING absolute_expires_at',
+        [familyId, user.id, clientKind, current[0].authz_version],
+      ) as Array<{ absolute_expires_at: Date }>;
+      await manager.query('INSERT INTO refresh_session (token_hash,family_id) VALUES ($1,$2)', [this.refreshHash(refreshToken), familyId]);
+      return rows[0]?.absolute_expires_at;
+    });
+    if (!family) throw new AppError('INVALID_CREDENTIALS', { status: 401 });
+    return this.issueSession(user, familyId, clientKind, refreshToken, family);
+  }
+
+  private async verifiedGoogleIdentity(idToken: string): Promise<{ subject: string; email: string; name: string }> {
+    if (!this.config.googleClientIds.length) throw new AppError('GOOGLE_LOGIN_UNAVAILABLE', { status: 503 });
+    try {
+      const ticket = await this.googleClient.verifyIdToken({ idToken, audience: [...this.config.googleClientIds] });
+      const payload = ticket.getPayload();
+      if (!payload || !payload.sub || !payload.email || payload.email_verified !== true) throw new Error('invalid Google identity');
+      return { subject: payload.sub, email: payload.email.trim().toLowerCase(), name: payload.name ?? '' };
+    } catch {
+      throw new AppError('GOOGLE_TOKEN_INVALID', { status: 401 });
+    }
+  }
+
+  private emailOtpHash(challengeId: string, code: string): string {
+    if (!this.config.emailOtpPepper) throw new AppError('EMAIL_OTP_UNAVAILABLE', { status: 503 });
+    return createHmac('sha256', this.config.emailOtpPepper).update('c48.email-otp.v1\0').update(challengeId).update('\0').update(code).digest('hex');
   }
 
   private issueSession(user: UserRow, familyId: string, clientKind: 'WEB' | 'NATIVE', refreshToken: string, absoluteExpiresAt: Date): IssuedSession {

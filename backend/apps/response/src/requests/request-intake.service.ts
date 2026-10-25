@@ -4,6 +4,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { canonicalRequestHash, IdempotencyService } from '../../../../packages/technical/src/idempotency/idempotency';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { aiInputHash, sanitizeAiDescription, scoreRequestRisk } from '../ai/ai-risk';
 import { hashPurposeBoundSecret, PepperSet } from '../../../../packages/technical/src/security/secret-hash';
 import { CreateProxyRequestDto, CreateSelfRequestDto } from './request-intake.dto';
 import { loadReporterTokenConfig, ReporterTokenConfig } from './reporter-token';
@@ -109,6 +110,18 @@ function validateSelfRequest(dto: CreateSelfRequestDto): void {
   if (people !== undefined && people !== null && (!Number.isInteger(people) || people < 1 || people > 10_000)) {
     throw invalidField('people_affected', 'PEOPLE_AFFECTED_OUT_OF_RANGE');
   }
+  const children = dto.children_count ?? 0;
+  const elderly = dto.elderly_count ?? 0;
+  if (!Number.isInteger(children) || children < 0 || children > 10_000) {
+    throw invalidField('children_count', 'VALIDATION_FAILED');
+  }
+  if (!Number.isInteger(elderly) || elderly < 0 || elderly > 10_000) throw invalidField('elderly_count', 'VALIDATION_FAILED');
+  if (people != null && children + elderly > people) {
+    throw invalidField('children_count', 'VULNERABLE_COUNT_EXCEEDS_TOTAL');
+  }
+  if ((dto.needs_rescue ?? true) === false && (dto.needs_relief_supplies ?? false) === false) {
+    throw invalidField('needs_rescue', 'AT_LEAST_ONE_NEED_REQUIRED');
+  }
   if (dto.location.source === 'GPS' && (dto.location.accuracy_m === undefined || dto.location.accuracy_m === null || dto.location.captured_at === undefined || dto.location.captured_at === null)) {
     throw invalidField('location', 'ACCURACY_REQUIRED');
   }
@@ -209,6 +222,14 @@ export class RequestIntakeService {
     if (categories.length === 0) throw invalidField('incident_category_code', 'CATEGORY_UNKNOWN');
 
     const location = dto.location;
+    const needsRescue = dto.needs_rescue !== false;
+    const needsReliefSupplies = dto.needs_relief_supplies === true;
+    const childrenCount = dto.children_count ?? null;
+    const elderlyCount = dto.elderly_count ?? null;
+    if (!needsRescue && !needsReliefSupplies) throw invalidField('needs_rescue', 'AT_LEAST_ONE_NEED_REQUIRED');
+    if (dto.people_affected != null && (childrenCount ?? 0) + (elderlyCount ?? 0) > dto.people_affected) {
+      throw invalidField('children_count', 'VULNERABLE_COUNT_EXCEEDS_TOTAL');
+    }
     const canonicalPayload = {
       report_mode: proxy ? 'PROXY' : 'SELF',
       reporter_user_id: reporterUserId,
@@ -218,6 +239,10 @@ export class RequestIntakeService {
       reporter_name: dto.reporter_name ?? null,
       reporter_contact_phone: phone,
       reporter_declared_danger: dto.reporter_declared_danger ?? false,
+      needs_rescue: needsRescue,
+      needs_relief_supplies: needsReliefSupplies,
+      children_count: childrenCount,
+      elderly_count: elderlyCount,
       location: {
         type: 'Point', coordinates: location.coordinates, source: location.source,
         accuracy_m: location.accuracy_m ?? null, captured_at: location.captured_at ?? null,
@@ -269,31 +294,31 @@ export class RequestIntakeService {
           Number(throttle.phone_count) >= this.config.softLimitPerMinute ||
           Number(throttle.global_count) >= this.config.globalLimitPerMinute;
         const reviewLane = proxy && proxyQuotaReached ? 'PROXY_QUOTA_REVIEW' : rateLimited ? 'RATE_LIMITED_REVIEW' : 'NORMAL';
-        let request: { id: string; tracking_code: string; status: string; received_at: Date | string; review_lane: string } | undefined;
+        let request: { id: string; tracking_code: string; status: string; received_at: Date | string; review_lane: string; version: number } | undefined;
         for (let attempt = 0; attempt < 5 && !request; attempt++) {
           const rows = await manager.query(
             `INSERT INTO assistance_request
               (tracking_code, tracking_secret_hash, incident_category_code, report_mode, reporter_user_id,
                reporter_name, reporter_contact_phone, source_ip_hash, description, organization_id, region_code,
-               review_lane, reporter_declared_danger, received_at)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+               review_lane, reporter_declared_danger, needs_rescue, needs_relief_supplies, received_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
              ON CONFLICT (tracking_code) DO NOTHING
-             RETURNING id, tracking_code, status, received_at, review_lane`,
+             RETURNING id, tracking_code, status, received_at, review_lane, version`,
             [generateTrackingCode(), secretHash, dto.incident_category_code, proxy ? 'PROXY' : 'SELF', reporterUserId,
               dto.reporter_name ?? null, phone, sourceIpHash, dto.description ?? null, this.config.organizationId,
-              regionRows[0]?.region_code ?? null, reviewLane, dto.reporter_declared_danger ?? false, throttle.received_at],
-          ) as Array<{ id: string; tracking_code: string; status: string; received_at: Date | string; review_lane: string }>;
+              regionRows[0]?.region_code ?? null, reviewLane, dto.reporter_declared_danger ?? false, needsRescue, needsReliefSupplies, throttle.received_at],
+          ) as Array<{ id: string; tracking_code: string; status: string; received_at: Date | string; review_lane: string; version: number }>;
           request = rows[0];
         }
         if (!request) throw new AppError('INTERNAL_ERROR', { status: 500 });
         const [longitude, latitude] = location.coordinates;
         await manager.query(
           `INSERT INTO request_subject
-            (request_id, people_affected, location, location_source, location_accuracy_m, location_captured_at,
+            (request_id, people_affected, children_count, elderly_count, location, location_source, location_accuracy_m, location_captured_at,
              reporter_relationship, beneficiary_contact_phone, alternate_contact_name, alternate_contact_phone,
              information_source, last_known_situation_at, contactability)
-           VALUES ($1,$2,ST_SetSRID(ST_MakePoint($3,$4),4326)::geography,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-          [request.id, dto.people_affected ?? null, longitude, latitude, location.source,
+           VALUES ($1,$2,$3,$4,ST_SetSRID(ST_MakePoint($5,$6),4326)::geography,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+          [request.id, dto.people_affected ?? null, childrenCount, elderlyCount, longitude, latitude, location.source,
             location.source === 'GPS' ? location.accuracy_m : null, location.captured_at ?? null,
             proxy?.relationship ?? null, proxy?.beneficiaryContactPhone ?? null, proxy?.alternateContactName ?? null,
             proxy?.alternateContactPhone ?? null, proxy?.informationSource ?? null, proxy?.lastKnownSituationAt ?? null,
@@ -304,6 +329,15 @@ export class RequestIntakeService {
            VALUES ($1,$2,'REQUEST_SUBMITTED','REPORTER',NULL,'SUBMITTED',$3::jsonb)`,
           [request.id, reporterUserId, JSON.stringify({ public_text_code: 'RECEIVED', review_lane: request.review_lane })],
         );
+        const safeDescription = sanitizeAiDescription(dto.description ?? '');
+        if (safeDescription) {
+          const risk = scoreRequestRisk({ description: safeDescription, reporterDeclaredDanger: dto.reporter_declared_danger ?? false, childrenCount, elderlyCount, needsRescue, needsReliefSupplies });
+          await manager.query(
+            `INSERT INTO ai_advisory (request_id,request_version,input_hash,model,prompt_version,schema_version,risk_score,reason_codes)
+             VALUES ($1,$2,$3,$4,'v1','v1',$5,$6) ON CONFLICT (request_id,input_hash) DO NOTHING`,
+            [request.id, Number(request.version), aiInputHash(safeDescription), process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite', risk.score, risk.reasonCodes],
+          );
+        }
         if (proxy) await this.recordProxyActivityFlag(manager, request.id, reporterUserId!, phone, throttle.received_at);
         const value = createdResponse(request);
         return { status: 201, value, resource: { type: 'assistance_request', id: request.id } };

@@ -44,6 +44,10 @@ npx expo start -c
   1. Bật máy ảo Android Studio.
   2. Nhấn phím `a` trên terminal của VS Code để tự động mở ứng dụng trên máy ảo.
 
+### Đăng nhập và đăng ký
+
+Đăng ký công dân cần email OTP; đăng nhập Google cần OAuth Client ID phù hợp với nền tảng. Sao chép `mobile/.env.example` thành `mobile/.env`, điền các `EXPO_PUBLIC_GOOGLE_*_CLIENT_ID`, rồi cấu hình cùng các Client ID trong `GOOGLE_CLIENT_IDS` ở `backend/.env`. Có thể bỏ trống các Client ID nếu chỉ dùng đăng nhập bằng tài khoản/mật khẩu. Không đặt OAuth client secret, Gemini API key, SMTP password, JWT private key hoặc pepper vào Mobile.
+
 ---
 
 ## ⚙️ 3. Cấu Hình Địa Chỉ API Backend
@@ -52,7 +56,7 @@ npx expo start -c
 
 - **Tự động nhận diện (Khi quét Expo Go):** Khi quét mã QR qua Expo Go trong cùng mạng Wi-Fi LAN, ứng dụng tự động trích xuất IP LAN của máy tính từ Metro bundler và kết nối tới `http://<IP_MÁY_TÍNH>:8080/api/v1`.
 - **Cấu hình qua file `.env`:**
-  File `mobile/.env` đã được tạo sẵn:
+  Sao chép `mobile/.env.example` thành `mobile/.env`, sau đó cập nhật địa chỉ backend nếu cần:
   ```env
   EXPO_PUBLIC_API_BASE_URL=http://192.168.1.2:8080/api/v1
   ```

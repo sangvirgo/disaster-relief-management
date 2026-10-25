@@ -11,6 +11,8 @@ import { rankTeamCandidates } from './request-operations.team-candidates.helpers
 interface TeamCandidateRow extends TeamRow {
   distance_m: number | null;
   recent_missions_24h: number;
+  recent_missions_7d: number;
+  recent_history: Array<Record<string, unknown>>;
 }
 
 @Injectable()
@@ -50,17 +52,33 @@ export class RequestOperationsTeamCandidatesService {
                 p.team_id AS position_team_id,p.captured_at,p.location AS position_location,q.request_location,q.query_time,
                 CASE WHEN p.captured_at BETWEEN q.query_time-interval '30 minutes' AND q.query_time
                      THEN ST_Distance(q.request_location,p.location) END AS distance_m,
-                recent.recent_missions_24h
+                recent.recent_missions_24h,recent.recent_missions_7d,recent.recent_history
            FROM rescue_team t CROSS JOIN target q
            LEFT JOIN team_position p ON p.team_id=t.id
            LEFT JOIN LATERAL (
-             SELECT count(DISTINCT m.id)::int AS recent_missions_24h
+             SELECT count(DISTINCT m.id) FILTER (WHERE m.status NOT IN ('DECLINED','CANCELLED') AND
+                      (m.created_at BETWEEN q.query_time-interval '24 hours' AND q.query_time OR EXISTS (
+                        SELECT 1 FROM mission_event me WHERE me.mission_id=m.id AND me.recorded_at BETWEEN q.query_time-interval '24 hours' AND q.query_time
+                      )))::int AS recent_missions_24h,
+                    count(DISTINCT m.id) FILTER (WHERE m.status NOT IN ('DECLINED','CANCELLED') AND
+                      (m.created_at >= q.query_time-interval '7 days' OR EXISTS (
+                        SELECT 1 FROM mission_event me WHERE me.mission_id=m.id AND me.recorded_at >= q.query_time-interval '7 days'
+                      )))::int AS recent_missions_7d,
+                    coalesce((
+                      SELECT jsonb_agg(jsonb_build_object(
+                        'id',history.id,'status',history.status,'mission_kind',history.mission_kind,
+                        'created_at',history.created_at,'override_reason',history.override_reason,
+                        'suggested_team_id',history.suggested_team_id,'last_progress',history.last_progress
+                      ) ORDER BY history.created_at DESC,history.id DESC)
+                      FROM (
+                        SELECT m.id,m.status,m.mission_kind,m.created_at,m.override_reason,m.suggested_team_id,
+                               (SELECT jsonb_build_object('status',me.to_status,'occurred_at',me.occurred_at,'recorded_basis',me.recorded_basis,'reported_by',me.reported_by)
+                                  FROM mission_event me WHERE me.mission_id=m.id ORDER BY me.occurred_at DESC,me.id DESC LIMIT 1) AS last_progress
+                          FROM mission m WHERE m.team_id=t.id ORDER BY m.created_at DESC,m.id DESC LIMIT 5
+                      ) history
+                    ),'[]'::jsonb) AS recent_history
                FROM mission m
-              WHERE m.team_id=t.id AND m.status NOT IN ('DECLINED','CANCELLED')
-                AND (m.created_at BETWEEN q.query_time-interval '24 hours' AND q.query_time
-                  OR EXISTS (SELECT 1 FROM mission_event me
-                              WHERE me.mission_id=m.id
-                                AND me.recorded_at BETWEEN q.query_time-interval '24 hours' AND q.query_time))
+               WHERE m.team_id=t.id
            ) recent ON true
           WHERE t.status='ACTIVE' AND t.availability='AVAILABLE' AND NOT t.readiness_required
             AND t.organization_id=q.organization_id AND t.operating_region_code=q.region_code
@@ -75,7 +93,7 @@ export class RequestOperationsTeamCandidatesService {
                                                 WHERE ts.team_id=t.id AND ts.skill_code=required.skill_code))
        )
        SELECT id,organization_id,operating_region_code,name,team_kind,reporting_mode,availability,status,readiness_required,version,created_at,
-              skills,position_age_s,position_accuracy_m,position_source,longitude,latitude,distance_m,recent_missions_24h
+              skills,position_age_s,position_accuracy_m,position_source,longitude,latitude,distance_m,recent_missions_24h,recent_missions_7d,recent_history
          FROM eligible
         WHERE position_team_id IS NULL
            OR captured_at < query_time-interval '30 minutes' OR captured_at > query_time
@@ -85,16 +103,18 @@ export class RequestOperationsTeamCandidatesService {
     ) as TeamCandidateRow[];
 
     const items = rankTeamCandidates(rows.filter((row): row is TeamCandidateRow & { distance_m: number } => row.distance_m !== null)
-      .map((row) => ({ ...row, distance_m: Number(row.distance_m), recent_missions_24h: Number(row.recent_missions_24h) })), toleranceM)
+      .map((row) => ({ ...row, distance_m: Number(row.distance_m), recent_missions_24h: Number(row.recent_missions_24h), recent_missions_7d: Number(row.recent_missions_7d) })), toleranceM)
       .map((row) => ({
         team: teamView(row), distance_m: Number(row.distance_m.toFixed(1)), position_age_s: row.position_age_s,
         accuracy_m: row.position_accuracy_m === null ? null : Number(row.position_accuracy_m),
         recent_missions_24h: row.recent_missions_24h, has_active_work: false, in_band: row.in_band, suggested: row.suggested,
+        recent_missions_7d: Number(row.recent_missions_7d), recent_history: row.recent_history ?? [],
       }));
     const unknownPosition = rows.filter((row) => row.distance_m === null).map((row) => ({
       team: teamView(row), distance_m: null, position_age_s: row.position_age_s,
       accuracy_m: row.position_accuracy_m === null ? null : Number(row.position_accuracy_m),
       recent_missions_24h: Number(row.recent_missions_24h), has_active_work: false, in_band: false, suggested: false,
+      recent_missions_7d: Number(row.recent_missions_7d), recent_history: row.recent_history ?? [],
     }));
     return { parameters, items, unknown_position: unknownPosition };
   }

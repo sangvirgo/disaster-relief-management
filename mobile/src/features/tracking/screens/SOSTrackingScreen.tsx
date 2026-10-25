@@ -196,7 +196,7 @@ export const SOSTrackingScreen: React.FC = () => {
           description: note,
         };
         const pending = await StorageService.getOrCreatePendingSupplement(data.id, payload);
-        await ResponseApi.supplementRequest(
+        await ResponseApi.updateReport(
           data.id,
           pending.payload,
           trackingCode,

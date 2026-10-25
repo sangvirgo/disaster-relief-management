@@ -20,6 +20,7 @@ type MissionCommandView = {
   request_id: string;
   team_id: string;
   status: string;
+  mission_kind: string;
   version: number;
   work_cycle: number;
   created_at: string;
@@ -40,6 +41,8 @@ interface RequestRow {
   verification_revision: string | null;
   attribution_locked_at: Date | string | null;
   reporter_user_id: string | null;
+  needs_rescue: boolean;
+  needs_relief_supplies: boolean;
 }
 
 interface TeamRow {
@@ -59,6 +62,7 @@ interface MissionRow {
   team_id: string;
   work_cycle: number;
   status: MissionStatus;
+  mission_kind: string;
   version: number;
   created_at: Date | string;
   suggested_team_id: string | null;
@@ -180,12 +184,13 @@ export class MissionsCommandsService {
     const overrideReason = cleanText(dto.override_reason);
     if (dto.team_id !== suggestedTeamId && !overrideReason) throw new AppError('OVERRIDE_REASON_REQUIRED', { status: 400 });
 
+    const missionKind = row.needs_rescue && row.needs_relief_supplies ? 'COMBINED' : row.needs_rescue ? 'RESCUE' : 'DELIVERY';
     const inserted = await manager.query(
       `INSERT INTO mission
-         (request_id,team_id,work_cycle,status,coordinator_user_id,suggested_team_id,override_reason,verification_revision)
-       VALUES ($1,$2,$3,'OFFERED',$4,$5,$6,$7)
-       RETURNING id,request_id,team_id,work_cycle,status,version,created_at,suggested_team_id`,
-      [requestId, team.id, row.work_cycle, session.userId, suggestedTeamId, overrideReason, row.verification_revision],
+         (request_id,team_id,work_cycle,status,mission_kind,coordinator_user_id,suggested_team_id,override_reason,verification_revision)
+       VALUES ($1,$2,$3,'OFFERED',$4,$5,$6,$7,$8)
+       RETURNING id,request_id,team_id,work_cycle,status,mission_kind,version,created_at,suggested_team_id`,
+      [requestId, team.id, row.work_cycle, missionKind, session.userId, suggestedTeamId, overrideReason, row.verification_revision],
     ) as MissionRow[];
     const mission = inserted[0];
     if (!mission) throw new AppError('INTERNAL_ERROR', { status: 500 });
@@ -278,7 +283,7 @@ export class MissionsCommandsService {
     }
 
     const missions = await manager.query(
-      `SELECT id,request_id,team_id,work_cycle,status,version,created_at,suggested_team_id
+      `SELECT id,request_id,team_id,work_cycle,status,mission_kind,version,created_at,suggested_team_id
          FROM mission WHERE id=$1 AND request_id=$2 AND team_id=$3 FOR UPDATE`, [missionId, requestId, teamId],
     ) as MissionRow[];
     const mission = missions[0];
@@ -299,7 +304,7 @@ export class MissionsCommandsService {
 
     const [updates] = await manager.query(
       `UPDATE mission SET status=$2,version=version+1 WHERE id=$1 AND version=$3
-       RETURNING id,request_id,team_id,work_cycle,status,version,created_at,suggested_team_id`,
+       RETURNING id,request_id,team_id,work_cycle,status,mission_kind,version,created_at,suggested_team_id`,
       [missionId, change.target, expectedVersion],
     ) as [MissionRow[], number];
     const updated = updates[0];
@@ -333,7 +338,7 @@ export class MissionsCommandsService {
       }
     }
     const rows = await manager.query(
-      `SELECT id,status,version,organization_id,region_code,campaign_id,incident_category_code,priority,priority_basis,
+      `SELECT id,status,version,organization_id,region_code,campaign_id,incident_category_code,priority,priority_basis,needs_rescue,needs_relief_supplies,
               work_cycle,verification_revision,attribution_locked_at,reporter_user_id
          FROM assistance_request WHERE id=$1 FOR UPDATE`,
       [requestId],
@@ -386,7 +391,7 @@ export class MissionsCommandsService {
 
   private async missionValue(queryable: Queryable, requestId: string, missionId: string): Promise<MissionCommandView> {
     const rows = await queryable.query(
-      `SELECT id,request_id,team_id,work_cycle,status,version,created_at,suggested_team_id
+      `SELECT id,request_id,team_id,work_cycle,status,mission_kind,version,created_at,suggested_team_id
          FROM mission WHERE id=$1 AND request_id=$2`, [missionId, requestId],
     ) as MissionRow[];
     if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
@@ -397,7 +402,7 @@ export class MissionsCommandsService {
     return {
       id: row.id, request_id: row.request_id, team_id: row.team_id, status: row.status,
       version: Number(row.version), work_cycle: Number(row.work_cycle), created_at: new Date(row.created_at).toISOString(),
-      suggested_team_id: row.suggested_team_id,
+      suggested_team_id: row.suggested_team_id, mission_kind: row.mission_kind,
     };
   }
 

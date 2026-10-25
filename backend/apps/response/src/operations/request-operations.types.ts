@@ -22,6 +22,8 @@ export interface OperationRequestRow {
   description: string | null;
   incident_category_code: string;
   reporter_declared_danger: boolean;
+  needs_rescue: boolean;
+  needs_relief_supplies: boolean;
   priority: string | null;
   priority_basis: string | null;
   work_cycle: number;

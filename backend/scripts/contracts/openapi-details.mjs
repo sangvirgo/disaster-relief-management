@@ -61,6 +61,38 @@ const requestCampaignAssociationViewSchema = object({
   campaign_id: { anyOf: [id, { type: 'null' }] },
 }, ['id', 'status', 'version', 'region_code', 'campaign_id']);
 const identityDetails = {
+  registerCitizen: {
+    summary: 'Register a citizen account and send an email verification code.',
+    description: 'Creates a PENDING_EMAIL account and sends a six-digit code. The account receives its CITIZEN grant only after email verification. WEB requests require the pre-session cookie and CSRF token; NATIVE requests send no cookies or Origin.',
+  },
+  identityAuthVerifyEmail: {
+    summary: 'Verify a citizen email address.',
+    request: request(object({ challenge_id: id, code: { type: 'string', pattern: '^\\d{6}$' } }, ['challenge_id', 'code'])),
+    response: response(object({ verified: { type: 'boolean', const: true }, user: object({ id, username: text, display_name: text }, ['id', 'username', 'display_name']) }, ['verified', 'user'])),
+  },
+  identityAuthResendEmailOtp: {
+    summary: 'Resend the email verification code.',
+    request: request(object({ challenge_id: id }, ['challenge_id'])),
+    response: response(object({ challenge_id: { anyOf: [id, { type: 'null' }] }, email_sent: boolean() }, ['challenge_id', 'email_sent'])),
+  },
+  identityAuthGoogleLogin: {
+    summary: 'Create a session using a verified Google identity.',
+    description: 'The server verifies the Google ID token against configured client IDs. Accounts are matched by the stable Google subject; an existing account is never linked by email alone. WEB sessions use secure cookies; NATIVE sessions return tokens in JSON.',
+    request: request(object({
+      id_token: { type: 'string', minLength: 20, maxLength: 8192 },
+      client_kind: { type: 'string', enum: ['WEB', 'NATIVE'] },
+      first_time_username: { type: 'string', minLength: 3, maxLength: 64, pattern: '^[A-Za-z0-9._-]+$' },
+    }, ['id_token', 'client_kind'])),
+    response: response({ oneOf: [
+      object({ user: { $ref: '#/components/schemas/AuthUser' }, session: object({ expires_at: dateTime }, ['expires_at']), must_change_password: { type: 'boolean', const: false } }, ['user', 'session', 'must_change_password']),
+      object({ user: { $ref: '#/components/schemas/AuthUser' }, access_token: text, refresh_token: text, expires_in: integer(), must_change_password: { type: 'boolean', const: false } }, ['user', 'access_token', 'refresh_token', 'expires_in', 'must_change_password']),
+    ] }, 'Verified Google login response; WEB returns cookies and NATIVE returns bearer tokens.'),
+  },
+  identityAuthLinkGoogle: {
+    summary: 'Link a verified Google identity to the signed-in account.',
+    request: request(object({ id_token: { type: 'string', minLength: 20, maxLength: 8192 } }, ['id_token'])),
+    response: response(object({ linked: { type: 'boolean', const: true } }, ['linked'])),
+  },
   identityInternalActiveUserCheck: {
     request: request(object({ user_id: id }, ['user_id'])),
     response: response({ oneOf: [
@@ -83,6 +115,46 @@ const identityPaginationQueries = {
 };
 
 const responseDetails = {
+  getStaffRequestDetail: {
+    summary: 'Get complete scoped SOS details, coordinator timeline, mission history and any AI advisory.',
+    description: 'Returns exact contacts and coordinates only to staff authorized for this request. The AI advisory is an untrusted, human-reviewed aid and never sets official priority or dispatches a team.',
+  },
+  listTeamCandidates: {
+    summary: 'Suggest eligible teams using distance bands and recent workload.',
+    description: 'Active-mission teams are excluded. The nearest eligible team defines a priority-dependent safety band; inside that band, the lowest weighted workload over 24 hours and 7 days wins, then distance and team ID break ties. Teams outside the band remain distance-ranked. The response includes each team’s recent mission history; suggestions never assign or dispatch a team.',
+  },
+  responseRequestOperationsReviewAiAdvisory: {
+    summary: 'Record a human decision on an AI advisory.',
+    description: 'Accepts, adjusts or rejects a completed advisory and appends a staff timeline event. It does not modify SOS facts, official priority, or team assignment. An ADJUSTED decision requires a note.',
+    parameters: [
+      { $ref: '#/components/parameters/RequestId' },
+      { name: 'advisoryId', in: 'path', required: true, schema: id },
+      { $ref: '#/components/parameters/IdempotencyKey' },
+    ],
+    request: request(object({ decision: { type: 'string', enum: ['ACCEPTED', 'ADJUSTED', 'REJECTED'] }, note: { type: 'string', maxLength: 1000 } }, ['decision'])),
+    response: response(object({ request_id: id, advisory_id: id, decision: { type: 'string', enum: ['ACCEPTED', 'ADJUSTED', 'REJECTED'] } }, ['request_id', 'advisory_id', 'decision'])),
+  },
+  responseTrackingUpdateReport: {
+    summary: 'Update editable facts on an SOS report before verification.',
+    description: 'Uses expected_version for concurrency control. Omitted facts retain their current values. The request must be owned by the signed-in reporter or accompanied by valid tracking credentials.',
+    parameters: [
+      { $ref: '#/components/parameters/RequestId' },
+      { $ref: '#/components/parameters/IdempotencyKey' },
+    ],
+    request: request(object({
+      expected_version: { type: 'integer', minimum: 1 },
+      description: { type: ['string', 'null'], maxLength: 2000 },
+      household_reference_note: { type: ['string', 'null'], maxLength: 500 },
+      people_affected: { type: ['integer', 'null'], minimum: 1, maximum: 10000 },
+      children_count: { type: ['integer', 'null'], minimum: 0, maximum: 10000 },
+      elderly_count: { type: ['integer', 'null'], minimum: 0, maximum: 10000 },
+      location: { $ref: '#/components/schemas/RequestLocation' },
+      reporter_declared_danger: boolean(),
+      needs_rescue: boolean(),
+      needs_relief_supplies: boolean(),
+    }, ['expected_version'])),
+    response: response(object({ id, version }, ['id', 'version']), 'Updated SOS request identifier and new version.'),
+  },
   responseRequestOperationsEvidence: {
     response: response(object({ items: item({ id, state: text, size_bytes: integer(), detected_mime: text, checksum: text, created_at: dateTime }), more: boolean(), cursor: text })),
   },
@@ -685,8 +757,12 @@ const errorCatalog = new Map([...fs.readFileSync(errorCatalogPath, 'utf8').match
 const routeErrorCodes = {
   identityInternalActiveUserCheck: ['FORBIDDEN'],
   identityInternalTeamLeaderEligibility: ['FORBIDDEN'],
-  registerCitizen: ['USERNAME_TAKEN', 'PASSWORD_WEAK', 'RATE_LIMITED', 'CSRF_INVALID'],
+  registerCitizen: ['USERNAME_TAKEN', 'EMAIL_TAKEN', 'PASSWORD_WEAK', 'EMAIL_OTP_UNAVAILABLE', 'RATE_LIMITED', 'CSRF_INVALID'],
   login: ['INVALID_CREDENTIALS', 'RATE_LIMITED', 'CSRF_INVALID'],
+  identityAuthVerifyEmail: ['EMAIL_OTP_INVALID', 'RATE_LIMITED', 'CSRF_INVALID'],
+  identityAuthResendEmailOtp: ['EMAIL_OTP_INVALID', 'EMAIL_OTP_UNAVAILABLE', 'RATE_LIMITED', 'CSRF_INVALID'],
+  identityAuthGoogleLogin: ['GOOGLE_TOKEN_INVALID', 'GOOGLE_LOGIN_UNAVAILABLE', 'GOOGLE_ACCOUNT_LINK_REQUIRED', 'USERNAME_TAKEN', 'RATE_LIMITED', 'CSRF_INVALID'],
+  identityAuthLinkGoogle: ['GOOGLE_TOKEN_INVALID', 'GOOGLE_LOGIN_UNAVAILABLE', 'GOOGLE_IDENTITY_IN_USE', 'GOOGLE_ALREADY_LINKED', 'SESSION_REAUTH_REQUIRED', 'CSRF_INVALID'],
   refreshSession: ['SESSION_EXPIRED', 'REFRESH_REUSED', 'REFRESH_RACE', 'CSRF_INVALID'],
   changePassword: ['INVALID_CREDENTIALS', 'PASSWORD_WEAK', 'CSRF_INVALID'],
   createIdentityUser: ['USERNAME_TAKEN', 'PASSWORD_WEAK'],
@@ -703,6 +779,8 @@ const routeErrorCodes = {
   trackSelfRequest: ['NOT_FOUND', 'RATE_LIMITED'],
   listReporterEvents: ['NOT_FOUND'],
   supplementSelfRequest: ['STATE_TRANSITION_INVALID', 'VERSION_CONFLICT'],
+  responseTrackingUpdateReport: ['NOT_FOUND', 'VALIDATION_FAILED', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
+  responseRequestOperationsReviewAiAdvisory: ['NOT_FOUND', 'VALIDATION_FAILED', 'STATE_TRANSITION_INVALID', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
   claimSelfRequest: ['ALREADY_CLAIMED', 'SESSION_EXPIRED'],
   issueRequestRecoveryCode: ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   redeemRequestRecoveryCode: ['NOT_FOUND', 'SESSION_EXPIRED'],
@@ -837,7 +915,7 @@ function routeSecurity(service, routePath, method, operationId) {
   const write = method !== 'get';
   if (service === 'identity') {
     if (routePath === '/auth/csrf') return [];
-    if (['/auth/register', '/auth/login'].includes(routePath)) {
+    if (['/auth/register', '/auth/login', '/auth/google', '/auth/email/verify', '/auth/email/resend'].includes(routePath)) {
       return [{ WebPreSessionCookie: [], CsrfToken: [] }, {}];
     }
     if (routePath === '/auth/refresh') {
@@ -855,7 +933,7 @@ function routeSecurity(service, routePath, method, operationId) {
       { TrackingSecret: [], TrackingCode: [] },
       ...sessionSecurity(service, false).map((requirement) => ({ ...requirement, TrackingCode: [] })),
     ];
-    if (operationId === 'listReporterEvents' || operationId === 'supplementSelfRequest' || operationId === 'uploadRequestEvidence') {
+    if (operationId === 'listReporterEvents' || operationId === 'supplementSelfRequest' || operationId === 'responseTrackingUpdateReport' || operationId === 'uploadRequestEvidence') {
       return [
         { TrackingSecret: [], TrackingCode: [] },
         ...sessionSecurity(service, write).map((requirement) => ({ ...requirement, TrackingCode: [] })),
@@ -887,11 +965,11 @@ function routeSecurity(service, routePath, method, operationId) {
 }
 
 function requiresExactSecurity(service, routePath, operationId) {
-  if (service === 'identity') return routePath.startsWith('/internal/') || ['/auth/csrf', '/auth/register', '/auth/login', '/auth/refresh'].includes(routePath);
+  if (service === 'identity') return routePath.startsWith('/internal/') || ['/auth/csrf', '/auth/register', '/auth/login', '/auth/refresh', '/auth/google', '/auth/email/verify', '/auth/email/resend'].includes(routePath);
   if (service === 'response') {
     return routePath.startsWith('/internal/') || routePath === '/public/campaigns' || [
       'createSelfRequest', 'trackSelfRequest', 'listReporterEvents', 'supplementSelfRequest',
-      'uploadRequestEvidence', 'claimSelfRequest', 'redeemRequestRecoveryCode',
+      'responseTrackingUpdateReport', 'uploadRequestEvidence', 'claimSelfRequest', 'redeemRequestRecoveryCode',
     ].includes(operationId);
   }
   return routePath.startsWith('/internal/') || [
@@ -936,6 +1014,21 @@ const identityConditionalSecurity = {
     native: { required: [], forbidden: ['Cookie', 'Origin'] },
   },
   login: {
+    access_token_required: false,
+    web: { required: ['Origin allowed by Identity', 'cookie c48_pre', 'header X-CSRF-Token'] },
+    native: { required: ['JSON body client_kind=NATIVE'], forbidden: ['Cookie', 'Origin'] },
+  },
+  identityAuthVerifyEmail: {
+    access_token_required: false,
+    web: { required: ['Origin allowed by Identity', 'cookie c48_pre', 'header X-CSRF-Token'] },
+    native: { required: [], forbidden: ['Cookie', 'Origin'] },
+  },
+  identityAuthResendEmailOtp: {
+    access_token_required: false,
+    web: { required: ['Origin allowed by Identity', 'cookie c48_pre', 'header X-CSRF-Token'] },
+    native: { required: [], forbidden: ['Cookie', 'Origin'] },
+  },
+  identityAuthGoogleLogin: {
     access_token_required: false,
     web: { required: ['Origin allowed by Identity', 'cookie c48_pre', 'header X-CSRF-Token'] },
     native: { required: ['JSON body client_kind=NATIVE'], forbidden: ['Cookie', 'Origin'] },
@@ -1007,6 +1100,107 @@ export function applyOpenApiDetails(document, service) {
     additionalProperties: false,
   };
   Object.assign(document.components.securitySchemes, serviceSecuritySchemes[service] ?? {});
+  if (service === 'identity') {
+    const registerRequest = document.components.schemas.RegisterRequest;
+    if (registerRequest) {
+      registerRequest.required = [...new Set([...(registerRequest.required ?? []), 'email'])];
+      registerRequest.properties = {
+        ...registerRequest.properties,
+        email: { type: 'string', format: 'email', maxLength: 254 },
+      };
+    }
+    const registerResponse = document.components.schemas.RegisterResponse;
+    if (registerResponse) {
+      registerResponse.required = [...new Set([...(registerResponse.required ?? []), 'verification', 'email_sent'])];
+      registerResponse.properties = {
+        ...registerResponse.properties,
+        verification: object({ challenge_id: id }, ['challenge_id']),
+        email_sent: boolean(),
+      };
+    }
+  }
+  if (service === 'response') {
+    const countFields = {
+      children_count: { type: ['integer', 'null'], minimum: 0, maximum: 10000 },
+      elderly_count: { type: ['integer', 'null'], minimum: 0, maximum: 10000 },
+    };
+    const needsFields = {
+      needs_rescue: { type: 'boolean', default: true },
+      needs_relief_supplies: { type: 'boolean', default: false },
+    };
+    for (const name of ['CreateSelfRequest', 'CreateProxyRequest']) {
+      const schema = document.components.schemas[name];
+      if (schema) schema.properties = { ...schema.properties, ...countFields, ...needsFields };
+    }
+    const staffDetail = document.components.schemas.StaffRequestDetail;
+    if (staffDetail) {
+      staffDetail.properties = {
+        ...staffDetail.properties,
+        report_mode: text,
+        category: text,
+        description: { anyOf: [text, { type: 'null' }] },
+        received_at: dateTime,
+        declared_danger: boolean(),
+        needs_rescue: boolean(),
+        needs_relief_supplies: boolean(),
+        mission_history: object({
+          items: array(object({
+            id, status: text, mission_kind: { type: 'string', enum: ['RESCUE', 'DELIVERY', 'COMBINED'] },
+            created_at: dateTime, team_id: id, team_name: text,
+            suggested_team_id: { anyOf: [id, { type: 'null' }] },
+            override_reason: { anyOf: [text, { type: 'null' }] },
+            last_status: { anyOf: [text, { type: 'null' }] },
+            last_occurred_at: { anyOf: [dateTime, { type: 'null' }] },
+            recorded_basis: { anyOf: [text, { type: 'null' }] },
+            reported_by: { anyOf: [text, { type: 'null' }] },
+          })), more: boolean(),
+        }, ['items', 'more']),
+        ai_advisory: { anyOf: [
+          { type: 'null' },
+          object({
+            id, model: text, status: { type: 'string', enum: ['QUEUED', 'PROCESSING', 'COMPLETED', 'FAILED', 'SKIPPED'] },
+            risk_score: { anyOf: [integer(), { type: 'null' }] }, reason_codes: array(text),
+            extracted_json: { anyOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }] },
+            review_status: { anyOf: [{ type: 'string', enum: ['ACCEPTED', 'ADJUSTED', 'REJECTED'] }, { type: 'null' }] },
+            review_note: { anyOf: [text, { type: 'null' }] }, error_code: { anyOf: [text, { type: 'null' }] },
+            human_review_required: { type: 'boolean', const: true },
+          }, ['id', 'model', 'status', 'reason_codes', 'human_review_required']),
+        ] },
+      };
+      staffDetail.properties.subject = {
+        ...staffDetail.properties.subject,
+        properties: {
+          ...staffDetail.properties.subject?.properties,
+          people_affected: { anyOf: [integer(), { type: 'null' }] },
+          ...countFields,
+          reporter_relationship: { anyOf: [text, { type: 'null' }] },
+          beneficiary_contact_phone: { anyOf: [text, { type: 'null' }] },
+          alternate_contact: object({ name: { anyOf: [text, { type: 'null' }] }, phone: { anyOf: [text, { type: 'null' }] } }),
+          information_source: { anyOf: [text, { type: 'null' }] },
+          last_known_situation_at: { anyOf: [dateTime, { type: 'null' }] },
+          contactability: { anyOf: [text, { type: 'null' }] },
+          household_reference_note: { anyOf: [text, { type: 'null' }] },
+        },
+        additionalProperties: true,
+      };
+    }
+    const recentHistory = array(object({
+      id, status: text, mission_kind: { type: 'string', enum: ['RESCUE', 'DELIVERY', 'COMBINED'] }, created_at: dateTime,
+      last_status: { anyOf: [text, { type: 'null' }] }, last_occurred_at: { anyOf: [dateTime, { type: 'null' }] },
+      recorded_basis: { anyOf: [text, { type: 'null' }] }, reported_by: { anyOf: [text, { type: 'null' }] },
+    }));
+    for (const name of ['TeamCandidate', 'UnknownPositionTeamCandidate']) {
+      const schema = document.components.schemas[name];
+      if (schema) {
+        schema.required = [...new Set([...(schema.required ?? []), 'recent_missions_7d', 'recent_history'])];
+        schema.properties = {
+          ...schema.properties,
+          recent_missions_7d: { type: 'integer', minimum: 0 },
+          recent_history: recentHistory,
+        };
+      }
+    }
+  }
   if (service === 'logistics') {
     document.components.parameters ??= {};
     document.components.parameters.IdempotencyKey ??= {

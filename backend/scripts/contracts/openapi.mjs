@@ -398,11 +398,12 @@ export function mergeOpenApiText(raw, current, exported) {
     const componentProperties = new Map(objectProperties(componentsNode, sourceFile));
     const schemasNode = componentProperties.get('schemas')?.initializer;
     const componentInsertions = [];
-    if (exported.components?.schemas?.ErrorEnvelope) {
+    const schemas = exported.components?.schemas ?? {};
+    if (Object.keys(schemas).length) {
       if (schemasNode && ts.isObjectLiteralExpression(schemasNode)) {
-        edits.push(...objectPropertyEdits(raw, sourceFile, schemasNode, [['ErrorEnvelope', exported.components.schemas.ErrorEnvelope]]));
+        edits.push(...objectPropertyEdits(raw, sourceFile, schemasNode, Object.entries(schemas)));
       } else {
-        componentInsertions.push(['schemas', exported.components.schemas]);
+        componentInsertions.push(['schemas', schemas]);
       }
     }
     const schemes = exported.components?.securitySchemes ?? {};

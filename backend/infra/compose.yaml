@@ -120,6 +120,14 @@ services:
       WEB_ALLOWED_ORIGINS: '${WEB_ALLOWED_ORIGINS:?Set WEB_ALLOWED_ORIGINS in backend/.env}'
       SECRET_HASH_PEPPER_AUTH_V1: '${SECRET_HASH_PEPPER_AUTH_V1:?Set SECRET_HASH_PEPPER_AUTH_V1 in backend/.env}'
       SECRET_HASH_PEPPER_AUTH_CURRENT: '${SECRET_HASH_PEPPER_AUTH_CURRENT:-v1}'
+      EMAIL_OTP_PEPPER: '${EMAIL_OTP_PEPPER:?Set EMAIL_OTP_PEPPER in backend/.env}'
+      IDENTITY_EMAIL_SMTP_HOST: '${IDENTITY_EMAIL_SMTP_HOST:-}'
+      IDENTITY_EMAIL_SMTP_PORT: '${IDENTITY_EMAIL_SMTP_PORT:-587}'
+      IDENTITY_EMAIL_SMTP_SECURE: '${IDENTITY_EMAIL_SMTP_SECURE:-false}'
+      IDENTITY_EMAIL_SMTP_USER: '${IDENTITY_EMAIL_SMTP_USER:-}'
+      IDENTITY_EMAIL_SMTP_PASSWORD: '${IDENTITY_EMAIL_SMTP_PASSWORD:-}'
+      IDENTITY_EMAIL_FROM: '${IDENTITY_EMAIL_FROM:-}'
+      GOOGLE_CLIENT_IDS: '${GOOGLE_CLIENT_IDS:-}'
       ARGON2_MEMORY_KIB: '${ARGON2_MEMORY_KIB:-65536}'
       ARGON2_TIME_COST: '${ARGON2_TIME_COST:-3}'
       ARGON2_PARALLELISM: '${ARGON2_PARALLELISM:-1}'
@@ -189,6 +197,8 @@ services:
       RESOLUTION_RECOVERY_ENABLED: '${RESOLUTION_RECOVERY_ENABLED:-false}'
       INTROSPECT_TIMEOUT_MS: '${INTROSPECT_TIMEOUT_MS:-500}'
       DEMO_INTAKE_ORGANIZATION_ID: '${DEMO_INTAKE_ORGANIZATION_ID:?Set DEMO_INTAKE_ORGANIZATION_ID in backend/.env}'
+      GEMINI_API_KEY: '${GEMINI_API_KEY:-}'
+      GEMINI_MODEL: '${GEMINI_MODEL:-gemini-3.1-flash-lite}'
     ports:
       - '127.0.0.1:3002:3002'
     depends_on:
@@ -251,6 +261,21 @@ services:
       start_period: 10s
     networks: [c48-internal]
 
+  web:
+    image: ${C48_IMAGE_NAMESPACE:-c48}/web:${C48_IMAGE_TAG:-local}
+    build:
+      context: ../../frontend/web
+      dockerfile: Dockerfile
+      args:
+        VITE_GOOGLE_CLIENT_ID: '${VITE_GOOGLE_CLIENT_ID:-}'
+        VITE_GOOGLE_MAPS_API_KEY: '${VITE_GOOGLE_MAPS_API_KEY:-}'
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /usr/share/nginx/html/index.html"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks: [c48-internal]
+
   nginx:
     image: nginx:1.30.5
     environment:
@@ -271,6 +296,8 @@ services:
       response-api:
         condition: service_healthy
       logistics-api:
+        condition: service_healthy
+      web:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "nginx -t"]

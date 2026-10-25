@@ -164,3 +164,11 @@ export class SupplementReviewDto extends RequestVersionDto {
   @IsOptional() @IsString() @MaxLength(1000)
   declare source_note?: string;
 }
+
+export class AiAdvisoryReviewDto {
+  @IsIn(['ACCEPTED', 'ADJUSTED', 'REJECTED'])
+  decision!: 'ACCEPTED' | 'ADJUSTED' | 'REJECTED';
+
+  @IsOptional() @IsString() @MaxLength(1000) @Matches(/\S/u)
+  declare note?: string;
+}

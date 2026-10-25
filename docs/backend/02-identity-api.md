@@ -20,15 +20,19 @@ Schema: [schema/identity.sql](schema/identity.sql). Conventions: [00](00-setup.m
 | Method & path | Auth | Request → Response |
 |---|---|---|
 | `GET /auth/csrf` | none (Web) | → `200 { "csrf_token": "…" }` |
-| `POST /auth/register` | none, CSRF (Web), throttled | `{ username, password, display_name }` → `201 { user: { id, username, display_name } }`. Always `CITIZEN` only; any `role*`/`scope*` field is ignored → `400` if present. Errors: `USERNAME_TAKEN` 409, `PASSWORD_WEAK` 400 |
+| `POST /auth/register` | none, CSRF (Web), throttled | `{ username, password, display_name, email }` → `201 { user, verification: { challenge_id }, email_sent }`. Creates `PENDING_EMAIL`; the `CITIZEN` grant is issued only after a valid email code. Errors: `USERNAME_TAKEN`/`EMAIL_TAKEN` 409, `PASSWORD_WEAK` 400, `EMAIL_OTP_UNAVAILABLE` 503 |
+| `POST /auth/email/verify` | none, CSRF (Web), throttled | `{ challenge_id, code }` → `{ verified: true, user }`; code expires after five minutes and allows five attempts. A successful verification activates the account and grants `CITIZEN` |
+| `POST /auth/email/resend` | none, CSRF (Web), throttled | `{ challenge_id }` → `{ challenge_id, email_sent }`; resend cooldown and IP/email rate limits apply. If delivery is unavailable, the account remains pending and the response reports `email_sent: false` |
 | `POST /auth/login` | none, CSRF (Web), throttled | `{ username, password, client_kind: "WEB"\|"NATIVE" }` → Web: `200 { user, session: { expires_at }, must_change_password }` + cookies. Native: `200 { user, access_token, refresh_token, expires_in, must_change_password }`. Errors: `INVALID_CREDENTIALS` 401 |
+| `POST /auth/google` | none, CSRF (Web), throttled | `{ id_token, client_kind: "WEB"\|"NATIVE", first_time_username? }` → a session in the same transport-specific shape as login. Identity verifies the Google ID token against `GOOGLE_CLIENT_IDS` and uses the stable Google `sub`; it never links an existing account by matching email alone |
+| `POST /auth/google/link` | live session, CSRF (Web) | `{ id_token }` → `{ linked: true }`; requires a session created within the last 15 minutes and refuses an identity already linked elsewhere |
 | `POST /auth/refresh` | refresh cookie / `{ refresh_token }` (native), CSRF (Web) | → same shape as login without `user`. Errors: `SESSION_EXPIRED` 401, `REFRESH_REUSED` 401 (family revoked) |
 | `POST /auth/logout` | session, CSRF | `204`; revokes the family, clears cookies |
 | `POST /auth/change-password` | session, CSRF | `{ current_password, new_password }` → `204`; revokes all other families; clears `must_change_password`. Errors `INVALID_CREDENTIALS`, `PASSWORD_WEAK` |
 | `GET /me` | session | → `200 { id, username, display_name, must_change_password, grants: [ { id, role_code, scope_type, organization_id, region_code, campaign_id } ] }` |
 | `GET /regions` | session | → `{ items: [ { code, name, status } ], next_cursor }` (paginated like every list; the catalog is small) |
 
-Throttling (Nginx + app): login 5 / minute per IP+username, 30 / minute per IP; register 3 / hour per IP. Exceeding → `429 RATE_LIMITED`.
+Throttling (Nginx + app): login 5 / minute per IP+username, 30 / minute per IP; register 3 / hour per IP; email verification 10 / minute per IP with five attempts per challenge; email resend 3 / hour per IP/email plus a per-challenge cooldown. Exceeding → `429 RATE_LIMITED`. Set `EMAIL_OTP_PEPPER` to a random server-only secret and configure `IDENTITY_EMAIL_SMTP_*`/`IDENTITY_EMAIL_FROM` for delivery. `GOOGLE_CLIENT_IDS` is a comma-separated server allow-list of accepted OAuth client IDs. Never put the Gemini or SMTP secret in Web or Mobile environment files.
 
 ## 3. Admin endpoints (`USER_MANAGE` / `GRANT_MANAGE` / `ORG_MANAGE`)
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../api/client';
+import { api, newCommandKey } from '../../api/client';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { label, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
@@ -19,16 +19,27 @@ type QueueItem = {
   region_code?: string | null;
 };
 type Queue = { items: QueueItem[]; cursor?: string; more: boolean; generated_at: string };
-type Event = { id: string; event_type: string; occurred_at: string };
+type Event = { id: string; event_type: string; occurred_at: string; payload?: Record<string, unknown> };
 type Detail = QueueItem & {
   version: number;
   description?: string | null;
   report_mode: string;
   campaign_id?: string | null;
+  needs_rescue: boolean;
+  needs_relief_supplies: boolean;
   reporter: { name?: string | null; contact_phone?: string | null };
   subject: {
     people_affected?: number | null;
+    children_count?: number | null;
+    elderly_count?: number | null;
     location?: { coordinates: [number, number]; source: string };
+    reporter_relationship?: string | null;
+    beneficiary_contact_phone?: string | null;
+    alternate_contact?: { name?: string | null; phone?: string | null };
+    information_source?: string | null;
+    last_known_situation_at?: string | null;
+    contactability?: string | null;
+    household_reference_note?: string | null;
   };
   contact_attempts: { items: { id: string; contact_target: string; outcome: string }[] };
   timeline: { items: Event[] };
@@ -36,6 +47,19 @@ type Detail = QueueItem & {
   active_missions?: {
     items: { id: string; status: string; created_at: string; team_id: string }[];
   };
+  mission_history?: {
+    items: {
+      id: string; status: string; mission_kind: string; created_at: string; team_id: string; team_name: string;
+      suggested_team_id?: string | null; override_reason?: string | null; last_status?: string | null;
+      last_occurred_at?: string | null; recorded_basis?: string | null; reported_by?: string | null;
+    }[];
+  };
+  ai_advisory?: {
+    id: string; model: string; status: string; risk_score: number; reason_codes: string[];
+    extracted_json?: { summary?: string; indicators?: string[]; facts?: Record<string, unknown>; confidence?: number } | null;
+    review_status?: string | null; review_note?: string | null; error_code?: string | null;
+    human_review_required: boolean;
+  } | null;
   evidence?: { items: { id: string; state: string; size_bytes: number; created_at: string }[] };
 };
 type Candidate = {
@@ -43,6 +67,12 @@ type Candidate = {
   distance_m: number | null;
   position_age_s: number | null;
   recent_missions_24h: number;
+  recent_missions_7d: number;
+  recent_history: {
+    id: string; status: string; mission_kind: string; created_at: string; override_reason?: string | null;
+    last_progress?: { status?: string; occurred_at?: string; recorded_basis?: string; reported_by?: string } | null;
+  }[];
+  in_band: boolean;
   suggested: boolean;
 };
 type Candidates = { items: Candidate[]; unknown_position: Candidate[] };
@@ -66,6 +96,28 @@ const title: Record<string, string> = {
   triage: 'Quyết định ưu tiên',
   assign: 'Chọn đội cứu hộ',
 };
+const advisoryFactLabels: Record<string, string> = {
+  people_affected: 'Tổng số người cần hỗ trợ',
+  children_count: 'Số trẻ em',
+  elderly_count: 'Số người cao tuổi',
+  life_threat: 'Có nguy cơ tính mạng',
+  needs_rescue: 'Cần đội cứu hộ',
+  needs_relief_supplies: 'Cần hàng cứu trợ',
+};
+const advisoryReasonLabels: Record<string, string> = {
+  DECLARED_LIFE_DANGER: 'Người báo khai có nguy hiểm tính mạng',
+  FLOOD_OR_TRAPPED: 'Có dấu hiệu ngập lụt hoặc mắc kẹt',
+  CHILDREN_PRESENT: 'Có trẻ em',
+  ELDERLY_PRESENT: 'Có người cao tuổi',
+  INJURY_OR_MEDICAL: 'Có dấu hiệu chấn thương hoặc cần cấp cứu',
+  RESCUE_REQUESTED: 'Có yêu cầu cứu hộ',
+  RELIEF_SUPPLIES_ONLY: 'Chỉ yêu cầu hàng cứu trợ',
+};
+const advisoryReviewLabels: Record<string, string> = {
+  ACCEPTED: 'Ghi nhận',
+  ADJUSTED: 'Điều chỉnh',
+  REJECTED: 'Không sử dụng',
+};
 
 export function Coordinator({ page }: { page: string }) {
   const [queue, setQueue] = useState<Queue | null>(null);
@@ -77,6 +129,8 @@ export function Coordinator({ page }: { page: string }) {
   const [reviewLane, setReviewLane] = useState('NORMAL');
   const [overdue, setOverdue] = useState(false);
   const [error, setError] = useState('');
+  const [aiReviewNote, setAiReviewNote] = useState('');
+  const [aiReviewBusy, setAiReviewBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
@@ -154,6 +208,28 @@ export function Coordinator({ page }: { page: string }) {
   };
   function command(spec: CommandSpec) {
     return <CommandForm key={spec.path + detail?.version} spec={spec} onSuccess={done} />;
+  }
+  async function reviewAiAdvisory(decision: 'ACCEPTED' | 'ADJUSTED' | 'REJECTED') {
+    if (!detail?.ai_advisory) return;
+    if (decision === 'ADJUSTED' && !aiReviewNote.trim()) {
+      setError('Vui lòng ghi nội dung điều chỉnh trước khi lưu quyết định.');
+      return;
+    }
+    setAiReviewBusy(true);
+    setError('');
+    try {
+      await api('response', `/requests/${detail.id}/ai-advisories/${detail.ai_advisory.id}/review`, {
+        method: 'POST',
+        body: { decision, ...(aiReviewNote.trim() ? { note: aiReviewNote.trim() } : {}) },
+        idempotencyKey: newCommandKey(),
+      });
+      setAiReviewNote('');
+      done();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Không thể lưu quyết định rà soát AI.');
+    } finally {
+      setAiReviewBusy(false);
+    }
   }
   return (
     <div className="coordinator-layout">
@@ -274,6 +350,19 @@ export function Coordinator({ page }: { page: string }) {
                 {detail.subject.people_affected ?? 'Chưa rõ'} người
               </p>
               <p>
+                <strong>Trẻ em / người cao tuổi</strong>
+                <br />
+                {detail.subject.children_count ?? 0} trẻ em · {detail.subject.elderly_count ?? 0} người cao tuổi
+              </p>
+              <p>
+                <strong>Nhu cầu</strong>
+                <br />
+                {[
+                  ...(detail.needs_rescue ? ['Cứu hộ'] : []),
+                  ...(detail.needs_relief_supplies ? ['Hàng cứu trợ'] : []),
+                ].join(' · ') || 'Chưa khai báo'}
+              </p>
+              <p>
                 <strong>Người báo</strong>
                 <br />
                 {detail.reporter.name || 'Chưa có tên'}
@@ -289,6 +378,33 @@ export function Coordinator({ page }: { page: string }) {
                 {detail.subject.location?.coordinates?.join(', ') || 'Chưa có tọa độ'}
               </p>
               <p>
+                <strong>Quan hệ với người cần hỗ trợ</strong>
+                <br />
+                {detail.subject.reporter_relationship || 'Tự báo / chưa ghi rõ'}
+              </p>
+              <p>
+                <strong>Số liên hệ người cần hỗ trợ</strong>
+                <br />
+                {detail.subject.beneficiary_contact_phone || 'Chưa có'}
+              </p>
+              <p>
+                <strong>Liên hệ thay thế</strong>
+                <br />
+                {[detail.subject.alternate_contact?.name, detail.subject.alternate_contact?.phone].filter(Boolean).join(' · ') || 'Chưa có'}
+              </p>
+              <p>
+                <strong>Nguồn thông tin / khả năng liên lạc</strong>
+                <br />
+                {[detail.subject.information_source, detail.subject.contactability].filter(Boolean).join(' · ') || 'Chưa ghi rõ'}
+              </p>
+              {detail.subject.last_known_situation_at && (
+                <p>
+                  <strong>Thời điểm biết tình hình gần nhất</strong>
+                  <br />
+                  {timeLabel(detail.subject.last_known_situation_at)}
+                </p>
+              )}
+              <p>
                 <strong>Phiên bản</strong>
                 <br />
                 {detail.version}
@@ -300,6 +416,9 @@ export function Coordinator({ page }: { page: string }) {
               </p>
             </div>
             {detail.description && <p>{detail.description}</p>}
+            {detail.subject.household_reference_note && (
+              <p><strong>Ghi chú nhận diện nơi ở:</strong> {detail.subject.household_reference_note}</p>
+            )}
             {detail.declared_danger && (
               <p className="notice warning">
                 Người báo cho biết có nguy hiểm tính mạng; cần kiểm tra ngay.
@@ -309,6 +428,50 @@ export function Coordinator({ page }: { page: string }) {
               <p className="notice warning">
                 Có tín hiệu hoạt động báo hộ cần rà soát. Đây không phải kết luận gian lận.
               </p>
+            )}
+            {detail.ai_advisory && (
+              <section className="notice">
+                <h3>Gợi ý trích xuất và rủi ro từ AI</h3>
+                <p>AI chỉ hỗ trợ tổng hợp thông tin. Điều phối viên phải tự xác minh; điểm này không thay thế mức ưu tiên P1–P4 và không tự giao đội.</p>
+                <p><strong>Trạng thái:</strong> {label(detail.ai_advisory.status)}</p>
+                {detail.ai_advisory.status === 'COMPLETED' && (
+                  <>
+                    <p><strong>Điểm rủi ro tham khảo:</strong> {detail.ai_advisory.risk_score}/100</p>
+                    <p><strong>Dấu hiệu theo quy tắc:</strong> {detail.ai_advisory.reason_codes.map((code) => advisoryReasonLabels[code] || 'Có dấu hiệu cần rà soát').join(' · ') || 'Không có'}</p>
+                    {detail.ai_advisory.extracted_json?.summary && <p><strong>Tóm tắt:</strong> {detail.ai_advisory.extracted_json.summary}</p>}
+                    {detail.ai_advisory.extracted_json?.indicators && detail.ai_advisory.extracted_json.indicators.length > 0 && (
+                      <p><strong>Dấu hiệu AI trích xuất:</strong> {detail.ai_advisory.extracted_json.indicators.join(' · ')}</p>
+                    )}
+                    {detail.ai_advisory.extracted_json?.facts && (
+                      <div>
+                        <strong>Dữ kiện trích xuất cần đối chiếu</strong>
+                        {Object.entries(detail.ai_advisory.extracted_json.facts)
+                          .filter(([key]) => advisoryFactLabels[key])
+                          .map(([key, value]) => (
+                            <p key={key}>{advisoryFactLabels[key]}: {typeof value === 'boolean' ? (value ? 'Có' : 'Không') : String(value)}</p>
+                          ))}
+                      </div>
+                    )}
+                    <p><strong>Độ tin cậy mô hình tự báo cáo:</strong> {Math.round((detail.ai_advisory.extracted_json?.confidence ?? 0) * 100)}% (chỉ tham khảo)</p>
+                    {detail.ai_advisory.review_status ? (
+                      <p><strong>Quyết định của điều phối viên:</strong> {advisoryReviewLabels[detail.ai_advisory.review_status] || 'Đã rà soát'}{detail.ai_advisory.review_note ? ` · ${detail.ai_advisory.review_note}` : ''}</p>
+                    ) : (
+                      <div>
+                        <label className="field">
+                          <span>Ghi chú khi điều chỉnh hoặc bác bỏ</span>
+                          <textarea value={aiReviewNote} onChange={(event) => setAiReviewNote(event.target.value)} maxLength={1000} />
+                        </label>
+                        <div className="action-grid">
+                          <button className="button" disabled={aiReviewBusy} onClick={() => void reviewAiAdvisory('ACCEPTED')}>Ghi nhận gợi ý</button>
+                          <button className="button secondary" disabled={aiReviewBusy} onClick={() => void reviewAiAdvisory('ADJUSTED')}>Điều chỉnh và ghi nhận</button>
+                          <button className="button secondary" disabled={aiReviewBusy} onClick={() => void reviewAiAdvisory('REJECTED')}>Không sử dụng gợi ý</button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+                {['FAILED', 'SKIPPED'].includes(detail.ai_advisory.status) && <p>Không có kết quả AI cho mô tả này. Hãy tiếp tục quy trình xác minh thủ công.</p>}
+              </section>
             )}
             {detail.active_missions && detail.active_missions.items.length > 0 && (
               <section>
@@ -321,6 +484,20 @@ export function Coordinator({ page }: { page: string }) {
                         Trạng thái: {label(m.status)} · Đội: {m.team_id.slice(0, 8)} ·{' '}
                         {timeLabel(m.created_at)}
                       </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+            {detail.mission_history && detail.mission_history.items.length > 0 && (
+              <section>
+                <h3>Lịch sử nhiệm vụ ({detail.mission_history.items.length})</h3>
+                <div className="record-list">
+                  {detail.mission_history.items.map((mission) => (
+                    <div className="candidate" key={mission.id}>
+                      <strong>{mission.team_name} · {label(mission.mission_kind)}</strong>
+                      <p>{label(mission.status)} · {timeLabel(mission.created_at)}{mission.last_status ? ` · Cập nhật: ${label(mission.last_status)}` : ''}</p>
+                      {mission.override_reason && <p>Lý do chọn đội khác đề xuất: {mission.override_reason}</p>}
                     </div>
                   ))}
                 </div>
@@ -578,15 +755,29 @@ export function Coordinator({ page }: { page: string }) {
                     Khoảng cách, vị trí và tải gần đây chỉ hỗ trợ so sánh; quyết định giao đội do
                     điều phối viên xác nhận.
                   </p>
+                  <p>Gợi ý ưu tiên tải nhiệm vụ 24 giờ và 7 ngày trong nhóm đội gần nhất. Đội đang có nhiệm vụ chưa hoàn tất sẽ không xuất hiện trong danh sách đủ điều kiện.</p>
                   {!candidates && <p role="status">Đang tải đội phù hợp…</p>}
                   {candidates?.items.map((candidate) => (
                     <div className="candidate" key={candidate.team.id}>
                       <strong>{candidate.team.name}</strong>
                       <p>
+                        {candidate.suggested ? 'Gợi ý cân bằng tải và khoảng cách · ' : candidate.in_band ? 'Trong nhóm khoảng cách gần · ' : 'Ngoài nhóm khoảng cách gần · '}
                         Cách {Math.round(candidate.distance_m || 0)} m · vị trí cập nhật{' '}
                         {Math.round((candidate.position_age_s || 0) / 60)} phút trước ·{' '}
-                        {candidate.recent_missions_24h} nhiệm vụ/24 giờ
+                        {candidate.recent_missions_24h} nhiệm vụ/24 giờ · {candidate.recent_missions_7d} nhiệm vụ/7 ngày
                       </p>
+                      {candidate.recent_history.length > 0 && (
+                        <details>
+                          <summary>Xem lịch sử 5 nhiệm vụ gần nhất</summary>
+                          {candidate.recent_history.map((mission) => (
+                            <p key={mission.id}>
+                              {label(mission.mission_kind)} · {label(mission.status)} · {timeLabel(mission.created_at)}
+                              {mission.last_progress?.status ? ` · ${label(mission.last_progress.status)}` : ''}
+                              {mission.override_reason ? ` · Lý do điều phối: ${mission.override_reason}` : ''}
+                            </p>
+                          ))}
+                        </details>
+                      )}
                       {command({
                         title: `Giao đội ${candidate.team.name}`,
                         service: 'response',

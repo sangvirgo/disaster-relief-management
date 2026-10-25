@@ -38,9 +38,13 @@ export function SosForm({ user, onConfirmed }: { user: Me | null; onConfirmed?: 
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [people, setPeople] = useState('');
+  const [children, setChildren] = useState('');
+  const [elderly, setElderly] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [danger, setDanger] = useState(false);
+  const [needsRescue, setNeedsRescue] = useState(true);
+  const [needsRelief, setNeedsRelief] = useState(false);
   const [longitude, setLongitude] = useState('');
   const [latitude, setLatitude] = useState('');
   const [source, setSource] = useState<'MANUAL_PIN' | 'GPS'>('MANUAL_PIN');
@@ -107,6 +111,11 @@ export function SosForm({ user, onConfirmed }: { user: Me | null; onConfirmed?: 
       (!Number.isInteger(Number(people)) || Number(people) < 1 || Number(people) > 10000)
     )
       throw new Error('Số người cần hỗ trợ phải từ 1 đến 10.000.');
+    for (const [label, value] of [['trẻ em', children], ['người cao tuổi', elderly]] as const) {
+      if (value && (!Number.isInteger(Number(value)) || Number(value) < 0 || Number(value) > 10000)) throw new Error(`Số ${label} phải từ 0 đến 10.000.`);
+    }
+    if (people && Number(children || 0) + Number(elderly || 0) > Number(people)) throw new Error('Tổng số trẻ em và người cao tuổi không được lớn hơn tổng số người.');
+    if (!needsRescue && !needsRelief) throw new Error('Hãy chọn ít nhất một nhu cầu: cứu hộ hoặc hàng cứu trợ.');
     if (mode === 'PROXY' && !user) throw new Error('Vui lòng đăng nhập để báo hộ.');
     if (mode === 'PROXY' && (!relationship.trim() || !informationSource.trim() || !situationAt))
       throw new Error('Vui lòng nhập quan hệ, nguồn thông tin và thời điểm biết tình hình.');
@@ -120,8 +129,12 @@ export function SosForm({ user, onConfirmed }: { user: Me | null; onConfirmed?: 
       incident_category_code: category,
       location,
       reporter_declared_danger: danger,
+      needs_rescue: needsRescue,
+      needs_relief_supplies: needsRelief,
       ...(description.trim() ? { description: description.trim() } : {}),
       ...(people ? { people_affected: Number(people) } : {}),
+      ...(children ? { children_count: Number(children) } : {}),
+      ...(elderly ? { elderly_count: Number(elderly) } : {}),
       ...(name.trim() ? { reporter_name: name.trim() } : {}),
       ...(phone.trim() ? { reporter_contact_phone: phone.trim() } : {}),
     };
@@ -255,6 +268,14 @@ export function SosForm({ user, onConfirmed }: { user: Me | null; onConfirmed?: 
           />
         </label>
         <label>
+          Trẻ em (nếu biết)
+          <input type="number" min="0" max="10000" value={children} onChange={(e) => { setChildren(e.target.value); pending.current = null; }} />
+        </label>
+        <label>
+          Người cao tuổi (nếu biết)
+          <input type="number" min="0" max="10000" value={elderly} onChange={(e) => { setElderly(e.target.value); pending.current = null; }} />
+        </label>
+        <label>
           Họ tên người báo (nếu muốn)
           <input
             value={name}
@@ -288,6 +309,14 @@ export function SosForm({ user, onConfirmed }: { user: Me | null; onConfirmed?: 
           placeholder="Mô tả ngắn tình trạng và điều cần hỗ trợ"
         />
       </label>
+      <div className="notice warning">
+        Mô tả ngắn được gửi đến Gemini để trích xuất dữ kiện thành JSON. Không nhập tên, số điện thoại, số giấy tờ hoặc địa chỉ cụ thể. Điều phối viên sẽ xem xét mọi gợi ý AI.
+      </div>
+      <fieldset className="sos-needs">
+        <legend>Nhu cầu cần hỗ trợ</legend>
+        <label className="radio"><input type="checkbox" checked={needsRescue} onChange={(e) => { setNeedsRescue(e.target.checked); pending.current = null; }} /> Cần đội đến cứu hộ tại hiện trường</label>
+        <label className="radio"><input type="checkbox" checked={needsRelief} onChange={(e) => { setNeedsRelief(e.target.checked); pending.current = null; }} /> Cần hàng cứu trợ (lương thực, nước uống, vật dụng)</label>
+      </fieldset>
       <label className="radio">
         <input
           type="checkbox"

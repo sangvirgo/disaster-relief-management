@@ -58,6 +58,7 @@ export const statusLabels: Record<string, string> = {
   PARTIALLY_FULFILLED: 'Đáp ứng một phần',
   FULFILLED: 'Đã đáp ứng',
   INACTIVE: 'Ngừng hoạt động',
+  PENDING_EMAIL: 'Chờ xác minh email',
   PENDING_LOSS: 'Chờ duyệt thất thoát',
   RESOLVING: 'Đang xử lý kết thúc',
   ABORTING: 'Đang hủy lệnh',
@@ -115,6 +116,10 @@ export const statusLabels: Record<string, string> = {
   REGION_UPDATED: 'Cập nhật khu vực',
   MEMBERSHIP_ADDED: 'Thêm thành viên tổ chức',
   MEMBERSHIP_REMOVED: 'Xóa thành viên tổ chức',
+  RESCUE: 'Cứu hộ tại hiện trường',
+  DELIVERY: 'Giao hàng cứu trợ',
+  COMBINED: 'Cứu hộ và giao hàng cứu trợ',
+  AI_ADVISORY_REVIEW: 'Điều phối viên đã rà soát gợi ý AI',
 };
 export const label = (value: unknown): string =>
   value == null || value === ''

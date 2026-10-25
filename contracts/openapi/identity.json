@@ -146,6 +146,14 @@
                                    "message": "Tên đăng nhập đã được sử dụng.",
                                    "correlation_id": "00000000-0000-4000-8000-000000000000"
                                  }
+                               },
+                               "EMAIL_TAKEN": {
+                                 "summary": "EMAIL_TAKEN",
+                                 "value": {
+                                   "code": "EMAIL_TAKEN",
+                                   "message": "Địa chỉ email đã được sử dụng.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
                                }
                              }
                            }
@@ -178,6 +186,26 @@
                          "headers": {
                            "Cache-Control": {
                              "$ref": "#/components/headers/CacheControlNoStore"
+                           }
+                         }
+                       },
+                       "503": {
+                         "description": "Documented error response; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "EMAIL_OTP_UNAVAILABLE": {
+                                 "summary": "EMAIL_OTP_UNAVAILABLE",
+                                 "value": {
+                                   "code": "EMAIL_OTP_UNAVAILABLE",
+                                   "message": "Dịch vụ xác minh email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
                            }
                          }
                        }
@@ -4163,6 +4191,755 @@
           }
         }
       }
+    },
+    "/auth/email/resend": {
+      "post": {
+        "operationId": "identityAuthResendEmailOtp",
+        "summary": "Resend the email verification code.",
+        "description": "Route exported from backend/apps/identity/src/auth/auth.controller.ts#AuthController.resendEmailOtp. Detailed request, response, and error contract: docs/backend/02-identity-api.md. This export does not infer payload schemas.",
+        "responses": {
+          "200": {
+            "description": "Documented response shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challenge_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "email_sent": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "challenge_id",
+                    "email_sent"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "EMAIL_OTP_INVALID": {
+                    "summary": "EMAIL_OTP_INVALID",
+                    "value": {
+                      "code": "EMAIL_OTP_INVALID",
+                      "message": "Mã xác minh email không hợp lệ hoặc đã hết hạn.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "CSRF_INVALID": {
+                    "summary": "CSRF_INVALID",
+                    "value": {
+                      "code": "CSRF_INVALID",
+                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "RATE_LIMITED": {
+                    "summary": "RATE_LIMITED",
+                    "value": {
+                      "code": "RATE_LIMITED",
+                      "message": "Bạn thao tác quá nhanh. Vui lòng thử lại sau.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "EMAIL_OTP_UNAVAILABLE": {
+                    "summary": "EMAIL_OTP_UNAVAILABLE",
+                    "value": {
+                      "code": "EMAIL_OTP_UNAVAILABLE",
+                      "message": "Dịch vụ xác minh email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/02-identity-api.md",
+        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.resendEmailOtp",
+        "security": [
+          {
+            "WebPreSessionCookie": [],
+            "CsrfToken": []
+          },
+          {}
+        ],
+        "x-c48-conditional-security": {
+          "access_token_required": false,
+          "web": {
+            "required": [
+              "Origin allowed by Identity",
+              "cookie c48_pre",
+              "header X-CSRF-Token"
+            ]
+          },
+          "native": {
+            "required": [],
+            "forbidden": [
+              "Cookie",
+              "Origin"
+            ]
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "challenge_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "challenge_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/email/verify": {
+      "post": {
+        "operationId": "identityAuthVerifyEmail",
+        "summary": "Verify a citizen email address.",
+        "description": "Route exported from backend/apps/identity/src/auth/auth.controller.ts#AuthController.verifyEmail. Detailed request, response, and error contract: docs/backend/02-identity-api.md. This export does not infer payload schemas.",
+        "responses": {
+          "200": {
+            "description": "Documented response shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "verified": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "username": {
+                          "type": "string"
+                        },
+                        "display_name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "username",
+                        "display_name"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "verified",
+                    "user"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "EMAIL_OTP_INVALID": {
+                    "summary": "EMAIL_OTP_INVALID",
+                    "value": {
+                      "code": "EMAIL_OTP_INVALID",
+                      "message": "Mã xác minh email không hợp lệ hoặc đã hết hạn.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "CSRF_INVALID": {
+                    "summary": "CSRF_INVALID",
+                    "value": {
+                      "code": "CSRF_INVALID",
+                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "RATE_LIMITED": {
+                    "summary": "RATE_LIMITED",
+                    "value": {
+                      "code": "RATE_LIMITED",
+                      "message": "Bạn thao tác quá nhanh. Vui lòng thử lại sau.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/02-identity-api.md",
+        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.verifyEmail",
+        "security": [
+          {
+            "WebPreSessionCookie": [],
+            "CsrfToken": []
+          },
+          {}
+        ],
+        "x-c48-conditional-security": {
+          "access_token_required": false,
+          "web": {
+            "required": [
+              "Origin allowed by Identity",
+              "cookie c48_pre",
+              "header X-CSRF-Token"
+            ]
+          },
+          "native": {
+            "required": [],
+            "forbidden": [
+              "Cookie",
+              "Origin"
+            ]
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "challenge_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": [
+                  "challenge_id",
+                  "code"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/google": {
+      "post": {
+        "operationId": "identityAuthGoogleLogin",
+        "summary": "Create a session using a verified Google identity.",
+        "description": "The server verifies the Google ID token against configured client IDs. Accounts are matched by the stable Google subject; an existing account is never linked by email alone. WEB sessions use secure cookies; NATIVE sessions return tokens in JSON.",
+        "responses": {
+          "200": {
+            "description": "Verified Google login response; WEB returns cookies and NATIVE returns bearer tokens.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "user": {
+                          "$ref": "#/components/schemas/AuthUser"
+                        },
+                        "session": {
+                          "type": "object",
+                          "properties": {
+                            "expires_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "expires_at"
+                          ]
+                        },
+                        "must_change_password": {
+                          "type": "boolean",
+                          "const": false
+                        }
+                      },
+                      "required": [
+                        "user",
+                        "session",
+                        "must_change_password"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "user": {
+                          "$ref": "#/components/schemas/AuthUser"
+                        },
+                        "access_token": {
+                          "type": "string"
+                        },
+                        "refresh_token": {
+                          "type": "string"
+                        },
+                        "expires_in": {
+                          "type": "integer"
+                        },
+                        "must_change_password": {
+                          "type": "boolean",
+                          "const": false
+                        }
+                      },
+                      "required": [
+                        "user",
+                        "access_token",
+                        "refresh_token",
+                        "expires_in",
+                        "must_change_password"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "GOOGLE_TOKEN_INVALID": {
+                    "summary": "GOOGLE_TOKEN_INVALID",
+                    "value": {
+                      "code": "GOOGLE_TOKEN_INVALID",
+                      "message": "Phiên xác thực Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "CSRF_INVALID": {
+                    "summary": "CSRF_INVALID",
+                    "value": {
+                      "code": "CSRF_INVALID",
+                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "GOOGLE_ACCOUNT_LINK_REQUIRED": {
+                    "summary": "GOOGLE_ACCOUNT_LINK_REQUIRED",
+                    "value": {
+                      "code": "GOOGLE_ACCOUNT_LINK_REQUIRED",
+                      "message": "Email này đã có tài khoản. Hãy đăng nhập bằng tài khoản hiện có rồi liên kết Google trong phần bảo mật.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "USERNAME_TAKEN": {
+                    "summary": "USERNAME_TAKEN",
+                    "value": {
+                      "code": "USERNAME_TAKEN",
+                      "message": "Tên đăng nhập đã được sử dụng.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "RATE_LIMITED": {
+                    "summary": "RATE_LIMITED",
+                    "value": {
+                      "code": "RATE_LIMITED",
+                      "message": "Bạn thao tác quá nhanh. Vui lòng thử lại sau.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "GOOGLE_LOGIN_UNAVAILABLE": {
+                    "summary": "GOOGLE_LOGIN_UNAVAILABLE",
+                    "value": {
+                      "code": "GOOGLE_LOGIN_UNAVAILABLE",
+                      "message": "Đăng nhập Google chưa được cấu hình. Vui lòng thử bằng tài khoản và mật khẩu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/02-identity-api.md",
+        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.googleLogin",
+        "security": [
+          {
+            "WebPreSessionCookie": [],
+            "CsrfToken": []
+          },
+          {}
+        ],
+        "x-c48-conditional-security": {
+          "access_token_required": false,
+          "web": {
+            "required": [
+              "Origin allowed by Identity",
+              "cookie c48_pre",
+              "header X-CSRF-Token"
+            ]
+          },
+          "native": {
+            "required": [
+              "JSON body client_kind=NATIVE"
+            ],
+            "forbidden": [
+              "Cookie",
+              "Origin"
+            ]
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id_token": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 8192
+                  },
+                  "client_kind": {
+                    "type": "string",
+                    "enum": [
+                      "WEB",
+                      "NATIVE"
+                    ]
+                  },
+                  "first_time_username": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9._-]+$"
+                  }
+                },
+                "required": [
+                  "id_token",
+                  "client_kind"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/google/link": {
+      "post": {
+        "operationId": "identityAuthLinkGoogle",
+        "summary": "Link a verified Google identity to the signed-in account.",
+        "description": "Route exported from backend/apps/identity/src/auth/auth.controller.ts#AuthController.linkGoogle. Detailed request, response, and error contract: docs/backend/02-identity-api.md. This export does not infer payload schemas.",
+        "responses": {
+          "200": {
+            "description": "Documented response shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "linked": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "linked"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "GOOGLE_TOKEN_INVALID": {
+                    "summary": "GOOGLE_TOKEN_INVALID",
+                    "value": {
+                      "code": "GOOGLE_TOKEN_INVALID",
+                      "message": "Phiên xác thực Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "SESSION_REAUTH_REQUIRED": {
+                    "summary": "SESSION_REAUTH_REQUIRED",
+                    "value": {
+                      "code": "SESSION_REAUTH_REQUIRED",
+                      "message": "Vui lòng đăng nhập lại trước khi liên kết Google.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "CSRF_INVALID": {
+                    "summary": "CSRF_INVALID",
+                    "value": {
+                      "code": "CSRF_INVALID",
+                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "GOOGLE_IDENTITY_IN_USE": {
+                    "summary": "GOOGLE_IDENTITY_IN_USE",
+                    "value": {
+                      "code": "GOOGLE_IDENTITY_IN_USE",
+                      "message": "Tài khoản Google này đã được liên kết với người dùng khác.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "GOOGLE_ALREADY_LINKED": {
+                    "summary": "GOOGLE_ALREADY_LINKED",
+                    "value": {
+                      "code": "GOOGLE_ALREADY_LINKED",
+                      "message": "Tài khoản đã có một tài khoản Google được liên kết.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "GOOGLE_LOGIN_UNAVAILABLE": {
+                    "summary": "GOOGLE_LOGIN_UNAVAILABLE",
+                    "value": {
+                      "code": "GOOGLE_LOGIN_UNAVAILABLE",
+                      "message": "Đăng nhập Google chưa được cấu hình. Vui lòng thử bằng tài khoản và mật khẩu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/02-identity-api.md",
+        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.linkGoogle",
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id_token": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 8192
+                  }
+                },
+                "required": [
+                  "id_token"
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4351,33 +5128,39 @@
         }
       },
       "RegisterRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "username",
-          "password",
-          "display_name"
-        ],
-        "properties": {
-          "username": {
-            "type": "string",
-            "minLength": 3,
-            "maxLength": 64,
-            "pattern": "^[A-Za-z0-9._-]+$"
-          },
-          "password": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 256,
-            "description": "At least ten characters and not a common password or the username."
-          },
-          "display_name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          }
-        }
-      },
+                           "type": "object",
+                           "additionalProperties": false,
+                           "required": [
+                             "username",
+                             "password",
+                             "display_name",
+                             "email"
+                           ],
+                           "properties": {
+                             "username": {
+                               "type": "string",
+                               "minLength": 3,
+                               "maxLength": 64,
+                               "pattern": "^[A-Za-z0-9._-]+$"
+                             },
+                             "password": {
+                               "type": "string",
+                               "minLength": 1,
+                               "maxLength": 256,
+                               "description": "At least ten characters and not a common password or the username."
+                             },
+                             "display_name": {
+                               "type": "string",
+                               "minLength": 1,
+                               "maxLength": 200
+                             },
+                             "email": {
+                               "type": "string",
+                               "format": "email",
+                               "maxLength": 254
+                             }
+                           }
+                         },
       "LoginRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -4458,16 +5241,33 @@
         }
       },
       "RegisterResponse": {
-        "type": "object",
-        "required": [
-          "user"
-        ],
-        "properties": {
-          "user": {
-            "$ref": "#/components/schemas/AuthUser"
-          }
-        }
-      },
+                            "type": "object",
+                            "required": [
+                              "user",
+                              "verification",
+                              "email_sent"
+                            ],
+                            "properties": {
+                              "user": {
+                                "$ref": "#/components/schemas/AuthUser"
+                              },
+                              "verification": {
+                                "type": "object",
+                                "properties": {
+                                  "challenge_id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  }
+                                },
+                                "required": [
+                                  "challenge_id"
+                                ]
+                              },
+                              "email_sent": {
+                                "type": "boolean"
+                              }
+                            }
+                          },
       "WebLoginResponse": {
         "type": "object",
         "required": [

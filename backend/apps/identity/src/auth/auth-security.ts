@@ -28,6 +28,8 @@ export interface IdentityAuthConfig {
   argonTimeCost: number;
   argonParallelism: number;
   argonMaxConcurrency: number;
+  emailOtpPepper?: string;
+  googleClientIds: readonly string[];
 }
 
 export interface AccessTokenClaims {
@@ -133,6 +135,9 @@ export function loadIdentityAuthConfig(env: NodeJS.ProcessEnv | Record<string, s
     errors.push('SECRET_HASH_PEPPER_AUTH_CURRENT');
   }
   const webOrigins = parseOrigins(env.WEB_ALLOWED_ORIGINS, nodeEnv, errors);
+  const emailOtpPepper = env.EMAIL_OTP_PEPPER;
+  if (emailOtpPepper && emailOtpPepper.length < 32) errors.push('EMAIL_OTP_PEPPER');
+  const googleClientIds = (env.GOOGLE_CLIENT_IDS ?? '').split(',').map((value) => value.trim()).filter(Boolean);
   const argonMemoryKib = positiveInteger(env.ARGON2_MEMORY_KIB, 'ARGON2_MEMORY_KIB', 65_536, 8_192, 262_144, errors);
   const argonTimeCost = positiveInteger(env.ARGON2_TIME_COST, 'ARGON2_TIME_COST', 3, 1, 10, errors);
   const argonParallelism = positiveInteger(env.ARGON2_PARALLELISM, 'ARGON2_PARALLELISM', 1, 1, 8, errors);
@@ -150,6 +155,8 @@ export function loadIdentityAuthConfig(env: NodeJS.ProcessEnv | Record<string, s
     argonTimeCost,
     argonParallelism,
     argonMaxConcurrency,
+    ...(emailOtpPepper ? { emailOtpPepper } : {}),
+    googleClientIds,
   };
 }
 

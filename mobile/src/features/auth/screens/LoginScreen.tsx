@@ -8,7 +8,9 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  Platform,
 } from 'react-native';
+import { useIdTokenAuthRequest } from 'expo-auth-session/providers/google';
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
@@ -19,11 +21,28 @@ import { User, Lock, ArrowRight, Eye, EyeOff, UserPlus } from 'lucide-react-nati
 
 export const LoginScreen: React.FC = () => {
   const router = useRouter();
-  const { login, isLoading, isVolunteerOrLeader } = useAuthStore();
+  const { login, loginWithGoogle, isLoading, isVolunteerOrLeader } = useAuthStore();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const googleClients = {
+    web: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    ios: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    android: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+  };
+  const googleConfigured = Boolean(Platform.select({
+    ios: googleClients.ios,
+    android: googleClients.android,
+    default: googleClients.web,
+  }));
+  const [googleRequest, , promptGoogle] = useIdTokenAuthRequest({
+    webClientId: googleClients.web || 'google-client-id-not-configured',
+    iosClientId: googleClients.ios || 'google-client-id-not-configured',
+    androidClientId: googleClients.android || 'google-client-id-not-configured',
+    selectAccount: true,
+  }, { scheme: 'com.disasterrelief.c48mobile' });
 
   const handleLogin = async () => {
     const trimmedUsername = username.trim();
@@ -66,6 +85,27 @@ export const LoginScreen: React.FC = () => {
     } catch (err: any) {
       const errorMsg = getApiErrorMessage(err, 'Tên đăng nhập hoặc mật khẩu không chính xác.');
       Alert.alert('Đăng nhập thất bại', errorMsg);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    if (!googleConfigured) {
+      Alert.alert('Chưa cấu hình Google', 'Cần khai báo Google OAuth Client ID cho nền tảng này trong biến môi trường EXPO_PUBLIC_GOOGLE_*_CLIENT_ID.');
+      return;
+    }
+    setGoogleBusy(true);
+    try {
+      const result = await promptGoogle();
+      if (result.type !== 'success') return;
+      const idToken = result.params.id_token;
+      if (!idToken) throw new Error('Google chưa trả về mã định danh an toàn.');
+      await loginWithGoogle(idToken);
+      if (isVolunteerOrLeader()) router.replace('/team');
+      else goBackOrHome(router);
+    } catch (err: unknown) {
+      Alert.alert('Đăng nhập Google thất bại', getApiErrorMessage(err, 'Không thể đăng nhập bằng Google. Vui lòng thử lại.'));
+    } finally {
+      setGoogleBusy(false);
     }
   };
 
@@ -147,6 +187,16 @@ export const LoginScreen: React.FC = () => {
             </>
           )}
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.googleButton, (isLoading || googleBusy || !googleRequest) && styles.loginButtonDisabled]}
+          onPress={handleGoogleLogin}
+          disabled={isLoading || googleBusy || !googleRequest}
+          activeOpacity={0.85}
+        >
+          {googleBusy ? <ActivityIndicator size="small" color={THEME.colors.text.primary} /> : <Text style={styles.googleButtonText}>Tiếp tục bằng Google</Text>}
+        </TouchableOpacity>
+        {!googleConfigured && <Text style={styles.googleHint}>Google chưa được cấu hình cho ứng dụng này.</Text>}
 
         {/* Nút đăng ký tài khoản công dân */}
         <View style={styles.registerPromptBox}>
@@ -286,6 +336,27 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: THEME.typography.fontSizes.base,
     letterSpacing: 0.5,
+  },
+  googleButton: {
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+  },
+  googleButtonText: {
+    color: THEME.colors.text.primary,
+    fontWeight: '700',
+    fontSize: THEME.typography.fontSizes.base,
+  },
+  googleHint: {
+    marginTop: 6,
+    textAlign: 'center',
+    color: THEME.colors.text.muted,
+    fontSize: 11,
   },
   registerPromptBox: {
     marginTop: 20,

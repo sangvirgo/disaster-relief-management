@@ -69,13 +69,17 @@ export class RequestOperationsSupplementReviewService {
              description=CASE WHEN $3::boolean THEN $4 ELSE description END,
              reporter_declared_danger=CASE WHEN $5::boolean THEN $6 ELSE reporter_declared_danger END,
              region_code=CASE WHEN $7::boolean THEN $8 ELSE region_code END,
+             needs_rescue=CASE WHEN $11::boolean THEN $12::boolean ELSE needs_rescue END,
+             needs_relief_supplies=CASE WHEN $13::boolean THEN $14::boolean ELSE needs_relief_supplies END,
              verification_revision=CASE WHEN $9::boolean THEN $10::uuid ELSE verification_revision END,
              version=version+1 WHERE id=$1 AND version=$2 RETURNING status,version,verification_revision`,
           [row.id, dto.expected_version,
             dto.decision === 'ACCEPT' && Object.hasOwn(reported, 'description'), reported.description ?? null,
             dto.decision === 'ACCEPT' && Object.hasOwn(reported, 'reporter_declared_danger'), reported.reporter_declared_danger ?? false,
             dto.decision === 'ACCEPT' && Object.hasOwn(reported, 'location'), nextRegion,
-            dto.decision === 'ACCEPT', reviewId],
+            dto.decision === 'ACCEPT', reviewId,
+            dto.decision === 'ACCEPT' && Object.hasOwn(reported, 'needs_rescue'), reported.needs_rescue ?? false,
+            dto.decision === 'ACCEPT' && Object.hasOwn(reported, 'needs_relief_supplies'), reported.needs_relief_supplies ?? false],
         ) as [Array<{ status: string; version: number; verification_revision: string | null }>, number];
         if (!updated[0]) checkVersion(Number(row.version), dto.expected_version);
         await this.persistence.notifyReporter(manager, row.reporter_user_id, row.id, Number(updated[0]!.version), 'SUPPLEMENT_REVIEWED', `SUPPLEMENT_${dto.decision}`);
@@ -99,6 +103,8 @@ export class RequestOperationsSupplementReviewService {
       `UPDATE request_subject SET
          people_affected=CASE WHEN $2::boolean THEN $3::integer ELSE people_affected END,
          household_reference_note=CASE WHEN $4::boolean THEN $5::text ELSE household_reference_note END,
+         children_count=CASE WHEN $12::boolean THEN $13::integer ELSE children_count END,
+         elderly_count=CASE WHEN $14::boolean THEN $15::integer ELSE elderly_count END,
          location=CASE WHEN $6::boolean THEN ST_SetSRID(ST_MakePoint($7::float8,$8::float8),4326)::geography ELSE location END,
          location_source=CASE WHEN $6::boolean THEN $9::text ELSE location_source END,
          location_accuracy_m=CASE WHEN $6::boolean THEN $10::numeric ELSE location_accuracy_m END,
@@ -107,7 +113,9 @@ export class RequestOperationsSupplementReviewService {
       [requestId, Object.hasOwn(reported, 'people_affected'), reported.people_affected ?? null,
         Object.hasOwn(reported, 'household_reference_note'), reported.household_reference_note ?? null,
         Object.hasOwn(reported, 'location'), longitude ?? null, latitude ?? null, location.source ?? null,
-        location.accuracy_m ?? null, location.captured_at ?? null],
+        location.accuracy_m ?? null, location.captured_at ?? null,
+        Object.hasOwn(reported, 'children_count'), reported.children_count ?? null,
+        Object.hasOwn(reported, 'elderly_count'), reported.elderly_count ?? null],
     );
   }
 }

@@ -21,6 +21,8 @@ export interface ReporterRequestRow {
   campaign_id: string | null;
   description: string | null;
   reporter_declared_danger: boolean;
+  needs_rescue: boolean;
+  needs_relief_supplies: boolean;
 }
 
 type Queryable = Pick<DataSource | EntityManager, 'query'>;
@@ -60,7 +62,7 @@ export class ReporterAccessService {
     if (session && trackingCode) {
       const rows = await queryable.query(
         `SELECT id, tracking_code, tracking_secret_hash, reporter_user_id, status, version, review_lane, received_at,
-                organization_id, region_code, campaign_id, description, reporter_declared_danger
+                organization_id, region_code, campaign_id, description, reporter_declared_danger,needs_rescue,needs_relief_supplies
            FROM assistance_request WHERE reporter_user_id = $1 AND tracking_code = $2`,
         [session.userId, trackingCode],
       ) as ReporterRequestRow[];
@@ -73,7 +75,7 @@ export class ReporterAccessService {
     const hash = lookupHash(trackingSecret, this.config);
     const rows = await queryable.query(
       `SELECT id, tracking_code, tracking_secret_hash, reporter_user_id, status, version, review_lane, received_at,
-              organization_id, region_code, campaign_id, description, reporter_declared_danger
+              organization_id, region_code, campaign_id, description, reporter_declared_danger,needs_rescue,needs_relief_supplies
          FROM assistance_request WHERE tracking_secret_hash = $1`,
       [hash],
     ) as ReporterRequestRow[];
@@ -96,7 +98,7 @@ export class ReporterAccessService {
   ): Promise<ReporterRequestRow> {
     const rows = await queryable.query(
       `SELECT id, tracking_code, tracking_secret_hash, reporter_user_id, status, version, review_lane, received_at,
-              organization_id, region_code, campaign_id, description, reporter_declared_danger
+              organization_id, region_code, campaign_id, description, reporter_declared_danger,needs_rescue,needs_relief_supplies
          FROM assistance_request WHERE id = $1${lock ? ' FOR UPDATE' : ''}`,
       [requestId],
     ) as ReporterRequestRow[];

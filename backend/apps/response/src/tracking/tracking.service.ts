@@ -12,6 +12,7 @@ import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from '../requests/request-
 import { ReporterAccessService, ReporterRequestRow, trackingCodeMatches } from './reporter-access.service';
 import { RecoveryIssueDto, RequestEventsQueryDto, SupplementRequestDto } from './tracking.dto';
 import { RequestOperationsService } from '../operations/request-operations.service';
+import { aiInputHash, sanitizeAiDescription, scoreRequestRisk } from '../ai/ai-risk';
 
 const terminalStatuses = new Set(['REJECTED', 'DUPLICATE', 'RESOLVED', 'CLOSED', 'CANCELLED']);
 const preVerificationStatuses = new Set(['SUBMITTED', 'VERIFYING']);
@@ -33,7 +34,7 @@ function invalidField(field: string, code: string): AppError {
 }
 
 function validateSupplement(dto: SupplementRequestDto): void {
-  const hasValue = ['description', 'household_reference_note', 'people_affected', 'location', 'reporter_declared_danger']
+  const hasValue = ['description', 'household_reference_note', 'people_affected', 'children_count', 'elderly_count', 'location', 'reporter_declared_danger', 'needs_rescue', 'needs_relief_supplies']
     .some((field) => Object.hasOwn(dto, field));
   if (!hasValue) throw invalidField('body', 'VALIDATION_FAILED');
   if (Object.hasOwn(dto, 'description')) {
@@ -48,6 +49,9 @@ function validateSupplement(dto: SupplementRequestDto): void {
   }
   if (dto.people_affected !== undefined && dto.people_affected !== null && (!Number.isInteger(dto.people_affected) || dto.people_affected < 1 || dto.people_affected > 10_000)) {
     throw invalidField('people_affected', 'PEOPLE_AFFECTED_OUT_OF_RANGE');
+  }
+  for (const [field, value] of [['children_count', dto.children_count], ['elderly_count', dto.elderly_count]] as const) {
+    if (value !== undefined && value !== null && (!Number.isInteger(value) || value < 0 || value > 10_000)) throw invalidField(field, 'VULNERABLE_COUNT_OUT_OF_RANGE');
   }
   if (Object.hasOwn(dto, 'location')) {
     const location = dto.location;
@@ -69,6 +73,9 @@ function validateSupplement(dto: SupplementRequestDto): void {
   if (Object.hasOwn(dto, 'reporter_declared_danger') && typeof dto.reporter_declared_danger !== 'boolean') {
     throw invalidField('reporter_declared_danger', 'VALIDATION_FAILED');
   }
+  if (Object.hasOwn(dto, 'needs_rescue') && typeof dto.needs_rescue !== 'boolean') throw invalidField('needs_rescue', 'VALIDATION_FAILED');
+  if (Object.hasOwn(dto, 'needs_relief_supplies') && typeof dto.needs_relief_supplies !== 'boolean') throw invalidField('needs_relief_supplies', 'VALIDATION_FAILED');
+  if (dto.needs_rescue === false && dto.needs_relief_supplies === false) throw invalidField('needs_rescue', 'AT_LEAST_ONE_NEED_REQUIRED');
 }
 
 function requestHashWithSecret(payload: unknown, secretHash: string | undefined): string {
@@ -222,6 +229,7 @@ export class TrackingService {
     trackingCode: string | undefined,
     trackingSecret: string | undefined,
     request: import('express').Request,
+    mode: 'SUPPLEMENT' | 'PUT' = 'SUPPLEMENT',
   ): Promise<IdempotentResult<Record<string, unknown>>> {
     validateSupplement(dto);
     const hasTrackingCapability = this.access.validTrackingSecret(trackingSecret);
@@ -230,7 +238,7 @@ export class TrackingService {
     const scope = session ? `user:${session.userId}` : `guest:${requestId}`;
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `response.requests.supplement:${scope}`,
-      command: 'response.requests.supplement',
+      command: mode === 'PUT' ? 'response.requests.report.update' : 'response.requests.supplement',
       key,
       requestHash: requestHashWithSecret({ request_id: requestId, session_user_id: session?.userId ?? null, dto }, secretHash),
       execute: async (manager) => {
@@ -238,7 +246,7 @@ export class TrackingService {
         if (!supplementAllowed(row.status, row.review_lane)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         if (Number(row.version) !== dto.expected_version) versionConflict(Number(row.version), dto.expected_version);
         const subjectRows = await manager.query(
-          `SELECT people_affected, household_reference_note, location_source, location_accuracy_m, location_captured_at,
+          `SELECT people_affected,children_count,elderly_count,household_reference_note,location_source,location_accuracy_m,location_captured_at,
                   ST_X(location::geometry) AS longitude, ST_Y(location::geometry) AS latitude
              FROM request_subject WHERE request_id = $1`,
           [row.id],
@@ -246,9 +254,18 @@ export class TrackingService {
         const before = subjectRows[0];
         if (!before) throw new AppError('INTERNAL_ERROR', { status: 500 });
         const verified = !preVerificationStatuses.has(row.status);
+        const nextNeedsRescue = dto.needs_rescue ?? row.needs_rescue;
+        const nextNeedsRelief = dto.needs_relief_supplies ?? row.needs_relief_supplies;
+        if (!nextNeedsRescue && !nextNeedsRelief) throw invalidField('needs_rescue', 'AT_LEAST_ONE_NEED_REQUIRED');
+        const nextPeople = Object.hasOwn(dto, 'people_affected') ? dto.people_affected ?? null : before.people_affected as number | null;
+        const nextChildren = Object.hasOwn(dto, 'children_count') ? dto.children_count ?? null : before.children_count as number | null;
+        const nextElderly = Object.hasOwn(dto, 'elderly_count') ? dto.elderly_count ?? null : before.elderly_count as number | null;
+        if (nextPeople != null && (nextChildren ?? 0) + (nextElderly ?? 0) > nextPeople) throw invalidField('children_count', 'VULNERABLE_COUNT_EXCEEDS_TOTAL');
         const previouslyReported = Object.fromEntries(Object.keys(dto).filter((field) => field !== 'expected_version').map((field) => {
           if (field === 'description') return [field, row.description];
           if (field === 'reporter_declared_danger') return [field, row.reporter_declared_danger];
+          if (field === 'needs_rescue') return [field, row.needs_rescue];
+          if (field === 'needs_relief_supplies') return [field, row.needs_relief_supplies];
           if (field === 'location') return [field, {
             coordinates: [before.longitude, before.latitude],
             source: before.location_source,
@@ -272,16 +289,24 @@ export class TrackingService {
           pending_review: verified,
           danger_alert_raised: dto.reporter_declared_danger === true && !row.reporter_declared_danger,
         };
+        const requestValues: unknown[] = [row.id, dto.expected_version];
+        const requestSets: string[] = [];
+        const setRequest = (column: string, value: unknown, cast = '') => {
+          requestValues.push(value);
+          requestSets.push(`${column}=$${requestValues.length}${cast}`);
+        };
+        if (!verified && Object.hasOwn(dto, 'description')) setRequest('description', dto.description ?? null, '::text');
+        if (!verified && Object.hasOwn(dto, 'reporter_declared_danger')) {
+          if (mode === 'PUT') setRequest('reporter_declared_danger', dto.reporter_declared_danger, '::boolean');
+          else if (dto.reporter_declared_danger) requestSets.push('reporter_declared_danger=true');
+        }
+        if (!verified && Object.hasOwn(dto, 'needs_rescue')) setRequest('needs_rescue', dto.needs_rescue, '::boolean');
+        if (!verified && Object.hasOwn(dto, 'needs_relief_supplies')) setRequest('needs_relief_supplies', dto.needs_relief_supplies, '::boolean');
+        if (!verified && dto.location) setRequest('region_code', regionRows[0]?.region_code ?? null, '::text');
+        requestSets.push('version=version+1');
         const [requestUpdates] = await manager.query(
-          `UPDATE assistance_request
-              SET description = CASE WHEN $3::boolean THEN coalesce($4, description) ELSE description END,
-                  reporter_declared_danger = reporter_declared_danger OR $5,
-                  region_code = CASE WHEN $6::boolean THEN $7::text ELSE region_code END,
-                  version = version + 1
-            WHERE id = $1 AND version = $2
-            RETURNING status, version, tracking_code`,
-          [row.id, dto.expected_version, !verified, dto.description ?? null, dto.reporter_declared_danger ?? false,
-            Boolean(dto.location) && !verified, regionRows[0]?.region_code ?? null],
+          `UPDATE assistance_request SET ${requestSets.join(',')} WHERE id=$1 AND version=$2 RETURNING status,version,tracking_code`,
+          requestValues,
         ) as [Array<{ status: string; version: number; tracking_code: string }>, number];
         const updated = requestUpdates[0];
         if (!updated) versionConflict(Number(row.version), dto.expected_version);
@@ -293,6 +318,8 @@ export class TrackingService {
             sets.push(`${column} = $${values.length}${cast}`);
           };
           if (Object.hasOwn(dto, 'people_affected')) add('people_affected', dto.people_affected ?? null, '::integer');
+          if (Object.hasOwn(dto, 'children_count')) add('children_count', dto.children_count ?? null, '::integer');
+          if (Object.hasOwn(dto, 'elderly_count')) add('elderly_count', dto.elderly_count ?? null, '::integer');
           if (Object.hasOwn(dto, 'household_reference_note')) add('household_reference_note', dto.household_reference_note ?? null, '::text');
           if (dto.location) {
             const location = dto.location;
@@ -303,6 +330,21 @@ export class TrackingService {
             add('location_captured_at', location.captured_at ?? null, '::timestamptz');
           }
           if (sets.length) await manager.query(`UPDATE request_subject SET ${sets.join(', ')} WHERE request_id = $1`, values);
+          const nextDescription = Object.hasOwn(dto, 'description') ? dto.description ?? null : row.description;
+          const risk = scoreRequestRisk({ description: nextDescription, reporterDeclaredDanger: dto.reporter_declared_danger ?? row.reporter_declared_danger,
+            childrenCount: nextChildren, elderlyCount: nextElderly, needsRescue: nextNeedsRescue, needsReliefSupplies: nextNeedsRelief });
+          await manager.query(
+            `UPDATE ai_advisory SET risk_score=$2,reason_codes=$3 WHERE id=(SELECT id FROM ai_advisory WHERE request_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1)`,
+            [row.id, risk.score, risk.reasonCodes],
+          );
+          const safeDescription = sanitizeAiDescription(nextDescription ?? '');
+          if (safeDescription && Object.hasOwn(dto, 'description')) {
+            await manager.query(
+              `INSERT INTO ai_advisory (request_id,request_version,input_hash,model,prompt_version,schema_version,risk_score,reason_codes)
+               VALUES ($1,$2,$3,$4,'v1','v1',$5,$6) ON CONFLICT (request_id,input_hash) DO NOTHING`,
+              [row.id, Number(updated.version), aiInputHash(safeDescription), process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite', risk.score, risk.reasonCodes],
+            );
+          }
         }
         const value = { id: row.id, tracking_code: updated.tracking_code, status: updated.status, version: Number(updated.version) };
         payload.result = value;

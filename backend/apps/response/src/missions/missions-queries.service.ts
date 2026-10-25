@@ -17,6 +17,7 @@ interface MissionRow extends Record<string, unknown> {
   team_name: string;
   work_cycle: number;
   status: string;
+  mission_kind: string;
   version: number;
   created_at: Date | string;
   cursor_created_at: string;
@@ -34,6 +35,7 @@ function missionView(row: MissionRow, includeContacts: boolean): Record<string, 
     request_id: row.request_id,
     team: { id: row.team_id, name: row.team_name },
     status: row.status,
+    mission_kind: row.mission_kind,
     version: Number(row.version),
     work_cycle: Number(row.work_cycle),
     created_at: toIso(row.created_at),
@@ -71,7 +73,7 @@ export class MissionsQueriesService {
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
     const limit = query.limit ?? 50;
     const rows = await this.dataSource.query(
-      `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,m.work_cycle,m.status,m.version,m.created_at,
+      `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,m.work_cycle,m.status,m.mission_kind,m.version,m.created_at,
               to_char(m.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
               r.organization_id,r.region_code,r.campaign_id,e.payload->'approved_facts' AS approved_facts,
               tm.member_role
@@ -143,7 +145,7 @@ export class MissionsQueriesService {
     const cursorId = values.push(cursor?.id ?? null);
     const limitIndex = values.push((query.limit ?? 50) + 1);
     const rows = await this.dataSource.query(
-      `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,m.status,m.version,m.created_at,
+      `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,m.status,m.mission_kind,m.version,m.created_at,
               to_char(m.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
               r.region_code,r.campaign_id
          FROM mission m JOIN assistance_request r ON r.id=m.request_id JOIN rescue_team t ON t.id=m.team_id
@@ -170,7 +172,7 @@ export class MissionsQueriesService {
 
   async findMission(queryable: Pick<DataSource, 'query'>, missionId: string): Promise<MissionRow | undefined> {
     const rows = await queryable.query(
-      `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,m.work_cycle,m.status,m.version,m.created_at,
+      `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,m.work_cycle,m.status,m.mission_kind,m.version,m.created_at,
               to_char(m.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
               r.organization_id,r.region_code,r.campaign_id,e.payload->'approved_facts' AS approved_facts
          FROM mission m JOIN rescue_team t ON t.id=m.team_id

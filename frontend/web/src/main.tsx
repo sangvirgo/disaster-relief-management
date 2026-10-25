@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api, ApiError, newCommandKey } from './api/client';
-import { changePassword, login, logout, me, register, roles, type Me } from './auth/session';
+import { changePassword, googleLogin, login, logout, me, register, resendEmailOtp, roles, verifyEmail, type Me } from './auth/session';
 import {
   allowedPages,
   allowedWorkspaces,
@@ -24,6 +24,17 @@ import { AnalyticsRegionField, useAnalyticsRegion } from './components/Analytics
 import { CitizenAccount } from './features/citizen/CitizenAccount';
 import type { components as ResponseComponents } from './api/generated/response';
 import './style.css';
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: { id: {
+        initialize: (options: { client_id: string; callback: (response: { credential?: string }) => void }) => void;
+        renderButton: (element: HTMLElement, options: Record<string, unknown>) => void;
+      } };
+    };
+  }
+}
 import './sos.css';
 import './workflow.css';
 import './refinements.css';
@@ -52,10 +63,15 @@ function AuthModal({
   onClose: () => void;
   onReady: (user: Me) => void;
 }) {
-  const [mode, setMode] = useState<'login' | 'register' | 'help'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'verify' | 'help'>('login');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [challengeId, setChallengeId] = useState('');
+  const [otp, setOtp] = useState('');
+  const googleButton = useRef<HTMLDivElement>(null);
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -80,6 +96,40 @@ function AuthModal({
     };
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (!isOpen || mode !== 'login' || !googleClientId || !googleButton.current) return;
+    let cancelled = false;
+    const renderButton = () => {
+      if (cancelled || !window.google || !googleButton.current) return;
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: (credential) => {
+          if (!credential.credential) return;
+          setBusy(true);
+          setMessage('');
+          void googleLogin(credential.credential).then((loggedUser) => { onReady(loggedUser); onClose(); })
+            .catch((error) => setMessage(error instanceof Error ? error.message : 'Không thể đăng nhập bằng Google.'))
+            .finally(() => setBusy(false));
+        },
+      });
+      window.google.accounts.id.renderButton(googleButton.current, { theme: 'outline', size: 'large', text: 'signin_with', locale: 'vi', width: 320 });
+    };
+    if (window.google) renderButton();
+    else {
+      let script = document.querySelector<HTMLScriptElement>('script[data-c48-google="true"]');
+      if (!script) {
+        script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.dataset.c48Google = 'true';
+        document.head.appendChild(script);
+      }
+      script.addEventListener('load', renderButton, { once: true });
+    }
+    return () => { cancelled = true; };
+  }, [googleClientId, isOpen, mode, onClose, onReady]);
+
   if (!isOpen) return null;
 
   async function submit(event: React.FormEvent) {
@@ -88,10 +138,15 @@ function AuthModal({
     setMessage('');
     try {
       if (mode === 'register') {
-        await register(username.trim(), password, displayName.trim());
-        setMessage('Tài khoản đã được tạo thành công! Vui lòng đăng nhập.');
+        const result = await register(username.trim(), password, displayName.trim(), email.trim());
+        setChallengeId(result.verification.challenge_id);
+        setMode('verify');
+        setMessage(result.email_sent ? 'Mã xác thực đã được gửi đến email. Mã có hiệu lực 5 phút.' : 'Tài khoản đang chờ xác thực. Chưa gửi được email; hãy kiểm tra cấu hình email rồi chọn gửi lại mã.');
+      } else if (mode === 'verify') {
+        await verifyEmail(challengeId, otp.trim());
         setMode('login');
-        setPassword('');
+        setOtp('');
+        setMessage('Email đã được xác thực. Bạn có thể đăng nhập.');
       } else {
         const loggedUser = await login(username.trim(), password);
         onReady(loggedUser);
@@ -121,12 +176,25 @@ function AuthModal({
           <span className="auth-brand-name">reliva</span>
         </div>
         <h2 id="auth-modal-title">
-          {mode === 'login' ? 'Đăng nhập' : mode === 'register' ? 'Tạo tài khoản' : 'Hỗ trợ mật khẩu'}
+          {mode === 'login' ? 'Đăng nhập' : mode === 'register' ? 'Tạo tài khoản' : mode === 'verify' ? 'Xác thực email' : 'Hỗ trợ mật khẩu'}
         </h2>
         {mode === 'help' && <p className="modal-desc">
           Nếu quên mật khẩu, hãy liên hệ quản trị viên của hệ thống để xác minh tài khoản và cấp mật khẩu tạm. Sau khi đăng nhập, bạn phải đổi mật khẩu tạm.
         </p>}
         {mode !== 'help' && <form onSubmit={submit} className="form-stack">
+          {mode === 'register' && (
+            <label className="auth-field">
+              Email nhận mã xác thực
+              <input required type="email" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="ten@example.com" />
+            </label>
+          )}
+          {mode === 'verify' && (
+            <label className="auth-field">
+              Mã xác thực 6 chữ số
+              <input required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} autoComplete="one-time-code" />
+            </label>
+          )}
+          {mode !== 'verify' && <>
           {mode === 'register' && (
             <label className="auth-field">
               Họ và tên
@@ -149,7 +217,8 @@ function AuthModal({
               placeholder="Nhập tên đăng nhập"
             />
           </label>
-          <label className="auth-field">
+          </>}
+          {mode !== 'verify' && <label className="auth-field">
             Mật khẩu
             <span className="auth-password-field">
               <input
@@ -165,19 +234,21 @@ function AuthModal({
                 {showPassword ? 'Ẩn' : 'Hiện'}
               </button>
             </span>
-          </label>
+          </label>}
           {message && (
             <p
               role="status"
-              className={`notice ${message.includes('thành công') ? 'success' : 'error'}`}
+              className={`notice ${/thành công|đã được xác thực|đã gửi/i.test(message) ? 'success' : 'error'}`}
             >
               {message}
             </p>
           )}
           <button disabled={busy} className="button" type="submit">
-            {busy ? 'Đang xử lý…' : mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
+            {busy ? 'Đang xử lý…' : mode === 'login' ? 'Đăng nhập' : mode === 'verify' ? 'Xác thực email' : 'Tạo tài khoản'}
           </button>
+          {mode === 'verify' && <button type="button" className="text-button" disabled={busy} onClick={() => void resendEmailOtp(challengeId).then((result) => { if (result.challenge_id) setChallengeId(result.challenge_id); setMessage(result.email_sent ? 'Mã mới đã được gửi.' : 'Nếu tài khoản đang chờ xác thực, hệ thống sẽ gửi mã khi email được cấu hình.'); }).catch((error) => setMessage(error instanceof Error ? error.message : 'Chưa gửi lại được mã.'))}>Gửi lại mã xác thực</button>}
         </form>}
+        {mode === 'login' && googleClientId && <div className="google-auth-button" ref={googleButton} aria-label="Đăng nhập bằng Google" />}
         <div className="modal-footer">
           {mode === 'login' && (
             <button type="button" className="text-button" onClick={() => { setMode('help'); setShowPassword(false); setMessage(''); }}>

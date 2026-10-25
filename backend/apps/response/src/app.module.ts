@@ -4,6 +4,8 @@ import { HealthModule, postgresOptions } from '../../../packages/technical/src';
 import { InitialResponse1710000000000 } from './database/migrations/InitialResponse1710000000000';
 import { AddRequestSourceIpIndex1710000000001 } from './database/migrations/AddRequestSourceIpIndex1710000000001';
 import { AddEvidenceUploadIpQuota1710000000002 } from './database/migrations/AddEvidenceUploadIpQuota1710000000002';
+import { AddSosFactsAndMissionKind1792953600000 } from './database/migrations/AddSosFactsAndMissionKind1792953600000';
+import { AddAiAdvisory1792953600001 } from './database/migrations/AddAiAdvisory1792953600001';
 import { RequestIntakeModule } from './requests/request-intake.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { EvidenceModule } from './evidence/evidence.module';
@@ -15,10 +17,11 @@ import { MapModule } from './map/map.module';
 import { ReportsModule } from './reports/reports.module';
 import { NoticesModule } from './notices/notices.module';
 import { RequestResolutionModule } from './resolution/request-resolution.module';
+import { AiAdvisoryService } from './ai/ai-advisory.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot(postgresOptions([InitialResponse1710000000000, AddRequestSourceIpIndex1710000000001, AddEvidenceUploadIpQuota1710000000002], 'response')),
+    TypeOrmModule.forRoot(postgresOptions([InitialResponse1710000000000, AddRequestSourceIpIndex1710000000001, AddEvidenceUploadIpQuota1710000000002, AddSosFactsAndMissionKind1792953600000, AddAiAdvisory1792953600001], 'response')),
     HealthModule,
     RequestIntakeModule,
     TrackingModule,
@@ -32,5 +35,6 @@ import { RequestResolutionModule } from './resolution/request-resolution.module'
     NoticesModule,
     RequestResolutionModule,
   ],
+  providers: [AiAdvisoryService],
 })
 export class AppModule {}
