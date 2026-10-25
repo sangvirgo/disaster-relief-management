@@ -1,4 +1,4 @@
-# 📱 Hướng Dẫn Vận Hành Ứng Dụng Di Động - Cứu Trợ Thiên Tai (C48 Mobile)
+# 📱 Hướng Dẫn Vận Hành Ứng Dụng Di Động Reliva
 
 Ứng dụng di động xây dựng bằng **React Native + Expo SDK 58 (TypeScript)**, kết nối trực tiếp với hệ sinh thái microservices NestJS (Identity, Response, Logistics qua API Gateway Nginx).
 

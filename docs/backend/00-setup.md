@@ -125,7 +125,7 @@ Build the static Web image from `backend/` with `docker compose --env-file .env 
 ## 5. Testing rules
 
 - Unit: state machines, permission predicates, quantity arithmetic, DTO mapping (Jest).
-- Database: **real PostgreSQL/PostGIS** in the primary C48 stack; run `docs/backend/schema/test-*.sql` against its migrated databases and add race checks with two parallel connections for every lock/unique-index claim. There is no separate test database or Compose stack. Any primary-volume reset requires the explicit `--reset` flag and must not be run against demo data.
+- Database: **real PostgreSQL/PostGIS** in the primary Reliva stack; run `docs/backend/schema/test-*.sql` against its migrated databases and add race checks with two parallel connections for every lock/unique-index claim. There is no separate test database or Compose stack. Any primary-volume reset requires the explicit `--reset` flag and must not be run against demo data.
 - API: Supertest role × endpoint × scope matrix from [05](05-permissions.md); every command endpoint: success, validation, 401, 403, 404-not-leaking, 409 version, idempotent replay.
 - Vietnamese: every error code has a catalog entry; a test fails if any response `message` contains no Vietnamese diacritic-capable text or is an English framework default (class-validator, Nest, Postgres, S3 strings must never leak).
 - Record commands and results actually run; never mark a TC passed from a documentation edit.
@@ -195,11 +195,11 @@ Networks: single bridge `c48-internal`; APIs reach each other by service name (`
 
 | Command | Effect |
 |---|---|
-| `scripts/dev/up` | Starts the main C48 APIs, PostgreSQL, Nginx, and the optional storage profile; waits for healthy |
+| `scripts/dev/up` | Starts the main Reliva APIs, PostgreSQL, Nginx, and the optional storage profile; waits for healthy |
 | `scripts/db/migrate` | Runs the three declared main-stack migration services |
 | `scripts/db/seed` | Runs the declared `seed` job; loads the full fixtures when all application tables are empty, otherwise adds the missing `UNKNOWN` incident category, demo campaign support, and campaigns. It never resets existing data. |
 | `bash scripts/db/reset-demo --reset` | Explicitly removes only the `c48_pgdata` volume, then migrates, seeds, and starts the main stack. Preserves `c48_minio-data` and all MinIO objects. |
-| `bash scripts/db/test-db --reset` | Requires explicit `--reset`; resets only `c48_pgdata`, then runs schema, migration, race, auth, and API smoke checks against the primary C48 databases and APIs. SQL proofs run through the existing PostgreSQL service; HTTP/database smoke scripts run from the host. It resets/reseeds the primary Postgres before API smoke and leaves smoke rows in the primary databases. |
+| `bash scripts/db/test-db --reset` | Requires explicit `--reset`; resets only `c48_pgdata`, then runs schema, migration, race, auth, and API smoke checks against the primary Reliva databases and APIs. SQL proofs run through the existing PostgreSQL service; HTTP/database smoke scripts run from the host. It resets/reseeds the primary Postgres before API smoke and leaves smoke rows in the primary databases. |
 | `scripts/dev/gen-keys` | generates the JWT key pair and service client secrets into `.env`/untracked files |
 | `scripts/db/backup`, `scripts/db/restore` | `pg_dump` of the three databases and `mc mirror` of the buckets. TC-29 restore execution remains pending: no isolated recovery destination was available, so no restore verification was run (see [T18 evidence](t18-hardening.md)). |
 

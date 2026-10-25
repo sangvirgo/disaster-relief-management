@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1090" viewBox="0 0 1200 1090" role="img" aria-labelledby="title desc"><title id="title">C48 | Quyên góp hiện vật và hỗ trợ</title><desc id="desc">Sơ đồ mô tả ca sử dụng backend của C48; kèm nguồn Draw.io để chỉnh sửa.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1090" viewBox="0 0 1200 1090" role="img" aria-labelledby="title desc"><title id="title">Reliva | Quyên góp hiện vật và hỗ trợ</title><desc id="desc">Sơ đồ mô tả ca sử dụng backend của Reliva; kèm nguồn Draw.io để chỉnh sửa.</desc>
 <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#334155"/></marker><marker id="generalization" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M1,1 L13,7 L1,13 Z" fill="white" stroke="#334155" stroke-width="1.5"/></marker></defs>
 <rect width="1200" height="1090" fill="white"/>
-<text x="40" y="38" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#0f172a">C48 | Quyên góp hiện vật và hỗ trợ</text>
+<text x="40" y="38" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#0f172a">Reliva | Quyên góp hiện vật và hỗ trợ</text>
 <rect x="240" y="100" width="720" height="850" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
 <text x="258" y="128" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#0f172a">Quyên góp và hỗ trợ vận hành</text>
 <path d="M138,234 L220,234 L220,240 L300.17,240" fill="none" stroke="#475569" stroke-width="1.5"/>

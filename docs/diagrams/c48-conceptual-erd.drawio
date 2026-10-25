@@ -1,11 +1,11 @@
 <?xml version='1.0' encoding='utf-8'?>
 <mxfile host="app.diagrams.net" type="device" version="24.7.17">
-  <diagram id="c48-conceptual-erd" name="C48 | Conceptual ERD — business concepts">
+  <diagram id="c48-conceptual-erd" name="Reliva | Conceptual ERD — business concepts">
     <mxGraphModel dx="1200" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1790" pageHeight="1190">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="title" value="C48 | Conceptual ERD — business concepts" style="text;html=0;fontSize=23;fontStyle=1;align=left;strokeColor=none;fillColor=none;" vertex="1" parent="1"><mxGeometry x="40" y="8" width="1120" height="45" as="geometry" /></mxCell>
+        <mxCell id="title" value="Reliva | Conceptual ERD — business concepts" style="text;html=0;fontSize=23;fontStyle=1;align=left;strokeColor=none;fillColor=none;" vertex="1" parent="1"><mxGeometry x="40" y="8" width="1120" height="45" as="geometry" /></mxCell>
         <mxCell id="edge0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;endArrow=none;strokeColor=#475569;fontSize=12;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="745" y="180" as="sourcePoint" /><mxPoint x="745" y="290" as="targetPoint" /><Array as="points"></Array></mxGeometry></mxCell>
         <mxCell id="edge1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;endArrow=none;strokeColor=#475569;fontSize=12;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="382" y="180" as="sourcePoint" /><mxPoint x="682" y="290" as="targetPoint" /><Array as="points"><mxPoint x="382" y="250" /><mxPoint x="682" y="250" /></Array></mxGeometry></mxCell>
         <mxCell id="edge2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=0;endArrow=none;strokeColor=#475569;fontSize=12;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="982" y="180" as="sourcePoint" /><mxPoint x="808" y="290" as="targetPoint" /><Array as="points"><mxPoint x="982" y="250" /><mxPoint x="808" y="250" /></Array></mxGeometry></mxCell>

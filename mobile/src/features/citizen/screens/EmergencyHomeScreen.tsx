@@ -98,7 +98,7 @@ export const EmergencyHomeScreen: React.FC = () => {
         />
         <View style={styles.brandTextContainer}>
           <Text style={styles.brandName}>Reliva</Text>
-          <Text style={styles.brandTagline}>HỆ THỐNG CỨU TRỢ THIÊN TAI C48</Text>
+          <Text style={styles.brandTagline}>CỨU HỘ & CỨU TRỢ THIÊN TAI</Text>
         </View>
       </View>
 

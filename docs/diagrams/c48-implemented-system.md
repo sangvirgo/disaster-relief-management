@@ -1,4 +1,4 @@
-# C48 Implemented System Diagrams
+# Reliva Implemented System Diagrams
 
 The diagrams here summarize the backend that is present in this repository. They describe current API and database behavior; they are not a claim that every planned Web or Mobile screen has been built.
 
@@ -17,7 +17,7 @@ The ERD in the reference image includes entities such as `PaymentTransaction` an
 
 ## Complete physical ERD decomposition
 
-![ERD vật lý tổng thể ReliefCare — toàn bộ database](erd/c48-erd-physical-overall.svg)
+![ERD vật lý tổng thể Reliva — toàn bộ database](erd/c48-erd-physical-overall.svg)
 
 [Editable full physical ERD](erd/c48-erd-physical-overall.drawio) · [All seven diagrams and previews](erd/README.md)
 
@@ -70,7 +70,7 @@ The public API is routed through Nginx by service prefix. The service ports are 
 
 ## 2. Overall use-case diagram
 
-![Sơ đồ ca sử dụng tổng thể ReliefCare](./c48-overall-use-cases.svg)
+![Sơ đồ ca sử dụng tổng thể Reliva](./c48-overall-use-cases.svg)
 
 [Mở nguồn Draw.io để chỉnh sửa](./c48-overall-use-cases.drawio). Sơ đồ tổng hợp các luồng backend theo sáu nhóm; mỗi hình bầu dục ghi tên chức năng, không chèn mã yêu cầu. Gợi ý AI là tùy chọn, kiểm kê tồn kho đang hoãn triển khai. Ba sơ đồ theo lĩnh vực trong kế hoạch dự án là các góc nhìn bổ trợ.
 

@@ -17,7 +17,7 @@ export const RESCUE_SKILL_LABELS: Record<string, string> = {
   RADIO: 'Thông tin liên lạc vô tuyến',
 };
 
-// Từ điển hiển thị tiếng Việt chuẩn hóa cho toàn bộ ứng dụng Mobile C48
+// Từ điển hiển thị tiếng Việt chuẩn hóa cho toàn bộ ứng dụng Reliva.
 
 export const INCIDENT_CATEGORIES: Record<string, { label: string; icon: string; desc: string }> = {
   FLOOD: {

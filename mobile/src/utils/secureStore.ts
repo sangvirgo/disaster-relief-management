@@ -37,7 +37,7 @@ export function bytesToBase64Url(bytes: Uint8Array): string {
   return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-// Sinh chuỗi bí mật chuẩn Backend C48 (Đúng 32 bytes raw, độ dài chuẩn 43 ký tự base64url)
+// Sinh chuỗi bí mật chuẩn backend Reliva (Đúng 32 bytes raw, độ dài chuẩn 43 ký tự base64url)
 export async function generateRandomSecret(): Promise<string> {
   return bytesToBase64Url(await Crypto.getRandomBytesAsync(32));
 }

@@ -1,4 +1,4 @@
-// Types định nghĩa theo hợp đồng API C48 (Identity, Response, Logistics)
+// Types định nghĩa theo hợp đồng API Reliva (Identity, Response, Logistics).
 
 export type UserRole = 'CITIZEN' | 'VOLUNTEER' | 'COORDINATOR' | 'OPERATIONS_MANAGER' | 'ADMIN';
 

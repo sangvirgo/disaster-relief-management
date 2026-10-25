@@ -1,14 +1,14 @@
 <?xml version='1.0' encoding='utf-8'?>
 <mxfile host="app.diagrams.net" type="device" version="24.7.17">
-  <diagram id="c48-overall-use-cases" name="ReliefCare | Sơ đồ ca sử dụng tổng thể">
+  <diagram id="c48-overall-use-cases" name="Reliva | Sơ đồ ca sử dụng tổng thể">
     <mxGraphModel dx="3650" dy="2040" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="3650" pageHeight="2040">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="system" value="Hệ thống ReliefCare" style="rounded=0;whiteSpace=wrap;html=0;verticalAlign=top;align=center;spacingTop=18;fontStyle=1;fontSize=22;fillColor=#ffffff;strokeColor=#1f2937;strokeWidth=2;" vertex="1" parent="1">
+        <mxCell id="system" value="Hệ thống Reliva" style="rounded=0;whiteSpace=wrap;html=0;verticalAlign=top;align=center;spacingTop=18;fontStyle=1;fontSize=22;fillColor=#ffffff;strokeColor=#1f2937;strokeWidth=2;" vertex="1" parent="1">
           <mxGeometry x="280" y="105" width="3030" height="1785" as="geometry" />
         </mxCell>
-        <mxCell id="diagram-title" value="ReliefCare — Sơ đồ ca sử dụng tổng thể" style="text;html=0;fontSize=30;fontStyle=1;align=left;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+        <mxCell id="diagram-title" value="Reliva — Sơ đồ ca sử dụng tổng thể" style="text;html=0;fontSize=30;fontStyle=1;align=left;strokeColor=none;fillColor=none;" vertex="1" parent="1">
           <mxGeometry x="24" y="10" width="2000" height="55" as="geometry" />
         </mxCell>
         <mxCell id="actor-guest" value="Khách / người báo tin" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#334155;fontSize=14;" vertex="1" parent="1">

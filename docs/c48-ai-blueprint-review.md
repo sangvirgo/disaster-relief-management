@@ -1,6 +1,6 @@
-# C48 Business and AI Blueprint Review
+# Reliva Business and AI Blueprint Review
 
-Research date: 2026-09-30. Baseline: `c48-technology-and-delivery-plan.md` v2.2 and `c48-project-context.md`. External proposal: `Cuu_tro_thien_tai.pdf`, 73 pages. The C48 plan remains authoritative; the PDF supplies candidate research ideas, not replacement architecture or approved operational policy. This review does not establish executed product tests or real-world rescue suitability.
+Research date: 2026-09-30. Baseline: `c48-technology-and-delivery-plan.md` v2.2 and `c48-project-context.md`. External proposal: `Cuu_tro_thien_tai.pdf`, 73 pages. The Reliva plan remains authoritative; the PDF supplies candidate research ideas, not replacement architecture or approved operational policy. This review does not establish executed product tests or real-world rescue suitability.
 
 **Follow-up:** the user requested incorporation of the AI integration recommendations into the main plan. Version 2.3 now records them in Section 12, including Section 12.10 and TC-AI-17..22. The business findings below remain review recommendations; this note records the earlier review evidence.
 
@@ -8,9 +8,9 @@ Research date: 2026-09-30. Baseline: `c48-technology-and-delivery-plan.md` v2.2 
 
 The v2.2 plan is a useful capstone baseline, but is not a complete or field-validated business specification. Its request/mission separation, inventory ledger, reservation compensation, human-controlled priority, scoped access, durable events and recovery design should be preserved. Remaining cases below require explicit decisions and executable acceptance checks before the corresponding slices can be called complete. A documented state rule is not proof that concurrent implementation preserves it.
 
-The PDF was extracted with `pdftotext -layout`; all 73 pages contained extracted text. Pages 8 and 18 were also rendered and visually checked for the weight table and the unsupported extraction example. PDF section numbers below refer to its numbered headings, not C48 section numbers. The main plan was not modified by this review.
+The PDF was extracted with `pdftotext -layout`; all 73 pages contained extracted text. Pages 8 and 18 were also rendered and visually checked for the weight table and the unsupported extraction example. PDF section numbers below refer to its numbered headings, not Reliva section numbers. The main plan was not modified by this review.
 
-## Remaining business issues in the C48 plan
+## Remaining business issues in the Reliva plan
 
 | Review ID / priority | Baseline location and counterexample | Recommended correction and planned verification |
 |---|---|---|
@@ -29,21 +29,21 @@ These items do not require abandoning five services or blocking independent work
 - **No-mission resolution:** the current resolution command requires completed mission evidence. A request already helped externally cannot be resolved through that command. Keep that limitation explicit, or add an audited coordinator-confirmed external-resolution reason/evidence path after agreement; do not manufacture a completed mission.
 - **Supplies versus rescue prerequisites:** `requires_stock` and the departure guard should mean essential supplies for this mission. Optional food/relief for the same households can be a separate mission; do not force every rescue to wait for all requested relief items. This uses the existing multiple-mission model and does not bypass required equipment checks.
 
-## PDF compatibility map: C48 remains the guide
+## PDF compatibility map: Reliva remains the guide
 
-| PDF proposal / section and page | Disposition for C48 |
+| PDF proposal / section and page | Disposition for Reliva |
 |---|---|
 | Human final priority, Section 73 (page 58) | Keep. It agrees with FR-AI-01/04 and UC-07. Only authorized coordinator review writes official P1-P4. |
 | Rules, scoring and rule+LLM experiments, Sections 5-24/70-75 | Adapt as optional Response-owned advisor experiments. Fix the scoring/extraction issues below before displaying recommendations. A/B can be a research contribution without changing the operational workflow. Hybrid is deferred until evidence supports it. |
-| Request state machine, Section 3.3 (page 6) | Do not replace C48 states. PDF combines request and mission travel states; use C48 request aggregation plus per-mission EN_ROUTE/ON_SCENE. CREATED/offline draft is not server receipt. Preserve SUBMITTED and truthful ACK. |
+| Request state machine, Section 3.3 (page 6) | Do not replace Reliva states. PDF combines request and mission travel states; use Reliva request aggregation plus per-mission EN_ROUTE/ON_SCENE. CREATED/offline draft is not server receipt. Preserve SUBMITTED and truthful ACK. |
 | SOS versus support requests, Section 3.1 | Use existing AssistanceRequest category/needs; optional request_kind may express intake intent. Neither citizen SOS label nor LLM label establishes official priority. Separate tables/services are unnecessary. |
 | DisasterEvent/HazardZone, Sections 2/59-62 | Incident belongs to Response. Rich forecasting and hazard layers are optional additions. If the experiment needs hazard input, start with dated synthetic/manual polygons with source/version/validity, never claim live forecast accuracy. |
 | GPS history/background tracking, Sections 25-28 (pages 26-29) | Defer; current MVP uses request snapshots and foreground/manual location. Old location is stale/unknown, not proof a person/team is offline. Do not import background intervals as adopted requirements. |
 | ETA/hazard routing and team score, Sections 29-35 (pages 29-33) | Defer provider/routing integration. Keep mandatory scope/capability/availability as hard filters; PDF's option of a low score for missing mandatory capability is unsuitable. Ranking among eligible teams may later use measured normalized ETA/safety; never call a route safe merely because it misses known hazard polygons. |
 | Role list and volunteer/member actions, Sections 36-39 | Map to existing five actors, scoped grants and team-leader relationship. Do not grant every member mission mutation or give coordinators global access. Do not add roles/services just to mirror headings. |
-| Resource/transfer/distribution, Sections 40-52 | Preserve Logistics ledger/intent/transit/issued-line accounting. PDF is a concept sketch and does not replace C48 compensation, race handling or no-double-decrement rules. |
+| Resource/transfer/distribution, Sections 40-52 | Preserve Logistics ledger/intent/transit/issued-line accounting. PDF is a concept sketch and does not replace Reliva compensation, race handling or no-double-decrement rules. |
 | Modular monolith/Python service, Sections 69/96 (pages 55-56/70) | Not adopted: current baseline is five NestJS/TypeScript services, TypeORM, PostgreSQL/PostGIS, Kafka and MinIO AIStor Free. Use existing Response worker for AI. Flutter/Redis/WebSocket are not selected merely by the PDF. |
-| Research metrics and synthetic dataset, Sections 66/74/97 | Keep as an experiment proposal, with stronger C48 Section 12.7 independent labels, group/time separation, abstention and limitations. 150-300 cases are not evidence of production accuracy. |
+| Research metrics and synthetic dataset, Sections 66/74/97 | Keep as an experiment proposal, with stronger Reliva Section 12.7 independent labels, group/time separation, abstention and limitations. 150-300 cases are not evidence of production accuracy. |
 
 ## Proposed AI integration contract (not an implemented or approved new slice)
 
@@ -77,30 +77,30 @@ These items do not require abandoning five services or blocking independent work
 
 ### Primary-source checks
 
-| Source, checked 2026-09-30 | Documented finding | C48 implication and limit |
+| Source, checked 2026-09-30 | Documented finding | Reliva implication and limit |
 |---|---|---|
-| [NIST AI RMF 1.0, January 2023](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf), MEASURE 1.3 and 2.1–2.5 | Assessment should involve suitable independent/domain expertise, document test sets and metrics, evaluate representative conditions and document generalization limits. | A synthetic capstone benchmark can test the prototype; it cannot establish field triage validity. NIST does not prescribe C48 urgency thresholds or rescue rules. |
+| [NIST AI RMF 1.0, January 2023](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf), MEASURE 1.3 and 2.1–2.5 | Assessment should involve suitable independent/domain expertise, document test sets and metrics, evaluate representative conditions and document generalization limits. | A synthetic capstone benchmark can test the prototype; it cannot establish field triage validity. NIST does not prescribe Reliva urgency thresholds or rescue rules. |
 | [NIST Generative AI Profile, July 2024](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.600-1.pdf), Section 2.2, MS-2.5-001/003/005 | Generative models can confidently produce incorrect facts and explanations. The profile recommends empirical evaluation, provenance/source verification and avoiding extrapolation from narrow assessments. | A JSON object and a fluent rationale do not verify victim counts or symptoms. Preserve source evidence, unknowns and abstention; measure extraction separately from priority classification. |
 | [OWASP LLM01:2025](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) | Reports and files can contain direct/indirect instructions that change model outputs. Format validation, least privilege and human approval reduce impact; prompts alone are insufficient. | Treat SOS text as untrusted data. No LLM tools, operational write permissions or automatic dispatch. Human review does not replace boundary enforcement. |
 | [OWASP prompt-injection prevention cheat sheet](https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html), secure architecture patterns | Quarantined parsing can extract information with zero tool access. | Fits the existing Response worker; additional autonomous agents are unnecessary. |
 | [NestJS validation documentation](https://docs.nestjs.com/techniques/validation) | ValidationPipe supports declared-field allowlisting and rejecting undeclared fields. | Reuse chosen DTO validation for APIs and explicitly validate worker/provider payloads. Controller pipes alone do not validate internal worker results or factual truth. No dependency/version selection is made here. |
 
-The following changes are review recommendations derived from the PDF and C48 baseline, rather than rules supplied by NIST/OWASP.
+The following changes are review recommendations derived from the PDF and Reliva baseline, rather than rules supplied by NIST/OWASP.
 
 ### Concrete defects in the PDF's AI proposal
 
 1. **Confidence is incorrectly mixed into urgency (PDF Sections 6, 13–14).** The formula adds `0.05 * C`, despite stating low confidence does not mean low urgency. Identical danger information with C=20 versus C=100 differs by four priority points and can cross a threshold. Keep data quality/verification need separate from urgency. Missing danger facts must remain unknown, not become zero-risk inputs. If confidence stays in an experimental formula, identify that as an intentionally investigated risk and test boundary counterexamples; do not deploy it as the default advisor.
 2. **Weighted averaging can dilute an immediate life-threat signal (Sections 6–7, 14, 17).** With S=100 and every other component=10, the supplied formula yields 37, or MEDIUM. This contradicts the PDF's proposed critical hard rules. A pure weighted model may remain a research comparator, but its limitation must be reported. Any human-facing advisor needs a domain-reviewed danger safeguard or abstention and urgent verification; do not describe an unreviewed safeguard as validated medical triage.
 3. **The extraction example invents a count (Section 16).** The narrative names a mother and a young child but does not state total occupants; `peopleCount: 4` is unsupported. Return null/unknown with a missing-field reason. Do not infer the total from mentioned relationships or assume group counts are disjoint. Other inferred values such as `trapped`, immobility or resource needs must retain reported-versus-inferred provenance.
-4. **Self-reported semantic certainty is uncalibrated (Section 16).** `semanticUrgency: 0.95` must not be displayed as a 95% probability. Use a stable reason/match code, or a calibrated measure only after an independent evaluation. This is already consistent with C48 Section 12.4.
+4. **Self-reported semantic certainty is uncalibrated (Section 16).** `semanticUrgency: 0.95` must not be displayed as a 95% probability. Use a stable reason/match code, or a calibrated measure only after an independent evaluation. This is already consistent with Reliva Section 12.4.
 5. **Draft life-threat rules are not an operational standard (Sections 17–19).** Symptoms, vulnerable-group weights, waiting-time increments and hard-rule precedence require domain review. Define unknown/negation/contradiction handling and prohibit a soft food-only rule from overriding a confirmed immediate-danger signal. No medical treatment recommendation is proposed here.
 6. **The proposed two-method comparison is not yet fair (Sections 70–75, 97).** Weighted scoring sees structured fields, while rule+LLM may discover additional narrative facts. Separate the end-to-end comparison on identical raw snapshots from a policy-only comparison on identical curated facts. Otherwise an apparent advantage could arise from additional information rather than the prioritization policy.
 
 ### Minimum acceptable research protocol
 
-- Version both experimental configurations and freeze thresholds before the held-out evaluation. Run on the same snapshots and map the PDF's LOW/MEDIUM/HIGH/CRITICAL labels explicitly to C48's P4/P3/P2/P1 taxonomy if that mapping is adopted; do not silently rewrite existing enums.
+- Version both experimental configurations and freeze thresholds before the held-out evaluation. Run on the same snapshots and map the PDF's LOW/MEDIUM/HIGH/CRITICAL labels explicitly to Reliva's P4/P3/P2/P1 taxonomy if that mapping is adopted; do not silently rewrite existing enums.
 - The PDF's 150–300 synthetic scenarios are a proposed workload, not statistical evidence of sufficiency. Label independently from the tested rules/model, record reviewers/disagreements, and keep paraphrases of an incident together across splits. Domain-review the labels before claiming meaningful urgency accuracy.
-- Report class counts, confusion matrix, per-class recall/F1, urgent under-prioritization severity, abstention and coverage, extraction accuracy/unsupported claims, latency and cost. State confidence/sample limitations and distinguish fixture correctness from real-world accuracy. C48 Section 12.7 already provides the stronger evaluation baseline.
+- Report class counts, confusion matrix, per-class recall/F1, urgent under-prioritization severity, abstention and coverage, extraction accuracy/unsupported claims, latency and cost. State confidence/sample limitations and distinguish fixture correctness from real-world accuracy. Reliva Section 12.7 already provides the stronger evaluation baseline.
 - Include negation, omitted counts, overlapping vulnerable groups, contradictory updates, stale location/hazard data, equivalent danger with different confidence, immediate life threat with low other scores, prompt injection, malformed JSON, late results and provider failure. Do not generate expected labels with the same engine being evaluated.
 
 ### Minimal integration into the existing baseline
@@ -109,6 +109,6 @@ Use the existing optional Response analysis job/snapshot/recommendation/review f
 
 The worker consumes a versioned authorized input snapshot, extracts only supported claims, validates types/ranges/lengths and source references, then runs a versioned experimental policy and stores a recommendation. Extraction is supplementary: do not silently replace coordinator-verified fields with inferred model values. Unsupported, conflicting or incomplete critical facts yield ABSTAIN or a separate verification flag. Narrative evidence remains available to the scoped reviewer without being logged wholesale.
 
-Only the existing coordinator review command may change authoritative priority, subject to verification, permission, current input revision, freshness and state guards. Explanations and summaries shown in the product must be Vietnamese; stable codes remain English. Intake/manual triage/dispatch continue when the optional worker is disabled or fails. Preserve C48's normal operational queue; a research score must not hide uncertain urgent requests.
+Only the existing coordinator review command may change authoritative priority, subject to verification, permission, current input revision, freshness and state guards. Explanations and summaries shown in the product must be Vietnamese; stable codes remain English. Intake/manual triage/dispatch continue when the optional worker is disabled or fails. Preserve Reliva's normal operational queue; a research score must not hide uncertain urgent requests.
 
 Provider selection, production data egress, clinical/operational validation, supported version pins and numeric acceptance targets remain unresolved. This review recommends integration boundaries; it does not authorize those decisions or claim deployed AI safety.

@@ -7,7 +7,7 @@ export type Point = { longitude: number; latitude: number };
 
 const envApiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() || '';
 
-// Biểu tượng ghim đỏ khẩn cấp chuẩn C48 (không phụ thuộc vào ảnh tĩnh để tránh lỗi 404 trên Vite)
+// Biểu tượng ghim đỏ khẩn cấp của Reliva, không phụ thuộc vào ảnh tĩnh.
 const redPinIcon = L.divIcon({
   className: 'c48-leaflet-marker',
   html: `

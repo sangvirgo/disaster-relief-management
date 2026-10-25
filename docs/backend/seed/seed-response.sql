@@ -78,7 +78,7 @@ INSERT INTO team_position (team_id, location, accuracy_m, captured_at, source, s
   (pg_temp.u('a3'), pg_temp.pt(106.75, 10.80), NULL, now() - interval '5 minutes',  'COORDINATOR_REPORTED', pg_temp.u('102')),
   (pg_temp.u('a6'), pg_temp.pt(106.7176, 10.79), NULL, now() - interval '5 minutes', 'COORDINATOR_REPORTED', pg_temp.u('102')),
   (pg_temp.u('a7'), pg_temp.pt(106.7268, 10.79), NULL, now() - interval '5 minutes', 'COORDINATOR_REPORTED', pg_temp.u('102')),
-  (pg_temp.u('a8'), pg_temp.pt(106.7815, 10.79), NULL, now() - interval '5 minutes', 'COORDINATOR_REPORTED', pg_temp.u('102'))
+  (pg_temp.u('a8'), pg_temp.pt(106.7814, 10.79), NULL, now() - interval '5 minutes', 'COORDINATOR_REPORTED', pg_temp.u('102'))
 ON CONFLICT DO NOTHING;
 
 -- ---------- requests (snapshot pointer is set after the snapshot events exist) ----------
@@ -209,14 +209,15 @@ UPDATE request_subject AS s
 INSERT INTO ai_advisory (id, request_id, request_version, input_hash, model, prompt_version, schema_version,
                          status, attempts, extracted_json, risk_score, reason_codes, review_status,
                          review_by_user_id, review_at, review_note, created_at, completed_at) VALUES
-  (pg_temp.u('af1'), pg_temp.u('f9'), 1, 'demo-ai-f9-v1', 'gemini-3.1-flash-lite', 'v1', 'v1',
+  -- input_hash is aiInputHash(sanitizeAiDescription(description)); risk_score/reason_codes use scoreRequestRisk.
+  (pg_temp.u('af1'), pg_temp.u('f9'), 1, 'd587df93f479c960f4ebf481e3074525f1f5c1caeda983f1517388738d6da421', 'gemini-3.1-flash-lite', 'v1', 'v1',
    'COMPLETED', 1,
    '{"summary":"Cháy lan gần khu dân cư; người báo cho biết có nguy hiểm tính mạng.","indicators":["Có nguy cơ cháy lan","Cần xác minh tình trạng người trong khu vực"],"facts":{"people_affected":6,"children_count":2,"elderly_count":1,"life_threat":true,"needs_rescue":true,"needs_relief_supplies":false},"confidence":0.86}'::jsonb,
-   78, ARRAY['DECLARED_LIFE_DANGER','CHILDREN_PRESENT'], NULL, NULL, NULL, NULL, now() - interval '42 minutes', now() - interval '41 minutes'),
-  (pg_temp.u('af2'), pg_temp.u('f6'), 5, 'demo-ai-f6-v1', 'gemini-3.1-flash-lite', 'v1', 'v1',
+   67, ARRAY['DECLARED_LIFE_DANGER','CHILDREN_PRESENT','ELDERLY_PRESENT','RESCUE_REQUESTED'], NULL, NULL, NULL, NULL, now() - interval '42 minutes', now() - interval '41 minutes'),
+  (pg_temp.u('af2'), pg_temp.u('f6'), 5, 'dbf91b1cbba2206f58f5a46bd8db92c6e169f42af28f12c62d65ac6408db0efe', 'gemini-3.1-flash-lite', 'v1', 'v1',
    'COMPLETED', 1,
    '{"summary":"Có người cao tuổi và trẻ nhỏ mắc kẹt; nước đang lên nhanh.","indicators":["Ngập lụt","Có người dễ bị tổn thương","Cần cứu hộ và hàng cứu trợ"],"facts":{"people_affected":3,"children_count":1,"elderly_count":1,"life_threat":true,"needs_rescue":true,"needs_relief_supplies":true},"confidence":0.93}'::jsonb,
-   94, ARRAY['DECLARED_LIFE_DANGER','FLOOD_OR_TRAPPED','CHILDREN_PRESENT','ELDERLY_PRESENT'],
+   90, ARRAY['DECLARED_LIFE_DANGER','FLOOD_OR_TRAPPED','CHILDREN_PRESENT','ELDERLY_PRESENT','RESCUE_REQUESTED'],
    'ACCEPTED', pg_temp.u('102'), now() - interval '44 minutes', NULL, now() - interval '52 minutes', now() - interval '51 minutes');
 
 -- ---------- timeline events (REPORTER-visible submission + staff events) ----------
@@ -292,31 +293,23 @@ INSERT INTO mission (id, request_id, team_id, work_cycle, status, mission_kind, 
   (pg_temp.u('b1'), pg_temp.u('f5'), pg_temp.u('a1'), 1, 'ACCEPTED',  'COMBINED', pg_temp.u('102'), pg_temp.u('a1'), pg_temp.u('e502'), now() - interval '230 minutes', 2),
   (pg_temp.u('b3'), pg_temp.u('f6'), pg_temp.u('a3'), 1, 'OFFERED',   'COMBINED', pg_temp.u('102'), pg_temp.u('a3'), pg_temp.u('e602'), now() - interval '50 minutes', 1);
 
-INSERT INTO mission_event (id, mission_id, actor_user_id, from_status, to_status, reason, outcome_note, occurred_at, recorded_at) VALUES
+INSERT INTO mission_event (id, mission_id, actor_user_id, from_status, to_status, reason, outcome_note, occurred_at, recorded_at, recorded_basis, reported_by) VALUES
   -- b2: earlier failed attempt on R5 (EN_ROUTE history)
-  (pg_temp.u('1b21'), pg_temp.u('b2'), pg_temp.u('102'), NULL,        'OFFERED',  NULL, NULL, now() - interval '300 minutes', now() - interval '300 minutes'),
-  (pg_temp.u('1b22'), pg_temp.u('b2'), pg_temp.u('10d'), 'OFFERED',   'ACCEPTED', NULL, NULL, now() - interval '295 minutes', now() - interval '295 minutes'),
-  (pg_temp.u('1b23'), pg_temp.u('b2'), pg_temp.u('10d'), 'ACCEPTED',  'EN_ROUTE', NULL, NULL, now() - interval '280 minutes', now() - interval '280 minutes'),
-  (pg_temp.u('1b24'), pg_temp.u('b2'), pg_temp.u('10d'), 'EN_ROUTE',  'FAILED',   'Xuồng không tiếp cận được do dòng chảy mạnh.', NULL, now() - interval '250 minutes', now() - interval '250 minutes'),
+  (pg_temp.u('1b21'), pg_temp.u('b2'), pg_temp.u('102'), NULL,        'OFFERED',  NULL, NULL, now() - interval '300 minutes', now() - interval '300 minutes', NULL, NULL),
+  (pg_temp.u('1b22'), pg_temp.u('b2'), pg_temp.u('102'), 'OFFERED',   'ACCEPTED', 'Ghi nhận theo báo cáo vô tuyến trong dữ liệu demo.', NULL, now() - interval '295 minutes', now() - interval '295 minutes', 'RADIO', 'Đầu mối đội B (demo)'),
+  (pg_temp.u('1b23'), pg_temp.u('b2'), pg_temp.u('102'), 'ACCEPTED',  'EN_ROUTE', 'Ghi nhận theo báo cáo vô tuyến trong dữ liệu demo.', NULL, now() - interval '280 minutes', now() - interval '280 minutes', 'RADIO', 'Đầu mối đội B (demo)'),
+  (pg_temp.u('1b24'), pg_temp.u('b2'), pg_temp.u('102'), 'EN_ROUTE',  'FAILED',   'Xuồng không tiếp cận được do dòng chảy mạnh.', NULL, now() - interval '250 minutes', now() - interval '250 minutes', 'RADIO', 'Đầu mối đội B (demo)'),
   -- b1: current accepted mission on R5
-  (pg_temp.u('1b11'), pg_temp.u('b1'), pg_temp.u('102'), NULL,        'OFFERED',  NULL, NULL, now() - interval '230 minutes', now() - interval '230 minutes'),
-  (pg_temp.u('1b12'), pg_temp.u('b1'), pg_temp.u('10c'), 'OFFERED',   'ACCEPTED', NULL, NULL, now() - interval '220 minutes', now() - interval '220 minutes'),
+  (pg_temp.u('1b11'), pg_temp.u('b1'), pg_temp.u('102'), NULL,        'OFFERED',  NULL, NULL, now() - interval '230 minutes', now() - interval '230 minutes', NULL, NULL),
+  (pg_temp.u('1b12'), pg_temp.u('b1'), pg_temp.u('10c'), 'OFFERED',   'ACCEPTED', NULL, NULL, now() - interval '220 minutes', now() - interval '220 minutes', NULL, NULL),
   -- b3: offered to a COORDINATOR-mode team, not yet answered
-  (pg_temp.u('1b31'), pg_temp.u('b3'), pg_temp.u('102'), NULL,        'OFFERED',  NULL, NULL, now() - interval '50 minutes', now() - interval '50 minutes'),
+  (pg_temp.u('1b31'), pg_temp.u('b3'), pg_temp.u('102'), NULL,        'OFFERED',  NULL, NULL, now() - interval '50 minutes', now() - interval '50 minutes', NULL, NULL),
   -- b4: R12 completed with a human outcome note
-  (pg_temp.u('1b41'), pg_temp.u('b4'), pg_temp.u('103'), NULL,        'OFFERED',   NULL, NULL, now() - interval '20 hours', now() - interval '20 hours'),
-  (pg_temp.u('1b42'), pg_temp.u('b4'), pg_temp.u('10d'), 'OFFERED',   'ACCEPTED',  NULL, NULL, now() - interval '19 hours', now() - interval '19 hours'),
-  (pg_temp.u('1b43'), pg_temp.u('b4'), pg_temp.u('10d'), 'ACCEPTED',  'EN_ROUTE',  NULL, NULL, now() - interval '1130 minutes', now() - interval '1130 minutes'),
-  (pg_temp.u('1b44'), pg_temp.u('b4'), pg_temp.u('10d'), 'EN_ROUTE',  'ON_SCENE',  NULL, NULL, now() - interval '1100 minutes', now() - interval '1100 minutes'),
-  (pg_temp.u('1b45'), pg_temp.u('b4'), pg_temp.u('10d'), 'ON_SCENE',  'COMPLETED', NULL, 'Đã sơ cứu vết thương và đưa người bị thương đến trạm y tế gần nhất (demo).', now() - interval '18 hours', now() - interval '18 hours');
-
--- Teams B/C/D are app-less, so coordinators record their radio reports with explicit provenance.
-UPDATE mission_event
-   SET actor_user_id = CASE WHEN mission_id = pg_temp.u('b2') THEN pg_temp.u('102') ELSE pg_temp.u('103') END,
-       recorded_basis = 'RADIO', reported_by = 'Đầu mối đội B (demo)',
-       reason = coalesce(reason, 'Ghi nhận theo báo cáo vô tuyến trong dữ liệu demo.')
- WHERE id IN (pg_temp.u('1b22'), pg_temp.u('1b23'), pg_temp.u('1b24'),
-              pg_temp.u('1b42'), pg_temp.u('1b43'), pg_temp.u('1b44'), pg_temp.u('1b45'));
+  (pg_temp.u('1b41'), pg_temp.u('b4'), pg_temp.u('103'), NULL,        'OFFERED',   NULL, NULL, now() - interval '20 hours', now() - interval '20 hours', NULL, NULL),
+  (pg_temp.u('1b42'), pg_temp.u('b4'), pg_temp.u('103'), 'OFFERED',   'ACCEPTED',  'Ghi nhận theo báo cáo vô tuyến trong dữ liệu demo.', NULL, now() - interval '19 hours', now() - interval '19 hours', 'RADIO', 'Đầu mối đội B (demo)'),
+  (pg_temp.u('1b43'), pg_temp.u('b4'), pg_temp.u('103'), 'ACCEPTED',  'EN_ROUTE',  'Ghi nhận theo báo cáo vô tuyến trong dữ liệu demo.', NULL, now() - interval '1130 minutes', now() - interval '1130 minutes', 'RADIO', 'Đầu mối đội B (demo)'),
+  (pg_temp.u('1b44'), pg_temp.u('b4'), pg_temp.u('103'), 'EN_ROUTE',  'ON_SCENE',  'Ghi nhận theo báo cáo vô tuyến trong dữ liệu demo.', NULL, now() - interval '1100 minutes', now() - interval '1100 minutes', 'RADIO', 'Đầu mối đội B (demo)'),
+  (pg_temp.u('1b45'), pg_temp.u('b4'), pg_temp.u('103'), 'ON_SCENE',  'COMPLETED', 'Ghi nhận theo báo cáo vô tuyến trong dữ liệu demo.', 'Đã sơ cứu vết thương và đưa người bị thương đến trạm y tế gần nhất (demo).', now() - interval '18 hours', now() - interval '18 hours', 'RADIO', 'Đầu mối đội B (demo)');
 
 -- closed resolution intent for R12 (command state machine finished; no seal because Logistics never admitted the request)
 INSERT INTO resolution_intent (id, request_id, work_cycle, kind, state, actor_user_id, expected_request_version, previous_status, reason, version, created_at, updated_at) VALUES
@@ -356,6 +349,12 @@ SELECT pg_temp.must('AI advisory review states are represented',
   (SELECT count(*) FROM ai_advisory) = 2
   AND (SELECT count(*) FROM ai_advisory WHERE review_status IS NULL) = 1
   AND (SELECT count(*) FROM ai_advisory WHERE review_status = 'ACCEPTED') = 1);
+SELECT pg_temp.must('AI seed hashes are SHA-256 and risk scores match current rules',
+  (SELECT count(*) = 2 FROM ai_advisory WHERE input_hash ~ '^[0-9a-f]{64}$')
+  AND EXISTS (SELECT 1 FROM ai_advisory WHERE request_id = pg_temp.u('f9') AND risk_score = 67
+              AND reason_codes = ARRAY['DECLARED_LIFE_DANGER','CHILDREN_PRESENT','ELDERLY_PRESENT','RESCUE_REQUESTED'])
+  AND EXISTS (SELECT 1 FROM ai_advisory WHERE request_id = pg_temp.u('f6') AND risk_score = 90
+              AND reason_codes = ARRAY['DECLARED_LIFE_DANGER','FLOOD_OR_TRAPPED','CHILDREN_PRESENT','ELDERLY_PRESENT','RESCUE_REQUESTED']));
 SELECT pg_temp.must('statuses covered: SUBMITTED VERIFYING VERIFIED DUPLICATE REJECTED TRIAGED DISPATCHED IN_PROGRESS RESOLVED',
   (SELECT count(DISTINCT status) FROM assistance_request WHERE status IN ('SUBMITTED','VERIFYING','VERIFIED','DUPLICATE','REJECTED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVED')) = 9);
 SELECT pg_temp.must('one request per non-NORMAL lane',

@@ -1,4 +1,4 @@
-// Hệ thống màu sắc và phong cách giao diện hiện đại cho Cứu trợ Thiên tai C48
+// Hệ thống màu sắc và phong cách giao diện hiện đại cho Reliva.
 
 export const THEME = {
   colors: {

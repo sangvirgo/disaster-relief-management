@@ -1,4 +1,4 @@
-# C48 Physical ERD Decomposition
+# Reliva Physical ERD Decomposition
 
 These diagrams are decomposed views of the current physical schemas in `docs/backend/schema/`. The SQL files remain authoritative for columns, constraints, indexes, triggers, and migrations.
 

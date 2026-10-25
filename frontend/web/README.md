@@ -1,4 +1,4 @@
-# C48 Web application
+# Reliva Web application
 
 This is the responsive React Web client. The native Mobile application is separate. Product copy is Vietnamese; code and contracts remain English.
 
@@ -48,7 +48,7 @@ The 38 prototype pages are represented as navigation destinations or page famili
 2. Add donation declaration revision after the owner projection exposes the delivery version required by its write contract. Replace the versioned demo incident-category list with a public API before production use.
 3. Expand coordinator operation recovery/adoption controls if they become part of the demo workflow.
 4. Add discoverable handoff history/loss review and broader catalog and stock adjustment management. Do not implement CSV export until a route exists.
-5. Run Phase F Vietnamese, keyboard, contrast and live API checks against the primary C48 databases without reset unless explicitly requested.
+5. Run Phase F Vietnamese, keyboard, contrast and live API checks against the primary databases without reset unless explicitly requested.
 
 No AI scoring, automatic priority/dispatch, cash payments, offline ACK, or fake CSV export is exposed.
 

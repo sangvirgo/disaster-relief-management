@@ -1,4 +1,4 @@
-# C48 backend implementation pack
+# Reliva backend implementation pack
 
 Turns the [technology and delivery plan](../c48-technology-and-delivery-plan.md) into something an engineer can implement without guessing. Status (2026-10-16): **T0–T19 implementation is delivered; T18 hardening and T19 contract/documentation work are implemented. Acceptance evidence remains open for T5/T9/T12/T15 AIStor storage and restore; T9 periodic scheduler; T10 authenticated HTTP heatmap timing at representative volume; T17 populated fulfillment, dashboard/UI, and 200k report plan; and T18 runtime pool saturation, broader log review, restore, accessibility, and recorded performance.** The T8 primary-stack membership/leader smoke now passes, while its storage and overdue-notice branches are skipped because MinIO is unavailable and the scheduler is disabled. T9's real overdue worker passed a controlled one-shot rollback probe; periodic scheduling and evidence storage remain unverified. The T10 rollback fixture passed the 200k query-plan check and its HTTP smoke passed on 2026-10-16; representative-volume HTTP latency remains open. T8's representative 200k candidate-query plan is recorded against unchanged service SQL. T13/T14 primary-stack write smokes passed on 2026-10-16; their synthetic ledger fixtures remain in the main databases. T17 has populated main-stack donation and reconciliation evidence plus keyset page-2 checks; fulfillment and UI evidence remain open. T18 includes the contract-backed, ADMIN-only Logistics audit reader; live permitted/denied audit checks and Nginx ingress checks now pass. Free-text audit reasons remain privileged data. T19 exports and validates 33 Identity, 79 Response, and 86 Logistics operations (198 total, zero `x-c48-contract-gap` operations); see [T19 traceability](T19-traceability.md) for the current inventory and evidence matrix. T7 supplies the coordinator queue/detail views for T6 review lanes and flags. The SQL was executed against PostgreSQL 17 + PostGIS 3.5. Original baseline: 96 assertions. After the 2026-10-10 cleanup and hardening (01 §9, status in §9.5): identity 37, response 95, logistics 133 assertions pass; restricted application roles, the SECURITY DEFINER stock writer, nine two-session races and the key query plans at 200k rows were executed.
 
@@ -14,7 +14,7 @@ Turns the [technology and delivery plan](../c48-technology-and-delivery-plan.md)
 
 **Precedence:** business rules → the plan; column lists and endpoint shapes → this folder. If they conflict, stop and report.
 
-**Run the SQL and API checks** against the main C48 stack (needs Docker):
+**Run the SQL and API checks** against the main Reliva stack (needs Docker):
 ```bash
 bash backend/scripts/db/test-db --reset
 ```

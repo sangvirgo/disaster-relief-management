@@ -33,7 +33,7 @@ function resolveApiBaseUrl(): string {
 export const API_BASE_URL = resolveApiBaseUrl();
 
 if (__DEV__) {
-  console.log('[C48 Mobile API] API_BASE_URL:', API_BASE_URL);
+  console.log('[Reliva Mobile API] API_BASE_URL:', API_BASE_URL);
 }
 
 if (!__DEV__ && !API_BASE_URL.startsWith('https://')) {

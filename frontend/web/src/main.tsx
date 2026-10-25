@@ -320,7 +320,7 @@ function PasswordChange({ onChanged, forced = false }: { onChanged: (user: Me) =
 
       <div className="notice" style={{ fontSize: 13, marginBottom: 14 }}>
         💡 <strong>Quy chuẩn mật khẩu mới:</strong> Tối thiểu 10 ký tự, khác tên đăng nhập và khác
-        mật khẩu hiện tại (Ví dụ: <code>C48Rescue@2026</code>).
+        mật khẩu hiện tại (Ví dụ: <code>MatKhauRieng!2026</code>).
       </div>
 
       <form className="form-stack" onSubmit={submit}>
@@ -344,7 +344,7 @@ function PasswordChange({ onChanged, forced = false }: { onChanged: (user: Me) =
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             autoComplete="new-password"
-            placeholder="Tối thiểu 10 ký tự (Ví dụ: C48Rescue@2026)"
+            placeholder="Tối thiểu 10 ký tự (Ví dụ: MatKhauRieng!2026)"
           />
         </label>
         {error && (

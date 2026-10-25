@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1110" viewBox="0 0 1200 1110" role="img" aria-labelledby="title desc"><title id="title">C48 | Container architecture — Response at the center</title><desc id="desc">Proposed C48 design. Aligned shapes and orthogonal connectors. Editable diagrams.net source accompanies this SVG.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1110" viewBox="0 0 1200 1110" role="img" aria-labelledby="title desc"><title id="title">Reliva | Container architecture — Response at the center</title><desc id="desc">Proposed Reliva design. Aligned shapes and orthogonal connectors. Editable diagrams.net source accompanies this SVG.</desc>
 <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#334155"/></marker><marker id="generalization" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M1,1 L13,7 L1,13 Z" fill="white" stroke="#334155" stroke-width="1.5"/></marker></defs>
 <rect width="1200" height="1110" fill="white"/>
-<text x="40" y="38" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#0f172a">C48 | Container architecture — Response at the center</text>
+<text x="40" y="38" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#0f172a">Reliva | Container architecture — Response at the center</text>
 <rect x="70" y="410" width="1060" height="270" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
 <text x="88" y="438" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#0f172a">Three application services</text>
 <path d="M365,175 L365,225 L510,225 L510,255" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>

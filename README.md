@@ -1,8 +1,8 @@
-# C48 — Emergency Response and Disaster Relief Management System
+# Reliva — Emergency Response and Disaster Relief Management System
 
 > Vietnamese project title: **Hệ thống quản lý ứng phó khẩn cấp và cứu trợ thiên tai**
 
-C48 is an academic capstone project for coordinating disaster reports, rescue missions, volunteer teams, and in-kind relief operations. It provides Vietnamese-language Web and Mobile workflows for affected residents, rescue teams, coordinators, operations staff, and administrators.
+Reliva is an academic capstone project for coordinating disaster reports, rescue missions, volunteer teams, and in-kind relief operations. It provides Vietnamese-language Web and Mobile workflows for affected residents, rescue teams, coordinators, operations staff, and administrators.
 
 > **Project status:** academic prototype. The system and its risk-assessment rules have not been validated for real-world emergency dispatch. Coordinators retain authority over verification, official priority, and team assignment. Use synthetic data for demonstrations.
 
@@ -22,7 +22,7 @@ C48 is an academic capstone project for coordinating disaster reports, rescue mi
 
 ## Project scope
 
-C48 connects the following roles:
+Reliva connects the following roles:
 
 | Role | Main workflows |
 |---|---|
@@ -192,7 +192,7 @@ npm ci
 npm start
 ```
 
-See the [backend implementation guide](docs/backend/README.md) and [T19 traceability](docs/backend/T19-traceability.md) for check scope, implementation status, and open acceptance evidence. Database reset and integration scripts use the primary C48 stack; read their instructions carefully and pass the explicit `--reset` flag only when an intentional reset is required.
+See the [backend implementation guide](docs/backend/README.md) and [T19 traceability](docs/backend/T19-traceability.md) for check scope, implementation status, and open acceptance evidence. Database reset and integration scripts use the primary Reliva stack; read their instructions carefully and pass the explicit `--reset` flag only when an intentional reset is required.
 
 ## Security and operational limits
 

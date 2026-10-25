@@ -1,10 +1,11 @@
-# C48 Project Context: Emergency Response and Disaster Relief Management
+# Reliva Project Context: Emergency Response and Disaster Relief Management
 
 > Context for AI agents and project members. This document consolidates the assigned requirements supplied in the conversation and the DOCX outline. Formatting and joined-word errors have been normalized while preserving source meaning. It describes the project brief, not a complete approved technical specification. The [technology and delivery plan](c48-technology-and-delivery-plan.md) separately records design decisions and open questions.
 
 ## 1. Project information
 
-- **Project code:** C48
+- **Product name:** Reliva
+- **Original project code in the supplied brief:** C48
 - **Original Vietnamese title:** Hệ thống quản lý ứng phó khẩn cấp và cứu trợ thiên tai
 - **English title in the outline:** Emergency Response and Disaster Relief Management System
 - **Product direction:** A Web/Mobile system connecting disaster-affected citizens, volunteers, rescue teams, coordination centers, and management authorities.

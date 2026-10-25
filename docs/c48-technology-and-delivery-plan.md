@@ -1,15 +1,16 @@
-# C48 Technology and Delivery Plan
+# Reliva Technology and Delivery Plan
 
 | Attribute | Value |
 |---|---|
 | Project | Emergency Response and Disaster Relief Management System |
-| Project code | C48 |
+| Product name | Reliva |
+| Original project code | C48 |
 | Version | 3.3 — focused logic review (2026-10-09), preserving all sections and diagrams; v3.2 gap review: coordinator-recorded progress for app-less teams, priority-aware workload balancing, PROXY abuse controls, team-profile/position use case, UC-10..13 flows, mission history/stock-reference/attachment entities, drive–campaign linkage; retains v3.1 scope |
 | Initial research / plan revision | 2026-09-29 / 2026-10-06 |
 | Team context | Three members in the project brief; backend owned by one member |
 | Document role | Single technical plan for implementation and further research |
 
-This document provides the proposed technical baseline for the SRS, SDD, database/API design, test cases, and user guide. The three-service architecture and adapted workflows below are C48 design proposals, not requirements imposed by the department or approved rescue policy.
+This document provides the proposed technical baseline for the SRS, SDD, database/API design, test cases, and user guide. The three-service architecture and adapted workflows below are Reliva design proposals, not requirements imposed by the department or approved rescue policy.
 
 **For implementation and further research:** this is the full technical plan. **Section 28 (round-2 review, 2026-10-09) governs wherever it differs from older text.** Section27 records focused logic corrections and their schema/API acceptance gates while preserving all earlier sections and diagram assets. Appendix A adds execution guidance and remaining slice-specific contract gates. Sections 22 and 23 define the backend structure, business invariants, and resolved architecture-review decisions; Section 25 defines the reduced in-kind donation and delivery scope. Section 26 records supervisor feedback, unresolved interpretations and new acceptance cases; it governs scope where older detailed examples differ. Section 12 specifies the optional AI decision-support extension; Section 6.3 records the object-storage choice. This plan does not claim implementation benchmarks or executed product tests.
 
@@ -99,17 +100,17 @@ These are problem hypotheses, not findings about a particular locality or author
 
 Campaign/operations manager publishes a needed-item appeal → guest leaves name/phone and declares actual goods handed over without login → intake staff independently count/inspect → a different reviewer approves exact quantities → accepted stock posts once → approved dispatch and independent handoff → private donor receipt and sanitized campaign progress. This is the second core workflow, supporting rescue and relief; no cash or checkout is planned. Formal warehouse transfers, pooled receipt-source allocation and stocktakes are deferred.
 
-### 3.3 Patterns adapted for C48
+### 3.3 Patterns adapted for Reliva
 
 The recommendations below reuse workflow ideas documented in [the disaster-response platform research](research/disaster-response-platform-patterns.md). They extend the project brief as proposals; they are not official requirements.
 
-| Inspiration | C48 adaptation | Why it fits |
+| Inspiration | Reliva adaptation | Why it fits |
 |---|---|---|
 | Ushahidi's review queue, moderation, and saved searches | Coordinator views for awaiting verification, verified-but-unassigned, active missions, and partially fulfilled requests; exact location/contact data stays scoped | Makes the handoff and backlog visible without automating human decisions |
 | Sahana ShaRe's partial commitments and separate logistics records | A fulfillment board shows requested, committed, issued, delivered, and outstanding quantities; more than one warehouse/organization can contribute | A request can remain open while some aid has been delivered, and one contribution does not hide the remaining need |
 | Peer capstones described in the CNTT catalogue: dispatch/logistics visibility, high-concurrency ticketing, and comparative traffic-simulation metrics | Add measurable workflow timings and a filtered outstanding-aid view by authorized request/region/item; use k6 for a modest API load scenario | Gives the demo a clear operational outcome and evidence without copying unrelated brokers, trading, or simulation domains |
 
-The workbook is a catalogue of project descriptions, not evidence that every listed technology or workload was implemented. C48's distinction is the traceable workflow from report verification through mission progress and partial aid fulfillment, supported by auditable quantities and response-time measurements.
+The workbook is a catalogue of project descriptions, not evidence that every listed technology or workload was implemented. Reliva's distinction is the traceable workflow from report verification through mission progress and partial aid fulfillment, supported by auditable quantities and response-time measurements.
 
 The workflow references the OCHA cycle conceptually. Validate terminology and responsibilities for this project. [OCHA HPC](https://knowledge.base.unocha.org/wiki/spaces/hpc/overview)
 
@@ -136,9 +137,9 @@ Inventory writes use short PostgreSQL transactions, deterministic row-lock order
 
 ### 4.2 Backend framework evaluation and selection
 
-**Evaluation method:** qualitative comparison against C48's three-service, TypeScript, PostgreSQL/PostGIS, GIS, and solo-backend needs, using official documentation reviewed on 2026-09-30. This is not a performance benchmark. NestJS/TypeScript is the selected backend; no Python framework is part of the implementation stack.
+**Evaluation method:** qualitative comparison against Reliva's three-service, TypeScript, PostgreSQL/PostGIS, GIS, and solo-backend needs, using official documentation reviewed on 2026-09-30. This is not a performance benchmark. NestJS/TypeScript is the selected backend; no Python framework is part of the implementation stack.
 
-| Framework | Strengths relevant to C48 | Integration work and tradeoffs | Assessment |
+| Framework | Strengths relevant to Reliva | Integration work and tradeoffs | Assessment |
 |---|---|---|---|
 | **NestJS (TypeScript/Node.js)** | Modules/providers/guards, TypeScript, OpenAPI and validation integrations; one language family across backend and clients | ORM/migrations, PostGIS queries, domain authorization, and operations UI still need explicit implementation | **Selected** for the three service boundaries and TypeScript development |
 | **Spring Boot (Java/Kotlin)** | Mature application/security/operations ecosystem | Separate JVM language/tooling from clients; strong alternative if the team already has more Spring experience | Technically capable; larger language/tooling switch for this project |
@@ -168,7 +169,7 @@ Emergency screens should minimize steps, provide accessible controls, clearly sh
 
 ### 4.4 Service communication and asynchronous work
 
-| Need | C48 baseline | Add a broker only when… |
+| Need | Reliva baseline | Add a broker only when… |
 |---|---|---|
 | Login, request intake, verification, mission updates, stock/fulfillment commands | REST/JSON with bounded timeouts, stable error codes, idempotency on retryable commands | A user-facing operation must fan out to many independently deployed consumers and synchronous APIs no longer fit |
 | Dashboards and notifications | Read each service's authoritative API; store an in-app notice with the business change in its owning service | Independent consumers need durable event replay or measured traffic makes the current approach insufficient |
@@ -176,7 +177,7 @@ Emergency screens should minimize steps, provide accessible controls, clearly sh
 
 Kafka is not required for k6 virtual users: k6 sends scripted HTTP/API requests and defines virtual-user counts and thresholds in the test configuration. [Grafana k6 HTTP requests](https://grafana.com/docs/k6/latest/using-k6/http-requests/), [k6 virtual users](https://grafana.com/docs/k6/latest/get-started/running-k6/)
 
-Reconsider Kafka only if C48 gains several independent consumers, needs durable event replay/reprocessing, or measured asynchronous backlog/fan-out cannot be handled by a small database-backed worker. Kafka provides durable event-stream storage and processing, but adds broker operation, schemas, retries, deduplication, monitoring, and recovery work. Those capabilities are not needed merely because the design has multiple services or load tests. [Apache Kafka documentation](https://kafka.apache.org/documentation/)
+Reconsider Kafka only if Reliva gains several independent consumers, needs durable event replay/reprocessing, or measured asynchronous backlog/fan-out cannot be handled by a small database-backed worker. Kafka provides durable event-stream storage and processing, but adds broker operation, schemas, retries, deduplication, monitoring, and recovery work. Those capabilities are not needed merely because the design has multiple services or load tests. [Apache Kafka documentation](https://kafka.apache.org/documentation/)
 
 ### 4.5 Service decomposition
 
@@ -878,7 +879,7 @@ Model review checklist: distinguish reporter/beneficiary/donor; show optional ca
 
 **Final choice for this capstone: MinIO AIStor Free, single-node lab deployment, using synthetic data.** MinIO Community is not selected: its repository is archived and marked unmaintained. AIStor Free is a separate proprietary product; its agreement allows standalone educational/research use, and its operations documentation sets edition-specific limits. This is a lab choice, not a production recommendation. No MinIO artifact/license, application integration, or restore test has been installed or verified as part of this plan. [Community repository](https://github.com/minio/minio), [AIStor Free agreement](https://www.min.io/legal/aistor-free-agreement), [AIStor license operations](https://docs.min.io/aistor/operations/licenses/)
 
-| Decision | C48 baseline |
+| Decision | Reliva baseline |
 |---|---|
 | Product/edition | MinIO AIStor Free; do not substitute a Community image or third-party rebuild |
 | Topology/data | One node for the lab; synthetic demo data only; no HA or production availability claim |
@@ -1030,7 +1031,7 @@ stateDiagram-v2
   IN_PROGRESS --> CANCELLED
 ```
 
-- Priority is separate from status and is a human decision recorded after verification. The criteria below are **C48 simulation rules proposed by the team, not rescue-authority policy** (R-07); they need domain review before any real use and imply no guaranteed SLA.
+- Priority is separate from status and is a human decision recorded after verification. The criteria below are **Reliva simulation rules proposed by the team, not rescue-authority policy** (R-07); they need domain review before any real use and imply no guaranteed SLA.
 
 | Level | Draft criterion | Illustrative demo case |
 |---|---|---|
@@ -1123,7 +1124,7 @@ Transfer: DRAFT -> RESERVED -> IN_TRANSIT -> RECEIVED
 
 ### 9.0 Sơ đồ tác nhân và ca sử dụng
 
-![Sơ đồ ca sử dụng tổng thể ReliefCare](diagrams/c48-overall-use-cases.svg)
+![Sơ đồ ca sử dụng tổng thể Reliva](diagrams/c48-overall-use-cases.svg)
 
 [Mở nguồn Draw.io để chỉnh sửa](diagrams/c48-overall-use-cases.drawio). Sơ đồ nhóm các luồng backend theo lĩnh vực; mỗi hình bầu dục ghi tên chức năng, không chèn mã UC. Gợi ý AI được đánh dấu tùy chọn, còn kiểm kê tồn kho được đánh dấu hoãn triển khai. Ba sơ đồ theo lĩnh vực bên dưới là các góc nhìn bổ trợ.
 
@@ -1423,11 +1424,11 @@ Do not encode all policy in JWTs: Response checks its own team/region/request re
 
 ### 12.1 Purpose, scope, and evidence
 
-**Original research: 2026-09-29; blueprint adaptation reviewed: 2026-09-30. Status: optional capstone integration design, not a validated emergency-triage system.** The goal is to help coordinators inspect incomplete reports and consider a priority suggestion, while preserving manual verification, assignment, and final decisions. Section 12.10 adapts relevant ideas from the supplied AI blueprint; the [review note](c48-ai-blueprint-review.md) records the source analysis and limitations. The architecture below is a C48 design decision; the cited sources establish technical mechanisms and evaluation practices, not the accuracy of this proposed application.
+**Original research: 2026-09-29; blueprint adaptation reviewed: 2026-09-30. Status: optional capstone integration design, not a validated emergency-triage system.** The goal is to help coordinators inspect incomplete reports and consider a priority suggestion, while preserving manual verification, assignment, and final decisions. Section 12.10 adapts relevant ideas from the supplied AI blueprint; the [review note](c48-ai-blueprint-review.md) records the source analysis and limitations. The architecture below is a Reliva design decision; the cited sources establish technical mechanisms and evaluation practices, not the accuracy of this proposed application.
 
-NIST AI RMF organizes risk management around Govern, Map, Measure, and Manage, including human responsibilities and ongoing evaluation. C48 applies these ideas through recorded ownership, a bounded purpose, evaluation before activation, human review, and a disable/rollback path. This is not a claim of certification or operational readiness. [NIST AI RMF Core](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/)
+NIST AI RMF organizes risk management around Govern, Map, Measure, and Manage, including human responsibilities and ongoing evaluation. Reliva applies these ideas through recorded ownership, a bounded purpose, evaluation before activation, human review, and a disable/rollback path. This is not a claim of certification or operational readiness. [NIST AI RMF Core](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/)
 
-| Candidate capability | Input/output | Value and limitations | C48 recommendation |
+| Candidate capability | Input/output | Value and limitations | Reliva recommendation |
 |---|---|---|---|
 | Priority suggestion | Structured incident facts → proposed P1–P4, reasons, missing facts | Helps review consistency; depends on agreed definitions and representative labels | Primary AI research experiment, always human-reviewed |
 | Missing-information detection | Required fields and contradictions → clarification checklist | Useful without a trained model; unknown facts must stay unknown | Implement as deterministic validation/rules first |
@@ -1579,7 +1580,7 @@ Split by incident/campaign and, where feasible, by time so near-duplicate report
 | Operations | End-to-end analysis age, inference p95, CPU/RAM, failure recovery, cost | Determines whether the optional worker fits the demo environment |
 | Human workflow | Review completion/time and override reasons; usability observations | Checks usefulness without assuming acceptance means correctness |
 
-Classification metrics and calibration concepts in the C48 evaluation plan are proposals; select compatible tooling only if a model is added.
+Classification metrics and calibration concepts in the Reliva evaluation plan are proposals; select compatible tooling only if a model is added.
 
 Compare manual/rule baseline and ML on the same held-out dataset. Report dataset size, provenance, class distribution, split method, preprocessing, seed, model/version, parameters, threshold selection, and uncertainty/sample limitations. Keep synthetic fixtures for workflow testing, but do not present agreement with labels generated by the same rules/LLM as independent validation. Do not invent a required accuracy or critical-case recall threshold before domain review.
 
@@ -1636,9 +1637,9 @@ All tests below are **planned, not executed**. Expand them into executable cases
 
 Deliver a short advisor design note, data/label manifest, experiment report, model/rule card with intended use/limits, API schema, and the planned test execution record. Their content can live within the existing SDD/test report; a separate platform or registry is unnecessary.
 
-### 12.10 C48-aligned integration of the supplied AI blueprint
+### 12.10 Reliva-aligned integration of the supplied AI blueprint
 
-**Adaptation decision: 2026-09-30.** The supplied blueprint, as analyzed in the [review note](c48-ai-blueprint-review.md), contributes an extraction/rules experiment and human-review workflow. C48's assigned scope, state machines, permissions, data ownership, and delivery priorities govern integration. AI remains optional; the blueprint does not replace the selected architecture or add mandatory research features.
+**Adaptation decision: 2026-09-30.** The supplied blueprint, as analyzed in the [review note](c48-ai-blueprint-review.md), contributes an extraction/rules experiment and human-review workflow. Reliva's assigned scope, state machines, permissions, data ownership, and delivery priorities govern integration. AI remains optional; the blueprint does not replace the selected architecture or add mandatory research features.
 
 ```mermaid
 flowchart TD
@@ -2084,7 +2085,7 @@ At the time this baseline was written, runtime/provider verification and convers
 - Mobile uses `Authorization: Bearer` for access tokens kept in memory and Expo SecureStore for the rotating refresh token. Native login/refresh has an explicit transport contract and returns tokens only to that flow; it must not also issue browser cookies. Browser routes cannot bypass CSRF by selecting a native transport. Native endpoints reject browser cookie authentication and browser Origin requests. Passwords are never persisted; logout/reset/revocation clears SecureStore, in-memory tokens and sensitive query caches. Sensitive API responses use `Cache-Control: no-store`.
 - Both clients serialize refresh attempts per session. Identity rotates under a session-row lock; an old refresh token is single-use. Reuse revokes the family as already specified. A lost refresh response may require login again; do not weaken reuse detection to silently recover it. Web tabs coordinate refresh through native browser locking where available; otherwise a conflict prompts login. Immediate request-boundary introspection/revocation remains the chosen tradeoff; load and outage tests include it.
 
-Sources: [OWASP Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html), [OWASP CSRF Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html), [React Native Security](https://reactnative.dev/docs/security). Cookie/CSRF configuration above is the C48 design, not a claim that cookie flags alone prevent every attack.
+Sources: [OWASP Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html), [OWASP CSRF Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html), [React Native Security](https://reactnative.dev/docs/security). Cookie/CSRF configuration above is the Reliva design, not a claim that cookie flags alone prevent every attack.
 
 ### 23.2 Resolution seal and cross-service recovery
 
@@ -2419,7 +2420,7 @@ Export logical ERDs individually at readable scale in the report; do not compres
 Research on 2026-10-06 found one attributable full prior graduation report and a second student-attributed project with narrower public design/demo material. The [research note](research/ptit-hcm-capstone-design-lessons.md) records provenance, inspected pages, source links and limitations. No grades or university endorsement were established.
 
 - **Nguyễn Thành Phong, N18DCCN147:** the [Android patient-registration capstone report](https://raw.githubusercontent.com/Phong-Kaster/PTIT-Do-An-Tot-Nghiep/main/api/document/CP_147_NguyenThanhPhong.pdf) connects business workflow, use-case scenarios, database design and Web/API/Android interfaces. Its architecture, use cases, ERD and dashboard were inspected at printed pages 10, 12, 68 and 74 (PDF pages 23, 25, 81 and 87). Adopt that traceability and explain dashboard quantities/time windows. Avoid its mixed architecture levels, unclear system boundary and diagram/dictionary discrepancies. The [student-hosted report outline](https://github.com/Phong-Kaster/PTIT-Do-An-Tot-Nghiep/blob/main/api/document/Noi%20dung%20quyen%20bao%20cao%20do%20an.txt) is a historical reference, not a verified current submission template.
-- **NutriAI / Lucfin, Phúc–Linh team:** the public [Lucfin design documentation](https://github.com/Phuc75nguyen/LucfinChatbot) and [NutriAI interface documentation](https://github.com/Phuc75nguyen/NutriAI) offer a presentation lesson: keep source evidence, time and generated interpretation visible together. A full thesis and reported metrics were not verified. For C48, show uncertainty and human review; retain the selected stack and the prohibition on automatic AI verification/dispatch.
+- **NutriAI / Lucfin, Phúc–Linh team:** the public [Lucfin design documentation](https://github.com/Phuc75nguyen/LucfinChatbot) and [NutriAI interface documentation](https://github.com/Phuc75nguyen/NutriAI) offer a presentation lesson: keep source evidence, time and generated interpretation visible together. A full thesis and reported metrics were not verified. For Reliva, show uncertainty and human review; retain the selected stack and the prohibition on automatic AI verification/dispatch.
 
 Apply the lessons through one concrete SDD walkthrough first: **UC-15 → Vietnamese Web/Mobile form → Response OpenAPI operation → request/subject/contact-attempt/verification data → TC-REV-01..04**. Follow with UC-02/03 and UC-11/12. Each walkthrough includes main/exception steps, a numbered sequence, data constraints and expected outcomes. Mark planned and implemented artifacts separately. This improves documentation without expanding warehouse or payment scope.
 
@@ -2544,7 +2545,7 @@ Goal: a team that already works on the request can carry and hand over the aid, 
 
 ### 28.5 Platform references for these choices
 
-Reference material is the dated research in `research/` (Sahana Eden commitments and returns, Ushahidi review gates and saved queues, KoboToolbox offline capture, Logistics Cluster goods-received notes and discrepancy records, IFRC quality-based acceptance). They support: a human gate before a report becomes actionable but with system-prepared candidates; commitment-backed allocation; goods-received notes with recorded discrepancy; returns from distribution points. Tolerance-based automatic matching of a received quantity against an expected quantity is common ERP practice, but this session did not verify a primary source for it; the exact-match rule above is a C48 proposal with the safeguards listed. These references are not re-verified for current versions.
+Reference material is the dated research in `research/` (Sahana Eden commitments and returns, Ushahidi review gates and saved queues, KoboToolbox offline capture, Logistics Cluster goods-received notes and discrepancy records, IFRC quality-based acceptance). They support: a human gate before a report becomes actionable but with system-prepared candidates; commitment-backed allocation; goods-received notes with recorded discrepancy; returns from distribution points. Tolerance-based automatic matching of a received quantity against an expected quantity is common ERP practice, but this session did not verify a primary source for it; the exact-match rule above is a Reliva proposal with the safeguards listed. These references are not re-verified for current versions.
 
 ### 28.6 New planned acceptance cases (not executed)
 

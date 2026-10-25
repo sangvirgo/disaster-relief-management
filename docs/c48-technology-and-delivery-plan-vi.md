@@ -1,17 +1,18 @@
 > **LƯU Ý — BẢN LỖI THỜI (v2.8):** tài liệu này chưa phản ánh PROXY, cân bằng tải đội, bản đồ nhiệt, quyên góp rút gọn và các sửa đổi v3.x. Bản tiếng Anh `c48-technology-and-delivery-plan.md` là bản chuẩn.
 
-# Kế hoạch Công nghệ và Triển khai C48
+# Kế hoạch Công nghệ và Triển khai Reliva
 
 | Thuộc tính | Giá trị |
 |---|---|
 | Dự án | Hệ thống quản lý ứng phó khẩn cấp và cứu trợ thiên tai |
-| Mã dự án | C48 |
+| Tên sản phẩm | Reliva |
+| Mã đồ án gốc | C48 |
 | Phiên bản | 2.8 — các điều chỉnh sau rà soát bảo vệ đồ án: bí mật theo dõi SOS do ứng dụng khách tạo, quy tắc xác minh và xử lý người báo tin không liên lạc được, tiêu chí P1–P4, phạm vi được bảo vệ bằng dấu niêm phong, lịch trình tích hợp và hạch toán nhu cầu đã hủy; kế thừa phần mở rộng quyên góp ở phiên bản 2.7 |
 | Nghiên cứu ban đầu / cập nhật kế hoạch | 2026-09-29 / 2026-10-04 |
 | Bối cảnh nhóm | Đề cương có ba thành viên; một thành viên phụ trách backend |
 | Vai trò tài liệu | Kế hoạch kỹ thuật thống nhất cho triển khai và nghiên cứu tiếp theo |
 
-Tài liệu này đề xuất cơ sở kỹ thuật cho SRS, SDD, thiết kế cơ sở dữ liệu/API, ca kiểm thử và hướng dẫn sử dụng. Kiến trúc ba dịch vụ và các quy trình được điều chỉnh dưới đây là đề xuất thiết kế của C48, không phải yêu cầu do khoa ban hành hay chính sách cứu hộ đã được phê duyệt.
+Tài liệu này đề xuất cơ sở kỹ thuật cho SRS, SDD, thiết kế cơ sở dữ liệu/API, ca kiểm thử và hướng dẫn sử dụng. Kiến trúc ba dịch vụ và các quy trình được điều chỉnh dưới đây là đề xuất thiết kế của Reliva, không phải yêu cầu do khoa ban hành hay chính sách cứu hộ đã được phê duyệt.
 
 **Dành cho triển khai và nghiên cứu tiếp theo:** đây là kế hoạch kỹ thuật thống nhất. Phụ lục A bổ sung hướng dẫn thực hiện và các điều kiện hợp đồng còn phải chốt cho từng lát chức năng. Mục 22 và 23 xác định cấu trúc backend, bất biến nghiệp vụ và các quyết định kiến trúc đã được giải quyết sau rà soát; Mục 25 mở rộng cơ sở thiết kế với quyên góp hiện vật, xác minh tiếp nhận độc lập, hạch toán nguồn hàng và bàn giao cứu trợ. Mục 12 mô tả phần mở rộng hỗ trợ ra quyết định bằng AI (tùy chọn); Mục 6.3 ghi nhận lựa chọn lưu trữ đối tượng. Kế hoạch này không tuyên bố đã đo hiệu năng triển khai hay thực hiện kiểm thử sản phẩm.
 
@@ -68,17 +69,17 @@ Bối cảnh dự án có thông tin được trao đổi qua nhiều kênh và 
 7. **Xác nhận kết quả:** đội cung cấp kết quả/bằng chứng; điều phối viên xác nhận nhu cầu đã được đáp ứng hay chưa. Hoàn tất một nhiệm vụ không tự động đóng yêu cầu còn nhu cầu chưa được đáp ứng.
 8. **Giám sát:** mỗi dịch vụ có thẩm quyền sở hữu dữ liệu cung cấp trạng thái vận hành và thời điểm dữ liệu bảng điều hành hiện tại được đọc.
 
-### 3.3. Các mô hình được điều chỉnh cho C48
+### 3.3. Các mô hình được điều chỉnh cho Reliva
 
 Các khuyến nghị dưới đây áp dụng lại ý tưởng quy trình được ghi nhận trong [nghiên cứu nền tảng ứng phó thiên tai](research/disaster-response-platform-patterns.md). Chúng mở rộng đề cương dự án dưới dạng đề xuất, không phải yêu cầu chính thức.
 
-| Nguồn tham khảo | Điều chỉnh cho C48 | Mức độ phù hợp |
+| Nguồn tham khảo | Điều chỉnh cho Reliva | Mức độ phù hợp |
 |---|---|---|
 | Hàng đợi rà soát, kiểm duyệt và tìm kiếm đã lưu của Ushahidi | Màn hình điều phối viên cho yêu cầu chờ xác minh, đã xác minh nhưng chưa phân công, nhiệm vụ đang diễn ra và yêu cầu mới được đáp ứng một phần; chỉ hiển thị vị trí/liên hệ chính xác trong phạm vi quyền hạn | Làm rõ điểm bàn giao và lượng việc tồn đọng mà không tự động hóa quyết định của con người |
 | Cam kết một phần và hồ sơ logistics tách biệt của Sahana ShaRe | Bảng đáp ứng nhu cầu hiển thị số lượng được yêu cầu, đã cam kết, đã xuất, đã giao và còn thiếu; nhiều kho/tổ chức có thể cùng đóng góp | Yêu cầu vẫn có thể mở dù đã giao một phần; một khoản đóng góp không che khuất nhu cầu còn lại |
 | Các đồ án cùng loại trong danh mục CNTT: khả năng quan sát điều động/logistics, xử lý vé đồng thời cao và số liệu mô phỏng lưu lượng có thể so sánh | Bổ sung thời gian quy trình có thể đo và chế độ xem cứu trợ còn thiếu được lọc theo yêu cầu/khu vực/mặt hàng trong phạm vi được cấp quyền; dùng k6 cho một kịch bản tải API vừa phải | Giúp demo thể hiện rõ kết quả vận hành và có số liệu minh chứng mà không sao chép broker, giao dịch hoặc miền mô phỏng không liên quan |
 
-Sổ tay dự án là danh mục mô tả đồ án, không phải bằng chứng rằng mọi công nghệ hay khối lượng công việc được liệt kê đều đã được triển khai. Điểm khác biệt của C48 là quy trình truy vết từ xác minh báo cáo đến tiến độ nhiệm vụ và đáp ứng cứu trợ một phần, với số lượng kiểm toán được cùng số đo thời gian phản hồi.
+Sổ tay dự án là danh mục mô tả đồ án, không phải bằng chứng rằng mọi công nghệ hay khối lượng công việc được liệt kê đều đã được triển khai. Điểm khác biệt của Reliva là quy trình truy vết từ xác minh báo cáo đến tiến độ nhiệm vụ và đáp ứng cứu trợ một phần, với số lượng kiểm toán được cùng số đo thời gian phản hồi.
 
 Quy trình tham khảo khái niệm chu trình OCHA. Cần xác nhận thuật ngữ và trách nhiệm áp dụng cho dự án này. [OCHA HPC](https://knowledge.base.unocha.org/wiki/spaces/hpc/overview)
 
@@ -104,9 +105,9 @@ Các thao tác ghi tồn kho dùng giao dịch PostgreSQL ngắn, thứ tự kh�
 
 ### 4.2. Đánh giá và lựa chọn framework backend
 
-**Phương pháp đánh giá:** so sánh định tính dựa trên nhu cầu của C48 về ba dịch vụ, TypeScript, PostgreSQL/PostGIS, GIS và backend do một người phụ trách; sử dụng tài liệu chính thức được rà soát ngày 2026-09-30. Đây không phải phép đo hiệu năng. NestJS/TypeScript là backend được chọn; ngăn xếp triển khai không dùng framework Python.
+**Phương pháp đánh giá:** so sánh định tính dựa trên nhu cầu của Reliva về ba dịch vụ, TypeScript, PostgreSQL/PostGIS, GIS và backend do một người phụ trách; sử dụng tài liệu chính thức được rà soát ngày 2026-09-30. Đây không phải phép đo hiệu năng. NestJS/TypeScript là backend được chọn; ngăn xếp triển khai không dùng framework Python.
 
-| Framework | Điểm mạnh liên quan đến C48 | Công việc tích hợp và đánh đổi | Đánh giá |
+| Framework | Điểm mạnh liên quan đến Reliva | Công việc tích hợp và đánh đổi | Đánh giá |
 |---|---|---|---|
 | **NestJS (TypeScript/Node.js)** | Module/provider/guard, TypeScript, tích hợp OpenAPI và validation; cùng họ ngôn ngữ giữa backend và ứng dụng khách | ORM/migration, truy vấn PostGIS, phân quyền nghiệp vụ và giao diện vận hành vẫn cần triển khai rõ ràng | **Chọn** cho ba ranh giới dịch vụ và phát triển TypeScript |
 | **Spring Boot (Java/Kotlin)** | Hệ sinh thái ứng dụng/bảo mật/vận hành trưởng thành | Ngôn ngữ/công cụ JVM khác với ứng dụng khách; là phương án tốt nếu nhóm đã có kinh nghiệm Spring nhiều hơn | Đủ năng lực về kỹ thuật, nhưng đòi hỏi chuyển đổi ngôn ngữ/công cụ lớn hơn cho dự án này |
@@ -135,7 +136,7 @@ Màn hình khẩn cấp nên giảm số bước, cung cấp điều khiển d�
 
 ### 4.4. Giao tiếp dịch vụ và công việc bất đồng bộ
 
-| Nhu cầu | Cơ sở C48 | Chỉ bổ sung broker khi… |
+| Nhu cầu | Cơ sở Reliva | Chỉ bổ sung broker khi… |
 |---|---|---|
 | Đăng nhập, tiếp nhận yêu cầu, xác minh, cập nhật nhiệm vụ, lệnh tồn kho/đáp ứng nhu cầu | REST/JSON với thời gian chờ có giới hạn, mã lỗi ổn định và idempotency cho lệnh có thể thử lại | Thao tác từ người dùng phải phát tán đến nhiều bên nhận triển khai độc lập và API đồng bộ không còn phù hợp |
 | Bảng điều hành và thông báo | Đọc API có thẩm quyền của từng dịch vụ; lưu thông báo trong ứng dụng cùng thay đổi nghiệp vụ tại dịch vụ sở hữu | Bên nhận độc lập cần phát lại sự kiện bền vững hoặc lưu lượng đo được cho thấy cách hiện tại không đủ |
@@ -143,7 +144,7 @@ Màn hình khẩn cấp nên giảm số bước, cung cấp điều khiển d�
 
 Không cần Kafka để tạo người dùng ảo k6: k6 gửi các yêu cầu HTTP/API theo kịch bản và cấu hình số người dùng ảo cùng ngưỡng kiểm tra trong bài kiểm thử. [Yêu cầu HTTP trong Grafana k6](https://grafana.com/docs/k6/latest/using-k6/http-requests/), [Người dùng ảo trong k6](https://grafana.com/docs/k6/latest/get-started/running-k6/)
 
-Chỉ xem xét lại Kafka nếu C48 có nhiều bên nhận độc lập, cần phát lại/xử lý lại sự kiện bền vững hoặc hàng đợi/phát tán bất đồng bộ đo được không thể xử lý bằng worker nhỏ dùng cơ sở dữ liệu. Kafka cung cấp lưu trữ và xử lý luồng sự kiện bền vững nhưng làm phát sinh công việc vận hành broker, schema, retry, khử trùng lặp, giám sát và phục hồi. Không cần các năng lực này chỉ vì thiết kế có nhiều dịch vụ hoặc kiểm thử tải. [Tài liệu Apache Kafka](https://kafka.apache.org/documentation/)
+Chỉ xem xét lại Kafka nếu Reliva có nhiều bên nhận độc lập, cần phát lại/xử lý lại sự kiện bền vững hoặc hàng đợi/phát tán bất đồng bộ đo được không thể xử lý bằng worker nhỏ dùng cơ sở dữ liệu. Kafka cung cấp lưu trữ và xử lý luồng sự kiện bền vững nhưng làm phát sinh công việc vận hành broker, schema, retry, khử trùng lặp, giám sát và phục hồi. Không cần các năng lực này chỉ vì thiết kế có nhiều dịch vụ hoặc kiểm thử tải. [Tài liệu Apache Kafka](https://kafka.apache.org/documentation/)
 
 ### 4.5. Phân rã dịch vụ
 
@@ -395,7 +396,7 @@ Mỗi nhiệm vụ có đúng một đội; đội bổ sung nhận nhiệm vụ
 
 **Lựa chọn cuối cùng cho đồ án: MinIO AIStor Free, triển khai một nút trong phòng lab, dùng dữ liệu tổng hợp.** Không chọn MinIO Community: repository của phiên bản này đã lưu trữ và được đánh dấu không còn bảo trì. AIStor Free là sản phẩm độc quyền riêng; thỏa thuận cho phép dùng độc lập phục vụ giáo dục/nghiên cứu, còn tài liệu vận hành quy định giới hạn riêng theo từng edition. Đây là lựa chọn cho môi trường lab, không phải khuyến nghị production. Kế hoạch này chưa cài đặt hay xác minh artifact/giấy phép MinIO, tích hợp ứng dụng hoặc kiểm thử phục hồi nào. [Repository Community](https://github.com/minio/minio), [Thỏa thuận AIStor Free](https://www.min.io/legal/aistor-free-agreement), [Vận hành giấy phép AIStor](https://docs.min.io/aistor/operations/licenses/)
 
-| Quyết định | Cơ sở C48 |
+| Quyết định | Cơ sở Reliva |
 |---|---|
 | Sản phẩm/edition | MinIO AIStor Free; không thay bằng image Community hoặc bản dựng lại của bên thứ ba |
 | Cấu trúc/dữ liệu | Một nút cho lab; chỉ dùng dữ liệu demo tổng hợp; không tuyên bố có HA hoặc khả dụng production |
@@ -541,7 +542,7 @@ stateDiagram-v2
   IN_PROGRESS --> CANCELLED
 ```
 
-- Mức ưu tiên tách khỏi trạng thái và là quyết định của con người, ghi lại sau khi xác minh. Các tiêu chí dưới đây là **quy tắc mô phỏng C48 do nhóm đề xuất, không phải chính sách của cơ quan cứu hộ** (R-07); cần được chuyên gia miền rà soát trước khi dùng thực tế và không hàm ý SLA được bảo đảm.
+- Mức ưu tiên tách khỏi trạng thái và là quyết định của con người, ghi lại sau khi xác minh. Các tiêu chí dưới đây là **quy tắc mô phỏng Reliva do nhóm đề xuất, không phải chính sách của cơ quan cứu hộ** (R-07); cần được chuyên gia miền rà soát trước khi dùng thực tế và không hàm ý SLA được bảo đảm.
 
 | Mức | Tiêu chí dự thảo | Trường hợp minh họa demo |
 |---|---|---|
@@ -812,11 +813,11 @@ Không mã hóa toàn bộ chính sách vào JWT: Response tự kiểm tra quan 
 
 ### 12.1. Mục tiêu, phạm vi và căn cứ
 
-**Nghiên cứu ban đầu: 2026-09-29; rà soát điều chỉnh blueprint: 2026-09-30. Trạng thái: thiết kế tích hợp tùy chọn cho đồ án, không phải hệ thống phân loại khẩn cấp đã được kiểm chứng.** Mục tiêu là giúp điều phối viên xem xét báo cáo chưa đầy đủ và cân nhắc gợi ý ưu tiên, đồng thời giữ việc xác minh thủ công, phân công và quyết định cuối cùng cho con người. Mục 12.10 điều chỉnh các ý phù hợp từ blueprint AI được cung cấp; [ghi chú rà soát](c48-ai-blueprint-review.md) lưu phân tích và giới hạn của nguồn. Kiến trúc dưới đây là quyết định thiết kế C48; các nguồn trích dẫn nêu cơ chế kỹ thuật/phương pháp đánh giá, không chứng minh độ chính xác của ứng dụng được đề xuất.
+**Nghiên cứu ban đầu: 2026-09-29; rà soát điều chỉnh blueprint: 2026-09-30. Trạng thái: thiết kế tích hợp tùy chọn cho đồ án, không phải hệ thống phân loại khẩn cấp đã được kiểm chứng.** Mục tiêu là giúp điều phối viên xem xét báo cáo chưa đầy đủ và cân nhắc gợi ý ưu tiên, đồng thời giữ việc xác minh thủ công, phân công và quyết định cuối cùng cho con người. Mục 12.10 điều chỉnh các ý phù hợp từ blueprint AI được cung cấp; [ghi chú rà soát](c48-ai-blueprint-review.md) lưu phân tích và giới hạn của nguồn. Kiến trúc dưới đây là quyết định thiết kế Reliva; các nguồn trích dẫn nêu cơ chế kỹ thuật/phương pháp đánh giá, không chứng minh độ chính xác của ứng dụng được đề xuất.
 
-NIST AI RMF tổ chức quản trị rủi ro thành Govern, Map, Measure và Manage, bao gồm trách nhiệm con người và đánh giá liên tục. C48 áp dụng các ý này qua ghi nhận người chịu trách nhiệm, mục đích giới hạn, đánh giá trước khi kích hoạt, rà soát bởi con người và đường tắt/tắt/quay lui. Đây không phải tuyên bố được chứng nhận hay sẵn sàng vận hành. [NIST AI RMF Core](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/)
+NIST AI RMF tổ chức quản trị rủi ro thành Govern, Map, Measure và Manage, bao gồm trách nhiệm con người và đánh giá liên tục. Reliva áp dụng các ý này qua ghi nhận người chịu trách nhiệm, mục đích giới hạn, đánh giá trước khi kích hoạt, rà soát bởi con người và đường tắt/tắt/quay lui. Đây không phải tuyên bố được chứng nhận hay sẵn sàng vận hành. [NIST AI RMF Core](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/)
 
-| Năng lực dự kiến | Đầu vào/đầu ra | Giá trị và giới hạn | Khuyến nghị C48 |
+| Năng lực dự kiến | Đầu vào/đầu ra | Giá trị và giới hạn | Khuyến nghị Reliva |
 |---|---|---|---|
 | Gợi ý ưu tiên | Dữ kiện sự cố có cấu trúc → đề xuất P1–P4, lý do, dữ kiện còn thiếu | Hỗ trợ rà soát nhất quán; phụ thuộc định nghĩa thống nhất và nhãn đại diện | Thử nghiệm AI chính, luôn do con người rà soát |
 | Phát hiện thiếu thông tin | Trường bắt buộc và mâu thuẫn → danh sách cần hỏi thêm | Có ích mà không cần mô hình huấn luyện; dữ kiện chưa biết phải giữ là chưa biết | Trước tiên triển khai bằng validation/quy tắc xác định |
@@ -968,7 +969,7 @@ Tách tập theo sự cố/chiến dịch và nếu khả thi theo thời gian �
 | Vận hành | Tuổi phân tích end-to-end, p95 suy luận, CPU/RAM, phục hồi lỗi, chi phí | Xác định worker tùy chọn có phù hợp môi trường demo không |
 | Quy trình con người | Tỷ lệ/thời gian rà soát, lý do ghi đè, quan sát khả dụng | Đánh giá mức hữu ích mà không mặc định chấp nhận nghĩa là đúng |
 
-Metric phân loại và khái niệm hiệu chuẩn trong kế hoạch đánh giá C48 là đề xuất; chỉ chọn công cụ tương thích nếu có bổ sung mô hình.
+Metric phân loại và khái niệm hiệu chuẩn trong kế hoạch đánh giá Reliva là đề xuất; chỉ chọn công cụ tương thích nếu có bổ sung mô hình.
 
 So sánh cơ sở thủ công/quy tắc và ML trên cùng tập dữ liệu giữ lại. Báo cáo kích thước dữ liệu, xuất xứ, phân bố lớp, cách chia tập, tiền xử lý, seed, model/phiên bản, tham số, cách chọn ngưỡng và giới hạn mẫu/độ bất định. Giữ fixture tổng hợp cho kiểm thử luồng nhưng không trình bày mức khớp với nhãn do chính rule/LLM tạo là kiểm chứng độc lập. Không tự đặt ngưỡng accuracy hay recall ca trọng yếu bắt buộc trước khi chuyên gia miền rà soát.
 
@@ -1025,9 +1026,9 @@ Tất cả kiểm thử dưới đây **mới được lên kế hoạch, chưa 
 
 Sản phẩm cần bàn giao: ghi chú thiết kế advisor ngắn, manifest dữ liệu/nhãn, báo cáo thử nghiệm, model/rule card nêu mục đích/giới hạn, schema API và hồ sơ chạy kiểm thử đã lên kế hoạch. Có thể đặt trong SDD/báo cáo kiểm thử hiện tại; không cần nền tảng hoặc registry riêng.
 
-### 12.10. Tích hợp blueprint AI được cung cấp theo định hướng C48
+### 12.10. Tích hợp blueprint AI được cung cấp theo định hướng Reliva
 
-**Quyết định điều chỉnh: 2026-09-30.** Blueprint đã cung cấp, như phân tích trong [ghi chú rà soát](c48-ai-blueprint-review.md), đóng góp một thử nghiệm trích xuất/quy tắc và quy trình con người rà soát. Phạm vi được giao, máy trạng thái, phân quyền, quyền sở hữu dữ liệu và ưu tiên triển khai của C48 quyết định việc tích hợp. AI vẫn là tùy chọn; blueprint không thay kiến trúc đã chọn hay bổ sung tính năng nghiên cứu bắt buộc.
+**Quyết định điều chỉnh: 2026-09-30.** Blueprint đã cung cấp, như phân tích trong [ghi chú rà soát](c48-ai-blueprint-review.md), đóng góp một thử nghiệm trích xuất/quy tắc và quy trình con người rà soát. Phạm vi được giao, máy trạng thái, phân quyền, quyền sở hữu dữ liệu và ưu tiên triển khai của Reliva quyết định việc tích hợp. AI vẫn là tùy chọn; blueprint không thay kiến trúc đã chọn hay bổ sung tính năng nghiên cứu bắt buộc.
 
 ```mermaid
 flowchart TD
@@ -1478,7 +1479,7 @@ Trước khi thiết lập, xác minh tương thích runtime/image/client bằng
 - Mobile dùng `Authorization: Bearer` cho access token trong bộ nhớ và Expo SecureStore cho refresh token xoay vòng. Login/refresh native có hợp đồng truyền tải tường minh, chỉ trả token cho luồng đó; không đồng thời cấp cookie trình duyệt. Route trình duyệt không được né CSRF bằng cách chọn transport native. Endpoint native từ chối xác thực bằng cookie trình duyệt và request có browser Origin. Không lưu password; logout/reset/thu hồi xóa SecureStore, token trong bộ nhớ và cache truy vấn nhạy cảm. Phản hồi API nhạy cảm dùng `Cache-Control: no-store`.
 - Cả hai client tuần tự hóa thao tác refresh theo session. Identity xoay token dưới row lock của session; refresh token cũ chỉ dùng một lần. Dùng lại token sẽ thu hồi cả family như đã quy định. Mất phản hồi refresh có thể cần đăng nhập lại; không nới phát hiện dùng lại để âm thầm khôi phục. Các tab Web phối hợp refresh qua browser lock gốc nếu có; nếu không, conflict thì yêu cầu login. Introspection/thu hồi ở ranh giới request vẫn là đánh đổi đã chọn; kiểm thử tải/sự cố bao gồm bước này.
 
-Nguồn: [Quản lý session OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html), [Ngăn chặn CSRF OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html), [Bảo mật React Native](https://reactnative.dev/docs/security). Cấu hình cookie/CSRF trên là thiết kế C48, không phải khẳng định rằng chỉ cờ cookie đã ngăn được mọi tấn công.
+Nguồn: [Quản lý session OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html), [Ngăn chặn CSRF OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html), [Bảo mật React Native](https://reactnative.dev/docs/security). Cấu hình cookie/CSRF trên là thiết kế Reliva, không phải khẳng định rằng chỉ cờ cookie đã ngăn được mọi tấn công.
 
 ### 23.2. Seal giải quyết và phục hồi liên dịch vụ
 
@@ -1610,7 +1611,7 @@ Ghi chú nghiên cứu [nguồn chính](research/in-kind-donation-reconciliation
 
 | Nguồn | Mô hình áp dụng | Ranh giới |
 |---|---|---|
-| Tài liệu lịch sử inventory/deployment của Sahana Eden | Danh sách mặt hàng cần, đóng góp một phần, lượng gốc so với lượng nhận, biên nhận/phiếu gửi | Blueprint cũ trộn tính năng đã triển khai/đề xuất; truy cập khách là quyết định riêng của C48 |
+| Tài liệu lịch sử inventory/deployment của Sahana Eden | Danh sách mặt hàng cần, đóng góp một phần, lượng gốc so với lượng nhận, biên nhận/phiếu gửi | Blueprint cũ trộn tính năng đã triển khai/đề xuất; truy cập khách là quyết định riêng của Reliva |
 | Hướng dẫn Logistics Cluster / WFP | Kiểm đếm/kiểm tra thực tế, phiếu nhận hàng, chênh lệch có ghi chép, xuất hàng được cấp quyền và bằng chứng nhận | Tham khảo quy trình, không tuyên bố được chứng nhận |
 | Hướng dẫn Logistics Xanh IFRC | Tiếp nhận theo nhu cầu, tiêu chí chất lượng/hạn dùng, hiển thị quyên góp hỏng/hết hạn | Không tối đa hóa tổng quyên góp bằng cách nhận hàng không dùng được |
 | Tài liệu lô hàng Odoo | Truy xuất lô nguồn từ tiếp nhận đến movement đầu ra | Không phụ thuộc Odoo hay tuần tự hóa từng món |
