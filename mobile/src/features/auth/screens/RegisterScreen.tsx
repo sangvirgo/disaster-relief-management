@@ -7,15 +7,18 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { useAuthStore } from '../../../store/authStore';
+import { getApiErrorMessage } from '../../../api/client';
 import { THEME } from '../../../constants/theme';
-import { UserPlus, User, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, UserCheck } from 'lucide-react-native';
+import { User, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, UserCheck } from 'lucide-react-native';
 
 export const RegisterScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const router = useRouter();
   const { register, isLoading } = useAuthStore();
 
   const [displayName, setDisplayName] = useState('');
@@ -76,26 +79,28 @@ export const RegisterScreen: React.FC = () => {
             text: 'Bắt đầu sử dụng',
             onPress: () => {
               // Chuyển về màn hình cứu hộ chính
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'EmergencyHomeScreen' }],
-              });
+              router.replace('/');
             },
           },
         ]
       );
     } catch (err: any) {
-      const errorMsg = typeof err === 'string' ? err : err?.message || 'Không thể tạo tài khoản. Vui lòng thử lại sau.';
+      const errorMsg = getApiErrorMessage(err, 'Không thể tạo tài khoản. Vui lòng thử lại sau.');
       Alert.alert('Đăng ký thất bại', errorMsg);
     }
   };
 
   return (
-    <ScreenContainer title="Đăng Ký Tài Khoản Công Dân" onBack={() => navigation.goBack()} scrollable={true}>
+    <ScreenContainer title="Đăng Ký Tài Khoản Công Dân" onBack={() => goBackOrHome(router)} scrollable={true}>
       <View style={styles.headerBox}>
-        <View style={styles.iconCircle}>
-          <UserPlus size={36} color={THEME.colors.primary.main} />
+        <View style={styles.logoFrame}>
+          <Image
+            source={require('../../../../assets/reliva-logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
+        <Text style={styles.brandTitle}>Reliva</Text>
         <Text style={styles.title}>TÀI KHOẢN CÔNG DÂN</Text>
         <Text style={styles.subtitle}>
           Đăng ký tài khoản để quản lý yêu cầu cứu trợ người thân (PROXY), theo dõi tiến độ cứu hộ và đồng bộ thông tin khẩn cấp.
@@ -214,7 +219,7 @@ export const RegisterScreen: React.FC = () => {
         {/* Chuyển sang đăng nhập */}
         <View style={styles.switchAuthRow}>
           <Text style={styles.switchAuthText}>Bạn đã có tài khoản?</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('LoginScreen')} activeOpacity={0.7}>
+          <TouchableOpacity onPress={() => router.push('/login')} activeOpacity={0.7}>
             <Text style={styles.switchAuthLink}> Đăng nhập ngay</Text>
           </TouchableOpacity>
         </View>
@@ -229,16 +234,29 @@ const styles = StyleSheet.create({
     marginVertical: 14,
     paddingHorizontal: 16,
   },
-  iconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: THEME.colors.primary.bg,
+  logoFrame: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: THEME.colors.primary.border,
+    borderColor: THEME.colors.surface.border,
+    ...THEME.shadows.md,
+  },
+  logoImage: {
+    width: 68,
+    height: 68,
+    borderRadius: 14,
+  },
+  brandTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: THEME.colors.emergency.main,
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   title: {
     fontSize: THEME.typography.fontSizes.lg,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Modal, Image } from 'react-native';
+import { useRouter } from 'expo-router';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { SOSButton } from '../../../components/common/SOSButton';
 import { THEME } from '../../../constants/theme';
@@ -24,13 +24,12 @@ import {
   ClipboardList,
   Bell,
   AlertCircle,
-  CheckCircle2,
   KeyRound,
   Flag,
 } from 'lucide-react-native';
 
 export const EmergencyHomeScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const router = useRouter();
   const [trackingCode, setTrackingCode] = useState('');
   const [notices, setNotices] = useState<NoticeItem[]>([]);
   const [selectedNotice, setSelectedNotice] = useState<NoticeItem | null>(null);
@@ -45,8 +44,6 @@ export const EmergencyHomeScreen: React.FC = () => {
           }
         })
         .catch(() => {});
-    } else {
-      setNotices([]);
     }
   }, [isAuthenticated]);
 
@@ -58,7 +55,7 @@ export const EmergencyHomeScreen: React.FC = () => {
         setNotices((prev) =>
           prev.map((n) => (n.id === notice.id ? { ...n, read_at: new Date().toISOString() } : n))
         );
-      } catch (e) {
+      } catch {
         // bỏ qua lỗi nếu không đánh dấu được
       }
     }
@@ -69,7 +66,7 @@ export const EmergencyHomeScreen: React.FC = () => {
       Alert.alert('Thông báo', 'Vui lòng nhập mã tra cứu cứu trợ.');
       return;
     }
-    navigation.navigate('SOSTrackingScreen', { trackingCode: trackingCode.trim().toUpperCase() });
+    router.push({ pathname: '/tracking', params: { trackingCode: trackingCode.trim().toUpperCase() } });
   };
 
   const handleLogout = () => {
@@ -92,6 +89,19 @@ export const EmergencyHomeScreen: React.FC = () => {
 
   return (
     <ScreenContainer scrollable={true}>
+      {/* Thương hiệu Cứu Trợ Reliva */}
+      <View style={styles.brandHeader}>
+        <Image
+          source={require('../../../../assets/reliva-logo.png')}
+          style={styles.brandLogo}
+          resizeMode="contain"
+        />
+        <View style={styles.brandTextContainer}>
+          <Text style={styles.brandName}>Reliva</Text>
+          <Text style={styles.brandTagline}>HỆ THỐNG CỨU TRỢ THIÊN TAI C48</Text>
+        </View>
+      </View>
+
       {/* Cảnh báo đường dây nóng cứu trợ */}
       <View style={styles.emergencyBanner}>
         <View style={styles.bannerIcon}>
@@ -112,7 +122,7 @@ export const EmergencyHomeScreen: React.FC = () => {
       {isAuthenticated && user?.must_change_password && (
         <TouchableOpacity
           style={styles.mustChangePassBanner}
-          onPress={() => navigation.navigate('ChangePasswordScreen')}
+          onPress={() => router.push('/change-password')}
           activeOpacity={0.85}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -159,7 +169,7 @@ export const EmergencyHomeScreen: React.FC = () => {
           <View style={styles.userActionsRow}>
             <TouchableOpacity
               style={styles.myRequestsBar}
-              onPress={() => navigation.navigate('MyRequestsScreen')}
+              onPress={() => router.push('/my-requests')}
               activeOpacity={0.8}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -171,7 +181,7 @@ export const EmergencyHomeScreen: React.FC = () => {
 
             <TouchableOpacity
               style={styles.changePassBar}
-              onPress={() => navigation.navigate('ChangePasswordScreen')}
+              onPress={() => router.push('/change-password')}
               activeOpacity={0.8}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -190,7 +200,7 @@ export const EmergencyHomeScreen: React.FC = () => {
           </View>
           <TouchableOpacity
             style={styles.loginQuickButton}
-            onPress={() => navigation.navigate('LoginScreen')}
+            onPress={() => router.push('/login')}
             activeOpacity={0.8}
           >
             <LogIn size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
@@ -209,7 +219,7 @@ export const EmergencyHomeScreen: React.FC = () => {
             </View>
             <TouchableOpacity
               style={styles.viewAllNoticesBtn}
-              onPress={() => navigation.navigate('NoticesScreen')}
+              onPress={() => router.push('/notices')}
               activeOpacity={0.7}
             >
               <Text style={styles.viewAllNoticesText}>
@@ -254,7 +264,7 @@ export const EmergencyHomeScreen: React.FC = () => {
 
       {/* Nút SOS khẩn cấp trung tâm */}
       <SOSButton
-        onPress={() => navigation.navigate('CreateSOSScreen')}
+        onPress={() => router.push('/create-sos')}
         title="GỬI YÊU CẦU CỨU NẠN"
         subTitle="CHẠM ĐỂ BÁO VỊ TRÍ & SỐ NGƯỜI CẦN CỨU"
       />
@@ -266,7 +276,7 @@ export const EmergencyHomeScreen: React.FC = () => {
         {/* 1. Báo cứu nạn tại chỗ */}
         <TouchableOpacity
           style={styles.modeCard}
-          onPress={() => navigation.navigate('CreateSOSScreen')}
+          onPress={() => router.push('/create-sos')}
           activeOpacity={0.8}
         >
           <View style={[styles.modeIconBox, { backgroundColor: THEME.colors.emergency.bg }]}>
@@ -282,7 +292,7 @@ export const EmergencyHomeScreen: React.FC = () => {
         {/* 2. Báo cứu trợ cho người thân từ xa (PROXY) */}
         <TouchableOpacity
           style={styles.modeCard}
-          onPress={() => navigation.navigate('ProxySOSScreen')}
+          onPress={() => router.push('/proxy-sos')}
           activeOpacity={0.8}
         >
           <View style={[styles.modeIconBox, { backgroundColor: THEME.colors.primary.bg }]}>
@@ -331,7 +341,7 @@ export const EmergencyHomeScreen: React.FC = () => {
       <View style={styles.quickAccessRow}>
         <TouchableOpacity
           style={styles.quickAccessCard}
-          onPress={() => navigation.navigate('DonationScreen')}
+          onPress={() => router.push('/donations')}
           activeOpacity={0.8}
         >
           <HeartHandshake size={26} color={THEME.colors.primary.main} />
@@ -341,7 +351,7 @@ export const EmergencyHomeScreen: React.FC = () => {
 
         <TouchableOpacity
           style={styles.quickAccessCard}
-          onPress={() => navigation.navigate('CampaignsScreen')}
+          onPress={() => router.push('/campaigns')}
           activeOpacity={0.8}
         >
           <Flag size={26} color={THEME.colors.success.main} />
@@ -353,9 +363,9 @@ export const EmergencyHomeScreen: React.FC = () => {
           style={styles.quickAccessCard}
           onPress={() => {
             if (isAuthenticated && isVolunteerOrLeader()) {
-              navigation.navigate('TeamDashboardScreen');
+              router.push('/team');
             } else {
-              navigation.navigate('LoginScreen');
+              router.push('/login');
             }
           }}
           activeOpacity={0.8}
@@ -409,6 +419,39 @@ export const EmergencyHomeScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  brandHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+    ...THEME.shadows.sm,
+  },
+  brandLogo: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+  },
+  brandTextContainer: {
+    marginLeft: 12,
+  },
+  brandName: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: THEME.colors.emergency.main,
+    letterSpacing: 0.5,
+  },
+  brandTagline: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: THEME.colors.text.secondary,
+    letterSpacing: 0.6,
+    marginTop: 1,
+  },
   mockBanner: {
     flexDirection: 'row',
     alignItems: 'center',

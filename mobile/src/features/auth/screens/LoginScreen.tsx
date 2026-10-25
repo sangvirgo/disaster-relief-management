@@ -7,16 +7,19 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { useAuthStore } from '../../../store/authStore';
+import { getApiErrorMessage } from '../../../api/client';
 import { THEME } from '../../../constants/theme';
-import { ShieldCheck, User, Lock, ArrowRight, Eye, EyeOff, UserPlus } from 'lucide-react-native';
+import { User, Lock, ArrowRight, Eye, EyeOff, UserPlus } from 'lucide-react-native';
 
 export const LoginScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
-  const { login, isLoading, isVolunteerOrLeader, user } = useAuthStore();
+  const router = useRouter();
+  const { login, isLoading, isVolunteerOrLeader } = useAuthStore();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -42,7 +45,7 @@ export const LoginScreen: React.FC = () => {
           [
             {
               text: 'Vào Bảng Điều Khiển Cứu Hộ',
-              onPress: () => navigation.replace('TeamDashboardScreen'),
+              onPress: () => router.replace('/team'),
             },
           ]
         );
@@ -54,28 +57,29 @@ export const LoginScreen: React.FC = () => {
             {
               text: 'Tiếp tục',
               onPress: () => {
-                if (navigation.canGoBack()) {
-                  navigation.goBack();
-                } else {
-                  navigation.replace('EmergencyHomeScreen');
-                }
+                goBackOrHome(router);
               },
             },
           ]
         );
       }
     } catch (err: any) {
-      const errorMsg = typeof err === 'string' ? err : err?.message || 'Tên đăng nhập hoặc mật khẩu không chính xác.';
+      const errorMsg = getApiErrorMessage(err, 'Tên đăng nhập hoặc mật khẩu không chính xác.');
       Alert.alert('Đăng nhập thất bại', errorMsg);
     }
   };
 
   return (
-    <ScreenContainer title="Đăng Nhập Hệ Thống" onBack={() => navigation.goBack()} scrollable={true}>
+    <ScreenContainer title="Đăng Nhập Hệ Thống" onBack={() => goBackOrHome(router)} scrollable={true}>
       <View style={styles.headerBox}>
-        <View style={styles.iconCircle}>
-          <ShieldCheck size={38} color={THEME.colors.primary.main} />
+        <View style={styles.logoFrame}>
+          <Image
+            source={require('../../../../assets/reliva-logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
+        <Text style={styles.brandTitle}>Reliva</Text>
         <Text style={styles.title}>ĐĂNG NHẬP HỆ THỐNG</Text>
         <Text style={styles.subtitle}>
           Dành cho Công dân quản lý tin báo cứu trợ & Đội cứu hộ / Tình nguyện viên tiếp nhận nhiệm vụ.
@@ -149,7 +153,7 @@ export const LoginScreen: React.FC = () => {
           <Text style={styles.registerPromptText}>Chưa có tài khoản công dân?</Text>
           <TouchableOpacity
             style={styles.registerPromptButton}
-            onPress={() => navigation.navigate('RegisterScreen')}
+            onPress={() => router.push('/register')}
             activeOpacity={0.7}
           >
             <UserPlus size={16} color={THEME.colors.primary.main} style={{ marginRight: 4 }} />
@@ -176,16 +180,29 @@ const styles = StyleSheet.create({
     marginVertical: 18,
     paddingHorizontal: 12,
   },
-  iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: THEME.colors.primary.bg,
+  logoFrame: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: THEME.colors.primary.border,
+    borderColor: THEME.colors.surface.border,
+    ...THEME.shadows.md,
+  },
+  logoImage: {
+    width: 68,
+    height: 68,
+    borderRadius: 14,
+  },
+  brandTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: THEME.colors.emergency.main,
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   title: {
     fontSize: THEME.typography.fontSizes.lg,

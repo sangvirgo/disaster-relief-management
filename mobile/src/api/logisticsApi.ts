@@ -6,19 +6,18 @@ import {
   ReviseDonationDeclarationPayload,
   PublicDonationReportSummary,
   EvidenceDownload,
+  CollectionPage,
 } from '../types/api';
 import { generateUUID } from '../utils/secureStore';
 
 export const LogisticsApi = {
   // Lấy danh sách các đợt tiếp nhận quyên góp cứu trợ đang mở
-  async getPublicDonationDrives(): Promise<DonationDrive[]> {
-    const response = await apiClient.get<{ items?: DonationDrive[] } | DonationDrive[]>(
-      '/logistics/public/donation-drives'
+  async getPublicDonationDrives(limit = 50, cursor?: string): Promise<CollectionPage<DonationDrive>> {
+    const response = await apiClient.get<CollectionPage<DonationDrive>>(
+      '/logistics/public/donation-drives',
+      { params: { limit, ...(cursor ? { cursor } : {}) } }
     );
-    if (Array.isArray(response.data)) {
-      return response.data;
-    }
-    return response.data.items || [];
+    return response.data;
   },
 
   // Chi tiết đợt quyên góp
@@ -31,14 +30,13 @@ export const LogisticsApi = {
   async declareDonation(
     driveId: string,
     payload: DonationDeclarationPayload,
-    donationSecret?: string
+    donationSecret: string,
+    idempotencyKey: string
   ): Promise<{ id: string; public_code: string; status: string }> {
     const headers: Record<string, string> = {
-      'Idempotency-Key': generateUUID(),
+      'Idempotency-Key': idempotencyKey,
     };
-    if (donationSecret) {
-      headers['X-Donation-Secret'] = donationSecret;
-    }
+    headers['X-Donation-Secret'] = donationSecret;
 
     const response = await apiClient.post(`/logistics/public/donation-drives/${driveId}/deliveries`, payload, {
       headers,
@@ -47,13 +45,13 @@ export const LogisticsApi = {
   },
 
   // Tra cứu tiến độ tiếp nhận và kiểm đếm biên nhận hàng cứu trợ
-  async trackDonation(donationId: string, donationSecret?: string): Promise<DonationTrackingDetail> {
+  async trackDonation(donationIdOrCode: string, donationSecret?: string): Promise<DonationTrackingDetail> {
     const headers: Record<string, string> = {};
     if (donationSecret) {
       headers['X-Donation-Secret'] = donationSecret;
     }
 
-    const response = await apiClient.get<DonationTrackingDetail>(`/logistics/public/donations/${donationId}`, {
+    const response = await apiClient.get<DonationTrackingDetail>(`/logistics/public/donations/${encodeURIComponent(donationIdOrCode)}`, {
       headers,
     });
     return response.data;
@@ -102,6 +100,15 @@ export const LogisticsApi = {
       `/logistics/public/donations/${donationId}/claim`,
       {},
       { headers }
+    );
+    return response.data;
+  },
+
+  async recoverDonation(publicCode: string, recoveryCode: string, idempotencyKey = generateUUID()): Promise<{ id: string; public_code: string }> {
+    const response = await apiClient.post<{ id: string; public_code: string }>(
+      '/logistics/public/donations/recover',
+      { public_code: publicCode.trim().toUpperCase() },
+      { headers: { 'Idempotency-Key': idempotencyKey, 'X-Recovery-Code': recoveryCode.trim() } }
     );
     return response.data;
   },

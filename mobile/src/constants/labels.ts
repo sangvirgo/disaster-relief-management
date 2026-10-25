@@ -1,3 +1,5 @@
+import { RequestStatus, MissionStatus, PriorityLevel } from '../types/api';
+
 // Phân loại lực lượng cứu hộ
 export const RESCUE_TEAM_KIND_LABELS: Record<string, string> = {
   VOLUNTEER: 'Tình nguyện viên chuyên nghiệp',
@@ -16,7 +18,6 @@ export const RESCUE_SKILL_LABELS: Record<string, string> = {
 };
 
 // Từ điển hiển thị tiếng Việt chuẩn hóa cho toàn bộ ứng dụng Mobile C48
-import { IncidentCategoryCode, RequestStatus, MissionStatus, PriorityLevel } from '../types/api';
 
 export const INCIDENT_CATEGORIES: Record<string, { label: string; icon: string; desc: string }> = {
   FLOOD: {
@@ -134,7 +135,7 @@ export const TIMELINE_EVENT_LABELS: Record<string, { title: string; desc: string
   },
   MISSION_DISPATCHED: {
     title: 'Đã điều phối đội cứu hộ tiếp cận',
-    desc: 'Đã lựa chọn đội cứu hộ cơ động gần nhất và trang thiết bị phù hợp.',
+    desc: 'Hồ sơ đã được chuyển đến bước điều phối. Theo dõi các cập nhật tiếp theo tại đây.',
   },
   MISSION_ACCEPTED: {
     title: 'Đội cứu hộ đã tiếp nhận lệnh',
@@ -149,8 +150,8 @@ export const TIMELINE_EVENT_LABELS: Record<string, { title: string; desc: string
     desc: 'Lực lượng cứu hộ đang triển khai ứng cứu trực tiếp tại chỗ.',
   },
   REQUEST_RESOLVED: {
-    title: 'Cứu nạn hoàn tất thành công',
-    desc: 'Nạn nhân đã được đưa về nơi an toàn hoặc nhận đầy đủ hàng cứu trợ.',
+    title: 'Hồ sơ đã được đánh dấu hoàn tất',
+    desc: 'Xem thông tin kết quả được ghi nhận trong hồ sơ cứu trợ.',
   },
   SUPPLEMENT_RECEIVED: {
     title: 'Đã ghi nhận thông tin & bằng chứng bổ sung',
@@ -190,9 +191,6 @@ export function formatNoticeDisplay(notice: any): {
     ''
   ).toUpperCase();
 
-  const explicitTitle = typeof payload.title === 'string' && payload.title.trim() ? payload.title.trim() : '';
-  const explicitMessage = typeof payload.message === 'string' && payload.message.trim() ? payload.message.trim() : '';
-
   const requestId = payload.request_id || payload.requestId || notice.request_id;
   const shortId = requestId ? String(requestId).slice(0, 8).toUpperCase() : '';
 
@@ -215,17 +213,17 @@ export function formatNoticeDisplay(notice: any): {
     },
     REQUEST_DISPATCHED: {
       title: 'Đang Điều Phối Đội Cứu Nạn',
-      message: 'Lệnh điều động đã được phát đi. Đội cứu hộ gần vị trí của bạn nhất đang chuẩn bị xuất phát.',
+      message: 'Hồ sơ đã được chuyển đến bước điều phối. Trung tâm sẽ cập nhật khi có thay đổi.',
       isUrgent: true,
     },
     REQUEST_IN_PROGRESS: {
-      title: 'Đội Cứu Hộ Đang Đến Hiện Trường',
-      message: 'Lực lượng cứu hộ đang trên đường di chuyển và tiếp cận điểm cứu nạn của bạn. Vui lòng giữ liên lạc và tiết kiệm pin!',
+      title: 'Nhiệm Vụ Cứu Trợ Đang Được Triển Khai',
+      message: 'Hãy theo dõi trạng thái và giữ điện thoại sẵn sàng liên lạc.',
       isUrgent: true,
     },
     REQUEST_RESOLVED: {
-      title: 'Nhiệm Vụ Cứu Hộ Hoàn Tất',
-      message: 'Công tác ứng cứu và cứu trợ đối với hồ sơ của bạn đã được thực hiện thành công và hoàn tất an toàn.',
+      title: 'Hồ Sơ Đã Được Đánh Dấu Hoàn Tất',
+      message: 'Xem thông tin kết quả được ghi nhận trong hồ sơ cứu trợ.',
     },
     REQUEST_CLOSED: {
       title: 'Hồ Sơ Cứu Hộ Đã Đóng',
@@ -251,8 +249,8 @@ export function formatNoticeDisplay(notice: any): {
       isUrgent: true,
     },
     MISSION_ACCEPTED: {
-      title: 'Đội Cứu Hộ Đã Nhận Nhiệm Vụ',
-      message: 'Đội trưởng đội cứu trợ đã xác nhận tiếp nhận nhiệm vụ và bắt đầu triển khai phương án.',
+      title: 'Đội Cứu Hộ Đã Tiếp Nhận Nhiệm Vụ',
+      message: 'Hệ thống đã ghi nhận đội cứu hộ tiếp nhận nhiệm vụ.',
     },
     MISSION_EN_ROUTE: {
       title: 'Đội Cứu Hộ Đang Di Chuyển',
@@ -265,8 +263,8 @@ export function formatNoticeDisplay(notice: any): {
       isUrgent: true,
     },
     MISSION_COMPLETED: {
-      title: 'Nhiệm Vụ Cứu Nạn Hoàn Thành',
-      message: 'Đội cứu hộ đã đưa nạn nhân đến vị trí an toàn hoặc cấp phát xong nhu yếu phẩm cần thiết.',
+      title: 'Nhiệm Vụ Được Ghi Nhận Hoàn Thành',
+      message: 'Xem thông tin kết quả do đội cứu hộ ghi nhận trong hồ sơ.',
     },
     REPORTER_SUPPLEMENT: {
       title: 'Ghi Nhận Thông Tin Bổ Sung',
@@ -275,16 +273,8 @@ export function formatNoticeDisplay(notice: any): {
   };
 
   const matched = NOTICES_MAP[code];
-  const finalTitle = explicitTitle || matched?.title || 'Thông Báo Cứu Trợ';
-  let finalMessage = explicitMessage || matched?.message;
-
-  if (!finalMessage) {
-    if (code) {
-      finalMessage = `Hệ thống ghi nhận sự kiện cập nhật tiến độ: ${code}. Ban chỉ huy đang tiếp tục giám sát xử lý.`;
-    } else {
-      finalMessage = 'Bạn có thông báo mới từ trung tâm điều phối cứu trợ.';
-    }
-  }
+  const finalTitle = matched?.title || 'Thông Báo Cứu Trợ';
+  let finalMessage = matched?.message || 'Bạn có cập nhật mới từ trung tâm điều phối cứu trợ.';
 
   if (shortId) {
     finalMessage += `\n\n(Mã hồ sơ: #${shortId})`;

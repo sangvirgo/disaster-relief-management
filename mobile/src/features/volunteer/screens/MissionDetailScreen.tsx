@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,13 +11,15 @@ import {
   Modal,
   Image,
 } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { goBackOrHome } from '../../../navigation/back';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { ResponseApi } from '../../../api/responseApi';
+import { getApiErrorMessage } from '../../../api/client';
 import { Mission, MissionStatus } from '../../../types/api';
-import { INCIDENT_CATEGORIES, MISSION_STATUS_LABELS } from '../../../constants/labels';
+import { INCIDENT_CATEGORIES } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
 import {
   MapPin,
@@ -33,14 +35,12 @@ import {
   Camera,
   ImageIcon,
   X,
-  Shield,
-  Info,
 } from 'lucide-react-native';
 
 export const MissionDetailScreen: React.FC = () => {
-  const route = useRoute<any>();
-  const navigation = useNavigation<any>();
-  const { missionId } = route.params || {};
+  const router = useRouter();
+  const { missionId: routeMissionId } = useLocalSearchParams<{ missionId?: string }>();
+  const missionId = Array.isArray(routeMissionId) ? routeMissionId[0] : routeMissionId;
 
   const [mission, setMission] = useState<Mission | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -89,22 +89,24 @@ export const MissionDetailScreen: React.FC = () => {
     }
   };
 
-  const fetchDetail = async () => {
+  const fetchDetail = useCallback(async () => {
     if (!missionId) return;
     setLoading(true);
     try {
       const data = await ResponseApi.getMissionDetail(missionId);
       setMission(data);
     } catch (e: any) {
-      Alert.alert('Lỗi', typeof e === 'string' ? e : 'Không thể tải chi tiết nhiệm vụ.');
+      Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể tải chi tiết nhiệm vụ.'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [missionId]);
 
   useEffect(() => {
+    // Fetch the route's initial mission snapshot.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDetail();
-  }, [missionId]);
+  }, [fetchDetail]);
 
   // Mở Google Maps ngoài điều hướng đường đi
   const openExternalMaps = () => {
@@ -121,8 +123,9 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Gọi điện thoại trực tiếp cho nạn nhân
   const callVictimPhone = () => {
-    if (!mission?.reporter_contact_phone) return;
-    Linking.openURL(`tel:${mission.reporter_contact_phone}`);
+    const phone = mission?.reporter_contact_phone;
+    if (!phone) return;
+    Linking.openURL(`tel:${phone}`).catch(() => Alert.alert('Không thể gọi điện', 'Thiết bị không hỗ trợ cuộc gọi điện thoại.'));
   };
 
   // Xử lý Tiếp nhận
@@ -130,11 +133,11 @@ export const MissionDetailScreen: React.FC = () => {
     if (!mission) return;
     setActionLoading(true);
     try {
-      await ResponseApi.acceptMission(mission.id, mission.version || 1);
-      Alert.alert('Thành công', 'Đã tiếp nhận nhiệm vụ. Hãy chuẩn bị phương tiện cứu hộ và lên đường!');
+      await ResponseApi.acceptMission(mission.id, mission.version);
+      Alert.alert('Đã tiếp nhận', 'Backend đã ghi nhận việc tiếp nhận nhiệm vụ.');
       fetchDetail();
     } catch (e: any) {
-      Alert.alert('Lỗi tiếp nhận', typeof e === 'string' ? e : 'Không thể tiếp nhận nhiệm vụ.');
+      Alert.alert('Lỗi tiếp nhận', getApiErrorMessage(e, 'Không thể tiếp nhận nhiệm vụ.'));
     } finally {
       setActionLoading(false);
     }
@@ -149,21 +152,21 @@ export const MissionDetailScreen: React.FC = () => {
     setActionLoading(true);
     try {
       if (mission.status === 'OFFERED') {
-        await ResponseApi.declineMission(mission.id, mission.version || 1, declineReason.trim());
-        Alert.alert('Đã từ chối', 'Đã báo về trung tâm điều phối để chuyển giao đội cứu nạn khác.');
+        await ResponseApi.declineMission(mission.id, mission.version, declineReason.trim());
+        Alert.alert('Đã từ chối', 'Backend đã ghi nhận lý do từ chối nhiệm vụ.');
       } else {
         await ResponseApi.transitionMission(
           mission.id,
-          mission.version || 1,
+          mission.version,
           'FAILED',
           declineReason.trim()
         );
-        Alert.alert('Đã ghi nhận', 'Đã báo cáo không thể tiếp cận hiện trường để điều phối viên có phương án chi viện.');
+        Alert.alert('Đã ghi nhận', 'Backend đã ghi nhận trạng thái nhiệm vụ không thể tiếp cận.');
       }
       setShowDeclineModal(false);
-      navigation.goBack();
+      goBackOrHome(router);
     } catch (e: any) {
-      Alert.alert('Lỗi', typeof e === 'string' ? e : 'Không thể cập nhật trạng thái nhiệm vụ.');
+      Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể cập nhật trạng thái nhiệm vụ.'));
     } finally {
       setActionLoading(false);
     }
@@ -179,10 +182,10 @@ export const MissionDetailScreen: React.FC = () => {
         onPress: async () => {
           setActionLoading(true);
           try {
-            await ResponseApi.transitionMission(mission.id, mission.version || 1, toStatus);
+            await ResponseApi.transitionMission(mission.id, mission.version, toStatus);
             fetchDetail();
           } catch (e: any) {
-            Alert.alert('Lỗi cập nhật', typeof e === 'string' ? e : 'Không thể cập nhật trạng thái.');
+            Alert.alert('Lỗi cập nhật', getApiErrorMessage(e, 'Không thể cập nhật trạng thái.'));
           } finally {
             setActionLoading(false);
           }
@@ -198,6 +201,7 @@ export const MissionDetailScreen: React.FC = () => {
       return;
     }
     setActionLoading(true);
+    let evidenceUploadFailed = false;
     try {
       // 1. Tải lên ảnh bằng chứng hiện trường nếu có
       if (completionImage) {
@@ -207,26 +211,30 @@ export const MissionDetailScreen: React.FC = () => {
             name: completionImage.fileName || `mission-${mission.id}-${Date.now()}.jpg`,
             type: completionImage.mimeType || 'image/jpeg',
           });
-        } catch (uploadErr) {
-          console.warn('Lỗi tải ảnh bằng chứng:', uploadErr);
-          // Không ngắt tiến trình nếu MinIO bận, nhưng ghi log
+        } catch {
+          evidenceUploadFailed = true;
         }
       }
 
       // 2. Chuyển trạng thái sang COMPLETED
       await ResponseApi.transitionMission(
         mission.id,
-        mission.version || 1,
+        mission.version,
         'COMPLETED',
         undefined,
         outcomeNote.trim()
       );
-      Alert.alert('Cứu nạn thành công', 'Hoan hô đồng chí! Nhiệm vụ đã hoàn thành xuất sắc.');
+      Alert.alert(
+        'Đã ghi nhận kết quả',
+        evidenceUploadFailed
+          ? 'Backend đã ghi nhận kết quả nhiệm vụ, nhưng ảnh bằng chứng chưa tải lên thành công.'
+          : 'Backend đã ghi nhận kết quả hoàn thành nhiệm vụ.'
+      );
       setShowCompleteModal(false);
       setCompletionImage(null);
       fetchDetail();
     } catch (e: any) {
-      Alert.alert('Lỗi', typeof e === 'string' ? e : 'Không thể kết thúc nhiệm vụ.');
+      Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể kết thúc nhiệm vụ.'));
     } finally {
       setActionLoading(false);
     }
@@ -234,7 +242,7 @@ export const MissionDetailScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <ScreenContainer title="Chi Tiết Nhiệm Vụ" onBack={() => navigation.goBack()}>
+      <ScreenContainer title="Chi Tiết Nhiệm Vụ" onBack={() => goBackOrHome(router)}>
         <View style={styles.centerBox}>
           <ActivityIndicator size="large" color={THEME.colors.primary.main} />
           <Text style={styles.loadingText}>Đang tải chi tiết nhiệm vụ cứu nạn...</Text>
@@ -245,7 +253,7 @@ export const MissionDetailScreen: React.FC = () => {
 
   if (!mission) {
     return (
-      <ScreenContainer title="Chi Tiết Nhiệm Vụ" onBack={() => navigation.goBack()}>
+      <ScreenContainer title="Chi Tiết Nhiệm Vụ" onBack={() => goBackOrHome(router)}>
         <Text style={styles.errorText}>Không tìm thấy thông tin ca cứu hộ này.</Text>
       </ScreenContainer>
     );
@@ -253,18 +261,11 @@ export const MissionDetailScreen: React.FC = () => {
 
   const categoryInfo = INCIDENT_CATEGORIES[mission.category] || { label: 'Sự cố cứu hộ' };
 
-  // Xác định quyền hạn: Theo Swagger, backend chỉ trả về reporter_contact_phone hoặc alternate_contact cho Đội trưởng (LEADER)
-  const isLeader = Boolean(
-    'reporter_contact_phone' in mission ||
-      'alternate_contact' in mission ||
-      'beneficiary_contact_phone' in mission
-  );
-
   return (
     <ScreenContainer
       title="Chi Tiết Nhiệm Vụ Cứu Nạn"
       subtitle={`Mã: ${mission.id.slice(0, 8)}`}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackOrHome(router)}
     >
       {/* 1. THẺ TỔNG QUAN SỰ CỐ */}
       <View style={styles.card}>
@@ -289,14 +290,16 @@ export const MissionDetailScreen: React.FC = () => {
         <View style={styles.metaRow}>
           <View style={styles.metaCol}>
             <Users size={18} color={THEME.colors.text.secondary} />
-            <Text style={styles.metaValue}>{mission.people_affected || 1} người</Text>
+            <Text style={styles.metaValue}>{mission.people_affected ?? 'Chưa rõ'}{mission.people_affected == null ? '' : ' người'}</Text>
             <Text style={styles.metaLabel}>Cần cứu nạn</Text>
           </View>
 
           <View style={styles.metaCol}>
             <MapPin size={18} color={THEME.colors.primary.main} />
             <Text style={styles.metaValue}>
-              {mission.distance_m ? `${(mission.distance_m / 1000).toFixed(1)} km` : '~1.2 km'}
+              {mission.distance_m != null && Number.isFinite(mission.distance_m)
+                ? `${(mission.distance_m / 1000).toFixed(1)} km`
+                : 'Chưa có dữ liệu'}
             </Text>
             <Text style={styles.metaLabel}>Khoảng cách</Text>
           </View>
@@ -327,8 +330,7 @@ export const MissionDetailScreen: React.FC = () => {
       {/* 3. LIÊN HỆ HIỆN TRƯỜNG */}
       <View style={styles.card}>
         <Text style={styles.cardSectionTitle}>LIÊN HỆ NẠN NHÂN / NGƯỜI BÁO TIN</Text>
-        {isLeader ? (
-          <>
+        <>
             {mission.reporter_contact_phone ? (
               <View style={styles.contactRow}>
                 <View>
@@ -340,9 +342,7 @@ export const MissionDetailScreen: React.FC = () => {
                   <Text style={styles.callBtnText}>Gọi điện</Text>
                 </TouchableOpacity>
               </View>
-            ) : (
-              <Text style={styles.noContactText}>Nạn nhân chưa để lại số điện thoại hoặc đã mất sóng.</Text>
-            )}
+            ) : null}
 
             {mission.alternate_contact ? (
               <View style={[styles.contactRow, { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderColor: THEME.colors.surface.border }]}>
@@ -361,23 +361,15 @@ export const MissionDetailScreen: React.FC = () => {
                 ) : null}
               </View>
             ) : null}
-          </>
-        ) : (
-          <View style={styles.privacyNoteBox}>
-            <Shield size={20} color={THEME.colors.primary.main} />
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.privacyNoteTitle}>Thông tin liên hệ được bảo mật</Text>
-              <Text style={styles.privacyNoteDesc}>
-                Số điện thoại người báo cứu hộ được bảo vệ quyền riêng tư và chỉ cung cấp cho Đội trưởng để liên lạc tác chiến trực tiếp.
-              </Text>
-            </View>
-          </View>
-        )}
+            {!mission.reporter_contact_phone && !mission.alternate_contact ? (
+              <Text style={styles.noContactText}>Hồ sơ hiện không có thông tin liên hệ được cung cấp.</Text>
+            ) : null}
+        </>
       </View>
 
-      {/* 4. CÁC NÚT HÀNH ĐỘNG VẬN HÀNH (THEO STATE MACHINE HOẶC VAI TRÒ THÀNH VIÊN) */}
-      {isLeader ? (
-        <View style={styles.actionSection}>
+      {/* Quyền thao tác được máy chủ kiểm tra theo trạng thái nhiệm vụ và thành viên hiện tại. */}
+      <View style={styles.actionSection}>
+          <Text style={styles.memberActionSub}>Quyền thao tác được kiểm tra khi gửi yêu cầu.</Text>
           {actionLoading && <ActivityIndicator size="small" color={THEME.colors.primary.main} style={{ marginBottom: 10 }} />}
 
           {/* Khi mới nhận (OFFERED) */}
@@ -411,7 +403,7 @@ export const MissionDetailScreen: React.FC = () => {
               disabled={actionLoading}
             >
               <Truck size={20} color="#FFFFFF" />
-              <Text style={styles.primaryActionText}>BẮT ĐẦU DI CHUYỂN (EN_ROUTE)</Text>
+              <Text style={styles.primaryActionText}>Bắt đầu di chuyển đến hiện trường</Text>
             </TouchableOpacity>
           )}
 
@@ -423,7 +415,7 @@ export const MissionDetailScreen: React.FC = () => {
               disabled={actionLoading}
             >
               <Flag size={20} color="#FFFFFF" />
-              <Text style={styles.primaryActionText}>ĐÃ ĐẾN HIỆN TRƯỜNG (ON_SCENE)</Text>
+              <Text style={styles.primaryActionText}>Xác nhận đã tiếp cận hiện trường</Text>
             </TouchableOpacity>
           )}
 
@@ -436,7 +428,7 @@ export const MissionDetailScreen: React.FC = () => {
                 disabled={actionLoading}
               >
                 <FileCheck size={20} color="#FFFFFF" />
-                <Text style={styles.primaryActionText}>HOÀN THÀNH CỨU NẠN THÀNH CÔNG</Text>
+                <Text style={styles.primaryActionText}>Báo cáo hoàn thành nhiệm vụ</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -447,32 +439,11 @@ export const MissionDetailScreen: React.FC = () => {
                 }}
                 disabled={actionLoading}
               >
-                <Text style={styles.failedBtnText}>Báo Trở Ngại Không Thể Tiếp Cận (FAILED)</Text>
+                <Text style={styles.failedBtnText}>Báo trở ngại không thể tiếp cận</Text>
               </TouchableOpacity>
             </View>
           )}
-        </View>
-      ) : (
-        <View style={styles.memberActionBanner}>
-          <View style={styles.memberActionHeader}>
-            <Shield size={18} color={THEME.colors.primary.main} />
-            <Text style={styles.memberActionTitle}>VAI TRÒ: THÀNH VIÊN TÁC CHIẾN ĐỘI</Text>
-          </View>
-          <Text style={styles.memberActionDesc}>
-            {mission.status === 'OFFERED' && '⏳ NHIỆM VỤ MỚI: Đang chờ Đội trưởng tiếp nhận điều động từ trung tâm.'}
-            {mission.status === 'ACCEPTED' && '🚀 ĐÃ TIẾP NHẬN: Đội trưởng đã nhận lệnh cứu hộ. Hãy chuẩn bị phương tiện cùng đội lên đường!'}
-            {mission.status === 'EN_ROUTE' && '🚚 ĐANG DI CHUYỂN: Đội đang trên đường tiếp cận mục tiêu. Mở bản đồ Google Maps bên trên để hành quân cùng đội.'}
-            {mission.status === 'ON_SCENE' && '🚩 ĐÃ ĐẾN HIỆN TRƯỜNG: Đã tiếp cận tọa độ nạn nhân. Triển khai phương án cứu nạn theo sự chỉ huy của Đội trưởng!'}
-            {mission.status === 'COMPLETED' && '✅ HOÀN TẤT XUẤT SẮC: Ca cứu hộ đã được Đội trưởng báo cáo hoàn thành thành công.'}
-            {mission.status === 'FAILED' && '⚠️ TẠM DỪNG TIẾP CẬN: Đội trưởng đã báo cáo trở ngại về trung tâm điều phối để xin chi viện.'}
-            {mission.status === 'DECLINED' && '⚪ TỪ CHỐI: Nhiệm vụ đã được Đội trưởng từ chối do ngoài khả năng tác chiến.'}
-            {mission.status === 'CANCELLED' && '⚪ ĐÃ HỦY: Ca cứu hộ đã bị trung tâm điều phối thu hồi.'}
-          </Text>
-          <Text style={styles.memberActionSub}>
-            * Quyền Tiếp nhận, Chuyển trạng thái và Báo cáo kết thúc ca cứu nạn do Đội trưởng điều hành.
-          </Text>
-        </View>
-      )}
+      </View>
 
       {/* MODAL HOÀN THÀNH NHIỆM VỤ */}
       <Modal visible={showCompleteModal} transparent={true} animationType="slide">

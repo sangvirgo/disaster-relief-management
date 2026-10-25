@@ -11,16 +11,17 @@ import {
   TextInput,
   Modal,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { ResponseApi } from '../../../api/responseApi';
+import { getApiErrorMessage } from '../../../api/client';
 import { MyRequestItem } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
 import {
   ClipboardList,
   ChevronRight,
-  PlusCircle,
   Clock,
   Link2,
   AlertCircle,
@@ -28,7 +29,7 @@ import {
 } from 'lucide-react-native';
 
 export const MyRequestsScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const router = useRouter();
   const [items, setItems] = useState<MyRequestItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -46,7 +47,7 @@ export const MyRequestsScreen: React.FC = () => {
       const result = await ResponseApi.getMyRequests();
       setItems(result.items || []);
     } catch (err: any) {
-      setErrorMsg(typeof err === 'string' ? err : 'Không thể tải danh sách yêu cầu. Vui lòng thử lại.');
+      setErrorMsg(getApiErrorMessage(err, 'Không thể tải danh sách yêu cầu. Vui lòng thử lại.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -54,6 +55,8 @@ export const MyRequestsScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // Initial loading is already true; this starts the initial request.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchMyRequests();
   }, [fetchMyRequests]);
 
@@ -83,7 +86,7 @@ export const MyRequestsScreen: React.FC = () => {
       setShowClaimModal(false);
       fetchMyRequests();
     } catch (err: any) {
-      Alert.alert('Lỗi', typeof err === 'string' ? err : 'Không thể gắn yêu cầu. Vui lòng kiểm tra lại mã và bí mật.');
+      Alert.alert('Lỗi', getApiErrorMessage(err, 'Không thể gắn yêu cầu. Vui lòng kiểm tra lại mã và bí mật.'));
     } finally {
       setIsClaiming(false);
     }
@@ -102,9 +105,9 @@ export const MyRequestsScreen: React.FC = () => {
       <TouchableOpacity
         style={styles.card}
         onPress={() =>
-          navigation.navigate('SOSTrackingScreen', {
+          router.push({ pathname: '/tracking', params: {
             trackingCode: item.tracking_code,
-          })
+          } })
         }
         activeOpacity={0.8}
       >
@@ -135,7 +138,7 @@ export const MyRequestsScreen: React.FC = () => {
       title="Yêu Cầu Cứu Trợ Của Tôi"
       subtitle="Danh sách các tin báo cứu nạn gắn với tài khoản của bạn"
       scrollable={false}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackOrHome(router)}
     >
       {/* Nút gắn yêu cầu ẩn danh vào tài khoản */}
       <TouchableOpacity
@@ -169,7 +172,7 @@ export const MyRequestsScreen: React.FC = () => {
           </Text>
           <TouchableOpacity
             style={styles.createSOSButton}
-            onPress={() => navigation.navigate('EmergencyHomeScreen')}
+            onPress={() => router.replace('/')}
             activeOpacity={0.85}
           >
             <Text style={styles.createSOSText}>GỬI YÊU CẦU CỨU NẠN NGAY</Text>

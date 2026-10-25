@@ -12,6 +12,8 @@ import {
   GeoLocation,
   ReporterEventPage,
   EvidenceDownload,
+  CollectionPage,
+  PublicCampaign,
 } from '../types/api';
 import { generateUUID } from '../utils/secureStore';
 
@@ -22,11 +24,11 @@ export const ResponseApi = {
   async createSelfSOS(
     payload: CreateSOSPayload,
     trackingSecret: string,
-    idempotencyKey?: string
+    idempotencyKey: string
   ): Promise<CreateSOSResponse> {
     const response = await apiClient.post<CreateSOSResponse>('/response/requests', payload, {
       headers: {
-        'Idempotency-Key': idempotencyKey || generateUUID(),
+        'Idempotency-Key': idempotencyKey,
         'X-Tracking-Secret': trackingSecret,
       },
     });
@@ -150,14 +152,11 @@ export const ResponseApi = {
   // === NHIỆM VỤ ĐỘI CỨU HỘ (MISSIONS) ===
 
   // Lấy danh sách nhiệm vụ phân công cho đội của tôi
-  async getMyMissions(limit = 50, cursor?: string): Promise<Mission[]> {
+  async getMyMissions(limit = 50, cursor?: string): Promise<CollectionPage<Mission>> {
     const params: Record<string, any> = { limit };
     if (cursor) params.cursor = cursor;
-    const response = await apiClient.get<{ items?: Mission[] } | Mission[]>('/response/missions/mine', { params });
-    if (Array.isArray(response.data)) {
-      return response.data;
-    }
-    return response.data.items || [];
+    const response = await apiClient.get<CollectionPage<Mission>>('/response/missions/mine', { params });
+    return response.data;
   },
 
   // Chi tiết nhiệm vụ cứu nạn
@@ -250,12 +249,11 @@ export const ResponseApi = {
   // === ĐỘI CỨU HỘ & TỌA ĐỘ GPS (TEAMS) ===
 
   // Lấy thông tin đội của tôi
-  async getMyTeams(): Promise<RescueTeam[]> {
-    const response = await apiClient.get<{ items?: RescueTeam[] } | RescueTeam[]>('/response/teams');
-    if (Array.isArray(response.data)) {
-      return response.data;
-    }
-    return response.data.items || [];
+  async getMyTeams(limit = 50, cursor?: string): Promise<CollectionPage<RescueTeam>> {
+    const response = await apiClient.get<CollectionPage<RescueTeam>>('/response/teams', {
+      params: { limit, ...(cursor ? { cursor } : {}) },
+    });
+    return response.data;
   },
 
   // Cập nhật vị trí di quân hiện tại của Đội cứu hộ (PUT /response/teams/:id/position)
@@ -293,6 +291,21 @@ export const ResponseApi = {
     );
   },
 
+  async confirmTeamReadiness(
+    teamId: string,
+    expectedVersion: number,
+    confirmationBasis: 'RADIO' | 'PHONE' | 'IN_PERSON' | 'OTHER',
+    reportedBy?: string,
+    idempotencyKey = generateUUID()
+  ): Promise<void> {
+    await apiClient.post(`/response/teams/${teamId}/ready`, {
+      expected_version: expectedVersion,
+      confirmation_basis: confirmationBasis,
+      ...(reportedBy?.trim() ? { reported_by: reportedBy.trim() } : {}),
+      occurred_at: new Date().toISOString(),
+    }, { headers: { 'Idempotency-Key': idempotencyKey } });
+  },
+
   // === THÔNG BÁO ĐIỀU PHỐI (NOTICES) & CHIẾN DỊCH (CAMPAIGNS) ===
 
   // Lấy danh sách thông báo điều phối khẩn cho tài khoản đã đăng nhập (GET /response/notices)
@@ -318,12 +331,21 @@ export const ResponseApi = {
   },
 
   // Lấy danh sách chiến dịch cứu trợ mở công khai (GET /response/public/campaigns)
-  async getPublicCampaigns(limit = 50, cursor?: string): Promise<{ items: any[]; more: boolean }> {
+  async getPublicCampaigns(limit = 50, cursor?: string): Promise<CollectionPage<PublicCampaign>> {
     const params: Record<string, any> = { limit };
     if (cursor) params.cursor = cursor;
-    const response = await apiClient.get<{ items: any[]; more: boolean }>('/response/public/campaigns', {
+    const response = await apiClient.get<CollectionPage<PublicCampaign>>('/response/public/campaigns', {
       params,
     });
+    return response.data;
+  },
+
+  async recoverRequest(trackingCode: string, recoveryCode: string, idempotencyKey = generateUUID()): Promise<{ id: string; tracking_code: string }> {
+    const response = await apiClient.post<{ id: string; tracking_code: string }>(
+      '/response/requests/recover',
+      { tracking_code: trackingCode.trim().toUpperCase() },
+      { headers: { 'Idempotency-Key': idempotencyKey, 'X-Recovery-Code': recoveryCode.trim() } }
+    );
     return response.data;
   },
 

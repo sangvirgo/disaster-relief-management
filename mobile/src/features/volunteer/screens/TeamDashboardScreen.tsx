@@ -9,11 +9,13 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
 import { useAuthStore } from '../../../store/authStore';
 import { useLocation } from '../../../hooks/useLocation';
 import { ResponseApi } from '../../../api/responseApi';
+import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { RescueTeamDetail, Mission } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
 import { RESCUE_TEAM_KIND_LABELS, RESCUE_SKILL_LABELS } from '../../../constants/labels';
@@ -38,35 +40,33 @@ import {
 } from 'lucide-react-native';
 
 export const TeamDashboardScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
-  const { user, logout, getUserRoleName } = useAuthStore();
+  const router = useRouter();
+  const { user, logout } = useAuthStore();
   const { location, refreshLocation } = useLocation();
 
   const [team, setTeam] = useState<RescueTeamDetail | null>(null);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isUpdatingPosition, setIsUpdatingPosition] = useState<boolean>(false);
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
-  const [isLeader, setIsLeader] = useState<boolean>(true);
+  const [showUserIdModal, setShowUserIdModal] = useState<boolean>(false);
 
   const loadTeamData = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const [teamsData, missionsData] = await Promise.all([
-        ResponseApi.getMyTeams().catch(() => []),
-        ResponseApi.getMyMissions().catch(() => []),
+      const [teamsPage, missionsPage] = await Promise.all([
+        ResponseApi.getMyTeams(),
+        ResponseApi.getMyMissions(),
       ]);
+      const teamsData = teamsPage.items;
+      const missionsData = missionsPage.items;
 
       if (teamsData.length > 0) {
         const firstTeam = teamsData[0];
         setTeam(firstTeam);
         setIsAvailable(firstTeam.availability === 'AVAILABLE');
-
-        // Nhận diện vai trò Đội trưởng hay Thành viên dựa trên việc backend có trả về số điện thoại riêng tư nạn nhân
-        if (missionsData.length > 0) {
-          const leaderDetected = missionsData.some((m) => 'reporter_contact_phone' in m);
-          setIsLeader(leaderDetected);
-        }
 
         // Lấy chi tiết kỹ năng và cấu hình đội từ GET /response/teams/:id
         try {
@@ -82,13 +82,15 @@ export const TeamDashboardScreen: React.FC = () => {
       }
       setMissions(missionsData);
     } catch (e) {
-      console.warn('Lỗi tải dữ liệu đội cứu hộ:', e);
+      setLoadError(getApiErrorMessage(e, 'Không thể tải thông tin đội và nhiệm vụ. Vui lòng thử lại.'));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    // Initial loading is already true; this starts the initial request.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadTeamData();
   }, []);
 
@@ -100,7 +102,7 @@ export const TeamDashboardScreen: React.FC = () => {
     try {
       await ResponseApi.updateTeamAvailability(
         team.id,
-        team.version || 1,
+        team.version,
         nextValue ? 'AVAILABLE' : 'UNAVAILABLE'
       );
       setTeam((prev) =>
@@ -108,24 +110,21 @@ export const TeamDashboardScreen: React.FC = () => {
           ? {
               ...prev,
               availability: nextValue ? 'AVAILABLE' : 'UNAVAILABLE',
-              version: (prev.version || 1) + 1,
+              version: prev.version + 1,
             }
           : null
       );
     } catch (err: any) {
       setIsAvailable(prevValue);
-      // Nếu bị backend chặn vì không phải LEADER
-      const errMsg = typeof err === 'string' ? err : err?.message || '';
-      if (errMsg.includes('403') || errMsg.includes('FORBIDDEN') || errMsg.includes('LEADER')) {
-        setIsLeader(false);
+      if (isApiErrorCode(err, 'FORBIDDEN')) {
         Alert.alert(
-          'Quyền hạn đội trưởng',
-          'Chỉ Đội trưởng cứu hộ mới có quyền bật/tắt trạng thái sẵn sàng nhận lệnh của đội.'
+          'Chưa được phép cập nhật',
+          'Backend chỉ cho phép đội trưởng đang hoạt động hoặc điều phối viên có thẩm quyền cập nhật trạng thái đội.'
         );
       } else {
         Alert.alert(
           'Lỗi cập nhật trạng thái',
-          typeof err === 'string' ? err : 'Không thể cập nhật trạng thái sẵn sàng của đội.'
+          getApiErrorMessage(err, 'Không thể cập nhật trạng thái sẵn sàng của đội.')
         );
       }
     }
@@ -144,15 +143,13 @@ export const TeamDashboardScreen: React.FC = () => {
       await ResponseApi.updateTeamPosition(team.id, location);
       Alert.alert('Thành công', 'Đã phát tín hiệu tọa độ hiện tại của đội cứu trợ lên bản đồ điều phối.');
     } catch (err: any) {
-      const errMsg = typeof err === 'string' ? err : err?.message || '';
-      if (errMsg.includes('403') || errMsg.includes('FORBIDDEN')) {
-        setIsLeader(false);
+      if (isApiErrorCode(err, 'FORBIDDEN')) {
         Alert.alert(
-          'Quyền hạn đội trưởng',
-          'Chỉ Đội trưởng cứu hộ mới có quyền phát tín hiệu tọa độ GPS di quân của đội.'
+          'Chưa được phép cập nhật',
+          'Backend chỉ cho phép đội trưởng đang hoạt động hoặc điều phối viên có thẩm quyền cập nhật vị trí đội.'
         );
       } else {
-        Alert.alert('Lỗi cập nhật', typeof err === 'string' ? err : 'Không thể cập nhật vị trí.');
+        Alert.alert('Lỗi cập nhật', getApiErrorMessage(err, 'Không thể cập nhật vị trí.'));
       }
     } finally {
       setIsUpdatingPosition(false);
@@ -161,11 +158,7 @@ export const TeamDashboardScreen: React.FC = () => {
 
   const handleCopyUserId = () => {
     if (!user?.id) return;
-    Alert.alert(
-      'Mã ID Tình Nguyện Viên',
-      `Mã tài khoản của bạn:\n\n${user.id}\n\nHãy gửi mã này cho Đội trưởng Đội cứu nạn hoặc Ban chỉ huy PCTT để được thêm vào đội cứu hộ cơ động.`,
-      [{ text: 'Đã sao chép/Ghi nhớ' }]
-    );
+    setShowUserIdModal(true);
   };
 
   const handleLogout = async () => {
@@ -176,7 +169,7 @@ export const TeamDashboardScreen: React.FC = () => {
         style: 'destructive',
         onPress: async () => {
           await logout();
-          navigation.replace('EmergencyHomeScreen');
+          router.replace('/');
         },
       },
     ]);
@@ -188,6 +181,19 @@ export const TeamDashboardScreen: React.FC = () => {
         <View style={styles.centerLoading}>
           <ActivityIndicator size="large" color={THEME.colors.primary.main} />
           <Text style={styles.loadingText}>Đang tải thông tin lực lượng cứu trợ...</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <ScreenContainer title="Bảng Tác Chiến Đội Cứu Hộ">
+        <View style={styles.centerLoading}>
+          <Text style={styles.loadingText}>{loadError}</Text>
+          <TouchableOpacity style={styles.viewMissionsBtn} onPress={loadTeamData}>
+            <Text style={styles.viewMissionsText}>Thử tải lại</Text>
+          </TouchableOpacity>
         </View>
       </ScreenContainer>
     );
@@ -270,7 +276,7 @@ export const TeamDashboardScreen: React.FC = () => {
             {/* Mục 1: Khai báo quyên góp & Hỗ trợ nhu yếu phẩm */}
             <TouchableOpacity
               style={styles.activityItem}
-              onPress={() => navigation.navigate('DonationScreen')}
+              onPress={() => router.push('/donations')}
               activeOpacity={0.85}
             >
               <View style={[styles.activityIconBox, { backgroundColor: '#ECFDF5' }]}>
@@ -288,7 +294,7 @@ export const TeamDashboardScreen: React.FC = () => {
             {/* Mục 2: Tra cứu chiến dịch cứu trợ mở */}
             <TouchableOpacity
               style={styles.activityItem}
-              onPress={() => navigation.navigate('CampaignsScreen')}
+              onPress={() => router.push('/campaigns')}
               activeOpacity={0.85}
             >
               <View style={[styles.activityIconBox, { backgroundColor: '#EFF6FF' }]}>
@@ -306,7 +312,7 @@ export const TeamDashboardScreen: React.FC = () => {
             {/* Mục 3: Bản tin điều phối & Cảnh báo khẩn */}
             <TouchableOpacity
               style={styles.activityItem}
-              onPress={() => navigation.navigate('NoticesScreen')}
+              onPress={() => router.push('/notices')}
               activeOpacity={0.85}
             >
               <View style={[styles.activityIconBox, { backgroundColor: '#FEF3C7' }]}>
@@ -335,7 +341,7 @@ export const TeamDashboardScreen: React.FC = () => {
 
   return (
     <ScreenContainer
-      title={isLeader ? 'Bảng Điều Khiển Đội Trưởng' : 'Bảng Tác Chiến Đội Cứu Hộ'}
+      title="Bảng Tác Chiến Đội Cứu Hộ"
       subtitle={`Xin chào, ${user?.display_name || user?.username || 'Đồng chí'}`}
       headerRight={
         <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
@@ -358,21 +364,21 @@ export const TeamDashboardScreen: React.FC = () => {
                 <View
                   style={[
                     styles.roleBadge,
-                    isLeader ? styles.roleBadgeLeader : styles.roleBadgeMember,
+                    styles.roleBadgeMember,
                   ]}
                 >
                   <Text
                     style={[
                       styles.roleBadgeText,
-                      isLeader ? styles.roleBadgeTextLeader : styles.roleBadgeTextMember,
+                      styles.roleBadgeTextMember,
                     ]}
                   >
-                    {isLeader ? '⭐ Đội Trưởng Cứu Hộ' : '🛡️ Thành Viên Tác Chiến'}
+                    Đội cứu hộ
                   </Text>
                 </View>
               </View>
               <Text style={styles.teamKind}>
-                Lực lượng: {RESCUE_TEAM_KIND_LABELS[team.team_kind || team.kind || 'VOLUNTEER']}
+                Lực lượng: {RESCUE_TEAM_KIND_LABELS[team.kind] || 'Lực lượng cứu hộ'}
               </Text>
             </View>
           </View>
@@ -386,13 +392,9 @@ export const TeamDashboardScreen: React.FC = () => {
               </View>
               <View style={styles.skillsList}>
                 {team.skills.map((skillItem, idx) => {
-                  const code = typeof skillItem === 'string' ? skillItem : skillItem.code;
-                  const label =
-                    typeof skillItem === 'string'
-                      ? RESCUE_SKILL_LABELS[code] || code
-                      : skillItem.name || RESCUE_SKILL_LABELS[code] || code;
+                  const label = RESCUE_SKILL_LABELS[skillItem] || 'Kỹ năng chuyên môn khác';
                   return (
-                    <View key={idx} style={styles.skillChip}>
+                    <View key={`${skillItem}-${idx}`} style={styles.skillChip}>
                       <Text style={styles.skillChipText}>{label}</Text>
                     </View>
                   );
@@ -410,38 +412,17 @@ export const TeamDashboardScreen: React.FC = () => {
               </Text>
             </View>
 
-            {/* Đội trưởng có công tắc chuyển trạng thái, Thành viên chỉ xem trạng thái tĩnh */}
-            {isLeader ? (
-              <Switch
-                value={isAvailable}
-                onValueChange={handleToggleAvailability}
-                trackColor={{ false: '#CBD5E1', true: THEME.colors.success.light }}
-                thumbColor={isAvailable ? THEME.colors.success.main : '#FFFFFF'}
-              />
-            ) : (
-              <View
-                style={[
-                  styles.statusTagReadonly,
-                  { backgroundColor: isAvailable ? THEME.colors.success.bg : '#F1F5F9' },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statusTagTextReadonly,
-                    { color: isAvailable ? THEME.colors.success.dark : THEME.colors.text.secondary },
-                  ]}
-                >
-                  {isAvailable ? '🟢 Sẵn Sàng' : '⚪ Tạm Dừng'}
-                </Text>
-              </View>
-            )}
+            <Switch
+              value={isAvailable}
+              onValueChange={handleToggleAvailability}
+              trackColor={{ false: '#CBD5E1', true: THEME.colors.success.light }}
+              thumbColor={isAvailable ? THEME.colors.success.main : '#FFFFFF'}
+            />
           </View>
 
-          {!isLeader && (
-            <Text style={styles.memberNote}>
-              * Quyền bật/tắt trực chiến của đội do Đội trưởng điều hành.
-            </Text>
-          )}
+          <Text style={styles.memberNote}>
+            Quyền thay đổi trạng thái được kiểm tra theo vai trò và trạng thái thành viên hiện tại.
+          </Text>
         </View>
 
         {/* 2. TỌA ĐỘ VỊ TRÍ DI QUÂN CỦA ĐỘI */}
@@ -451,13 +432,10 @@ export const TeamDashboardScreen: React.FC = () => {
             <Text style={styles.cardTitle}>TỌA ĐỘ VỊ TRÍ DI QUÂN CỦA ĐỘI</Text>
           </View>
           <Text style={styles.cardDesc}>
-            {isLeader
-              ? 'Đội trưởng định kỳ phát tín hiệu GPS để trung tâm điều phối tìm kiếm và chỉ định các ca cứu nạn gần nhất.'
-              : 'Tọa độ vị trí di quân chính thức của đội do Đội trưởng định kỳ phát sóng lên bản đồ điều phối tác chiến.'}
+            Vị trí đội được cập nhật từ GPS của thiết bị và được kiểm tra theo quyền hiện tại.
           </Text>
 
-          {isLeader ? (
-            <TouchableOpacity
+          <TouchableOpacity
               style={[styles.beaconButton, isUpdatingPosition && { opacity: 0.7 }]}
               onPress={handleBroadcastPosition}
               disabled={isUpdatingPosition}
@@ -471,17 +449,10 @@ export const TeamDashboardScreen: React.FC = () => {
                   <Text style={styles.beaconButtonText}>Phát Tín Hiệu Vị Trí Hiện Tại</Text>
                 </>
               )}
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.teamPositionSyncedBox}>
-              <Radio size={18} color={THEME.colors.success.main} />
-              <Text style={styles.teamPositionSyncedText}>
-                {location
-                  ? `Vị trí thiết bị: ${location.coordinates[1].toFixed(5)}, ${location.coordinates[0].toFixed(5)}`
-                  : 'Đang duy trì kết nối GPS cùng chỉ huy đội.'}
-              </Text>
-            </View>
-          )}
+          </TouchableOpacity>
+          {team.position?.age_s != null ? (
+            <Text style={styles.memberNote}>Lần cập nhật vị trí gần nhất: {team.position.age_s} giây trước.</Text>
+          ) : null}
         </View>
 
         {/* 3. THỐNG KÊ NHIỆM VỤ ĐƯỢC GIAO */}
@@ -513,7 +484,7 @@ export const TeamDashboardScreen: React.FC = () => {
 
           <TouchableOpacity
             style={styles.viewMissionsBtn}
-            onPress={() => navigation.navigate('MissionListScreen')}
+            onPress={() => router.push('/missions')}
             activeOpacity={0.85}
           >
             <Text style={styles.viewMissionsText}>Mở Danh Sách Nhiệm Vụ Phối Hợp</Text>
@@ -521,6 +492,18 @@ export const TeamDashboardScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      {showUserIdModal && user?.id ? (
+        <CopyableInfoModal
+          visible
+          title="Mã ID tình nguyện viên"
+          description="Dùng mã tài khoản này để Đội trưởng đội cứu nạn hoặc Ban chỉ huy PCTT ghi danh bạn vào đội cứu hộ cơ động."
+          helperText="Chỉ chia sẻ mã này với đơn vị có thẩm quyền ghi danh tình nguyện viên."
+          credentials={[
+            { key: 'volunteer-account-id', label: 'Mã tài khoản', value: user.id },
+          ]}
+          onClose={() => setShowUserIdModal(false)}
+        />
+      ) : null}
     </ScreenContainer>
   );
 };

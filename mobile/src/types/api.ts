@@ -30,8 +30,15 @@ export interface NativeLoginResponse {
 export interface ApiErrorEnvelope {
   code: string;
   message: string;
-  field_errors?: Record<string, string>;
+  field_errors?: Record<string, string | string[]>;
   correlation_id?: string;
+}
+
+export interface CollectionPage<T> {
+  items: T[];
+  more: boolean;
+  cursor?: string;
+  generated_at?: string;
 }
 
 export type IncidentCategoryCode =
@@ -145,7 +152,7 @@ export interface Mission {
   request_id: string;
   team_id?: string;
   team?: { id: string; name: string };
-  version?: number;
+  version: number;
   work_cycle?: number;
   status: MissionStatus;
   category: IncidentCategoryCode;
@@ -161,19 +168,18 @@ export interface Mission {
     phone?: string;
   } | null;
   created_at: string;
-  distance_m?: number;
+  distance_m?: number | null;
 }
 
 export interface RescueTeam {
   id: string;
   name: string;
-  version?: number;
+  version: number;
   availability: 'AVAILABLE' | 'UNAVAILABLE';
-  team_kind?: 'VOLUNTEER' | 'MILITARY' | 'GOVERNMENT' | 'OTHER';
-  kind?: 'VOLUNTEER' | 'MILITARY' | 'GOVERNMENT' | 'OTHER';
+  status: 'ACTIVE' | 'INACTIVE';
+  kind: 'VOLUNTEER' | 'MILITARY' | 'GOVERNMENT' | 'OTHER';
   reporting_mode: 'APP' | 'COORDINATOR';
-  operating_region_code?: string;
-  skills: Array<string | { id: string; code: string; name: string }>;
+  skills: string[];
   position?: {
     location?: GeoLocation;
     age_s?: number;
@@ -195,10 +201,11 @@ export interface NoticeItem {
 export interface PublicCampaign {
   id: string;
   title: string;
-  description?: string;
-  status: string;
-  region_code?: string;
-  created_at: string;
+  objective?: string | null;
+  status: 'ACTIVE' | 'PAUSED';
+  region_name?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
 }
 
 // ==================== LOGISTICS (DONATIONS) ====================
@@ -230,11 +237,13 @@ export interface DonationDrive {
       coordinates: [number, number];
     } | null;
   };
-  opens_at?: string;
-  closes_at?: string;
-  status: 'DRAFT' | 'OPEN' | 'PAUSED' | 'CLOSED';
+  opens_at?: string | null;
+  closes_at?: string | null;
+  status: 'OPEN';
+  campaign_status?: 'ACTIVE' | 'PAUSED' | 'CLOSED' | null;
   items: DonationDriveItem[];
-  created_at?: string;
+  accepted_total?: string;
+  generated_at?: string;
 }
 
 export interface DonationDeclarationPayload {
@@ -266,21 +275,21 @@ export interface DonationTrackingDetail {
       item_id?: string;
       item_name?: string;
       unit_name?: string;
-      declared_quantity?: string | number;
-      counted_quantity?: string | number;
-      accepted_quantity?: string | number;
-      held_quantity?: string | number;
-      rejected_quantity?: string | number;
+      declared_quantity?: string;
+      counted_quantity?: string;
+      accepted_quantity?: string;
+      held_quantity?: string;
+      rejected_quantity?: string;
       condition_note?: string | null;
     }[];
   } | null;
-  disputes?: Array<{
+  disputes?: {
     id: string;
     status: string;
     reason: string;
     opened_at: string;
     resolution_note?: string | null;
-  }>;
+  }[];
 }
 
 // Bằng chứng đa phương tiện (Ảnh / Video)
@@ -339,7 +348,4 @@ export interface ReviseDonationDeclarationPayload {
 }
 
 // Chi tiết mở rộng của Đội cứu hộ
-export interface RescueTeamDetail extends RescueTeam {
-  readiness_required?: boolean;
-  organization_id?: string;
-}
+export type RescueTeamDetail = RescueTeam;
