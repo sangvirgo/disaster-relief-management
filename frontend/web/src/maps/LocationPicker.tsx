@@ -2,38 +2,64 @@ import { useEffect, useRef, useState } from 'react';
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { maplibreGL } from '@maplibre/maplibre-gl-leaflet';
+import { setWorkerUrl } from 'maplibre-gl';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+import 'maplibre-gl/dist/maplibre-gl.css';
+
+setWorkerUrl(workerUrl);
 
 export type Point = { longitude: number; latitude: number };
+type SearchPlace = { id: string; name: string; address: string; point: Point };
+
+function photonPlaces(value: unknown): SearchPlace[] {
+  if (!value || typeof value !== 'object' || !('features' in value) || !Array.isArray(value.features))
+    return [];
+  return value.features.flatMap((feature: unknown) => {
+    if (!feature || typeof feature !== 'object' || !('geometry' in feature) || !('properties' in feature))
+      return [];
+    const { geometry, properties } = feature as {
+      geometry?: { coordinates?: unknown };
+      properties?: Record<string, unknown>;
+    };
+    const coordinates = geometry?.coordinates;
+    if (!Array.isArray(coordinates) || coordinates.length < 2) return [];
+    const [longitude, latitude] = coordinates;
+    if (
+      typeof longitude !== 'number' || typeof latitude !== 'number' ||
+      !Number.isFinite(longitude) || !Number.isFinite(latitude) ||
+      Math.abs(longitude) > 180 || Math.abs(latitude) > 90
+    ) return [];
+    const field = (key: string) =>
+      typeof properties?.[key] === 'string' ? String(properties[key]).trim() : '';
+    if (field('countrycode').toUpperCase() !== 'VN') return [];
+    const name = field('name') || field('street') || 'Địa điểm chưa có tên';
+    const address = [...new Set([
+      field('housenumber'), field('street'), field('locality'), field('district'), field('city'),
+    ].filter(Boolean))].join(', ');
+    return [{
+      id: `${field('osm_type')}-${String(properties?.osm_id ?? '')}-${longitude}-${latitude}`,
+      name, address, point: { longitude, latitude },
+    }];
+  });
+}
 
 const envApiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() || '';
+const tileUrl = (import.meta.env.VITE_OSM_TILE_URL as string | undefined)?.trim()
+  || '';
+const mapStyleUrl = (import.meta.env.VITE_OPENFREEMAP_STYLE_URL as string | undefined)?.trim()
+  || 'https://tiles.openfreemap.org/styles/liberty';
+const tileAttribution = (import.meta.env.VITE_OSM_TILE_ATTRIBUTION as string | undefined)?.trim()
+  || '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
-// Biểu tượng ghim đỏ khẩn cấp của Reliva, không phụ thuộc vào ảnh tĩnh.
-const redPinIcon = L.divIcon({
-  className: 'c48-leaflet-marker',
-  html: `
-    <div style="
-      background-color: #DC2626;
-      width: 26px;
-      height: 26px;
-      border-radius: 50% 50% 50% 0;
-      transform: rotate(-45deg);
-      border: 2px solid #FFFFFF;
-      box-shadow: 0 4px 10px rgba(220, 38, 38, 0.45);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    ">
-      <div style="
-        width: 8px;
-        height: 8px;
-        background-color: #FFFFFF;
-        border-radius: 50%;
-      "></div>
-    </div>
-  `,
-  iconSize: [26, 26],
-  iconAnchor: [13, 26],
-});
+function pointLabel(point: Point) {
+  return `${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}`;
+}
+
+function samePoint(a: Point, b: Point) {
+  return Math.abs(a.latitude - b.latitude) < 0.000001 &&
+    Math.abs(a.longitude - b.longitude) < 0.000001;
+}
 
 export function LocationPicker({
   value,
@@ -51,7 +77,10 @@ export function LocationPicker({
   // Leaflet refs
   const leafletContainerRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<L.Map | null>(null);
-  const leafletMarkerRef = useRef<L.Marker | null>(null);
+  const chosenSearchRef = useRef<{ point: Point; label: string } | null>(null);
+  const confirmedPointRef = useRef<Point | null>(value);
+  const reverseAbortRef = useRef<AbortController | null>(null);
+  const suppressMoveRef = useRef(false);
 
   // Google Maps refs
   const googleContainerRef = useRef<HTMLDivElement>(null);
@@ -61,23 +90,27 @@ export function LocationPicker({
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
 
-  // Search state for OpenStreetMap / Nominatim
+  // Photon uses the same OSM search index as the current Mobile picker.
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
-  const [suggestions, setSuggestions] = useState<
-    Array<{ display_name: string; lat: string; lon: string }>
-  >([]);
+  const [suggestions, setSuggestions] = useState<SearchPlace[]>([]);
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const searchOnTypingRef = useRef(false);
   const [selectedAddress, setSelectedAddress] = useState('');
+  const [draftPoint, setDraftPoint] = useState<Point | null>(null);
+  const [moving, setMoving] = useState(false);
+  const [pinDropKey, setPinDropKey] = useState(0);
+  const [tileError, setTileError] = useState(false);
   const [error, setError] = useState('');
 
-  // 1. Khởi tạo / cập nhật bản đồ OpenStreetMap (Leaflet)
+  // The pin is fixed over the map center. Moving the map changes the draft point.
   useEffect(() => {
     if (!open || mapEngine !== 'osm' || !leafletContainerRef.current) return;
 
     const initialCenter: [number, number] = value
       ? [value.latitude, value.longitude]
       : [16.1, 107.7];
-    const initialZoom = value ? 16 : 6;
+    const initialZoom = value ? 17 : 6;
 
     const map = L.map(leafletContainerRef.current, {
       center: initialCenter,
@@ -86,27 +119,51 @@ export function LocationPicker({
     });
     leafletMapRef.current = map;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19,
-    }).addTo(map);
-
-    let marker: L.Marker | null = null;
-    if (value) {
-      marker = L.marker([value.latitude, value.longitude], { icon: redPinIcon }).addTo(map);
-      leafletMarkerRef.current = marker;
-      setSelectedAddress(`Đã ghim: ${value.latitude.toFixed(6)}, ${value.longitude.toFixed(6)}`);
+    setTileError(false);
+    if (tileUrl) {
+      const tiles = L.tileLayer(tileUrl, {
+        attribution: tileAttribution,
+        maxZoom: 19,
+      });
+      tiles.on('tileerror', () => setTileError(true));
+      tiles.on('tileload', () => setTileError(false));
+      tiles.addTo(map);
+    } else {
+      const vectorLayer = maplibreGL({ style: mapStyleUrl }).addTo(map);
+      const vectorMap = vectorLayer.getMaplibreMap();
+      vectorMap.on('load', () => setTileError(false));
+      vectorMap.on('error', () => setTileError(true));
     }
 
+    if (value) {
+      setDraftPoint(value);
+      setSelectedAddress('Đã có vị trí. Kéo bản đồ nếu cần chỉnh lại.');
+    }
+
+    let frame = 0;
+    const updateCenter = () => {
+      if (suppressMoveRef.current || frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const center = map.getCenter();
+        const point = { latitude: center.lat, longitude: center.lng };
+        setDraftPoint(point);
+        setSelectedAddress('Đã chỉnh vị trí. Hãy xác nhận địa chỉ.');
+        if (confirmedPointRef.current && !samePoint(point, confirmedPointRef.current)) {
+          confirmedPointRef.current = null;
+          selectRef.current(null);
+        }
+        reverseAbortRef.current?.abort();
+      });
+    };
+    map.on('movestart', () => setMoving(true));
+    map.on('move', updateCenter);
+    map.on('moveend', () => {
+      setMoving(false);
+      updateCenter();
+    });
     map.on('click', (event: L.LeafletMouseEvent) => {
-      const { lat, lng } = event.latlng;
-      if (leafletMarkerRef.current) {
-        leafletMarkerRef.current.setLatLng([lat, lng]);
-      } else {
-        leafletMarkerRef.current = L.marker([lat, lng], { icon: redPinIcon }).addTo(map);
-      }
-      setSelectedAddress(`Đã chọn điểm trên bản đồ (${lat.toFixed(6)}, ${lng.toFixed(6)})`);
-      selectRef.current({ latitude: lat, longitude: lng });
+      map.setView(event.latlng, map.getZoom(), { animate: false });
     });
 
     // Ép Leaflet render lại kích thước sau khi container xuất hiện
@@ -115,24 +172,21 @@ export function LocationPicker({
     }, 200);
 
     return () => {
+      cancelAnimationFrame(frame);
       map.remove();
       leafletMapRef.current = null;
-      leafletMarkerRef.current = null;
     };
   }, [open, mapEngine]);
 
-  // Cập nhật vị trí marker khi value từ ngoài đổi
+  // Recenter when coordinates are edited outside the picker.
   useEffect(() => {
     if (mapEngine === 'osm' && value && leafletMapRef.current) {
       const { latitude, longitude } = value;
-      leafletMapRef.current.panTo([latitude, longitude]);
-      if (leafletMarkerRef.current) {
-        leafletMarkerRef.current.setLatLng([latitude, longitude]);
-      } else {
-        leafletMarkerRef.current = L.marker([latitude, longitude], { icon: redPinIcon }).addTo(
-          leafletMapRef.current
-        );
-      }
+      suppressMoveRef.current = true;
+      leafletMapRef.current.setView([latitude, longitude], Math.max(leafletMapRef.current.getZoom(), 17), { animate: false });
+      suppressMoveRef.current = false;
+      setDraftPoint(value);
+      confirmedPointRef.current = value;
     }
   }, [value?.latitude, value?.longitude, mapEngine]);
 
@@ -141,7 +195,10 @@ export function LocationPicker({
     if (!open || mapEngine !== 'google' || !activeGoogleKey || !googleContainerRef.current) return;
 
     let active = true;
-    let listener: google.maps.MapsEventListener | undefined;
+    let clickListener: google.maps.MapsEventListener | undefined;
+    let moveListener: google.maps.MapsEventListener | undefined;
+    let moveStartListener: google.maps.MapsEventListener | undefined;
+    let moveEndListener: google.maps.MapsEventListener | undefined;
     let autocomplete: google.maps.places.PlaceAutocompleteElement | undefined;
 
     async function initGoogle() {
@@ -165,14 +222,24 @@ export function LocationPicker({
         });
         googleMapRef.current = map;
 
-        listener = map.addListener('click', (event: google.maps.MapMouseEvent) => {
+        moveStartListener = map.addListener('dragstart', () => setMoving(true));
+        moveListener = map.addListener('center_changed', () => {
+          if (suppressMoveRef.current) return;
+          const center = map.getCenter();
+          if (!center) return;
+          const point = { latitude: center.lat(), longitude: center.lng() };
+          setDraftPoint(point);
+          setSelectedAddress('Đã chỉnh vị trí. Hãy xác nhận địa chỉ.');
+          if (confirmedPointRef.current && !samePoint(point, confirmedPointRef.current)) {
+            confirmedPointRef.current = null;
+            selectRef.current(null);
+          }
+          reverseAbortRef.current?.abort();
+        });
+        moveEndListener = map.addListener('idle', () => setMoving(false));
+        clickListener = map.addListener('click', (event: google.maps.MapMouseEvent) => {
           if (!event.latLng) return;
-          const point = { latitude: event.latLng.lat(), longitude: event.latLng.lng() };
           map.panTo(event.latLng);
-          setSelectedAddress(
-            `Đã chọn điểm trên Google Maps (${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)})`
-          );
-          selectRef.current(point);
         });
 
         if (googleSearchRef.current) {
@@ -188,15 +255,18 @@ export function LocationPicker({
               ).placePrediction.toPlace();
               await place.fetchFields({ fields: ['formattedAddress', 'location', 'viewport'] });
               if (!active || !place.location) return;
-              if (place.viewport) map.fitBounds(place.viewport);
-              else {
-                map.setCenter(place.location);
-                map.setZoom(17);
-              }
+              suppressMoveRef.current = true;
+              map.setCenter(place.location);
+              map.setZoom(17);
+              suppressMoveRef.current = false;
               const lat = place.location.lat();
               const lng = place.location.lng();
-              setSelectedAddress(`Đã tìm thấy ${place.formattedAddress || 'địa điểm'}`);
-              selectRef.current({ latitude: lat, longitude: lng });
+              const point = { latitude: lat, longitude: lng };
+              setSelectedAddress(place.formattedAddress || 'Đã chọn địa điểm. Hãy xác nhận địa chỉ.');
+              setDraftPoint(point);
+              chosenSearchRef.current = { point, label: place.formattedAddress || pointLabel(point) };
+              confirmedPointRef.current = null;
+              selectRef.current(null);
             } catch {
               if (active)
                 setError('Không thể lấy tọa độ địa điểm này. Hãy chạm điểm trực tiếp trên bản đồ.');
@@ -219,82 +289,122 @@ export function LocationPicker({
 
     return () => {
       active = false;
-      listener?.remove();
+      clickListener?.remove();
+      moveListener?.remove();
+      moveStartListener?.remove();
+      moveEndListener?.remove();
       autocomplete?.remove();
       googleMapRef.current = null;
     };
   }, [open, mapEngine, activeGoogleKey]);
 
-  // Tìm kiếm địa chỉ với OpenStreetMap (Nominatim API miễn phí tiếng Việt)
-  async function searchOsm(e?: React.SyntheticEvent) {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
+  // Debounce public Photon requests and ignore responses from superseded text.
+  useEffect(() => {
+    if (!open || mapEngine !== 'osm' || !searchOnTypingRef.current) return;
+    const query = searchQuery.trim();
+    if (query.length < 3) {
+      setSuggestions([]);
+      setSearching(false);
+      return;
     }
-    if (!searchQuery.trim()) return;
+    const timer = window.setTimeout(() => void searchPlaces(query), 450);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery, open, mapEngine]);
+
+  async function searchPlaces(query: string) {
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
     setSearching(true);
+    setSuggestions([]);
     setError('');
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery.trim())}&countrycodes=vn&limit=5`,
-        {
-          headers: { 'Accept-Language': 'vi' },
-        }
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10&countrycode=VN`,
+        { signal: controller.signal }
       );
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        setSuggestions(data);
+      if (!res.ok) throw new Error('PLACE_SEARCH_FAILED');
+      const places = photonPlaces(await res.json());
+      if (controller.signal.aborted) return;
+      if (places.length > 0) {
+        setSuggestions(places);
       } else {
         setSuggestions([]);
-        setError(
-          'Không tìm thấy địa điểm phù hợp tại Việt Nam. Bạn có thể zoom và chạm trực tiếp trên bản đồ.'
-        );
+        setError('Không tìm thấy địa điểm phù hợp. Hãy thử tên khác hoặc kéo bản đồ đến nơi cần hỗ trợ.');
       }
     } catch {
-      setError('Lỗi kết nối tra cứu địa chỉ. Bạn có thể kéo bản đồ và chạm điểm cần chọn.');
+      if (!controller.signal.aborted)
+        setError('Không thể tìm địa điểm lúc này. Bạn có thể kéo bản đồ đến nơi cần hỗ trợ.');
     } finally {
-      setSearching(false);
+      if (searchAbortRef.current === controller) {
+        setSearching(false);
+        searchAbortRef.current = null;
+      }
     }
   }
 
-  function chooseSuggestion(item: { display_name: string; lat: string; lon: string }) {
-    const lat = parseFloat(item.lat);
-    const lon = parseFloat(item.lon);
+  function chooseSuggestion(item: SearchPlace) {
+    searchOnTypingRef.current = false;
+    searchAbortRef.current?.abort();
+    const { latitude: lat, longitude: lon } = item.point;
     if (leafletMapRef.current) {
-      leafletMapRef.current.flyTo([lat, lon], 16);
-      if (leafletMarkerRef.current) {
-        leafletMarkerRef.current.setLatLng([lat, lon]);
-      } else {
-        leafletMarkerRef.current = L.marker([lat, lon], { icon: redPinIcon }).addTo(
-          leafletMapRef.current
-        );
-      }
+      suppressMoveRef.current = true;
+      leafletMapRef.current.setView([lat, lon], 17, { animate: false });
+      suppressMoveRef.current = false;
     }
-    setSelectedAddress(item.display_name);
+    const label = [item.name, item.address].filter(Boolean).join(' · ');
+    chosenSearchRef.current = { point: item.point, label };
+    setSelectedAddress(label);
+    setDraftPoint(item.point);
     setSuggestions([]);
-    selectRef.current({ latitude: lat, longitude: lon });
+    confirmedPointRef.current = null;
+    selectRef.current(null);
   }
 
-  function pickMapCenter() {
-    if (mapEngine === 'osm' && leafletMapRef.current) {
-      const center = leafletMapRef.current.getCenter();
-      if (leafletMarkerRef.current) {
-        leafletMarkerRef.current.setLatLng(center);
-      } else {
-        leafletMarkerRef.current = L.marker(center, { icon: redPinIcon }).addTo(
-          leafletMapRef.current
-        );
-      }
-      setSelectedAddress(`Đã chọn tâm bản đồ (${center.lat.toFixed(6)}, ${center.lng.toFixed(6)})`);
-      selectRef.current({ latitude: center.lat, longitude: center.lng });
-    } else if (mapEngine === 'google' && googleMapRef.current) {
-      const center = googleMapRef.current.getCenter();
-      if (center) {
-        setSelectedAddress(
-          `Đã chọn tâm bản đồ (${center.lat().toFixed(6)}, ${center.lng().toFixed(6)})`
-        );
-        selectRef.current({ latitude: center.lat(), longitude: center.lng() });
-      }
+  async function confirmCenter() {
+    searchOnTypingRef.current = false;
+    const center = mapEngine === 'osm'
+      ? leafletMapRef.current?.getCenter()
+      : googleMapRef.current?.getCenter();
+    if (!center) return;
+    const point = mapEngine === 'osm'
+      ? { latitude: (center as L.LatLng).lat, longitude: (center as L.LatLng).lng }
+      : { latitude: (center as google.maps.LatLng).lat(), longitude: (center as google.maps.LatLng).lng() };
+    confirmedPointRef.current = point;
+    setDraftPoint(point);
+    setPinDropKey((current) => current + 1);
+    selectRef.current(point);
+
+    const original = chosenSearchRef.current;
+    if (original && samePoint(original.point, point)) {
+      setSearchQuery(original.label);
+      setSelectedAddress(`Đã xác nhận: ${original.label}`);
+      return;
+    }
+
+    // One reverse lookup on confirmation, never for every map movement.
+    reverseAbortRef.current?.abort();
+    const controller = new AbortController();
+    reverseAbortRef.current = controller;
+    const fallback = 'Vị trí đã chọn trên bản đồ';
+    setSearchQuery(fallback);
+    setSelectedAddress(`Đã xác nhận: ${fallback}`);
+    if (mapEngine !== 'osm') return;
+    try {
+      const result = await fetch(
+        `https://photon.komoot.io/reverse?lat=${point.latitude}&lon=${point.longitude}&limit=1`,
+        { signal: controller.signal }
+      );
+      if (!result.ok) return;
+      const [nearest] = photonPlaces(await result.json());
+      if (!nearest || controller.signal.aborted ||
+          !confirmedPointRef.current || !samePoint(confirmedPointRef.current, point)) return;
+      const label = [nearest.name, nearest.address].filter(Boolean).join(' · ');
+      setSearchQuery(label);
+      setSelectedAddress(`Đã xác nhận · Địa chỉ gần đúng: ${label}`);
+      chosenSearchRef.current = { point, label };
+    } catch {
+      // Exact coordinates remain confirmed even when the address service is unavailable.
     }
   }
 
@@ -314,12 +424,10 @@ export function LocationPicker({
           <div className="map-engine-switch">
             <div>
               <p style={{ margin: 0, fontWeight: 700, color: 'var(--color-primary-dark)' }}>
-                {mapEngine === 'google'
-                  ? 'Đang dùng Google Maps'
-                  : 'Đang dùng OpenStreetMap'}
+                {mapEngine === 'google' ? 'Google Maps' : 'Bản đồ OpenStreetMap · OpenFreeMap'}
               </p>
               <small style={{ color: 'var(--color-text-secondary)' }}>
-                Chạm hoặc nhấp vào vị trí trên bản đồ để ghim đúng nơi cần hỗ trợ
+                Kéo bản đồ để đặt ghim đỏ đúng nơi cần hỗ trợ, rồi xác nhận địa chỉ
               </small>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -344,59 +452,47 @@ export function LocationPicker({
             </div>
           </div>
 
-          {/* Ô tìm kiếm cho OpenStreetMap (Nominatim) */}
+          {/* Tìm kiếm địa điểm bằng Photon trên dữ liệu OpenStreetMap */}
           {mapEngine === 'osm' && (
             <div className="location-search">
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="text"
-                  placeholder="Gõ tên tỉnh, thành phố, quận huyện hoặc đường (VD: Ba Đình Hà Nội, Quận 1 TP.HCM)..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      searchOsm(e);
-                    }
-                  }}
-                  style={{
-                    flex: 1,
-                    border: '1px solid var(--color-surface-divider)',
-                    borderRadius: 'var(--radius-sm)',
-                    padding: '8px 12px',
-                    fontSize: 14,
-                    background: '#FFFFFF',
-                  }}
-                />
-                <button
-                  type="button"
-                  className="button"
-                  disabled={searching}
-                  style={{ minHeight: 40, padding: '8px 16px' }}
-                  onClick={(e) => searchOsm(e)}
-                >
-                  {searching ? 'Đang tìm…' : 'Tìm địa điểm'}
-                </button>
-              </div>
+              <input
+                type="search"
+                placeholder="Nhập địa chỉ hoặc tên địa điểm"
+                aria-label="Tìm địa chỉ hoặc địa điểm cần hỗ trợ"
+                aria-autocomplete="list"
+                aria-expanded={suggestions.length > 0}
+                value={searchQuery}
+                onChange={(e) => {
+                  searchOnTypingRef.current = true;
+                  searchAbortRef.current?.abort();
+                  searchAbortRef.current = null;
+                  setSearching(false);
+                  setSuggestions([]);
+                  reverseAbortRef.current?.abort();
+                  chosenSearchRef.current = null;
+                  confirmedPointRef.current = null;
+                  setSearchQuery(e.target.value);
+                  setSelectedAddress('');
+                  setDraftPoint(null);
+                  selectRef.current(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.preventDefault();
+                }}
+              />
+              {searching && <span className="location-search-status" role="status">Đang tìm địa điểm…</span>}
 
               {suggestions.length > 0 && (
-                <div
-                  style={{
-                    marginTop: 6,
-                    background: '#FFFFFF',
-                    border: '1px solid var(--color-surface-border)',
-                    borderRadius: 'var(--radius-sm)',
-                    maxHeight: 180,
-                    overflowY: 'auto',
-                    boxShadow: 'var(--shadow-md)',
-                  }}
-                >
-                  {suggestions.map((item, idx) => (
-                    <div
-                      key={idx}
+                <div className="location-suggestions" role="listbox" aria-label="Địa điểm gợi ý">
+                  {suggestions.map((item) => (
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected="false"
+                      key={item.id}
                       onClick={() => chooseSuggestion(item)}
                       style={{
+                        display: 'block', width: '100%', textAlign: 'left', background: '#FFFFFF', border: 0,
                         padding: '8px 12px',
                         fontSize: 13,
                         cursor: 'pointer',
@@ -407,8 +503,8 @@ export function LocationPicker({
                       }
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
                     >
-                      📍 {item.display_name}
-                    </div>
+                      📍 <strong>{item.name}</strong>{item.address ? ` · ${item.address}` : ''}
+                    </button>
                   ))}
                 </div>
               )}
@@ -418,7 +514,6 @@ export function LocationPicker({
           {/* Container tìm kiếm của Google Maps */}
           {mapEngine === 'google' && <div ref={googleSearchRef} className="location-search" />}
 
-          {/* Khung bản đồ */}
           <div className="location-map-wrap">
             {mapEngine === 'osm' && (
               <div
@@ -426,44 +521,43 @@ export function LocationPicker({
                 className="location-map"
                 role="application"
                 aria-label="Bản đồ OpenStreetMap chọn vị trí cần hỗ trợ"
-                style={{ width: '100%', height: 340, zIndex: 1 }}
+                style={{ width: '100%', height: '100%', zIndex: 1 }}
               />
             )}
             {mapEngine === 'google' && (
-              <>
-                <div
-                  ref={googleContainerRef}
-                  className="location-map"
-                  role="application"
-                  aria-label="Bản đồ Google chọn vị trí cần hỗ trợ"
-                  style={{ width: '100%', height: 340 }}
-                />
-                <span className="location-map-pin" aria-hidden="true">
-                  ●
-                </span>
-              </>
+              <div
+                ref={googleContainerRef}
+                className="location-map"
+                role="application"
+                aria-label="Bản đồ Google chọn vị trí cần hỗ trợ"
+                style={{ width: '100%', height: '100%' }}
+              />
             )}
+            <div
+              key={pinDropKey}
+              className={`location-center-pin${moving ? ' is-moving' : ''}${pinDropKey ? ' is-confirmed' : ''}`}
+              aria-hidden="true"
+            >
+              <span className="location-center-pin-head"><span /></span>
+              <span className="location-center-pin-shadow" />
+            </div>
+            <button
+              type="button"
+              className="location-confirm-button"
+              onClick={() => void confirmCenter()}
+              disabled={!draftPoint}
+            >
+              Xác nhận địa chỉ
+            </button>
           </div>
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginTop: 10,
-              flexWrap: 'wrap',
-              gap: 8,
-            }}
-          >
-            <button type="button" className="button secondary" onClick={pickMapCenter}>
-              📍 Ghim điểm tại tâm bản đồ
-            </button>
-            {selectedAddress && (
-              <span style={{ fontSize: 13, color: 'var(--color-primary-dark)', fontWeight: 600 }}>
-                {selectedAddress}
-              </span>
-            )}
-          </div>
+          {selectedAddress && <p className="location-selection-status" role="status">{selectedAddress}</p>}
+
+          {mapEngine === 'osm' && tileError && (
+            <p role="alert" className="notice warning">
+              Nền bản đồ chưa tải được. Hãy kiểm tra kết nối mạng rồi mở lại bản đồ. Bạn vẫn có thể tìm địa điểm và xác nhận tọa độ.
+            </p>
+          )}
 
           {error && (
             <p role="alert" className="notice error" style={{ marginTop: 10 }}>

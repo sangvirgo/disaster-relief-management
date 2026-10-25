@@ -146,6 +146,27 @@ export function Donations({
     event.preventDefault();
     if (!selected) return;
     setError('');
+    if (!donorName.trim()) {
+      setError('Vui lòng nhập họ tên người đóng góp.');
+      return;
+    }
+    const digits = donorPhone.replace(/\D/g, '');
+    if (!/^[+0-9 ()-]+$/.test(donorPhone.trim()) || digits.length < 8 || digits.length > 15) {
+      setError('Số điện thoại người đóng góp cần có 8–15 chữ số và không chứa chữ cái.');
+      return;
+    }
+    for (const item of selected.items) {
+      const value = quantities[item.item_id]?.trim();
+      if (!value) continue;
+      if (!/^\d+(?:\.\d+)?$/.test(value) || Number(value) < 0) {
+        setError(`${item.item_name}: số lượng phải là số không âm.`);
+        return;
+      }
+      if ((value.split('.')[1]?.length || 0) > item.scale) {
+        setError(`${item.item_name}: chỉ được có tối đa ${item.scale} chữ số thập phân.`);
+        return;
+      }
+    }
     setLoading(true);
     try {
       let command = pending.current;
@@ -588,7 +609,7 @@ export function Donations({
             {selected.intake_location?.address_note}
           </p>
           {page === 'declare' && (
-            <form className="form-stack" onSubmit={declare}>
+            <form className="form-stack" onSubmit={declare} noValidate>
               <div className="form-grid">
                 <label>
                   Họ tên người đóng góp

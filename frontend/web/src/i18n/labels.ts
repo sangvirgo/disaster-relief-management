@@ -16,6 +16,7 @@ export const statusLabels: Record<string, string> = {
   COMPLETED: 'Hoàn thành',
   FAILED: 'Không hoàn thành',
   ACTIVE: 'Đang hoạt động',
+  DISABLED: 'Đã vô hiệu hóa',
   PAUSED: 'Tạm dừng',
   OPEN: 'Đang mở',
   DECLARED: 'Đã khai báo',

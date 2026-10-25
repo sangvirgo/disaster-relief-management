@@ -83,7 +83,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const [selected, setSelected] = useState<Row | null>(null);
   const [detail, setDetail] = useState<Row | null>(null);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
   const route =
     page === 'assets'
@@ -112,11 +112,13 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   useEffect(() => {
     if (!route || !ready) {
       setItems([]);
+      setLoading(false);
       return;
     }
     let live = true;
     setLoading(true);
     setError('');
+    setItems([]);
     api<List>('logistics', path)
       .then((value) => {
         if (live) {
@@ -342,8 +344,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               <tbody>{items.map((item, index) => (
                 <tr key={string(item.id || item.balance_id) || index} className={selected === item ? 'selected' : ''}>
                   <th scope="row"><button type="button" className="table-row-link" onClick={() => setSelected(item)}>{string((item.item as Row | undefined)?.name) || string(item.item_name) || item.name || 'Vật phẩm'}</button></th>
-                  <td>{string(item.warehouse_name) || string(item.warehouse_id).slice(0, 8) || '—'}</td>
-                  <td>{string((item.unit as Row | undefined)?.display_name) || string(item.unit_name) || '—'}</td>
+                  <td>{string(item.warehouse_name) || (item.warehouse_id ? `Mã …${string(item.warehouse_id).slice(-8)}` : '—')}</td>
+                  <td>{string((item.unit as Row | undefined)?.display_name) || string(item.unit) || string(item.unit_name) || '—'}</td>
                   <td className="numeric">{quantity(item.on_hand)}</td>
                   <td className="numeric">{quantity(item.reserved)}</td>
                   <td className="numeric"><strong className="available-value">{quantity(item.available)}</strong></td>

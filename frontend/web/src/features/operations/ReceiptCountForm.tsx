@@ -49,12 +49,13 @@ export function ReceiptCountForm({
   );
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [itemsError, setItemsError] = useState('');
   const [busy, setBusy] = useState(false);
   const key = useRef<string | null>(null);
   useEffect(() => {
     api<{ items: Item[] }>('logistics', '/items?status=ACTIVE&limit=100')
       .then((result) => setItems(result.items))
-      .catch(() => setItems([]));
+      .catch((cause) => setItemsError(cause instanceof Error ? cause.message : 'Không thể tải danh mục vật phẩm.'));
   }, []);
   function edit(index: number, field: keyof Line, value: string) {
     setLines((current) =>
@@ -65,6 +66,29 @@ export function ReceiptCountForm({
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError('');
+    for (const [index, line] of lines.entries()) {
+      if (!line.item_id.trim()) {
+        setError(`Vật phẩm ${index + 1}: vui lòng chọn hoặc nhập mã vật phẩm.`);
+        return;
+      }
+      for (const [field, title] of [
+        ['counted_quantity', 'Số đã đếm'],
+        ['accepted_quantity', 'Số tiếp nhận'],
+        ['held_quantity', 'Số tạm giữ'],
+        ['rejected_quantity', 'Số từ chối'],
+      ] as const) {
+        const quantity = line[field].trim();
+        if (!quantity || !/^\d+(?:\.\d+)?$/.test(quantity)) {
+          setError(`Vật phẩm ${index + 1}: ${title.toLowerCase()} phải là số không âm.`);
+          return;
+        }
+        const item = items.find((candidate) => candidate.id === line.item_id);
+        if (item && (quantity.split('.')[1]?.length || 0) > item.scale) {
+          setError(`Vật phẩm ${index + 1}: ${title.toLowerCase()} chỉ được có tối đa ${item.scale} chữ số thập phân.`);
+          return;
+        }
+      }
+    }
     if (new Set(lines.map((line) => line.item_id)).size !== lines.length) {
       setError('Mỗi vật phẩm chỉ xuất hiện một lần trong lần kiểm đếm.');
       return;
@@ -112,12 +136,13 @@ export function ReceiptCountForm({
     }
   }
   return (
-    <form className="form-stack command-form" onSubmit={submit}>
+    <form className="form-stack command-form" onSubmit={submit} noValidate>
       <h3>Gửi kết quả kiểm đếm</h3>
       <p>
         Ghi số lượng thực tế cho từng vật phẩm. Có thể thêm vật phẩm ngoài bản khai; người khác sẽ
         duyệt độc lập.
       </p>
+      {itemsError && <p className="notice error" role="alert">Danh mục vật phẩm: {itemsError} Bạn vẫn có thể nhập mã vật phẩm.</p>}
       {lines.map((line, index) => (
         <fieldset className="candidate count-line" key={index}>
           <legend>Vật phẩm {index + 1}</legend>

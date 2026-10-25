@@ -37,6 +37,7 @@ const noticeNames: Record<string, string> = {
 
 export function Notices() {
   const [items, setItems] = useState<Notice[]>([]);
+  const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState('');
   const [next, setNext] = useState('');
   const [error, setError] = useState('');
@@ -45,6 +46,9 @@ export function Notices() {
 
   useEffect(() => {
     let live = true;
+    setLoading(true);
+    setError('');
+    setItems([]);
     const params = new URLSearchParams();
     if (cursor) params.set('cursor', cursor);
     if (filter === 'unread') params.set('unread', 'true');
@@ -59,6 +63,9 @@ export function Notices() {
       })
       .catch((cause) => {
         if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải thông báo.');
+      })
+      .finally(() => {
+        if (live) setLoading(false);
       });
     return () => {
       live = false;
@@ -108,7 +115,8 @@ export function Notices() {
           {error}
         </p>
       )}
-      {!items.length && !error && <div className="empty">Chưa có thông báo trong mục này.</div>}
+      {loading && <p role="status">Đang tải thông báo…</p>}
+      {!loading && !items.length && !error && <div className="empty">Chưa có thông báo trong mục này.</div>}
       <div className="record-list">
         {items.map((item) => (
           <article className="record" key={item.id}>
@@ -137,6 +145,7 @@ export function Notices() {
 export function Volunteer({ page }: { page: string }) {
   const isTeam = page === 'team';
   const [items, setItems] = useState<Mission[] | Team[]>([]);
+  const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState('');
   const [next, setNext] = useState('');
   const [error, setError] = useState('');
@@ -170,7 +179,9 @@ export function Volunteer({ page }: { page: string }) {
   // Load list of missions or teams
   useEffect(() => {
     let live = true;
+    setLoading(true);
     setError('');
+    setItems([]);
     const path = isTeam ? '/teams' : '/missions/mine';
     api<{ items: Mission[] | Team[]; cursor?: string }>(
       'response',
@@ -184,6 +195,9 @@ export function Volunteer({ page }: { page: string }) {
       })
       .catch((cause) => {
         if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải dữ liệu.');
+      })
+      .finally(() => {
+        if (live) setLoading(false);
       });
     return () => {
       live = false;
@@ -424,7 +438,8 @@ export function Volunteer({ page }: { page: string }) {
             {error}
           </p>
         )}
-        {!items.length && !error && (
+        {loading && <p role="status">Đang tải dữ liệu…</p>}
+        {!loading && !items.length && !error && (
           <div className="empty">Chưa có dữ liệu trong phạm vi của bạn.</div>
         )}
 
@@ -556,7 +571,7 @@ export function Volunteer({ page }: { page: string }) {
 
                 <hr />
                 <h3>Cập nhật vị trí GPS của đội</h3>
-                <p>Vị trí mới nhất giúp điều phối viên gợi ý giao nhiệm vụ cứu nạn chính xác.</p>
+                <p>Vị trí mới nhất giúp điều phối viên tìm đội gần nơi cần hỗ trợ.</p>
                 <div className="action-grid">
                   <button
                     type="button"
