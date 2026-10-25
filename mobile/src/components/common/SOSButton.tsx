@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { AlertTriangle } from 'lucide-react-native';
@@ -15,8 +15,8 @@ export const SOSButton: React.FC<SOSButtonProps> = ({
   title = 'GỬI YÊU CẦU CỨU NẠN',
   subTitle = 'CHẠM ĐỂ BÁO CỨU HỘ KHẨN CẤP',
 }) => {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const opacityAnim = useRef(new Animated.Value(0.6)).current;
+  const [pulseAnim] = useState(() => new Animated.Value(1));
+  const [opacityAnim] = useState(() => new Animated.Value(0.6));
 
   useEffect(() => {
     const pulse = Animated.loop(

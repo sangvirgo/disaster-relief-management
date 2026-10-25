@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,55 +7,157 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Modal,
+  Platform,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import DateTimePicker from '@expo/ui/community/datetime-picker';
+import { useRouter } from 'expo-router';
+import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { useAuthStore } from '../../../store/authStore';
 import { INCIDENT_CATEGORIES, CONTACTABILITY_LABELS } from '../../../constants/labels';
 import { IncidentCategoryCode, CreateProxySOSPayload, GeoLocation } from '../../../types/api';
 import { ResponseApi } from '../../../api/responseApi';
+import { getApiErrorMessage } from '../../../api/client';
+import { PendingProxySOSCommand, StorageService } from '../../../utils/secureStore';
 import { THEME } from '../../../constants/theme';
 import { LocationPickerModal } from '../../../components/common/LocationPickerModal';
+import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
 import {
   Users,
   MapPin,
-  Phone,
-  FileText,
   Send,
   AlertCircle,
   Clock,
   LogIn,
   Map,
+  Trash2,
+  CalendarDays,
+  Check,
+  X,
 } from 'lucide-react-native';
 
+type SituationPickerMode = 'date' | 'time';
+
+const formatLocalSituationDate = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  return `${day}/${month}/${date.getFullYear()} · ${hour}:${minute}`;
+};
+
 export const ProxySOSScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const router = useRouter();
   const { isAuthenticated } = useAuthStore();
 
   const [selectedCategory, setSelectedCategory] = useState<IncidentCategoryCode>('FLOOD');
-  const [relationship, setRelationship] = useState<string>('Bố mẹ / Gia đình ruột thịt');
-  const [peopleAffected, setPeopleAffected] = useState<string>('2');
-  const [householdLng, setHouseholdLng] = useState<string>('108.2022');
-  const [householdLat, setHouseholdLat] = useState<string>('16.0544');
+  const [relationship, setRelationship] = useState<string>('');
+  const [peopleAffected, setPeopleAffected] = useState<string>('');
+  const [householdLng, setHouseholdLng] = useState<string>('');
+  const [householdLat, setHouseholdLat] = useState<string>('');
+  const [householdLocation, setHouseholdLocation] = useState<GeoLocation | null>(null);
   const [householdAddressNote, setHouseholdAddressNote] = useState<string>('');
+  const [informationSource, setInformationSource] = useState<string>('');
+  const [lastKnownSituationAt, setLastKnownSituationAt] = useState<string>('');
+  const [isSituationPickerVisible, setIsSituationPickerVisible] = useState<boolean>(false);
+  const [situationPickerMode, setSituationPickerMode] = useState<SituationPickerMode>('date');
+  const [draftSituationDate, setDraftSituationDate] = useState<Date>(new Date());
   const [beneficiaryPhone, setBeneficiaryPhone] = useState<string>('');
-  const [contactability, setContactability] = useState<'REACHABLE' | 'UNREACHABLE' | 'UNKNOWN'>('UNREACHABLE');
+  const [contactability, setContactability] = useState<'REACHABLE' | 'UNREACHABLE' | 'UNKNOWN'>('UNKNOWN');
   const [description, setDescription] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isMapModalVisible, setIsMapModalVisible] = useState<boolean>(false);
+  const [pendingCommand, setPendingCommand] = useState<PendingProxySOSCommand | null>(null);
+  const [restoringPending, setRestoringPending] = useState<boolean>(true);
+  const [submissionSuccessCode, setSubmissionSuccessCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    StorageService.getPendingProxySOS()
+      .then((pending) => {
+        if (!mounted || !pending) return;
+        const { payload } = pending;
+        setPendingCommand(pending);
+        setSelectedCategory(payload.incident_category_code);
+        setRelationship(payload.relationship);
+        setPeopleAffected(payload.people_affected == null ? '' : String(payload.people_affected));
+        setHouseholdLocation(payload.location);
+        setHouseholdLng(String(payload.location.coordinates[0]));
+        setHouseholdLat(String(payload.location.coordinates[1]));
+        setBeneficiaryPhone(payload.beneficiary_contact_phone || '');
+        setContactability(payload.contactability);
+        setDescription(payload.description || '');
+        setInformationSource(payload.information_source);
+        setLastKnownSituationAt(payload.last_known_situation_at);
+      })
+      .catch(() => mounted && Alert.alert('Không thể khôi phục yêu cầu', 'Không đọc được bản báo hộ đang chờ trên thiết bị.'))
+      .finally(() => mounted && setRestoringPending(false));
+    return () => { mounted = false; };
+  }, []);
 
   const handleConfirmMapLocation = (coords: [number, number], note?: string) => {
     setHouseholdLng(coords[0].toFixed(6));
     setHouseholdLat(coords[1].toFixed(6));
+    setHouseholdLocation({ type: 'Point', coordinates: coords, source: 'MANUAL_PIN', captured_at: new Date().toISOString() });
     if (note) {
       setHouseholdAddressNote(note);
     }
   };
 
+  const openSituationPicker = () => {
+    const selectedDate = lastKnownSituationAt ? new Date(lastKnownSituationAt) : new Date();
+    setDraftSituationDate(Number.isNaN(selectedDate.getTime()) ? new Date() : selectedDate);
+    setSituationPickerMode('date');
+    setIsSituationPickerVisible(true);
+  };
+
+  const confirmSituationDate = () => {
+    setLastKnownSituationAt(draftSituationDate.toISOString());
+    setIsSituationPickerVisible(false);
+  };
+
+  const handleDiscardPending = () => {
+    Alert.alert(
+      'Hủy bản báo hộ đang chờ?',
+      'Bạn có chắc muốn xóa bản gửi chưa hoàn tất này để bắt đầu soạn báo hộ mới?',
+      [
+        { text: 'Giữ lại', style: 'cancel' },
+        {
+          text: 'Xóa & Tạo mới',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await StorageService.clearPendingProxySOS();
+              setPendingCommand(null);
+              setSelectedCategory('FLOOD');
+              setRelationship('');
+              setPeopleAffected('');
+              setHouseholdLng('');
+              setHouseholdLat('');
+              setHouseholdLocation(null);
+              setHouseholdAddressNote('');
+              setInformationSource('');
+              setLastKnownSituationAt('');
+              setBeneficiaryPhone('');
+              setContactability('UNKNOWN');
+              setDescription('');
+            } catch {
+              Alert.alert('Lỗi', 'Không thể xóa bản lưu tạm.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Nếu chưa đăng nhập, bắt buộc đăng nhập để bảo đảm trách nhiệm báo tin (UC-15)
   if (!isAuthenticated) {
     return (
-      <ScreenContainer title="Báo Cứu Trợ Người Thân" onBack={() => navigation.goBack()}>
+      <ScreenContainer title="Báo Cứu Trợ Người Thân" onBack={() => goBackOrHome(router)}>
         <View style={styles.authRequiredCard}>
           <AlertCircle size={48} color={THEME.colors.primary.main} />
           <Text style={styles.authRequiredTitle}>YÊU CẦU ĐĂNG NHẬP TÀI KHOẢN</Text>
@@ -64,7 +166,7 @@ export const ProxySOSScreen: React.FC = () => {
           </Text>
           <TouchableOpacity
             style={styles.loginNowButton}
-            onPress={() => navigation.navigate('LoginScreen')}
+            onPress={() => router.push('/login')}
             activeOpacity={0.85}
           >
             <LogIn size={20} color="#FFFFFF" />
@@ -76,58 +178,54 @@ export const ProxySOSScreen: React.FC = () => {
   }
 
   const handleSubmit = async () => {
-    const lng = parseFloat(householdLng);
-    const lat = parseFloat(householdLat);
-
-    if (isNaN(lng) || isNaN(lat)) {
-      Alert.alert('Tọa độ chưa đúng', 'Vui lòng nhập tọa độ vị trí hộ gia đình nạn nhân hợp lệ.');
+    if (!pendingCommand && !householdLocation) {
+      Alert.alert('Chưa chọn vị trí hộ gia đình', 'Vui lòng ghim và xác nhận vị trí thực tế của hộ gia đình đang cần hỗ trợ.');
       return;
     }
 
-    const headcount = parseInt(peopleAffected, 10);
-    if (isNaN(headcount) || headcount < 1) {
-      Alert.alert('Số lượng chưa hợp lệ', 'Vui lòng nhập số lượng người cần cứu trợ.');
+    const headcountText = peopleAffected.trim();
+    const headcount = headcountText ? Number(headcountText) : null;
+    if (!pendingCommand && headcountText && (!/^\d+$/.test(headcountText) || !Number.isInteger(headcount) || (headcount as number) < 1 || (headcount as number) > 10000)) {
+      Alert.alert('Số lượng chưa hợp lệ', 'Nhập số nguyên từ 1 đến 10.000; để trống nếu chưa rõ.');
+      return;
+    }
+    if (!pendingCommand && (!relationship.trim() || !informationSource.trim() || !lastKnownSituationAt.trim())) {
+      Alert.alert('Thiếu thông tin nguồn tin', 'Hãy nhập mối quan hệ, nguồn nhận tin và chọn thời điểm gần nhất biết tình hình.');
+      return;
+    }
+    if (!pendingCommand && !/Z$/.test(lastKnownSituationAt.trim())) {
+      Alert.alert('Thời điểm chưa hợp lệ', 'Vui lòng chọn lại ngày và giờ gần nhất biết tình hình.');
+      return;
+    }
+    const lastKnownDate = new Date(lastKnownSituationAt.trim());
+    if (!pendingCommand && Number.isNaN(lastKnownDate.getTime())) {
+      Alert.alert('Thời điểm chưa đúng', 'Không thể đọc thời điểm tình hình gần nhất.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const location: GeoLocation = {
-        type: 'Point',
-        coordinates: [lng, lat],
-        source: 'MANUAL_PIN',
-        captured_at: new Date().toISOString(),
-      };
-
-      const payload: CreateProxySOSPayload = {
+      const payload: CreateProxySOSPayload = pendingCommand?.payload || {
         incident_category_code: selectedCategory,
-        description: `${householdAddressNote ? `[Địa chỉ: ${householdAddressNote}] ` : ''}${description}`.trim(),
+        description: [householdAddressNote.trim() ? `Địa chỉ tham chiếu do người báo cung cấp: ${householdAddressNote.trim()}` : '', description.trim()].filter(Boolean).join('\n') || undefined,
         people_affected: headcount,
-        location,
+        location: householdLocation!,
         relationship: relationship.trim(),
-        information_source: 'Gia đình liên lạc trước khi mất sóng',
-        last_known_situation_at: new Date().toISOString(),
+        information_source: informationSource.trim(),
+        last_known_situation_at: lastKnownDate.toISOString(),
         contactability,
         beneficiary_contact_phone: beneficiaryPhone.trim() || undefined,
       };
 
-      const response = await ResponseApi.createProxySOS(payload);
+      const command = pendingCommand || await StorageService.getOrCreatePendingProxySOS(payload);
+      setPendingCommand(command);
+      const response = await ResponseApi.createProxySOS(command.payload, command.idempotencyKey);
+      await StorageService.clearPendingProxySOS();
+      setPendingCommand(null);
 
-      Alert.alert(
-        'ĐÃ GHI NHẬN YÊU CẦU CỨU TRỢ',
-        `Mã tra cứu yêu cầu của người thân: ${response.tracking_code}\n\nĐiều phối viên sẽ đối soát thông tin và điều phối đội cứu nạn đến vị trí bạn đã chỉ định.`,
-        [
-          {
-            text: 'Xem tiến độ cứu hộ',
-            onPress: () =>
-              navigation.replace('SOSTrackingScreen', {
-                trackingCode: response.tracking_code,
-              }),
-          },
-        ]
-      );
+      setSubmissionSuccessCode(response.tracking_code);
     } catch (error: any) {
-      Alert.alert('Lỗi gửi yêu cầu', typeof error === 'string' ? error : 'Không thể gửi yêu cầu báo hộ. Vui lòng thử lại.');
+      Alert.alert('Lỗi gửi yêu cầu', getApiErrorMessage(error, 'Không thể gửi báo hộ. Nội dung và khóa lần gửi được giữ lại để thử lại an toàn.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -137,8 +235,29 @@ export const ProxySOSScreen: React.FC = () => {
     <ScreenContainer
       title="Báo Cứu Trợ Người Thân"
       subtitle="Báo hộ vị trí cho gia đình gặp nạn (PROXY)"
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackOrHome(router)}
     >
+      {/* Banner khôi phục bản gửi cũ */}
+      {pendingCommand ? (
+        <View style={styles.pendingBanner}>
+          <View style={styles.pendingBannerHeader}>
+            <AlertCircle size={18} color={THEME.colors.warning.dark} />
+            <Text style={styles.pendingBannerTitle}>Có bản báo hộ chưa hoàn tất</Text>
+          </View>
+          <Text style={styles.pendingBannerDesc}>
+            Ứng dụng đã khôi phục lại dữ liệu báo hộ của lần trước để bạn gửi tiếp. Bạn có thể kiểm tra lại rồi bấm Gửi tiếp, hoặc hủy bản cũ để tạo mới.
+          </Text>
+          <TouchableOpacity
+            style={styles.discardPendingBtn}
+            onPress={handleDiscardPending}
+            activeOpacity={0.8}
+          >
+            <Trash2 size={14} color={THEME.colors.emergency.main} />
+            <Text style={styles.discardPendingText}>Xóa bản cũ & Soạn báo hộ mới</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       <View style={styles.noticeBox}>
         <Clock size={18} color={THEME.colors.primary.main} />
         <Text style={styles.noticeText}>
@@ -170,7 +289,7 @@ export const ProxySOSScreen: React.FC = () => {
         <View style={styles.selectedCoordsBox}>
           <Text style={styles.selectedCoordsTitle}>Tọa độ đã chọn:</Text>
           <Text style={styles.selectedCoordsText}>
-            Kinh độ: {householdLng} | Vĩ độ: {householdLat}
+            {householdLocation ? `Kinh độ: ${householdLng} | Vĩ độ: ${householdLat}` : 'Chưa xác nhận vị trí hộ gia đình'}
           </Text>
         </View>
 
@@ -191,7 +310,7 @@ export const ProxySOSScreen: React.FC = () => {
             <TextInput
               style={styles.textInput}
               value={householdLng}
-              onChangeText={setHouseholdLng}
+              onChangeText={(value) => { setHouseholdLng(value); setHouseholdLocation(null); }}
               keyboardType="numeric"
             />
           </View>
@@ -200,7 +319,7 @@ export const ProxySOSScreen: React.FC = () => {
             <TextInput
               style={styles.textInput}
               value={householdLat}
-              onChangeText={setHouseholdLat}
+              onChangeText={(value) => { setHouseholdLat(value); setHouseholdLocation(null); }}
               keyboardType="numeric"
             />
           </View>
@@ -210,16 +329,113 @@ export const ProxySOSScreen: React.FC = () => {
       {/* Modal Ghim Vị Trí Trên Bản Đồ */}
       <LocationPickerModal
         visible={isMapModalVisible}
-        initialCoordinates={[
-          parseFloat(householdLng) || 108.2022,
-          parseFloat(householdLat) || 16.0544,
-        ]}
+        initialCoordinates={householdLocation?.coordinates}
         initialAddressNote={householdAddressNote}
         title="Ghim Vị Trí Hộ Gia Đình Người Thân"
         confirmButtonText="Xác nhận vị trí hộ gia đình"
         onClose={() => setIsMapModalVisible(false)}
         onConfirm={handleConfirmMapLocation}
       />
+
+      <Modal
+        visible={isSituationPickerVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setIsSituationPickerVisible(false)}
+      >
+        <View style={styles.situationPickerOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setIsSituationPickerVisible(false)}
+            accessibilityLabel="Đóng bộ chọn ngày giờ"
+          />
+          <View style={styles.situationPickerCard}>
+            <View style={styles.situationPickerHeader}>
+              <View style={styles.situationPickerIcon}>
+                <CalendarDays size={20} color={THEME.colors.primary.main} />
+              </View>
+              <View style={styles.situationPickerHeaderText}>
+                <Text style={styles.situationPickerTitle}>Chọn thời điểm</Text>
+                <Text style={styles.situationPickerSubtitle}>Lần gần nhất bạn biết tình hình</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.situationPickerClose}
+                onPress={() => setIsSituationPickerVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Đóng"
+              >
+                <X size={19} color={THEME.colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.situationPickerSummary}>
+              <Text style={styles.situationPickerSummaryLabel}>ĐANG CHỌN</Text>
+              <Text style={styles.situationPickerSummaryValue}>
+                {formatLocalSituationDate(draftSituationDate.toISOString())}
+              </Text>
+            </View>
+
+            <View style={styles.situationPickerTabs}>
+              {([
+                { key: 'date', label: 'Ngày', icon: CalendarDays },
+                { key: 'time', label: 'Giờ', icon: Clock },
+              ] as const).map(({ key, label, icon: Icon }) => {
+                const selected = situationPickerMode === key;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.situationPickerTab, selected && styles.situationPickerTabActive]}
+                    onPress={() => setSituationPickerMode(key)}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected }}
+                  >
+                    <Icon size={16} color={selected ? THEME.colors.primary.main : THEME.colors.text.muted} />
+                    <Text style={[styles.situationPickerTabText, selected && styles.situationPickerTabTextActive]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.situationNativePicker}>
+              <DateTimePicker
+                style={{ width: '100%' }}
+                value={draftSituationDate}
+                mode={situationPickerMode}
+                presentation="inline"
+                display={situationPickerMode === 'date' ? 'inline' : 'default'}
+                is24Hour
+                locale="vi_VN"
+                accentColor={THEME.colors.primary.main}
+                onValueChange={(_event, selectedDate) => setDraftSituationDate(selectedDate)}
+              />
+            </View>
+
+            <Text style={styles.situationPickerHint}>Ngày giờ hiển thị theo múi giờ trên điện thoại.</Text>
+
+            <View style={styles.situationPickerActions}>
+              <TouchableOpacity
+                style={styles.situationPickerCancel}
+                onPress={() => setIsSituationPickerVisible(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.situationPickerCancelText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.situationPickerConfirm}
+                onPress={confirmSituationDate}
+                activeOpacity={0.85}
+              >
+                <Check size={17} color="#FFFFFF" />
+                <Text style={styles.situationPickerConfirmText}>Xác nhận</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* 2. CHỌN LOẠI THIÊN TAI / SỰ CỐ NGƯỜI THÂN ĐANG GẶP */}
       <View style={styles.card}>
@@ -262,11 +478,57 @@ export const ProxySOSScreen: React.FC = () => {
         </View>
 
         <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Nguồn nhận thông tin (bắt buộc):</Text>
+          <TextInput
+            style={styles.textInput}
+            value={informationSource}
+            onChangeText={setInformationSource}
+            placeholder="Ví dụ: Gọi điện trực tiếp cho người thân lúc 14:30"
+            placeholderTextColor={THEME.colors.text.muted}
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Thời điểm gần nhất biết tình hình:</Text>
+          {Platform.OS === 'web' ? (
+            <TextInput
+              style={styles.textInput}
+              value={lastKnownSituationAt}
+              onChangeText={setLastKnownSituationAt}
+              placeholder="2026-10-25T07:30:00Z"
+              placeholderTextColor={THEME.colors.text.muted}
+              autoCapitalize="none"
+            />
+          ) : (
+            <TouchableOpacity
+              style={styles.situationDateButton}
+              onPress={openSituationPicker}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Chọn ngày giờ gần nhất biết tình hình"
+            >
+              <CalendarDays size={19} color={THEME.colors.primary.main} />
+              <Text style={[styles.situationDateValue, !lastKnownSituationAt && styles.situationDatePlaceholder]}>
+                {lastKnownSituationAt ? formatLocalSituationDate(lastKnownSituationAt) : 'Chạm để chọn ngày và giờ'}
+              </Text>
+              <Clock size={18} color={THEME.colors.text.muted} />
+            </TouchableOpacity>
+          )}
+          <Text style={styles.fieldHint}>
+            {Platform.OS === 'web'
+              ? 'Nhập thời điểm theo định dạng UTC, kết thúc bằng Z.'
+              : 'Ngày giờ hiển thị theo giờ trên điện thoại và sẽ được chuẩn hóa UTC khi gửi.'}
+          </Text>
+        </View>
+
+        <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Số người dự kiến trong nhà:</Text>
           <TextInput
             style={styles.textInput}
             value={peopleAffected}
             onChangeText={setPeopleAffected}
+            placeholder="Để trống nếu chưa rõ"
+            placeholderTextColor={THEME.colors.text.muted}
             keyboardType="number-pad"
           />
         </View>
@@ -319,7 +581,7 @@ export const ProxySOSScreen: React.FC = () => {
       <TouchableOpacity
         style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
         onPress={handleSubmit}
-        disabled={isSubmitting}
+        disabled={isSubmitting || restoringPending}
         activeOpacity={0.85}
       >
         {isSubmitting ? (
@@ -331,6 +593,27 @@ export const ProxySOSScreen: React.FC = () => {
           </>
         )}
       </TouchableOpacity>
+
+      {submissionSuccessCode ? (
+        <CopyableInfoModal
+          visible
+          title="Đã ghi nhận yêu cầu cứu trợ"
+          description="Máy chủ đã ghi nhận báo hộ. Điều phối viên sẽ xác minh thông tin trước khi có quyết định điều phối."
+          helperText="Lưu hoặc sao chép mã tra cứu để xem tiến độ của yêu cầu này."
+          credentials={[
+            { key: 'tracking-code', label: 'Mã tra cứu yêu cầu', value: submissionSuccessCode },
+          ]}
+          onClose={() => setSubmissionSuccessCode(null)}
+          primaryAction={{
+            label: 'Xem tiến độ cứu hộ',
+            onPress: () => {
+              const trackingCode = submissionSuccessCode;
+              setSubmissionSuccessCode(null);
+              router.replace({ pathname: '/tracking', params: { trackingCode } });
+            },
+          }}
+        />
+      ) : null}
     </ScreenContainer>
   );
 };
@@ -352,6 +635,48 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     flex: 1,
     lineHeight: 16,
+  },
+  pendingBanner: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  pendingBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  pendingBannerTitle: {
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '700',
+    color: '#92400E',
+    marginLeft: 6,
+  },
+  pendingBannerDesc: {
+    fontSize: THEME.typography.fontSizes.xs,
+    color: '#78350F',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  discardPendingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: THEME.colors.emergency.main,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  discardPendingText: {
+    fontSize: THEME.typography.fontSizes.xs,
+    fontWeight: '700',
+    color: THEME.colors.emergency.main,
+    marginLeft: 6,
   },
   card: {
     backgroundColor: THEME.colors.surface.card,
@@ -433,6 +758,182 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: THEME.colors.text.primary,
     marginBottom: 6,
+  },
+  fieldHint: {
+    color: THEME.colors.text.muted,
+    fontSize: THEME.typography.fontSizes.xs,
+    lineHeight: 17,
+    marginTop: 6,
+  },
+  situationDateButton: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: THEME.colors.surface.background,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+  },
+  situationDateValue: {
+    flex: 1,
+    color: THEME.colors.text.primary,
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '600',
+    marginHorizontal: 10,
+  },
+  situationDatePlaceholder: {
+    color: THEME.colors.text.muted,
+    fontWeight: '400',
+  },
+  situationPickerOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 18,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+  },
+  situationPickerCard: {
+    width: '100%',
+    maxWidth: 460,
+    backgroundColor: THEME.colors.surface.card,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+    ...THEME.shadows.md,
+  },
+  situationPickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  situationPickerIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: THEME.colors.primary.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  situationPickerHeaderText: {
+    flex: 1,
+    marginLeft: 11,
+  },
+  situationPickerTitle: {
+    color: THEME.colors.text.primary,
+    fontSize: THEME.typography.fontSizes.base,
+    fontWeight: '800',
+  },
+  situationPickerSubtitle: {
+    color: THEME.colors.text.secondary,
+    fontSize: THEME.typography.fontSizes.xs,
+    marginTop: 2,
+  },
+  situationPickerClose: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: THEME.colors.surface.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  situationPickerSummary: {
+    backgroundColor: THEME.colors.primary.bg,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 13,
+    marginBottom: 14,
+  },
+  situationPickerSummaryLabel: {
+    color: THEME.colors.primary.main,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+  },
+  situationPickerSummaryValue: {
+    color: THEME.colors.text.primary,
+    fontSize: THEME.typography.fontSizes.base,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  situationPickerTabs: {
+    flexDirection: 'row',
+    backgroundColor: THEME.colors.surface.background,
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 8,
+  },
+  situationPickerTab: {
+    flex: 1,
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9,
+  },
+  situationPickerTabActive: {
+    backgroundColor: THEME.colors.surface.card,
+    ...THEME.shadows.sm,
+  },
+  situationPickerTabText: {
+    color: THEME.colors.text.muted,
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '600',
+    marginLeft: 7,
+  },
+  situationPickerTabTextActive: {
+    color: THEME.colors.primary.main,
+    fontWeight: '800',
+  },
+  situationNativePicker: {
+    minHeight: 230,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  situationPickerHint: {
+    color: THEME.colors.text.muted,
+    fontSize: THEME.typography.fontSizes.xs,
+    lineHeight: 17,
+    textAlign: 'center',
+    marginTop: 2,
+    marginBottom: 14,
+  },
+  situationPickerActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 10,
+  },
+  situationPickerCancel: {
+    minHeight: 44,
+    minWidth: 78,
+    paddingHorizontal: 16,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: THEME.colors.surface.background,
+  },
+  situationPickerCancelText: {
+    color: THEME.colors.text.secondary,
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '700',
+  },
+  situationPickerConfirm: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    borderRadius: 11,
+    backgroundColor: THEME.colors.primary.main,
+  },
+  situationPickerConfirmText: {
+    color: '#FFFFFF',
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '800',
+    marginLeft: 7,
   },
   textInput: {
     backgroundColor: THEME.colors.surface.background,

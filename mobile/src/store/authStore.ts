@@ -80,7 +80,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         isLoading: false,
       });
-    } catch (e) {
+    } catch {
       await StorageService.clearTokens();
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
@@ -103,7 +103,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const me = await IdentityApi.getMe();
       set({ user: me.user, grants: me.grants });
-    } catch (e) {
+    } catch {
       // Bỏ qua nếu lỗi mạng tạm thời
     }
   },

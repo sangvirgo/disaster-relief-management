@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Modal,
   View,
@@ -23,7 +23,6 @@ import {
   Search,
   Compass,
   ArrowRight,
-  RotateCcw,
 } from "lucide-react-native";
 
 interface LocationPickerModalProps {
@@ -43,7 +42,7 @@ interface SearchPlaceItem {
   coordinates: [number, number]; // [longitude, latitude]
 }
 
-// Tọa độ mặc định (Khu vực Đông Nam Bộ / TP.HCM / Bình Dương)
+// Tâm bản đồ để người dùng bắt đầu tìm kiếm; không được dùng làm vị trí đã chọn.
 const DEFAULT_LATITUDE = 10.9289;
 const DEFAULT_LONGITUDE = 106.8595;
 
@@ -53,14 +52,15 @@ function formatPhotonProperties(properties: any): {
   fullAddress: string;
 } {
   const name = properties.name || properties.street || "Vị trí được chọn";
-  const parts: string[] = [];
-  if (properties.name) parts.push(properties.name);
-  if (properties.street && properties.street !== properties.name)
-    parts.push(properties.street);
-  if (properties.locality) parts.push(properties.locality);
-  if (properties.district && properties.district !== properties.locality)
-    parts.push(properties.district);
-  if (properties.city) parts.push(properties.city);
+  const parts = [
+    properties.name,
+    properties.street,
+    properties.locality,
+    properties.district,
+    properties.city,
+    properties.county,
+    properties.state,
+  ].filter((part, index, allParts) => part && allParts.indexOf(part) === index);
   if (properties.country && parts.length === 0) parts.push(properties.country);
 
   return {
@@ -78,8 +78,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   onClose,
   onConfirm,
 }) => {
-  const webViewRef = useRef<WebView>(null);
-  const reverseTimeoutRef = useRef<any>(null);
+  const webViewRef = useRef<WebView<object>>(null);
 
   const [longitude, setLongitude] = useState<number>(
     initialCoordinates ? initialCoordinates[0] : DEFAULT_LONGITUDE,
@@ -97,9 +96,9 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       ? initialCoordinates[1].toFixed(6)
       : DEFAULT_LATITUDE.toFixed(6),
   );
+  const [isLocationSelected, setIsLocationSelected] = useState<boolean>(Boolean(initialCoordinates));
   const [addressNote, setAddressNote] = useState<string>(initialAddressNote);
   const [detectedAddress, setDetectedAddress] = useState<string>("");
-  const [isReverseGeocoding, setIsReverseGeocoding] = useState<boolean>(false);
 
   // Trạng thái tìm kiếm địa điểm
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -109,29 +108,46 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
   const [locatingGPS, setLocatingGPS] = useState<boolean>(false);
   const [isMapReady, setIsMapReady] = useState<boolean>(false);
+  const [isResolvingAddress, setIsResolvingAddress] = useState<boolean>(false);
+  const [addressLookupError, setAddressLookupError] = useState<boolean>(false);
+  const addressLookupRequestRef = useRef(0);
 
-  // Tự động Reverse Geocode khi tọa độ thay đổi
-  const reverseGeocode = async (lat: number, lng: number) => {
-    setIsReverseGeocoding(true);
+  const resolveSelectedAddress = useCallback(async (lat: number, lng: number) => {
+    const requestId = ++addressLookupRequestRef.current;
+    setDetectedAddress("");
+    setAddressLookupError(false);
+    setIsResolvingAddress(true);
+
     try {
       const response = await fetch(
-        `https://photon.komoot.io/reverse?lon=${lng}&lat=${lat}`,
+        // The public Photon instance does not support `vi`; omitting `lang`
+        // lets it return the local name for Vietnamese locations.
+        `https://photon.komoot.io/reverse?lon=${encodeURIComponent(lng)}&lat=${encodeURIComponent(lat)}&limit=1`,
       );
+      if (!response.ok) throw new Error("Address lookup failed");
+
       const data = await response.json();
-      if (data && data.features && data.features.length > 0) {
-        const { fullAddress } = formatPhotonProperties(
-          data.features[0].properties,
-        );
-        if (fullAddress) {
-          setDetectedAddress(fullAddress);
-        }
+      if (requestId !== addressLookupRequestRef.current) return;
+
+      const properties = data?.features?.[0]?.properties;
+      if (!properties) {
+        setAddressLookupError(true);
+        return;
       }
+
+      const { name, fullAddress } = formatPhotonProperties(properties);
+      const address = fullAddress || name;
+      if (!address || address === "Vị trí được chọn") {
+        setAddressLookupError(true);
+        return;
+      }
+      setDetectedAddress(address);
     } catch {
-      // Bỏ qua lỗi mạng tra cứu địa chỉ nền
+      if (requestId === addressLookupRequestRef.current) setAddressLookupError(true);
     } finally {
-      setIsReverseGeocoding(false);
+      if (requestId === addressLookupRequestRef.current) setIsResolvingAddress(false);
     }
-  };
+  }, []);
 
   // Cập nhật khi mở modal hoặc initialCoordinates thay đổi
   useEffect(() => {
@@ -142,19 +158,19 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       const initLat = initialCoordinates
         ? initialCoordinates[1]
         : DEFAULT_LATITUDE;
+      // The picker keeps its draft pin in local state while the modal is open.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLongitude(initLng);
       setLatitude(initLat);
-      setLngInput(initLng.toFixed(6));
-      setLatInput(initLat.toFixed(6));
+      setLngInput(initialCoordinates ? initLng.toFixed(6) : "");
+      setLatInput(initialCoordinates ? initLat.toFixed(6) : "");
+      setIsLocationSelected(Boolean(initialCoordinates));
       setAddressNote(initialAddressNote || "");
       setSearchQuery("");
       setSearchResults([]);
       setSearchError("");
 
-      // Tra cứu địa chỉ ban đầu
-      reverseGeocode(initLat, initLng);
-
-      if (isMapReady && webViewRef.current) {
+      if (initialCoordinates && isMapReady && webViewRef.current) {
         webViewRef.current.injectJavaScript(`
           if (typeof window.updateMapLocation === 'function') {
             window.updateMapLocation(${initLat}, ${initLng}, 16);
@@ -165,33 +181,42 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     }
   }, [visible, initialCoordinates, initialAddressNote, isMapReady]);
 
+  useEffect(() => {
+    if (!visible || !initialCoordinates) {
+      addressLookupRequestRef.current += 1;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsResolvingAddress(false);
+      setDetectedAddress("");
+      setAddressLookupError(false);
+      return;
+    }
+    void resolveSelectedAddress(initialCoordinates[1], initialCoordinates[0]);
+  }, [visible, initialCoordinates, resolveSelectedAddress]);
+
   // Xử lý message từ Leaflet Map trong WebView
   const handleWebViewMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === "MAP_READY") {
         setIsMapReady(true);
-        webViewRef.current?.injectJavaScript(`
-          if (typeof window.updateMapLocation === 'function') {
-            window.updateMapLocation(${latitude}, ${longitude}, 16);
-          }
-          true;
-        `);
+        if (initialCoordinates) {
+          webViewRef.current?.injectJavaScript(`
+            if (typeof window.updateMapLocation === 'function') {
+              window.updateMapLocation(${latitude}, ${longitude}, 16);
+            }
+            true;
+          `);
+        }
       } else if (data.type === "LOCATION_CHANGED") {
         const newLat = parseFloat(data.latitude);
         const newLng = parseFloat(data.longitude);
         if (!isNaN(newLat) && !isNaN(newLng)) {
           setLatitude(newLat);
           setLongitude(newLng);
+          setIsLocationSelected(true);
           setLatInput(newLat.toFixed(6));
           setLngInput(newLng.toFixed(6));
-
-          // Đợi 400ms sau khi ngừng chạm/kéo thì dịch địa chỉ
-          if (reverseTimeoutRef.current)
-            clearTimeout(reverseTimeoutRef.current);
-          reverseTimeoutRef.current = setTimeout(() => {
-            reverseGeocode(newLat, newLng);
-          }, 400);
+          void resolveSelectedAddress(newLat, newLng);
         }
       }
     } catch {
@@ -245,11 +270,15 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   // Chọn địa điểm từ danh sách gợi ý
   const handleSelectSearchResult = (item: SearchPlaceItem) => {
     const [newLng, newLat] = item.coordinates;
+    addressLookupRequestRef.current += 1;
+    setIsResolvingAddress(false);
+    setAddressLookupError(false);
     setLongitude(newLng);
     setLatitude(newLat);
     setLngInput(newLng.toFixed(6));
     setLatInput(newLat.toFixed(6));
     setDetectedAddress(item.fullAddress);
+    setIsLocationSelected(true);
     setSearchResults([]);
     setSearchQuery(item.name);
 
@@ -258,7 +287,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       setAddressNote(item.fullAddress);
     }
 
-    // Di chuyển bản đồ đến điểm vừa chọn
+    // Di chuyển bản đồ đến địa điểm người dùng đã chọn.
     webViewRef.current?.injectJavaScript(`
       if (typeof window.updateMapLocation === 'function') {
         window.updateMapLocation(${newLat}, ${newLng}, 16);
@@ -288,11 +317,10 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       const newLng = current.coords.longitude;
       setLatitude(newLat);
       setLongitude(newLng);
+      setIsLocationSelected(true);
       setLatInput(newLat.toFixed(6));
       setLngInput(newLng.toFixed(6));
-
-      // Dịch địa chỉ GPS
-      reverseGeocode(newLat, newLng);
+      void resolveSelectedAddress(newLat, newLng);
 
       // Di chuyển bản đồ tới tọa độ GPS mới
       webViewRef.current?.injectJavaScript(`
@@ -315,7 +343,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   const handleApplyManualInputs = () => {
     const parsedLng = parseFloat(lngInput);
     const parsedLat = parseFloat(latInput);
-    if (isNaN(parsedLng) || isNaN(parsedLat)) {
+    if (!Number.isFinite(parsedLng) || !Number.isFinite(parsedLat) || parsedLng < -180 || parsedLng > 180 || parsedLat < -90 || parsedLat > 90) {
       Alert.alert(
         "Tọa độ không hợp lệ",
         "Vui lòng kiểm tra lại kinh độ và vĩ độ.",
@@ -324,7 +352,8 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     }
     setLongitude(parsedLng);
     setLatitude(parsedLat);
-    reverseGeocode(parsedLat, parsedLng);
+    setIsLocationSelected(true);
+    void resolveSelectedAddress(parsedLat, parsedLng);
     webViewRef.current?.injectJavaScript(`
       if (typeof window.updateMapLocation === 'function') {
         window.updateMapLocation(${parsedLat}, ${parsedLng}, 16);
@@ -344,7 +373,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   const handleConfirm = () => {
     const parsedLng = parseFloat(lngInput);
     const parsedLat = parseFloat(latInput);
-    if (isNaN(parsedLng) || isNaN(parsedLat)) {
+    if (!isLocationSelected || !Number.isFinite(parsedLng) || !Number.isFinite(parsedLat) || parsedLng < -180 || parsedLng > 180 || parsedLat < -90 || parsedLat > 90) {
       Alert.alert("Tọa độ chưa đúng", "Vui lòng chọn hoặc nhập tọa độ hợp lệ.");
       return;
     }
@@ -389,9 +418,6 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             position: absolute;
             border-radius: 50%;
           }
-          .leaflet-control-attribution {
-            display: none !important;
-          }
         </style>
       </head>
       <body>
@@ -399,12 +425,12 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
         <script>
           var map = L.map('map', {
             zoomControl: true,
-            attributionControl: false
+            attributionControl: true
           }).setView([${latitude}, ${longitude}], 15);
 
-          // Lớp bản đồ OpenStreetMap chính thức (tile.openstreetmap.de) không watermark, miễn phí 100%
           L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
-            maxZoom: 19
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
           }).addTo(map);
 
           var pinIcon = L.divIcon({
@@ -414,10 +440,19 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             iconAnchor: [17, 34]
           });
 
-          var marker = L.marker([${latitude}, ${longitude}], {
-            icon: pinIcon,
-            draggable: true
-          }).addTo(map);
+          var marker = null;
+
+          function placeMarker(lat, lng) {
+            if (!marker) {
+              marker = L.marker([lat, lng], { icon: pinIcon, draggable: true }).addTo(map);
+              marker.on('dragend', function() {
+                var pos = marker.getLatLng();
+                notifyApp(pos.lat, pos.lng);
+              });
+            } else {
+              marker.setLatLng([lat, lng]);
+            }
+          }
 
           function notifyApp(lat, lng) {
             if (window.ReactNativeWebView) {
@@ -431,19 +466,13 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
           // Chạm vào bất kỳ điểm nào trên bản đồ để di chuyển ghim
           map.on('click', function(e) {
-            marker.setLatLng(e.latlng);
+            placeMarker(e.latlng.lat, e.latlng.lng);
             notifyApp(e.latlng.lat, e.latlng.lng);
-          });
-
-          // Kéo thả ghim
-          marker.on('dragend', function(e) {
-            var pos = marker.getLatLng();
-            notifyApp(pos.lat, pos.lng);
           });
 
           // Hàm cập nhật từ React Native
           window.updateMapLocation = function(lat, lng, zoomLevel) {
-            marker.setLatLng([lat, lng]);
+            placeMarker(lat, lng);
             map.setView([lat, lng], zoomLevel || 16);
           };
 
@@ -564,7 +593,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
         {/* Khu vực Bản đồ Tương tác Leaflet / OpenStreetMap */}
         <View style={styles.mapContainer}>
-          <WebView
+          <WebView<object>
             ref={webViewRef}
             originWhitelist={["*"]}
             source={{ html: leafletHtml }}
@@ -607,22 +636,18 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Khung Thông Tin Địa Chỉ Nhận Diện (Reverse Geocoded Address) */}
+        {/* Khung địa danh người dùng đã chọn từ tìm kiếm */}
         <View style={styles.detectedAddressBox}>
           <View style={styles.detectedHeaderRow}>
             <Compass size={16} color={THEME.colors.primary.main} />
-            <Text style={styles.detectedTitle}>ĐỊA CHỈ TẠI ĐIỂM GHIM:</Text>
-            {isReverseGeocoding && (
-              <ActivityIndicator
-                size="small"
-                color={THEME.colors.primary.main}
-                style={{ marginLeft: 6 }}
-              />
-            )}
+            <Text style={styles.detectedTitle}>ĐỊA BÀN CỦA VỊ TRÍ ĐANG GHIM:</Text>
           </View>
           <Text style={styles.detectedContentText} numberOfLines={2}>
-            {detectedAddress ||
-              "Chạm hoặc kéo ghim đỏ để nhận diện địa chỉ cụ thể."}
+            {isResolvingAddress
+              ? "Đang tra cứu tên địa bàn..."
+              : detectedAddress || (addressLookupError
+                ? "Chưa tra được tên địa bàn. Bạn vẫn có thể xác nhận bằng tọa độ đã chọn."
+                : "Chạm bản đồ để ghim vị trí và xem tên địa bàn.")}
           </Text>
           {detectedAddress ? (
             <TouchableOpacity
@@ -693,8 +718,9 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             <Text style={styles.cancelBtnText}>Hủy bỏ</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.confirmBtn}
+            style={[styles.confirmBtn, !isLocationSelected && styles.confirmBtnDisabled]}
             onPress={handleConfirm}
+            disabled={!isLocationSelected}
             activeOpacity={0.85}
           >
             <Check size={18} color="#FFFFFF" />
@@ -900,6 +926,7 @@ const styles = StyleSheet.create({
     color: THEME.colors.primary.dark,
     marginLeft: 6,
     letterSpacing: 0.5,
+    flexShrink: 1,
   },
   detectedContentText: {
     fontSize: THEME.typography.fontSizes.xs,
@@ -981,6 +1008,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: THEME.colors.emergency.main,
     ...THEME.shadows.sm,
+  },
+  confirmBtnDisabled: {
+    opacity: 0.45,
   },
   confirmBtnText: {
     fontSize: THEME.typography.fontSizes.sm,

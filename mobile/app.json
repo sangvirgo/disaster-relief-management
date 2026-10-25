@@ -33,7 +33,13 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-router",
+        {
+          "root": "src/app"
+        }
+      ]
     ]
   }
 }

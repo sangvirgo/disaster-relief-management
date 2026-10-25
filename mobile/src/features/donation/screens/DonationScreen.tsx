@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,16 +10,20 @@ import {
   Modal,
   Image,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { goBackOrHome } from '../../../navigation/back';
 import * as ImagePicker from 'expo-image-picker';
+import * as Clipboard from 'expo-clipboard';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
 import { LogisticsApi } from '../../../api/logisticsApi';
 import {
   DonationDrive,
   DonationTrackingDetail,
   PublicDonationReportSummary,
 } from '../../../types/api';
-import { StorageService, generateRandomSecret } from '../../../utils/secureStore';
+import { PendingDonationCommand, StorageService, generateUUID } from '../../../utils/secureStore';
+import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { useAuthStore } from '../../../store/authStore';
 import { THEME } from '../../../constants/theme';
 import {
@@ -34,16 +38,16 @@ import {
   CheckCircle2,
   RefreshCw,
   Camera,
+  Copy,
   ImageIcon,
   X,
   BookmarkCheck,
   MessageSquareWarning,
   BarChart3,
-  FileEdit,
 } from 'lucide-react-native';
 
 export const DonationScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const router = useRouter();
   const { isAuthenticated } = useAuthStore();
 
   // Tab: 'DRIVES' (Danh sách đợt quyên góp) | 'TRACKING' (Tra cứu biên nhận)
@@ -52,6 +56,10 @@ export const DonationScreen: React.FC = () => {
   // Dữ liệu đợt quyên góp
   const [drives, setDrives] = useState<DonationDrive[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [drivesError, setDrivesError] = useState<string | null>(null);
+  const [driveCursor, setDriveCursor] = useState<string | undefined>();
+  const [moreDrives, setMoreDrives] = useState<boolean>(false);
+  const [loadingMoreDrives, setLoadingMoreDrives] = useState<boolean>(false);
 
   // Modal khai báo quyên góp
   const [selectedDrive, setSelectedDrive] = useState<DonationDrive | null>(null);
@@ -60,23 +68,30 @@ export const DonationScreen: React.FC = () => {
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [donationPhoto, setDonationPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [pendingDonationCommand, setPendingDonationCommand] = useState<PendingDonationCommand | null>(null);
+  const [submissionReceipt, setSubmissionReceipt] = useState<{
+    id: string;
+    publicCode: string;
+    secret: string;
+    description: string;
+  } | null>(null);
 
   // Tra cứu & Thao tác biên nhận quyên góp
   const [searchCode, setSearchCode] = useState<string>('');
+  const [donationTrackingSecret, setDonationTrackingSecret] = useState<string>('');
+  const [donationRecoveryCode, setDonationRecoveryCode] = useState<string>('');
+  const [recoveryIdempotencyKey, setRecoveryIdempotencyKey] = useState<string>(generateUUID);
   const [trackingLoading, setTrackingLoading] = useState<boolean>(false);
   const [trackingResult, setTrackingResult] = useState<DonationTrackingDetail | null>(null);
   const [trackingError, setTrackingError] = useState<string | null>(null);
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
+  const [trackingCapabilityAvailable, setTrackingCapabilityAvailable] = useState<boolean>(false);
+  const [claimedDonationIds, setClaimedDonationIds] = useState<string[]>([]);
 
   // Khiếu nại kiểm đếm
   const [showDisputeModal, setShowDisputeModal] = useState<boolean>(false);
   const [disputeReason, setDisputeReason] = useState<string>('');
   const [isSubmittingDispute, setIsSubmittingDispute] = useState<boolean>(false);
-
-  // Sửa bản khai quyên góp trước khi kiểm đếm
-  const [showReviseModal, setShowReviseModal] = useState<boolean>(false);
-  const [reviseQuantities, setReviseQuantities] = useState<Record<string, string>>({});
-  const [isSubmittingRevise, setIsSubmittingRevise] = useState<boolean>(false);
 
   // Báo cáo minh bạch quyên góp
   const [selectedReportDrive, setSelectedReportDrive] = useState<DonationDrive | null>(null);
@@ -87,24 +102,26 @@ export const DonationScreen: React.FC = () => {
   const [previewPhotoUri, setPreviewPhotoUri] = useState<string | null>(null);
 
   const [recentReceipts, setRecentReceipts] = useState<
-    Array<{
+    {
       id: string;
       public_code: string;
-      secret: string;
       drive_title?: string;
       created_at: string;
-    }>
+    }[]
   >([]);
 
-  const fetchDrives = async () => {
-    setLoading(true);
+  const fetchDrives = async (cursor?: string, append = false) => {
+    setDrivesError(null);
     try {
-      const data = await LogisticsApi.getPublicDonationDrives();
-      setDrives(data);
-    } catch (e) {
-      console.warn('Lỗi tải đợt quyên góp:', e);
+      const page = await LogisticsApi.getPublicDonationDrives(50, cursor);
+      setDrives((current) => append ? [...current, ...page.items] : page.items);
+      setDriveCursor(page.cursor);
+      setMoreDrives(page.more);
+    } catch (error) {
+      setDrivesError(getApiErrorMessage(error, 'Không thể tải các đợt tiếp nhận. Vui lòng thử lại.'));
     } finally {
       setLoading(false);
+      setLoadingMoreDrives(false);
     }
   };
 
@@ -113,12 +130,38 @@ export const DonationScreen: React.FC = () => {
     setRecentReceipts(list);
   };
 
+  const getReceiptSecret = async (id: string, publicCode: string): Promise<string | undefined> => {
+    return (await StorageService.getSecretForDonation(id))
+      || (await StorageService.getSecretForDonation(publicCode))
+      || undefined;
+  };
+
   useEffect(() => {
+    // Load drives and restore any command left pending by an interrupted submission.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDrives();
     loadRecentReceipts();
+    StorageService.getPendingDonation().then(async (pending) => {
+      if (!pending) return;
+      setPendingDonationCommand(pending);
+      setDonorName(pending.payload.donor_name);
+      setDonorPhone(pending.payload.donor_phone);
+      setQuantities(Object.fromEntries(pending.payload.lines.map((line) => [line.item_id, line.declared_quantity])));
+      let knownDrive: DonationDrive | null = null;
+      try {
+        knownDrive = await LogisticsApi.getDonationDriveDetail(pending.driveId);
+      } catch {
+        // The pending command can still be retried with its original payload and key.
+      }
+      setSelectedDrive(knownDrive || { id: pending.driveId, title: pending.driveTitle, status: 'OPEN', items: [] });
+    }).catch(() => Alert.alert('Không thể khôi phục lần khai báo', 'Không đọc được bản khai đang chờ trên thiết bị.'));
   }, []);
 
   const handleOpenDonateModal = (drive: DonationDrive) => {
+    if (drive.campaign_status === 'PAUSED' || drive.campaign_status === 'CLOSED') {
+      Alert.alert('Đợt tiếp nhận đã dừng', 'Đợt quyên góp này hiện không nhận khai báo bàn giao mới.');
+      return;
+    }
     setSelectedDrive(drive);
     setQuantities({});
     setDonationPhoto(null);
@@ -166,35 +209,60 @@ export const DonationScreen: React.FC = () => {
   };
 
   const handleSubmitDeclaration = async () => {
-    if (!selectedDrive) return;
-    if (!donorName.trim() || !donorPhone.trim()) {
+    if (!selectedDrive && !pendingDonationCommand) return;
+    if (selectedDrive && (selectedDrive.campaign_status === 'PAUSED' || selectedDrive.campaign_status === 'CLOSED')) {
+      Alert.alert('Đợt tiếp nhận đã dừng', 'Đợt quyên góp này hiện không nhận khai báo bàn giao mới.');
+      return;
+    }
+    const normalizedPhone = donorPhone.trim().replace(/[\s()-]/g, '');
+    if (!pendingDonationCommand && (!donorName.trim() || !normalizedPhone)) {
       Alert.alert('Thiếu thông tin', 'Vui lòng nhập họ tên và số điện thoại người bàn giao.');
       return;
     }
+    if (!pendingDonationCommand && (donorName.trim().length > 200 || !/^\+?[0-9]{8,15}$/.test(normalizedPhone))) {
+      Alert.alert('Thông tin chưa hợp lệ', 'Họ tên tối đa 200 ký tự; số điện thoại cần có 8–15 chữ số và có thể bắt đầu bằng dấu +.');
+      return;
+    }
 
-    const lines = Object.entries(quantities)
-      .filter(([_, q]) => parseFloat(q) > 0)
-      .map(([itemId, q]) => ({
-        item_id: itemId,
-        declared_quantity: q.trim(),
-      }));
+    const hasInvalidQuantity = Object.values(quantities).some((value) => {
+      const quantity = value.trim();
+      return quantity !== '' && !/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(quantity);
+    });
+    if (!pendingDonationCommand && hasInvalidQuantity) {
+      Alert.alert('Số lượng chưa hợp lệ', 'Nhập số thập phân không âm, không dùng dấu phân cách hàng nghìn hoặc số mũ.');
+      return;
+    }
 
-    if (lines.length === 0) {
+    const lines = Object.entries(quantities).flatMap(([itemId, value]) => {
+      const quantity = value.trim();
+      if (!/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(quantity) || !/[1-9]/.test(quantity.replace('.', ''))) return [];
+      return [{ item_id: itemId, declared_quantity: quantity }];
+    });
+
+    if (!pendingDonationCommand && lines.length === 0) {
       Alert.alert('Chưa chọn hiện vật', 'Vui lòng nhập số lượng cho ít nhất 1 loại hàng cứu trợ.');
       return;
     }
 
     setIsSubmitting(true);
+    let evidenceFailed = false;
     try {
-      const secret = generateRandomSecret();
+      const payload = pendingDonationCommand?.payload || {
+        donor_name: donorName.trim(),
+        donor_phone: normalizedPhone,
+        lines,
+      };
+      const command = pendingDonationCommand || await StorageService.getOrCreatePendingDonation(
+        selectedDrive!.id,
+        payload,
+        selectedDrive!.title
+      );
+      setPendingDonationCommand(command);
       const res = await LogisticsApi.declareDonation(
-        selectedDrive.id,
-        {
-          donor_name: donorName.trim(),
-          donor_phone: donorPhone.trim(),
-          lines,
-        },
-        secret
+        command.driveId,
+        command.payload,
+        command.donationSecret,
+        command.idempotencyKey
       );
 
       // Tải ảnh kiện hàng lên MinIO nếu người hảo tâm đã chọn ảnh
@@ -207,10 +275,10 @@ export const DonationScreen: React.FC = () => {
               name: donationPhoto.fileName || `donation-${res.id}.jpg`,
               type: donationPhoto.mimeType || 'image/jpeg',
             },
-            secret
+            command.donationSecret
           );
-        } catch (uploadErr) {
-          console.warn('Lỗi tải ảnh kiện hàng:', uploadErr);
+        } catch {
+          evidenceFailed = true;
         }
       }
 
@@ -218,39 +286,27 @@ export const DonationScreen: React.FC = () => {
       await StorageService.saveDonationReceipt({
         id: res.id,
         public_code: res.public_code,
-        secret,
-        drive_title: selectedDrive.title,
+        secret: command.donationSecret,
+        drive_title: command.driveTitle,
       });
+      await StorageService.clearPendingDonation();
+      setPendingDonationCommand(null);
       await loadRecentReceipts();
 
-      Alert.alert(
-        'ĐÃ KHAI BÁO BÀN GIAO THÀNH CÔNG',
-        `Mã biên nhận của bạn là: ${res.public_code}\n\nThủ kho sẽ tiến hành kiểm đếm độc lập khi nhận hàng tại kho. Bạn có thể tra cứu kết quả kiểm đếm ngay trên ứng dụng.`,
-        [
-          {
-            text: 'Đóng',
-            onPress: () => {
-              setSelectedDrive(null);
-              setDonorName('');
-              setDonorPhone('');
-              setDonationPhoto(null);
-            },
-          },
-          {
-            text: 'Tra cứu tiến độ ngay',
-            onPress: () => {
-              setSelectedDrive(null);
-              setDonorName('');
-              setDonorPhone('');
-              setDonationPhoto(null);
-              setActiveTab('TRACKING');
-              handleTrackDonation(res.id, secret);
-            },
-          },
-        ]
-      );
-    } catch (e: any) {
-      Alert.alert('Lỗi', typeof e === 'string' ? e : 'Không thể gửi khai báo bàn giao hàng cứu trợ.');
+      setSelectedDrive(null);
+      setDonorName('');
+      setDonorPhone('');
+      setDonationPhoto(null);
+      setSubmissionReceipt({
+        id: res.id,
+        publicCode: res.public_code,
+        secret: command.donationSecret,
+        description: evidenceFailed
+          ? 'Tờ khai đã được ghi nhận, nhưng ảnh minh chứng chưa tải lên. Vui lòng liên hệ kho tiếp nhận để gửi bổ sung.'
+          : 'Thủ kho sẽ kiểm đếm độc lập khi nhận hàng.',
+      });
+    } catch (error: any) {
+      Alert.alert('Lỗi', getApiErrorMessage(error, 'Không thể gửi khai báo. Bản khai và khóa lần gửi được giữ lại để thử lại an toàn.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -259,22 +315,29 @@ export const DonationScreen: React.FC = () => {
   // Lưu biên nhận vào tài khoản đã đăng nhập
   const handleClaimDonation = async () => {
     if (!trackingResult) return;
+    if (!trackingCapabilityAvailable) {
+      Alert.alert('Cần khóa bí mật', 'Để liên kết biên nhận, hãy nhập khóa bí mật đã được cấp khi khai báo.');
+      return;
+    }
     setIsClaiming(true);
     try {
       let secret: string | undefined;
       const saved = recentReceipts.find(
         (r) => r.id === trackingResult.id || r.public_code === trackingResult.public_code
       );
-      if (saved) secret = saved.secret;
-      if (!secret) {
-        const found = await StorageService.getSecretForDonation(trackingResult.id);
-        if (found) secret = found;
-      }
+      if (saved) secret = await getReceiptSecret(saved.id, saved.public_code);
+      if (!secret) secret = await getReceiptSecret(trackingResult.id, trackingResult.public_code);
 
       await LogisticsApi.claimDonation(trackingResult.id, secret);
+      setClaimedDonationIds((current) => current.includes(trackingResult.id) ? current : [...current, trackingResult.id]);
       Alert.alert('Thành công', 'Biên nhận cứu trợ đã được gắn vĩnh viễn vào tài khoản của bạn.');
     } catch (err: any) {
-      Alert.alert('Lỗi', typeof err === 'string' ? err : 'Không thể lưu biên nhận vào tài khoản.');
+      if (isApiErrorCode(err, 'ALREADY_CLAIMED')) {
+        setClaimedDonationIds((current) => current.includes(trackingResult.id) ? current : [...current, trackingResult.id]);
+        Alert.alert('Đã liên kết', 'Biên nhận này đã được liên kết với một tài khoản.');
+      } else {
+        Alert.alert('Lỗi', getApiErrorMessage(err, 'Không thể lưu biên nhận vào tài khoản.'));
+      }
     } finally {
       setIsClaiming(false);
     }
@@ -292,11 +355,8 @@ export const DonationScreen: React.FC = () => {
       const saved = recentReceipts.find(
         (r) => r.id === trackingResult.id || r.public_code === trackingResult.public_code
       );
-      if (saved) secret = saved.secret;
-      if (!secret) {
-        const found = await StorageService.getSecretForDonation(trackingResult.id);
-        if (found) secret = found;
-      }
+      if (saved) secret = await getReceiptSecret(saved.id, saved.public_code);
+      if (!secret) secret = await getReceiptSecret(trackingResult.id, trackingResult.public_code);
 
       await LogisticsApi.openDonationDispute(trackingResult.id, disputeReason.trim(), secret);
       Alert.alert('Đã gửi khiếu nại', 'Khiếu nại kiểm đếm đã gửi đến quản lý kho để đối soát lại.');
@@ -304,7 +364,7 @@ export const DonationScreen: React.FC = () => {
       setDisputeReason('');
       handleTrackDonation(trackingResult.id, secret);
     } catch (err: any) {
-      Alert.alert('Lỗi', typeof err === 'string' ? err : 'Không thể gửi khiếu nại kiểm đếm.');
+      Alert.alert('Lỗi', getApiErrorMessage(err, 'Không thể gửi khiếu nại kiểm đếm.'));
     } finally {
       setIsSubmittingDispute(false);
     }
@@ -319,9 +379,15 @@ export const DonationScreen: React.FC = () => {
 
     setTrackingLoading(true);
     setTrackingError(null);
+    setTrackingResult(null);
+    setTrackingCapabilityAvailable(false);
     try {
       let resolvedId = query;
-      let secret = targetSecret;
+      let secret = targetSecret || (
+        query.toUpperCase() === searchCode.trim().toUpperCase()
+          ? donationTrackingSecret.trim() || undefined
+          : undefined
+      );
 
       // Tìm trong danh sách đã lưu nếu là public_code
       const saved = recentReceipts.find(
@@ -329,24 +395,61 @@ export const DonationScreen: React.FC = () => {
       );
       if (saved) {
         resolvedId = saved.id;
-        if (!secret) secret = saved.secret;
+        setSearchCode(saved.public_code);
+        if (!secret) secret = await getReceiptSecret(saved.id, saved.public_code);
+      } else if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(query)) {
+        throw new Error('DONATION_RECOVERY_REQUIRED');
       }
 
       if (!secret) {
-        const foundSecret = await StorageService.getSecretForDonation(resolvedId);
-        if (foundSecret) secret = foundSecret;
+        secret = await getReceiptSecret(resolvedId, query);
       }
 
       const res = await LogisticsApi.trackDonation(resolvedId, secret);
       setTrackingResult(res);
+      setTrackingCapabilityAvailable(Boolean(secret));
       setSearchCode(res.public_code || query);
+      if (secret) {
+        try {
+          await StorageService.saveDonationReceipt({ id: res.id, public_code: res.public_code, secret });
+          await loadRecentReceipts();
+        } catch {
+          // Keep the API result visible even if secure local persistence is unavailable.
+        }
+      }
     } catch (err: any) {
-      setTrackingError(
-        typeof err === 'string'
-          ? err
-          : 'Không tìm thấy biên nhận quyên góp. Vui lòng kiểm tra lại mã hoặc thử lại sau.'
-      );
+      setTrackingError(err?.message === 'DONATION_RECOVERY_REQUIRED'
+        ? 'Mã công khai cần được liên kết bằng mã khôi phục do kho tiếp nhận cấp.'
+        : getApiErrorMessage(err, 'Không tìm thấy biên nhận quyên góp. Vui lòng kiểm tra lại mã hoặc thử lại sau.'));
       setTrackingResult(null);
+      setTrackingCapabilityAvailable(false);
+    } finally {
+      setTrackingLoading(false);
+    }
+  };
+
+  const handleRecoverDonation = async () => {
+    const publicCode = searchCode.trim().toUpperCase();
+    if (!publicCode || !donationRecoveryCode.trim()) {
+      Alert.alert('Thiếu thông tin', 'Vui lòng nhập mã biên nhận và mã khôi phục do kho tiếp nhận cấp.');
+      return;
+    }
+    setTrackingLoading(true);
+    setTrackingError(null);
+    setTrackingResult(null);
+    setTrackingCapabilityAvailable(false);
+    try {
+      const recovered = await LogisticsApi.recoverDonation(publicCode, donationRecoveryCode.trim(), recoveryIdempotencyKey);
+      const detail = await LogisticsApi.trackDonation(recovered.id);
+      setTrackingResult(detail);
+      setTrackingCapabilityAvailable(false);
+      setClaimedDonationIds((current) => current.includes(detail.id) ? current : [...current, detail.id]);
+      setSearchCode(detail.public_code);
+      setDonationRecoveryCode('');
+      setRecoveryIdempotencyKey(generateUUID());
+      await loadRecentReceipts();
+    } catch (error) {
+      setTrackingError(getApiErrorMessage(error, 'Không thể khôi phục biên nhận. Hãy kiểm tra mã hoặc liên hệ kho tiếp nhận.'));
     } finally {
       setTrackingLoading(false);
     }
@@ -366,69 +469,70 @@ export const DonationScreen: React.FC = () => {
     }
   };
 
-  const handleOpenReviseModal = () => {
-    if (!trackingResult?.declaration?.lines) return;
-    const initial: Record<string, string> = {};
-    trackingResult.declaration.lines.forEach((line) => {
-      if (line.item_id) {
-        const num = parseFloat(line.declared_quantity || '0');
-        initial[line.item_id] = isNaN(num) ? '0' : String(num);
-      }
-    });
-    setReviseQuantities(initial);
-    setShowReviseModal(true);
-  };
-
-  const handleSubmitRevise = async () => {
-    if (!trackingResult) return;
-    const lines = Object.entries(reviseQuantities)
-      .filter(([_, q]) => Number(q) > 0)
-      .map(([item_id, declared_quantity]) => ({ item_id, declared_quantity }));
-
-    if (lines.length === 0) {
-      Alert.alert('Chưa có số lượng', 'Vui lòng nhập số lượng cho ít nhất một loại hiện vật.');
-      return;
-    }
-
-    setIsSubmittingRevise(true);
-    try {
-      let secret: string | undefined;
-      const saved = recentReceipts.find(
-        (r) => r.id === trackingResult.id || r.public_code === trackingResult.public_code
-      );
-      if (saved) secret = saved.secret;
-      if (!secret) secret = (await StorageService.getSecretForDonation(trackingResult.id)) || undefined;
-
-      await LogisticsApi.reviseDonationDeclaration(
-        trackingResult.id,
-        {
-          expected_version: trackingResult.declaration.revision || 1,
-          lines,
-        },
-        secret
-      );
-
-      Alert.alert('Thành công', 'Đã cập nhật lại bản khai số lượng hiện vật trước khi kiểm đếm.');
-      setShowReviseModal(false);
-      handleTrackDonation(trackingResult.id, secret);
-    } catch (err: any) {
-      Alert.alert(
-        'Lỗi cập nhật',
-        typeof err === 'string'
-          ? err
-          : 'Không thể cập nhật bản khai. Có thể thủ kho đã bắt đầu kiểm đếm.'
-      );
-    } finally {
-      setIsSubmittingRevise(false);
-    }
-  };
-
   const formatNumberVN = (val: number | string | undefined | null): string => {
     if (val === undefined || val === null || val === '') return '0';
-    const num = typeof val === 'string' ? parseFloat(val) : val;
-    if (isNaN(num)) return '0';
-    return new Intl.NumberFormat('vi-VN').format(num);
+    const raw = String(val).trim();
+    const match = /^(\d+)(?:\.(\d+))?$/.exec(raw);
+    if (!match) return raw;
+    const integer = match[1].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    const fraction = match[2]?.replace(/0+$/, '');
+    return fraction ? `${integer},${fraction}` : integer;
   };
+
+  const copyDonationCode = async (code: string) => {
+    try {
+      await Clipboard.setStringAsync(code);
+      Alert.alert('Đã sao chép', 'Mã biên nhận đã được sao chép vào bộ nhớ tạm.');
+    } catch {
+      Alert.alert('Không thể sao chép', 'Vui lòng thử lại.');
+    }
+  };
+
+  const subtractQuantities = (targetValue: string, acceptedValue: string): string => {
+    const target = /^(\d+)(?:\.(\d+))?$/.exec(targetValue);
+    const accepted = /^(\d+)(?:\.(\d+))?$/.exec(acceptedValue);
+    if (!target || !accepted) return '0';
+    const scale = Math.max(target[2]?.length || 0, accepted[2]?.length || 0);
+    const toScaled = (match: RegExpExecArray) => BigInt(`${match[1]}${(match[2] || '').padEnd(scale, '0')}`);
+    const difference = toScaled(target) - toScaled(accepted);
+    if (difference <= 0n) return '0';
+    const digits = difference.toString().padStart(scale + 1, '0');
+    if (scale === 0) return digits;
+    const whole = digits.slice(0, -scale);
+    const fraction = digits.slice(-scale).replace(/0+$/, '');
+    return fraction ? `${whole}.${fraction}` : whole;
+  };
+
+  const compareQuantities = (leftValue: string, rightValue: string): number => {
+    const left = /^(\d+)(?:\.(\d+))?$/.exec(leftValue);
+    const right = /^(\d+)(?:\.(\d+))?$/.exec(rightValue);
+    if (!left || !right) return 0;
+    const scale = Math.max(left[2]?.length || 0, right[2]?.length || 0);
+    const toScaled = (match: RegExpExecArray) => BigInt(`${match[1]}${(match[2] || '').padEnd(scale, '0')}`);
+    const leftScaled = toScaled(left);
+    const rightScaled = toScaled(right);
+    return leftScaled > rightScaled ? 1 : leftScaled < rightScaled ? -1 : 0;
+  };
+
+  const percentageComplete = (acceptedValue: string, targetValue: string): number => {
+    const accepted = /^(\d+)(?:\.(\d+))?$/.exec(acceptedValue);
+    const target = /^(\d+)(?:\.(\d+))?$/.exec(targetValue);
+    if (!accepted || !target) return 0;
+    const scale = Math.max(accepted[2]?.length || 0, target[2]?.length || 0);
+    const toScaled = (match: RegExpExecArray) => BigInt(`${match[1]}${(match[2] || '').padEnd(scale, '0')}`);
+    const acceptedScaled = toScaled(accepted);
+    const targetScaled = toScaled(target);
+    if (targetScaled <= 0n) return 0;
+    const percent = (acceptedScaled * 100n) / targetScaled;
+    return Number(percent > 100n ? 100n : percent);
+  };
+
+  const canRecoverDonation = Boolean(
+    isAuthenticated &&
+    trackingError &&
+    searchCode.trim() &&
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(searchCode.trim())
+  );
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -443,18 +547,21 @@ export const DonationScreen: React.FC = () => {
       case 'POSTED':
         return { label: 'Đã nhập kho chính thức', color: '#059669', bg: '#D1FAE5' };
       default:
-        return { label: status, color: THEME.colors.text.secondary, bg: '#F1F5F9' };
+        return { label: 'Đang xử lý', color: THEME.colors.text.secondary, bg: '#F1F5F9' };
     }
   };
 
   const renderDriveItem = (item: DonationDrive) => {
+    const canAcceptDonations = item.campaign_status !== 'PAUSED' && item.campaign_status !== 'CLOSED';
     return (
       <View key={item.id} style={styles.driveCard}>
         <View style={styles.driveHeader}>
           <HeartHandshake size={24} color={THEME.colors.primary.main} />
           <View style={{ flex: 1, marginLeft: 10 }}>
             <Text style={styles.driveTitle}>{item.title}</Text>
-            <Text style={styles.driveStatus}>Đang tiếp nhận tại kho</Text>
+            <Text style={styles.driveStatus}>
+              {canAcceptDonations ? 'Đang tiếp nhận tại kho' : 'Đợt tiếp nhận đã tạm dừng'}
+            </Text>
           </View>
         </View>
 
@@ -472,12 +579,12 @@ export const DonationScreen: React.FC = () => {
           <Text style={styles.itemsHeader}>TIẾN ĐỘ TIẾP NHẬN NHU YẾU PHẨM:</Text>
           {item.items &&
             item.items.map((it) => {
-              const target = Number(it.target_quantity) || 0;
-              const accepted = Number(it.accepted_total) || 0;
-              const remaining = Math.max(0, target - accepted);
-              const pct = target > 0 ? Math.min(100, Math.round((accepted / target) * 100)) : 0;
+              const target = it.target_quantity || '0';
+              const accepted = it.accepted_total || '0';
+              const remaining = subtractQuantities(target, accepted);
+              const pct = percentageComplete(accepted, target);
               const unit = it.unit_name || 'đơn vị';
-              const isFulfilled = remaining === 0 && target > 0;
+              const isFulfilled = compareQuantities(accepted, target) >= 0 && compareQuantities(target, '0') > 0;
 
               return (
                 <View key={it.item_id} style={styles.itemProgressCard}>
@@ -527,10 +634,10 @@ export const DonationScreen: React.FC = () => {
                       <Text
                         style={[
                           styles.itemStatValue,
-                          remaining > 0 ? styles.itemStatRemaining : styles.itemStatDone,
+                          compareQuantities(remaining, '0') > 0 ? styles.itemStatRemaining : styles.itemStatDone,
                         ]}
                       >
-                        {remaining > 0 ? `${formatNumberVN(remaining)} ${unit}` : 'Đã đủ'}
+                        {compareQuantities(remaining, '0') > 0 ? `${formatNumberVN(remaining)} ${unit}` : 'Đã đủ'}
                       </Text>
                     </View>
                   </View>
@@ -541,8 +648,9 @@ export const DonationScreen: React.FC = () => {
 
         <View style={styles.driveActionRow}>
           <TouchableOpacity
-            style={styles.donateActionBtn}
+            style={[styles.donateActionBtn, !canAcceptDonations && { opacity: 0.5 }]}
             onPress={() => handleOpenDonateModal(item)}
+            disabled={!canAcceptDonations}
             activeOpacity={0.85}
           >
             <Plus size={18} color="#FFFFFF" />
@@ -566,7 +674,7 @@ export const DonationScreen: React.FC = () => {
     <ScreenContainer
       title="Quyên Góp Cứu Trợ"
       subtitle="Ủng hộ hiện vật trực tiếp & minh bạch"
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackOrHome(router)}
     >
       {/* THANH ĐIỀU HƯỚNG TAB */}
       <View style={styles.tabContainer}>
@@ -614,6 +722,15 @@ export const DonationScreen: React.FC = () => {
               <ActivityIndicator size="large" color={THEME.colors.primary.main} />
               <Text style={styles.loadingText}>Đang tải các đợt quyên góp mở...</Text>
             </View>
+          ) : drivesError ? (
+            <View style={styles.emptyCard}>
+              <AlertCircle size={40} color={THEME.colors.emergency.main} />
+              <Text style={styles.emptyTitle}>Không thể tải các đợt tiếp nhận</Text>
+              <Text style={styles.emptySubtitle}>{drivesError}</Text>
+              <TouchableOpacity style={[styles.searchButton, { alignSelf: 'center', marginLeft: 0 }]} onPress={() => fetchDrives()}>
+                <Text style={styles.searchButtonText}>Thử lại</Text>
+              </TouchableOpacity>
+            </View>
           ) : drives.length === 0 ? (
             <View style={styles.emptyCard}>
               <HeartHandshake size={48} color={THEME.colors.text.muted} />
@@ -621,7 +738,22 @@ export const DonationScreen: React.FC = () => {
               <Text style={styles.emptySubtitle}>Các đợt kêu gọi cứu trợ mới sẽ được cập nhật tại đây.</Text>
             </View>
           ) : (
-            <View>{drives.map((drive) => renderDriveItem(drive))}</View>
+            <View>
+              {drives.map((drive) => renderDriveItem(drive))}
+              {moreDrives ? (
+                <TouchableOpacity
+                  style={[styles.searchButton, { alignSelf: 'center', marginLeft: 0, marginTop: 12 }]}
+                  onPress={() => {
+                    if (!driveCursor) return;
+                    setLoadingMoreDrives(true);
+                    fetchDrives(driveCursor, true);
+                  }}
+                  disabled={loadingMoreDrives || !driveCursor}
+                >
+                  {loadingMoreDrives ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.searchButtonText}>Tải thêm đợt tiếp nhận</Text>}
+                </TouchableOpacity>
+              ) : null}
+            </View>
           )}
         </View>
       ) : (
@@ -631,15 +763,21 @@ export const DonationScreen: React.FC = () => {
           <View style={styles.searchCard}>
             <Text style={styles.searchTitle}>TRA CỨU TIẾN ĐỘ KIỂM ĐẾM TẠI KHO</Text>
             <Text style={styles.searchSubtitle}>
-              Nhập mã biên nhận do hệ thống cấp khi bạn bàn giao hàng cứu trợ:
+              Nhập mã định danh tra cứu; mã biên nhận đã lưu trên thiết bị cũng được chấp nhận:
             </Text>
             <View style={styles.searchRow}>
               <TextInput
                 style={styles.searchInput}
-                placeholder="Ví dụ: DN8899..."
+                placeholder="Mã biên nhận hoặc mã định danh tra cứu"
                 placeholderTextColor={THEME.colors.text.muted}
                 value={searchCode}
-                onChangeText={setSearchCode}
+                onChangeText={(value) => {
+                  setSearchCode(value);
+                  setDonationTrackingSecret('');
+                  setTrackingResult(null);
+                  setTrackingCapabilityAvailable(false);
+                  setTrackingError(null);
+                }}
                 autoCapitalize="characters"
               />
               <TouchableOpacity
@@ -658,6 +796,38 @@ export const DonationScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
             </View>
+            <TextInput
+              style={[styles.searchInput, styles.secretInput]}
+              placeholder="Khóa bí mật (nếu bạn đã lưu)"
+              placeholderTextColor={THEME.colors.text.muted}
+              value={donationTrackingSecret}
+              onChangeText={setDonationTrackingSecret}
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry
+            />
+            {canRecoverDonation ? (
+              <View style={styles.recoveryBox}>
+                <Text style={styles.recoveryHint}>Để liên kết mã biên nhận công khai, cần mã khôi phục do kho tiếp nhận cấp.</Text>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Mã khôi phục"
+                  placeholderTextColor={THEME.colors.text.muted}
+                  value={donationRecoveryCode}
+                  onChangeText={setDonationRecoveryCode}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  secureTextEntry
+                />
+                <TouchableOpacity
+                  style={[styles.searchButton, { marginLeft: 0, marginTop: 8, alignSelf: 'flex-start' }]}
+                  onPress={handleRecoverDonation}
+                  disabled={trackingLoading}
+                >
+                  {trackingLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.searchButtonText}>Khôi phục biên nhận</Text>}
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
 
           {/* DANH SÁCH BIÊN NHẬN GẦN ĐÂY ĐÃ LƯU TRÊN THIẾT BỊ */}
@@ -671,7 +841,7 @@ export const DonationScreen: React.FC = () => {
                 <TouchableOpacity
                   key={item.id}
                   style={styles.recentCard}
-                  onPress={() => handleTrackDonation(item.id, item.secret)}
+                  onPress={() => handleTrackDonation(item.id)}
                   activeOpacity={0.8}
                 >
                   <View style={{ flex: 1 }}>
@@ -705,6 +875,14 @@ export const DonationScreen: React.FC = () => {
                   <View>
                     <Text style={styles.resultCodeLabel}>MÃ BIÊN NHẬN BÀN GIAO</Text>
                     <Text style={styles.resultCodeValue}>{trackingResult.public_code}</Text>
+                    <TouchableOpacity
+                      style={styles.copyReceiptCodeBtn}
+                      onPress={() => copyDonationCode(trackingResult.public_code)}
+                      activeOpacity={0.75}
+                    >
+                      <Copy size={14} color={THEME.colors.primary.main} />
+                      <Text style={styles.copyReceiptCodeText}>Sao chép mã</Text>
+                    </TouchableOpacity>
                   </View>
                   <View
                     style={[
@@ -772,7 +950,7 @@ export const DonationScreen: React.FC = () => {
                               {line.accepted_quantity != null ? formatNumberVN(line.accepted_quantity) : '--'}
                             </Text>
                           </View>
-                          {Number(line.rejected_quantity) > 0 ? (
+                          {line.rejected_quantity != null && compareQuantities(String(line.rejected_quantity), '0') > 0 ? (
                             <View style={styles.lineStatItem}>
                               <Text style={styles.lineStatLabel}>Từ chối:</Text>
                               <Text style={[styles.lineStatVal, { color: THEME.colors.emergency.main }]}>
@@ -854,18 +1032,7 @@ export const DonationScreen: React.FC = () => {
 
               {/* HÀNG NÚT THAO TÁC BIÊN NHẬN */}
               <View style={styles.actionButtonsCol}>
-                {trackingResult.status === 'DECLARED' && (
-                  <TouchableOpacity
-                    style={styles.reviseBtn}
-                    onPress={handleOpenReviseModal}
-                    activeOpacity={0.8}
-                  >
-                    <FileEdit size={18} color={THEME.colors.primary.main} />
-                    <Text style={styles.reviseBtnText}>Sửa Số Lượng Khai Báo (Chưa Kiểm Đếm)</Text>
-                  </TouchableOpacity>
-                )}
-
-                {isAuthenticated && (
+                {isAuthenticated && trackingCapabilityAvailable && !claimedDonationIds.includes(trackingResult.id) && (
                   <TouchableOpacity
                     style={styles.claimBtn}
                     onPress={handleClaimDonation}
@@ -941,9 +1108,9 @@ export const DonationScreen: React.FC = () => {
             <Text style={[styles.inputLabel, { marginTop: 12 }]}>Số lượng từng loại hiện vật:</Text>
             {selectedDrive?.items &&
               selectedDrive.items.map((it) => {
-                const target = Number(it.target_quantity) || 0;
-                const accepted = Number(it.accepted_total) || 0;
-                const remaining = Math.max(0, target - accepted);
+                const target = it.target_quantity || '0';
+                const accepted = it.accepted_total || '0';
+                const remaining = subtractQuantities(target, accepted);
                 const unit = it.unit_name || 'đơn vị';
 
                 return (
@@ -953,7 +1120,7 @@ export const DonationScreen: React.FC = () => {
                         {it.item_name || it.name} ({unit})
                       </Text>
                       <Text style={styles.modalItemRemaining}>
-                        {remaining > 0
+                        {compareQuantities(remaining, '0') > 0
                           ? `Đang cần thêm: ${formatNumberVN(remaining)} ${unit}`
                           : `Đã đủ mục tiêu (${formatNumberVN(target)} ${unit})`}
                       </Text>
@@ -1071,63 +1238,6 @@ export const DonationScreen: React.FC = () => {
         </View>
       </Modal>
 
-      {/* MODAL SỬA BẢN KHAI HIỆN VẬT */}
-      <Modal visible={showReviseModal} transparent={true} animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>SỬA SỐ LƯỢNG BẢN KHAI</Text>
-            <Text style={styles.modalSubtitle}>
-              Thủ kho chưa tiến hành kiểm đếm. Bạn có thể cập nhật lại số lượng hàng thực tế mang đến kho:
-            </Text>
-
-            {trackingResult?.declaration?.lines?.map((line, idx) => {
-              const itemId = line.item_id || String(idx);
-              const itemName = line.item_name || 'Hiện vật';
-              const unit = line.unit_name || 'đơn vị';
-
-              return (
-                <View key={itemId} style={styles.modalItemRow}>
-                  <View style={{ flex: 1, marginRight: 10 }}>
-                    <Text style={styles.modalItemName}>{itemName}</Text>
-                    <Text style={styles.modalItemRemaining}>Đơn vị: {unit}</Text>
-                  </View>
-                  <TextInput
-                    style={styles.modalItemInput}
-                    placeholder="0"
-                    placeholderTextColor={THEME.colors.text.muted}
-                    keyboardType="numeric"
-                    value={reviseQuantities[itemId] || ''}
-                    onChangeText={(val) =>
-                      setReviseQuantities((prev) => ({ ...prev, [itemId]: val }))
-                    }
-                  />
-                </View>
-              );
-            })}
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setShowReviseModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Hủy</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalSubmitBtn}
-                onPress={handleSubmitRevise}
-                disabled={isSubmittingRevise}
-              >
-                {isSubmittingRevise ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.modalSubmitText}>Lưu Thay Đổi</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
       {/* MODAL BÁO CÁO MINH BẠCH QUYÊN GÓP */}
       <Modal visible={!!selectedReportDrive} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
@@ -1222,6 +1332,30 @@ export const DonationScreen: React.FC = () => {
           )}
         </View>
       </Modal>
+
+      {submissionReceipt ? (
+        <CopyableInfoModal
+          visible
+          title="Đã khai báo bàn giao thành công"
+          description={submissionReceipt.description}
+          helperText="Lưu mã định danh và khóa bí mật để tra cứu trên thiết bị khác."
+          credentials={[
+            { key: 'donation-public-code', label: 'Mã biên nhận', value: submissionReceipt.publicCode },
+            { key: 'donation-id', label: 'Mã định danh tra cứu', value: submissionReceipt.id },
+            { key: 'donation-secret', label: 'Khóa bí mật', value: submissionReceipt.secret, sensitive: true },
+          ]}
+          onClose={() => setSubmissionReceipt(null)}
+          primaryAction={{
+            label: 'Tra cứu tiến độ ngay',
+            onPress: () => {
+              const { id, secret } = submissionReceipt;
+              setSubmissionReceipt(null);
+              setActiveTab('TRACKING');
+              handleTrackDonation(id, secret);
+            },
+          }}
+        />
+      ) : null}
     </ScreenContainer>
   );
 };
@@ -1536,6 +1670,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: THEME.colors.text.primary,
   },
+  secretInput: {
+    flex: 0,
+    width: '100%',
+    marginTop: 8,
+  },
+  recoveryBox: {
+    backgroundColor: THEME.colors.primary.bg,
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 10,
+  },
+  recoveryHint: {
+    color: THEME.colors.text.secondary,
+    fontSize: THEME.typography.fontSizes.xs,
+    marginBottom: 8,
+  },
   searchButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1634,6 +1784,18 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: THEME.colors.primary.main,
     marginTop: 2,
+  },
+  copyReceiptCodeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+  },
+  copyReceiptCodeText: {
+    color: THEME.colors.primary.main,
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 5,
   },
   statusBadge: {
     paddingHorizontal: 10,

@@ -8,15 +8,17 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { IdentityApi } from '../../../api/identityApi';
+import { getApiErrorMessage } from '../../../api/client';
 import { useAuthStore } from '../../../store/authStore';
 import { THEME } from '../../../constants/theme';
 import { KeyRound, Lock, Eye, EyeOff, ShieldAlert, CheckCircle2 } from 'lucide-react-native';
 
 export const ChangePasswordScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const router = useRouter();
   const { user, refreshMe } = useAuthStore();
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -59,20 +61,14 @@ export const ChangePasswordScreen: React.FC = () => {
         {
           text: 'Đồng ý',
           onPress: () => {
-            if (navigation.canGoBack()) {
-              navigation.goBack();
-            } else {
-              navigation.replace('EmergencyHomeScreen');
-            }
+            goBackOrHome(router);
           },
         },
       ]);
     } catch (err: any) {
       Alert.alert(
         'Lỗi đổi mật khẩu',
-        typeof err === 'string'
-          ? err
-          : 'Không thể đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu hiện tại.'
+        getApiErrorMessage(err, 'Không thể đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu hiện tại.')
       );
     } finally {
       setIsSubmitting(false);
@@ -80,7 +76,7 @@ export const ChangePasswordScreen: React.FC = () => {
   };
 
   return (
-    <ScreenContainer title="Đổi Mật Khẩu" onBack={() => navigation.goBack()} scrollable={true}>
+      <ScreenContainer title="Đổi Mật Khẩu" onBack={() => goBackOrHome(router)} scrollable={true}>
       {/* CẢNH BÁO ĐỔI MẬT KHẨU MẶC ĐỊNH NẾU CÓ */}
       {user?.must_change_password && (
         <View style={styles.warningBanner}>

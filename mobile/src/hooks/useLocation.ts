@@ -21,18 +21,57 @@ export function useLocation() {
       }
 
       setPermissionDenied(false);
-      // Lấy vị trí với độ chính xác cao
-      const currentLocation = await Location.getCurrentPositionAsync({
+
+      // Thử lấy nhanh vị trí đã biết gần nhất trong bộ nhớ đệm
+      try {
+        const lastKnown = await Location.getLastKnownPositionAsync();
+        if (lastKnown?.coords) {
+          const acc = typeof lastKnown.coords.accuracy === 'number' && Number.isFinite(lastKnown.coords.accuracy)
+            ? lastKnown.coords.accuracy
+            : 50;
+          setLocation({
+            type: 'Point',
+            coordinates: [lastKnown.coords.longitude, lastKnown.coords.latitude],
+            source: 'GPS',
+            accuracy_m: acc,
+            captured_at: new Date(lastKnown.timestamp).toISOString(),
+          });
+        }
+      } catch {
+        // Tiếp tục lấy GPS tươi bên dưới
+      }
+
+      // Lấy vị trí GPS tươi với thời gian chờ tối đa 8 giây để tránh treo ứng dụng
+      const locationPromise = Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
 
-      setLocation({
-        type: 'Point',
-        coordinates: [currentLocation.coords.longitude, currentLocation.coords.latitude],
-        source: 'GPS',
-        accuracy_m: Math.round(currentLocation.coords.accuracy || 10),
-        captured_at: new Date(currentLocation.timestamp).toISOString(),
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 8000);
       });
+
+      const currentLocation = await Promise.race([locationPromise, timeoutPromise]);
+
+      if (currentLocation && currentLocation.coords) {
+        const accuracy = currentLocation.coords.accuracy;
+        if (typeof accuracy === 'number' && Number.isFinite(accuracy) && accuracy >= 0) {
+          setLocation({
+            type: 'Point',
+            coordinates: [currentLocation.coords.longitude, currentLocation.coords.latitude],
+            source: 'GPS',
+            accuracy_m: accuracy,
+            captured_at: new Date(currentLocation.timestamp).toISOString(),
+          });
+        }
+      } else {
+        // Hết thời gian chờ 8s mà chưa có GPS mới: giữ vị trí đệm nếu có, hoặc báo để ghim bản đồ
+        setLocation((prev) => {
+          if (!prev) {
+            setErrorMsg('Tín hiệu GPS yếu hoặc thiết bị đang trong nhà. Bạn có thể ghim vị trí ngay trên bản đồ.');
+          }
+          return prev;
+        });
+      }
     } catch (error: any) {
       console.warn('Lỗi lấy GPS:', error);
       setErrorMsg('Không thể bắt được vị trí GPS. Vui lòng bật định vị hoặc ghim thủ công.');
@@ -42,11 +81,12 @@ export function useLocation() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     requestAndFetchLocation();
   }, [requestAndFetchLocation]);
 
   // Cho phép ghim thủ công trên bản đồ (MANUAL_PIN) khi GPS yếu hoặc người dùng chỉnh lại
-  const setManualLocation = (longitude: number, latitude: number) => {
+  const setManualLocation = useCallback((longitude: number, latitude: number) => {
     setLocation({
       type: 'Point',
       coordinates: [longitude, latitude],
@@ -54,7 +94,13 @@ export function useLocation() {
       captured_at: new Date().toISOString(),
     });
     setErrorMsg(null);
-  };
+  }, []);
+
+  const setLocationSnapshot = useCallback((snapshot: GeoLocation) => {
+    setLocation(snapshot);
+    setErrorMsg(null);
+    setPermissionDenied(false);
+  }, []);
 
   return {
     location,
@@ -63,5 +109,6 @@ export function useLocation() {
     permissionDenied,
     refreshLocation: requestAndFetchLocation,
     setManualLocation,
+    setLocationSnapshot,
   };
 }

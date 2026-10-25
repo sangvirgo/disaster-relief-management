@@ -9,7 +9,8 @@ import {
   ScrollView,
   RefreshControl,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { ResponseApi } from '../../../api/responseApi';
 import { NoticeItem } from '../../../types/api';
@@ -18,7 +19,7 @@ import { THEME } from '../../../constants/theme';
 import { Bell, AlertCircle, CheckCircle2, ChevronRight, RefreshCw, X } from 'lucide-react-native';
 
 export const NoticesScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const router = useRouter();
 
   const [notices, setNotices] = useState<NoticeItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -39,7 +40,8 @@ export const NoticesScreen: React.FC = () => {
   }, [filterUnread]);
 
   useEffect(() => {
-    setLoading(true);
+    // Initial loading is already true; this starts the initial request.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchNotices();
   }, [fetchNotices]);
 
@@ -68,7 +70,7 @@ export const NoticesScreen: React.FC = () => {
     <ScreenContainer
       title="Thông Báo Khẩn"
       subtitle="Từ Ban Chỉ Huy Điều Phối Cứu Trợ"
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackOrHome(router)}
       scrollable={false}
       headerRight={
         <TouchableOpacity onPress={onRefresh} style={styles.refreshBtn}>

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity, StatusBar } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Image } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
 import { THEME } from '../../constants/theme';
@@ -11,6 +12,7 @@ interface ScreenContainerProps {
   scrollable?: boolean;
   onBack?: () => void;
   headerRight?: React.ReactNode;
+  showLogo?: boolean;
 }
 
 export const ScreenContainer: React.FC<ScreenContainerProps> = ({
@@ -20,18 +22,26 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   scrollable = true,
   onBack,
   headerRight,
+  showLogo,
 }) => {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={THEME.colors.surface.background} />
+      <StatusBar style="dark" />
 
-      {(title || onBack || headerRight) && (
+      {(title || onBack || headerRight || showLogo) && (
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             {onBack && (
               <TouchableOpacity onPress={onBack} style={styles.backButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <ChevronLeft size={26} color={THEME.colors.text.primary} />
               </TouchableOpacity>
+            )}
+            {showLogo && (
+              <Image
+                source={require('../../../assets/reliva-logo.png')}
+                style={styles.headerLogo}
+                resizeMode="contain"
+              />
             )}
             <View>
               {title && <Text style={styles.title}>{title}</Text>}
@@ -84,6 +94,12 @@ const styles = StyleSheet.create({
   backButton: {
     marginRight: 8,
     padding: 4,
+  },
+  headerLogo: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    marginRight: 10,
   },
   title: {
     fontSize: THEME.typography.fontSizes.lg,

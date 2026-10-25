@@ -8,34 +8,47 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { ResponseApi } from '../../../api/responseApi';
-import { Mission, MissionStatus } from '../../../types/api';
+import { getApiErrorMessage } from '../../../api/client';
+import { Mission } from '../../../types/api';
 import { INCIDENT_CATEGORIES } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
 import { AlertTriangle, Users, MapPin, ChevronRight, Inbox } from 'lucide-react-native';
 
 export const MissionListScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const router = useRouter();
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<string | undefined>();
+  const [hasMore, setHasMore] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'OFFERED' | 'ACTIVE' | 'COMPLETED'>('OFFERED');
 
-  const fetchMissions = async () => {
-    setLoading(true);
+  const fetchMissions = async (nextCursor?: string, append = false) => {
+    setErrorMessage(null);
+    if (append) setLoadingMore(true);
+    else setLoading(true);
     try {
-      const data = await ResponseApi.getMyMissions();
-      setMissions(data);
+      const page = await ResponseApi.getMyMissions(50, nextCursor);
+      setMissions((current) => append ? [...current, ...page.items] : page.items);
+      setCursor(page.cursor);
+      setHasMore(page.more);
     } catch (e) {
-      console.warn('Lỗi lấy danh sách nhiệm vụ:', e);
+      setErrorMessage(getApiErrorMessage(e, 'Không thể tải danh sách nhiệm vụ. Vui lòng thử lại.'));
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
+    // Initial loading is already true; this starts the initial request.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchMissions();
   }, []);
 
@@ -51,7 +64,7 @@ export const MissionListScreen: React.FC = () => {
     return (
       <TouchableOpacity
         style={styles.missionCard}
-        onPress={() => navigation.navigate('MissionDetailScreen', { missionId: item.id })}
+        onPress={() => router.push({ pathname: '/mission-detail', params: { missionId: item.id } })}
         activeOpacity={0.85}
       >
         <View style={styles.cardTopRow}>
@@ -75,13 +88,17 @@ export const MissionListScreen: React.FC = () => {
         <View style={styles.cardBottomRow}>
           <View style={styles.metaItem}>
             <Users size={16} color={THEME.colors.text.secondary} />
-            <Text style={styles.metaText}>{item.people_affected || 1} người</Text>
+            <Text style={styles.metaText}>
+              {item.people_affected == null ? 'Chưa rõ số người' : `${item.people_affected} người`}
+            </Text>
           </View>
 
           <View style={styles.metaItem}>
             <MapPin size={16} color={THEME.colors.primary.main} />
             <Text style={styles.metaText}>
-              {item.distance_m ? `${(item.distance_m / 1000).toFixed(1)} km` : 'Cách ~1.2 km'}
+              {item.distance_m != null && Number.isFinite(item.distance_m)
+                ? `${(item.distance_m / 1000).toFixed(1)} km`
+                : 'Chưa có khoảng cách'}
             </Text>
           </View>
 
@@ -99,7 +116,7 @@ export const MissionListScreen: React.FC = () => {
       title="Danh Sách Nhiệm Vụ"
       subtitle="Nhiệm vụ cứu hộ được chỉ định"
       scrollable={false}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackOrHome(router)}
     >
       {/* CÁC TAB PHÂN LOẠI */}
       <View style={styles.tabContainer}>
@@ -131,6 +148,15 @@ export const MissionListScreen: React.FC = () => {
           <ActivityIndicator size="large" color={THEME.colors.primary.main} />
           <Text style={styles.loadingText}>Đang tải danh sách nhiệm vụ...</Text>
         </View>
+      ) : errorMessage ? (
+        <View style={styles.emptyBox}>
+          <Inbox size={48} color={THEME.colors.emergency.main} />
+          <Text style={styles.emptyTitle}>Không thể tải nhiệm vụ</Text>
+          <Text style={styles.emptySubtitle}>{errorMessage}</Text>
+          <TouchableOpacity onPress={() => fetchMissions()} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Thử lại</Text>
+          </TouchableOpacity>
+        </View>
       ) : filteredMissions.length === 0 ? (
         <View style={styles.emptyBox}>
           <Inbox size={48} color={THEME.colors.text.muted} />
@@ -140,6 +166,15 @@ export const MissionListScreen: React.FC = () => {
               ? 'Hiện tại không có nhiệm vụ mới đang chờ tiếp nhận.'
               : 'Không có nhiệm vụ trong mục này.'}
           </Text>
+          {hasMore ? (
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => cursor && fetchMissions(cursor, true)}
+              disabled={loadingMore || !cursor}
+            >
+              {loadingMore ? <ActivityIndicator color={THEME.colors.primary.main} /> : <Text style={styles.retryButtonText}>Tải thêm</Text>}
+            </TouchableOpacity>
+          ) : null}
         </View>
       ) : (
         <FlatList
@@ -149,6 +184,15 @@ export const MissionListScreen: React.FC = () => {
           contentContainerStyle={{ paddingBottom: 20 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchMissions} />}
+          ListFooterComponent={hasMore ? (
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => cursor && fetchMissions(cursor, true)}
+              disabled={loadingMore || !cursor}
+            >
+              {loadingMore ? <ActivityIndicator color={THEME.colors.primary.main} /> : <Text style={styles.retryButtonText}>Tải thêm</Text>}
+            </TouchableOpacity>
+          ) : undefined}
         />
       )}
     </ScreenContainer>
@@ -287,5 +331,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     lineHeight: 18,
+  },
+  retryButton: {
+    alignSelf: 'center',
+    backgroundColor: THEME.colors.primary.bg,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginTop: 12,
+  },
+  retryButtonText: {
+    color: THEME.colors.primary.main,
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '700',
   },
 });

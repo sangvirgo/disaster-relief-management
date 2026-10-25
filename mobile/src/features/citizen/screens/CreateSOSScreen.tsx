@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,18 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { useLocation } from '../../../hooks/useLocation';
 import { INCIDENT_CATEGORIES } from '../../../constants/labels';
 import { IncidentCategoryCode, CreateSOSPayload } from '../../../types/api';
 import { ResponseApi } from '../../../api/responseApi';
-import { StorageService, generateRandomSecret } from '../../../utils/secureStore';
+import { getApiErrorMessage } from '../../../api/client';
+import { PendingSOSCommand, StorageService } from '../../../utils/secureStore';
 import { THEME } from '../../../constants/theme';
 import { LocationPickerModal } from '../../../components/common/LocationPickerModal';
+import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
 import {
   MapPin,
   AlertTriangle,
@@ -26,23 +29,24 @@ import {
   FileText,
   Send,
   RefreshCw,
-  Info,
   Map,
-  CheckCircle2,
+  Trash2,
+  AlertCircle,
 } from 'lucide-react-native';
 
 export const CreateSOSScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const router = useRouter();
   const {
     location,
     loading: locationLoading,
     errorMsg: locationError,
     refreshLocation,
     setManualLocation,
+    setLocationSnapshot,
   } = useLocation();
 
   const [selectedCategory, setSelectedCategory] = useState<IncidentCategoryCode>('FLOOD');
-  const [peopleAffected, setPeopleAffected] = useState<string>('1');
+  const [peopleAffected, setPeopleAffected] = useState<string>('');
   const [declaredDanger, setDeclaredDanger] = useState<boolean>(false);
   const [reporterName, setReporterName] = useState<string>('');
   const [reporterPhone, setReporterPhone] = useState<string>('');
@@ -50,6 +54,33 @@ export const CreateSOSScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isMapModalVisible, setIsMapModalVisible] = useState<boolean>(false);
   const [locationNote, setLocationNote] = useState<string>('');
+  const [pendingCommand, setPendingCommand] = useState<PendingSOSCommand | null>(null);
+  const [restoringPending, setRestoringPending] = useState<boolean>(true);
+  const [submissionSuccess, setSubmissionSuccess] = useState<{
+    trackingCode: string;
+    trackingSecret: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    StorageService.getPendingSOS()
+      .then((pending) => {
+        if (!mounted || !pending) return;
+        setPendingCommand(pending);
+        setSelectedCategory(pending.payload.incident_category_code);
+        setPeopleAffected(pending.payload.people_affected == null ? '' : String(pending.payload.people_affected));
+        setDeclaredDanger(Boolean(pending.payload.reporter_declared_danger));
+        setReporterName(pending.payload.reporter_name || '');
+        setReporterPhone(pending.payload.reporter_contact_phone || '');
+        setDescription(pending.payload.description || '');
+        setLocationSnapshot(pending.payload.location);
+      })
+      .catch(() => {
+        if (mounted) Alert.alert('Không thể khôi phục yêu cầu', 'Không đọc được bản gửi đang chờ trên thiết bị. Vui lòng thử khởi động lại ứng dụng.');
+      })
+      .finally(() => mounted && setRestoringPending(false));
+    return () => { mounted = false; };
+  }, [setLocationSnapshot]);
 
   const handleConfirmManualLocation = (coords: [number, number], note?: string) => {
     setManualLocation(coords[0], coords[1]);
@@ -58,8 +89,38 @@ export const CreateSOSScreen: React.FC = () => {
     }
   };
 
+  const handleDiscardPending = () => {
+    Alert.alert(
+      'Hủy bản gửi đang chờ?',
+      'Bạn có chắc muốn xóa bản gửi chưa hoàn tất này để bắt đầu soạn yêu cầu cứu nạn mới?',
+      [
+        { text: 'Giữ lại', style: 'cancel' },
+        {
+          text: 'Xóa & Tạo mới',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await StorageService.clearPendingSOS();
+              setPendingCommand(null);
+              setSelectedCategory('FLOOD');
+              setPeopleAffected('');
+              setDeclaredDanger(false);
+              setReporterName('');
+              setReporterPhone('');
+              setDescription('');
+              setLocationNote('');
+              refreshLocation();
+            } catch {
+              Alert.alert('Lỗi', 'Không thể xóa bản lưu tạm.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSubmit = async () => {
-    if (!location) {
+    if (!pendingCommand && !location) {
       Alert.alert(
         'Chưa có vị trí',
         'Vui lòng chọn hoặc ghim vị trí hiện trường trên bản đồ trước khi gửi yêu cầu cứu nạn.',
@@ -71,56 +132,48 @@ export const CreateSOSScreen: React.FC = () => {
       return;
     }
 
-    const headcount = parseInt(peopleAffected, 10);
-    if (isNaN(headcount) || headcount < 1) {
-      Alert.alert('Thông tin chưa hợp lệ', 'Vui lòng nhập số người cần hỗ trợ ít nhất là 1 người.');
+    const headcountText = peopleAffected.trim();
+    const headcount = headcountText ? Number(headcountText) : null;
+    if (!pendingCommand && headcountText && (!/^\d+$/.test(headcountText) || !Number.isInteger(headcount) || (headcount as number) < 1 || (headcount as number) > 10000)) {
+      Alert.alert('Thông tin chưa hợp lệ', 'Số người cần hỗ trợ phải là số nguyên từ 1 đến 10.000; để trống nếu chưa rõ.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // 1. Sinh chuỗi bí mật tra cứu dành riêng cho thiết bị này
-      const trackingSecret = generateRandomSecret();
-
-      const combinedDescription = [
-        locationNote ? `[Vị trí: ${locationNote}]` : '',
-        description.trim(),
-      ]
-        .filter(Boolean)
-        .join(' ');
-
-      const payload: CreateSOSPayload = {
+      const combinedDescription = [locationNote ? `[Vị trí: ${locationNote}]` : '', description.trim()]
+        .filter(Boolean).join(' ');
+      const payload: CreateSOSPayload = pendingCommand?.payload || {
         incident_category_code: selectedCategory,
         description: combinedDescription || undefined,
         people_affected: headcount,
         reporter_name: reporterName.trim() || undefined,
         reporter_contact_phone: reporterPhone.trim() || undefined,
         reporter_declared_danger: declaredDanger,
-        location,
+        location: location!,
       };
 
-      // 2. Gửi yêu cầu lên máy chủ Response
-      const response = await ResponseApi.createSelfSOS(payload, trackingSecret);
+      // Ghi bền khóa idempotency và capability trước khi gửi để retry an toàn sau timeout.
+      const command = pendingCommand || await StorageService.getOrCreatePendingSOS(payload);
+      setPendingCommand(command);
+      const response = await ResponseApi.createSelfSOS(payload, command.trackingSecret, command.idempotencyKey);
 
-      // 3. Lưu mã bí mật vào SecureStore để tra cứu về sau
-      await StorageService.saveGuestTrackingSecret(response.tracking_code, trackingSecret);
+      await StorageService.saveGuestTrackingSecret(response.tracking_code, command.trackingSecret);
+      await StorageService.clearPendingSOS();
+      setPendingCommand(null);
 
-      Alert.alert(
-        'ĐÃ GỬI YÊU CẦU THÀNH CÔNG',
-        `Mã tra cứu của bạn là: ${response.tracking_code}\n\nĐiều phối viên đang xác minh và điều phối đội cứu hộ đến vị trí của bạn. Vui lòng giữ liên lạc và tiết kiệm pin!`,
-        [
-          {
-            text: 'Theo dõi tiến độ ngay',
-            onPress: () =>
-              navigation.replace('SOSTrackingScreen', {
-                trackingCode: response.tracking_code,
-                trackingSecret,
-              }),
-          },
-        ]
-      );
+      setSubmissionSuccess({
+        trackingCode: response.tracking_code,
+        trackingSecret: command.trackingSecret,
+      });
     } catch (error: any) {
-      Alert.alert('Không thể gửi yêu cầu', typeof error === 'string' ? error : 'Đã có lỗi xảy ra. Vui lòng kiểm tra kết nối mạng và thử lại.');
+      if (error instanceof Error && error.message === 'PENDING_SOS_MUST_BE_RESUMED') {
+        Alert.alert('Có yêu cầu đang chờ xác nhận', 'Ứng dụng giữ nguyên nội dung và khóa của lần gửi trước để tránh tạo SOS trùng. Hãy khôi phục nội dung cũ hoặc chờ kết nối rồi gửi lại.');
+      } else if (error instanceof Error && error.message === 'PENDING_COMMAND_TOO_LARGE') {
+        Alert.alert('Bản gửi quá dài', 'Không thể lưu an toàn để bảo đảm gửi lại đúng một lần. Hãy rút gọn mô tả rồi thử lại.');
+      } else {
+        Alert.alert('Không thể gửi yêu cầu', getApiErrorMessage(error, 'Đã có lỗi xảy ra. Bản gửi được giữ lại để bạn thử lại an toàn.'));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -130,8 +183,29 @@ export const CreateSOSScreen: React.FC = () => {
     <ScreenContainer
       title="Báo Cứu Nạn Tại Chỗ"
       subtitle="Gửi vị trí & tình trạng khẩn cấp"
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackOrHome(router)}
     >
+      {/* Cảnh báo khi có bản lưu pending từ lần gửi trước */}
+      {pendingCommand ? (
+        <View style={styles.pendingBanner}>
+          <View style={styles.pendingBannerHeader}>
+            <AlertCircle size={18} color={THEME.colors.warning.dark} />
+            <Text style={styles.pendingBannerTitle}>Có bản gửi cứu nạn chưa hoàn tất</Text>
+          </View>
+          <Text style={styles.pendingBannerDesc}>
+            Ứng dụng đã khôi phục lại dữ liệu lần gửi trước để bạn không phải nhập lại. Bạn có thể kiểm tra lại rồi bấm Gửi tiếp, hoặc hủy bản cũ để tạo mới.
+          </Text>
+          <TouchableOpacity
+            style={styles.discardPendingBtn}
+            onPress={handleDiscardPending}
+            activeOpacity={0.8}
+          >
+            <Trash2 size={14} color={THEME.colors.emergency.main} />
+            <Text style={styles.discardPendingText}>Xóa bản cũ & Soạn yêu cầu mới</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       {/* 1. TỌA ĐỘ VỊ TRÍ HIỆN TRƯỜNG */}
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
@@ -180,7 +254,7 @@ export const CreateSOSScreen: React.FC = () => {
             </View>
             <Text style={styles.accuracyText}>
               {location.source === 'GPS'
-                ? `Độ chính xác: ±${location.accuracy_m || 10}m (Từ định vị GPS thiết bị)`
+                ? `Độ chính xác thiết bị báo: ±${location.accuracy_m}m (GPS)`
                 : 'Đã ghim thủ công chính xác trên bản đồ'}
             </Text>
             {locationNote ? (
@@ -344,7 +418,7 @@ export const CreateSOSScreen: React.FC = () => {
       <TouchableOpacity
         style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
         onPress={handleSubmit}
-        disabled={isSubmitting}
+        disabled={isSubmitting || restoringPending}
         activeOpacity={0.85}
       >
         {isSubmitting ? (
@@ -356,6 +430,28 @@ export const CreateSOSScreen: React.FC = () => {
           </>
         )}
       </TouchableOpacity>
+
+      {submissionSuccess ? (
+        <CopyableInfoModal
+          visible
+          title="Đã gửi yêu cầu cứu nạn"
+          description="Máy chủ đã ghi nhận yêu cầu. Điều phối viên sẽ xác minh thông tin trước khi điều phối lực lượng."
+          helperText="Hãy lưu mã tra cứu và khóa bí mật để tra cứu trên thiết bị khác."
+          credentials={[
+            { key: 'tracking-code', label: 'Mã tra cứu', value: submissionSuccess.trackingCode },
+            { key: 'tracking-secret', label: 'Khóa bí mật', value: submissionSuccess.trackingSecret, sensitive: true },
+          ]}
+          onClose={() => setSubmissionSuccess(null)}
+          primaryAction={{
+            label: 'Theo dõi tiến độ',
+            onPress: () => {
+              const trackingCode = submissionSuccess.trackingCode;
+              setSubmissionSuccess(null);
+              router.replace({ pathname: '/tracking', params: { trackingCode } });
+            },
+          }}
+        />
+      ) : null}
     </ScreenContainer>
   );
 };
@@ -408,6 +504,48 @@ const styles = StyleSheet.create({
     fontSize: THEME.typography.fontSizes.xs,
     color: THEME.colors.text.secondary,
     marginTop: 4,
+  },
+  pendingBanner: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  pendingBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  pendingBannerTitle: {
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '700',
+    color: '#92400E',
+    marginLeft: 6,
+  },
+  pendingBannerDesc: {
+    fontSize: THEME.typography.fontSizes.xs,
+    color: '#78350F',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  discardPendingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: THEME.colors.emergency.main,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  discardPendingText: {
+    fontSize: THEME.typography.fontSizes.xs,
+    fontWeight: '700',
+    color: THEME.colors.emergency.main,
+    marginLeft: 6,
   },
   locationErrorBox: {
     backgroundColor: THEME.colors.emergency.bg,
