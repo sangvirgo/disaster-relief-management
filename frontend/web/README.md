@@ -17,6 +17,8 @@ The default SOS picker uses Leaflet and MapLibre with OpenFreeMap vector tiles, 
 
 For optional Google Maps, copy `.env.example` to `.env` in `frontend/web/` and set `VITE_GOOGLE_MAPS_API_KEY`. Enable Maps JavaScript API and Places API (New) in the Google Cloud project, configure billing, and restrict the browser key by HTTP referrer and API. Restart Vite after editing `.env`. The key is embedded in browser assets; do not use a server secret here. Without a key, users can still search with Photon, use browser GPS for SELF, or choose a manual pin. The same picker can add a location to a reporter supplement; the backend already accepts `RequestSupplement.location` for human review.
 
+For optional Google sign-in, set `VITE_GOOGLE_CLIENT_ID` to the browser OAuth client ID and configure the corresponding backend audience. Email registration uses the backend OTP delivery settings; without email delivery, verification remains pending until the service can send a code.
+
 ```powershell
 npm.cmd run typecheck
 npm.cmd run build
@@ -52,6 +54,6 @@ The 38 prototype pages are represented as navigation destinations or page famili
 4. Add discoverable handoff history/loss review and broader catalog and stock adjustment management. Do not implement CSV export until a route exists.
 5. Run Phase F Vietnamese, keyboard, contrast and live API checks against the primary databases without reset unless explicitly requested.
 
-No AI scoring, automatic priority/dispatch, cash payments, offline ACK, or fake CSV export is exposed.
+The coordinator can review an AI advisory, but priority and dispatch remain human decisions. Cash payments, offline ACK, and fake CSV export are not exposed.
 
 The [2026-10-21 Web integration audit](../../docs/frontend-web-audit-2026-10-21.md) records the current live checks and remaining acceptance gaps. The full backend test command is not green on this Windows host: all 529 Jest tests pass, followed by seven failing Node script tests concerning host-specific shell/path/permission assumptions.
