@@ -83,7 +83,10 @@ export function Donations({
   const pending = useRef<Pending | null>(null);
   const guestCredentials = user ? 'include' as const : 'omit' as const;
   const [showCreatedTracking, setShowCreatedTracking] = useState(false);
-  useEffect(() => setShowCreatedTracking(false), [page]);
+  useEffect(() => {
+    setShowCreatedTracking(false);
+    setError('');
+  }, [page]);
   async function attachCreated(event: FormEvent) {
     event.preventDefault();
     if (!created || !createdFile) return;

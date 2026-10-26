@@ -1096,10 +1096,7 @@ function App() {
             <div>
               <span className="eyebrow">HỆ THỐNG RELIVA</span>
               <h1>{selected.title}</h1>
-              <p>
-                {selected.note ||
-                  'Thông tin được cập nhật từ dịch vụ theo quyền và phạm vi của tài khoản.'}
-              </p>
+              {selected.note && <p>{selected.note}</p>}
             </div>
           </div>
 

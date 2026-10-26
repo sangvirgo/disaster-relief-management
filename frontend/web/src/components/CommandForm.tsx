@@ -24,6 +24,7 @@ export interface CommandSpec {
   warning?: string;
   build?: (values: Record<string, string>) => Record<string, unknown>;
 }
+const sentenceLabel = (value: string) => value.charAt(0).toLocaleLowerCase('vi-VN') + value.slice(1);
 export function CommandForm({ spec, onSuccess, onStale }: { spec: CommandSpec; onSuccess: () => void; onStale?: () => void }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -35,7 +36,7 @@ export function CommandForm({ spec, onSuccess, onStale }: { spec: CommandSpec; o
     const invalid: Record<string, string> = {};
     for (const field of spec.fields || []) {
       const value = (values[field.name] || '').trim();
-      if (field.required && !value) invalid[field.name] = `Vui lòng ${field.type === 'select' ? 'chọn' : 'nhập'} ${field.label.toLowerCase()}.`;
+      if (field.required && !value) invalid[field.name] = `Vui lòng ${field.type === 'select' ? 'chọn' : 'nhập'} ${sentenceLabel(field.label)}.`;
       else if (value && field.minLength && value.length < field.minLength)
         invalid[field.name] = `${field.label} cần ít nhất ${field.minLength} ký tự.`;
       else if (value && field.maxLength && value.length > field.maxLength)
@@ -80,7 +81,7 @@ export function CommandForm({ spec, onSuccess, onStale }: { spec: CommandSpec; o
         const errors: Record<string, string> = {};
         for (const field of spec.fields || []) {
           if (Object.keys(cause.fieldErrors).some((name) => name === field.name || name.endsWith(`.${field.name}`)))
-            errors[field.name] = `Vui lòng kiểm tra ${field.label.toLowerCase()}.`;
+            errors[field.name] = `Vui lòng kiểm tra ${sentenceLabel(field.label)}.`;
         }
         setFieldErrors(errors);
       }

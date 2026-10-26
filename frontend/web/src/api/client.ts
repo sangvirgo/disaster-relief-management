@@ -65,7 +65,7 @@ function formatFieldErrors(errors: Record<string, string[]> | undefined): string
 function serverError(service: Service, status: number, payload: ErrorEnvelope, fallback: string): ApiError {
   const code = payload.code || (status === 403 ? 'FORBIDDEN' : 'REQUEST_FAILED');
   const reason = messages[code] || (typeof payload.message === 'string' && payload.message.trim()) || fallback;
-  const reference = payload.correlation_id ? ` Mã tra cứu: ${payload.correlation_id}.` : '';
+  const reference = payload.correlation_id ? ` Mã tham chiếu lỗi: ${payload.correlation_id}.` : '';
   return new ApiError(
     code,
     status,

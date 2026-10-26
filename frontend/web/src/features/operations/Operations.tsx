@@ -54,7 +54,7 @@ const distributionPages = new Set(['distribution', 'handoff']);
 function recordTitle(page: string, item: Row): string {
   if (distributionPages.has(page)) return string(item.purpose) ? label(item.purpose) : 'Phiếu phân phối';
   if (page === 'intake') return string(item.donor_name) ? `Đóng góp của ${item.donor_name}` : 'Đóng góp chờ tiếp nhận';
-  return item.title || item.name || item.public_code || string(item.item_name) ||
+  return item.title || item.name || item.public_code || string(item.identifier) || string(item.item_name) ||
     string((item.item as Row | undefined)?.name) || item.id || 'Bản ghi';
 }
 function distributionItems(item: Row): string {
@@ -422,6 +422,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         {detail && (
           <>
             <div className="detail-grid">
+              {page === 'assets' && asset === 'vehicles' && Boolean(detail.identifier) && (
+                <p><strong>Biển số hoặc mã xe</strong><br />{string(detail.identifier)}</p>
+              )}
               {distributionPages.has(page) && Boolean(detail.purpose) && (
                 <p><strong>Mục đích phân phối</strong><br />{label(detail.purpose)}</p>
               )}
