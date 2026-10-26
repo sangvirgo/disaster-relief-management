@@ -56,15 +56,22 @@ const fieldNames: Record<string, string> = {
   tracking_code: 'Mã theo dõi',
   public_code: 'Mã bản khai',
 };
-const fieldLabel = (path: string) => fieldNames[path.split('.').filter(Boolean).at(-1) || ''] || `Trường ${path}`;
+const fieldLabel = (path: string) =>
+  fieldNames[path.split('.').filter(Boolean).at(-1) || ''] || `Trường ${path}`;
 function formatFieldErrors(errors: Record<string, string[]> | undefined): string {
   if (!errors) return '';
   const fields = Object.keys(errors).slice(0, 3).map(fieldLabel);
   return fields.length ? ` Kiểm tra: ${fields.join(', ')}.` : '';
 }
-function serverError(service: Service, status: number, payload: ErrorEnvelope, fallback: string): ApiError {
+function serverError(
+  service: Service,
+  status: number,
+  payload: ErrorEnvelope,
+  fallback: string
+): ApiError {
   const code = payload.code || (status === 403 ? 'FORBIDDEN' : 'REQUEST_FAILED');
-  const reason = messages[code] || (typeof payload.message === 'string' && payload.message.trim()) || fallback;
+  const reason =
+    messages[code] || (typeof payload.message === 'string' && payload.message.trim()) || fallback;
   const reference = payload.correlation_id ? ` Mã tham chiếu lỗi: ${payload.correlation_id}.` : '';
   return new ApiError(
     code,
@@ -135,7 +142,11 @@ async function refresh(): Promise<void> {
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken! },
         body: '{}',
       }).catch(() => {
-        throw new ApiError('NETWORK_UNAVAILABLE', 0, 'Tài khoản: Không thể làm mới phiên vì mất kết nối.');
+        throw new ApiError(
+          'NETWORK_UNAVAILABLE',
+          0,
+          'Tài khoản: Không thể làm mới phiên vì mất kết nối.'
+        );
       });
       if (!response.ok) {
         const payload = (await response.json().catch(() => ({}))) as ErrorEnvelope;
@@ -201,7 +212,12 @@ export async function api<T>(
   }
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as ErrorEnvelope;
-    throw serverError(service, response.status, payload, 'Yêu cầu chưa hoàn tất. Vui lòng thử lại.');
+    throw serverError(
+      service,
+      response.status,
+      payload,
+      'Yêu cầu chưa hoàn tất. Vui lòng thử lại.'
+    );
   }
   return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
 }
@@ -212,7 +228,11 @@ export async function upload<T>(
   service: Service,
   path: string,
   file: File,
-  options: { headers?: Record<string, string>; idempotencyKey: string; credentials?: RequestCredentials },
+  options: {
+    headers?: Record<string, string>;
+    idempotencyKey: string;
+    credentials?: RequestCredentials;
+  },
   retryAuth = true
 ): Promise<T> {
   const credentials = options.credentials || 'include';
@@ -249,7 +269,12 @@ export async function upload<T>(
   }
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as ErrorEnvelope;
-    throw serverError(service, response.status, payload, 'Không thể tải tệp lên. Vui lòng kiểm tra tệp và thử lại.');
+    throw serverError(
+      service,
+      response.status,
+      payload,
+      'Không thể tải tệp lên. Vui lòng kiểm tra tệp và thử lại.'
+    );
   }
   return response.json() as Promise<T>;
 }

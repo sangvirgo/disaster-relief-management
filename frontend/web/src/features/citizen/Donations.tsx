@@ -81,7 +81,7 @@ export function Donations({
   const [createdFile, setCreatedFile] = useState<File | null>(null);
   const [createdUploadMessage, setCreatedUploadMessage] = useState('');
   const pending = useRef<Pending | null>(null);
-  const guestCredentials = user ? 'include' as const : 'omit' as const;
+  const guestCredentials = user ? ('include' as const) : ('omit' as const);
   const [showCreatedTracking, setShowCreatedTracking] = useState(false);
   useEffect(() => {
     setShowCreatedTracking(false);
@@ -216,10 +216,10 @@ export function Donations({
     setTracking(null);
     try {
       const result = await api<Tracking>(
-          'logistics',
-          `/public/donations/${encodeURIComponent(id)}`,
-          { headers: secret ? { 'X-Donation-Secret': secret } : {}, credentials: guestCredentials }
-        );
+        'logistics',
+        `/public/donations/${encodeURIComponent(id)}`,
+        { headers: secret ? { 'X-Donation-Secret': secret } : {}, credentials: guestCredentials }
+      );
       if (version === lookupVersion.current) {
         setVerifiedSecret(secret);
         setTracking(result);
@@ -259,10 +259,12 @@ export function Donations({
       setDisputeReason('');
       setActionMessage('Máy chủ đã tiếp nhận khiếu nại của bạn.');
       try {
-        setTracking(await api('logistics', `/public/donations/${encodeURIComponent(tracking.id)}`, {
-          headers: verifiedSecret ? { 'X-Donation-Secret': verifiedSecret } : {},
-          credentials: guestCredentials,
-        }));
+        setTracking(
+          await api('logistics', `/public/donations/${encodeURIComponent(tracking.id)}`, {
+            headers: verifiedSecret ? { 'X-Donation-Secret': verifiedSecret } : {},
+            credentials: guestCredentials,
+          })
+        );
       } catch {
         setActionMessage('Máy chủ đã tiếp nhận khiếu nại. Hãy tra cứu lại để xem trạng thái mới.');
       }

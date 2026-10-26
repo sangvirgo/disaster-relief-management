@@ -122,7 +122,9 @@ export function Notices() {
         </p>
       )}
       {loading && <p role="status">Đang tải thông báo…</p>}
-      {!loading && !items.length && !error && <div className="empty">Chưa có thông báo trong mục này.</div>}
+      {!loading && !items.length && !error && (
+        <div className="empty">Chưa có thông báo trong mục này.</div>
+      )}
       <div className="record-list">
         {items.map((item) => (
           <article className="record" key={item.id}>
@@ -467,7 +469,9 @@ export function Volunteer({ page }: { page: string }) {
                     <p>
                       {label(team.kind)} · <span className="chip">{label(team.availability)}</span>
                     </p>
-                    <p>Kỹ năng: {team.skills.length ? team.skills.map(label).join(', ') : 'Chưa có'}</p>
+                    <p>
+                      Kỹ năng: {team.skills.length ? team.skills.map(label).join(', ') : 'Chưa có'}
+                    </p>
                     <small>
                       {team.position
                         ? `Vị trí cập nhật ${positionAge(team.position.age_s)} trước (${label(team.position.source)})`

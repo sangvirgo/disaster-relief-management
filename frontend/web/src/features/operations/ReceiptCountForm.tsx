@@ -55,7 +55,9 @@ export function ReceiptCountForm({
   useEffect(() => {
     api<{ items: Item[] }>('logistics', '/items?status=ACTIVE&limit=100')
       .then((result) => setItems(result.items))
-      .catch((cause) => setItemsError(cause instanceof Error ? cause.message : 'Không thể tải danh mục vật phẩm.'));
+      .catch((cause) =>
+        setItemsError(cause instanceof Error ? cause.message : 'Không thể tải danh mục vật phẩm.')
+      );
   }, []);
   function edit(index: number, field: keyof Line, value: string) {
     setLines((current) =>
@@ -84,7 +86,9 @@ export function ReceiptCountForm({
         }
         const item = items.find((candidate) => candidate.id === line.item_id);
         if (item && (quantity.split('.')[1]?.length || 0) > item.scale) {
-          setError(`Vật phẩm ${index + 1}: ${title.toLowerCase()} chỉ được có tối đa ${item.scale} chữ số thập phân.`);
+          setError(
+            `Vật phẩm ${index + 1}: ${title.toLowerCase()} chỉ được có tối đa ${item.scale} chữ số thập phân.`
+          );
           return;
         }
       }
@@ -142,7 +146,11 @@ export function ReceiptCountForm({
         Ghi số lượng thực tế cho từng vật phẩm. Có thể thêm vật phẩm ngoài bản khai; người khác sẽ
         duyệt độc lập.
       </p>
-      {itemsError && <p className="notice error" role="alert">Danh mục vật phẩm: {itemsError} Bạn vẫn có thể nhập mã vật phẩm.</p>}
+      {itemsError && (
+        <p className="notice error" role="alert">
+          Danh mục vật phẩm: {itemsError} Bạn vẫn có thể nhập mã vật phẩm.
+        </p>
+      )}
       {lines.map((line, index) => (
         <fieldset className="candidate count-line" key={index}>
           <legend>Vật phẩm {index + 1}</legend>

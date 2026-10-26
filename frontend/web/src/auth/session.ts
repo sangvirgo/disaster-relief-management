@@ -18,7 +18,7 @@ export async function register(
   username: string,
   password: string,
   display_name: string,
-  email: string,
+  email: string
 ): Promise<{ verification: { challenge_id: string }; email_sent: boolean }> {
   return api('identity', '/auth/register', {
     method: 'POST',
@@ -27,11 +27,25 @@ export async function register(
     retryAuth: false,
   });
 }
-export const verifyEmail = (challenge_id: string, code: string) => api('identity', '/auth/email/verify', { method: 'POST', body: { challenge_id, code }, retryAuth: false });
-export const resendEmailOtp = (challenge_id: string) => api<{ challenge_id: string | null; email_sent: boolean }>('identity', '/auth/email/resend', { method: 'POST', body: { challenge_id }, retryAuth: false });
+export const verifyEmail = (challenge_id: string, code: string) =>
+  api('identity', '/auth/email/verify', {
+    method: 'POST',
+    body: { challenge_id, code },
+    retryAuth: false,
+  });
+export const resendEmailOtp = (challenge_id: string) =>
+  api<{ challenge_id: string | null; email_sent: boolean }>('identity', '/auth/email/resend', {
+    method: 'POST',
+    body: { challenge_id },
+    retryAuth: false,
+  });
 export async function googleLogin(id_token: string): Promise<Me> {
   await csrf();
-  await api('identity', '/auth/google', { method: 'POST', body: { id_token, client_kind: 'WEB' }, retryAuth: false });
+  await api('identity', '/auth/google', {
+    method: 'POST',
+    body: { id_token, client_kind: 'WEB' },
+    retryAuth: false,
+  });
   invalidateCsrf();
   return me();
 }

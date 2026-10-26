@@ -963,8 +963,8 @@ textarea:focus-visible {
   font-weight: 600;
 }
 
-input[aria-invalid="true"],
-select[aria-invalid="true"],
-textarea[aria-invalid="true"] {
+input[aria-invalid='true'],
+select[aria-invalid='true'],
+textarea[aria-invalid='true'] {
   border-color: #b42318;
 }

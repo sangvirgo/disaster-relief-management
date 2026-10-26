@@ -52,13 +52,23 @@ const number = (value: unknown) => (typeof value === 'number' ? value : undefine
 const quantity = (value: unknown) => (value == null ? '—' : String(value));
 const distributionPages = new Set(['distribution', 'handoff']);
 function recordTitle(page: string, item: Row): string {
-  if (distributionPages.has(page)) return string(item.purpose) ? label(item.purpose) : 'Phiếu phân phối';
-  if (page === 'intake') return string(item.donor_name) ? `Đóng góp của ${item.donor_name}` : 'Đóng góp chờ tiếp nhận';
-  return item.title || item.name || item.public_code || string(item.identifier) || string(item.item_name) ||
-    string((item.item as Row | undefined)?.name) || item.id || 'Bản ghi';
+  if (distributionPages.has(page))
+    return string(item.purpose) ? label(item.purpose) : 'Phiếu phân phối';
+  if (page === 'intake')
+    return string(item.donor_name) ? `Đóng góp của ${item.donor_name}` : 'Đóng góp chờ tiếp nhận';
+  return (
+    item.title ||
+    item.name ||
+    item.public_code ||
+    string(item.identifier) ||
+    string(item.item_name) ||
+    string((item.item as Row | undefined)?.name) ||
+    item.id ||
+    'Bản ghi'
+  );
 }
 function distributionItems(item: Row): string {
-  const lines = Array.isArray(item.lines) ? item.lines as Row[] : [];
+  const lines = Array.isArray(item.lines) ? (item.lines as Row[]) : [];
   if (!lines.length) return 'Chưa có vật phẩm';
   const first = lines[0];
   const name = string(first.item_name) || 'Vật phẩm';
@@ -227,7 +237,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     }),
   };
   return (
-    <div className={`coordinator-layout ${page === 'stock' || (page === 'reports' && report === 'stock-summary') ? 'operations-table-layout' : ''}`}>
+    <div
+      className={`coordinator-layout ${page === 'stock' || (page === 'reports' && report === 'stock-summary') ? 'operations-table-layout' : ''}`}
+    >
       <section className="card">
         <h2>{headings[page]}</h2>
         {page === 'assets' && (
@@ -337,72 +349,119 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         {!loading && ready && !error && !items.length && (
           <div className="empty">Chưa có bản ghi trong phạm vi được cấp quyền.</div>
         )}
-        {(page === 'stock' || (page === 'reports' && report === 'stock-summary')) ? (
-          <><p className="table-swipe-hint">Vuốt ngang bảng để xem các cột số lượng.</p><div className="stock-table-scroll">
-            <table className="stock-table">
-              <thead><tr><th>Vật phẩm</th><th>Kho</th><th>Đơn vị</th><th className="numeric">Tồn thực tế</th><th className="numeric">Đã giữ</th><th className="numeric">Khả dụng</th></tr></thead>
-              <tbody>{items.map((item, index) => (
-                <tr key={string(item.id || item.balance_id) || index} className={selected === item ? 'selected' : ''}>
-                  <th scope="row"><button type="button" className="table-row-link" onClick={() => setSelected(item)}>{string((item.item as Row | undefined)?.name) || string(item.item_name) || item.name || 'Vật phẩm'}</button></th>
-                  <td>{string(item.warehouse_name) || (item.warehouse_id ? `Mã …${string(item.warehouse_id).slice(-8)}` : '—')}</td>
-                  <td>{string((item.unit as Row | undefined)?.display_name) || string(item.unit) || string(item.unit_name) || '—'}</td>
-                  <td className="numeric">{quantity(item.on_hand)}</td>
-                  <td className="numeric">{quantity(item.reserved)}</td>
-                  <td className="numeric"><strong className="available-value">{quantity(item.available)}</strong></td>
-                </tr>
-              ))}</tbody>
-            </table>
-          </div></>
-        ) : <div className="record-list">
-          {items.map((item, index) => (
-            <button
-              type="button"
-              className={`queue-row ${selected === item ? 'selected' : ''}`}
-              key={item.id || index}
-              onClick={() => setSelected(item)}
-            >
-              <span>
-                <strong>
-                  {recordTitle(page, item)}
-                </strong>
-                {distributionPages.has(page) && <small>Phiếu phân phối · {distributionItems(item)}</small>}
-                {page === 'intake' && <small>{string(item.drive_title) || 'Đợt quyên góp'}{item.public_code ? ` · Mã ${item.public_code}` : ''}</small>}
-                <small>
-                  {page !== 'intake' && item.donor_name ? `Người đóng góp: ${item.donor_name} · ` : ''}
-                  {item.created_at
-                    ? timeLabel(item.created_at)
-                    : string(item.warehouse_name) || string(item.region_code)}
-                </small>
-                {item.on_hand != null && (
+        {page === 'stock' || (page === 'reports' && report === 'stock-summary') ? (
+          <>
+            <p className="table-swipe-hint">Vuốt ngang bảng để xem các cột số lượng.</p>
+            <div className="stock-table-scroll">
+              <table className="stock-table">
+                <thead>
+                  <tr>
+                    <th>Vật phẩm</th>
+                    <th>Kho</th>
+                    <th>Đơn vị</th>
+                    <th className="numeric">Tồn thực tế</th>
+                    <th className="numeric">Đã giữ</th>
+                    <th className="numeric">Khả dụng</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, index) => (
+                    <tr
+                      key={string(item.id || item.balance_id) || index}
+                      className={selected === item ? 'selected' : ''}
+                    >
+                      <th scope="row">
+                        <button
+                          type="button"
+                          className="table-row-link"
+                          onClick={() => setSelected(item)}
+                        >
+                          {string((item.item as Row | undefined)?.name) ||
+                            string(item.item_name) ||
+                            item.name ||
+                            'Vật phẩm'}
+                        </button>
+                      </th>
+                      <td>
+                        {string(item.warehouse_name) ||
+                          (item.warehouse_id ? `Mã …${string(item.warehouse_id).slice(-8)}` : '—')}
+                      </td>
+                      <td>
+                        {string((item.unit as Row | undefined)?.display_name) ||
+                          string(item.unit) ||
+                          string(item.unit_name) ||
+                          '—'}
+                      </td>
+                      <td className="numeric">{quantity(item.on_hand)}</td>
+                      <td className="numeric">{quantity(item.reserved)}</td>
+                      <td className="numeric">
+                        <strong className="available-value">{quantity(item.available)}</strong>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <div className="record-list">
+            {items.map((item, index) => (
+              <button
+                type="button"
+                className={`queue-row ${selected === item ? 'selected' : ''}`}
+                key={item.id || index}
+                onClick={() => setSelected(item)}
+              >
+                <span>
+                  <strong>{recordTitle(page, item)}</strong>
+                  {distributionPages.has(page) && (
+                    <small>Phiếu phân phối · {distributionItems(item)}</small>
+                  )}
+                  {page === 'intake' && (
+                    <small>
+                      {string(item.drive_title) || 'Đợt quyên góp'}
+                      {item.public_code ? ` · Mã ${item.public_code}` : ''}
+                    </small>
+                  )}
                   <small>
-                    Tồn: {quantity(item.on_hand)} · Khả dụng: {quantity(item.available)} · Đã giữ:{' '}
-                    {quantity(item.reserved)}
+                    {page !== 'intake' && item.donor_name
+                      ? `Người đóng góp: ${item.donor_name} · `
+                      : ''}
+                    {item.created_at
+                      ? timeLabel(item.created_at)
+                      : string(item.warehouse_name) || string(item.region_code)}
                   </small>
-                )}
-                {item.requested != null && (
-                  <small>
-                    Cần: {quantity(item.requested)} · Đã giao: {quantity(item.delivered)} · Còn
-                    thiếu: {quantity(item.outstanding)}
-                  </small>
-                )}
-                {item.active_requested != null && (
-                  <small>
-                    Nhu cầu hiện hành: {quantity(item.active_requested)} · Đã giao:{' '}
-                    {quantity(item.delivered)} · Còn thiếu: {quantity(item.active_outstanding)}
-                  </small>
-                )}
-                {item.posted_movements != null && (
-                  <small>
-                    Nhập đã ghi sổ: {quantity(item.intake_accepted)} · Đang vận chuyển:{' '}
-                    {quantity(item.issued_in_transit)} · Tại điểm: {quantity(item.at_point)}
-                  </small>
-                )}
-                {item.receipt_id && <small>Đã lập biên nhận</small>}
-              </span>
-              {item.status && <span className="chip">{label(item.status)}</span>}
-            </button>
-          ))}
-        </div>}
+                  {item.on_hand != null && (
+                    <small>
+                      Tồn: {quantity(item.on_hand)} · Khả dụng: {quantity(item.available)} · Đã giữ:{' '}
+                      {quantity(item.reserved)}
+                    </small>
+                  )}
+                  {item.requested != null && (
+                    <small>
+                      Cần: {quantity(item.requested)} · Đã giao: {quantity(item.delivered)} · Còn
+                      thiếu: {quantity(item.outstanding)}
+                    </small>
+                  )}
+                  {item.active_requested != null && (
+                    <small>
+                      Nhu cầu hiện hành: {quantity(item.active_requested)} · Đã giao:{' '}
+                      {quantity(item.delivered)} · Còn thiếu: {quantity(item.active_outstanding)}
+                    </small>
+                  )}
+                  {item.posted_movements != null && (
+                    <small>
+                      Nhập đã ghi sổ: {quantity(item.intake_accepted)} · Đang vận chuyển:{' '}
+                      {quantity(item.issued_in_transit)} · Tại điểm: {quantity(item.at_point)}
+                    </small>
+                  )}
+                  {item.receipt_id && <small>Đã lập biên nhận</small>}
+                </span>
+                {item.status && <span className="chip">{label(item.status)}</span>}
+              </button>
+            ))}
+          </div>
+        )}
         {next && (
           <button className="button secondary" onClick={() => setCursor(next)}>
             Xem thêm
@@ -410,7 +469,14 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         )}
       </section>
       <section className={`card detail-panel-card ${selected ? 'is-open' : ''}`}>
-        {selected && <DetailCloseButton onClick={() => { setSelected(null); setDetail(null); }} />}
+        {selected && (
+          <DetailCloseButton
+            onClick={() => {
+              setSelected(null);
+              setDetail(null);
+            }}
+          />
+        )}
         <h2>
           {selected
             ? 'Chi tiết và thao tác'
@@ -423,13 +489,27 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           <>
             <div className="detail-grid">
               {page === 'assets' && asset === 'vehicles' && Boolean(detail.identifier) && (
-                <p><strong>Biển số hoặc mã xe</strong><br />{string(detail.identifier)}</p>
+                <p>
+                  <strong>Biển số hoặc mã xe</strong>
+                  <br />
+                  {string(detail.identifier)}
+                </p>
               )}
               {distributionPages.has(page) && Boolean(detail.purpose) && (
-                <p><strong>Mục đích phân phối</strong><br />{label(detail.purpose)}</p>
+                <p>
+                  <strong>Mục đích phân phối</strong>
+                  <br />
+                  {label(detail.purpose)}
+                </p>
               )}
               <p>
-                <strong>{distributionPages.has(page) ? 'Mã phiếu phân phối' : page === 'intake' ? 'Mã tiếp nhận' : 'Mã bản ghi'}</strong>
+                <strong>
+                  {distributionPages.has(page)
+                    ? 'Mã phiếu phân phối'
+                    : page === 'intake'
+                      ? 'Mã tiếp nhận'
+                      : 'Mã bản ghi'}
+                </strong>
                 <br />
                 {string(selected?.id || selected?.balance_id || selected?.warehouse_id) ||
                   'Không có mã riêng'}
@@ -901,7 +981,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           page === 'drives' &&
           (rights.has('CAMPAIGN_MANAGER') || rights.has('OPERATIONS_MANAGER')) &&
           command(driveCreate)}
-        {!selected && page === 'needs' && (rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR')) && command(needCreate)}
+        {!selected &&
+          page === 'needs' &&
+          (rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR')) &&
+          command(needCreate)}
         {!selected &&
           page === 'assets' &&
           rights.has('OPERATIONS_MANAGER') &&

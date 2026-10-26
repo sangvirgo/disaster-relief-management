@@ -24,8 +24,17 @@ export interface CommandSpec {
   warning?: string;
   build?: (values: Record<string, string>) => Record<string, unknown>;
 }
-const sentenceLabel = (value: string) => value.charAt(0).toLocaleLowerCase('vi-VN') + value.slice(1);
-export function CommandForm({ spec, onSuccess, onStale }: { spec: CommandSpec; onSuccess: () => void; onStale?: () => void }) {
+const sentenceLabel = (value: string) =>
+  value.charAt(0).toLocaleLowerCase('vi-VN') + value.slice(1);
+export function CommandForm({
+  spec,
+  onSuccess,
+  onStale,
+}: {
+  spec: CommandSpec;
+  onSuccess: () => void;
+  onStale?: () => void;
+}) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -36,7 +45,9 @@ export function CommandForm({ spec, onSuccess, onStale }: { spec: CommandSpec; o
     const invalid: Record<string, string> = {};
     for (const field of spec.fields || []) {
       const value = (values[field.name] || '').trim();
-      if (field.required && !value) invalid[field.name] = `Vui lòng ${field.type === 'select' ? 'chọn' : 'nhập'} ${sentenceLabel(field.label)}.`;
+      if (field.required && !value)
+        invalid[field.name] =
+          `Vui lòng ${field.type === 'select' ? 'chọn' : 'nhập'} ${sentenceLabel(field.label)}.`;
       else if (value && field.minLength && value.length < field.minLength)
         invalid[field.name] = `${field.label} cần ít nhất ${field.minLength} ký tự.`;
       else if (value && field.maxLength && value.length > field.maxLength)
@@ -80,13 +91,19 @@ export function CommandForm({ spec, onSuccess, onStale }: { spec: CommandSpec; o
       if (cause instanceof ApiError && Object.keys(cause.fieldErrors).length) {
         const errors: Record<string, string> = {};
         for (const field of spec.fields || []) {
-          if (Object.keys(cause.fieldErrors).some((name) => name === field.name || name.endsWith(`.${field.name}`)))
+          if (
+            Object.keys(cause.fieldErrors).some(
+              (name) => name === field.name || name.endsWith(`.${field.name}`)
+            )
+          )
             errors[field.name] = `Vui lòng kiểm tra ${sentenceLabel(field.label)}.`;
         }
         setFieldErrors(errors);
       }
-      if (cause instanceof ApiError &&
-          ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'].includes(cause.code)) {
+      if (
+        cause instanceof ApiError &&
+        ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'].includes(cause.code)
+      ) {
         key.current = null;
         onStale?.();
       }
@@ -138,9 +155,15 @@ export function CommandForm({ spec, onSuccess, onStale }: { spec: CommandSpec; o
             <input
               required={field.required}
               type={field.type || 'text'}
-              min={field.type === 'number' ? field.min ?? 1 : undefined}
+              min={field.type === 'number' ? (field.min ?? 1) : undefined}
               max={field.type === 'number' ? field.max : undefined}
-              step={field.type === 'number' ? (field.integer || field.name === 'work_cycle' ? '1' : 'any') : undefined}
+              step={
+                field.type === 'number'
+                  ? field.integer || field.name === 'work_cycle'
+                    ? '1'
+                    : 'any'
+                  : undefined
+              }
               minLength={field.minLength}
               maxLength={field.maxLength}
               aria-invalid={Boolean(fieldErrors[field.name])}
@@ -154,11 +177,16 @@ export function CommandForm({ spec, onSuccess, onStale }: { spec: CommandSpec; o
               }}
             />
           )}
-          {fieldErrors[field.name] && <small className="field-error">{fieldErrors[field.name]}</small>}
+          {fieldErrors[field.name] && (
+            <small className="field-error">{fieldErrors[field.name]}</small>
+          )}
         </label>
       ))}
       {message && (
-        <p role={message.startsWith('Thao tác đã') ? 'status' : 'alert'} className={message.startsWith('Thao tác đã') ? 'notice' : 'notice error'}>
+        <p
+          role={message.startsWith('Thao tác đã') ? 'status' : 'alert'}
+          className={message.startsWith('Thao tác đã') ? 'notice' : 'notice error'}
+        >
           {message}
         </p>
       )}

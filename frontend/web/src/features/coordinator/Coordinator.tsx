@@ -19,7 +19,12 @@ type QueueItem = {
   region_code?: string | null;
 };
 type Queue = { items: QueueItem[]; cursor?: string; more: boolean; generated_at: string };
-type Event = { id: string; event_type: string; occurred_at: string; payload?: Record<string, unknown> };
+type Event = {
+  id: string;
+  event_type: string;
+  occurred_at: string;
+  payload?: Record<string, unknown>;
+};
 type Detail = QueueItem & {
   version: number;
   description?: string | null;
@@ -49,15 +54,35 @@ type Detail = QueueItem & {
   };
   mission_history?: {
     items: {
-      id: string; status: string; mission_kind: string; created_at: string; team_id: string; team_name: string;
-      suggested_team_id?: string | null; override_reason?: string | null; last_status?: string | null;
-      last_occurred_at?: string | null; recorded_basis?: string | null; reported_by?: string | null;
+      id: string;
+      status: string;
+      mission_kind: string;
+      created_at: string;
+      team_id: string;
+      team_name: string;
+      suggested_team_id?: string | null;
+      override_reason?: string | null;
+      last_status?: string | null;
+      last_occurred_at?: string | null;
+      recorded_basis?: string | null;
+      reported_by?: string | null;
     }[];
   };
   ai_advisory?: {
-    id: string; model: string; status: string; risk_score: number; reason_codes: string[];
-    extracted_json?: { summary?: string; indicators?: string[]; facts?: Record<string, unknown>; confidence?: number } | null;
-    review_status?: string | null; review_note?: string | null; error_code?: string | null;
+    id: string;
+    model: string;
+    status: string;
+    risk_score: number;
+    reason_codes: string[];
+    extracted_json?: {
+      summary?: string;
+      indicators?: string[];
+      facts?: Record<string, unknown>;
+      confidence?: number;
+    } | null;
+    review_status?: string | null;
+    review_note?: string | null;
+    error_code?: string | null;
     human_review_required: boolean;
   } | null;
   evidence?: { items: { id: string; state: string; size_bytes: number; created_at: string }[] };
@@ -69,8 +94,17 @@ type Candidate = {
   recent_missions_24h: number;
   recent_missions_7d: number;
   recent_history: {
-    id: string; status: string; mission_kind: string; created_at: string; override_reason?: string | null;
-    last_progress?: { status?: string; occurred_at?: string; recorded_basis?: string; reported_by?: string } | null;
+    id: string;
+    status: string;
+    mission_kind: string;
+    created_at: string;
+    override_reason?: string | null;
+    last_progress?: {
+      status?: string;
+      occurred_at?: string;
+      recorded_basis?: string;
+      reported_by?: string;
+    } | null;
   }[];
   in_band: boolean;
   suggested: boolean;
@@ -206,9 +240,11 @@ export function Coordinator({ page }: { page: string }) {
             refreshReasonRef.current = null;
             setQueueStatus(value.status);
             setCursor('');
-            setUpdateMessage(reason === 'success'
-              ? `Đã cập nhật. Trạng thái hiện tại: ${label(value.status)}.`
-              : `Đã tải lại hồ sơ. Trạng thái hiện tại: ${label(value.status)}.`);
+            setUpdateMessage(
+              reason === 'success'
+                ? `Đã cập nhật. Trạng thái hiện tại: ${label(value.status)}.`
+                : `Đã tải lại hồ sơ. Trạng thái hiện tại: ${label(value.status)}.`
+            );
           }
         }
       })
@@ -233,7 +269,8 @@ export function Coordinator({ page }: { page: string }) {
         if (live) setCandidates(value);
       })
       .catch((cause) => {
-        if (live) setCandidateError(cause instanceof Error ? cause.message : 'Không thể tải đội phù hợp.');
+        if (live)
+          setCandidateError(cause instanceof Error ? cause.message : 'Không thể tải đội phù hợp.');
       });
     return () => {
       live = false;
@@ -252,7 +289,10 @@ export function Coordinator({ page }: { page: string }) {
         if (live) setDuplicates(value.items);
       })
       .catch((cause) => {
-        if (live) setDuplicateError(cause instanceof Error ? cause.message : 'Không thể kiểm tra yêu cầu có thể trùng.');
+        if (live)
+          setDuplicateError(
+            cause instanceof Error ? cause.message : 'Không thể kiểm tra yêu cầu có thể trùng.'
+          );
       });
     return () => {
       live = false;
@@ -269,7 +309,14 @@ export function Coordinator({ page }: { page: string }) {
     setRevision((value) => value + 1);
   }, []);
   function command(spec: CommandSpec) {
-    return <CommandForm key={spec.path + detail?.version} spec={spec} onSuccess={done} onStale={refreshAfterConflict} />;
+    return (
+      <CommandForm
+        key={spec.path + detail?.version}
+        spec={spec}
+        onSuccess={done}
+        onStale={refreshAfterConflict}
+      />
+    );
   }
   async function reviewAiAdvisory(decision: 'ACCEPTED' | 'ADJUSTED' | 'REJECTED') {
     if (!detail?.ai_advisory) return;
@@ -280,11 +327,15 @@ export function Coordinator({ page }: { page: string }) {
     setAiReviewBusy(true);
     setError('');
     try {
-      await api('response', `/requests/${detail.id}/ai-advisories/${detail.ai_advisory.id}/review`, {
-        method: 'POST',
-        body: { decision, ...(aiReviewNote.trim() ? { note: aiReviewNote.trim() } : {}) },
-        idempotencyKey: newCommandKey(),
-      });
+      await api(
+        'response',
+        `/requests/${detail.id}/ai-advisories/${detail.ai_advisory.id}/review`,
+        {
+          method: 'POST',
+          body: { decision, ...(aiReviewNote.trim() ? { note: aiReviewNote.trim() } : {}) },
+          idempotencyKey: newCommandKey(),
+        }
+      );
       setAiReviewNote('');
       done();
     } catch (cause) {
@@ -297,17 +348,28 @@ export function Coordinator({ page }: { page: string }) {
     <div className="coordinator-layout">
       <section className="card">
         <h2>{title[page] || title.queue}</h2>
-        <p>
-          Yêu cầu được sắp theo thời điểm tiếp nhận. Chọn một yêu cầu để xem và xử lý.
-        </p>
-        <button type="button" className="button secondary" onClick={() => setRevision((value) => value + 1)}>Cập nhật danh sách</button>
+        <p>Yêu cầu được sắp theo thời điểm tiếp nhận. Chọn một yêu cầu để xem và xử lý.</p>
+        <button
+          type="button"
+          className="button secondary"
+          onClick={() => setRevision((value) => value + 1)}
+        >
+          Cập nhật danh sách
+        </button>
         <label>
           Trạng thái trong danh sách
-          <select value={queueStatus} onChange={(event) => {
-            setQueueStatus(event.target.value);
-            setCursor('');
-          }}>
-            {queueStatuses.map(([status, name]) => <option key={status} value={status}>{name}</option>)}
+          <select
+            value={queueStatus}
+            onChange={(event) => {
+              setQueueStatus(event.target.value);
+              setCursor('');
+            }}
+          >
+            {queueStatuses.map(([status, name]) => (
+              <option key={status} value={status}>
+                {name}
+              </option>
+            ))}
           </select>
         </label>
         <div className="tabs">
@@ -358,7 +420,12 @@ export function Coordinator({ page }: { page: string }) {
                 <button
                   type="button"
                   className={`queue-row ${selected === item.id ? 'selected' : ''}`}
-                  onClick={() => { setSelected(item.id); setDetail(null); setDetailError(''); setUpdateMessage(''); }}
+                  onClick={() => {
+                    setSelected(item.id);
+                    setDetail(null);
+                    setDetailError('');
+                    setUpdateMessage('');
+                  }}
                   key={item.id}
                 >
                   <span>
@@ -384,8 +451,23 @@ export function Coordinator({ page }: { page: string }) {
       </section>
       <section className="card">
         <h2>Hồ sơ yêu cầu</h2>
-        {updateMessage && <p className="notice" role="status">{updateMessage}</p>}
-        {detailError && <p className="notice error" role="alert">{detailError} <button type="button" className="button secondary" onClick={() => setRevision((value) => value + 1)}>Tải lại hồ sơ</button></p>}
+        {updateMessage && (
+          <p className="notice" role="status">
+            {updateMessage}
+          </p>
+        )}
+        {detailError && (
+          <p className="notice error" role="alert">
+            {detailError}{' '}
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => setRevision((value) => value + 1)}
+            >
+              Tải lại hồ sơ
+            </button>
+          </p>
+        )}
         {!selected && (
           <div className="empty">Chọn một yêu cầu để xem thông tin được cấp quyền.</div>
         )}
@@ -416,7 +498,9 @@ export function Coordinator({ page }: { page: string }) {
               <p>
                 <strong>Hình thức gửi</strong>
                 <br />
-                {detail.report_mode === 'PROXY' ? 'Báo hộ người ở nơi khác' : 'Báo cho bản thân hoặc gia đình'}
+                {detail.report_mode === 'PROXY'
+                  ? 'Báo hộ người ở nơi khác'
+                  : 'Báo cho bản thân hoặc gia đình'}
               </p>
               <p>
                 <strong>Người cần hỗ trợ</strong>
@@ -426,7 +510,8 @@ export function Coordinator({ page }: { page: string }) {
               <p>
                 <strong>Trẻ em / người cao tuổi</strong>
                 <br />
-                {detail.subject.children_count ?? 0} trẻ em · {detail.subject.elderly_count ?? 0} người cao tuổi
+                {detail.subject.children_count ?? 0} trẻ em · {detail.subject.elderly_count ?? 0}{' '}
+                người cao tuổi
               </p>
               <p>
                 <strong>Nhu cầu</strong>
@@ -464,12 +549,16 @@ export function Coordinator({ page }: { page: string }) {
               <p>
                 <strong>Liên hệ thay thế</strong>
                 <br />
-                {[detail.subject.alternate_contact?.name, detail.subject.alternate_contact?.phone].filter(Boolean).join(' · ') || 'Chưa có'}
+                {[detail.subject.alternate_contact?.name, detail.subject.alternate_contact?.phone]
+                  .filter(Boolean)
+                  .join(' · ') || 'Chưa có'}
               </p>
               <p>
                 <strong>Nguồn thông tin / khả năng liên lạc</strong>
                 <br />
-                {[detail.subject.information_source, detail.subject.contactability].filter(Boolean).join(' · ') || 'Chưa ghi rõ'}
+                {[detail.subject.information_source, detail.subject.contactability]
+                  .filter(Boolean)
+                  .join(' · ') || 'Chưa ghi rõ'}
               </p>
               {detail.subject.last_known_situation_at && (
                 <p>
@@ -491,7 +580,9 @@ export function Coordinator({ page }: { page: string }) {
             </div>
             {detail.description && <p>{detail.description}</p>}
             {detail.subject.household_reference_note && (
-              <p><strong>Ghi chú nhận diện nơi ở:</strong> {detail.subject.household_reference_note}</p>
+              <p>
+                <strong>Ghi chú nhận diện nơi ở:</strong> {detail.subject.household_reference_note}
+              </p>
             )}
             {detail.declared_danger && (
               <p className="notice warning">
@@ -506,45 +597,108 @@ export function Coordinator({ page }: { page: string }) {
             {detail.ai_advisory && (
               <section className="notice">
                 <h3>Gợi ý trích xuất và rủi ro từ AI</h3>
-                <p>AI chỉ hỗ trợ tổng hợp thông tin. Điều phối viên phải tự xác minh; điểm này không thay thế mức ưu tiên P1–P4 và không tự giao đội.</p>
-                <p><strong>Trạng thái:</strong> {label(detail.ai_advisory.status)}</p>
+                <p>
+                  AI chỉ hỗ trợ tổng hợp thông tin. Điều phối viên phải tự xác minh; điểm này không
+                  thay thế mức ưu tiên P1–P4 và không tự giao đội.
+                </p>
+                <p>
+                  <strong>Trạng thái:</strong> {label(detail.ai_advisory.status)}
+                </p>
                 {detail.ai_advisory.status === 'COMPLETED' && (
                   <>
-                    <p><strong>Điểm rủi ro tham khảo:</strong> {detail.ai_advisory.risk_score}/100</p>
-                    <p><strong>Dấu hiệu theo quy tắc:</strong> {detail.ai_advisory.reason_codes.map((code) => advisoryReasonLabels[code] || 'Có dấu hiệu cần rà soát').join(' · ') || 'Không có'}</p>
-                    {detail.ai_advisory.extracted_json?.summary && <p><strong>Tóm tắt:</strong> {detail.ai_advisory.extracted_json.summary}</p>}
-                    {detail.ai_advisory.extracted_json?.indicators && detail.ai_advisory.extracted_json.indicators.length > 0 && (
-                      <p><strong>Dấu hiệu AI trích xuất:</strong> {detail.ai_advisory.extracted_json.indicators.join(' · ')}</p>
+                    <p>
+                      <strong>Điểm rủi ro tham khảo:</strong> {detail.ai_advisory.risk_score}/100
+                    </p>
+                    <p>
+                      <strong>Dấu hiệu theo quy tắc:</strong>{' '}
+                      {detail.ai_advisory.reason_codes
+                        .map((code) => advisoryReasonLabels[code] || 'Có dấu hiệu cần rà soát')
+                        .join(' · ') || 'Không có'}
+                    </p>
+                    {detail.ai_advisory.extracted_json?.summary && (
+                      <p>
+                        <strong>Tóm tắt:</strong> {detail.ai_advisory.extracted_json.summary}
+                      </p>
                     )}
+                    {detail.ai_advisory.extracted_json?.indicators &&
+                      detail.ai_advisory.extracted_json.indicators.length > 0 && (
+                        <p>
+                          <strong>Dấu hiệu AI trích xuất:</strong>{' '}
+                          {detail.ai_advisory.extracted_json.indicators.join(' · ')}
+                        </p>
+                      )}
                     {detail.ai_advisory.extracted_json?.facts && (
                       <div>
                         <strong>Dữ kiện trích xuất cần đối chiếu</strong>
                         {Object.entries(detail.ai_advisory.extracted_json.facts)
                           .filter(([key]) => advisoryFactLabels[key])
                           .map(([key, value]) => (
-                            <p key={key}>{advisoryFactLabels[key]}: {typeof value === 'boolean' ? (value ? 'Có' : 'Không') : String(value)}</p>
+                            <p key={key}>
+                              {advisoryFactLabels[key]}:{' '}
+                              {typeof value === 'boolean'
+                                ? value
+                                  ? 'Có'
+                                  : 'Không'
+                                : String(value)}
+                            </p>
                           ))}
                       </div>
                     )}
-                    <p><strong>Độ tin cậy mô hình tự báo cáo:</strong> {Math.round((detail.ai_advisory.extracted_json?.confidence ?? 0) * 100)}% (chỉ tham khảo)</p>
+                    <p>
+                      <strong>Độ tin cậy mô hình tự báo cáo:</strong>{' '}
+                      {Math.round((detail.ai_advisory.extracted_json?.confidence ?? 0) * 100)}% (chỉ
+                      tham khảo)
+                    </p>
                     {detail.ai_advisory.review_status ? (
-                      <p><strong>Quyết định của điều phối viên:</strong> {advisoryReviewLabels[detail.ai_advisory.review_status] || 'Đã rà soát'}{detail.ai_advisory.review_note ? ` · ${detail.ai_advisory.review_note}` : ''}</p>
+                      <p>
+                        <strong>Quyết định của điều phối viên:</strong>{' '}
+                        {advisoryReviewLabels[detail.ai_advisory.review_status] || 'Đã rà soát'}
+                        {detail.ai_advisory.review_note
+                          ? ` · ${detail.ai_advisory.review_note}`
+                          : ''}
+                      </p>
                     ) : (
                       <div>
                         <label className="field">
                           <span>Ghi chú khi điều chỉnh hoặc bác bỏ</span>
-                          <textarea value={aiReviewNote} onChange={(event) => setAiReviewNote(event.target.value)} maxLength={1000} />
+                          <textarea
+                            value={aiReviewNote}
+                            onChange={(event) => setAiReviewNote(event.target.value)}
+                            maxLength={1000}
+                          />
                         </label>
                         <div className="action-grid">
-                          <button className="button" disabled={aiReviewBusy} onClick={() => void reviewAiAdvisory('ACCEPTED')}>Ghi nhận gợi ý</button>
-                          <button className="button secondary" disabled={aiReviewBusy} onClick={() => void reviewAiAdvisory('ADJUSTED')}>Điều chỉnh và ghi nhận</button>
-                          <button className="button secondary" disabled={aiReviewBusy} onClick={() => void reviewAiAdvisory('REJECTED')}>Không sử dụng gợi ý</button>
+                          <button
+                            className="button"
+                            disabled={aiReviewBusy}
+                            onClick={() => void reviewAiAdvisory('ACCEPTED')}
+                          >
+                            Ghi nhận gợi ý
+                          </button>
+                          <button
+                            className="button secondary"
+                            disabled={aiReviewBusy}
+                            onClick={() => void reviewAiAdvisory('ADJUSTED')}
+                          >
+                            Điều chỉnh và ghi nhận
+                          </button>
+                          <button
+                            className="button secondary"
+                            disabled={aiReviewBusy}
+                            onClick={() => void reviewAiAdvisory('REJECTED')}
+                          >
+                            Không sử dụng gợi ý
+                          </button>
                         </div>
                       </div>
                     )}
                   </>
                 )}
-                {['FAILED', 'SKIPPED'].includes(detail.ai_advisory.status) && <p>Không có kết quả AI cho mô tả này. Hãy tiếp tục quy trình xác minh thủ công.</p>}
+                {['FAILED', 'SKIPPED'].includes(detail.ai_advisory.status) && (
+                  <p>
+                    Không có kết quả AI cho mô tả này. Hãy tiếp tục quy trình xác minh thủ công.
+                  </p>
+                )}
               </section>
             )}
             {detail.active_missions && detail.active_missions.items.length > 0 && (
@@ -569,9 +723,16 @@ export function Coordinator({ page }: { page: string }) {
                 <div className="record-list">
                   {detail.mission_history.items.map((mission) => (
                     <div className="candidate" key={mission.id}>
-                      <strong>{mission.team_name} · {label(mission.mission_kind)}</strong>
-                      <p>{label(mission.status)} · {timeLabel(mission.created_at)}{mission.last_status ? ` · Cập nhật: ${label(mission.last_status)}` : ''}</p>
-                      {mission.override_reason && <p>Lý do chọn đội khác đề xuất: {mission.override_reason}</p>}
+                      <strong>
+                        {mission.team_name} · {label(mission.mission_kind)}
+                      </strong>
+                      <p>
+                        {label(mission.status)} · {timeLabel(mission.created_at)}
+                        {mission.last_status ? ` · Cập nhật: ${label(mission.last_status)}` : ''}
+                      </p>
+                      {mission.override_reason && (
+                        <p>Lý do chọn đội khác đề xuất: {mission.override_reason}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -749,11 +910,18 @@ export function Coordinator({ page }: { page: string }) {
                         reason: values.reason,
                       }),
                     })}
-                  {duplicateError && <p role="alert" className="notice error">Kiểm tra yêu cầu trùng: {duplicateError}</p>}
+                  {duplicateError && (
+                    <p role="alert" className="notice error">
+                      Kiểm tra yêu cầu trùng: {duplicateError}
+                    </p>
+                  )}
                   {duplicates.length > 0 && (
                     <section>
                       <h3>Yêu cầu có thể trùng</h3>
-                      <p>Hai yêu cầu ở gần nhau vẫn có thể thuộc hai hộ khác nhau. Hãy đối chiếu trước khi đánh dấu trùng.</p>
+                      <p>
+                        Hai yêu cầu ở gần nhau vẫn có thể thuộc hai hộ khác nhau. Hãy đối chiếu
+                        trước khi đánh dấu trùng.
+                      </p>
                       {duplicates.map((candidate) => (
                         <div className="candidate" key={candidate.id}>
                           <strong>{candidate.tracking_code || candidate.id}</strong>
@@ -827,26 +995,43 @@ export function Coordinator({ page }: { page: string }) {
                 <section>
                   <h3>Đội có thể giao nhiệm vụ</h3>
                   <p>Xem khoảng cách, vị trí cập nhật và số nhiệm vụ gần đây trước khi chọn đội.</p>
-                  <p>Gợi ý cân bằng dựa trên nhiệm vụ 24 giờ và 7 ngày của các đội gần nhất. Đội đang bận không xuất hiện trong danh sách đủ điều kiện.</p>
-                  {candidateError && <p role="alert" className="notice error">Tải đội phù hợp: {candidateError}</p>}
+                  <p>
+                    Gợi ý cân bằng dựa trên nhiệm vụ 24 giờ và 7 ngày của các đội gần nhất. Đội đang
+                    bận không xuất hiện trong danh sách đủ điều kiện.
+                  </p>
+                  {candidateError && (
+                    <p role="alert" className="notice error">
+                      Tải đội phù hợp: {candidateError}
+                    </p>
+                  )}
                   {!candidates && !candidateError && <p role="status">Đang tải đội phù hợp…</p>}
                   {candidates?.items.map((candidate) => (
                     <div className="candidate" key={candidate.team.id}>
                       <strong>{candidate.team.name}</strong>
                       <p>
-                        {candidate.suggested ? 'Gợi ý cân bằng tải và khoảng cách · ' : candidate.in_band ? 'Trong nhóm khoảng cách gần · ' : 'Ngoài nhóm khoảng cách gần · '}
+                        {candidate.suggested
+                          ? 'Gợi ý cân bằng tải và khoảng cách · '
+                          : candidate.in_band
+                            ? 'Trong nhóm khoảng cách gần · '
+                            : 'Ngoài nhóm khoảng cách gần · '}
                         Cách {Math.round(candidate.distance_m || 0)} m · vị trí cập nhật{' '}
                         {Math.round((candidate.position_age_s || 0) / 60)} phút trước ·{' '}
-                        {candidate.recent_missions_24h} nhiệm vụ/24 giờ · {candidate.recent_missions_7d} nhiệm vụ/7 ngày
+                        {candidate.recent_missions_24h} nhiệm vụ/24 giờ ·{' '}
+                        {candidate.recent_missions_7d} nhiệm vụ/7 ngày
                       </p>
                       {candidate.recent_history.length > 0 && (
                         <details>
                           <summary>Xem lịch sử 5 nhiệm vụ gần nhất</summary>
                           {candidate.recent_history.map((mission) => (
                             <p key={mission.id}>
-                              {label(mission.mission_kind)} · {label(mission.status)} · {timeLabel(mission.created_at)}
-                              {mission.last_progress?.status ? ` · ${label(mission.last_progress.status)}` : ''}
-                              {mission.override_reason ? ` · Lý do điều phối: ${mission.override_reason}` : ''}
+                              {label(mission.mission_kind)} · {label(mission.status)} ·{' '}
+                              {timeLabel(mission.created_at)}
+                              {mission.last_progress?.status
+                                ? ` · ${label(mission.last_progress.status)}`
+                                : ''}
+                              {mission.override_reason
+                                ? ` · Lý do điều phối: ${mission.override_reason}`
+                                : ''}
                             </p>
                           ))}
                         </details>
@@ -935,7 +1120,13 @@ export function Coordinator({ page }: { page: string }) {
 }
 
 export function CoordinatorMap() {
-  const { region, setRegion, regions, loading: regionLoading, error: regionError } = useAnalyticsRegion();
+  const {
+    region,
+    setRegion,
+    regions,
+    loading: regionLoading,
+    error: regionError,
+  } = useAnalyticsRegion();
   const [layer, setLayer] = useState<'confirmed' | 'unverified'>('confirmed');
   const [data, setData] = useState<{
     items: { center: { coordinates: [number, number] }; count: number }[];
@@ -953,9 +1144,15 @@ export function CoordinatorMap() {
       'response',
       `/map/heatmap?from=${encodeURIComponent(from)}&to=${encodeURIComponent(now)}&status_layer=${layer}&region_code=${encodeURIComponent(region)}`
     )
-      .then((value) => { if (active) setData(value); })
-      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Không thể tải bản đồ.'); });
-    return () => { active = false; };
+      .then((value) => {
+        if (active) setData(value);
+      })
+      .catch((cause) => {
+        if (active) setError(cause instanceof Error ? cause.message : 'Không thể tải bản đồ.');
+      });
+    return () => {
+      active = false;
+    };
   }, [layer, region]);
   return (
     <section className="card">
@@ -964,7 +1161,11 @@ export function CoordinatorMap() {
         Chỉ hiển thị số lượng theo ô, không hiển thị vị trí hoặc liên hệ chính xác của người báo.
       </p>
       <AnalyticsRegionField region={region} onChange={setRegion} regions={regions} />
-      {regionError && <p role="alert" className="notice error">{regionError}</p>}
+      {regionError && (
+        <p role="alert" className="notice error">
+          {regionError}
+        </p>
+      )}
       {!region && !regionLoading && <p>Chọn hoặc nhập mã khu vực để tải bản đồ.</p>}
       <div className="tabs">
         <button

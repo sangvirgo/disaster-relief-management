@@ -1,7 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api, ApiError, newCommandKey } from './api/client';
-import { changePassword, googleLogin, login, logout, me, register, resendEmailOtp, roles, verifyEmail, type Me } from './auth/session';
+import {
+  changePassword,
+  googleLogin,
+  login,
+  logout,
+  me,
+  register,
+  resendEmailOtp,
+  roles,
+  verifyEmail,
+  type Me,
+} from './auth/session';
 import {
   allowedPages,
   allowedWorkspaces,
@@ -28,10 +39,15 @@ import './style.css';
 declare global {
   interface Window {
     google?: {
-      accounts: { id: {
-        initialize: (options: { client_id: string; callback: (response: { credential?: string }) => void }) => void;
-        renderButton: (element: HTMLElement, options: Record<string, unknown>) => void;
-      } };
+      accounts: {
+        id: {
+          initialize: (options: {
+            client_id: string;
+            callback: (response: { credential?: string }) => void;
+          }) => void;
+          renderButton: (element: HTMLElement, options: Record<string, unknown>) => void;
+        };
+      };
     };
   }
 }
@@ -109,12 +125,26 @@ function AuthModal({
           if (!credential.credential) return;
           setBusy(true);
           setMessage('');
-          void googleLogin(credential.credential).then((loggedUser) => { onReady(loggedUser); onClose(); })
-            .catch((error) => setMessage(error instanceof Error ? error.message : 'Không thể đăng nhập bằng Google.'))
+          void googleLogin(credential.credential)
+            .then((loggedUser) => {
+              onReady(loggedUser);
+              onClose();
+            })
+            .catch((error) =>
+              setMessage(
+                error instanceof Error ? error.message : 'Không thể đăng nhập bằng Google.'
+              )
+            )
             .finally(() => setBusy(false));
         },
       });
-      window.google.accounts.id.renderButton(googleButton.current, { theme: 'outline', size: 'large', text: 'signin_with', locale: 'vi', width: 320 });
+      window.google.accounts.id.renderButton(googleButton.current, {
+        theme: 'outline',
+        size: 'large',
+        text: 'signin_with',
+        locale: 'vi',
+        width: 320,
+      });
     };
     if (window.google) renderButton();
     else {
@@ -129,7 +159,9 @@ function AuthModal({
       }
       script.addEventListener('load', renderButton, { once: true });
     }
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [googleClientId, isOpen, mode, onClose, onReady]);
 
   if (!isOpen) return null;
@@ -138,14 +170,17 @@ function AuthModal({
     event.preventDefault();
     const invalid: Record<string, string> = {};
     if (mode === 'verify') {
-      if (!/^[0-9]{6}$/.test(otp.trim())) invalid.otp = 'Vui lòng nhập đúng mã xác thực gồm 6 chữ số.';
+      if (!/^[0-9]{6}$/.test(otp.trim()))
+        invalid.otp = 'Vui lòng nhập đúng mã xác thực gồm 6 chữ số.';
     } else {
-      if (mode === 'register' && !displayName.trim()) invalid.display_name = 'Vui lòng nhập họ và tên.';
+      if (mode === 'register' && !displayName.trim())
+        invalid.display_name = 'Vui lòng nhập họ và tên.';
       if (mode === 'register' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
         invalid.email = 'Vui lòng nhập địa chỉ email hợp lệ để nhận mã xác thực.';
       if (!username.trim()) invalid.username = 'Vui lòng nhập tên đăng nhập.';
       else if (mode === 'register' && !/^[A-Za-z0-9._-]{3,64}$/.test(username.trim()))
-        invalid.username = 'Tên đăng nhập cần 3–64 ký tự, chỉ gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.';
+        invalid.username =
+          'Tên đăng nhập cần 3–64 ký tự, chỉ gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.';
       if (!password) invalid.password = 'Vui lòng nhập mật khẩu.';
       else if (mode === 'register' && password.length < 10)
         invalid.password = 'Mật khẩu đăng ký cần ít nhất 10 ký tự.';
@@ -162,7 +197,11 @@ function AuthModal({
         const result = await register(username.trim(), password, displayName.trim(), email.trim());
         setChallengeId(result.verification.challenge_id);
         setMode('verify');
-        setMessage(result.email_sent ? 'Mã xác thực đã được gửi đến email. Mã có hiệu lực 5 phút.' : 'Tài khoản đang chờ xác thực. Chưa gửi được email; hãy kiểm tra cấu hình email rồi chọn gửi lại mã.');
+        setMessage(
+          result.email_sent
+            ? 'Mã xác thực đã được gửi đến email. Mã có hiệu lực 5 phút.'
+            : 'Tài khoản đang chờ xác thực. Chưa gửi được email; hãy kiểm tra cấu hình email rồi chọn gửi lại mã.'
+        );
       } else if (mode === 'verify') {
         await verifyEmail(challengeId, otp.trim());
         setMode('login');
@@ -176,7 +215,11 @@ function AuthModal({
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Không thể hoàn tất yêu cầu.');
       if (error instanceof ApiError && Object.keys(error.fieldErrors).length) {
-        setAuthErrors(Object.fromEntries(Object.keys(error.fieldErrors).map((name) => [name, 'Thông tin này chưa hợp lệ.'])));
+        setAuthErrors(
+          Object.fromEntries(
+            Object.keys(error.fieldErrors).map((name) => [name, 'Thông tin này chưa hợp lệ.'])
+          )
+        );
       }
     } finally {
       setBusy(false);
@@ -196,97 +239,200 @@ function AuthModal({
           ✕
         </button>
         <div className="auth-brand" aria-hidden="true">
-          <span className="auth-logo-frame"><img src="/reliva-logo.png" alt="" /></span>
+          <span className="auth-logo-frame">
+            <img src="/reliva-logo.png" alt="" />
+          </span>
           <span className="auth-brand-name">reliva</span>
         </div>
         <h2 id="auth-modal-title">
-          {mode === 'login' ? 'Đăng nhập' : mode === 'register' ? 'Tạo tài khoản' : mode === 'verify' ? 'Xác thực email' : 'Hỗ trợ mật khẩu'}
+          {mode === 'login'
+            ? 'Đăng nhập'
+            : mode === 'register'
+              ? 'Tạo tài khoản'
+              : mode === 'verify'
+                ? 'Xác thực email'
+                : 'Hỗ trợ mật khẩu'}
         </h2>
-        {mode === 'help' && <p className="modal-desc">
-          Nếu quên mật khẩu, hãy liên hệ quản trị viên của hệ thống để xác minh tài khoản và cấp mật khẩu tạm. Sau khi đăng nhập, bạn phải đổi mật khẩu tạm.
-        </p>}
-        {mode !== 'help' && <form onSubmit={submit} noValidate className="form-stack">
-          {mode === 'register' && (
-            <label className="auth-field">
-              Email nhận mã xác thực
-              <input required type="email" maxLength={254} aria-invalid={Boolean(authErrors.email)} value={email} onChange={(e) => { setEmail(e.target.value); setAuthErrors((current) => ({ ...current, email: '' })); }} autoComplete="email" placeholder="ten@example.com" />
-              {authErrors.email && <small className="field-error">{authErrors.email}</small>}
-            </label>
-          )}
-          {mode === 'verify' && (
-            <label className="auth-field">
-              Mã xác thực 6 chữ số
-              <input required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} aria-invalid={Boolean(authErrors.otp)} value={otp} onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); setAuthErrors((current) => ({ ...current, otp: '' })); }} autoComplete="one-time-code" />
-              {authErrors.otp && <small className="field-error">{authErrors.otp}</small>}
-            </label>
-          )}
-          {mode !== 'verify' && <>
-          {mode === 'register' && (
-            <label className="auth-field">
-              Họ và tên
-              <input
-                required
-                maxLength={200}
-                aria-invalid={Boolean(authErrors.display_name)}
-                value={displayName}
-                onChange={(e) => { setDisplayName(e.target.value); setAuthErrors((current) => ({ ...current, display_name: '' })); }}
-                autoComplete="name"
-                placeholder="Nguyễn Văn A"
-              />
-              {authErrors.display_name && <small className="field-error">{authErrors.display_name}</small>}
-            </label>
-          )}
-          <label className="auth-field">
-            Tên đăng nhập
-            <input
-              required
-              maxLength={64}
-              aria-invalid={Boolean(authErrors.username)}
-              value={username}
-              onChange={(e) => { setUsername(e.target.value); setAuthErrors((current) => ({ ...current, username: '' })); }}
-              autoComplete="username"
-              placeholder="Nhập tên đăng nhập"
-            />
-            {authErrors.username && <small className="field-error">{authErrors.username}</small>}
-          </label>
-          </>}
-          {mode !== 'verify' && <label className="auth-field">
-            Mật khẩu
-            <span className="auth-password-field">
-              <input
-                required
-                type={showPassword ? 'text' : 'password'}
-                minLength={mode === 'register' ? 10 : undefined}
-                maxLength={256}
-                aria-invalid={Boolean(authErrors.password)}
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setAuthErrors((current) => ({ ...current, password: '' })); }}
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                placeholder={mode === 'register' ? 'Tối thiểu 10 ký tự' : 'Nhập mật khẩu'}
-              />
-              <button type="button" className="auth-password-toggle" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
-                {showPassword ? 'Ẩn' : 'Hiện'}
+        {mode === 'help' && (
+          <p className="modal-desc">
+            Nếu quên mật khẩu, hãy liên hệ quản trị viên của hệ thống để xác minh tài khoản và cấp
+            mật khẩu tạm. Sau khi đăng nhập, bạn phải đổi mật khẩu tạm.
+          </p>
+        )}
+        {mode !== 'help' && (
+          <form onSubmit={submit} noValidate className="form-stack">
+            {mode === 'register' && (
+              <label className="auth-field">
+                Email nhận mã xác thực
+                <input
+                  required
+                  type="email"
+                  maxLength={254}
+                  aria-invalid={Boolean(authErrors.email)}
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setAuthErrors((current) => ({ ...current, email: '' }));
+                  }}
+                  autoComplete="email"
+                  placeholder="ten@example.com"
+                />
+                {authErrors.email && <small className="field-error">{authErrors.email}</small>}
+              </label>
+            )}
+            {mode === 'verify' && (
+              <label className="auth-field">
+                Mã xác thực 6 chữ số
+                <input
+                  required
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  aria-invalid={Boolean(authErrors.otp)}
+                  value={otp}
+                  onChange={(e) => {
+                    setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
+                    setAuthErrors((current) => ({ ...current, otp: '' }));
+                  }}
+                  autoComplete="one-time-code"
+                />
+                {authErrors.otp && <small className="field-error">{authErrors.otp}</small>}
+              </label>
+            )}
+            {mode !== 'verify' && (
+              <>
+                {mode === 'register' && (
+                  <label className="auth-field">
+                    Họ và tên
+                    <input
+                      required
+                      maxLength={200}
+                      aria-invalid={Boolean(authErrors.display_name)}
+                      value={displayName}
+                      onChange={(e) => {
+                        setDisplayName(e.target.value);
+                        setAuthErrors((current) => ({ ...current, display_name: '' }));
+                      }}
+                      autoComplete="name"
+                      placeholder="Nguyễn Văn A"
+                    />
+                    {authErrors.display_name && (
+                      <small className="field-error">{authErrors.display_name}</small>
+                    )}
+                  </label>
+                )}
+                <label className="auth-field">
+                  Tên đăng nhập
+                  <input
+                    required
+                    maxLength={64}
+                    aria-invalid={Boolean(authErrors.username)}
+                    value={username}
+                    onChange={(e) => {
+                      setUsername(e.target.value);
+                      setAuthErrors((current) => ({ ...current, username: '' }));
+                    }}
+                    autoComplete="username"
+                    placeholder="Nhập tên đăng nhập"
+                  />
+                  {authErrors.username && (
+                    <small className="field-error">{authErrors.username}</small>
+                  )}
+                </label>
+              </>
+            )}
+            {mode !== 'verify' && (
+              <label className="auth-field">
+                Mật khẩu
+                <span className="auth-password-field">
+                  <input
+                    required
+                    type={showPassword ? 'text' : 'password'}
+                    minLength={mode === 'register' ? 10 : undefined}
+                    maxLength={256}
+                    aria-invalid={Boolean(authErrors.password)}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setAuthErrors((current) => ({ ...current, password: '' }));
+                    }}
+                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                    placeholder={mode === 'register' ? 'Tối thiểu 10 ký tự' : 'Nhập mật khẩu'}
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    onClick={() => setShowPassword((value) => !value)}
+                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {showPassword ? 'Ẩn' : 'Hiện'}
+                  </button>
+                </span>
+                {authErrors.password && (
+                  <small className="field-error">{authErrors.password}</small>
+                )}
+              </label>
+            )}
+            {message && (
+              <p
+                role={/thành công|đã được xác thực|đã gửi/i.test(message) ? 'status' : 'alert'}
+                className={`notice ${/thành công|đã được xác thực|đã gửi/i.test(message) ? 'success' : 'error'}`}
+              >
+                {message}
+              </p>
+            )}
+            <button disabled={busy} className="button" type="submit">
+              {busy
+                ? 'Đang xử lý…'
+                : mode === 'login'
+                  ? 'Đăng nhập'
+                  : mode === 'verify'
+                    ? 'Xác thực email'
+                    : 'Tạo tài khoản'}
+            </button>
+            {mode === 'verify' && (
+              <button
+                type="button"
+                className="text-button"
+                disabled={busy}
+                onClick={() =>
+                  void resendEmailOtp(challengeId)
+                    .then((result) => {
+                      if (result.challenge_id) setChallengeId(result.challenge_id);
+                      setMessage(
+                        result.email_sent
+                          ? 'Mã mới đã được gửi.'
+                          : 'Nếu tài khoản đang chờ xác thực, hệ thống sẽ gửi mã khi email được cấu hình.'
+                      );
+                    })
+                    .catch((error) =>
+                      setMessage(error instanceof Error ? error.message : 'Chưa gửi lại được mã.')
+                    )
+                }
+              >
+                Gửi lại mã xác thực
               </button>
-            </span>
-            {authErrors.password && <small className="field-error">{authErrors.password}</small>}
-          </label>}
-          {message && (
-            <p
-              role={/thành công|đã được xác thực|đã gửi/i.test(message) ? 'status' : 'alert'}
-              className={`notice ${/thành công|đã được xác thực|đã gửi/i.test(message) ? 'success' : 'error'}`}
-            >
-              {message}
-            </p>
-          )}
-          <button disabled={busy} className="button" type="submit">
-            {busy ? 'Đang xử lý…' : mode === 'login' ? 'Đăng nhập' : mode === 'verify' ? 'Xác thực email' : 'Tạo tài khoản'}
-          </button>
-          {mode === 'verify' && <button type="button" className="text-button" disabled={busy} onClick={() => void resendEmailOtp(challengeId).then((result) => { if (result.challenge_id) setChallengeId(result.challenge_id); setMessage(result.email_sent ? 'Mã mới đã được gửi.' : 'Nếu tài khoản đang chờ xác thực, hệ thống sẽ gửi mã khi email được cấu hình.'); }).catch((error) => setMessage(error instanceof Error ? error.message : 'Chưa gửi lại được mã.'))}>Gửi lại mã xác thực</button>}
-        </form>}
-        {mode === 'login' && googleClientId && <div className="google-auth-button" ref={googleButton} aria-label="Đăng nhập bằng Google" />}
+            )}
+          </form>
+        )}
+        {mode === 'login' && googleClientId && (
+          <div
+            className="google-auth-button"
+            ref={googleButton}
+            aria-label="Đăng nhập bằng Google"
+          />
+        )}
         <div className="modal-footer">
           {mode === 'login' && (
-            <button type="button" className="text-button" onClick={() => { setMode('help'); setShowPassword(false); setMessage(''); }}>
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => {
+                setMode('help');
+                setShowPassword(false);
+                setMessage('');
+              }}
+            >
               Quên mật khẩu?
             </button>
           )}
@@ -300,9 +446,7 @@ function AuthModal({
               setAuthErrors({});
             }}
           >
-            {mode === 'login'
-              ? 'Chưa có tài khoản? Đăng ký ngay'
-              : 'Quay lại đăng nhập'}
+            {mode === 'login' ? 'Chưa có tài khoản? Đăng ký ngay' : 'Quay lại đăng nhập'}
           </button>
         </div>
       </div>
@@ -326,7 +470,13 @@ function AuthRequiredNotice({ onOpenAuth }: { onOpenAuth: () => void }) {
   );
 }
 
-function PasswordChange({ onChanged, forced = false }: { onChanged: (user: Me) => void; forced?: boolean }) {
+function PasswordChange({
+  onChanged,
+  forced = false,
+}: {
+  onChanged: (user: Me) => void;
+  forced?: boolean;
+}) {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -350,9 +500,11 @@ function PasswordChange({ onChanged, forced = false }: { onChanged: (user: Me) =
     <section className="card auth-card">
       <div className="eyebrow">Bảo mật tài khoản</div>
       <h2>Đổi mật khẩu tài khoản</h2>
-      <p>{forced
-        ? 'Tài khoản vừa đăng nhập bằng mật khẩu tạm. Vui lòng cập nhật mật khẩu mới để tiếp tục.'
-        : 'Nhập mật khẩu hiện tại và mật khẩu mới để bảo vệ tài khoản của bạn.'}</p>
+      <p>
+        {forced
+          ? 'Tài khoản vừa đăng nhập bằng mật khẩu tạm. Vui lòng cập nhật mật khẩu mới để tiếp tục.'
+          : 'Nhập mật khẩu hiện tại và mật khẩu mới để bảo vệ tài khoản của bạn.'}
+      </p>
 
       <div className="notice" style={{ fontSize: 13, marginBottom: 14 }}>
         💡 <strong>Quy chuẩn mật khẩu mới:</strong> Tối thiểu 10 ký tự, khác tên đăng nhập và khác
@@ -412,12 +564,16 @@ function Tracking({ user, initialCode = '' }: { user: Me | null; initialCode?: s
   async function refreshTracking(credentials = verified) {
     if (!credentials) return;
     const version = lookupVersion.current;
-    const result = await api<ResponseComponents['schemas']['ReporterTracking']>('response', '/requests/track', {
+    const result = await api<ResponseComponents['schemas']['ReporterTracking']>(
+      'response',
+      '/requests/track',
+      {
         headers: {
           'X-Tracking-Code': credentials.code,
           ...(credentials.secret ? { 'X-Tracking-Secret': credentials.secret } : {}),
         },
-      });
+      }
+    );
     if (version === lookupVersion.current) {
       setVerified(credentials);
       setData(result);
@@ -474,7 +630,11 @@ function Tracking({ user, initialCode = '' }: { user: Me | null; initialCode?: s
     <div className="grid-two">
       <section className="card">
         <h2>Tra cứu riêng tư</h2>
-        <p>Mã theo dõi được máy chủ cấp sau khi nhận SOS. Nếu gửi khi chưa đăng nhập, bạn còn nhận một mã bảo mật chỉ hiện một lần; hãy giữ riêng mã này để tra cứu. Nếu đã đăng nhập khi gửi, hãy dùng tài khoản của mình và mã theo dõi.</p>
+        <p>
+          Mã theo dõi được máy chủ cấp sau khi nhận SOS. Nếu gửi khi chưa đăng nhập, bạn còn nhận
+          một mã bảo mật chỉ hiện một lần; hãy giữ riêng mã này để tra cứu. Nếu đã đăng nhập khi
+          gửi, hãy dùng tài khoản của mình và mã theo dõi.
+        </p>
         <form onSubmit={lookup} className="form-stack">
           <label>
             Mã theo dõi
@@ -772,7 +932,13 @@ function DetailPanel({
 }
 
 function LivePage({ page, user }: { page: Page; user: Me | null }) {
-  const { region, setRegion, regions, loading: regionLoading, error: regionError } = useAnalyticsRegion(page.path === '/reports/summary');
+  const {
+    region,
+    setRegion,
+    regions,
+    loading: regionLoading,
+    error: regionError,
+  } = useAnalyticsRegion(page.path === '/reports/summary');
   const [data, setData] = useState<DataPage | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -830,14 +996,30 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
   return (
     <section className={`card ${page.path === '/reports/summary' ? 'report-card' : ''}`}>
       <div className="section-header">
-        <div><span className="eyebrow">Số liệu trực tiếp</span><h2>{page.path === '/reports/summary' ? 'Tổng quan ứng cứu' : page.title}</h2></div>
-        <span className="report-period">{page.path === '/reports/summary' ? '7 ngày gần đây' : 'Dữ liệu từ hệ thống'}</span>
+        <div>
+          <span className="eyebrow">Số liệu trực tiếp</span>
+          <h2>{page.path === '/reports/summary' ? 'Tổng quan ứng cứu' : page.title}</h2>
+        </div>
+        <span className="report-period">
+          {page.path === '/reports/summary' ? '7 ngày gần đây' : 'Dữ liệu từ hệ thống'}
+        </span>
       </div>
       {page.note && page.path !== '/reports/summary' && <p>{page.note}</p>}
       {page.path === '/reports/summary' && (
         <>
-          <AnalyticsRegionField region={region} onChange={(value) => { setCursor(null); setRegion(value); }} regions={regions} />
-          {regionError && <p role="alert" className="notice error">{regionError}</p>}
+          <AnalyticsRegionField
+            region={region}
+            onChange={(value) => {
+              setCursor(null);
+              setRegion(value);
+            }}
+            regions={regions}
+          />
+          {regionError && (
+            <p role="alert" className="notice error">
+              {regionError}
+            </p>
+          )}
           {!region && !regionLoading && <p>Chọn hoặc nhập mã khu vực để xem báo cáo.</p>}
         </>
       )}
@@ -869,22 +1051,51 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
           ) : 'status_counts' in data ? (
             <div className="report-content">
               <div className="report-metrics">
-                <div className="metric-tile"><span>Nhiệm vụ đang hoạt động</span><strong>{data.active_missions ?? 0}</strong><small>Đội đang thực hiện</small></div>
-                <div className="metric-tile metric-tile-warning"><span>Nhiệm vụ quá hạn</span><strong>{data.overdue_missions ?? 0}</strong><small>Cần theo dõi</small></div>
-                <div className="metric-tile metric-tile-green"><span>Tổng yêu cầu</span><strong>{Object.values(data.status_counts || {}).reduce((sum, count) => sum + count, 0)}</strong><small>Trong khu vực đã chọn</small></div>
+                <div className="metric-tile">
+                  <span>Nhiệm vụ đang hoạt động</span>
+                  <strong>{data.active_missions ?? 0}</strong>
+                  <small>Đội đang thực hiện</small>
+                </div>
+                <div className="metric-tile metric-tile-warning">
+                  <span>Nhiệm vụ quá hạn</span>
+                  <strong>{data.overdue_missions ?? 0}</strong>
+                  <small>Cần theo dõi</small>
+                </div>
+                <div className="metric-tile metric-tile-green">
+                  <span>Tổng yêu cầu</span>
+                  <strong>
+                    {Object.values(data.status_counts || {}).reduce((sum, count) => sum + count, 0)}
+                  </strong>
+                  <small>Trong khu vực đã chọn</small>
+                </div>
               </div>
               <div className="report-breakdown">
                 <h3>Yêu cầu theo trạng thái</h3>
                 <p>Mỗi trạng thái là một nhóm riêng trong báo cáo.</p>
                 <div className="report-status-grid">
                   {Object.entries(data.status_counts || {}).map(([key, value]) => (
-                    <div className="report-status" key={key}><span>{label(key)}</span><strong>{value}</strong></div>
+                    <div className="report-status" key={key}>
+                      <span>{label(key)}</span>
+                      <strong>{value}</strong>
+                    </div>
                   ))}
                 </div>
-                {!Object.keys(data.status_counts || {}).length && <div className="empty">Chưa có yêu cầu trong khoảng thời gian này.</div>}
+                {!Object.keys(data.status_counts || {}).length && (
+                  <div className="empty">Chưa có yêu cầu trong khoảng thời gian này.</div>
+                )}
               </div>
               {Boolean(data.priority_counts && Object.keys(data.priority_counts).length) && (
-                <div className="report-breakdown"><h3>Mức ưu tiên đã quyết định</h3><div className="report-status-grid">{Object.entries(data.priority_counts || {}).map(([key, value]) => <div className="report-status" key={key}><span>{label(key)}</span><strong>{value}</strong></div>)}</div></div>
+                <div className="report-breakdown">
+                  <h3>Mức ưu tiên đã quyết định</h3>
+                  <div className="report-status-grid">
+                    {Object.entries(data.priority_counts || {}).map(([key, value]) => (
+                      <div className="report-status" key={key}>
+                        <span>{label(key)}</span>
+                        <strong>{value}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           ) : (
@@ -1003,7 +1214,9 @@ function App() {
     <div className="shell">
       <aside className={`sidebar ${menuOpen ? 'open' : ''}`} aria-label="Điều hướng chính">
         <div className="brand">
-          <span className="brand-mark"><img src="/reliva-logo.png" alt="" aria-hidden="true" /></span>
+          <span className="brand-mark">
+            <img src="/reliva-logo.png" alt="" aria-hidden="true" />
+          </span>
           <div>
             <strong>Reliva</strong>
             <small>CHUNG TAY CỨU TRỢ</small>
@@ -1069,7 +1282,10 @@ function App() {
               <button
                 type="button"
                 className="user-profile profile-trigger"
-                onClick={() => { changeWorkspace('citizen'); setPageId('account'); }}
+                onClick={() => {
+                  changeWorkspace('citizen');
+                  setPageId('account');
+                }}
                 aria-label="Mở tài khoản của tôi"
               >
                 <span className="user-avatar" aria-hidden="true">
@@ -1077,7 +1293,9 @@ function App() {
                 </span>
                 <span className="user-info">
                   <span className="user-name">{user.display_name}</span>
-                  <span className="user-role-badge">{label(user.grants[0]?.role_code || 'CITIZEN')}</span>
+                  <span className="user-role-badge">
+                    {label(user.grants[0]?.role_code || 'CITIZEN')}
+                  </span>
                 </span>
               </button>
             ) : (
@@ -1132,11 +1350,20 @@ function App() {
                 {workspace === 'citizen' && selected.id === 'home' ? (
                   <section className="card">
                     <h2>Bạn cần hỗ trợ?</h2>
-                    <p>Gửi yêu cầu SOS khi cần cứu hộ, giữ mã theo dõi sau khi máy chủ xác nhận và tra cứu tiến độ tại đây.</p>
+                    <p>
+                      Gửi yêu cầu SOS khi cần cứu hộ, giữ mã theo dõi sau khi máy chủ xác nhận và
+                      tra cứu tiến độ tại đây.
+                    </p>
                     <div className="action-grid">
-                      <button className="button" onClick={() => changePage('sos')}>Gửi yêu cầu SOS</button>
-                      <button className="button secondary" onClick={() => changePage('track')}>Theo dõi SOS</button>
-                      <button className="button secondary" onClick={() => changePage('drives')}>Xem đợt quyên góp</button>
+                      <button className="button" onClick={() => changePage('sos')}>
+                        Gửi yêu cầu SOS
+                      </button>
+                      <button className="button secondary" onClick={() => changePage('track')}>
+                        Theo dõi SOS
+                      </button>
+                      <button className="button secondary" onClick={() => changePage('drives')}>
+                        Xem đợt quyên góp
+                      </button>
                     </div>
                   </section>
                 ) : workspace === 'citizen' && selected.id === 'receipt' ? (
@@ -1144,13 +1371,26 @@ function App() {
                     <h2>Xác nhận tiếp nhận SOS</h2>
                     {latestReceipt ? (
                       <>
-                        <p>Mã theo dõi: <strong>{latestReceipt.tracking_code}</strong></p>
-                        <p>Trạng thái: {label(latestReceipt.status)} · Thời điểm: {timeLabel(latestReceipt.received_at)}</p>
-                        <p>Mã bảo mật chỉ hiện một lần trên màn hình gửi SOS. Nếu đã rời màn hình đó, hãy dùng mã đã lưu để tra cứu.</p>
-                        <button className="button secondary" onClick={() => changePage('track')}>Theo dõi tiến độ</button>
+                        <p>
+                          Mã theo dõi: <strong>{latestReceipt.tracking_code}</strong>
+                        </p>
+                        <p>
+                          Trạng thái: {label(latestReceipt.status)} · Thời điểm:{' '}
+                          {timeLabel(latestReceipt.received_at)}
+                        </p>
+                        <p>
+                          Mã bảo mật chỉ hiện một lần trên màn hình gửi SOS. Nếu đã rời màn hình đó,
+                          hãy dùng mã đã lưu để tra cứu.
+                        </p>
+                        <button className="button secondary" onClick={() => changePage('track')}>
+                          Theo dõi tiến độ
+                        </button>
                       </>
                     ) : (
-                      <p>Chưa có yêu cầu SOS nào được xác nhận trong phiên mở trang này. Hãy gửi yêu cầu hoặc tra cứu bằng mã theo dõi đã lưu.</p>
+                      <p>
+                        Chưa có yêu cầu SOS nào được xác nhận trong phiên mở trang này. Hãy gửi yêu
+                        cầu hoặc tra cứu bằng mã theo dõi đã lưu.
+                      </p>
                     )}
                   </section>
                 ) : selected.id === 'account' && !user ? (
@@ -1158,14 +1398,21 @@ function App() {
                 ) : workspace === 'citizen' && selected.id === 'account' && user ? (
                   <CitizenAccount
                     user={user}
-                    onTrack={(code) => { setSelectedTrackingCode(code); changePage('track'); }}
+                    onTrack={(code) => {
+                      setSelectedTrackingCode(code);
+                      changePage('track');
+                    }}
                     onChangePassword={() => setShowPasswordModal(true)}
                     onLogout={signOut}
                   />
                 ) : workspace === 'citizen' && selected.id === 'sos' ? (
                   <SosForm user={user} onConfirmed={setLatestReceipt} />
                 ) : selected.id === 'track' ? (
-                  <Tracking key={selectedTrackingCode} user={user} initialCode={selectedTrackingCode} />
+                  <Tracking
+                    key={selectedTrackingCode}
+                    user={user}
+                    initialCode={selectedTrackingCode}
+                  />
                 ) : workspace === 'citizen' &&
                   ['drives', 'declare', 'donation'].includes(selected.id) ? (
                   <Donations page={selected.id as 'drives' | 'declare' | 'donation'} user={user} />
@@ -1213,10 +1460,27 @@ function App() {
         }}
       />
       {showPasswordModal && user && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Đổi mật khẩu" onClick={() => setShowPasswordModal(false)}>
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Đổi mật khẩu"
+          onClick={() => setShowPasswordModal(false)}
+        >
           <div className="modal-card" onClick={(event) => event.stopPropagation()}>
-            <button className="modal-close-button" aria-label="Đóng cửa sổ" onClick={() => setShowPasswordModal(false)}>✕</button>
-            <PasswordChange onChanged={(updatedUser) => { setUser(updatedUser); setShowPasswordModal(false); }} />
+            <button
+              className="modal-close-button"
+              aria-label="Đóng cửa sổ"
+              onClick={() => setShowPasswordModal(false)}
+            >
+              ✕
+            </button>
+            <PasswordChange
+              onChanged={(updatedUser) => {
+                setUser(updatedUser);
+                setShowPasswordModal(false);
+              }}
+            />
           </div>
         </div>
       )}

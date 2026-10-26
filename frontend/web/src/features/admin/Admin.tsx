@@ -235,7 +235,14 @@ export function Admin({ page }: { page: string }) {
         )}
       </section>
       <section className={`card detail-panel-card ${selected ? 'is-open' : ''}`}>
-        {selected && <DetailCloseButton onClick={() => { setSelected(null); setDetail(null); }} />}
+        {selected && (
+          <DetailCloseButton
+            onClick={() => {
+              setSelected(null);
+              setDetail(null);
+            }}
+          />
+        )}
         <h2>
           {selected
             ? 'Chi tiết và thao tác'

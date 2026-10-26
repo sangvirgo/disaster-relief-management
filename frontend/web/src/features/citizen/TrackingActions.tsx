@@ -78,7 +78,9 @@ export function TrackingActions({
       try {
         await onUpdated();
       } catch {
-        setMessage('Máy chủ đã tiếp nhận thông tin bổ sung. Hãy tra cứu lại để xem trạng thái mới.');
+        setMessage(
+          'Máy chủ đã tiếp nhận thông tin bổ sung. Hãy tra cứu lại để xem trạng thái mới.'
+        );
       }
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Chưa xác nhận được thông tin bổ sung.');

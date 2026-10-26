@@ -57,13 +57,13 @@ assert.deepEqual(Object.keys(compose.services).sort(), [...expectedServices].sor
 for (const name of expectedServices) {
   assert.doesNotMatch(name, /test/i, `Docker service name ${name} must not contain test`);
   const service = compose.services[name];
-  assert.ok(!service.container_name, `${name} must use its stable Compose-generated container name`);
+  assert.equal(service.container_name, `reliva-${name}`, `${name} must use its explicit Reliva container name`);
   assert.ok(!service.env_file, `${name} must not load a shared env_file`);
   assert.deepEqual(Object.keys(service.environment ?? {}).sort(), [...expectedEnvironment[name]].sort(), `${name} environment allow-list changed`);
-  if (service.image) assert.doesNotMatch(service.image, /test/i, `${name} image name must not contain test`);
+  if (service.image) assert.doesNotMatch(service.image, /(?:^|[/:._-])test(?:$|[/:._-])/i, `${name} image name must not contain test`);
 }
 
-for (const [namespace, tag] of [['c48', 'local'], ['ghcr.io/sangvirgo', 'handoff-test']]) {
+for (const [namespace, tag] of [['reliva', 'latest'], ['ghcr.io/sangvirgo', 'handoff-test']]) {
   const configured = spawnSync('docker', args, {
     encoding: 'utf8',
     env: { ...process.env, C48_IMAGE_NAMESPACE: namespace, C48_IMAGE_TAG: tag },

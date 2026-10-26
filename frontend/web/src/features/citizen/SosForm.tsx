@@ -33,7 +33,13 @@ function secret32(): string {
     .replaceAll('=', '');
 }
 
-export function SosForm({ user, onConfirmed }: { user: Me | null; onConfirmed?: (receipt: Created) => void }) {
+export function SosForm({
+  user,
+  onConfirmed,
+}: {
+  user: Me | null;
+  onConfirmed?: (receipt: Created) => void;
+}) {
   const [mode, setMode] = useState<'SELF' | 'PROXY'>('SELF');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -111,11 +117,17 @@ export function SosForm({ user, onConfirmed }: { user: Me | null; onConfirmed?: 
       (!Number.isInteger(Number(people)) || Number(people) < 1 || Number(people) > 10000)
     )
       throw new Error('Số người cần hỗ trợ phải từ 1 đến 10.000.');
-    for (const [label, value] of [['trẻ em', children], ['người cao tuổi', elderly]] as const) {
-      if (value && (!Number.isInteger(Number(value)) || Number(value) < 0 || Number(value) > 10000)) throw new Error(`Số ${label} phải từ 0 đến 10.000.`);
+    for (const [label, value] of [
+      ['trẻ em', children],
+      ['người cao tuổi', elderly],
+    ] as const) {
+      if (value && (!Number.isInteger(Number(value)) || Number(value) < 0 || Number(value) > 10000))
+        throw new Error(`Số ${label} phải từ 0 đến 10.000.`);
     }
-    if (people && Number(children || 0) + Number(elderly || 0) > Number(people)) throw new Error('Tổng số trẻ em và người cao tuổi không được lớn hơn tổng số người.');
-    if (!needsRescue && !needsRelief) throw new Error('Hãy chọn ít nhất một nhu cầu: cứu hộ hoặc hàng cứu trợ.');
+    if (people && Number(children || 0) + Number(elderly || 0) > Number(people))
+      throw new Error('Tổng số trẻ em và người cao tuổi không được lớn hơn tổng số người.');
+    if (!needsRescue && !needsRelief)
+      throw new Error('Hãy chọn ít nhất một nhu cầu: cứu hộ hoặc hàng cứu trợ.');
     if (mode === 'PROXY' && !user) throw new Error('Vui lòng đăng nhập để báo hộ.');
     if (mode === 'PROXY' && (!relationship.trim() || !informationSource.trim() || !situationAt))
       throw new Error('Vui lòng nhập quan hệ, nguồn thông tin và thời điểm biết tình hình.');
@@ -269,11 +281,29 @@ export function SosForm({ user, onConfirmed }: { user: Me | null; onConfirmed?: 
         </label>
         <label>
           Trẻ em (nếu biết)
-          <input type="number" min="0" max="10000" value={children} onChange={(e) => { setChildren(e.target.value); pending.current = null; }} />
+          <input
+            type="number"
+            min="0"
+            max="10000"
+            value={children}
+            onChange={(e) => {
+              setChildren(e.target.value);
+              pending.current = null;
+            }}
+          />
         </label>
         <label>
           Người cao tuổi (nếu biết)
-          <input type="number" min="0" max="10000" value={elderly} onChange={(e) => { setElderly(e.target.value); pending.current = null; }} />
+          <input
+            type="number"
+            min="0"
+            max="10000"
+            value={elderly}
+            onChange={(e) => {
+              setElderly(e.target.value);
+              pending.current = null;
+            }}
+          />
         </label>
         <label>
           Họ tên người báo (nếu muốn)
@@ -310,12 +340,33 @@ export function SosForm({ user, onConfirmed }: { user: Me | null; onConfirmed?: 
         />
       </label>
       <div className="notice warning">
-        Mô tả ngắn được gửi đến Gemini để trích xuất dữ kiện thành JSON. Không nhập tên, số điện thoại, số giấy tờ hoặc địa chỉ cụ thể. Điều phối viên sẽ xem xét mọi gợi ý AI.
+        Mô tả ngắn được gửi đến Gemini để trích xuất dữ kiện thành JSON. Không nhập tên, số điện
+        thoại, số giấy tờ hoặc địa chỉ cụ thể. Điều phối viên sẽ xem xét mọi gợi ý AI.
       </div>
       <fieldset className="sos-needs">
         <legend>Nhu cầu cần hỗ trợ</legend>
-        <label className="radio"><input type="checkbox" checked={needsRescue} onChange={(e) => { setNeedsRescue(e.target.checked); pending.current = null; }} /> Cần đội đến cứu hộ tại hiện trường</label>
-        <label className="radio"><input type="checkbox" checked={needsRelief} onChange={(e) => { setNeedsRelief(e.target.checked); pending.current = null; }} /> Cần hàng cứu trợ (lương thực, nước uống, vật dụng)</label>
+        <label className="radio">
+          <input
+            type="checkbox"
+            checked={needsRescue}
+            onChange={(e) => {
+              setNeedsRescue(e.target.checked);
+              pending.current = null;
+            }}
+          />{' '}
+          Cần đội đến cứu hộ tại hiện trường
+        </label>
+        <label className="radio">
+          <input
+            type="checkbox"
+            checked={needsRelief}
+            onChange={(e) => {
+              setNeedsRelief(e.target.checked);
+              pending.current = null;
+            }}
+          />{' '}
+          Cần hàng cứu trợ (lương thực, nước uống, vật dụng)
+        </label>
       </fieldset>
       <label className="radio">
         <input

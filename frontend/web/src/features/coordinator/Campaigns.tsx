@@ -73,7 +73,8 @@ export function Campaigns() {
   };
   const id = selected?.id;
   const version = selected?.version;
-  const visibleItems = statusFilter === 'ALL' ? items : items.filter((item) => item.status === statusFilter);
+  const visibleItems =
+    statusFilter === 'ALL' ? items : items.filter((item) => item.status === statusFilter);
   const statusOptions = [...new Set(items.map((item) => item.status))];
   const action = (title: string, suffix: string, reason = false) =>
     id &&
@@ -96,11 +97,32 @@ export function Campaigns() {
   return (
     <div className="campaign-layout">
       <section className="card campaign-list-panel">
-        <div className="section-header"><div><span className="eyebrow">Điều phối cứu trợ</span><h2>Chiến dịch cứu trợ</h2></div><span className="chip">{items.length} chiến dịch trên trang</span></div>
+        <div className="section-header">
+          <div>
+            <span className="eyebrow">Điều phối cứu trợ</span>
+            <h2>Chiến dịch cứu trợ</h2>
+          </div>
+          <span className="chip">{items.length} chiến dịch trên trang</span>
+        </div>
         <p>Chọn chiến dịch để xem mục tiêu, thời gian và thao tác được cấp quyền.</p>
         <div className="campaign-filters" role="group" aria-label="Lọc chiến dịch theo trạng thái">
-          <button type="button" className={statusFilter === 'ALL' ? 'active' : ''} onClick={() => setStatusFilter('ALL')}>Tất cả</button>
-          {statusOptions.map((status) => <button type="button" key={status} className={statusFilter === status ? 'active' : ''} onClick={() => setStatusFilter(status)}>{label(status)}</button>)}
+          <button
+            type="button"
+            className={statusFilter === 'ALL' ? 'active' : ''}
+            onClick={() => setStatusFilter('ALL')}
+          >
+            Tất cả
+          </button>
+          {statusOptions.map((status) => (
+            <button
+              type="button"
+              key={status}
+              className={statusFilter === status ? 'active' : ''}
+              onClick={() => setStatusFilter(status)}
+            >
+              {label(status)}
+            </button>
+          ))}
         </div>
         {loading && <p role="status">Đang tải chiến dịch…</p>}
         {error && (
@@ -118,19 +140,29 @@ export function Campaigns() {
               onClick={() => setSelected(item)}
               key={item.id}
             >
-              <span className="campaign-card-main"><strong>{item.name}</strong><small>{item.objective || 'Chưa có mô tả mục tiêu.'}</small><span>{item.region_code || 'Nhiều khu vực'} · Tạo {timeLabel(item.created_at)}</span></span>
+              <span className="campaign-card-main">
+                <strong>{item.name}</strong>
+                <small>{item.objective || 'Chưa có mô tả mục tiêu.'}</small>
+                <span>
+                  {item.region_code || 'Nhiều khu vực'} · Tạo {timeLabel(item.created_at)}
+                </span>
+              </span>
               <span className="chip">{label(item.status)}</span>
             </button>
           ))}
         </div>
-        {!loading && items.length > 0 && visibleItems.length === 0 && <div className="empty">Không có chiến dịch ở trạng thái này trên trang hiện tại.</div>}
+        {!loading && items.length > 0 && visibleItems.length === 0 && (
+          <div className="empty">Không có chiến dịch ở trạng thái này trên trang hiện tại.</div>
+        )}
         {next && (
           <button className="button secondary" onClick={() => setCursor(next)}>
             Xem thêm
           </button>
         )}
       </section>
-      <section className={`card campaign-detail-panel detail-panel-card ${selected ? 'is-open' : ''}`}>
+      <section
+        className={`card campaign-detail-panel detail-panel-card ${selected ? 'is-open' : ''}`}
+      >
         {selected && <DetailCloseButton onClick={() => setSelected(null)} />}
         <span className="eyebrow">{selected ? 'Hồ sơ chiến dịch' : 'Chiến dịch mới'}</span>
         <h2>{selected ? selected.name : 'Thiết lập chiến dịch mới'}</h2>
@@ -138,10 +170,24 @@ export function Campaigns() {
           <>
             <p className="campaign-objective">{selected.objective || 'Chưa có mô tả mục tiêu.'}</p>
             <dl className="fact-list">
-              <div><dt>Trạng thái</dt><dd><span className="chip">{label(selected.status)}</span></dd></div>
-              <div><dt>Khu vực</dt><dd>{selected.region_code || 'Nhiều khu vực'}</dd></div>
-              <div><dt>Bắt đầu</dt><dd>{selected.starts_at ? timeLabel(selected.starts_at) : 'Chưa ấn định'}</dd></div>
-              <div><dt>Kết thúc</dt><dd>{selected.ends_at ? timeLabel(selected.ends_at) : 'Chưa ấn định'}</dd></div>
+              <div>
+                <dt>Trạng thái</dt>
+                <dd>
+                  <span className="chip">{label(selected.status)}</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Khu vực</dt>
+                <dd>{selected.region_code || 'Nhiều khu vực'}</dd>
+              </div>
+              <div>
+                <dt>Bắt đầu</dt>
+                <dd>{selected.starts_at ? timeLabel(selected.starts_at) : 'Chưa ấn định'}</dd>
+              </div>
+              <div>
+                <dt>Kết thúc</dt>
+                <dd>{selected.ends_at ? timeLabel(selected.ends_at) : 'Chưa ấn định'}</dd>
+              </div>
             </dl>
             <div className="action-grid">
               {selected.status === 'DRAFT' && action('Kích hoạt chiến dịch', 'activate')}

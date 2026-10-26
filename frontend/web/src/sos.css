@@ -329,15 +329,27 @@
 }
 
 @keyframes location-pin-drop {
-  0% { transform: translate(-50%, calc(-100% - 48px)) scale(1.12); }
-  55% { transform: translate(-50%, calc(-100% + 5px)) scale(0.96); }
-  76% { transform: translate(-50%, calc(-100% - 9px)) scale(1.03); }
-  100% { transform: translate(-50%, -100%) scale(1); }
+  0% {
+    transform: translate(-50%, calc(-100% - 48px)) scale(1.12);
+  }
+  55% {
+    transform: translate(-50%, calc(-100% + 5px)) scale(0.96);
+  }
+  76% {
+    transform: translate(-50%, calc(-100% - 9px)) scale(1.03);
+  }
+  100% {
+    transform: translate(-50%, -100%) scale(1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .location-center-pin { transition: none; }
-  .location-center-pin.is-confirmed { animation: none; }
+  .location-center-pin {
+    transition: none;
+  }
+  .location-center-pin.is-confirmed {
+    animation: none;
+  }
 }
 
 @media (max-width: 720px) {

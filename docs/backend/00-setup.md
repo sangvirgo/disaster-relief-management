@@ -159,6 +159,8 @@ Stock balance writer uses SECURITY DEFINER with dedicated NOLOGIN owner, fixed t
 
 One host, one Compose project `c48`. PostgreSQL, API, Nginx, and MinIO console ports bind only to loopback; Nginx is the public API entry point. Names below are the current service names; the images, ports and volumes are recorded in `VERSIONS.md`.
 
+From `backend/`, `docker compose build` builds the application images and `docker compose up --build` builds and starts the core stack. `COMPOSE_FILE=infra/compose.yaml` in `.env` selects the sole Compose file. Application images default to `reliva/<service>:latest`; every service has the explicit container name `reliva-<service>`. The Compose project, database names, network, and persistent volumes retain their existing C48 names. Explicit container names are intended for this single-host stack and prevent scaling a service to multiple replicas.
+
 ### 8.1 Services
 
 | Service | Image / build | Internal port | Published | Depends on (healthy) | Purpose |
@@ -170,7 +172,7 @@ One host, one Compose project `c48`. PostgreSQL, API, Nginx, and MinIO console p
 | `minio` | MinIO AIStor Free, version pinned (licence recorded in `VERSIONS.md`), `storage` profile | 9000 (S3); 9001 console | console: `127.0.0.1:9001`; S3 stays internal | — | Private buckets `c48-response-evidence`, `c48-logistics-evidence`; volume `c48_minio-data` |
 | `minio-init` | `mc` one-shot | — | — | minio | Creates the two buckets, one access key per service limited to its bucket, no public policy |
 | `nginx` | `nginx:1.30.5` | 80 | `127.0.0.1:${PUBLIC_PORT:-8080}:80` | the three APIs | Routing, rate limits, body limits, header hygiene (8.3) |
-| `seed` (profile `seed`) | `c48/identity-api:local`, one-shot | — | — | all migrate jobs | Demo data (section 9); refuses `NODE_ENV=production` |
+| `seed` (profile `seed`) | `reliva/identity-api:latest`, one-shot | — | — | all migrate jobs | Demo data (section 9); refuses `NODE_ENV=production` |
 
 Networks: single bridge `c48-internal`; APIs reach each other by service name (`http://response-api:3002`) for `/internal/` calls. PostgreSQL and published API/console ports bind to host loopback; service-to-service traffic stays on the internal network. Migration jobs wait for PostgreSQL, and APIs wait for their migration jobs; API-to-MinIO dependency is optional when the `storage` profile is off.
 

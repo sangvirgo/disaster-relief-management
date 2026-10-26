@@ -128,18 +128,27 @@ Set `EMAIL_OTP_PEPPER` to a separate random value, and fill in the remaining req
 
 ```bash
 cd backend
-docker compose --env-file .env -f infra/compose.yaml up --build
+docker compose up --build
 ```
 
 Compose builds the Web and API images, initializes PostgreSQL, runs the declared migrations, and starts Nginx. Open **<http://localhost:8080>** for the Web application. The same origin serves the API paths listed above.
 
 Demo data is opt-in. The `seed` profile uses synthetic fixtures and does not reset existing database volumes. Read the [backend setup guide](docs/backend/00-setup.md) before loading it. The `storage` profile is also optional; review the provider and license requirements in the [technology plan](docs/c48-technology-and-delivery-plan.md) before enabling it.
 
+`backend/.env` sets `COMPOSE_FILE=infra/compose.yaml`, so Compose uses the single infrastructure definition automatically. Application images use `reliva/<service>:latest`; containers use explicit names such as `reliva-identity-api`, without a generated numeric suffix. Override `C48_IMAGE_NAMESPACE` and `C48_IMAGE_TAG` to use a registry or a release tag.
+
+To build all application images without starting containers:
+
+```bash
+cd backend
+docker compose build
+```
+
 To build only the Web image:
 
 ```bash
 cd backend
-docker compose --env-file .env -f infra/compose.yaml build web
+docker compose build web
 ```
 
 ## Configuration

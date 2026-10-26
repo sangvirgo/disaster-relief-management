@@ -70,33 +70,64 @@ export function AnalyticsRegionField({
   return (
     <div className="region-control">
       <div className="region-control-heading">
-        <span className="region-control-symbol" aria-hidden="true">⌖</span>
-        <span><strong>Khu vực báo cáo</strong><small>Chọn phạm vi để cập nhật số liệu</small></span>
+        <span className="region-control-symbol" aria-hidden="true">
+          ⌖
+        </span>
+        <span>
+          <strong>Khu vực báo cáo</strong>
+          <small>Chọn phạm vi để cập nhật số liệu</small>
+        </span>
       </div>
       <div className="region-control-inputs">
-        <label className="visually-hidden" htmlFor="analytics-region">Chọn khu vực báo cáo</label>
+        <label className="visually-hidden" htmlFor="analytics-region">
+          Chọn khu vực báo cáo
+        </label>
         <select
           id="analytics-region"
           value={listed && !manual ? region : ''}
-          onChange={(event) => { setManual(false); onChange(event.target.value); }}
+          onChange={(event) => {
+            setManual(false);
+            onChange(event.target.value);
+          }}
         >
           <option value="">Chọn khu vực</option>
-          {regions.map((code) => <option key={code} value={code}>{code}</option>)}
+          {regions.map((code) => (
+            <option key={code} value={code}>
+              {code}
+            </option>
+          ))}
         </select>
-        <button type="button" className="region-manual-button" onClick={() => setManual((value) => !value)}>
+        <button
+          type="button"
+          className="region-manual-button"
+          onClick={() => setManual((value) => !value)}
+        >
           {manual ? 'Ẩn nhập mã' : 'Nhập mã khác'}
         </button>
       </div>
       {manual && (
         <label className="region-manual-field">
           Mã khu vực khác
-          <input value={region} onChange={(event) => onChange(event.target.value.trim())} placeholder="Ví dụ: DEMO_A" autoComplete="off" />
+          <input
+            value={region}
+            onChange={(event) => onChange(event.target.value.trim())}
+            placeholder="Ví dụ: DEMO_A"
+            autoComplete="off"
+          />
         </label>
       )}
       {regions.length > 0 && (
         <div className="region-shortcuts" role="group" aria-label="Khu vực thường dùng">
           {regions.slice(0, 4).map((code) => (
-            <button key={code} type="button" className={region === code ? 'active' : ''} onClick={() => { setManual(false); onChange(code); }}>
+            <button
+              key={code}
+              type="button"
+              className={region === code ? 'active' : ''}
+              onClick={() => {
+                setManual(false);
+                onChange(code);
+              }}
+            >
               {code}
             </button>
           ))}

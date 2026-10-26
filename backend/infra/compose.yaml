@@ -2,6 +2,7 @@ name: c48
 
 services:
   postgres:
+    container_name: reliva-postgres
     image: postgis/postgis:17-3.5@sha256:01a6a70e41e6c4467c8f55f6063555ed72db2d6662cd0d571040d42eadaeb6f6
     environment:
       POSTGRES_DB: postgres
@@ -21,6 +22,7 @@ services:
     networks: [c48-internal]
 
   db-init:
+    container_name: reliva-db-init
     image: postgis/postgis:17-3.5@sha256:01a6a70e41e6c4467c8f55f6063555ed72db2d6662cd0d571040d42eadaeb6f6
     entrypoint: ["/bin/bash", "/init.sh"]
     environment:
@@ -40,7 +42,8 @@ services:
     networks: [c48-internal]
 
   identity-migrate:
-    image: ${C48_IMAGE_NAMESPACE:-c48}/identity-api:${C48_IMAGE_TAG:-local}
+    container_name: reliva-identity-migrate
+    image: ${C48_IMAGE_NAMESPACE:-reliva}/identity-api:${C48_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: backend/apps/identity/Dockerfile
@@ -60,7 +63,8 @@ services:
     networks: [c48-internal]
 
   response-migrate:
-    image: ${C48_IMAGE_NAMESPACE:-c48}/response-api:${C48_IMAGE_TAG:-local}
+    container_name: reliva-response-migrate
+    image: ${C48_IMAGE_NAMESPACE:-reliva}/response-api:${C48_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: backend/apps/response/Dockerfile
@@ -80,7 +84,8 @@ services:
     networks: [c48-internal]
 
   logistics-migrate:
-    image: ${C48_IMAGE_NAMESPACE:-c48}/logistics-api:${C48_IMAGE_TAG:-local}
+    container_name: reliva-logistics-migrate
+    image: ${C48_IMAGE_NAMESPACE:-reliva}/logistics-api:${C48_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: backend/apps/logistics/Dockerfile
@@ -100,7 +105,8 @@ services:
     networks: [c48-internal]
 
   identity-api:
-    image: ${C48_IMAGE_NAMESPACE:-c48}/identity-api:${C48_IMAGE_TAG:-local}
+    container_name: reliva-identity-api
+    image: ${C48_IMAGE_NAMESPACE:-reliva}/identity-api:${C48_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: backend/apps/identity/Dockerfile
@@ -153,7 +159,8 @@ services:
     networks: [c48-internal]
 
   response-api:
-    image: ${C48_IMAGE_NAMESPACE:-c48}/response-api:${C48_IMAGE_TAG:-local}
+    container_name: reliva-response-api
+    image: ${C48_IMAGE_NAMESPACE:-reliva}/response-api:${C48_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: backend/apps/response/Dockerfile
@@ -216,7 +223,8 @@ services:
     networks: [c48-internal]
 
   logistics-api:
-    image: ${C48_IMAGE_NAMESPACE:-c48}/logistics-api:${C48_IMAGE_TAG:-local}
+    container_name: reliva-logistics-api
+    image: ${C48_IMAGE_NAMESPACE:-reliva}/logistics-api:${C48_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: backend/apps/logistics/Dockerfile
@@ -262,7 +270,8 @@ services:
     networks: [c48-internal]
 
   web:
-    image: ${C48_IMAGE_NAMESPACE:-c48}/web:${C48_IMAGE_TAG:-local}
+    container_name: reliva-web
+    image: ${C48_IMAGE_NAMESPACE:-reliva}/web:${C48_IMAGE_TAG:-latest}
     build:
       context: ../../frontend/web
       dockerfile: Dockerfile
@@ -277,6 +286,7 @@ services:
     networks: [c48-internal]
 
   nginx:
+    container_name: reliva-nginx
     image: nginx:1.30.5
     environment:
       SOS_SOFT_LIMIT_PER_IP: '${SOS_SOFT_LIMIT_PER_IP:-30}'
@@ -307,6 +317,7 @@ services:
     networks: [c48-internal]
 
   minio:
+    container_name: reliva-minio
     image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-09-07T16-13-09Z}
     profiles: [storage]
     command: ["server", "/mnt/data", "--console-address", ":9001"]
@@ -325,6 +336,7 @@ services:
     networks: [c48-internal]
 
   minio-init:
+    container_name: reliva-minio-init
     image: ${MINIO_MC_IMAGE:-minio/mc:RELEASE.2025-08-13T08-35-41Z}
     profiles: [storage]
     entrypoint: ["/bin/sh", "-ec"]
@@ -355,7 +367,8 @@ services:
     networks: [c48-internal]
 
   seed:
-    image: ${C48_IMAGE_NAMESPACE:-c48}/identity-api:${C48_IMAGE_TAG:-local}
+    container_name: reliva-seed
+    image: ${C48_IMAGE_NAMESPACE:-reliva}/identity-api:${C48_IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: backend/apps/identity/Dockerfile

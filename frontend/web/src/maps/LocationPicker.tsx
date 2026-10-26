@@ -13,10 +13,20 @@ export type Point = { longitude: number; latitude: number };
 type SearchPlace = { id: string; name: string; address: string; point: Point };
 
 function photonPlaces(value: unknown): SearchPlace[] {
-  if (!value || typeof value !== 'object' || !('features' in value) || !Array.isArray(value.features))
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('features' in value) ||
+    !Array.isArray(value.features)
+  )
     return [];
   return value.features.flatMap((feature: unknown) => {
-    if (!feature || typeof feature !== 'object' || !('geometry' in feature) || !('properties' in feature))
+    if (
+      !feature ||
+      typeof feature !== 'object' ||
+      !('geometry' in feature) ||
+      !('properties' in feature)
+    )
       return [];
     const { geometry, properties } = feature as {
       geometry?: { coordinates?: unknown };
@@ -26,39 +36,57 @@ function photonPlaces(value: unknown): SearchPlace[] {
     if (!Array.isArray(coordinates) || coordinates.length < 2) return [];
     const [longitude, latitude] = coordinates;
     if (
-      typeof longitude !== 'number' || typeof latitude !== 'number' ||
-      !Number.isFinite(longitude) || !Number.isFinite(latitude) ||
-      Math.abs(longitude) > 180 || Math.abs(latitude) > 90
-    ) return [];
+      typeof longitude !== 'number' ||
+      typeof latitude !== 'number' ||
+      !Number.isFinite(longitude) ||
+      !Number.isFinite(latitude) ||
+      Math.abs(longitude) > 180 ||
+      Math.abs(latitude) > 90
+    )
+      return [];
     const field = (key: string) =>
       typeof properties?.[key] === 'string' ? String(properties[key]).trim() : '';
     if (field('countrycode').toUpperCase() !== 'VN') return [];
     const name = field('name') || field('street') || 'Địa điểm chưa có tên';
-    const address = [...new Set([
-      field('housenumber'), field('street'), field('locality'), field('district'), field('city'),
-    ].filter(Boolean))].join(', ');
-    return [{
-      id: `${field('osm_type')}-${String(properties?.osm_id ?? '')}-${longitude}-${latitude}`,
-      name, address, point: { longitude, latitude },
-    }];
+    const address = [
+      ...new Set(
+        [
+          field('housenumber'),
+          field('street'),
+          field('locality'),
+          field('district'),
+          field('city'),
+        ].filter(Boolean)
+      ),
+    ].join(', ');
+    return [
+      {
+        id: `${field('osm_type')}-${String(properties?.osm_id ?? '')}-${longitude}-${latitude}`,
+        name,
+        address,
+        point: { longitude, latitude },
+      },
+    ];
   });
 }
 
 const envApiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() || '';
-const tileUrl = (import.meta.env.VITE_OSM_TILE_URL as string | undefined)?.trim()
-  || '';
-const mapStyleUrl = (import.meta.env.VITE_OPENFREEMAP_STYLE_URL as string | undefined)?.trim()
-  || 'https://tiles.openfreemap.org/styles/liberty';
-const tileAttribution = (import.meta.env.VITE_OSM_TILE_ATTRIBUTION as string | undefined)?.trim()
-  || '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const tileUrl = (import.meta.env.VITE_OSM_TILE_URL as string | undefined)?.trim() || '';
+const mapStyleUrl =
+  (import.meta.env.VITE_OPENFREEMAP_STYLE_URL as string | undefined)?.trim() ||
+  'https://tiles.openfreemap.org/styles/liberty';
+const tileAttribution =
+  (import.meta.env.VITE_OSM_TILE_ATTRIBUTION as string | undefined)?.trim() ||
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 function pointLabel(point: Point) {
   return `${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}`;
 }
 
 function samePoint(a: Point, b: Point) {
-  return Math.abs(a.latitude - b.latitude) < 0.000001 &&
-    Math.abs(a.longitude - b.longitude) < 0.000001;
+  return (
+    Math.abs(a.latitude - b.latitude) < 0.000001 && Math.abs(a.longitude - b.longitude) < 0.000001
+  );
 }
 
 export function LocationPicker({
@@ -183,7 +211,11 @@ export function LocationPicker({
     if (mapEngine === 'osm' && value && leafletMapRef.current) {
       const { latitude, longitude } = value;
       suppressMoveRef.current = true;
-      leafletMapRef.current.setView([latitude, longitude], Math.max(leafletMapRef.current.getZoom(), 17), { animate: false });
+      leafletMapRef.current.setView(
+        [latitude, longitude],
+        Math.max(leafletMapRef.current.getZoom(), 17),
+        { animate: false }
+      );
       suppressMoveRef.current = false;
       setDraftPoint(value);
       confirmedPointRef.current = value;
@@ -262,9 +294,14 @@ export function LocationPicker({
               const lat = place.location.lat();
               const lng = place.location.lng();
               const point = { latitude: lat, longitude: lng };
-              setSelectedAddress(place.formattedAddress || 'Đã chọn địa điểm. Hãy xác nhận địa chỉ.');
+              setSelectedAddress(
+                place.formattedAddress || 'Đã chọn địa điểm. Hãy xác nhận địa chỉ.'
+              );
               setDraftPoint(point);
-              chosenSearchRef.current = { point, label: place.formattedAddress || pointLabel(point) };
+              chosenSearchRef.current = {
+                point,
+                label: place.formattedAddress || pointLabel(point),
+              };
               confirmedPointRef.current = null;
               selectRef.current(null);
             } catch {
@@ -330,7 +367,9 @@ export function LocationPicker({
         setSuggestions(places);
       } else {
         setSuggestions([]);
-        setError('Không tìm thấy địa điểm phù hợp. Hãy thử tên khác hoặc kéo bản đồ đến nơi cần hỗ trợ.');
+        setError(
+          'Không tìm thấy địa điểm phù hợp. Hãy thử tên khác hoặc kéo bản đồ đến nơi cần hỗ trợ.'
+        );
       }
     } catch {
       if (!controller.signal.aborted)
@@ -363,13 +402,16 @@ export function LocationPicker({
 
   async function confirmCenter() {
     searchOnTypingRef.current = false;
-    const center = mapEngine === 'osm'
-      ? leafletMapRef.current?.getCenter()
-      : googleMapRef.current?.getCenter();
+    const center =
+      mapEngine === 'osm' ? leafletMapRef.current?.getCenter() : googleMapRef.current?.getCenter();
     if (!center) return;
-    const point = mapEngine === 'osm'
-      ? { latitude: (center as L.LatLng).lat, longitude: (center as L.LatLng).lng }
-      : { latitude: (center as google.maps.LatLng).lat(), longitude: (center as google.maps.LatLng).lng() };
+    const point =
+      mapEngine === 'osm'
+        ? { latitude: (center as L.LatLng).lat, longitude: (center as L.LatLng).lng }
+        : {
+            latitude: (center as google.maps.LatLng).lat(),
+            longitude: (center as google.maps.LatLng).lng(),
+          };
     confirmedPointRef.current = point;
     setDraftPoint(point);
     setPinDropKey((current) => current + 1);
@@ -397,8 +439,13 @@ export function LocationPicker({
       );
       if (!result.ok) return;
       const [nearest] = photonPlaces(await result.json());
-      if (!nearest || controller.signal.aborted ||
-          !confirmedPointRef.current || !samePoint(confirmedPointRef.current, point)) return;
+      if (
+        !nearest ||
+        controller.signal.aborted ||
+        !confirmedPointRef.current ||
+        !samePoint(confirmedPointRef.current, point)
+      )
+        return;
       const label = [nearest.name, nearest.address].filter(Boolean).join(' · ');
       setSearchQuery(label);
       setSelectedAddress(`Đã xác nhận · Địa chỉ gần đúng: ${label}`);
@@ -480,7 +527,11 @@ export function LocationPicker({
                   if (e.key === 'Enter') e.preventDefault();
                 }}
               />
-              {searching && <span className="location-search-status" role="status">Đang tìm địa điểm…</span>}
+              {searching && (
+                <span className="location-search-status" role="status">
+                  Đang tìm địa điểm…
+                </span>
+              )}
 
               {suggestions.length > 0 && (
                 <div className="location-suggestions" role="listbox" aria-label="Địa điểm gợi ý">
@@ -492,7 +543,11 @@ export function LocationPicker({
                       key={item.id}
                       onClick={() => chooseSuggestion(item)}
                       style={{
-                        display: 'block', width: '100%', textAlign: 'left', background: '#FFFFFF', border: 0,
+                        display: 'block',
+                        width: '100%',
+                        textAlign: 'left',
+                        background: '#FFFFFF',
+                        border: 0,
                         padding: '8px 12px',
                         fontSize: 13,
                         cursor: 'pointer',
@@ -503,7 +558,8 @@ export function LocationPicker({
                       }
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
                     >
-                      📍 <strong>{item.name}</strong>{item.address ? ` · ${item.address}` : ''}
+                      📍 <strong>{item.name}</strong>
+                      {item.address ? ` · ${item.address}` : ''}
                     </button>
                   ))}
                 </div>
@@ -538,7 +594,9 @@ export function LocationPicker({
               className={`location-center-pin${moving ? ' is-moving' : ''}${pinDropKey ? ' is-confirmed' : ''}`}
               aria-hidden="true"
             >
-              <span className="location-center-pin-head"><span /></span>
+              <span className="location-center-pin-head">
+                <span />
+              </span>
               <span className="location-center-pin-shadow" />
             </div>
             <button
@@ -551,11 +609,16 @@ export function LocationPicker({
             </button>
           </div>
 
-          {selectedAddress && <p className="location-selection-status" role="status">{selectedAddress}</p>}
+          {selectedAddress && (
+            <p className="location-selection-status" role="status">
+              {selectedAddress}
+            </p>
+          )}
 
           {mapEngine === 'osm' && tileError && (
             <p role="alert" className="notice warning">
-              Nền bản đồ chưa tải được. Hãy kiểm tra kết nối mạng rồi mở lại bản đồ. Bạn vẫn có thể tìm địa điểm và xác nhận tọa độ.
+              Nền bản đồ chưa tải được. Hãy kiểm tra kết nối mạng rồi mở lại bản đồ. Bạn vẫn có thể
+              tìm địa điểm và xác nhận tọa độ.
             </p>
           )}
 
