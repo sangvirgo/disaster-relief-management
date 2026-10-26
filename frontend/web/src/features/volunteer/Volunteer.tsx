@@ -35,6 +35,12 @@ const noticeNames: Record<string, string> = {
   DONATION_REVIEWED: 'Đóng góp đã được duyệt',
 };
 
+function positionAge(ageSeconds: number): string {
+  if (ageSeconds < 3600) return `${Math.max(1, Math.round(ageSeconds / 60))} phút`;
+  if (ageSeconds < 86400) return `${Math.round(ageSeconds / 3600)} giờ`;
+  return `${Math.round(ageSeconds / 86400)} ngày`;
+}
+
 export function Notices() {
   const [items, setItems] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -461,10 +467,10 @@ export function Volunteer({ page }: { page: string }) {
                     <p>
                       {label(team.kind)} · <span className="chip">{label(team.availability)}</span>
                     </p>
-                    <p>Kỹ năng: {team.skills.length ? team.skills.join(', ') : 'Chưa có'}</p>
+                    <p>Kỹ năng: {team.skills.length ? team.skills.map(label).join(', ') : 'Chưa có'}</p>
                     <small>
                       {team.position
-                        ? `Vị trí cập nhật ${Math.round(team.position.age_s / 60)} phút trước (${label(team.position.source)})`
+                        ? `Vị trí cập nhật ${positionAge(team.position.age_s)} trước (${label(team.position.source)})`
                         : 'Chưa có dữ liệu tọa độ'}
                     </small>
                   </div>
