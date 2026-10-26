@@ -1,17 +1,10 @@
-# Reliva (C48)
+# Reliva
 
 **Emergency Response and Disaster Relief Management System**
 
 **Vietnamese:** Hệ thống quản lý ứng phó khẩn cấp và cứu trợ thiên tai
 
 Reliva is a Web and Mobile project for coordinating emergency reports, rescue missions, volunteers, and in-kind relief. It connects affected residents with rescue teams, coordinators, operations staff, and administrators through a shared workflow and auditable records.
-
-## Project information
-
-- **Academic program:** Graduation capstone, class D22CQCNPM01-N
-- **Advisor:** ThS. Trương Thị Mỹ Ngọc
-- **Student team:** Nguyễn Lưu Tấn Sang (N22DCCN068), Vũ Ngọc Sơn (N22DCCN071), and Đỗ Xuân Trí (N22DCCN088)
-- **Product language:** Vietnamese for Web, Mobile, and human-readable application messages
 
 ## Problem and goals
 
@@ -100,9 +93,9 @@ flowchart LR
   Response <-->|versioned REST| Identity
   Logistics <-->|versioned REST| Identity
   Response <-->|versioned REST| Logistics
-  Identity --> IdentityDB[(c48_identity)]
-  Response --> ResponseDB[(c48_response<br/>PostgreSQL + PostGIS)]
-  Logistics --> LogisticsDB[(c48_logistics)]
+  Identity --> IdentityDB[(Identity database)]
+  Response --> ResponseDB[(Response database<br/>PostgreSQL + PostGIS)]
+  Logistics --> LogisticsDB[(Logistics database)]
   Response -. optional private evidence .-> Storage[S3-compatible storage]
   Logistics -. optional private evidence .-> Storage
   Response -. optional advice .-> AI[Gemini API]
@@ -195,7 +188,7 @@ docker compose --profile seed up seed
 
 On empty databases, the seed job loads the full fixtures. On populated databases, it adds deterministic demo users, regions, campaigns, teams, reports, and relief records with insert-only statements. It does not reset existing data. The optional `storage` profile requires a separately obtained AIStor Free license; see [technology plan §6.3](docs/c48-technology-and-delivery-plan.md#63-gps-and-evidence-files).
 
-Do not use `docker compose down -v`. For an intentional demo reset, use only `bash scripts/db/reset-demo --reset` or `bash scripts/db/test-db --reset` from `backend/`; these reset only `c48_pgdata` and preserve `c48_minio-data` and its objects.
+Do not use `docker compose down -v`. For an intentional demo reset, use only `bash scripts/db/reset-demo --reset` or `bash scripts/db/test-db --reset` from `backend/`; these reset only PostgreSQL data and preserve MinIO data and its objects.
 
 ### Development commands
 
