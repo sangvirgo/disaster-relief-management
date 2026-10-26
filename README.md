@@ -1,52 +1,41 @@
-# Reliva — Emergency Response and Disaster Relief Management System
+# Reliva
 
-> Vietnamese project title: **Hệ thống quản lý ứng phó khẩn cấp và cứu trợ thiên tai**
+**Emergency Response and Disaster Relief Management System**<br>
+**Vietnamese:** Hệ thống quản lý ứng phó khẩn cấp và cứu trợ thiên tai
 
-Reliva is an academic capstone project for coordinating disaster reports, rescue missions, volunteer teams, and in-kind relief operations. It provides Vietnamese-language Web and Mobile workflows for affected residents, rescue teams, coordinators, operations staff, and administrators.
+Reliva is an academic capstone project for coordinating emergency reports, rescue missions, volunteer teams, and in-kind relief. Its Vietnamese Web and Mobile applications serve affected residents, rescue teams, coordinators, operations staff, and administrators.
 
-> **Project status:** academic prototype. The system and its risk-assessment rules have not been validated for real-world emergency dispatch. Coordinators retain authority over verification, official priority, and team assignment. Use synthetic data for demonstrations.
+> **Prototype only.** Reliva and its risk-assessment rules have not been validated for real emergency dispatch. Coordinators retain authority over verification, official priority, and team assignment. Use synthetic data for demonstrations.
 
-## Contents
+## Project status
 
-- [Project scope](#project-scope)
-- [Architecture](#architecture)
-- [Technology stack](#technology-stack)
-- [Repository layout](#repository-layout)
-- [Quick start](#quick-start)
-- [Configuration](#configuration)
-- [Local endpoints](#local-endpoints)
-- [Development and verification](#development-and-verification)
-- [Security and operational limits](#security-and-operational-limits)
-- [Project documentation](#project-documentation)
-- [License](#license)
+The latest T20 note (25 October 2026) records backend and Web builds plus OpenAPI and Compose-environment checks on Node 26.11.1, outside the declared Node 24 engine range. T20 tests, migrations, and seed execution were not run. The same note records two existing Mobile TypeScript errors in `LocationPickerModal.tsx` and `ScreenContainer.tsx`. See the [backend guide](docs/backend/README.md) for implementation status and remaining acceptance evidence.
 
-## Project scope
+**Contents:** [Capabilities](#what-the-system-supports) · [Architecture](#architecture) · [Technology](#technology) · [Local setup](#get-started-locally) · [Postman](#try-the-apis-in-postman) · [Development](#development-commands) · [Project documents](#project-documents)
 
-Reliva connects the following roles:
+## What the system supports
 
 | Role | Main workflows |
 |---|---|
-| Citizen / reporter | Submit an SOS or assistance report, share a location, provide household and incident details, and follow progress. |
-| Volunteer / rescue team | Maintain team availability and location, review missions, report progress, and record outcomes. |
-| Coordinator | Review and verify reports, inspect risk factors, compare teams, assign missions, and follow operational history. |
+| Citizen / reporter | Submit and update an SOS or assistance report, share a location, and follow progress. |
+| Volunteer / rescue team | Maintain team availability and location, receive missions, report progress, and record outcomes. |
+| Coordinator | Review and verify reports, consider risk factors, compare eligible teams, assign missions, and monitor operations. |
 | Operations staff | Manage in-kind donation drives, warehouses, stock, vehicles, relief points, and distributions. |
 | Administrator | Manage accounts, organizations, memberships, permissions, and operational records. |
 
-The current implementation includes these capability areas:
+The current implementation includes:
 
-- Email one-time-password registration and Google ID-token sign-in, subject to provider configuration.
-- GPS-based SOS intake with reported danger, rescue and supply needs, and household counts for older adults, children, and other affected people.
-- Reporter updates, verification, coordinator review queues, request timelines, and scoped tracking.
-- Server-side deterministic risk factors and balanced team suggestions that consider eligibility, position freshness, distance, and recent workload. Assignment remains a coordinator action.
+- Email OTP registration and Google ID-token sign-in/linking when configured.
+- GPS-based SOS intake with incident details, household counts, danger reports, and rescue or supply needs.
+- Reporter updates, verification workflows, scoped coordinator queues, request history, and tracking.
+- Deterministic server-side risk factors and team suggestions based on eligibility, location freshness, distance, and recent workload. A coordinator makes the assignment.
 - Mission progress and team history for operational review.
-- In-kind donation intake and review, inventory and fulfillment workflows, and distribution records.
-- Optional Gemini narrative extraction into structured JSON for coordinator review. The provider call limit is capped locally at 500 calls per `America/Los_Angeles` calendar date.
-
-The implementation status and remaining acceptance evidence are maintained in the [backend implementation guide](docs/backend/README.md).
+- In-kind donation declarations, independent intake review, stock accounting, fulfillment, and distribution records. Cash collection and payment processing are out of scope.
+- Optional Gemini narrative extraction into structured JSON for human review, with a local limit of 500 calls per `America/Los_Angeles` calendar day. This is an application guard, not Google's project quota. AI output does not set official priority or dispatch a team.
 
 ## Architecture
 
-The three NestJS services own separate databases and communicate through versioned REST APIs. Nginx serves the Web application and routes API traffic through the same local origin.
+Three NestJS services own separate PostgreSQL databases and communicate through versioned REST APIs. Nginx serves the Web application and routes public API requests through the same local origin.
 
 ```mermaid
 flowchart LR
@@ -72,112 +61,119 @@ flowchart LR
   Response <-->|REST contracts| Logistics
 
   Response -. optional advisory .-> Gemini[Gemini API]
-  Response -. private evidence .-> Storage[S3-compatible object storage]
+  Response -. private evidence .-> Storage[S3-compatible storage]
   Logistics -. private evidence .-> Storage
 ```
 
-In the default Compose setup, Web is available at `/` and the APIs use `/api/v1/identity`, `/api/v1/response`, and `/api/v1/logistics` on port `8080`. PostgreSQL hosts three service-owned databases with separate service credentials. The optional AI worker belongs to Response; it has no authority to change a request priority or dispatch a team.
+In the default Compose setup, Web is served at `/`; public APIs use `/api/v1/identity`, `/api/v1/response`, and `/api/v1/logistics`. PostgreSQL hosts the three service-owned databases with separate credentials. Service-to-service routes under `/internal/` are not exposed through the public Nginx ingress.
 
-## Technology stack
+## Technology
 
 | Area | Technology |
 |---|---|
 | Backend APIs | NestJS, TypeScript, TypeORM, REST/JSON |
 | Identity | Email OTP, Google ID-token verification, role- and region-scoped access |
-| Database | PostgreSQL with PostGIS for spatial queries |
-| Web | React, TypeScript, Vite, Nginx static image |
+| Database | PostgreSQL with PostGIS |
+| Web | React, TypeScript, Vite, Nginx |
 | Mobile | React Native, Expo, TypeScript |
-| Ingress and local deployment | Nginx and Docker Compose |
-| AI-assisted extraction | Optional server-side Gemini API integration with schema-constrained JSON output |
-| File evidence | Private S3-compatible object-storage interface |
+| Local deployment | Docker Compose and Nginx |
+| File evidence | Private S3-compatible interface; the capstone plan selects single-node MinIO AIStor Free, subject to current terms and limits |
+| AI assistance | Optional server-side Gemini integration with schema-constrained output and human review |
 
 ## Repository layout
 
 ```text
 backend/
-  apps/identity/       Authentication, accounts, organizations, permissions
-  apps/response/       SOS intake, verification, teams, missions, AI advisor
-  apps/logistics/      Donations, inventory, fulfillment, distribution
-  infra/compose.yaml   The project's single Docker Compose definition
+  apps/identity/       Accounts, authentication, organizations, and permissions
+  apps/response/       SOS reports, verification, teams, missions, and AI advisories
+  apps/logistics/      Donations, inventory, fulfillment, and distribution
+  infra/compose.yaml   The only Docker Compose definition
+  postman/             Manual API collection and local-only environment
 contracts/openapi/     Identity, Response, and Logistics API contracts
-frontend/web/          Vietnamese React Web application
-mobile/                Vietnamese React Native / Expo application
-docs/                  Project context, architecture, APIs, schemas, and guides
+frontend/web/           Vietnamese React Web application
+mobile/                 Vietnamese React Native / Expo application
+docs/
+  backend/              Setup, schemas, API guides, and acceptance evidence
+  diagrams/             Architecture diagrams
 ```
 
-## Quick start
+## Get started locally
 
-### Prerequisites
+### Requirements
 
 - Docker Engine and the Docker Compose plugin.
-- Node.js `24.15.x` and npm `10`–`12` for host-side development and checks.
-- Provider credentials only for the integrations you plan to use (SMTP, Google sign-in, Gemini, or object storage).
+- Node.js `>=24.15.0 <25` and npm `>=10 <13` for host-side development and checks.
+- Provider credentials only for the flows you plan to exercise.
 
-### Configure environment
+### Configure the backend
 
-From the repository root, create a private backend environment file and generate local development credentials:
+For a fresh local setup, create the environment file without replacing an existing one, then generate signing keys and service secrets:
 
 ```bash
-cp backend/.env.example backend/.env
+cp -n backend/.env.example backend/.env
 node backend/scripts/dev/gen-keys.mjs
 ```
 
-Set `EMAIL_OTP_PEPPER` to a separate random value, and fill in the remaining required values following the [backend setup guide](docs/backend/00-setup.md). SMTP, Google, Gemini, and storage integrations need their corresponding configuration before those flows can be used. Do not commit `.env` files or paste their contents into issues or chat.
+Set `EMAIL_OTP_PEPPER` to a separate random value and choose a local `SEED_PASSWORD`. Review the remaining values in `.env` and follow the [backend setup guide](docs/backend/00-setup.md). Keep `.env` private; never commit it or paste its contents into issues or chat.
 
-### Build and start the core stack
+If `backend/.env` already contains generated secrets, keep it and skip these two setup commands; the key generator intentionally refuses to rotate existing secrets.
 
-```bash
-cd backend
-docker compose up --build
-```
+### Start the core stack
 
-Compose builds the Web and API images, initializes PostgreSQL, runs the declared migrations, and starts Nginx. Open **<http://localhost:8080>** for the Web application. The same origin serves the API paths listed above.
-
-Demo data is opt-in. The `seed` profile uses synthetic fixtures and does not reset existing database volumes. Read the [backend setup guide](docs/backend/00-setup.md) before loading it. The `storage` profile is also optional; review the provider and license requirements in the [technology plan](docs/c48-technology-and-delivery-plan.md) before enabling it.
-
-`backend/.env` sets `COMPOSE_FILE=infra/compose.yaml`, so Compose uses the single infrastructure definition automatically. Application images use `reliva/<service>:latest`; containers use explicit names such as `reliva-identity-api`, without a generated numeric suffix. Override `C48_IMAGE_NAMESPACE` and `C48_IMAGE_TAG` to use a registry or a release tag.
-
-To build all application images without starting containers:
+From `backend/`:
 
 ```bash
-cd backend
-docker compose build
+docker compose up --build -d
 ```
 
-To build only the Web image:
+Compose builds the Web and API images, initializes PostgreSQL, runs the declared migrations, and starts Nginx. Open **<http://127.0.0.1:8080>**. The default public host and service/database ports bind to loopback.
+
+Demo data is optional and synthetic. Set `SEED_PASSWORD`, then run the declared seed job from `backend/`:
 
 ```bash
-cd backend
-docker compose build web
+docker compose --profile seed up seed
 ```
+
+Seeding does not reset existing data. Do not run `docker compose down -v`: it removes both PostgreSQL and object-storage volumes. If a full demo reset is intentional, use only the documented `bash scripts/db/reset-demo --reset` or `bash scripts/db/test-db --reset` command from `backend/`; those paths remove only `c48_pgdata` and preserve `c48_minio-data` and its objects.
+
+The optional `storage` profile requires separate provider and license review. The project plan selects MinIO AIStor Free for single-node lab use; the Compose storage image, private access, and restore path must be checked against that decision before treating storage as accepted or using real evidence. See [technology plan §6.3](docs/c48-technology-and-delivery-plan.md#63-gps-and-evidence-files) and the [backend evidence guide](docs/backend/README.md).
+
+### Try the APIs in Postman
+
+Import [C48-backend-demo.postman_collection.json](backend/postman/C48-backend-demo.postman_collection.json). Requests default to the public Nginx ingress at `http://127.0.0.1:8080`. Select the local `C48 Local Demo` environment if you have it. That environment file is ignored by Git; on a fresh checkout, create it in Postman and set `seedPassword` to the same value as `SEED_PASSWORD` in `backend/.env`.
+
+Start with a login request in the relevant actor folder, then send requests one at a time. The collection saves returned tokens, IDs, and versions where applicable. Use synthetic demo data: write requests persist in the primary databases.
+
+- For a new citizen account, set `citizenEmail` to an unused mailbox you can access. SMTP must be configured to receive its OTP; enter the six-digit code in `emailOtpCode`. Send only one of the two registration requests for that email.
+- Google sign-in/linking needs `GOOGLE_CLIENT_IDS` and a valid ID token in `googleIdToken`.
+- AI review needs a coordinator session and an advisory on the request. Gemini is optional; AI output remains a suggestion.
+- Evidence requests are skipped unless the collection variable `aiStorAvailable` is set to `true` after confirming storage is available.
 
 ## Configuration
 
-The committed environment files are templates only:
+Committed environment files are templates:
 
-- [`backend/.env.example`](backend/.env.example) — backend, Compose, SMTP, Google allow-list, and Gemini settings.
-- [`frontend/web/.env.example`](frontend/web/.env.example) — public Web client settings for direct Vite development.
+- [`backend/.env.example`](backend/.env.example) — backend, Compose, SMTP, Google allow-list, Gemini, and storage settings.
+- [`frontend/web/.env.example`](frontend/web/.env.example) — public Web settings for direct Vite development.
 - [`mobile/.env.example`](mobile/.env.example) — public Google client IDs for Expo platforms.
 
-For Compose Web builds, `VITE_GOOGLE_CLIENT_ID` and the optional `VITE_GOOGLE_MAPS_API_KEY` are read from `backend/.env` as public build-time values. Google client IDs are public identifiers. Provider secrets such as `GEMINI_API_KEY`, SMTP passwords, JWT private keys, and hash peppers belong only in server-side environment configuration.
-
-Set `GOOGLE_CLIENT_IDS` on the backend to the allowed Web, Android, and iOS OAuth client IDs. Set `GEMINI_API_KEY` to enable optional extraction; `GEMINI_MODEL` defaults to `gemini-3.1-flash-lite`. The local 500-call limit is an application guard, not a statement of Google's project quota.
+For Compose Web builds, `VITE_GOOGLE_CLIENT_ID` and the optional `VITE_GOOGLE_MAPS_API_KEY` are public build-time values read from `backend/.env`. Google client IDs are public identifiers. SMTP passwords, `GEMINI_API_KEY`, JWT private keys, and secret-hash peppers belong only in server-side configuration. Set `GOOGLE_CLIENT_IDS` to the permitted Web, Android, and iOS client IDs. `GEMINI_MODEL` defaults to `gemini-3.1-flash-lite`; the local 500-call limit is an application guard, not Google's project quota.
 
 ## Local endpoints
 
 | Service | Address | Notes |
 |---|---|---|
-| Web and public API ingress | `http://localhost:8080` | Main browser and mobile origin |
-| Identity API | `http://127.0.0.1:3001` | Loopback-published for host-side development and checks |
-| Response API | `http://127.0.0.1:3002` | Loopback-published for host-side development and checks |
-| Logistics API | `http://127.0.0.1:3003` | Loopback-published for host-side development and checks |
-| PostgreSQL | `127.0.0.1:55432` | Local development access only |
+| Web and public API ingress | `http://127.0.0.1:8080` | Main browser and Postman origin; configurable with `PUBLIC_PORT` |
+| Identity API | `http://127.0.0.1:3001` | Host-side development and checks |
+| Response API | `http://127.0.0.1:3002` | Host-side development and checks |
+| Logistics API | `http://127.0.0.1:3003` | Host-side development and checks |
+| PostgreSQL | `127.0.0.1:55432` | Local development only; configurable with `POSTGRES_HOST_PORT` |
 
-The public interface is the Nginx ingress. The API and database ports are bound to loopback by the Compose configuration.
+The API and database ports bind to loopback. Use Nginx for normal client and Postman requests.
 
-## Development and verification
+## Development commands
 
-Backend checks (run from `backend/`):
+Backend commands run from `backend/`:
 
 ```bash
 npm ci
@@ -187,39 +183,41 @@ npm run contracts:check
 npm run check:compose-env
 ```
 
-Web build (run from `frontend/web/`):
+Web commands run from `frontend/web/`:
 
 ```bash
 npm ci
 npm run build
 ```
 
-Mobile development (run from `mobile/`):
+Mobile commands run from `mobile/`:
 
 ```bash
 npm ci
 npm start
+npm run lint
 ```
 
-See the [backend implementation guide](docs/backend/README.md) and [T19 traceability](docs/backend/T19-traceability.md) for check scope, implementation status, and open acceptance evidence. Database reset and integration scripts use the primary Reliva stack; read their instructions carefully and pass the explicit `--reset` flag only when an intentional reset is required.
+There is one Compose file and no separate test database or helper container. Database and HTTP integration checks use the main APIs and primary `c48_identity`, `c48_response`, and `c48_logistics` databases. The documented database suite requires an explicit reset flag and resets primary PostgreSQL data; read [backend setup §8.5](docs/backend/00-setup.md) before running it.
 
-## Security and operational limits
+## Security and operating limits
 
-- Use synthetic names, phone numbers, coordinates, and evidence in development and demos.
-- Keep object buckets private and authorize every upload and download against its owning request or mission.
-- Treat citizen-entered descriptions as untrusted input. AI output is advisory; coordinators make operational decisions.
-- Minimize and redact data sent to external AI providers. Never put provider keys or private credentials in Web or Mobile builds.
-- Compose is a single-host development/demo deployment. It does not provide high availability, an operational SLA, or validated emergency-response accuracy.
-- The storage provider's release, license, private access, and restore process must be verified before use with real evidence.
+- All Web and Mobile user-facing text and backend human-readable responses are Vietnamese. Clients should branch on stable error codes, not message text.
+- Use synthetic names, contact details, coordinates, and evidence for development and demonstrations.
+- Keep evidence buckets private and authorize every upload/download against its owning request, mission, or distribution.
+- Treat submitted descriptions as untrusted input. Minimize data sent to external AI providers; AI output is advisory and requires human review.
+- Compose is a single-host development/demo deployment. It does not provide high availability, a production SLA, or validated emergency-response accuracy.
+- Verify the selected storage artifact, license terms, private access, and restore process before using real evidence.
 
-## Project documentation
+## Project documents
 
-- [Project brief and scope](docs/c48-project-context.md)
+- [Project context and assigned scope](docs/c48-project-context.md)
 - [Technology and delivery plan](docs/c48-technology-and-delivery-plan.md)
-- [Backend setup and implementation guide](docs/backend/README.md)
-- [Identity API](contracts/openapi/identity.json) · [Response API](contracts/openapi/response.json) · [Logistics API](contracts/openapi/logistics.json)
-- [Implemented system and diagrams](docs/diagrams/c48-implemented-system.md)
-- [Backend traceability and acceptance evidence](docs/backend/T19-traceability.md)
+- [Backend setup, implementation status, and remaining evidence](docs/backend/README.md)
+- [Postman collection](backend/postman/C48-backend-demo.postman_collection.json)
+- [Identity API contract](contracts/openapi/identity.json) · [Response API contract](contracts/openapi/response.json) · [Logistics API contract](contracts/openapi/logistics.json)
+- [Implemented system diagrams](docs/diagrams/c48-implemented-system.md)
+- [T19 baseline contract traceability](docs/backend/T19-traceability.md)
 
 ## License
 

@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "b794aaf5-169e-470b-a0c4-9a2176a8c480",
     "name": "C48 Backend · API client qua Nginx",
-    "description": "## Bắt đầu\n\n1. Import và chọn environment C48 Local Demo từ backend/postman/C48-Local-Demo.postman_environment.json. Environment local lấy mật khẩu từ backend/.env và đã được Git ignore.\n2. Mở folder actor, gửi request đăng nhập trước; username lấy theo seeder, password là {{seedPassword}}. Token tự lưu theo đúng actor. Người quyên góp và các API public không cần đăng nhập.\n3. Dùng 00 · Dùng chung cho API public, phiên chung và ví dụ cần scope kho; tiếp đó chọn actor phù hợp. Gửi từng request để xem ID/version được lưu tự động.\n4. coord1 có scope ORGANIZATION; coord_regional có scope REGION DEMO_A. Queue chưa gán yêu cầu scope ORGANIZATION hoặc SYSTEM.\n\n## Header và dữ liệu\n\n- JSON: Accept: application/json, Content-Type: application/json; lệnh ghi dùng Idempotency-Key tự tạo.\n- SOS: request SELF dùng access token công dân; PROXY dùng token riêng của citizen2. Theo dõi bằng X-Tracking-Code và X-Tracking-Secret.\n- Quyên góp public dùng X-Donation-Secret cho các thao tác capability; Postman tạo mã mới khi gửi khai báo.\n- WEB dùng CookieJar, Origin và CSRF trong nhóm phiên WEB.\n\nTất cả URL client trỏ qua Nginx http://127.0.0.1:8080/api/v1/{identity|response|logistics}; collection không chứa health check hay endpoint /internal.\n\nCác lệnh ghi có thể tạo hoặc đổi dữ liệu thật trong database demo. Request đổi mật khẩu chỉ chạy khi chủ động muốn đổi; chạy seeder để khôi phục mật khẩu seed.",
+    "description": "## Bắt đầu\n\n1. Import collection này. Nếu có file environment `C48-Local-Demo.postman_environment.json` trên máy, hãy import và chọn nó; nếu thiếu, tạo environment `C48 Local Demo` rồi đặt `seedPassword` bằng giá trị `SEED_PASSWORD` trong `backend/.env`.\n2. Mặc định, API gọi qua Nginx tại `http://127.0.0.1:8080`. Đảm bảo stack chính đã chạy và đã nạp dữ liệu demo nếu cần tài khoản mẫu.\n3. Mở folder actor, gửi request đăng nhập trước, sau đó gửi từng request theo luồng. Collection tự lưu token, ID và version khi response có các giá trị đó.\n4. Đọc body trước mỗi lệnh ghi: các thay đổi được lưu vào database demo chính. Không chạy hai request đăng ký công dân cho cùng một email.\n\n## Luồng xác thực\n\n- Đăng ký công dân cần `citizenEmail` là email chưa đăng ký và có thể nhận thư. `challengeId` được lưu tự động; nhập mã OTP nhận được vào `emailOtpCode`. Cần cấu hình SMTP.\n- Đăng nhập Google/liên kết Google cần `GOOGLE_CLIENT_IDS` và Google ID token hợp lệ trong `googleIdToken`.\n- Đăng nhập Native dùng Bearer token. Các request phiên WEB riêng cần Origin được allowlist, HTTPS, CookieJar và CSRF.\n\n## Quy ước\n\n- Mọi URL API đi qua Nginx: `/api/v1/identity`, `/api/v1/response`, `/api/v1/logistics`. Collection bỏ qua health check và `/internal/`.\n- SOS dùng `X-Tracking-Code` và `X-Tracking-Secret`; quyên góp công khai dùng `X-Donation-Secret` cho các thao tác cần quyền sở hữu.\n- Request evidence tự bỏ qua khi `aiStorAvailable` chưa được đặt thành `true`; chỉ bật sau khi xác nhận storage đang chạy.\n- Gemini là tùy chọn và advisory luôn cần con người rà soát. Token, OTP và credential không nên được lưu hoặc chia sẻ trong collection đã export.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -617,6 +617,36 @@
       "value": "",
       "type": "default",
       "description": "Mật khẩu mới ngẫu nhiên, chỉ dùng nếu chủ động chạy API đổi mật khẩu; lấy giá trị từ environment C48 Local Demo."
+    },
+    {
+      "key": "citizenEmail",
+      "value": "",
+      "type": "string",
+      "description": "Hộp thư bạn kiểm soát để nhận mã OTP; điền trước khi đăng ký."
+    },
+    {
+      "key": "challengeId",
+      "value": "",
+      "type": "string",
+      "description": "Được lưu tự động từ kết quả đăng ký hoặc gửi lại OTP."
+    },
+    {
+      "key": "emailOtpCode",
+      "value": "",
+      "type": "string",
+      "description": "Nhập mã OTP 6 chữ số nhận qua email."
+    },
+    {
+      "key": "googleIdToken",
+      "value": "",
+      "type": "string",
+      "description": "Google ID token tạm thời dùng để kiểm thử; xóa sau khi hoàn tất."
+    },
+    {
+      "key": "advisoryId",
+      "value": "",
+      "type": "string",
+      "description": "ID advisory AI trong chi tiết yêu cầu; nhập để kiểm thử bước rà soát."
     }
   ],
   "item": [
@@ -784,10 +814,10 @@
                           }
                         ],
                         "url": "{{identityBaseUrl}}/auth/register",
-                        "description": "## Mục đích\nRegister a citizen account\n\n## Quyền và điều kiện\nKhông yêu cầu đăng nhập theo contract.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 201.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /auth/register` · Operation: `registerCitizen` · Service: `identity`.\n\n---\n\n## Ghi chú chạy tay\nKhông cần đăng nhập cho route public.",
+                        "description": "## Mục đích\nRegister a citizen account\n\n## Quyền và điều kiện\nKhông yêu cầu đăng nhập theo contract.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 201.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /auth/register` · Operation: `registerCitizen` · Service: `identity`.\n\n---\n\n## Ghi chú chạy tay\nKhông cần đăng nhập cho route public.\n\n## Email xác minh\nĐiền `citizenEmail` bằng hộp thư bạn kiểm soát trước khi gửi. `challenge_id` được lưu tự động để dùng ở bước xác minh.",
                         "body": {
                           "mode": "raw",
-                          "raw": "{\n  \"username\": \"{{citizenUsername}}\",\n  \"password\": \"{{citizenPassword}}\",\n  \"display_name\": \"C48 Demo {{demoSuffix}}\"\n}",
+                          "raw": "{\n  \"username\": \"{{citizenUsername}}\",\n  \"password\": \"{{citizenPassword}}\",\n  \"display_name\": \"C48 Demo {{demoSuffix}}\",\n  \"email\": \"{{citizenEmail}}\"\n}",
                           "options": {
                             "raw": {
                               "language": "json"
@@ -965,6 +995,200 @@
                             "type": "text/javascript",
                             "exec": [
                               "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"changePassword\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/change-password\\\",\\\"expectedStatus\\\":204,\\\"strategy\\\":[\\\"NativeBearer\\\"],\\\"tokenTarget\\\":\\\"operationsManagerAccessToken\\\"}\");"
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "name": "POST Xác minh email bằng mã OTP · identityAuthVerifyEmail",
+                      "request": {
+                        "method": "POST",
+                        "header": [
+                          {
+                            "key": "Accept",
+                            "value": "application/json"
+                          },
+                          {
+                            "key": "Content-Type",
+                            "value": "application/json"
+                          }
+                        ],
+                        "url": "{{identityBaseUrl}}/auth/email/verify",
+                        "description": "## Cách chạy\nGửi đăng ký công dân trước. `challengeId` được lấy tự động; nhập mã 6 chữ số đã nhận vào `emailOtpCode`. Cần SMTP hoạt động để nhận thư.\n\nMong đợi HTTP 200.\n\nRoute: `POST /auth/email/verify` · Operation: `identityAuthVerifyEmail`.",
+                        "body": {
+                          "mode": "raw",
+                          "raw": "{\n  \"challenge_id\": \"{{challengeId}}\",\n  \"code\": \"{{emailOtpCode}}\"\n}",
+                          "options": {
+                            "raw": {
+                              "language": "json"
+                            }
+                          }
+                        }
+                      },
+                      "event": [
+                        {
+                          "listen": "prerequest",
+                          "script": {
+                            "type": "text/javascript",
+                            "exec": [
+                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"identityAuthVerifyEmail\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/email/verify\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"citizenAccessToken\\\"}\");"
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "name": "POST Gửi lại mã OTP email · identityAuthResendEmailOtp",
+                      "request": {
+                        "method": "POST",
+                        "header": [
+                          {
+                            "key": "Accept",
+                            "value": "application/json"
+                          },
+                          {
+                            "key": "Content-Type",
+                            "value": "application/json"
+                          }
+                        ],
+                        "url": "{{identityBaseUrl}}/auth/email/resend",
+                        "description": "## Cách chạy\nGửi sau khi đăng ký công dân. Kiểm tra `email_sent` trong phản hồi; cần SMTP để gửi thư.\n\nMong đợi HTTP 200.\n\nRoute: `POST /auth/email/resend` · Operation: `identityAuthResendEmailOtp`.",
+                        "body": {
+                          "mode": "raw",
+                          "raw": "{\n  \"challenge_id\": \"{{challengeId}}\"\n}",
+                          "options": {
+                            "raw": {
+                              "language": "json"
+                            }
+                          }
+                        }
+                      },
+                      "event": [
+                        {
+                          "listen": "prerequest",
+                          "script": {
+                            "type": "text/javascript",
+                            "exec": [
+                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"identityAuthResendEmailOtp\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/email/resend\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"citizenAccessToken\\\"}\");"
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "name": "POST Đăng nhập công dân vừa đăng ký · login",
+                      "request": {
+                        "method": "POST",
+                        "header": [
+                          {
+                            "key": "Accept",
+                            "value": "application/json"
+                          },
+                          {
+                            "key": "Content-Type",
+                            "value": "application/json"
+                          }
+                        ],
+                        "url": "{{identityBaseUrl}}/auth/login",
+                        "description": "## Cách chạy\nGửi sau khi xác minh email thành công. Access token được lưu vào `citizenAccessToken`.\n\nMong đợi HTTP 200.\n\nRoute: `POST /auth/login` · Operation: `login`.",
+                        "body": {
+                          "mode": "raw",
+                          "raw": "{\n  \"username\": \"{{citizenUsername}}\",\n  \"password\": \"{{citizenPassword}}\",\n  \"client_kind\": \"NATIVE\"\n}",
+                          "options": {
+                            "raw": {
+                              "language": "json"
+                            }
+                          }
+                        }
+                      },
+                      "event": [
+                        {
+                          "listen": "prerequest",
+                          "script": {
+                            "type": "text/javascript",
+                            "exec": [
+                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"citizenAccessToken\\\"}\");"
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "name": "POST Đăng nhập bằng Google ID token · identityAuthGoogleLogin",
+                      "request": {
+                        "method": "POST",
+                        "header": [
+                          {
+                            "key": "Accept",
+                            "value": "application/json"
+                          },
+                          {
+                            "key": "Content-Type",
+                            "value": "application/json"
+                          }
+                        ],
+                        "url": "{{identityBaseUrl}}/auth/google",
+                        "description": "## Cách chạy\nCần cấu hình `GOOGLE_CLIENT_IDS` và điền Google ID token hợp lệ vào `googleIdToken`. Tài khoản mới được cấp username tự động; token phiên được lưu để gọi API tiếp theo.\n\nMong đợi HTTP 200.\n\nRoute: `POST /auth/google` · Operation: `identityAuthGoogleLogin`.",
+                        "body": {
+                          "mode": "raw",
+                          "raw": "{\n  \"id_token\": \"{{googleIdToken}}\",\n  \"client_kind\": \"NATIVE\"\n}",
+                          "options": {
+                            "raw": {
+                              "language": "json"
+                            }
+                          }
+                        }
+                      },
+                      "event": [
+                        {
+                          "listen": "prerequest",
+                          "script": {
+                            "type": "text/javascript",
+                            "exec": [
+                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"identityAuthGoogleLogin\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/google\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"citizenAccessToken\\\"}\");"
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "name": "POST Liên kết Google với tài khoản đang đăng nhập · identityAuthLinkGoogle",
+                      "request": {
+                        "method": "POST",
+                        "header": [
+                          {
+                            "key": "Accept",
+                            "value": "application/json"
+                          },
+                          {
+                            "key": "Authorization",
+                            "value": "Bearer {{citizenAccessToken}}"
+                          },
+                          {
+                            "key": "Content-Type",
+                            "value": "application/json"
+                          }
+                        ],
+                        "url": "{{identityBaseUrl}}/auth/google/link",
+                        "description": "## Cách chạy\nĐăng nhập tài khoản công dân trước và dùng ID token Google có email trùng tài khoản. Request này gắn danh tính Google vào phiên hiện tại.\n\nMong đợi HTTP 200.\n\nRoute: `POST /auth/google/link` · Operation: `identityAuthLinkGoogle`.",
+                        "body": {
+                          "mode": "raw",
+                          "raw": "{\n  \"id_token\": \"{{googleIdToken}}\"\n}",
+                          "options": {
+                            "raw": {
+                              "language": "json"
+                            }
+                          }
+                        }
+                      },
+                      "event": [
+                        {
+                          "listen": "prerequest",
+                          "script": {
+                            "type": "text/javascript",
+                            "exec": [
+                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"identityAuthLinkGoogle\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/google/link\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[\\\"NativeBearer\\\"],\\\"tokenTarget\\\":\\\"citizenAccessToken\\\"}\");"
                             ]
                           }
                         }
@@ -1363,10 +1587,10 @@
                   }
                 ],
                 "url": "{{identityBaseUrl}}/auth/register",
-                "description": "## Mục đích\nRegister a citizen account\n\n## Quyền và điều kiện\nKhông yêu cầu đăng nhập theo contract.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 201.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /auth/register` · Operation: `registerCitizen` · Service: `identity`.",
+                "description": "## Mục đích\nRegister a citizen account\n\n## Quyền và điều kiện\nKhông yêu cầu đăng nhập theo contract.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 201.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /auth/register` · Operation: `registerCitizen` · Service: `identity`.\n\n## Email xác minh\nĐiền `citizenEmail` bằng hộp thư bạn kiểm soát. Đây là request thay thế cho request đăng ký trong nhóm API Identity; chỉ gửi một trong hai request để tránh đăng ký trùng email.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"username\": \"{{citizenUsername}}\",\n  \"password\": \"{{citizenPassword}}\",\n  \"display_name\": \"C48 Demo {{demoSuffix}}\"\n}",
+                  "raw": "{\n  \"username\": \"{{citizenUsername}}\",\n  \"password\": \"{{citizenPassword}}\",\n  \"display_name\": \"C48 Demo {{demoSuffix}}\",\n  \"email\": \"{{citizenEmail}}\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -2061,6 +2285,60 @@
                         "type": "text/javascript",
                         "exec": [
                           "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"getRequestEvidenceDownloadUrl\\\",\\\"method\\\":\\\"GET\\\",\\\"routePath\\\":\\\"/evidence/{id}/download\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[\\\"NativeBearer\\\"],\\\"tokenTarget\\\":\\\"citizenAccessToken\\\"}\");"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "PUT Cập nhật thông tin yêu cầu SOS · responseTrackingUpdateReport",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{citizenAccessToken}}"
+                      },
+                      {
+                        "key": "X-Tracking-Code",
+                        "value": "{{trackingCode}}"
+                      },
+                      {
+                        "key": "X-Tracking-Secret",
+                        "value": "{{trackingSecret}}"
+                      },
+                      {
+                        "key": "Idempotency-Key",
+                        "value": "{{$guid}}"
+                      },
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": "{{responseBaseUrl}}/requests/{{requestId}}/report",
+                    "description": "## Cách chạy\nGửi sau khi tạo SOS. Chỉ cập nhật khi yêu cầu còn cho phép người báo tin sửa thông tin; đọc lại `version` trước khi thử lại nếu gặp xung đột.\n\nMong đợi HTTP 200.\n\nRoute: `PUT /requests/{id}/report` · Operation: `responseTrackingUpdateReport`.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"expected_version\": {{requestVersion}},\n  \"description\": \"Cập nhật thông tin qua Postman.\",\n  \"reporter_declared_danger\": true,\n  \"needs_rescue\": true,\n  \"needs_relief_supplies\": false\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  },
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"responseTrackingUpdateReport\\\",\\\"method\\\":\\\"PUT\\\",\\\"routePath\\\":\\\"/requests/{id}/report\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[\\\"NativeBearer\\\",\\\"TrackingCode\\\",\\\"TrackingSecret\\\"],\\\"tokenTarget\\\":\\\"citizenAccessToken\\\",\\\"resourceVariable\\\":\\\"requestId\\\",\\\"versionVariable\\\":\\\"requestVersion\\\"}\");"
                         ]
                       }
                     }
@@ -3581,6 +3859,52 @@
                         "type": "text/javascript",
                         "exec": [
                           "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"listTeamCandidates\\\",\\\"method\\\":\\\"GET\\\",\\\"routePath\\\":\\\"/requests/{id}/team-candidates\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[\\\"NativeBearer\\\"],\\\"tokenTarget\\\":\\\"operationsManagerAccessToken\\\",\\\"resourceVariable\\\":\\\"requestId\\\",\\\"versionVariable\\\":\\\"requestVersion\\\"}\");"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "POST Ghi nhận quyết định rà soát AI · responseRequestOperationsReviewAiAdvisory",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Accept",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{coordinatorAccessToken}}"
+                      },
+                      {
+                        "key": "Idempotency-Key",
+                        "value": "{{$guid}}"
+                      },
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": "{{responseBaseUrl}}/requests/{{requestId}}/ai-advisories/{{advisoryId}}/review",
+                    "description": "## Cách chạy\nCần coordinator có quyền và advisory đã được tạo. Lấy `advisoryId` từ chi tiết yêu cầu; Gemini phải được bật nếu muốn tạo advisory trong môi trường demo. AI chỉ là gợi ý; quyết định này do người dùng gửi.\n\nMong đợi HTTP 200.\n\nRoute: `POST /requests/{id}/ai-advisories/{advisoryId}/review` · Operation: `responseRequestOperationsReviewAiAdvisory`.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"decision\": \"REJECTED\",\n  \"note\": \"Kiểm thử thao tác rà soát AI qua Postman.\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  },
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"responseRequestOperationsReviewAiAdvisory\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/requests/{id}/ai-advisories/{advisoryId}/review\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[\\\"NativeBearer\\\"],\\\"tokenTarget\\\":\\\"coordinatorAccessToken\\\",\\\"resourceVariable\\\":\\\"requestId\\\"}\");"
                         ]
                       }
                     }
@@ -12736,7 +13060,10 @@
           "if (meta.operationId === 'getAuthCsrf' && body.csrf_token) { pm.collectionVariables.set('csrfToken', body.csrf_token); if (pm.variables.get('clientKind') !== 'WEB') pm.cookies.jar().clear(pm.request.url.toString(), function () {}); }",
           "if (meta.operationId === 'logisticsCatalogCreateItemType' && body.code) pm.collectionVariables.set('itemTypeCode', body.code);",
           "if (meta.operationId === 'logisticsCatalogCreateUnit' && body.code) pm.collectionVariables.set('unitCode', body.code);",
-          "    if (meta.operationId === 'registerCitizen') { const user = body.user || body; if (user.id) pm.collectionVariables.set('citizenUserId', user.id); }",
+          "    if (meta.operationId === 'registerCitizen') { const user = body.user || body; if (user.id) pm.collectionVariables.set('citizenUserId', user.id); if (body.verification && body.verification.challenge_id) pm.collectionVariables.set('challengeId', body.verification.challenge_id); }",
+          "    if (meta.operationId === 'identityAuthResendEmailOtp' && body.challenge_id) pm.collectionVariables.set('challengeId', body.challenge_id);",
+          "    if (meta.operationId === 'identityAuthGoogleLogin') { pm.collectionVariables.set('authTokenTarget', 'citizenAccessToken'); if (body.access_token) pm.collectionVariables.set('citizenAccessToken', body.access_token); if (body.refresh_token) pm.collectionVariables.set('refreshToken', body.refresh_token); }",
+          "    if (meta.operationId === 'getStaffRequestDetail' && body.ai_advisory && body.ai_advisory.id) pm.collectionVariables.set('advisoryId', body.ai_advisory.id);",
           "    if (meta.operationId === 'createSelfRequest') { if (body.id) pm.collectionVariables.set('requestId', body.id); if (body.tracking_code) pm.collectionVariables.set('trackingCode', body.tracking_code); }",
           "    if (meta.operationId === 'logisticsDrivesPublicList') { pm.collectionVariables.unset('donationDriveId'); pm.collectionVariables.unset('donationItemId'); }",
           "    if (meta.operationId === 'logisticsDrivesPublicList' || meta.operationId === 'logisticsDrivesPublicDetail') { const drive = Array.isArray(body.items) ? body.items[0] : body; if (drive && drive.id) pm.collectionVariables.set('donationDriveId', drive.id); if (drive && Array.isArray(drive.items) && drive.items[0]) pm.collectionVariables.set('donationItemId', drive.items[0].item_id || drive.items[0].id); }",
