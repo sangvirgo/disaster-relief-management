@@ -4,10 +4,75 @@ export class ApiError extends Error {
   constructor(
     public code: ApiErrorCode,
     public status: number,
-    message: string
+    message: string,
+    public fieldErrors: Record<string, string[]> = {},
+    public correlationId?: string
   ) {
     super(message);
   }
+}
+
+type ErrorEnvelope = {
+  code?: string;
+  message?: string;
+  field_errors?: Record<string, string[]>;
+  correlation_id?: string;
+};
+const serviceNames: Record<Service, string> = {
+  identity: 'Tài khoản',
+  response: 'SOS và điều phối',
+  logistics: 'Quyên góp và vật phẩm',
+};
+const fieldNames: Record<string, string> = {
+  username: 'Tên đăng nhập',
+  password: 'Mật khẩu',
+  current_password: 'Mật khẩu hiện tại',
+  new_password: 'Mật khẩu mới',
+  temporary_password: 'Mật khẩu tạm',
+  display_name: 'Họ và tên',
+  donor_name: 'Tên người đóng góp',
+  donor_phone: 'Số điện thoại người đóng góp',
+  reporter_contact_phone: 'Số điện thoại người gửi',
+  beneficiary_contact_phone: 'Số điện thoại người cần hỗ trợ',
+  incident_category_code: 'Loại sự cố',
+  people_affected: 'Số người cần hỗ trợ',
+  location: 'Vị trí cần hỗ trợ',
+  coordinates: 'Tọa độ',
+  longitude: 'Kinh độ',
+  latitude: 'Vĩ độ',
+  relationship: 'Quan hệ với người cần hỗ trợ',
+  information_source: 'Nguồn tin',
+  last_known_situation_at: 'Thời điểm nhận tin',
+  contactability: 'Khả năng liên hệ',
+  description: 'Mô tả tình hình',
+  reason: 'Lý do',
+  quantity: 'Số lượng',
+  counted_quantity: 'Số đã đếm',
+  accepted_quantity: 'Số tiếp nhận',
+  held_quantity: 'Số tạm giữ',
+  rejected_quantity: 'Số từ chối',
+  item_id: 'Vật phẩm',
+  lines: 'Danh sách vật phẩm',
+  tracking_code: 'Mã theo dõi',
+  public_code: 'Mã bản khai',
+};
+const fieldLabel = (path: string) => fieldNames[path.split('.').filter(Boolean).at(-1) || ''] || `Trường ${path}`;
+function formatFieldErrors(errors: Record<string, string[]> | undefined): string {
+  if (!errors) return '';
+  const fields = Object.keys(errors).slice(0, 3).map(fieldLabel);
+  return fields.length ? ` Kiểm tra: ${fields.join(', ')}.` : '';
+}
+function serverError(service: Service, status: number, payload: ErrorEnvelope, fallback: string): ApiError {
+  const code = payload.code || (status === 403 ? 'FORBIDDEN' : 'REQUEST_FAILED');
+  const reason = messages[code] || (typeof payload.message === 'string' && payload.message.trim()) || fallback;
+  const reference = payload.correlation_id ? ` Mã tham chiếu lỗi: ${payload.correlation_id}.` : '';
+  return new ApiError(
+    code,
+    status,
+    `${serviceNames[service]}: ${reason}${formatFieldErrors(payload.field_errors)}${reference}`,
+    payload.field_errors,
+    payload.correlation_id
+  );
 }
 
 const messages: Record<string, string> = {
@@ -29,7 +94,7 @@ const messages: Record<string, string> = {
   IDENTITY_UNAVAILABLE: 'Dịch vụ tài khoản tạm thời không khả dụng. Vui lòng thử lại.',
   PASSWORD_WEAK:
     'Mật khẩu mới chưa đủ mạnh. Mật khẩu phải từ 10 ký tự, khác tên tài khoản, khác mật khẩu hiện tại và không dùng mật khẩu phổ biến (như password123, 1234567890...).',
-  INVALID_CREDENTIALS: 'Mật khẩu hiện tại không chính xác. Vui lòng kiểm tra lại.',
+  INVALID_CREDENTIALS: 'Tên đăng nhập hoặc mật khẩu không đúng. Vui lòng kiểm tra lại.',
 };
 let csrfToken: string | null = null;
 let refreshPromise: Promise<void> | null = null;
@@ -45,10 +110,13 @@ export async function csrf(): Promise<void> {
     throw new ApiError(
       'NETWORK_UNAVAILABLE',
       0,
-      'Không thể kết nối tới hệ thống. Yêu cầu chưa được xác nhận.'
+      'Tài khoản: Không thể kết nối tới máy chủ. Yêu cầu chưa được xác nhận.'
     );
   }
-  if (!response.ok) throw new ApiError('CSRF_INVALID', response.status, messages.CSRF_INVALID);
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as ErrorEnvelope;
+    throw serverError('identity', response.status, payload, messages.CSRF_INVALID);
+  }
   const body = (await response.json()) as { csrf_token: string };
   csrfToken = body.csrf_token;
 }
@@ -67,15 +135,11 @@ async function refresh(): Promise<void> {
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken! },
         body: '{}',
       }).catch(() => {
-        throw new ApiError('NETWORK_UNAVAILABLE', 0, 'Không thể làm mới phiên vì mất kết nối.');
+        throw new ApiError('NETWORK_UNAVAILABLE', 0, 'Tài khoản: Không thể làm mới phiên vì mất kết nối.');
       });
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { code?: string };
-        throw new ApiError(
-          body.code || 'SESSION_EXPIRED',
-          response.status,
-          messages[body.code || ''] || messages.SESSION_EXPIRED
-        );
+        const payload = (await response.json().catch(() => ({}))) as ErrorEnvelope;
+        throw serverError('identity', response.status, payload, messages.SESSION_EXPIRED);
       }
       csrfToken = null;
     })().finally(() => {
@@ -118,7 +182,7 @@ export async function api<T>(
     throw new ApiError(
       'NETWORK_UNAVAILABLE',
       0,
-      'Không thể kết nối tới hệ thống. Yêu cầu chưa được xác nhận.'
+      `${serviceNames[service]}: Không thể kết nối tới máy chủ. Yêu cầu chưa được xác nhận.`
     );
   }
   if (
@@ -136,14 +200,8 @@ export async function api<T>(
     }
   }
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { code?: string; message?: string };
-    const code = body.code || (response.status === 403 ? 'FORBIDDEN' : 'REQUEST_FAILED');
-    const msg =
-      messages[code] ||
-      (typeof body.message === 'string' && body.message
-        ? body.message
-        : 'Yêu cầu chưa hoàn tất. Vui lòng thử lại.');
-    throw new ApiError(code, response.status, msg);
+    const payload = (await response.json().catch(() => ({}))) as ErrorEnvelope;
+    throw serverError(service, response.status, payload, 'Yêu cầu chưa hoàn tất. Vui lòng thử lại.');
   }
   return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
 }
@@ -178,7 +236,7 @@ export async function upload<T>(
     throw new ApiError(
       'NETWORK_UNAVAILABLE',
       0,
-      'Không thể tải tệp lên. Chưa có xác nhận từ máy chủ.'
+      `${serviceNames[service]}: Không thể tải tệp lên. Chưa có xác nhận từ máy chủ.`
     );
   }
   if (response.status === 401 && retryAuth && credentials !== 'omit') {
@@ -190,13 +248,8 @@ export async function upload<T>(
     }
   }
   if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as { code?: string };
-    const code = payload.code || 'UPLOAD_FAILED';
-    throw new ApiError(
-      code,
-      response.status,
-      messages[code] || 'Không thể tải tệp lên. Vui lòng kiểm tra tệp và thử lại.'
-    );
+    const payload = (await response.json().catch(() => ({}))) as ErrorEnvelope;
+    throw serverError(service, response.status, payload, 'Không thể tải tệp lên. Vui lòng kiểm tra tệp và thử lại.');
   }
   return response.json() as Promise<T>;
 }

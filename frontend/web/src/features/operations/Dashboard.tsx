@@ -120,7 +120,7 @@ export function OperationsDashboard() {
                 <table className="stock-table">
                   <thead><tr><th>Vật phẩm</th><th>Kho</th><th>Đơn vị</th><th className="numeric">Tồn thực tế</th><th className="numeric">Đã giữ</th><th className="numeric">Khả dụng</th></tr></thead>
                   <tbody>{stock.items.map((item, index) => (
-                    <tr key={`${item.warehouse_id}:${item.item.name}:${index}`}><th scope="row">{item.item.name}</th><td>{item.warehouse_id.slice(0, 8)}</td><td>{item.unit.display_name}</td><td className="numeric">{item.on_hand}</td><td className="numeric">{item.reserved}</td><td className="numeric"><strong className="available-value">{item.available}</strong></td></tr>
+                    <tr key={`${item.warehouse_id}:${item.item.name}:${index}`}><th scope="row">{item.item.name}</th><td title={item.warehouse_id}>Mã …{item.warehouse_id.slice(-8)}</td><td>{item.unit.display_name}</td><td className="numeric">{item.on_hand}</td><td className="numeric">{item.reserved}</td><td className="numeric"><strong className="available-value">{item.available}</strong></td></tr>
                   ))}</tbody>
                 </table>
               </div>

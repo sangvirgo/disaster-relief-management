@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { label, timeLabel } from '../../i18n/labels';
@@ -90,6 +90,21 @@ const stateFilter: Record<string, string> = {
   triage: 'VERIFIED',
   assign: 'TRIAGED',
 };
+const queueStatuses = [
+  ['', 'Tất cả trạng thái'],
+  ['SUBMITTED', 'Chờ xác minh'],
+  ['VERIFYING', 'Đang xác minh'],
+  ['VERIFIED', 'Đã xác minh'],
+  ['TRIAGED', 'Đã quyết định ưu tiên'],
+  ['ASSIGNED', 'Đã giao đội'],
+  ['IN_PROGRESS', 'Đang thực hiện'],
+  ['RESOLVING', 'Đang kết thúc'],
+  ['RESOLVED', 'Đã giải quyết'],
+  ['CLOSED', 'Đã đóng'],
+  ['REJECTED', 'Đã từ chối'],
+  ['DUPLICATE', 'Trùng yêu cầu'],
+  ['CANCELLED', 'Đã hủy'],
+] as const;
 const title: Record<string, string> = {
   queue: 'Hàng đợi SOS',
   verify: 'Xác minh yêu cầu',
@@ -121,24 +136,44 @@ const advisoryReviewLabels: Record<string, string> = {
 
 export function Coordinator({ page }: { page: string }) {
   const [queue, setQueue] = useState<Queue | null>(null);
+  const [queueStatus, setQueueStatus] = useState(stateFilter[page] || '');
   const [cursor, setCursor] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [candidates, setCandidates] = useState<Candidates | null>(null);
+  const [candidateError, setCandidateError] = useState('');
   const [duplicates, setDuplicates] = useState<DuplicateCandidate[]>([]);
+  const [duplicateError, setDuplicateError] = useState('');
   const [reviewLane, setReviewLane] = useState('NORMAL');
   const [overdue, setOverdue] = useState(false);
   const [error, setError] = useState('');
+  const [detailError, setDetailError] = useState('');
+  const [updateMessage, setUpdateMessage] = useState('');
   const [aiReviewNote, setAiReviewNote] = useState('');
   const [aiReviewBusy, setAiReviewBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
+  const refreshReasonRef = useRef<'success' | 'stale' | null>(null);
+  useEffect(() => {
+    setQueueStatus(stateFilter[page] || '');
+    setCursor('');
+    setSelected(null);
+    setDetail(null);
+    setUpdateMessage('');
+    refreshReasonRef.current = null;
+  }, [page]);
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') setRevision((value) => value + 1);
+    }, 20000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     let live = true;
     setLoading(true);
     setError('');
     const params = new URLSearchParams();
-    if (stateFilter[page]) params.set('status', stateFilter[page]);
+    if (queueStatus) params.set('status', queueStatus);
     if (cursor) params.set('cursor', cursor);
     if (reviewLane) params.set('review_lane', reviewLane);
     if (overdue) params.set('overdue', 'true');
@@ -155,18 +190,35 @@ export function Coordinator({ page }: { page: string }) {
     return () => {
       live = false;
     };
-  }, [page, cursor, revision, reviewLane, overdue]);
+  }, [page, queueStatus, cursor, revision, reviewLane, overdue]);
   useEffect(() => {
     if (!selected) return;
     let live = true;
-    setDetail(null);
+    setDetailError('');
     setCandidates(null);
+    setCandidateError('');
     api<Detail>('response', `/requests/${selected}`)
       .then((value) => {
-        if (live) setDetail(value);
+        if (live) {
+          setDetail(value);
+          if (refreshReasonRef.current) {
+            const reason = refreshReasonRef.current;
+            refreshReasonRef.current = null;
+            setQueueStatus(value.status);
+            setCursor('');
+            setUpdateMessage(reason === 'success'
+              ? `Đã cập nhật. Trạng thái hiện tại: ${label(value.status)}.`
+              : `Đã tải lại hồ sơ. Trạng thái hiện tại: ${label(value.status)}.`);
+          }
+        }
       })
       .catch((cause) => {
-        if (live) setError(cause instanceof Error ? cause.message : 'Không thể mở yêu cầu.');
+        if (live) {
+          refreshReasonRef.current = null;
+          setUpdateMessage('');
+          setDetail(null);
+          setDetailError(cause instanceof Error ? cause.message : 'Không thể tải lại hồ sơ.');
+        }
       });
     return () => {
       live = false;
@@ -175,12 +227,13 @@ export function Coordinator({ page }: { page: string }) {
   useEffect(() => {
     if (!selected || !detail || detail.status !== 'TRIAGED') return;
     let live = true;
+    setCandidateError('');
     api<Candidates>('response', `/requests/${selected}/team-candidates`)
       .then((value) => {
         if (live) setCandidates(value);
       })
-      .catch(() => {
-        if (live) setCandidates({ items: [], unknown_position: [] });
+      .catch((cause) => {
+        if (live) setCandidateError(cause instanceof Error ? cause.message : 'Không thể tải đội phù hợp.');
       });
     return () => {
       live = false;
@@ -189,25 +242,34 @@ export function Coordinator({ page }: { page: string }) {
   useEffect(() => {
     if (!selected || detail?.status !== 'VERIFYING') {
       setDuplicates([]);
+      setDuplicateError('');
       return;
     }
     let live = true;
+    setDuplicateError('');
     api<{ items: DuplicateCandidate[] }>('response', `/requests/${selected}/duplicate-candidates`)
       .then((value) => {
         if (live) setDuplicates(value.items);
       })
-      .catch(() => {
-        if (live) setDuplicates([]);
+      .catch((cause) => {
+        if (live) setDuplicateError(cause instanceof Error ? cause.message : 'Không thể kiểm tra yêu cầu có thể trùng.');
       });
     return () => {
       live = false;
     };
   }, [selected, detail?.status, revision]);
-  const done = () => {
+  const done = useCallback(() => {
+    refreshReasonRef.current = 'success';
+    setUpdateMessage('Đã lưu thay đổi. Đang tải trạng thái mới từ máy chủ…');
     setRevision((value) => value + 1);
-  };
+  }, []);
+  const refreshAfterConflict = useCallback(() => {
+    refreshReasonRef.current = 'stale';
+    setUpdateMessage('Đang tải lại hồ sơ để kiểm tra trạng thái.');
+    setRevision((value) => value + 1);
+  }, []);
   function command(spec: CommandSpec) {
-    return <CommandForm key={spec.path + detail?.version} spec={spec} onSuccess={done} />;
+    return <CommandForm key={spec.path + detail?.version} spec={spec} onSuccess={done} onStale={refreshAfterConflict} />;
   }
   async function reviewAiAdvisory(decision: 'ACCEPTED' | 'ADJUSTED' | 'REJECTED') {
     if (!detail?.ai_advisory) return;
@@ -236,8 +298,18 @@ export function Coordinator({ page }: { page: string }) {
       <section className="card">
         <h2>{title[page] || title.queue}</h2>
         <p>
-          Danh sách giữ nguyên thứ tự tiếp nhận. Gợi ý chỉ hỗ trợ người điều phối ra quyết định.
+          Yêu cầu được sắp theo thời điểm tiếp nhận. Chọn một yêu cầu để xem và xử lý.
         </p>
+        <button type="button" className="button secondary" onClick={() => setRevision((value) => value + 1)}>Cập nhật danh sách</button>
+        <label>
+          Trạng thái trong danh sách
+          <select value={queueStatus} onChange={(event) => {
+            setQueueStatus(event.target.value);
+            setCursor('');
+          }}>
+            {queueStatuses.map(([status, name]) => <option key={status} value={status}>{name}</option>)}
+          </select>
+        </label>
         <div className="tabs">
           {[
             ['NORMAL', 'Thông thường'],
@@ -269,7 +341,7 @@ export function Coordinator({ page }: { page: string }) {
           />{' '}
           Chỉ xem yêu cầu cần chú ý
         </label>
-        {loading && <p role="status">Đang tải hàng đợi…</p>}
+        {loading && <p role="status">Đang cập nhật danh sách…</p>}
         {error && (
           <p className="notice error" role="alert">
             {error}
@@ -286,7 +358,7 @@ export function Coordinator({ page }: { page: string }) {
                 <button
                   type="button"
                   className={`queue-row ${selected === item.id ? 'selected' : ''}`}
-                  onClick={() => setSelected(item.id)}
+                  onClick={() => { setSelected(item.id); setDetail(null); setDetailError(''); setUpdateMessage(''); }}
                   key={item.id}
                 >
                   <span>
@@ -312,10 +384,12 @@ export function Coordinator({ page }: { page: string }) {
       </section>
       <section className="card">
         <h2>Hồ sơ yêu cầu</h2>
+        {updateMessage && <p className="notice" role="status">{updateMessage}</p>}
+        {detailError && <p className="notice error" role="alert">{detailError} <button type="button" className="button secondary" onClick={() => setRevision((value) => value + 1)}>Tải lại hồ sơ</button></p>}
         {!selected && (
           <div className="empty">Chọn một yêu cầu để xem thông tin được cấp quyền.</div>
         )}
-        {selected && !detail && <p role="status">Đang tải hồ sơ…</p>}
+        {selected && !detail && !detailError && <p role="status">Đang tải hồ sơ…</p>}
         {detail && (
           <>
             <div className="detail-grid">
@@ -340,9 +414,9 @@ export function Coordinator({ page }: { page: string }) {
                 {detail.priority || 'Chưa quyết định'}
               </p>
               <p>
-                <strong>Chế độ báo</strong>
+                <strong>Hình thức gửi</strong>
                 <br />
-                {detail.report_mode === 'PROXY' ? 'Báo hộ, cần xác minh' : 'Tự báo'}
+                {detail.report_mode === 'PROXY' ? 'Báo hộ người ở nơi khác' : 'Báo cho bản thân hoặc gia đình'}
               </p>
               <p>
                 <strong>Người cần hỗ trợ</strong>
@@ -591,16 +665,16 @@ export function Coordinator({ page }: { page: string }) {
                   })}
                   {detail.report_mode === 'PROXY' &&
                     command({
-                      title: 'Đồng xác nhận báo hộ',
+                      title: 'Điều phối viên thứ hai xác nhận',
                       service: 'response',
                       path: `/requests/${detail.id}/concur`,
                       version: detail.version,
                       warning:
-                        'Bạn đã tự xem hồ sơ và có thể đồng xác nhận thông tin báo hộ? Người xác minh cuối cùng phải là điều phối viên khác.',
+                        'Bạn đã kiểm tra độc lập yêu cầu báo hộ này? Một điều phối viên khác sẽ thực hiện bước xác minh cuối.',
                       fields: [
                         {
                           name: 'note',
-                          label: 'Căn cứ đồng xác nhận',
+                          label: 'Thông tin bạn đã đối chiếu',
                           type: 'textarea',
                           required: true,
                         },
@@ -643,7 +717,7 @@ export function Coordinator({ page }: { page: string }) {
                   {detail.report_mode === 'PROXY' &&
                     detail.timeline.items.some((event) => event.event_type === 'CONCURRENCE') &&
                     command({
-                      title: 'Xác minh báo hộ sau đồng xác nhận',
+                      title: 'Hoàn tất xác minh yêu cầu báo hộ',
                       service: 'response',
                       path: `/requests/${detail.id}/verify`,
                       version: detail.version,
@@ -675,10 +749,11 @@ export function Coordinator({ page }: { page: string }) {
                         reason: values.reason,
                       }),
                     })}
+                  {duplicateError && <p role="alert" className="notice error">Kiểm tra yêu cầu trùng: {duplicateError}</p>}
                   {duplicates.length > 0 && (
                     <section>
                       <h3>Yêu cầu có thể trùng</h3>
-                      <p>Khoảng cách là gợi ý để rà soát, không tự đánh dấu trùng.</p>
+                      <p>Hai yêu cầu ở gần nhau vẫn có thể thuộc hai hộ khác nhau. Hãy đối chiếu trước khi đánh dấu trùng.</p>
                       {duplicates.map((candidate) => (
                         <div className="candidate" key={candidate.id}>
                           <strong>{candidate.tracking_code || candidate.id}</strong>
@@ -751,12 +826,10 @@ export function Coordinator({ page }: { page: string }) {
               {detail.status === 'TRIAGED' && (
                 <section>
                   <h3>Đội có thể giao nhiệm vụ</h3>
-                  <p>
-                    Khoảng cách, vị trí và tải gần đây chỉ hỗ trợ so sánh; quyết định giao đội do
-                    điều phối viên xác nhận.
-                  </p>
-                  <p>Gợi ý ưu tiên tải nhiệm vụ 24 giờ và 7 ngày trong nhóm đội gần nhất. Đội đang có nhiệm vụ chưa hoàn tất sẽ không xuất hiện trong danh sách đủ điều kiện.</p>
-                  {!candidates && <p role="status">Đang tải đội phù hợp…</p>}
+                  <p>Xem khoảng cách, vị trí cập nhật và số nhiệm vụ gần đây trước khi chọn đội.</p>
+                  <p>Gợi ý cân bằng dựa trên nhiệm vụ 24 giờ và 7 ngày của các đội gần nhất. Đội đang bận không xuất hiện trong danh sách đủ điều kiện.</p>
+                  {candidateError && <p role="alert" className="notice error">Tải đội phù hợp: {candidateError}</p>}
+                  {!candidates && !candidateError && <p role="status">Đang tải đội phù hợp…</p>}
                   {candidates?.items.map((candidate) => (
                     <div className="candidate" key={candidate.team.id}>
                       <strong>{candidate.team.name}</strong>

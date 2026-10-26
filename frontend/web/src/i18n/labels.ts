@@ -16,6 +16,7 @@ export const statusLabels: Record<string, string> = {
   COMPLETED: 'Hoàn thành',
   FAILED: 'Không hoàn thành',
   ACTIVE: 'Đang hoạt động',
+  DISABLED: 'Đã vô hiệu hóa',
   PAUSED: 'Tạm dừng',
   OPEN: 'Đang mở',
   DECLARED: 'Đã khai báo',
@@ -119,6 +120,11 @@ export const statusLabels: Record<string, string> = {
   RESCUE: 'Cứu hộ tại hiện trường',
   DELIVERY: 'Giao hàng cứu trợ',
   COMBINED: 'Cứu hộ và giao hàng cứu trợ',
+  BOAT: 'Điều khiển xuồng',
+  FIRST_AID: 'Sơ cứu',
+  GPS: 'GPS',
+  MANUAL_PIN: 'Ghim trên bản đồ',
+  COORDINATOR_REPORTED: 'Điều phối viên cập nhật',
   AI_ADVISORY_REVIEW: 'Điều phối viên đã rà soát gợi ý AI',
 };
 export const label = (value: unknown): string =>

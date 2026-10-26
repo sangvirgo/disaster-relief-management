@@ -75,6 +75,7 @@ function AuthModal({
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [authErrors, setAuthErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isOpen) {
@@ -82,6 +83,7 @@ function AuthModal({
       setPassword('');
       setShowPassword(false);
       setMessage('');
+      setAuthErrors({});
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose();
@@ -134,6 +136,25 @@ function AuthModal({
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    const invalid: Record<string, string> = {};
+    if (mode === 'verify') {
+      if (!/^[0-9]{6}$/.test(otp.trim())) invalid.otp = 'Vui lòng nhập đúng mã xác thực gồm 6 chữ số.';
+    } else {
+      if (mode === 'register' && !displayName.trim()) invalid.display_name = 'Vui lòng nhập họ và tên.';
+      if (mode === 'register' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+        invalid.email = 'Vui lòng nhập địa chỉ email hợp lệ để nhận mã xác thực.';
+      if (!username.trim()) invalid.username = 'Vui lòng nhập tên đăng nhập.';
+      else if (mode === 'register' && !/^[A-Za-z0-9._-]{3,64}$/.test(username.trim()))
+        invalid.username = 'Tên đăng nhập cần 3–64 ký tự, chỉ gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.';
+      if (!password) invalid.password = 'Vui lòng nhập mật khẩu.';
+      else if (mode === 'register' && password.length < 10)
+        invalid.password = 'Mật khẩu đăng ký cần ít nhất 10 ký tự.';
+    }
+    setAuthErrors(invalid);
+    if (Object.keys(invalid).length) {
+      setMessage('Hãy sửa các trường được đánh dấu.');
+      return;
+    }
     setBusy(true);
     setMessage('');
     try {
@@ -154,6 +175,9 @@ function AuthModal({
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Không thể hoàn tất yêu cầu.');
+      if (error instanceof ApiError && Object.keys(error.fieldErrors).length) {
+        setAuthErrors(Object.fromEntries(Object.keys(error.fieldErrors).map((name) => [name, 'Thông tin này chưa hợp lệ.'])));
+      }
     } finally {
       setBusy(false);
     }
@@ -181,17 +205,19 @@ function AuthModal({
         {mode === 'help' && <p className="modal-desc">
           Nếu quên mật khẩu, hãy liên hệ quản trị viên của hệ thống để xác minh tài khoản và cấp mật khẩu tạm. Sau khi đăng nhập, bạn phải đổi mật khẩu tạm.
         </p>}
-        {mode !== 'help' && <form onSubmit={submit} className="form-stack">
+        {mode !== 'help' && <form onSubmit={submit} noValidate className="form-stack">
           {mode === 'register' && (
             <label className="auth-field">
               Email nhận mã xác thực
-              <input required type="email" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="ten@example.com" />
+              <input required type="email" maxLength={254} aria-invalid={Boolean(authErrors.email)} value={email} onChange={(e) => { setEmail(e.target.value); setAuthErrors((current) => ({ ...current, email: '' })); }} autoComplete="email" placeholder="ten@example.com" />
+              {authErrors.email && <small className="field-error">{authErrors.email}</small>}
             </label>
           )}
           {mode === 'verify' && (
             <label className="auth-field">
               Mã xác thực 6 chữ số
-              <input required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} autoComplete="one-time-code" />
+              <input required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} aria-invalid={Boolean(authErrors.otp)} value={otp} onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); setAuthErrors((current) => ({ ...current, otp: '' })); }} autoComplete="one-time-code" />
+              {authErrors.otp && <small className="field-error">{authErrors.otp}</small>}
             </label>
           )}
           {mode !== 'verify' && <>
@@ -200,22 +226,28 @@ function AuthModal({
               Họ và tên
               <input
                 required
+                maxLength={200}
+                aria-invalid={Boolean(authErrors.display_name)}
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
+                onChange={(e) => { setDisplayName(e.target.value); setAuthErrors((current) => ({ ...current, display_name: '' })); }}
                 autoComplete="name"
                 placeholder="Nguyễn Văn A"
               />
+              {authErrors.display_name && <small className="field-error">{authErrors.display_name}</small>}
             </label>
           )}
           <label className="auth-field">
             Tên đăng nhập
             <input
               required
+              maxLength={64}
+              aria-invalid={Boolean(authErrors.username)}
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => { setUsername(e.target.value); setAuthErrors((current) => ({ ...current, username: '' })); }}
               autoComplete="username"
               placeholder="Nhập tên đăng nhập"
             />
+            {authErrors.username && <small className="field-error">{authErrors.username}</small>}
           </label>
           </>}
           {mode !== 'verify' && <label className="auth-field">
@@ -225,8 +257,10 @@ function AuthModal({
                 required
                 type={showPassword ? 'text' : 'password'}
                 minLength={mode === 'register' ? 10 : undefined}
+                maxLength={256}
+                aria-invalid={Boolean(authErrors.password)}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setAuthErrors((current) => ({ ...current, password: '' })); }}
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 placeholder={mode === 'register' ? 'Tối thiểu 10 ký tự' : 'Nhập mật khẩu'}
               />
@@ -234,10 +268,11 @@ function AuthModal({
                 {showPassword ? 'Ẩn' : 'Hiện'}
               </button>
             </span>
+            {authErrors.password && <small className="field-error">{authErrors.password}</small>}
           </label>}
           {message && (
             <p
-              role="status"
+              role={/thành công|đã được xác thực|đã gửi/i.test(message) ? 'status' : 'alert'}
               className={`notice ${/thành công|đã được xác thực|đã gửi/i.test(message) ? 'success' : 'error'}`}
             >
               {message}
@@ -262,6 +297,7 @@ function AuthModal({
               setMode(mode === 'login' ? 'register' : 'login');
               setShowPassword(false);
               setMessage('');
+              setAuthErrors({});
             }}
           >
             {mode === 'login'
@@ -444,6 +480,7 @@ function Tracking({ user, initialCode = '' }: { user: Me | null; initialCode?: s
             Mã theo dõi
             <input
               required
+              name="tracking_code"
               value={code}
               onChange={(e) => {
                 setCode(e.target.value);
@@ -458,12 +495,13 @@ function Tracking({ user, initialCode = '' }: { user: Me | null; initialCode?: s
             <input
               required={!user}
               type="password"
+              name="tracking_secret"
               value={secret}
               onChange={(e) => {
                 setSecret(e.target.value);
                 invalidateLookup();
               }}
-              autoComplete="off"
+              autoComplete="new-password"
             />
           </label>
           <button className="button" disabled={busy}>
@@ -1058,10 +1096,7 @@ function App() {
             <div>
               <span className="eyebrow">HỆ THỐNG RELIVA</span>
               <h1>{selected.title}</h1>
-              <p>
-                {selected.note ||
-                  'Thông tin được cập nhật từ dịch vụ theo quyền và phạm vi của tài khoản.'}
-              </p>
+              {selected.note && <p>{selected.note}</p>}
             </div>
           </div>
 
