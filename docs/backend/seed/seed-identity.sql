@@ -105,6 +105,8 @@ FROM (VALUES
 ) AS g(suffix, role_code, scope_type, org)
 WHERE NOT EXISTS (SELECT 1 FROM role_grant r WHERE r.user_id = pg_temp.u(g.suffix) AND r.role_code = g.role_code AND r.revoked_at IS NULL);
 
+-- @include demo expansion
+
 -- minimal audit: the bootstrap seed is the only permitted self-grant (see role_grant comment in identity.sql)
 INSERT INTO audit_log (actor_user_id, action, entity_type, entity_id, reason)
 VALUES (NULL, 'SEED_LOADED', 'SYSTEM', 'seed-identity', 'Dữ liệu demo tổng hợp, không phải người thật');

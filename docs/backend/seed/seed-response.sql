@@ -4,7 +4,8 @@
 --
 -- Response has no FK to Identity, so user / organization / region ids are opaque uuids matching seed-identity.sql:
 --   ORG_COORD 00000000-0000-4000-8000-000000000001   ORG_VOLUNTEER ...000000000002
---   CAMPAIGN_ACTIVE ...0000c1   CAMPAIGN_DRAFT ...0000c2   users ...000101 .. ...000111 (see seed-identity.sql header)
+--   CAMPAIGN_ACTIVE ...0000c1/2; expansion campaigns ...0000c3..c8 (see seed-campaigns.sql)
+--   users ...000101 .. ...000118 (see seed-identity.sql and seed-expansion-identity.sql)
 -- All people, phones (0900000xxx), hashes and call-signs are fictional. received_at / captured_at are relative to now().
 --
 -- Scenario map (request id suffix -> short name):
@@ -325,6 +326,8 @@ INSERT INTO notice (id, recipient_user_id, source_id, source_version, notice_typ
   (pg_temp.u('1f3'), pg_temp.u('102'), pg_temp.u('f2'), 1, 'REQUEST_OVERDUE',
      '{"request_id":"00000000-0000-4000-8000-0000000000f2","reason_code":"VERIFYING_AGED","review_lane":"NORMAL"}', now() - interval '30 minutes', now() - interval '10 minutes');
 
+-- @include demo expansion
+
 -- minimal audit trail (evidence_metadata intentionally empty: the demo seed carries no files)
 INSERT INTO audit_log (actor_user_id, action, entity_type, entity_id, reason)
 VALUES (NULL, 'SEED_LOADED', 'SYSTEM', 'seed-response', 'Dữ liệu demo tổng hợp, không phải người thật');
@@ -334,8 +337,8 @@ VALUES (NULL, 'SEED_LOADED', 'SYSTEM', 'seed-response', 'Dữ liệu demo tổng
 CREATE FUNCTION pg_temp.must(label text, ok boolean) RETURNS void LANGUAGE plpgsql AS
 $$ BEGIN IF ok IS NOT TRUE THEN RAISE EXCEPTION 'SEED ASSERTION FAILED: %', label; END IF; END $$;
 
-SELECT pg_temp.must('13 requests', (SELECT count(*) FROM assistance_request) = 13);
-SELECT pg_temp.must('every request has exactly one subject', (SELECT count(*) FROM request_subject) = 13);
+SELECT pg_temp.must('25 requests', (SELECT count(*) FROM assistance_request) = 25);
+SELECT pg_temp.must('every request has exactly one subject', (SELECT count(*) FROM request_subject) = 25);
 SELECT pg_temp.must('rescue and supply needs are both represented',
   (SELECT count(*) FROM assistance_request WHERE needs_rescue) > 0
   AND (SELECT count(*) FROM assistance_request WHERE needs_relief_supplies) > 0
@@ -397,9 +400,9 @@ SELECT pg_temp.must('R12 resolved without seal or Logistics admission, completed
 SELECT pg_temp.must('capacity-one: every team has at most one active mission and exactly 2 are active',
   (SELECT coalesce(max(c), 0) FROM (SELECT count(*) c FROM mission WHERE status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE') GROUP BY team_id) x) = 1
   AND (SELECT count(*) FROM mission WHERE status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE')) = 2);
-SELECT pg_temp.must('teams: 8 teams, mixed kinds/modes, stale position, no position, readiness latch',
-  (SELECT count(*) FROM rescue_team) = 8
-  AND (SELECT count(*) FROM rescue_team WHERE reporting_mode = 'COORDINATOR' AND external_contact_note IS NOT NULL) = 5
+SELECT pg_temp.must('teams: 12 teams, mixed kinds/modes, stale position, no position, readiness latch',
+  (SELECT count(*) FROM rescue_team) = 12
+  AND (SELECT count(*) FROM rescue_team WHERE reporting_mode = 'COORDINATOR' AND external_contact_note IS NOT NULL) = 7
   AND (SELECT count(*) FROM team_position WHERE captured_at < now() - interval '30 minutes') = 1
   AND NOT EXISTS (SELECT 1 FROM team_position WHERE team_id = pg_temp.u('a4'))
   AND NOT EXISTS (SELECT 1 FROM team_member WHERE team_id IN (pg_temp.u('a3'), pg_temp.u('a4')))
@@ -418,10 +421,10 @@ SELECT pg_temp.must('P3 comparison: B is 3 km with 2 recent missions, C is 4 km 
                                                         pg_temp.u('1b42'), pg_temp.u('1b43'), pg_temp.u('1b44'), pg_temp.u('1b45'))
        AND recorded_basis = 'RADIO' AND reported_by IS NOT NULL) = 7);
 SELECT pg_temp.must('regions do not overlap and 9 categories / 5 skills / 4 category-skill links',
-  NOT (SELECT ST_Intersects(a.geom, b.geom) FROM region_boundary a, region_boundary b WHERE a.region_code = 'DEMO_A' AND b.region_code = 'DEMO_B')
+  NOT EXISTS (SELECT 1 FROM region_boundary a JOIN region_boundary b ON a.region_code < b.region_code WHERE ST_Intersects(a.geom, b.geom))
   AND (SELECT count(*) FROM incident_category) = 9 AND (SELECT count(*) FROM skill) = 5 AND (SELECT count(*) FROM incident_category_skill) = 4);
-SELECT pg_temp.must('2 active campaigns; 3 notices for coord1',
-  (SELECT count(*) FROM campaign WHERE status = 'ACTIVE') = 2
+SELECT pg_temp.must('6 active campaigns; 3 notices for coord1',
+  (SELECT count(*) FROM campaign WHERE status = 'ACTIVE') = 6
   AND (SELECT count(*) FROM notice WHERE recipient_user_id = pg_temp.u('102')) = 3
   AND (SELECT count(*) FROM evidence_metadata) = 0);
 
