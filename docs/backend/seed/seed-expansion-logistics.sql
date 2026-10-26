@@ -128,7 +128,7 @@ SELECT balance.id, 'OPENING', fixture.quantity, 0, fixture.operation_ref,
     ('00000000-0000-4000-8000-0000000a5c00'::uuid, '00000000-0000-4000-8000-0000000a2010'::uuid, '00000000-0000-4000-8000-0000000a1010'::uuid, 'Gạo đóng túi Demo C', 80.000::numeric, 'OPEN:DEMO_C:RICE'),
     ('00000000-0000-4000-8000-0000000a5c01'::uuid, '00000000-0000-4000-8000-0000000a2010'::uuid, '00000000-0000-4000-8000-0000000a1011'::uuid, 'Nước uống đóng chai Demo C', 180.000::numeric, 'OPEN:DEMO_C:WATER'),
     ('00000000-0000-4000-8000-0000000a5c02'::uuid, '00000000-0000-4000-8000-0000000a2010'::uuid, '00000000-0000-4000-8000-0000000a1012'::uuid, 'Bộ sơ cứu cộng đồng Demo C', 32.000::numeric, 'OPEN:DEMO_C:MEDICAL'),
-    ('00000000-0000-4000-8000-0000000a5c03'::uuid, '00000000-0000-4000-8000-0000000a1013'::uuid, 'Chăn giữ nhiệt Demo C', 45.000::numeric, 'OPEN:DEMO_C:BLANKETS')
+    ('00000000-0000-4000-8000-0000000a5c03'::uuid, '00000000-0000-4000-8000-0000000a2010'::uuid, '00000000-0000-4000-8000-0000000a1013'::uuid, 'Chăn giữ nhiệt Demo C', 45.000::numeric, 'OPEN:DEMO_C:BLANKETS')
   ) AS fixture(balance_id, warehouse_id, item_id, item_name, quantity, operation_ref)
   JOIN stock_balance balance ON balance.id = fixture.balance_id
                              AND balance.warehouse_id = fixture.warehouse_id AND balance.item_id = fixture.item_id
