@@ -8,7 +8,6 @@ Reliva is a Web and Mobile project for coordinating emergency reports, rescue mi
 
 ## Project information
 
-- **Project code:** C48
 - **Academic program:** Graduation capstone, class D22CQCNPM01-N
 - **Advisor:** ThS. Trương Thị Mỹ Ngọc
 - **Student team:** Nguyễn Lưu Tấn Sang (N22DCCN068), Vũ Ngọc Sơn (N22DCCN071), and Đỗ Xuân Trí (N22DCCN088)
