@@ -225,7 +225,7 @@ npm start
 npm run lint
 ```
 
-Database and API integration checks use the primary C48 databases and APIs. See the [backend setup guide](docs/backend/00-setup.md) before running database checks.
+Database and API integration checks use the primary project databases and APIs. See the [backend setup guide](docs/backend/00-setup.md) before running database checks.
 
 ## Project documents and API contracts
 
