@@ -151,6 +151,30 @@ export type MissionStatus =
   | 'FAILED'
   | 'CANCELLED';
 
+export type MissionKind = 'RESCUE' | 'DELIVERY' | 'COMBINED';
+
+export interface MissionTimelineEvent {
+  id: string;
+  actor_user_id?: string | null;
+  from_status?: string | null;
+  to_status: string;
+  recorded_basis?: string | null;
+  reported_by?: string | null;
+  reason?: string | null;
+  outcome_note?: string | null;
+  occurred_at: string;
+  recorded_at?: string;
+}
+
+export interface MissionEvidenceItem {
+  id: string;
+  state: string;
+  size_bytes: number;
+  detected_mime: string;
+  checksum?: string;
+  created_at: string;
+}
+
 export interface Mission {
   id: string;
   request_id: string;
@@ -159,6 +183,7 @@ export interface Mission {
   version: number;
   work_cycle?: number;
   status: MissionStatus;
+  mission_kind?: MissionKind;
   category: IncidentCategoryCode;
   description?: string;
   people_affected?: number | null;
@@ -171,8 +196,24 @@ export interface Mission {
     name: string;
     phone?: string;
   } | null;
+  outcome_note?: string | null;
+  timeline?: MissionTimelineEvent[];
+  evidence?: MissionEvidenceItem[];
   created_at: string;
   distance_m?: number | null;
+}
+
+export interface TeamMemberItem {
+  team_id: string;
+  user_id: string;
+  member_role: 'LEADER' | 'MEMBER';
+  joined_at: string;
+}
+
+export interface RegionItem {
+  code: string;
+  name: string;
+  status: string;
 }
 
 export interface RescueTeam {

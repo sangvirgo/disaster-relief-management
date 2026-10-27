@@ -14,6 +14,7 @@ import {
   EvidenceDownload,
   CollectionPage,
   PublicCampaign,
+  TeamMemberItem,
 } from '../types/api';
 import { generateUUID } from '../utils/secureStore';
 
@@ -423,5 +424,40 @@ export const ResponseApi = {
   async getTeamDetail(teamId: string): Promise<RescueTeamDetail> {
     const response = await apiClient.get<RescueTeamDetail>(`/response/teams/${teamId}`);
     return response.data;
+  },
+
+  // Đội trưởng thêm thành viên mới vào đội bằng mã User ID (POST /response/teams/:id/members)
+  async addTeamMember(
+    teamId: string,
+    userId: string,
+    idempotencyKey?: string
+  ): Promise<TeamMemberItem> {
+    const response = await apiClient.post<TeamMemberItem>(
+      `/response/teams/${teamId}/members`,
+      { user_id: userId.trim() },
+      {
+        headers: {
+          'Idempotency-Key': idempotencyKey || generateUUID(),
+        },
+      }
+    );
+    return response.data;
+  },
+
+  // Đội trưởng xóa thành viên khỏi đội (POST /response/teams/:id/members/:user_id/remove)
+  async removeTeamMember(
+    teamId: string,
+    userId: string,
+    idempotencyKey?: string
+  ): Promise<void> {
+    await apiClient.post(
+      `/response/teams/${teamId}/members/${userId.trim()}/remove`,
+      {},
+      {
+        headers: {
+          'Idempotency-Key': idempotencyKey || generateUUID(),
+        },
+      }
+    );
   },
 };

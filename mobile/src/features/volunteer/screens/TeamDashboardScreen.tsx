@@ -8,9 +8,13 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { FormFieldError } from '../../../components/common/FormFieldError';
+import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
 import { useAuthStore } from '../../../store/authStore';
 import { useLocation } from '../../../hooks/useLocation';
@@ -18,6 +22,7 @@ import { ResponseApi } from '../../../api/responseApi';
 import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { RescueTeamDetail, Mission } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
+import { isValidUuid } from '../../../utils/formValidation';
 import { RESCUE_TEAM_KIND_LABELS, RESCUE_SKILL_LABELS } from '../../../constants/labels';
 import {
   Shield,
@@ -37,6 +42,8 @@ import {
   PackageCheck,
   Flag,
   Bell,
+  UserPlus,
+  X,
 } from 'lucide-react-native';
 
 export const TeamDashboardScreen: React.FC = () => {
@@ -51,6 +58,10 @@ export const TeamDashboardScreen: React.FC = () => {
   const [isUpdatingPosition, setIsUpdatingPosition] = useState<boolean>(false);
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
   const [showUserIdModal, setShowUserIdModal] = useState<boolean>(false);
+  const [showAddMemberModal, setShowAddMemberModal] = useState<boolean>(false);
+  const [newMemberUserId, setNewMemberUserId] = useState<string>('');
+  const [memberIdError, setMemberIdError] = useState<string | undefined>();
+  const [isAddingMember, setIsAddingMember] = useState<boolean>(false);
 
   const loadTeamData = async () => {
     setLoading(true);
@@ -160,6 +171,43 @@ export const TeamDashboardScreen: React.FC = () => {
     if (!user?.id) return;
     setShowUserIdModal(true);
   };
+
+  const handleAddMember = async () => {
+    const trimmedId = newMemberUserId.trim();
+    if (!team) return;
+    if (!trimmedId) {
+      setMemberIdError('Vui lòng nhập mã ID tài khoản tình nguyện viên.');
+      return;
+    }
+    if (!isValidUuid(trimmedId)) {
+      setMemberIdError('Mã ID phải đúng định dạng UUID, ví dụ 123e4567-e89b-12d3-a456-426614174000.');
+      return;
+    }
+    setMemberIdError(undefined);
+    setIsAddingMember(true);
+    try {
+      await ResponseApi.addTeamMember(team.id, trimmedId);
+      Alert.alert('Thành công', 'Đã thêm thành viên mới vào đội cứu hộ.');
+      setNewMemberUserId('');
+      setMemberIdError(undefined);
+      setShowAddMemberModal(false);
+      await loadTeamData();
+    } catch (err: unknown) {
+      if (isApiErrorCode(err, 'USER_IN_OTHER_TEAM')) {
+        Alert.alert('Không thể thêm', 'Tài khoản này hiện đang thuộc một đội cứu hộ khác.');
+      } else if (isApiErrorCode(err, 'NOT_FOUND')) {
+        Alert.alert('Không tìm thấy', 'Không tìm thấy tài khoản với mã ID đã nhập. Vui lòng kiểm tra lại.');
+      } else if (isApiErrorCode(err, 'FORBIDDEN', 'MISSION_NOT_LEADER')) {
+        Alert.alert('Chưa có quyền', 'Chỉ Đội trưởng đang hoạt động mới có quyền ghi danh thành viên vào đội.');
+      } else {
+        Alert.alert('Lỗi thêm thành viên', getApiErrorMessage(err, 'Không thể thêm thành viên vào đội. Vui lòng thử lại.'));
+      }
+    } finally {
+      setIsAddingMember(false);
+    }
+  };
+
+  const addMemberDisabled = isAddingMember || newMemberUserId.length > 36 || !isValidUuid(newMemberUserId);
 
   const handleLogout = async () => {
     Alert.alert('Xác nhận đăng xuất', 'Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?', [
@@ -463,23 +511,35 @@ export const TeamDashboardScreen: React.FC = () => {
           </View>
 
           <View style={styles.statsGrid}>
-            <View style={[styles.statBox, { backgroundColor: THEME.colors.warning.bg }]}>
+            <TouchableOpacity
+              style={[styles.statBox, { backgroundColor: THEME.colors.warning.bg }]}
+              onPress={() => router.push({ pathname: '/missions', params: { tab: 'OFFERED' } })}
+              activeOpacity={0.8}
+            >
               <AlertTriangle size={20} color={THEME.colors.warning.main} />
               <Text style={[styles.statNumber, { color: THEME.colors.warning.dark }]}>{offeredCount}</Text>
               <Text style={styles.statLabel}>Mới nhận</Text>
-            </View>
+            </TouchableOpacity>
 
-            <View style={[styles.statBox, { backgroundColor: THEME.colors.primary.bg }]}>
+            <TouchableOpacity
+              style={[styles.statBox, { backgroundColor: THEME.colors.primary.bg }]}
+              onPress={() => router.push({ pathname: '/missions', params: { tab: 'ACTIVE' } })}
+              activeOpacity={0.8}
+            >
               <Clock size={20} color={THEME.colors.primary.main} />
               <Text style={[styles.statNumber, { color: THEME.colors.primary.dark }]}>{activeCount}</Text>
               <Text style={styles.statLabel}>Đang cứu</Text>
-            </View>
+            </TouchableOpacity>
 
-            <View style={[styles.statBox, { backgroundColor: THEME.colors.success.bg }]}>
+            <TouchableOpacity
+              style={[styles.statBox, { backgroundColor: THEME.colors.success.bg }]}
+              onPress={() => router.push({ pathname: '/missions', params: { tab: 'COMPLETED' } })}
+              activeOpacity={0.8}
+            >
               <CheckCircle2 size={20} color={THEME.colors.success.main} />
               <Text style={[styles.statNumber, { color: THEME.colors.success.dark }]}>{completedCount}</Text>
               <Text style={styles.statLabel}>Hoàn thành</Text>
-            </View>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
@@ -491,7 +551,90 @@ export const TeamDashboardScreen: React.FC = () => {
             <ChevronRight size={18} color={THEME.colors.primary.main} />
           </TouchableOpacity>
         </View>
+
+        {/* 4. QUẢN LÝ THÀNH VIÊN ĐỘI CỨU HỘ */}
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <UserCheck size={20} color={THEME.colors.primary.main} />
+            <Text style={styles.cardTitle}>QUẢN LÝ THÀNH VIÊN ĐỘI</Text>
+          </View>
+          <Text style={styles.cardDesc}>
+            Đội trưởng có thể ghi danh các tình nguyện viên tự do vào biên chế đội bằng Mã ID tài khoản của họ.
+          </Text>
+
+          <TouchableOpacity
+            style={styles.addMemberBtn}
+            onPress={() => setShowAddMemberModal(true)}
+            activeOpacity={0.85}
+          >
+            <UserPlus size={18} color="#FFFFFF" />
+            <Text style={styles.addMemberBtnText}>Thêm Thành Viên Vào Đội</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+
+      {/* MODAL THÊM THÀNH VIÊN VÀO ĐỘI */}
+      <Modal visible={showAddMemberModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>Thêm Thành Viên Vào Đội</Text>
+              <TouchableOpacity onPress={() => setShowAddMemberModal(false)} disabled={isAddingMember}>
+                <X size={20} color={THEME.colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalSubtitle}>
+              Nhập mã định danh (User ID) do tình nguyện viên cung cấp để ghi danh vào đội cứu hộ.
+            </Text>
+            <Text style={styles.modalSubtitle}>Mã tài khoản (UUID) <RequiredAsterisk /></Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Nhập mã ID tình nguyện viên (UUID)..."
+              placeholderTextColor={THEME.colors.text.muted}
+              value={newMemberUserId}
+              onChangeText={(value) => {
+                setNewMemberUserId(value);
+                setMemberIdError(value.length > 36
+                  ? 'Mã tài khoản không được vượt quá 36 ký tự.'
+                  : value && !isValidUuid(value)
+                    ? 'Mã ID phải đúng định dạng UUID, ví dụ 123e4567-e89b-12d3-a456-426614174000.'
+                    : undefined);
+              }}
+              onBlur={() => {
+                if (!newMemberUserId.trim()) setMemberIdError('Mã tài khoản là bắt buộc.');
+                else if (newMemberUserId.length > 36) setMemberIdError('Mã tài khoản không được vượt quá 36 ký tự.');
+                else if (!isValidUuid(newMemberUserId)) setMemberIdError('Mã ID phải đúng định dạng UUID, ví dụ 123e4567-e89b-12d3-a456-426614174000.');
+                else setMemberIdError(undefined);
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={37}
+              editable={!isAddingMember}
+            />
+            <FormFieldError message={memberIdError} />
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setShowAddMemberModal(false)}
+                disabled={isAddingMember}
+              >
+                <Text style={styles.modalCancelText}>Hủy bỏ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmitBtn, addMemberDisabled && { opacity: 0.5 }]}
+                onPress={handleAddMember}
+                disabled={addMemberDisabled}
+              >
+                {isAddingMember ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Ghi danh vào đội</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       {showUserIdModal && user?.id ? (
         <CopyableInfoModal
           visible
@@ -897,5 +1040,90 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: THEME.colors.primary.main,
     marginRight: 4,
+  },
+  addMemberBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: THEME.colors.primary.main,
+    borderRadius: 10,
+    marginTop: 10,
+    ...THEME.shadows.sm,
+  },
+  addMemberBtnText: {
+    fontSize: THEME.typography.fontSizes.xs + 1,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginLeft: 6,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalBox: {
+    width: '100%',
+    backgroundColor: THEME.colors.surface.card,
+    borderRadius: 16,
+    padding: 20,
+    ...THEME.shadows.md,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontSize: THEME.typography.fontSizes.base,
+    fontWeight: '700',
+    color: THEME.colors.text.primary,
+  },
+  modalSubtitle: {
+    fontSize: THEME.typography.fontSizes.xs,
+    color: THEME.colors.text.secondary,
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  modalInput: {
+    backgroundColor: THEME.colors.surface.background,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: THEME.typography.fontSizes.sm,
+    color: THEME.colors.text.primary,
+    marginBottom: 16,
+  },
+  modalButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  modalCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: THEME.colors.surface.border,
+  },
+  modalCancelText: {
+    fontSize: THEME.typography.fontSizes.xs + 1,
+    fontWeight: '600',
+    color: THEME.colors.text.secondary,
+  },
+  modalSubmitBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: THEME.colors.primary.main,
+  },
+  modalSubmitText: {
+    fontSize: THEME.typography.fontSizes.xs + 1,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

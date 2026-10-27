@@ -65,11 +65,13 @@ export const INCIDENT_CATEGORIES: Record<string, { label: string; icon: string; 
     icon: 'AlertCircle',
     desc: 'Cần xác minh thêm thông tin hiện trường',
   },
-  ISOLATED: {
-    label: 'Cô lập thiếu đói',
-    icon: 'Compass',
-    desc: 'Hết lương thực, nước uống, không có đường ra',
-  },
+};
+
+// Phân loại hình thức nhiệm vụ cứu trợ
+export const MISSION_KIND_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  RESCUE: { label: 'Cứu nạn khẩn cấp', color: '#DC2626', bg: '#FEE2E2' },
+  DELIVERY: { label: 'Tiếp tế cứu trợ', color: '#2563EB', bg: '#EFF6FF' },
+  COMBINED: { label: 'Cứu nạn & Tiếp tế kết hợp', color: '#7C3AED', bg: '#F5F3FF' },
 };
 
 export const REQUEST_STATUS_LABELS: Record<RequestStatus, { label: string; color: string; bg: string }> = {

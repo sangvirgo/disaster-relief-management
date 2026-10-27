@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Modal, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { FormFieldError } from '../../../components/common/FormFieldError';
 import { SOSButton } from '../../../components/common/SOSButton';
 import { THEME } from '../../../constants/theme';
+import { getTrackingCodeError, isValidTrackingCode } from '../../../utils/formValidation';
 import { useAuthStore } from '../../../store/authStore';
 import { ResponseApi } from '../../../api/responseApi';
 import { NoticeItem } from '../../../types/api';
@@ -31,6 +33,7 @@ import {
 export const EmergencyHomeScreen: React.FC = () => {
   const router = useRouter();
   const [trackingCode, setTrackingCode] = useState('');
+  const [trackingCodeError, setTrackingCodeError] = useState<string | undefined>();
   const [notices, setNotices] = useState<NoticeItem[]>([]);
   const [selectedNotice, setSelectedNotice] = useState<NoticeItem | null>(null);
   const { user, isAuthenticated, logout, getUserRoleName, isVolunteerOrLeader } = useAuthStore();
@@ -62,11 +65,17 @@ export const EmergencyHomeScreen: React.FC = () => {
   };
 
   const handleTrackSubmit = () => {
-    if (!trackingCode.trim()) {
-      Alert.alert('Thông báo', 'Vui lòng nhập mã tra cứu cứu trợ.');
+    const code = trackingCode.trim().toUpperCase();
+    if (!code) {
+      setTrackingCodeError('Vui lòng nhập mã tra cứu cứu trợ.');
       return;
     }
-    router.push({ pathname: '/tracking', params: { trackingCode: trackingCode.trim().toUpperCase() } });
+    if (!isValidTrackingCode(code)) {
+      setTrackingCodeError('Mã tra cứu phải gồm đúng 10 ký tự hợp lệ.');
+      return;
+    }
+    setTrackingCodeError(undefined);
+    router.push({ pathname: '/tracking', params: { trackingCode: code } });
   };
 
   const handleLogout = () => {
@@ -186,7 +195,7 @@ export const EmergencyHomeScreen: React.FC = () => {
             >
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <KeyRound size={15} color={THEME.colors.text.secondary} style={{ marginRight: 6 }} />
-                <Text style={styles.changePassBarText}>Đổi mật khẩu</Text>
+                <Text style={styles.changePassBarText}>Đổi mật khẩu & Bảo mật</Text>
               </View>
               <ChevronRight size={15} color={THEME.colors.text.muted} />
             </TouchableOpacity>
@@ -317,24 +326,36 @@ export const EmergencyHomeScreen: React.FC = () => {
       {/* Tra cứu tiến độ cứu hộ nhanh bằng mã */}
       <View style={styles.trackingCard}>
         <Text style={styles.trackingTitle}>TRA CỨU TIẾN ĐỘ CỨU TRỢ</Text>
-        <Text style={styles.trackingDesc}>Nhập mã tra cứu (VD: SOS-7890) được cấp khi gửi yêu cầu:</Text>
+        <Text style={styles.trackingDesc}>Nhập mã tra cứu 10 ký tự được cấp khi gửi yêu cầu:</Text>
         <View style={styles.searchRow}>
           <TextInput
             style={styles.searchInput}
-            placeholder="Nhập mã tra cứu cứu trợ..."
+            placeholder="Ví dụ: AB12CD34EF"
             placeholderTextColor={THEME.colors.text.muted}
             value={trackingCode}
-            onChangeText={setTrackingCode}
+            onChangeText={(value) => {
+              const normalized = value.toUpperCase();
+              setTrackingCode(normalized);
+              setTrackingCodeError(getTrackingCodeError(normalized));
+            }}
+            onBlur={() => {
+              setTrackingCodeError(!trackingCode.trim()
+                ? 'Mã tra cứu là bắt buộc.'
+                : getTrackingCodeError(trackingCode));
+            }}
             autoCapitalize="characters"
+            maxLength={11}
           />
           <TouchableOpacity
-            style={styles.searchButton}
+            style={[styles.searchButton, (trackingCode.length > 10 || !isValidTrackingCode(trackingCode)) && { opacity: 0.5 }]}
             onPress={handleTrackSubmit}
+            disabled={trackingCode.length > 10 || !isValidTrackingCode(trackingCode)}
             activeOpacity={0.8}
           >
             <Search size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
+        <FormFieldError message={trackingCodeError} />
       </View>
 
       {/* Truy cập nhanh các tính năng khác */}

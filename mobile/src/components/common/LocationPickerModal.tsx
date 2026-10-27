@@ -15,6 +15,7 @@ import {
 import { WebView } from "react-native-webview";
 import * as Location from "expo-location";
 import { THEME } from "../../constants/theme";
+import { FormFieldError } from "./FormFieldError";
 import {
   MapPin,
   Navigation,
@@ -45,6 +46,13 @@ interface SearchPlaceItem {
 // Tâm bản đồ để người dùng bắt đầu tìm kiếm; không được dùng làm vị trí đã chọn.
 const DEFAULT_LATITUDE = 10.9289;
 const DEFAULT_LONGITUDE = 106.8595;
+
+function parseCoordinate(value: string): number | null {
+  const normalized = value.trim();
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) return null;
+  const coordinate = Number(normalized);
+  return Number.isFinite(coordinate) ? coordinate : null;
+}
 
 // Hàm định dạng địa chỉ tiếng Việt từ kết quả Photon/OSM
 function formatPhotonProperties(properties: any): {
@@ -97,6 +105,8 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       : DEFAULT_LATITUDE.toFixed(6),
   );
   const [isLocationSelected, setIsLocationSelected] = useState<boolean>(Boolean(initialCoordinates));
+  const [hasManualCoordinates, setHasManualCoordinates] = useState<boolean>(false);
+  const [coordinateError, setCoordinateError] = useState<string | undefined>();
   const [addressNote, setAddressNote] = useState<string>(initialAddressNote);
   const [detectedAddress, setDetectedAddress] = useState<string>("");
 
@@ -165,21 +175,25 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       setLngInput(initialCoordinates ? initLng.toFixed(6) : "");
       setLatInput(initialCoordinates ? initLat.toFixed(6) : "");
       setIsLocationSelected(Boolean(initialCoordinates));
+      setHasManualCoordinates(false);
+      setCoordinateError(undefined);
       setAddressNote(initialAddressNote || "");
       setSearchQuery("");
       setSearchResults([]);
       setSearchError("");
 
-      if (initialCoordinates && isMapReady && webViewRef.current) {
-        webViewRef.current.injectJavaScript(`
-          if (typeof window.updateMapLocation === 'function') {
-            window.updateMapLocation(${initLat}, ${initLng}, 16);
-          }
-          true;
-        `);
-      }
     }
-  }, [visible, initialCoordinates, initialAddressNote, isMapReady]);
+  }, [visible, initialCoordinates, initialAddressNote]);
+
+  useEffect(() => {
+    if (!visible || !initialCoordinates || !isMapReady || !webViewRef.current) return;
+    webViewRef.current.injectJavaScript(`
+      if (typeof window.updateMapLocation === 'function') {
+        window.updateMapLocation(${initialCoordinates[1]}, ${initialCoordinates[0]}, 16);
+      }
+      true;
+    `);
+  }, [visible, initialCoordinates, isMapReady]);
 
   useEffect(() => {
     if (!visible || !initialCoordinates) {
@@ -341,15 +355,17 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
   // Áp dụng tọa độ nhập từ bàn phím
   const handleApplyManualInputs = () => {
-    const parsedLng = parseFloat(lngInput);
-    const parsedLat = parseFloat(latInput);
-    if (!Number.isFinite(parsedLng) || !Number.isFinite(parsedLat) || parsedLng < -180 || parsedLng > 180 || parsedLat < -90 || parsedLat > 90) {
-      Alert.alert(
-        "Tọa độ không hợp lệ",
-        "Vui lòng kiểm tra lại kinh độ và vĩ độ.",
-      );
+    if (!lngInput.trim() || !latInput.trim()) {
+      setCoordinateError(undefined);
       return;
     }
+    const parsedLng = parseCoordinate(lngInput);
+    const parsedLat = parseCoordinate(latInput);
+    if (parsedLng === null || parsedLat === null || parsedLng < -180 || parsedLng > 180 || parsedLat < -90 || parsedLat > 90) {
+      setCoordinateError("Kinh độ phải từ -180 đến 180 và vĩ độ từ -90 đến 90.");
+      return;
+    }
+    setCoordinateError(undefined);
     setLongitude(parsedLng);
     setLatitude(parsedLat);
     setIsLocationSelected(true);
@@ -371,12 +387,17 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
   // Xác nhận vị trí
   const handleConfirm = () => {
-    const parsedLng = parseFloat(lngInput);
-    const parsedLat = parseFloat(latInput);
-    if (!isLocationSelected || !Number.isFinite(parsedLng) || !Number.isFinite(parsedLat) || parsedLng < -180 || parsedLng > 180 || parsedLat < -90 || parsedLat > 90) {
-      Alert.alert("Tọa độ chưa đúng", "Vui lòng chọn hoặc nhập tọa độ hợp lệ.");
+    const parsedLng = parseCoordinate(lngInput);
+    const parsedLat = parseCoordinate(latInput);
+    if (parsedLng === null || parsedLat === null || parsedLng < -180 || parsedLng > 180 || parsedLat < -90 || parsedLat > 90) {
+      setCoordinateError("Nhập kinh độ từ -180 đến 180 và vĩ độ từ -90 đến 90.");
       return;
     }
+    if (!isLocationSelected && !hasManualCoordinates) {
+      setCoordinateError("Hãy chọn vị trí trên bản đồ hoặc nhập cả kinh độ và vĩ độ.");
+      return;
+    }
+    setCoordinateError(undefined);
     onConfirm([parsedLng, parsedLat], addressNote.trim() || undefined);
     onClose();
   };
@@ -672,7 +693,11 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               <TextInput
                 style={styles.input}
                 value={lngInput}
-                onChangeText={setLngInput}
+                onChangeText={(value) => {
+                  setLngInput(value);
+                  setHasManualCoordinates(true);
+                  setCoordinateError(undefined);
+                }}
                 onBlur={handleApplyManualInputs}
                 keyboardType="numeric"
                 placeholder="106.859509"
@@ -684,7 +709,11 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               <TextInput
                 style={styles.input}
                 value={latInput}
-                onChangeText={setLatInput}
+                onChangeText={(value) => {
+                  setLatInput(value);
+                  setHasManualCoordinates(true);
+                  setCoordinateError(undefined);
+                }}
                 onBlur={handleApplyManualInputs}
                 keyboardType="numeric"
                 placeholder="10.928944"
@@ -692,6 +721,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               />
             </View>
           </View>
+            <FormFieldError message={coordinateError} />
 
           <View style={styles.noteInputGroup}>
             <Text style={styles.fieldLabel}>

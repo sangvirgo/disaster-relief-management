@@ -15,11 +15,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { FormFieldError } from '../../../components/common/FormFieldError';
+import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { StatusBadge } from '../../../components/common/StatusBadge';
+import { TimelineStep } from '../../../components/common/TimelineStep';
 import { ResponseApi } from '../../../api/responseApi';
 import { getApiErrorMessage } from '../../../api/client';
 import { Mission, MissionStatus } from '../../../types/api';
-import { INCIDENT_CATEGORIES } from '../../../constants/labels';
+import { INCIDENT_CATEGORIES, MISSION_KIND_LABELS, MISSION_STATUS_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
 import {
   MapPin,
@@ -49,11 +52,30 @@ export const MissionDetailScreen: React.FC = () => {
   // Modal hoàn thành nhiệm vụ & ảnh bằng chứng cứu nạn
   const [showCompleteModal, setShowCompleteModal] = useState<boolean>(false);
   const [outcomeNote, setOutcomeNote] = useState<string>('');
+  const [formErrors, setFormErrors] = useState<Record<string, string | undefined>>({});
   const [completionImage, setCompletionImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
   // Modal từ chối hoặc báo thất bại
   const [showDeclineModal, setShowDeclineModal] = useState<boolean>(false);
   const [declineReason, setDeclineReason] = useState<string>('');
+
+  // Xem ảnh minh chứng phóng to
+  const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
+  const [loadingEvidence, setLoadingEvidence] = useState<boolean>(false);
+
+  const handleViewEvidence = async (evidenceId: string) => {
+    setLoadingEvidence(true);
+    try {
+      const res = await ResponseApi.getEvidenceDownloadUrl(evidenceId);
+      if (res?.url) {
+        setPreviewImageUri(res.url);
+      }
+    } catch (e: any) {
+      Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể tải ảnh minh chứng.'));
+    } finally {
+      setLoadingEvidence(false);
+    }
+  };
 
   const pickImage = async () => {
     try {
@@ -145,21 +167,28 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Xử lý Từ chối hoặc Báo thất bại
   const handleDeclineSubmit = async () => {
-    if (!mission || !declineReason.trim()) {
-      Alert.alert('Thiếu lý do', 'Vui lòng nêu rõ lý do không thể tiếp nhận ca cứu nạn này.');
+    if (!mission) return;
+    const reason = declineReason.trim();
+    if (!reason) {
+      setFormErrors((current) => ({ ...current, declineReason: 'Vui lòng nêu rõ lý do từ chối hoặc trở ngại.' }));
       return;
     }
+    if (reason.length > 2000) {
+      setFormErrors((current) => ({ ...current, declineReason: 'Lý do không được vượt quá 2.000 ký tự.' }));
+      return;
+    }
+    setFormErrors((current) => ({ ...current, declineReason: undefined }));
     setActionLoading(true);
     try {
       if (mission.status === 'OFFERED') {
-        await ResponseApi.declineMission(mission.id, mission.version, declineReason.trim());
+        await ResponseApi.declineMission(mission.id, mission.version, reason);
         Alert.alert('Đã từ chối', 'Backend đã ghi nhận lý do từ chối nhiệm vụ.');
       } else {
         await ResponseApi.transitionMission(
           mission.id,
           mission.version,
           'FAILED',
-          declineReason.trim()
+          reason
         );
         Alert.alert('Đã ghi nhận', 'Backend đã ghi nhận trạng thái nhiệm vụ không thể tiếp cận.');
       }
@@ -196,10 +225,17 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Xử lý Hoàn thành cứu nạn thành công (kèm ảnh bằng chứng nếu có)
   const handleCompleteSubmit = async () => {
-    if (!mission || !outcomeNote.trim()) {
-      Alert.alert('Thiếu báo cáo kết quả', 'Vui lòng nhập báo cáo kết quả cứu hộ (số người đã giải cứu, bàn giao ở đâu...).');
+    if (!mission) return;
+    const outcome = outcomeNote.trim();
+    if (!outcome) {
+      setFormErrors((current) => ({ ...current, outcomeNote: 'Vui lòng nhập báo cáo kết quả cứu hộ.' }));
       return;
     }
+    if (outcome.length > 2000) {
+      setFormErrors((current) => ({ ...current, outcomeNote: 'Báo cáo kết quả không được vượt quá 2.000 ký tự.' }));
+      return;
+    }
+    setFormErrors((current) => ({ ...current, outcomeNote: undefined }));
     setActionLoading(true);
     let evidenceUploadFailed = false;
     try {
@@ -222,7 +258,7 @@ export const MissionDetailScreen: React.FC = () => {
         mission.version,
         'COMPLETED',
         undefined,
-        outcomeNote.trim()
+        outcome
       );
       Alert.alert(
         'Đã ghi nhận kết quả',
@@ -239,6 +275,9 @@ export const MissionDetailScreen: React.FC = () => {
       setActionLoading(false);
     }
   };
+
+  const completeSubmitDisabled = actionLoading || !outcomeNote.trim() || outcomeNote.length > 2000;
+  const declineSubmitDisabled = actionLoading || !declineReason.trim() || declineReason.length > 2000;
 
   if (loading) {
     return (
@@ -260,6 +299,7 @@ export const MissionDetailScreen: React.FC = () => {
   }
 
   const categoryInfo = INCIDENT_CATEGORIES[mission.category] || { label: 'Sự cố cứu hộ' };
+  const kindInfo = mission.mission_kind ? MISSION_KIND_LABELS[mission.mission_kind] : null;
 
   return (
     <ScreenContainer
@@ -270,8 +310,15 @@ export const MissionDetailScreen: React.FC = () => {
       {/* 1. THẺ TỔNG QUAN SỰ CỐ */}
       <View style={styles.card}>
         <View style={styles.headerRow}>
-          <View style={styles.categoryPill}>
-            <Text style={styles.categoryText}>{categoryInfo.label}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, flex: 1, marginRight: 8 }}>
+            <View style={styles.categoryPill}>
+              <Text style={styles.categoryText}>{categoryInfo.label}</Text>
+            </View>
+            {kindInfo && (
+              <View style={[styles.kindPill, { backgroundColor: kindInfo.bg }]}>
+                <Text style={[styles.kindText, { color: kindInfo.color }]}>{kindInfo.label}</Text>
+              </View>
+            )}
           </View>
           <StatusBadge missionStatus={mission.status} />
         </View>
@@ -367,6 +414,82 @@ export const MissionDetailScreen: React.FC = () => {
         </>
       </View>
 
+      {/* 4. KẾT QUẢ CỨU NẠN THỰC ĐỊA (KHI ĐÃ HOÀN THÀNH) */}
+      {mission.outcome_note ? (
+        <View style={[styles.card, { borderColor: THEME.colors.success.main, backgroundColor: '#F0FDF4' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+            <CheckCircle2 size={18} color={THEME.colors.success.main} style={{ marginRight: 6 }} />
+            <Text style={[styles.cardSectionTitle, { color: THEME.colors.success.dark, marginBottom: 0 }]}>
+              BÁO CÁO KẾT QUẢ HOÀN THÀNH
+            </Text>
+          </View>
+          <Text style={{ fontSize: THEME.typography.fontSizes.sm, color: THEME.colors.text.primary, lineHeight: 20 }}>
+            {mission.outcome_note}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* 5. TIẾN TRÌNH NHIỆM VỤ (TIMELINE) */}
+      {mission.timeline && mission.timeline.length > 0 && (
+        <View style={styles.card}>
+          <Text style={styles.cardSectionTitle}>TIẾN TRÌNH NHIỆM VỤ CỨU HỘ</Text>
+          {mission.timeline.map((evt, idx) => {
+            const info = MISSION_STATUS_LABELS[evt.to_status as MissionStatus] || { label: evt.to_status };
+            const isLast = idx === mission.timeline!.length - 1;
+            const dateObj = new Date(evt.occurred_at);
+            const timeStr = !isNaN(dateObj.getTime())
+              ? `${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')} · ${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`
+              : undefined;
+            const desc = evt.outcome_note
+              ? `Kết quả: ${evt.outcome_note}`
+              : evt.reason
+                ? `Lý do: ${evt.reason}`
+                : evt.recorded_basis
+                  ? `Điều phối viên ghi thay qua hình thức ${evt.recorded_basis}`
+                  : `Trạng thái: ${info.label}`;
+            return (
+              <TimelineStep
+                key={evt.id || idx}
+                title={info.label}
+                description={desc}
+                timestamp={timeStr}
+                isCompleted={true}
+                isCurrent={isLast}
+                isLast={isLast}
+              />
+            );
+          })}
+        </View>
+      )}
+
+      {/* 6. MINH CHỨNG HIỆN TRƯỜNG ĐÃ TẢI LÊN */}
+      {mission.evidence && mission.evidence.length > 0 && (
+        <View style={styles.card}>
+          <Text style={styles.cardSectionTitle}>ẢNH & MINH CHỨNG HIỆN TRƯỜNG ({mission.evidence.length})</Text>
+          {loadingEvidence && (
+            <ActivityIndicator size="small" color={THEME.colors.primary.main} style={{ marginBottom: 8 }} />
+          )}
+          <View style={styles.evidenceGrid}>
+            {mission.evidence.map((ev) => (
+              <TouchableOpacity
+                key={ev.id}
+                style={styles.evidenceThumbCard}
+                onPress={() => handleViewEvidence(ev.id)}
+                activeOpacity={0.8}
+              >
+                <ImageIcon size={22} color={THEME.colors.primary.main} />
+                <Text style={styles.evidenceThumbText} numberOfLines={1}>
+                  {ev.detected_mime.includes('video') ? 'Video hiện trường' : 'Ảnh hiện trường'}
+                </Text>
+                <Text style={styles.evidenceSizeText}>
+                  {(ev.size_bytes / (1024 * 1024)).toFixed(1)} MB · Chạm để xem
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
       {/* Quyền thao tác được máy chủ kiểm tra theo trạng thái nhiệm vụ và thành viên hiện tại. */}
       <View style={styles.actionSection}>
           <Text style={styles.memberActionSub}>Quyền thao tác được kiểm tra khi gửi yêu cầu.</Text>
@@ -377,7 +500,10 @@ export const MissionDetailScreen: React.FC = () => {
             <View style={styles.buttonRow}>
               <TouchableOpacity
                 style={[styles.declineBtn, actionLoading && { opacity: 0.6 }]}
-                onPress={() => setShowDeclineModal(true)}
+                onPress={() => {
+                  setFormErrors((current) => ({ ...current, declineReason: undefined }));
+                  setShowDeclineModal(true);
+                }}
                 disabled={actionLoading}
               >
                 <XCircle size={18} color={THEME.colors.emergency.main} />
@@ -424,7 +550,10 @@ export const MissionDetailScreen: React.FC = () => {
             <View>
               <TouchableOpacity
                 style={[styles.primaryActionBtn, { backgroundColor: THEME.colors.success.main }]}
-                onPress={() => setShowCompleteModal(true)}
+                onPress={() => {
+                  setFormErrors((current) => ({ ...current, outcomeNote: undefined }));
+                  setShowCompleteModal(true);
+                }}
                 disabled={actionLoading}
               >
                 <FileCheck size={20} color="#FFFFFF" />
@@ -451,7 +580,7 @@ export const MissionDetailScreen: React.FC = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>BÁO CÁO KẾT QUẢ CỨU NẠN</Text>
             <Text style={styles.modalSubtitle}>
-              Ghi chú kết quả hoàn thành để trung tâm điều phối chốt hồ sơ:
+              Ghi chú kết quả hoàn thành để trung tâm điều phối chốt hồ sơ <RequiredAsterisk />:
             </Text>
 
             <TextInput
@@ -459,10 +588,21 @@ export const MissionDetailScreen: React.FC = () => {
               placeholder="Ví dụ: Đã đưa 2 người lên ca nô an toàn, sức khỏe bình thường, đã bàn giao cho trạm y tế xã..."
               placeholderTextColor={THEME.colors.text.muted}
               value={outcomeNote}
-              onChangeText={setOutcomeNote}
+              onChangeText={(value) => {
+                setOutcomeNote(value);
+                setFormErrors((current) => ({
+                  ...current,
+                  outcomeNote: value.length > 2000 ? 'Báo cáo kết quả không được vượt quá 2.000 ký tự.' : undefined,
+                }));
+              }}
+              onBlur={() => {
+                if (!outcomeNote.trim()) setFormErrors((current) => ({ ...current, outcomeNote: 'Báo cáo kết quả cứu hộ là bắt buộc.' }));
+              }}
               multiline={true}
               numberOfLines={4}
+              maxLength={2001}
             />
+            <FormFieldError message={formErrors.outcomeNote} />
 
             {/* ĐÍNH KÈM ẢNH BẰNG CHỨNG CỨU NẠN */}
             <View style={styles.imagePickerSection}>
@@ -503,9 +643,9 @@ export const MissionDetailScreen: React.FC = () => {
                 <Text style={styles.modalCancelText}>Hủy</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, { backgroundColor: THEME.colors.success.main }]}
+                style={[styles.modalSubmitBtn, { backgroundColor: THEME.colors.success.main }, completeSubmitDisabled && { opacity: 0.5 }]}
                 onPress={handleCompleteSubmit}
-                disabled={actionLoading}
+                disabled={completeSubmitDisabled}
               >
                 {actionLoading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
@@ -528,16 +668,28 @@ export const MissionDetailScreen: React.FC = () => {
             <Text style={styles.modalSubtitle}>
               Nêu rõ lý do để điều phối viên cử đội cứu nạn khác chi viện:
             </Text>
+            <Text style={styles.modalSubtitle}>Lý do từ chối hoặc trở ngại <RequiredAsterisk /></Text>
 
             <TextInput
               style={styles.modalInput}
               placeholder="Ví dụ: Nước chảy quá xiết, sạt lở chia cắt đường không thể đưa ca nô vào..."
               placeholderTextColor={THEME.colors.text.muted}
               value={declineReason}
-              onChangeText={setDeclineReason}
+              onChangeText={(value) => {
+                setDeclineReason(value);
+                setFormErrors((current) => ({
+                  ...current,
+                  declineReason: value.length > 2000 ? 'Lý do không được vượt quá 2.000 ký tự.' : undefined,
+                }));
+              }}
+              onBlur={() => {
+                if (!declineReason.trim()) setFormErrors((current) => ({ ...current, declineReason: 'Lý do từ chối hoặc trở ngại là bắt buộc.' }));
+              }}
               multiline={true}
               numberOfLines={4}
+              maxLength={2001}
             />
+            <FormFieldError message={formErrors.declineReason} />
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -547,13 +699,33 @@ export const MissionDetailScreen: React.FC = () => {
                 <Text style={styles.modalCancelText}>Đóng</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, { backgroundColor: THEME.colors.emergency.main }]}
+                style={[styles.modalSubmitBtn, { backgroundColor: THEME.colors.emergency.main }, declineSubmitDisabled && { opacity: 0.5 }]}
                 onPress={handleDeclineSubmit}
+                disabled={declineSubmitDisabled}
               >
                 <Text style={styles.modalSubmitText}>Gửi Báo Cáo</Text>
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* MODAL XEM ẢNH MINH CHỨNG PHÓNG TO */}
+      <Modal visible={Boolean(previewImageUri)} transparent animationType="fade">
+        <View style={styles.previewModalOverlay}>
+          <TouchableOpacity
+            style={styles.previewModalClose}
+            onPress={() => setPreviewImageUri(null)}
+          >
+            <X size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          {previewImageUri ? (
+            <Image
+              source={{ uri: previewImageUri }}
+              style={styles.previewFullImage}
+              resizeMode="contain"
+            />
+          ) : null}
         </View>
       </Modal>
     </ScreenContainer>
@@ -583,6 +755,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: THEME.colors.surface.border,
+  },
+  kindPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  kindText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   categoryText: {
     fontSize: 11,
@@ -943,5 +1124,49 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#3B82F6',
     fontStyle: 'italic',
+  },
+  evidenceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 6,
+  },
+  evidenceThumbCard: {
+    width: '48%',
+    backgroundColor: THEME.colors.surface.background,
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+    alignItems: 'center',
+  },
+  evidenceThumbText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.colors.text.primary,
+    marginTop: 6,
+  },
+  evidenceSizeText: {
+    fontSize: 10,
+    color: THEME.colors.text.muted,
+    marginTop: 2,
+  },
+  previewModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  previewModalClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    padding: 8,
+  },
+  previewFullImage: {
+    width: '100%',
+    height: '80%',
   },
 });

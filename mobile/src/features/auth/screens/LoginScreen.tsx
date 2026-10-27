@@ -14,6 +14,8 @@ import { useIdTokenAuthRequest } from 'expo-auth-session/providers/google';
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { FormFieldError } from '../../../components/common/FormFieldError';
+import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { useAuthStore } from '../../../store/authStore';
 import { getApiErrorMessage } from '../../../api/client';
 import { THEME } from '../../../constants/theme';
@@ -25,6 +27,7 @@ export const LoginScreen: React.FC = () => {
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [formErrors, setFormErrors] = useState<Record<string, string | undefined>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const googleClients = {
@@ -46,8 +49,13 @@ export const LoginScreen: React.FC = () => {
 
   const handleLogin = async () => {
     const trimmedUsername = username.trim();
-    if (!trimmedUsername || !password.trim()) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.');
+    const errors: Record<string, string> = {};
+    if (!trimmedUsername) errors.username = 'Vui lòng nhập tên đăng nhập.';
+    else if (trimmedUsername.length > 64) errors.username = 'Tên đăng nhập không được vượt quá 64 ký tự.';
+    if (!password) errors.password = 'Vui lòng nhập mật khẩu.';
+    else if (password.length > 256) errors.password = 'Mật khẩu không được vượt quá 256 ký tự.';
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
       return;
     }
 
@@ -109,6 +117,8 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
+  const loginDisabled = isLoading || !username.trim() || !password || username.length > 64 || password.length > 256;
+
   return (
     <ScreenContainer title="Đăng Nhập Hệ Thống" onBack={() => goBackOrHome(router)} scrollable={true}>
       <View style={styles.headerBox}>
@@ -130,23 +140,34 @@ export const LoginScreen: React.FC = () => {
         <View style={styles.inputGroup}>
           <View style={styles.labelRow}>
             <User size={16} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Tên đăng nhập:</Text>
+            <Text style={styles.inputLabel}>Tên đăng nhập <RequiredAsterisk /></Text>
           </View>
           <TextInput
             style={styles.textInput}
             placeholder="Nhập tên đăng nhập..."
             placeholderTextColor={THEME.colors.text.muted}
             value={username}
-            onChangeText={setUsername}
+            onChangeText={(value) => {
+              setUsername(value);
+              setFormErrors((current) => ({
+                ...current,
+                username: value.length > 64 ? 'Tên đăng nhập không được vượt quá 64 ký tự.' : undefined,
+              }));
+            }}
+            onBlur={() => {
+              if (!username.trim()) setFormErrors((current) => ({ ...current, username: 'Tên đăng nhập là bắt buộc.' }));
+            }}
             autoCapitalize="none"
             autoCorrect={false}
+            maxLength={65}
           />
+          <FormFieldError message={formErrors.username} />
         </View>
 
         <View style={styles.inputGroup}>
           <View style={styles.labelRow}>
             <Lock size={16} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Mật khẩu:</Text>
+            <Text style={styles.inputLabel}>Mật khẩu <RequiredAsterisk /></Text>
           </View>
           <View style={styles.passwordContainer}>
             <TextInput
@@ -154,9 +175,19 @@ export const LoginScreen: React.FC = () => {
               placeholder="Nhập mật khẩu..."
               placeholderTextColor={THEME.colors.text.muted}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                setFormErrors((current) => ({
+                  ...current,
+                  password: value.length > 256 ? 'Mật khẩu không được vượt quá 256 ký tự.' : undefined,
+                }));
+              }}
+              onBlur={() => {
+                if (!password) setFormErrors((current) => ({ ...current, password: 'Mật khẩu là bắt buộc.' }));
+              }}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
+              maxLength={257}
             />
             <TouchableOpacity
               onPress={() => setShowPassword(!showPassword)}
@@ -170,12 +201,13 @@ export const LoginScreen: React.FC = () => {
               )}
             </TouchableOpacity>
           </View>
+          <FormFieldError message={formErrors.password} />
         </View>
 
         <TouchableOpacity
-          style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+          style={[styles.loginButton, loginDisabled && styles.loginButtonDisabled]}
           onPress={handleLogin}
-          disabled={isLoading}
+          disabled={loginDisabled}
           activeOpacity={0.85}
         >
           {isLoading ? (

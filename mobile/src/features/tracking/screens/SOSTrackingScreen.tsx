@@ -15,14 +15,18 @@ import { goBackOrHome } from '../../../navigation/back';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { FormFieldError } from '../../../components/common/FormFieldError';
+import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { TimelineStep } from '../../../components/common/TimelineStep';
 import { ResponseApi } from '../../../api/responseApi';
 import { generateUUID, StorageService } from '../../../utils/secureStore';
 import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
+import { useAuthStore } from '../../../store/authStore';
 import { RequestTrackingDetail } from '../../../types/api';
 import { TIMELINE_EVENT_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
+import { getTrackingCodeError, getTrackingSecretError, isValidTrackingCode, isValidTrackingSecret } from '../../../utils/formValidation';
 import {
   RefreshCw,
   Copy,
@@ -33,10 +37,12 @@ import {
   ImageIcon,
   Video,
   X,
+  KeyRound,
 } from 'lucide-react-native';
 
 export const SOSTrackingScreen: React.FC = () => {
   const router = useRouter();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { trackingCode: routeCode } = useLocalSearchParams<{ trackingCode?: string }>();
   const initialCode = Array.isArray(routeCode) ? routeCode[0] : routeCode;
 
@@ -45,16 +51,26 @@ export const SOSTrackingScreen: React.FC = () => {
   const [data, setData] = useState<RequestTrackingDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(Boolean(initialCode));
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [trackingCodeError, setTrackingCodeError] = useState<string | undefined>();
+  const [trackingSecretError, setTrackingSecretError] = useState<string | undefined>();
 
   // State cho Modal bổ sung thông tin
   const [showSupplementModal, setShowSupplementModal] = useState<boolean>(false);
   const [supplementNote, setSupplementNote] = useState<string>('');
+  const [supplementError, setSupplementError] = useState<string | undefined>();
   const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isSubmittingSupplement, setIsSubmittingSupplement] = useState<boolean>(false);
   const [uploadedEvidence, setUploadedEvidence] = useState<{ uri: string; type: 'image' | 'video'; name: string }[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const initialFetchStarted = useRef(false);
   const evidenceIdempotencyKeys = useRef(new Map<string, string>());
+
+  // State cho Modal khôi phục mã tra cứu bị mất
+  const [showRecoveryModal, setShowRecoveryModal] = useState<boolean>(false);
+  const [recoveryTrackingCode, setRecoveryTrackingCode] = useState<string>('');
+  const [recoveryCode, setRecoveryCode] = useState<string>('');
+  const [recoveryErrors, setRecoveryErrors] = useState<Record<string, string | undefined>>({});
+  const [isRecovering, setIsRecovering] = useState<boolean>(false);
 
   const pickImage = async () => {
     try {
@@ -64,6 +80,7 @@ export const SOSTrackingScreen: React.FC = () => {
       });
       if (!result.canceled && result.assets[0]) {
         setSelectedImage(result.assets[0]);
+        setSupplementError(supplementNote.length > 2000 ? 'Ghi chú không được vượt quá 2.000 ký tự.' : undefined);
       }
     } catch {
       Alert.alert('Thông báo', 'Không thể mở thư viện ảnh.');
@@ -83,6 +100,7 @@ export const SOSTrackingScreen: React.FC = () => {
       });
       if (!result.canceled && result.assets[0]) {
         setSelectedImage(result.assets[0]);
+        setSupplementError(supplementNote.length > 2000 ? 'Ghi chú không được vượt quá 2.000 ký tự.' : undefined);
       }
     } catch {
       Alert.alert('Thông báo', 'Không thể mở máy ảnh.');
@@ -90,10 +108,17 @@ export const SOSTrackingScreen: React.FC = () => {
   };
 
   const fetchTrackingData = useCallback(async () => {
-    if (!trackingCode.trim()) {
+    const normalizedCode = trackingCode.trim().toUpperCase();
+    if (!normalizedCode) {
       setLoading(false);
-      setErrorMsg(null);
       setData(null);
+      setErrorMsg('Vui lòng nhập mã tra cứu cứu trợ.');
+      return;
+    }
+    if (!isValidTrackingCode(normalizedCode)) {
+      setLoading(false);
+      setData(null);
+      setErrorMsg('Mã tra cứu phải gồm đúng 10 ký tự hợp lệ.');
       return;
     }
     setLoading(true);
@@ -102,14 +127,26 @@ export const SOSTrackingScreen: React.FC = () => {
       // Nếu chưa có secret thì thử lấy từ SecureStore của máy
       let secret: string | undefined = trackingSecret;
       if (!secret) {
-        const found = await StorageService.getSecretForTrackingCode(trackingCode);
+        const found = await StorageService.getSecretForTrackingCode(normalizedCode);
         if (found) {
           secret = found;
           setTrackingSecret(found);
         }
       }
 
-      const normalizedCode = trackingCode.trim().toUpperCase();
+      if (!isAuthenticated && !secret) {
+        setLoading(false);
+        setData(null);
+        setErrorMsg('Vui lòng nhập khóa bí mật đã được cấp khi gửi yêu cầu.');
+        return;
+      }
+      if (secret && !isValidTrackingSecret(secret)) {
+        setLoading(false);
+        setData(null);
+        setErrorMsg('Khóa bí mật không đúng định dạng. Hãy kiểm tra hoặc khôi phục quyền truy cập.');
+        return;
+      }
+      setTrackingCode(normalizedCode);
       const result = await ResponseApi.trackRequest(normalizedCode, secret);
       if (secret) {
         try {
@@ -136,7 +173,7 @@ export const SOSTrackingScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [trackingCode, trackingSecret]);
+  }, [trackingCode, trackingSecret, isAuthenticated]);
 
   useEffect(() => {
     if (initialCode && !initialFetchStarted.current) {
@@ -147,6 +184,7 @@ export const SOSTrackingScreen: React.FC = () => {
 
   const openSupplementModal = async () => {
     if (!data) return;
+    setSupplementError(undefined);
     try {
       const pending = await StorageService.getPendingSupplement(data.id);
       if (pending) {
@@ -167,13 +205,18 @@ export const SOSTrackingScreen: React.FC = () => {
   };
 
   const handleSupplementSubmit = async () => {
-    if (!supplementNote.trim() && !selectedImage) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập ghi chú hoặc đính kèm ảnh hiện trường.');
+    const note = supplementNote.trim();
+    if (!note && !selectedImage) {
+      setSupplementError('Nhập ghi chú hoặc đính kèm ảnh hiện trường.');
       return;
     }
+    if (note.length > 2000) {
+      setSupplementError('Ghi chú không được vượt quá 2.000 ký tự.');
+      return;
+    }
+    setSupplementError(undefined);
     if (!data) return;
 
-    const note = supplementNote.trim();
     const image = selectedImage;
     let noteSent = false;
     let evidenceSent = false;
@@ -196,13 +239,23 @@ export const SOSTrackingScreen: React.FC = () => {
           description: note,
         };
         const pending = await StorageService.getOrCreatePendingSupplement(data.id, payload);
-        await ResponseApi.updateReport(
-          data.id,
-          pending.payload,
-          trackingCode,
-          secret,
-          pending.idempotencyKey
-        );
+        if (data.status === 'SUBMITTED') {
+          await ResponseApi.updateReport(
+            data.id,
+            pending.payload,
+            trackingCode,
+            secret,
+            pending.idempotencyKey
+          );
+        } else {
+          await ResponseApi.supplementRequest(
+            data.id,
+            pending.payload,
+            trackingCode,
+            secret,
+            pending.idempotencyKey
+          );
+        }
         noteSent = true;
         setSupplementNote('');
         try {
@@ -295,6 +348,46 @@ export const SOSTrackingScreen: React.FC = () => {
     }
   };
 
+  const handleRecoverSubmit = async () => {
+    const code = recoveryTrackingCode.trim().toUpperCase();
+    const token = recoveryCode.trim();
+    const errors: Record<string, string> = {};
+    if (!code) errors.trackingCode = 'Vui lòng nhập mã tra cứu.';
+    else if (!isValidTrackingCode(code)) errors.trackingCode = 'Mã tra cứu phải gồm đúng 10 ký tự hợp lệ.';
+    if (!token) errors.recoveryCode = 'Vui lòng nhập mã khôi phục.';
+    else if (!isValidTrackingSecret(token)) errors.recoveryCode = 'Mã khôi phục phải gồm đúng 43 ký tự hợp lệ.';
+    setRecoveryErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Yêu cầu đăng nhập',
+        'Bạn cần đăng nhập tài khoản trước khi thực hiện khôi phục để liên kết yêu cầu cứu trợ vào hồ sơ cá nhân.',
+        [
+          { text: 'Hủy', style: 'cancel' },
+          { text: 'Đăng nhập', onPress: () => router.push('/login') },
+        ]
+      );
+      return;
+    }
+
+    setIsRecovering(true);
+    try {
+      const result = await ResponseApi.recoverRequest(code, token);
+      setShowRecoveryModal(false);
+      setRecoveryCode('');
+      setTrackingCode(result.tracking_code || code);
+      setTrackingSecret('');
+      Alert.alert('Thành công', 'Yêu cầu cứu trợ đã được khôi phục và liên kết thành công vào tài khoản của bạn.');
+      await fetchTrackingData();
+    } catch (err: any) {
+      Alert.alert('Không thể khôi phục', getApiErrorMessage(err, 'Mã khôi phục không hợp lệ hoặc đã hết hiệu lực.'));
+    } finally {
+      setIsRecovering(false);
+    }
+  };
+
   const copyCodeToClipboard = async () => {
     const code = data?.tracking_code || trackingCode;
     if (!code) return;
@@ -305,6 +398,13 @@ export const SOSTrackingScreen: React.FC = () => {
       Alert.alert('Không thể sao chép', 'Vui lòng thử lại.');
     }
   };
+
+  const lookupDisabled = loading || trackingCode.length > 10 || trackingSecret.length > 43 || !isValidTrackingCode(trackingCode) ||
+    (trackingSecret.length > 0 && !isValidTrackingSecret(trackingSecret)) ||
+    (!isAuthenticated && !isValidTrackingSecret(trackingSecret));
+  const supplementSubmitDisabled = isSubmittingSupplement || (!supplementNote.trim() && !selectedImage) || supplementNote.length > 2000;
+  const recoverySubmitDisabled = isRecovering || recoveryTrackingCode.length > 10 || recoveryCode.length > 43 ||
+    !isValidTrackingCode(recoveryTrackingCode) || !isValidTrackingSecret(recoveryCode);
 
   return (
     <ScreenContainer
@@ -320,28 +420,86 @@ export const SOSTrackingScreen: React.FC = () => {
       {!data && !loading ? (
         <View style={styles.lookupCard}>
           <Text style={styles.lookupTitle}>Tra cứu yêu cầu cứu trợ</Text>
+          <Text style={styles.inputLabel}>Mã tra cứu <RequiredAsterisk /></Text>
           <TextInput
             style={styles.lookupInput}
             placeholder="Mã tra cứu"
             placeholderTextColor={THEME.colors.text.muted}
             value={trackingCode}
-            onChangeText={(value) => setTrackingCode(value.toUpperCase())}
+            onChangeText={(value) => {
+              const normalized = value.toUpperCase();
+              setTrackingCode(normalized);
+              setTrackingCodeError(getTrackingCodeError(normalized));
+              setErrorMsg(null);
+            }}
+            onBlur={async () => {
+              const code = trackingCode.trim().toUpperCase();
+              if (!code) {
+                setTrackingCodeError('Mã tra cứu là bắt buộc.');
+              } else if (!isValidTrackingCode(code)) {
+                setTrackingCodeError(getTrackingCodeError(code));
+              } else if (!isAuthenticated && !trackingSecret.trim()) {
+                setTrackingCodeError(undefined);
+                try {
+                  const savedSecret = await StorageService.getSecretForTrackingCode(code);
+                  if (savedSecret) {
+                    setTrackingSecret(savedSecret);
+                    setTrackingSecretError(undefined);
+                    setErrorMsg(null);
+                  }
+                } catch {
+                  setErrorMsg('Không thể đọc khóa bí mật đã lưu trên thiết bị.');
+                }
+              } else {
+                setTrackingCodeError(undefined);
+              }
+            }}
             autoCapitalize="characters"
             autoCorrect={false}
+            maxLength={11}
           />
+          <FormFieldError message={trackingCodeError} />
+          <Text style={styles.inputLabel}>
+            Khóa bí mật{isAuthenticated ? ' (nếu có)' : ' '}
+            {!isAuthenticated ? <RequiredAsterisk /> : null}
+          </Text>
           <TextInput
             style={styles.lookupInput}
-            placeholder="Khóa bí mật (nếu có)"
+            placeholder="Khóa bí mật (bắt buộc nếu chưa đăng nhập)"
             placeholderTextColor={THEME.colors.text.muted}
             value={trackingSecret}
-            onChangeText={setTrackingSecret}
+            onChangeText={(value) => {
+              setTrackingSecret(value);
+              setTrackingSecretError(getTrackingSecretError(value));
+              setErrorMsg(null);
+            }}
+            onBlur={() => {
+              if (!isAuthenticated && !trackingSecret.trim()) setTrackingSecretError('Khóa bí mật là bắt buộc khi chưa đăng nhập.');
+              else setTrackingSecretError(getTrackingSecretError(trackingSecret));
+            }}
             autoCapitalize="none"
             autoCorrect={false}
+            maxLength={44}
             secureTextEntry
           />
-          {errorMsg ? <Text style={styles.errorCardDesc}>{errorMsg}</Text> : null}
-          <TouchableOpacity style={styles.retryBtn} onPress={fetchTrackingData}>
+          <FormFieldError message={trackingSecretError} />
+          <FormFieldError message={errorMsg ?? undefined} />
+          <TouchableOpacity
+            style={[styles.retryBtn, lookupDisabled && { opacity: 0.5 }]}
+            onPress={fetchTrackingData}
+            disabled={lookupDisabled}
+          >
             <Text style={styles.retryBtnText}>Tra cứu</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.recoveryLinkBtn}
+            onPress={() => {
+              setRecoveryTrackingCode(trackingCode);
+              setShowRecoveryModal(true);
+            }}
+          >
+            <KeyRound size={16} color={THEME.colors.primary.main} style={{ marginRight: 6 }} />
+            <Text style={styles.recoveryLinkText}>Mất khóa bí mật? Khôi phục bằng mã hỗ trợ</Text>
           </TouchableOpacity>
         </View>
       ) : loading ? (
@@ -356,6 +514,16 @@ export const SOSTrackingScreen: React.FC = () => {
           <Text style={styles.errorCardDesc}>{errorMsg}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={fetchTrackingData}>
             <Text style={styles.retryBtnText}>Thử lại</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.recoveryLinkBtn, { marginTop: 12 }]}
+            onPress={() => {
+              setRecoveryTrackingCode(trackingCode);
+              setShowRecoveryModal(true);
+            }}
+          >
+            <KeyRound size={16} color={THEME.colors.primary.main} style={{ marginRight: 6 }} />
+            <Text style={styles.recoveryLinkText}>Khôi phục quyền truy cập bằng mã hỗ trợ</Text>
           </TouchableOpacity>
         </View>
       ) : data ? (
@@ -518,15 +686,27 @@ export const SOSTrackingScreen: React.FC = () => {
               Thông tin sẽ được cập nhật trực tiếp đến điều phối viên phụ trách:
             </Text>
 
+            <Text style={styles.inputLabel}>Ghi chú hiện trường (hoặc đính kèm ảnh) <RequiredAsterisk /></Text>
             <TextInput
               style={styles.modalInput}
               placeholder="Ví dụ: Nước đã dâng thêm 30cm, pin sắp hết..."
               placeholderTextColor={THEME.colors.text.muted}
               value={supplementNote}
-              onChangeText={setSupplementNote}
+              onChangeText={(value) => {
+                setSupplementNote(value);
+                setSupplementError(value.length > 2000
+                  ? 'Ghi chú không được vượt quá 2.000 ký tự.'
+                  : undefined);
+              }}
+              onBlur={() => {
+                if (!supplementNote.trim() && !selectedImage) setSupplementError('Ghi chú hoặc ảnh hiện trường là bắt buộc.');
+                else if (supplementNote.length > 2000) setSupplementError('Ghi chú không được vượt quá 2.000 ký tự.');
+              }}
               multiline={true}
               numberOfLines={4}
+              maxLength={2001}
             />
+            <FormFieldError message={supplementError} />
 
             {/* Đính kèm ảnh hiện trường */}
             <View style={styles.imagePickerSection}>
@@ -556,7 +736,10 @@ export const SOSTrackingScreen: React.FC = () => {
                   )}
                   <TouchableOpacity
                     style={styles.removeImageBtn}
-                    onPress={() => setSelectedImage(null)}
+                    onPress={() => {
+                      setSelectedImage(null);
+                      if (!supplementNote.trim()) setSupplementError('Ghi chú hoặc ảnh hiện trường là bắt buộc.');
+                    }}
                     activeOpacity={0.8}
                   >
                     <X size={14} color="#FFFFFF" />
@@ -573,9 +756,9 @@ export const SOSTrackingScreen: React.FC = () => {
                 <Text style={styles.modalCancelText}>Hủy Bỏ</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, isSubmittingSupplement && { opacity: 0.6 }]}
+                style={[styles.modalSubmitBtn, supplementSubmitDisabled && { opacity: 0.6 }]}
                 onPress={handleSupplementSubmit}
-                disabled={isSubmittingSupplement}
+                disabled={supplementSubmitDisabled}
               >
                 {isSubmittingSupplement ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
@@ -587,6 +770,96 @@ export const SOSTrackingScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* MODAL KHÔI PHỤC MÃ TRA CỨU */}
+      <Modal visible={showRecoveryModal} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>KHÔI PHỤC QUYỀN TRUY CẬP</Text>
+            <Text style={styles.modalSubtitle}>
+              Nhập mã khôi phục được điều phối viên cấp để liên kết hồ sơ cứu nạn vào tài khoản đã đăng nhập của bạn:
+            </Text>
+
+            <Text style={styles.inputLabel}>MÃ TRA CỨU CỨU TRỢ (10 KÝ TỰ) <RequiredAsterisk /></Text>
+            <TextInput
+              style={styles.modalInputSingle}
+              placeholder="Ví dụ: AB12CD34EF"
+              placeholderTextColor={THEME.colors.text.muted}
+              value={recoveryTrackingCode}
+              onChangeText={(v) => {
+                const normalized = v.toUpperCase();
+                setRecoveryTrackingCode(normalized);
+                setRecoveryErrors((current) => ({
+                  ...current,
+                  trackingCode: getTrackingCodeError(normalized, 'Mã tra cứu cứu trợ'),
+                }));
+              }}
+              onBlur={() => {
+                setRecoveryErrors((current) => ({
+                  ...current,
+                  trackingCode: !recoveryTrackingCode.trim()
+                    ? 'Mã tra cứu cứu trợ là bắt buộc.'
+                    : getTrackingCodeError(recoveryTrackingCode, 'Mã tra cứu cứu trợ'),
+                }));
+              }}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={11}
+            />
+            <FormFieldError message={recoveryErrors.trackingCode} />
+
+            <Text style={styles.inputLabel}>MÃ KHÔI PHỤC BÍ MẬT (43 KÝ TỰ) <RequiredAsterisk /></Text>
+            <TextInput
+              style={styles.modalInputSingle}
+              placeholder="Mã một lần do điều phối viên cấp"
+              placeholderTextColor={THEME.colors.text.muted}
+              value={recoveryCode}
+              onChangeText={(value) => {
+                setRecoveryCode(value);
+                setRecoveryErrors((current) => ({
+                  ...current,
+                  recoveryCode: getTrackingSecretError(value, 'Mã khôi phục bí mật'),
+                }));
+              }}
+              onBlur={() => {
+                setRecoveryErrors((current) => ({
+                  ...current,
+                  recoveryCode: !recoveryCode.trim()
+                    ? 'Mã khôi phục bí mật là bắt buộc.'
+                    : getTrackingSecretError(recoveryCode, 'Mã khôi phục bí mật'),
+                }));
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={44}
+              secureTextEntry
+            />
+            <FormFieldError message={recoveryErrors.recoveryCode} />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setShowRecoveryModal(false)}
+                disabled={recoverySubmitDisabled}
+              >
+                <Text style={styles.modalCancelText}>Hủy Bỏ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmitBtn, recoverySubmitDisabled && { opacity: 0.6 }]}
+                onPress={handleRecoverSubmit}
+                disabled={isRecovering}
+              >
+                {isRecovering ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Xác Nhận Khôi Phục</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* MODAL XEM ẢNH HIỆN TRƯỜNG PHÓNG TO */}
       <Modal visible={!!previewImage} transparent={true} animationType="fade">
         <View style={styles.imageViewerOverlay}>
@@ -1024,5 +1297,34 @@ const styles = StyleSheet.create({
   fullPreviewImage: {
     width: '100%',
     height: '80%',
+  },
+  recoveryLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+    paddingVertical: 8,
+  },
+  recoveryLinkText: {
+    fontSize: THEME.typography.fontSizes.sm,
+    color: THEME.colors.primary.main,
+    fontWeight: '600',
+  },
+  inputLabel: {
+    fontSize: THEME.typography.fontSizes.xs,
+    fontWeight: '700',
+    color: THEME.colors.text.secondary,
+    marginTop: 12,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  modalInputSingle: {
+    backgroundColor: THEME.colors.surface.background,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: THEME.typography.fontSizes.sm,
+    color: THEME.colors.text.primary,
   },
 });

@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { NativeLoginResponse, User, RoleGrant } from '../types/api';
+import { NativeLoginResponse, User, RoleGrant, RegionItem } from '../types/api';
 import { StorageService } from '../utils/secureStore';
 
 export const IdentityApi = {
@@ -96,5 +96,19 @@ export const IdentityApi = {
     } finally {
       await StorageService.clearTokens();
     }
+  },
+
+  // Liên kết tài khoản Google cho phiên đang đăng nhập (POST /identity/auth/google/link)
+  async linkGoogle(idToken: string): Promise<{ linked: true }> {
+    const response = await apiClient.post<{ linked: true }>('/identity/auth/google/link', {
+      id_token: idToken,
+    });
+    return response.data;
+  },
+
+  // Danh mục khu vực hành chính (GET /identity/regions)
+  async getRegions(): Promise<{ items: RegionItem[]; next_cursor?: string }> {
+    const response = await apiClient.get<{ items: RegionItem[]; next_cursor?: string }>('/identity/regions');
+    return response.data;
   },
 };
