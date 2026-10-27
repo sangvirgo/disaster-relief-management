@@ -205,7 +205,7 @@ services:
       INTROSPECT_TIMEOUT_MS: '${INTROSPECT_TIMEOUT_MS:-500}'
       DEMO_INTAKE_ORGANIZATION_ID: '${DEMO_INTAKE_ORGANIZATION_ID:?Set DEMO_INTAKE_ORGANIZATION_ID in backend/.env}'
       GEMINI_API_KEY: '${GEMINI_API_KEY:-}'
-      GEMINI_MODEL: '${GEMINI_MODEL:-gemini-3.1-flash-lite}'
+      GEMINI_MODEL: '${GEMINI_MODEL:-gemini-3.5-flash-lite}'
     ports:
       - '127.0.0.1:3002:3002'
     depends_on:

@@ -23,6 +23,19 @@ describe('advisory input identity and review', () => {
     expect((query.mock.calls[1] as unknown as [string, unknown[]])[1].slice(0, 3)).toEqual(['request', 4, aiAssessmentHash(facts, 4, 1)]);
   });
 
+  it('defaults new advisory jobs to Gemini 3.5 Flash-Lite', async () => {
+    const previousModel = process.env.GEMINI_MODEL;
+    delete process.env.GEMINI_MODEL;
+    try {
+      const query = jest.fn(async (sql: string) => sql.includes('SELECT r.version') ? [facts] : []);
+      await enqueueAiAdvisory({ query } as never, 'request');
+      expect((query.mock.calls[1] as unknown as [string, unknown[]])[1][3]).toBe('gemini-3.5-flash-lite');
+    } finally {
+      if (previousModel === undefined) delete process.env.GEMINI_MODEL;
+      else process.env.GEMINI_MODEL = previousModel;
+    }
+  });
+
   it.each(['changed', 'superseded', 'version', 'cycle'])('rejects %s advisory review before writing history', async (condition) => {
     const advisory = { id: 'advisory', status: 'COMPLETED', review_status: null, request_version: 4,
       input_hash: aiAssessmentHash(condition === 'changed' ? { ...facts, peopleAffected: 20 } : facts, 4, 1),

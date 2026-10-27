@@ -3,7 +3,7 @@ import { aiPriorityAdvisory } from '../src/ai/ai-priority-advisory';
 describe('AI priority advisory view', () => {
   it('maps Gemini priority into a separate human-reviewed advisory', () => {
     expect(aiPriorityAdvisory({
-      model: 'gemini-3.1-flash-lite',
+      model: 'gemini-3.5-flash-lite',
       status: 'COMPLETED',
       extracted_json: { priority_score: 74, priority_reasons: ['Có dấu hiệu cháy lan.'], confidence: 0.82 },
       review_status: null,
@@ -21,7 +21,7 @@ describe('AI priority advisory view', () => {
 
   it('labels seeded samples as fixtures and omits invalid provider scores', () => {
     expect(aiPriorityAdvisory({
-      model: 'demo-fixture:gemini-3.1-flash-lite',
+      model: 'demo-fixture:gemini-3.5-flash-lite',
       status: 'COMPLETED',
       extracted_json: { priority_score: 101, priority_reasons: ['demo'] },
       review_status: 'ACCEPTED',

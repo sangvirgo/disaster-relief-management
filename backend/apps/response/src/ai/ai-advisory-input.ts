@@ -43,6 +43,6 @@ export async function enqueueAiAdvisory(manager: Pick<EntityManager, 'query'>, r
     `INSERT INTO ai_advisory (request_id,request_version,input_hash,model,prompt_version,schema_version,risk_score,reason_codes)
      VALUES ($1,$2,$3,$4,'v3','v3',$5,$6) ON CONFLICT (request_id,input_hash) DO NOTHING`,
     [requestId, Number(facts.version), aiAssessmentHash(facts, facts.version, facts.workCycle),
-      process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite', risk.score, risk.reasonCodes],
+      process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite', risk.score, risk.reasonCodes],
   );
 }
