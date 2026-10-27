@@ -9,6 +9,8 @@ import {
   TextInput,
   Modal,
   Image,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
@@ -27,6 +29,7 @@ import { RequestTrackingDetail } from '../../../types/api';
 import { TIMELINE_EVENT_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
 import { getTrackingCodeError, getTrackingSecretError, isValidTrackingCode, isValidTrackingSecret } from '../../../utils/formValidation';
+import { getEvidenceSizeLimitBytes, getSupportedEvidenceMimeType } from '../../../utils/evidence';
 import {
   RefreshCw,
   Copy,
@@ -39,6 +42,8 @@ import {
   X,
   KeyRound,
 } from 'lucide-react-native';
+
+const MAX_EVIDENCE_FILES_PER_REQUEST = 5;
 
 export const SOSTrackingScreen: React.FC = () => {
   const router = useRouter();
@@ -61,7 +66,7 @@ export const SOSTrackingScreen: React.FC = () => {
   const [showSupplementModal, setShowSupplementModal] = useState<boolean>(false);
   const [supplementNote, setSupplementNote] = useState<string>('');
   const [supplementError, setSupplementError] = useState<string | undefined>();
-  const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [isSubmittingSupplement, setIsSubmittingSupplement] = useState<boolean>(false);
   const [uploadedEvidence, setUploadedEvidence] = useState<{ uri: string; type: 'image' | 'video'; name: string }[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -75,18 +80,76 @@ export const SOSTrackingScreen: React.FC = () => {
   const [recoveryErrors, setRecoveryErrors] = useState<Record<string, string | undefined>>({});
   const [isRecovering, setIsRecovering] = useState<boolean>(false);
 
+  const addSelectedEvidence = (assets: ImagePicker.ImagePickerAsset[]) => {
+    const existingUris = new Set(selectedImages.map((asset) => asset.uri));
+    const availableSlots = MAX_EVIDENCE_FILES_PER_REQUEST - selectedImages.length;
+    const acceptedAssets: ImagePicker.ImagePickerAsset[] = [];
+    let unsupportedCount = 0;
+    let oversizedCount = 0;
+    let limitExceeded = false;
+
+    for (const asset of assets) {
+      if (existingUris.has(asset.uri) || acceptedAssets.some((item) => item.uri === asset.uri)) continue;
+      const mimeType = getSupportedEvidenceMimeType(asset);
+      if (!mimeType) {
+        unsupportedCount += 1;
+        continue;
+      }
+      if (asset.fileSize !== undefined && asset.fileSize > getEvidenceSizeLimitBytes(mimeType)) {
+        oversizedCount += 1;
+        continue;
+      }
+      if (acceptedAssets.length >= availableSlots) {
+        limitExceeded = true;
+        continue;
+      }
+      acceptedAssets.push(asset);
+    }
+
+    if (acceptedAssets.length > 0) {
+      setSelectedImages((current) => {
+        const currentUris = new Set(current.map((asset) => asset.uri));
+        const newAssets = acceptedAssets.filter((asset) => !currentUris.has(asset.uri));
+        return [...current, ...newAssets].slice(0, MAX_EVIDENCE_FILES_PER_REQUEST);
+      });
+      if (!supplementNote.trim()) setSupplementError(undefined);
+    }
+
+    const warnings: string[] = [];
+    if (unsupportedCount > 0) warnings.push(`${unsupportedCount} tệp không đúng định dạng JPEG, PNG hoặc MP4.`);
+    if (oversizedCount > 0) warnings.push(`${oversizedCount} tệp vượt giới hạn dung lượng.`);
+    if (limitExceeded) warnings.push(`Mỗi hồ sơ chỉ đính kèm tối đa ${MAX_EVIDENCE_FILES_PER_REQUEST} tệp.`);
+    if (warnings.length > 0) {
+      Alert.alert('Một số tệp chưa được thêm', warnings.join('\n'));
+    }
+  };
+
   const pickImage = async () => {
+    const availableSlots = MAX_EVIDENCE_FILES_PER_REQUEST - selectedImages.length;
+    if (availableSlots <= 0) {
+      Alert.alert('Đã đủ số tệp', `Mỗi hồ sơ chỉ đính kèm tối đa ${MAX_EVIDENCE_FILES_PER_REQUEST} tệp.`);
+      return;
+    }
     try {
+      if (Platform.OS === 'ios') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Cần quyền thư viện', 'Hãy cho phép truy cập thư viện để chọn ảnh hoặc video.');
+          return;
+        }
+      }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images', 'videos'],
+        allowsMultipleSelection: true,
+        selectionLimit: availableSlots,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
         quality: 0.8,
       });
-      if (!result.canceled && result.assets[0]) {
-        setSelectedImage(result.assets[0]);
-        setSupplementError(supplementNote.length > 2000 ? 'Ghi chú không được vượt quá 2.000 ký tự.' : undefined);
+      if (!result.canceled && result.assets.length > 0) {
+        addSelectedEvidence(result.assets);
       }
     } catch {
-      Alert.alert('Thông báo', 'Không thể mở thư viện ảnh.');
+      Alert.alert('Thông báo', 'Không thể mở thư viện ảnh và video.');
     }
   };
 
@@ -102,8 +165,7 @@ export const SOSTrackingScreen: React.FC = () => {
         quality: 0.8,
       });
       if (!result.canceled && result.assets[0]) {
-        setSelectedImage(result.assets[0]);
-        setSupplementError(supplementNote.length > 2000 ? 'Ghi chú không được vượt quá 2.000 ký tự.' : undefined);
+        addSelectedEvidence([result.assets[0]]);
       }
     } catch {
       Alert.alert('Thông báo', 'Không thể mở máy ảnh.');
@@ -142,7 +204,7 @@ export const SOSTrackingScreen: React.FC = () => {
       if (!isAuthenticated && !secret) {
         setLoading(false);
         setData(null);
-        setErrorMsg('Vui lòng nhập khóa bí mật đã được cấp khi gửi yêu cầu.');
+        setErrorMsg(null);
         return;
       }
       if (secret && !isValidTrackingSecret(secret)) {
@@ -232,8 +294,8 @@ export const SOSTrackingScreen: React.FC = () => {
 
   const handleSupplementSubmit = async () => {
     const note = supplementNote.trim();
-    if (!note && !selectedImage) {
-      setSupplementError('Nhập ghi chú hoặc đính kèm ảnh hiện trường.');
+    if (!note && selectedImages.length === 0) {
+      setSupplementError('Nhập ghi chú hoặc đính kèm ảnh/video hiện trường.');
       return;
     }
     if (note.length > 2000) {
@@ -243,9 +305,9 @@ export const SOSTrackingScreen: React.FC = () => {
     setSupplementError(undefined);
     if (!data) return;
 
-    const image = selectedImage;
+    const images = selectedImages;
     let noteSent = false;
-    let evidenceSent = false;
+    let uploadedCount = 0;
     setIsSubmittingSupplement(true);
     try {
       // Đảm bảo có trackingSecret từ state hoặc StorageService
@@ -291,25 +353,15 @@ export const SOSTrackingScreen: React.FC = () => {
         }
       }
 
-      // Tải ảnh riêng; nếu thất bại sau khi ghi chú thành công, lần sau chỉ gửi ảnh.
-      if (image) {
+      // Upload each media file separately so successful files do not need to be retried.
+      for (const image of images) {
         const uri = image.uri;
         const fileName = image.fileName || uri.split('/').pop() || 'evidence.jpg';
-        const extension = /\.(\w+)$/.exec(fileName)?.[1]?.toLowerCase();
-        const extensionMimeType = extension === 'jpg' || extension === 'jpeg'
-          ? 'image/jpeg'
-          : extension === 'png'
-            ? 'image/png'
-            : extension === 'mp4'
-              ? 'video/mp4'
-              : undefined;
-        const supportedMimeTypes = ['image/jpeg', 'image/png', 'video/mp4'];
-        const type = image.mimeType || extensionMimeType;
-        if (!type || !supportedMimeTypes.includes(type)) {
+        const type = getSupportedEvidenceMimeType(image);
+        if (!type) {
           throw new Error('UNSUPPORTED_EVIDENCE_TYPE');
         }
-        const sizeLimit = type === 'video/mp4' ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
-        if (image.fileSize !== undefined && image.fileSize > sizeLimit) {
+        if (image.fileSize !== undefined && image.fileSize > getEvidenceSizeLimitBytes(type)) {
           throw new Error('EVIDENCE_FILE_TOO_LARGE');
         }
         const key = `${data.id}:${uri}`;
@@ -319,29 +371,41 @@ export const SOSTrackingScreen: React.FC = () => {
           evidenceIdempotencyKeys.current.set(key, idempotencyKey);
         }
 
-        await ResponseApi.uploadEvidence(
-          data.id,
-          { uri, name: fileName, type },
-          trackingCode,
-          secret,
-          idempotencyKey
-        );
-        evidenceSent = true;
+        try {
+          await ResponseApi.uploadEvidence(
+            data.id,
+            { uri, name: fileName, type },
+            trackingCode,
+            secret,
+            idempotencyKey
+          );
+        } catch (uploadError) {
+          if (isApiErrorCode(uploadError, 'STORAGE_UNAVAILABLE')) {
+            // The backend records this attachment as FAILED; retry it with a fresh key.
+            evidenceIdempotencyKeys.current.delete(key);
+          }
+          throw uploadError;
+        }
+
         evidenceIdempotencyKeys.current.delete(key);
+        uploadedCount += 1;
         setUploadedEvidence((prev) => [
           { uri, type: type === 'video/mp4' ? 'video' : 'image', name: fileName },
           ...prev,
         ]);
-        setSelectedImage(null);
+        setSelectedImages((current) => current.filter((asset) => asset.uri !== uri));
       }
 
       await fetchTrackingData();
       setShowSupplementModal(false);
-      const successMessage = noteSent && evidenceSent
-        ? 'Đã gửi ghi chú và tải ảnh hiện trường lên.'
+      const evidenceMessage = images.length > 0
+        ? `Đã tải lên ${uploadedCount} tệp bằng chứng hiện trường.`
+        : '';
+      const successMessage = noteSent && evidenceMessage
+        ? `Đã gửi ghi chú. ${evidenceMessage}`
         : noteSent
           ? 'Đã gửi ghi chú hiện trường.'
-          : 'Đã tải ảnh hiện trường lên.';
+          : evidenceMessage;
       Alert.alert('Thành công', successMessage);
     } catch (err: any) {
       if (isApiErrorCode(err, 'VERSION_CONFLICT')) {
@@ -358,16 +422,26 @@ export const SOSTrackingScreen: React.FC = () => {
             ? 'Định dạng tệp chưa được hỗ trợ. Vui lòng chọn ảnh JPEG, PNG hoặc video MP4.'
           : err instanceof Error && err.message === 'EVIDENCE_FILE_TOO_LARGE'
             ? 'Tệp vượt giới hạn tải lên: ảnh tối đa 10 MB, video MP4 tối đa 50 MB.'
+            : isApiErrorCode(err, 'EVIDENCE_LIMIT_REACHED')
+              ? `Hồ sơ đã đạt giới hạn ${MAX_EVIDENCE_FILES_PER_REQUEST} tệp bằng chứng.`
             : null;
       const failureMessage = localMessage || getApiErrorMessage(err, 'Không thể gửi bổ sung thông tin.');
-      if (noteSent) {
+      if (noteSent || uploadedCount > 0) {
         await fetchTrackingData();
+        const pendingCount = images.length - uploadedCount;
+        const sentMessage = uploadedCount > 0
+          ? `Đã tải lên ${uploadedCount}/${images.length} tệp. `
+          : '';
+        const pendingMessage = pendingCount > 0
+          ? `${pendingCount} tệp chưa gửi vẫn được giữ để bạn thử lại.`
+          : 'Các tệp đã tải lên thành công.';
         Alert.alert(
-          'Ghi chú đã được gửi',
-          `Ảnh chưa tải lên. Hãy gửi lại ảnh đã chọn. ${failureMessage}`
+          noteSent ? 'Ghi chú đã được gửi' : 'Đã tải một phần bằng chứng',
+          `${noteSent ? 'Ghi chú đã được gửi. ' : ''}${sentMessage}${pendingMessage} ${failureMessage}`
         );
       } else {
-        Alert.alert('Lỗi', failureMessage);
+        const retainedMessage = images.length > 0 ? ' Tệp đã chọn vẫn được giữ để bạn thử lại.' : '';
+        Alert.alert('Lỗi', `${failureMessage}${retainedMessage}`);
       }
     } finally {
       setIsSubmittingSupplement(false);
@@ -428,7 +502,7 @@ export const SOSTrackingScreen: React.FC = () => {
   const lookupDisabled = loading || trackingCode.length > 10 || trackingSecret.length > 43 || !isValidTrackingCode(trackingCode) ||
     (trackingSecret.length > 0 && !isValidTrackingSecret(trackingSecret)) ||
     (!isAuthenticated && !isValidTrackingSecret(trackingSecret));
-  const supplementSubmitDisabled = isSubmittingSupplement || (!supplementNote.trim() && !selectedImage) || supplementNote.length > 2000;
+  const supplementSubmitDisabled = isSubmittingSupplement || (!supplementNote.trim() && selectedImages.length === 0) || supplementNote.length > 2000;
   const recoverySubmitDisabled = isRecovering || recoveryTrackingCode.length > 10 || recoveryCode.length > 43 ||
     !isValidTrackingCode(recoveryTrackingCode) || !isValidTrackingSecret(recoveryCode);
 
@@ -446,6 +520,14 @@ export const SOSTrackingScreen: React.FC = () => {
       {!data && !loading ? (
         <View style={styles.lookupCard}>
           <Text style={styles.lookupTitle}>Tra cứu yêu cầu cứu trợ</Text>
+          {!isAuthenticated && !trackingSecret ? (
+            <View style={styles.lookupNotice}>
+              <KeyRound size={18} color={THEME.colors.primary.main} />
+              <Text style={styles.lookupNoticeText}>
+                Khách vãng lai cần nhập cả mã tra cứu và khóa bí mật đã được cấp. Mã từ trang trước mới chỉ được kiểm tra định dạng, chưa xác nhận hồ sơ tồn tại.
+              </Text>
+            </View>
+          ) : null}
           <Text style={styles.inputLabel}>Mã tra cứu <RequiredAsterisk /></Text>
           <TextInput
             style={styles.lookupInput}
@@ -725,7 +807,7 @@ export const SOSTrackingScreen: React.FC = () => {
               Thông tin sẽ được cập nhật trực tiếp đến điều phối viên phụ trách:
             </Text>
 
-            <Text style={styles.inputLabel}>Ghi chú hiện trường (hoặc đính kèm ảnh) <RequiredAsterisk /></Text>
+            <Text style={styles.inputLabel}>Ghi chú hiện trường (hoặc đính kèm ảnh/video) <RequiredAsterisk /></Text>
             <TextInput
               style={styles.modalInput}
               placeholder="Ví dụ: Nước đã dâng thêm 30cm, pin sắp hết..."
@@ -738,52 +820,89 @@ export const SOSTrackingScreen: React.FC = () => {
                   : undefined);
               }}
               onBlur={() => {
-                if (!supplementNote.trim() && !selectedImage) setSupplementError('Ghi chú hoặc ảnh hiện trường là bắt buộc.');
+                if (!supplementNote.trim() && selectedImages.length === 0) setSupplementError('Ghi chú hoặc ảnh/video hiện trường là bắt buộc.');
                 else if (supplementNote.length > 2000) setSupplementError('Ghi chú không được vượt quá 2.000 ký tự.');
               }}
               multiline={true}
               numberOfLines={4}
               maxLength={2001}
+              editable={!isSubmittingSupplement}
             />
             <FormFieldError message={supplementError} />
 
             {/* Đính kèm ảnh hiện trường */}
             <View style={styles.imagePickerSection}>
-              <Text style={styles.imagePickerLabel}>Đính kèm ảnh hoặc video bằng chứng hiện trường (nếu có):</Text>
+              <Text style={styles.imagePickerLabel}>Chọn tối đa {MAX_EVIDENCE_FILES_PER_REQUEST} ảnh/video bằng chứng hiện trường:</Text>
               <View style={styles.imageButtonRow}>
-                <TouchableOpacity style={styles.pickImageBtn} onPress={pickImage} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={[
+                    styles.pickImageBtn,
+                    (isSubmittingSupplement || selectedImages.length >= MAX_EVIDENCE_FILES_PER_REQUEST) && styles.disabledButton,
+                  ]}
+                  onPress={pickImage}
+                  activeOpacity={0.8}
+                  disabled={isSubmittingSupplement || selectedImages.length >= MAX_EVIDENCE_FILES_PER_REQUEST}
+                  accessibilityRole="button"
+                  accessibilityLabel="Chọn ảnh hoặc video từ thư viện"
+                >
                   <ImageIcon size={16} color={THEME.colors.primary.main} style={{ marginRight: 4 }} />
-                  <Text style={styles.pickImageText}>Thư viện ảnh/video</Text>
+                  <Text style={styles.pickImageText}>Chọn ảnh/video</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.pickImageBtn} onPress={takePhoto} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={[styles.pickImageBtn, isSubmittingSupplement && styles.disabledButton]}
+                  onPress={takePhoto}
+                  activeOpacity={0.8}
+                  disabled={isSubmittingSupplement || selectedImages.length >= MAX_EVIDENCE_FILES_PER_REQUEST}
+                  accessibilityRole="button"
+                  accessibilityLabel="Chụp ảnh hiện trường"
+                >
                   <Camera size={16} color={THEME.colors.primary.main} style={{ marginRight: 4 }} />
                   <Text style={styles.pickImageText}>Chụp ảnh mới</Text>
                 </TouchableOpacity>
               </View>
 
-              {selectedImage && (
-                <View style={styles.previewContainer}>
-                  {selectedImage.type === 'video' ? (
-                    <View style={styles.videoPreview}>
-                      <Video size={28} color={THEME.colors.primary.main} />
-                      <Text style={styles.videoPreviewText} numberOfLines={2}>
-                        {selectedImage.fileName || 'Video MP4 đã chọn'}
-                      </Text>
-                    </View>
-                  ) : (
-                    <Image source={{ uri: selectedImage.uri }} style={styles.previewImage} />
-                  )}
-                  <TouchableOpacity
-                    style={styles.removeImageBtn}
-                    onPress={() => {
-                      setSelectedImage(null);
-                      if (!supplementNote.trim()) setSupplementError('Ghi chú hoặc ảnh hiện trường là bắt buộc.');
-                    }}
-                    activeOpacity={0.8}
+              {selectedImages.length > 0 && (
+                <>
+                  <Text style={styles.selectedEvidenceCount}>
+                    Đã chọn {selectedImages.length}/{MAX_EVIDENCE_FILES_PER_REQUEST} tệp
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.selectedEvidenceRow}
+                    accessibilityLabel="Các tệp bằng chứng đã chọn"
                   >
-                    <X size={14} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
+                    {selectedImages.map((asset) => (
+                      <View key={asset.uri} style={styles.previewContainer}>
+                        {asset.type === 'video' ? (
+                          <View style={styles.videoPreview}>
+                            <Video size={28} color={THEME.colors.primary.main} />
+                            <Text style={styles.videoPreviewText} numberOfLines={2}>
+                              {asset.fileName || 'Video MP4 đã chọn'}
+                            </Text>
+                          </View>
+                        ) : (
+                          <Image source={{ uri: asset.uri }} style={styles.previewImage} />
+                        )}
+                        <TouchableOpacity
+                          style={styles.removeImageBtn}
+                          onPress={() => {
+                            setSelectedImages((current) => current.filter((item) => item.uri !== asset.uri));
+                            if (!supplementNote.trim() && selectedImages.length === 1) {
+                              setSupplementError('Ghi chú hoặc ảnh/video hiện trường là bắt buộc.');
+                            }
+                          }}
+                          activeOpacity={0.8}
+                          disabled={isSubmittingSupplement}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Xóa ${asset.fileName || 'tệp đã chọn'}`}
+                        >
+                          <X size={14} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </>
               )}
             </View>
 
@@ -791,6 +910,7 @@ export const SOSTrackingScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.modalCancelBtn}
                 onPress={() => setShowSupplementModal(false)}
+                disabled={isSubmittingSupplement}
               >
                 <Text style={styles.modalCancelText}>Hủy Bỏ</Text>
               </TouchableOpacity>
@@ -936,6 +1056,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: THEME.colors.text.primary,
     marginBottom: 10,
+  },
+  lookupNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: THEME.colors.primary.bg,
+    borderWidth: 1,
+    borderColor: THEME.colors.primary.border,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+  },
+  lookupNoticeText: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: THEME.typography.fontSizes.xs,
+    lineHeight: 18,
+    color: THEME.colors.text.secondary,
   },
   lookupInput: {
     backgroundColor: THEME.colors.surface.background,
@@ -1234,6 +1371,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 8,
   },
+  disabledButton: {
+    opacity: 0.5,
+  },
   pickImageText: {
     fontSize: 12,
     fontWeight: '700',
@@ -1241,9 +1381,21 @@ const styles = StyleSheet.create({
   },
   previewContainer: {
     marginTop: 10,
+    marginRight: 8,
     position: 'relative',
     width: 80,
     height: 80,
+  },
+  selectedEvidenceCount: {
+    marginTop: 8,
+    fontSize: 12,
+    color: THEME.colors.text.secondary,
+    fontWeight: '600',
+  },
+  selectedEvidenceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 8,
   },
   previewImage: {
     width: 80,

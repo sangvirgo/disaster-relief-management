@@ -45,11 +45,10 @@ import {
   Bell,
   UserPlus,
   UserMinus,
-  Crown,
   X,
 } from 'lucide-react-native';
 
-type TeamMemberAction = 'ADD' | 'REMOVE' | 'TRANSFER_LEADER';
+type TeamMemberAction = 'ADD' | 'REMOVE';
 
 export const TeamDashboardScreen: React.FC = () => {
   const router = useRouter();
@@ -262,12 +261,9 @@ export const TeamDashboardScreen: React.FC = () => {
       if (memberAction === 'ADD') {
         await ResponseApi.addTeamMember(team.id, userId);
         Alert.alert('Thành công', 'Đã thêm thành viên mới vào đội cứu hộ.');
-      } else if (memberAction === 'REMOVE') {
+      } else {
         await ResponseApi.removeTeamMember(team.id, userId);
         Alert.alert('Đã gỡ thành viên', 'Tài khoản đã được gỡ khỏi đội cứu hộ.');
-      } else {
-        await ResponseApi.transferTeamLeader(team.id, userId, team.version);
-        Alert.alert('Đã chuyển quyền đội trưởng', 'Quyền đội trưởng đã được chuyển cho thành viên được chọn.');
       }
       setNewMemberUserId('');
       setMemberIdError(undefined);
@@ -281,9 +277,9 @@ export const TeamDashboardScreen: React.FC = () => {
       } else if (isApiErrorCode(err, 'FORBIDDEN', 'MISSION_NOT_LEADER')) {
         Alert.alert('Chưa có quyền', 'Chỉ đội trưởng đang hoạt động mới có quyền quản lý thành viên của đội.');
       } else if (isApiErrorCode(err, 'LEADER_REQUIRED')) {
-        Alert.alert('Không thể gỡ thành viên', 'Đội phải luôn có đội trưởng. Hãy chuyển quyền trước khi gỡ tài khoản này.');
+        Alert.alert('Không thể gỡ thành viên', 'Đội phải luôn có đội trưởng. Không thể gỡ đội trưởng hiện tại.');
       } else if (isApiErrorCode(err, 'VERSION_CONFLICT')) {
-        Alert.alert('Dữ liệu đã thay đổi', 'Hãy tải lại thông tin đội trước khi chuyển quyền đội trưởng.');
+        Alert.alert('Dữ liệu đã thay đổi', 'Hãy tải lại thông tin đội trước khi tiếp tục.');
         await loadTeamData();
       } else {
         Alert.alert('Không thể cập nhật thành viên', getApiErrorMessage(err, 'Vui lòng thử lại.'));
@@ -308,7 +304,6 @@ export const TeamDashboardScreen: React.FC = () => {
     const copy = {
       ADD: { title: 'Xác nhận thêm thành viên', message: 'Thêm tài khoản này vào đội cứu hộ?', action: 'Thêm thành viên' },
       REMOVE: { title: 'Xác nhận gỡ thành viên', message: 'Gỡ tài khoản này khỏi đội cứu hộ?', action: 'Gỡ thành viên' },
-      TRANSFER_LEADER: { title: 'Xác nhận chuyển quyền', message: 'Chuyển quyền đội trưởng cho tài khoản này? Thao tác chỉ dành cho thành viên đang có trong đội.', action: 'Chuyển quyền' },
     }[memberAction];
     if (memberAction === 'ADD') {
       void executeMemberAction(trimmedId);
@@ -322,8 +317,7 @@ export const TeamDashboardScreen: React.FC = () => {
 
   const memberActionCopy = {
     ADD: { title: 'Thêm thành viên vào đội', help: 'Nhập mã ID do tình nguyện viên cung cấp để ghi danh vào đội.', button: 'Ghi danh vào đội', placeholder: 'Mã ID tình nguyện viên (UUID)' },
-    REMOVE: { title: 'Gỡ thành viên khỏi đội', help: 'Nhập mã ID của thành viên cần gỡ. Đội trưởng hiện tại không thể tự gỡ nếu chưa chuyển quyền.', button: 'Gỡ khỏi đội', placeholder: 'Mã ID thành viên (UUID)' },
-    TRANSFER_LEADER: { title: 'Chuyển quyền đội trưởng', help: 'Nhập mã ID của thành viên đang có trong đội để chuyển quyền đội trưởng.', button: 'Chuyển quyền', placeholder: 'Mã ID thành viên mới (UUID)' },
+    REMOVE: { title: 'Gỡ thành viên khỏi đội', help: 'Nhập mã ID của thành viên cần gỡ. Đội trưởng hiện tại không thể tự gỡ.', button: 'Gỡ khỏi đội', placeholder: 'Mã ID thành viên (UUID)' },
   }[memberAction];
 
   const openMemberAction = (action: TeamMemberAction) => {
@@ -379,7 +373,7 @@ export const TeamDashboardScreen: React.FC = () => {
   if (!team) {
     return (
       <ScreenContainer
-        title="Hồ Sơ Tình Nguyện Viên"
+        title="Khu Vực Đội Cứu Hộ"
         subtitle={`Xin chào, ${user?.display_name || user?.username || 'Bạn'}`}
         headerRight={
           <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
@@ -396,11 +390,11 @@ export const TeamDashboardScreen: React.FC = () => {
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={styles.volunteerName} numberOfLines={1}>
-                  {user?.display_name || user?.username || 'Tình nguyện viên'}
+                  {user?.display_name || user?.username || 'Người dùng'}
                 </Text>
                 <View style={styles.freeBadgeRow}>
                   <View style={styles.freeVolunteerBadge}>
-                    <Text style={styles.freeVolunteerBadgeText}>🤝 Tình Nguyện Viên Tự Do</Text>
+                  <Text style={styles.freeVolunteerBadgeText}>🤝 Chưa tham gia đội cứu hộ</Text>
                   </View>
                 </View>
               </View>
@@ -427,10 +421,10 @@ export const TeamDashboardScreen: React.FC = () => {
           <View style={styles.noticeBox}>
             <View style={styles.noticeHeaderRow}>
               <Info size={20} color={THEME.colors.warning.dark} />
-              <Text style={styles.noticeTitle}>CHƯA THAM GIA ĐỘI CỨU HỘ THỰC ĐỊA</Text>
+              <Text style={styles.noticeTitle}>CHƯA ĐƯỢC GHI DANH VÀO ĐỘI CỨU HỘ</Text>
             </View>
             <Text style={styles.noticeDesc}>
-              Tài khoản của bạn hiện là <Text style={{ fontWeight: '700' }}>Tình nguyện viên tự do</Text>, chưa được biên chế vào Đội cứu hộ cơ động nào.
+              Tài khoản của bạn chưa được ghi danh vào Đội cứu hộ nào.
             </Text>
             <Text style={styles.noticeGuidance}>
               • Để tham gia tác chiến cứu nạn thực địa: Hãy gửi <Text style={{ fontWeight: '700' }}>Mã ID tài khoản</Text> ở trên cho Đội trưởng đội cứu nạn tại địa bàn của bạn hoặc Ban chỉ huy PCTT địa phương để được ghi danh vào đội.
@@ -712,7 +706,7 @@ export const TeamDashboardScreen: React.FC = () => {
             <Text style={styles.cardTitle}>QUẢN LÝ THÀNH VIÊN ĐỘI</Text>
           </View>
           <Text style={styles.cardDesc}>
-            Sử dụng mã ID tài khoản do thành viên cung cấp để thêm, gỡ hoặc chuyển quyền đội trưởng. Máy chủ kiểm tra quyền và tư cách thành viên trước khi lưu.
+            Đội trưởng đang hoạt động có thể thêm hoặc gỡ thành viên bằng mã ID tài khoản. Máy chủ kiểm tra quyền và tư cách thành viên trước khi lưu.
           </Text>
           <View style={styles.memberActionsRow}>
             <TouchableOpacity style={styles.memberActionButton} onPress={() => openMemberAction('ADD')} activeOpacity={0.85}>
@@ -722,10 +716,6 @@ export const TeamDashboardScreen: React.FC = () => {
             <TouchableOpacity style={[styles.memberActionButton, styles.memberActionSecondary]} onPress={() => openMemberAction('REMOVE')} activeOpacity={0.85}>
               <UserMinus size={16} color={THEME.colors.emergency.main} />
               <Text style={styles.memberActionSecondaryText}>Gỡ</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.memberActionButton, styles.memberActionSecondary]} onPress={() => openMemberAction('TRANSFER_LEADER')} activeOpacity={0.85}>
-              <Crown size={16} color={THEME.colors.primary.main} />
-              <Text style={styles.memberActionSecondaryText}>Chuyển đội trưởng</Text>
             </TouchableOpacity>
           </View>
         </View>

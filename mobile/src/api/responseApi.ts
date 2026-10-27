@@ -178,7 +178,7 @@ export const ResponseApi = {
 
     const response = await apiClient.post(`/response/requests/${requestId}/evidence`, formData, {
       headers,
-      timeout: 60000,
+      timeout: 120000,
     });
     return response.data;
   },
@@ -276,6 +276,7 @@ export const ResponseApi = {
 
     const response = await apiClient.post(`/response/missions/${missionId}/evidence`, formData, {
       headers,
+      timeout: 120000,
     });
     return response.data;
   },
@@ -340,20 +341,6 @@ export const ResponseApi = {
     const response = await apiClient.patch<RescueTeamDetail>(
       `/response/teams/${teamId}`,
       { expected_version: expectedVersion, ...patch },
-      { headers: { 'Idempotency-Key': idempotencyKey || generateUUID() } },
-    );
-    return response.data;
-  },
-
-  async transferTeamLeader(
-    teamId: string,
-    userId: string,
-    expectedVersion: number,
-    idempotencyKey?: string,
-  ): Promise<{ team_id: string; leader_user_id: string; version: number }> {
-    const response = await apiClient.post<{ team_id: string; leader_user_id: string; version: number }>(
-      `/response/teams/${teamId}/leader`,
-      { user_id: userId.trim(), expected_version: expectedVersion },
       { headers: { 'Idempotency-Key': idempotencyKey || generateUUID() } },
     );
     return response.data;

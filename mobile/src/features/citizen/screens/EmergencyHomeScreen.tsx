@@ -36,7 +36,7 @@ export const EmergencyHomeScreen: React.FC = () => {
   const [trackingCodeError, setTrackingCodeError] = useState<string | undefined>();
   const [notices, setNotices] = useState<NoticeItem[]>([]);
   const [selectedNotice, setSelectedNotice] = useState<NoticeItem | null>(null);
-  const { user, isAuthenticated, logout, getUserRoleName, isVolunteerOrLeader } = useAuthStore();
+  const { user, isAuthenticated, logout, getUserRoleName } = useAuthStore();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -326,7 +326,11 @@ export const EmergencyHomeScreen: React.FC = () => {
       {/* Tra cứu tiến độ cứu hộ nhanh bằng mã */}
       <View style={styles.trackingCard}>
         <Text style={styles.trackingTitle}>TRA CỨU TIẾN ĐỘ CỨU TRỢ</Text>
-        <Text style={styles.trackingDesc}>Nhập mã tra cứu 10 ký tự được cấp khi gửi yêu cầu:</Text>
+        <Text style={styles.trackingDesc}>
+          {isAuthenticated
+            ? 'Nhập mã tra cứu 10 ký tự được cấp khi gửi yêu cầu.'
+            : 'Khách vãng lai cần mã tra cứu và khóa bí mật. Trên thiết bị đã gửi SOS, ứng dụng sẽ tự dùng khóa đã lưu.'}
+        </Text>
         <View style={styles.searchRow}>
           <TextInput
             style={styles.searchInput}
@@ -383,7 +387,7 @@ export const EmergencyHomeScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.quickAccessCard}
           onPress={() => {
-            if (isAuthenticated && isVolunteerOrLeader()) {
+            if (isAuthenticated) {
               router.push('/team');
             } else {
               router.push('/login');
@@ -393,10 +397,10 @@ export const EmergencyHomeScreen: React.FC = () => {
         >
           <ShieldAlert size={26} color={THEME.colors.warning.main} />
           <Text style={styles.quickAccessTitle}>
-            {isAuthenticated && isVolunteerOrLeader() ? 'Cứu Hộ & TNV' : 'Đội cứu hộ'}
+            {isAuthenticated ? 'Đội cứu hộ của tôi' : 'Đội cứu hộ'}
           </Text>
           <Text style={styles.quickAccessDesc}>
-            {isAuthenticated && isVolunteerOrLeader() ? 'Tác chiến & Hậu cần' : 'Đăng nhập tác chiến'}
+            {isAuthenticated ? 'Nhiệm vụ và hoạt động đội' : 'Đăng nhập để xem nhiệm vụ'}
           </Text>
         </TouchableOpacity>
       </View>

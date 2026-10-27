@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -20,10 +20,12 @@ import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { TimelineStep } from '../../../components/common/TimelineStep';
 import { ResponseApi } from '../../../api/responseApi';
-import { getApiErrorMessage } from '../../../api/client';
+import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { Mission, MissionStatus } from '../../../types/api';
 import { INCIDENT_CATEGORIES, MISSION_KIND_LABELS, MISSION_STATUS_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
+import { generateUUID } from '../../../utils/secureStore';
+import { getEvidenceSizeLimitBytes, getSupportedEvidenceMimeType } from '../../../utils/evidence';
 import {
   MapPin,
   Users,
@@ -37,6 +39,7 @@ import {
   FileCheck,
   Camera,
   ImageIcon,
+  Video,
   X,
 } from 'lucide-react-native';
 
@@ -54,6 +57,7 @@ export const MissionDetailScreen: React.FC = () => {
   const [outcomeNote, setOutcomeNote] = useState<string>('');
   const [formErrors, setFormErrors] = useState<Record<string, string | undefined>>({});
   const [completionImage, setCompletionImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const evidenceUploadKey = useRef<{ uri: string; key: string } | null>(null);
 
   // Modal từ chối hoặc báo thất bại
   const [showDeclineModal, setShowDeclineModal] = useState<boolean>(false);
@@ -63,32 +67,50 @@ export const MissionDetailScreen: React.FC = () => {
   const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
   const [loadingEvidence, setLoadingEvidence] = useState<boolean>(false);
 
-  const handleViewEvidence = async (evidenceId: string) => {
+  const handleViewEvidence = async (evidenceId: string, mimeType: string) => {
     setLoadingEvidence(true);
     try {
       const res = await ResponseApi.getEvidenceDownloadUrl(evidenceId);
       if (res?.url) {
-        setPreviewImageUri(res.url);
+        if (mimeType === 'video/mp4') {
+          await Linking.openURL(res.url);
+        } else {
+          setPreviewImageUri(res.url);
+        }
       }
     } catch (e: any) {
-      Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể tải ảnh minh chứng.'));
+      Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể mở tệp minh chứng.'));
     } finally {
       setLoadingEvidence(false);
     }
   };
 
-  const pickImage = async () => {
+  const pickEvidence = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ['images', 'videos'],
         allowsEditing: true,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
         quality: 0.8,
       });
       if (!result.canceled && result.assets[0]) {
-        setCompletionImage(result.assets[0]);
+        const asset = result.assets[0];
+        const mimeType = getSupportedEvidenceMimeType(asset);
+        if (!mimeType) {
+          Alert.alert('Định dạng chưa hỗ trợ', 'Chỉ chọn ảnh JPEG, PNG hoặc video MP4.');
+          return;
+        }
+        if (asset.fileSize !== undefined && asset.fileSize > getEvidenceSizeLimitBytes(mimeType)) {
+          Alert.alert('Tệp quá lớn', mimeType === 'video/mp4'
+            ? 'Video MP4 phải có dung lượng không quá 50 MB.'
+            : 'Ảnh phải có dung lượng không quá 10 MB.');
+          return;
+        }
+        evidenceUploadKey.current = null;
+        setCompletionImage(asset);
       }
     } catch {
-      Alert.alert('Thông báo', 'Không thể mở thư viện ảnh.');
+      Alert.alert('Thông báo', 'Không thể mở thư viện ảnh và video.');
     }
   };
 
@@ -104,6 +126,7 @@ export const MissionDetailScreen: React.FC = () => {
         quality: 0.8,
       });
       if (!result.canceled && result.assets[0]) {
+        evidenceUploadKey.current = null;
         setCompletionImage(result.assets[0]);
       }
     } catch {
@@ -237,22 +260,43 @@ export const MissionDetailScreen: React.FC = () => {
     }
     setFormErrors((current) => ({ ...current, outcomeNote: undefined }));
     setActionLoading(true);
-    let evidenceUploadFailed = false;
     try {
-      // 1. Tải lên ảnh bằng chứng hiện trường nếu có
+      // Upload selected media first so a storage failure does not lose the local file.
       if (completionImage) {
+        const mimeType = getSupportedEvidenceMimeType(completionImage);
+        if (!mimeType) {
+          Alert.alert('Định dạng chưa hỗ trợ', 'Chỉ chọn ảnh JPEG, PNG hoặc video MP4.');
+          return;
+        }
+        if (completionImage.fileSize !== undefined && completionImage.fileSize > getEvidenceSizeLimitBytes(mimeType)) {
+          Alert.alert('Tệp quá lớn', mimeType === 'video/mp4'
+            ? 'Video MP4 phải có dung lượng không quá 50 MB.'
+            : 'Ảnh phải có dung lượng không quá 10 MB.');
+          return;
+        }
         try {
+          if (!evidenceUploadKey.current || evidenceUploadKey.current.uri !== completionImage.uri) {
+            evidenceUploadKey.current = { uri: completionImage.uri, key: generateUUID() };
+          }
+          const uploadKey = evidenceUploadKey.current.key;
           await ResponseApi.uploadMissionEvidence(mission.id, {
             uri: completionImage.uri,
-            name: completionImage.fileName || `mission-${mission.id}-${Date.now()}.jpg`,
-            type: completionImage.mimeType || 'image/jpeg',
-          });
-        } catch {
-          evidenceUploadFailed = true;
+            name: completionImage.fileName || `mission-${mission.id}-${Date.now()}${mimeType === 'video/mp4' ? '.mp4' : mimeType === 'image/png' ? '.png' : '.jpg'}`,
+            type: mimeType,
+          }, uploadKey);
+        } catch (uploadError) {
+          if (isApiErrorCode(uploadError, 'STORAGE_UNAVAILABLE')) {
+            // The backend records this attachment as FAILED; retry it with a new key.
+            evidenceUploadKey.current = null;
+          }
+          Alert.alert(
+            'Chưa tải được bằng chứng',
+            `${getApiErrorMessage(uploadError, 'Không thể tải tệp minh chứng lên.')} Tệp vẫn được giữ. Hãy thử lại hoặc xóa tệp đã chọn để hoàn tất mà không đính kèm.`,
+          );
+          return;
         }
       }
 
-      // 2. Chuyển trạng thái sang COMPLETED
       await ResponseApi.transitionMission(
         mission.id,
         mission.version,
@@ -260,17 +304,18 @@ export const MissionDetailScreen: React.FC = () => {
         undefined,
         outcome
       );
-      Alert.alert(
-        'Đã ghi nhận kết quả',
-        evidenceUploadFailed
-          ? 'Backend đã ghi nhận kết quả nhiệm vụ, nhưng ảnh bằng chứng chưa tải lên thành công.'
-          : 'Backend đã ghi nhận kết quả hoàn thành nhiệm vụ.'
-      );
+      Alert.alert('Đã ghi nhận kết quả', 'Đã ghi nhận kết quả hoàn thành nhiệm vụ.');
       setShowCompleteModal(false);
       setCompletionImage(null);
+      evidenceUploadKey.current = null;
       fetchDetail();
     } catch (e: any) {
-      Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể kết thúc nhiệm vụ.'));
+      if (isApiErrorCode(e, 'VERSION_CONFLICT')) {
+        await fetchDetail();
+        Alert.alert('Nhiệm vụ đã thay đổi', 'Thông tin mới nhất đã được tải. Hãy kiểm tra lại rồi xác nhận hoàn thành lần nữa.');
+      } else {
+        Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể kết thúc nhiệm vụ.'));
+      }
     } finally {
       setActionLoading(false);
     }
@@ -465,7 +510,7 @@ export const MissionDetailScreen: React.FC = () => {
       {/* 6. MINH CHỨNG HIỆN TRƯỜNG ĐÃ TẢI LÊN */}
       {mission.evidence && mission.evidence.length > 0 && (
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>ẢNH & MINH CHỨNG HIỆN TRƯỜNG ({mission.evidence.length})</Text>
+          <Text style={styles.cardSectionTitle}>ẢNH / VIDEO HIỆN TRƯỜNG ({mission.evidence.length})</Text>
           {loadingEvidence && (
             <ActivityIndicator size="small" color={THEME.colors.primary.main} style={{ marginBottom: 8 }} />
           )}
@@ -474,10 +519,12 @@ export const MissionDetailScreen: React.FC = () => {
               <TouchableOpacity
                 key={ev.id}
                 style={styles.evidenceThumbCard}
-                onPress={() => handleViewEvidence(ev.id)}
+                onPress={() => handleViewEvidence(ev.id, ev.detected_mime)}
                 activeOpacity={0.8}
               >
-                <ImageIcon size={22} color={THEME.colors.primary.main} />
+                {ev.detected_mime === 'video/mp4'
+                  ? <Video size={22} color={THEME.colors.primary.main} />
+                  : <ImageIcon size={22} color={THEME.colors.primary.main} />}
                 <Text style={styles.evidenceThumbText} numberOfLines={1}>
                   {ev.detected_mime.includes('video') ? 'Video hiện trường' : 'Ảnh hiện trường'}
                 </Text>
@@ -604,15 +651,27 @@ export const MissionDetailScreen: React.FC = () => {
             />
             <FormFieldError message={formErrors.outcomeNote} />
 
-            {/* ĐÍNH KÈM ẢNH BẰNG CHỨNG CỨU NẠN */}
+            {/* ĐÍNH KÈM ẢNH HOẶC VIDEO BẰNG CHỨNG CỨU NẠN */}
             <View style={styles.imagePickerSection}>
-              <Text style={styles.imageSectionTitle}>ẢNH BẰNG CHỨNG HIỆN TRƯỜNG (KHUYẾN KHÍCH):</Text>
+              <Text style={styles.imageSectionTitle}>ẢNH HOẶC VIDEO MP4 BẰNG CHỨNG (KHUYẾN KHÍCH):</Text>
               {completionImage ? (
                 <View style={styles.imagePreviewContainer}>
-                  <Image source={{ uri: completionImage.uri }} style={styles.imagePreview} />
+                  {getSupportedEvidenceMimeType(completionImage) === 'video/mp4' ? (
+                    <View style={styles.videoPreview}>
+                      <Video size={24} color={THEME.colors.primary.main} />
+                      <Text style={styles.videoPreviewText} numberOfLines={2}>
+                        {completionImage.fileName || 'Video MP4 đã chọn'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Image source={{ uri: completionImage.uri }} style={styles.imagePreview} />
+                  )}
                   <TouchableOpacity
                     style={styles.removeImageBtn}
-                    onPress={() => setCompletionImage(null)}
+                    onPress={() => {
+                      setCompletionImage(null);
+                      evidenceUploadKey.current = null;
+                    }}
                     activeOpacity={0.8}
                   >
                     <X size={16} color="#FFFFFF" />
@@ -624,9 +683,9 @@ export const MissionDetailScreen: React.FC = () => {
                     <Camera size={16} color={THEME.colors.primary.main} />
                     <Text style={styles.imagePickerBtnText}>Chụp Ảnh</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage} activeOpacity={0.8}>
-                    <ImageIcon size={16} color={THEME.colors.primary.main} />
-                    <Text style={styles.imagePickerBtnText}>Chọn Từ Máy</Text>
+                  <TouchableOpacity style={styles.imagePickerBtn} onPress={pickEvidence} activeOpacity={0.8}>
+                    <Video size={16} color={THEME.colors.primary.main} />
+                    <Text style={styles.imagePickerBtnText}>Ảnh / Video</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -638,6 +697,7 @@ export const MissionDetailScreen: React.FC = () => {
                 onPress={() => {
                   setShowCompleteModal(false);
                   setCompletionImage(null);
+                  evidenceUploadKey.current = null;
                 }}
               >
                 <Text style={styles.modalCancelText}>Hủy</Text>
@@ -1059,6 +1119,21 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 10,
+  },
+  videoPreview: {
+    width: 160,
+    minHeight: 100,
+    borderRadius: 10,
+    padding: 12,
+    backgroundColor: THEME.colors.primary.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoPreviewText: {
+    marginTop: 6,
+    color: THEME.colors.text.secondary,
+    fontSize: THEME.typography.fontSizes.xs,
+    textAlign: 'center',
   },
   removeImageBtn: {
     position: 'absolute',
