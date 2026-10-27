@@ -6,6 +6,8 @@ import { AddRequestSourceIpIndex1710000000001 } from './database/migrations/AddR
 import { AddEvidenceUploadIpQuota1710000000002 } from './database/migrations/AddEvidenceUploadIpQuota1710000000002';
 import { AddSosFactsAndMissionKind1792953600000 } from './database/migrations/AddSosFactsAndMissionKind1792953600000';
 import { AddAiAdvisory1792953600001 } from './database/migrations/AddAiAdvisory1792953600001';
+import { AllowAiAdvisoryRetries1793116235000 } from './database/migrations/AllowAiAdvisoryRetries1793116235000';
+import { AllowAiAdvisoryRetryAttempts1793117000000 } from './database/migrations/AllowAiAdvisoryRetryAttempts1793117000000';
 import { RequestIntakeModule } from './requests/request-intake.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { EvidenceModule } from './evidence/evidence.module';
@@ -21,7 +23,7 @@ import { AiAdvisoryService } from './ai/ai-advisory.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot(postgresOptions([InitialResponse1710000000000, AddRequestSourceIpIndex1710000000001, AddEvidenceUploadIpQuota1710000000002, AddSosFactsAndMissionKind1792953600000, AddAiAdvisory1792953600001], 'response')),
+    TypeOrmModule.forRoot(postgresOptions([InitialResponse1710000000000, AddRequestSourceIpIndex1710000000001, AddEvidenceUploadIpQuota1710000000002, AddSosFactsAndMissionKind1792953600000, AddAiAdvisory1792953600001, AllowAiAdvisoryRetries1793116235000, AllowAiAdvisoryRetryAttempts1793117000000], 'response')),
     HealthModule,
     RequestIntakeModule,
     TrackingModule,

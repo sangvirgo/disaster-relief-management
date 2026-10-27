@@ -5,7 +5,7 @@ import type { DataSource } from 'typeorm';
 import { AiAdvisoryService } from '../src/ai/ai-advisory.service';
 import { aiInputHash } from '../src/ai/ai-risk';
 import { aiAssessmentHash, enqueueAiAdvisory } from '../src/ai/ai-advisory-input';
-const job = { id: '00000000-0000-4000-8000-000000000001', request_id: 'request', description: 'Cần nước uống', input_hash: aiInputHash('Cần nước uống'), model: 'test' };
+const job = { id: '00000000-0000-4000-8000-000000000001', request_id: 'request', description: 'Cần nước uống', input_hash: aiInputHash('Cần nước uống'), model: 'test', attempts: 1 };
 const extraction = {
   summary: 'Cần nước uống', indicators: [], facts: {}, confidence: 0.5,
   priority_score: 82, priority_reasons: ['Có người cần cứu hộ khẩn cấp.'],
@@ -24,16 +24,9 @@ describe('AI advisory worker lifecycle', () => {
     delete process.env.SCHEDULER_ENABLED;
     delete process.env.GEMINI_ADVISORY_WORKER_ENABLED;
   });
-  it('does not claim jobs when the scheduler is disabled', async () => {
+  it('claims AI jobs even when the legacy worker toggle is false and other schedulers are disabled', () => {
     process.env.GEMINI_ADVISORY_WORKER_ENABLED = 'false';
-    const transaction = jest.fn();
-    const worker = new AiAdvisoryService({ transaction } as unknown as DataSource);
-    worker.onModuleInit(); await Promise.resolve(); worker.onModuleDestroy();
-    expect(transaction).not.toHaveBeenCalled();
-  });
-  it('runs Gemini independently when other scheduled jobs are disabled', () => {
     process.env.SCHEDULER_ENABLED = 'false';
-    process.env.GEMINI_ADVISORY_WORKER_ENABLED = 'true';
     const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
     const transaction = jest.fn((work: (manager: { query: typeof query }) => Promise<unknown>) => work({ query }));
     const worker = new AiAdvisoryService({ transaction } as unknown as DataSource);
@@ -104,15 +97,70 @@ describe('AI advisory worker lifecycle', () => {
     expect(Logger.prototype.warn).toHaveBeenCalledWith('AI_ADVISORY_CLAIM_FAILED');
     expect(JSON.stringify(jest.mocked(Logger.prototype.warn).mock.calls)).not.toContain('secret');
   });
-  it('records provider failure with a safe code and job identifier', async () => {
+  it('retries network failures with a safe status and job identifier', async () => {
     const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
     const worker = new AiAdvisoryService({ query } as unknown as DataSource);
     jest.spyOn(worker as unknown as { claimJob(): Promise<typeof job> }, 'claimJob').mockResolvedValue(job);
     jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('key=secret and private description'));
     await worker['processOne']();
-    expect(query).toHaveBeenCalledWith(expect.stringContaining("status='FAILED'"), [job.id, 'AI_PROVIDER_ERROR']);
-    expect(Logger.prototype.warn).toHaveBeenCalledWith('AI_PROVIDER_ERROR', `job:${job.id}`);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("status='QUEUED'"), [job.id, 30]);
+    expect(Logger.prototype.warn).toHaveBeenCalledWith(
+      'AI_PROVIDER_RETRY_SCHEDULED',
+      `job:${job.id} attempt:1 delay_seconds:30 provider_status:NETWORK`,
+    );
     expect(JSON.stringify(jest.mocked(Logger.prototype.warn).mock.calls)).not.toContain('secret');
+  });
+  it.each([{ attempts: 1, delaySeconds: 30 }, { attempts: 2, delaySeconds: 120 }, { attempts: 3, delaySeconds: 480 }, { attempts: 6, delaySeconds: 900 }])(
+    'requeues a transient Gemini failure after attempt $attempts with a $delaySeconds second delay', async ({ attempts, delaySeconds }) => {
+      const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
+      const worker = new AiAdvisoryService({ query } as unknown as DataSource);
+      jest.spyOn(worker as unknown as { claimJob(): Promise<typeof job> }, 'claimJob').mockResolvedValue({ ...job, attempts });
+      jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 503 } as Response);
+
+      await worker['processOne']();
+
+      expect(query).toHaveBeenCalledWith(expect.stringContaining("status='QUEUED'"), [job.id, delaySeconds]);
+      expect(query.mock.calls.some(([sql]) => String(sql).includes("status='FAILED'"))).toBe(false);
+      expect(Logger.prototype.warn).toHaveBeenCalledWith(
+        'AI_PROVIDER_RETRY_SCHEDULED',
+        `job:${job.id} attempt:${attempts} delay_seconds:${delaySeconds} provider_status:503`,
+      );
+    },
+  );
+  it('does not retry permanent Gemini client errors', async () => {
+    const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
+    const worker = new AiAdvisoryService({ query } as unknown as DataSource);
+    jest.spyOn(worker as unknown as { claimJob(): Promise<typeof job> }, 'claimJob').mockResolvedValue(job);
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 400 } as Response);
+
+    await worker['processOne']();
+
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("status='FAILED'"), [job.id, 'AI_PROVIDER_ERROR']);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes("status='QUEUED'"))).toBe(false);
+  });
+  it('defers queued advisories until the next local day when the provider-call cap is reached', async () => {
+    process.env.GEMINI_API_KEY = 'unit-test';
+    const facts = { version: 2, workCycle: 1, incidentCategoryCode: 'FLOOD', description: 'Bí mật cần giữ tại máy chủ',
+      peopleAffected: 3, childrenCount: 1, elderlyCount: 0, reporterDeclaredDanger: true, needsRescue: true, needsReliefSupplies: false };
+    const queuedJob = { ...job, attempts: 4, input_hash: aiAssessmentHash(facts, 2, 1), request_version: 2, latest_id: job.id,
+      workCycle: 1, incidentCategoryCode: 'FLOOD', description: facts.description, peopleAffected: 3, childrenCount: 1,
+      elderlyCount: 0, reporterDeclaredDanger: true, needsRescue: true, needsReliefSupplies: false };
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes('SELECT a.id')) return [queuedJob];
+      if (sql.includes('INSERT INTO ai_daily_usage')) return [];
+      return [];
+    });
+    const transaction = async (work: (manager: { query: typeof query }) => Promise<unknown>) => work({ query });
+    const worker = new AiAdvisoryService({ query, transaction } as unknown as DataSource);
+    const fetch = jest.spyOn(globalThis, 'fetch');
+
+    await worker['processOne']();
+
+    const deferral = query.mock.calls.find(([sql]) => sql.includes("AT TIME ZONE 'America/Los_Angeles'"));
+    expect(deferral?.[0]).toContain("status='QUEUED'");
+    expect(deferral?.[1]).toEqual([job.id]);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(Logger.prototype.warn).toHaveBeenCalledWith('AI_DAILY_LIMIT_RETRY_SCHEDULED', `job:${job.id}`);
   });
   it('retries result persistence without repeating the provider call', async () => {
     const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockRejectedValueOnce(new Error('DB unavailable')).mockResolvedValueOnce([]);
@@ -139,6 +187,6 @@ describe('AI advisory worker lifecycle', () => {
     const worker = new AiAdvisoryService({ transaction } as unknown as DataSource);
     await worker['processOne']();
     expect(query).toHaveBeenNthCalledWith(1, expect.stringMatching(/status='FAILED'.*status='PROCESSING'.*lease_until<now\(\)/));
-    expect(query).toHaveBeenNthCalledWith(2, expect.stringMatching(/a.status='QUEUED'.*a.attempts=0/s));
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringMatching(/a.status='QUEUED'.*a.lease_until IS NULL.*a.lease_until<=now\(\)/s));
   });
 });
