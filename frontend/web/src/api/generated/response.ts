@@ -1398,7 +1398,7 @@ export interface paths {
         put?: never;
         /**
          * Record a human decision on an AI advisory.
-         * @description Accepts, adjusts or rejects a completed advisory and appends a staff timeline event. It does not modify SOS facts, official priority, or team assignment. An ADJUSTED decision requires a note.
+         * @description Accepts, adjusts or rejects a completed advisory and appends a staff timeline event. The advisory must still match the current SOS facts and expected_version; stale decisions return VERSION_CONFLICT. It does not modify SOS facts, official priority, or team assignment. An ADJUSTED decision requires a note.
          */
         post: operations["responseRequestOperationsReviewAiAdvisory"];
         delete?: never;
@@ -1631,6 +1631,29 @@ export interface components {
                 latitude: number;
             };
             staff_flags: string[];
+            priority_advisory: {
+                /** @enum {string} */
+                outcome: "SUGGESTION" | "INSUFFICIENT_DATA";
+                score: number | null;
+                level: ("CRITICAL" | "HIGH" | "ELEVATED" | "STANDARD") | null;
+                reason_codes: string[];
+                /** @constant */
+                source: "BACKEND_RULES";
+                rules_version: string;
+            };
+            ai_priority_advisory: {
+                /** @enum {string} */
+                status: "QUEUED" | "PROCESSING" | "COMPLETED" | "SKIPPED" | "FAILED" | "STALE" | "UNKNOWN";
+                score: number | null;
+                level: ("CRITICAL" | "HIGH" | "ELEVATED" | "STANDARD") | null;
+                reasons: string[];
+                confidence: number | null;
+                /** @enum {string} */
+                source: "GEMINI" | "DEMO_FIXTURE";
+                /** @constant */
+                human_review_required: true;
+                review_status: ("ACCEPTED" | "ADJUSTED" | "REJECTED") | null;
+            } | null;
         };
         RequestQueuePage: {
             items: components["schemas"]["RequestQueueItem"][];
@@ -1744,7 +1767,7 @@ export interface components {
                 id: string;
                 model: string;
                 /** @enum {string} */
-                status: "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED" | "SKIPPED";
+                status: "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED" | "SKIPPED" | "STALE";
                 risk_score?: number | null;
                 reason_codes: string[];
                 extracted_json?: {
@@ -1756,6 +1779,29 @@ export interface components {
                 /** @constant */
                 human_review_required: true;
             };
+            priority_advisory: {
+                /** @enum {string} */
+                outcome: "SUGGESTION" | "INSUFFICIENT_DATA";
+                score: number | null;
+                level: ("CRITICAL" | "HIGH" | "ELEVATED" | "STANDARD") | null;
+                reason_codes: string[];
+                /** @constant */
+                source: "BACKEND_RULES";
+                rules_version: string;
+            };
+            ai_priority_advisory: {
+                /** @enum {string} */
+                status: "QUEUED" | "PROCESSING" | "COMPLETED" | "SKIPPED" | "FAILED" | "STALE" | "UNKNOWN";
+                score: number | null;
+                level: ("CRITICAL" | "HIGH" | "ELEVATED" | "STANDARD") | null;
+                reasons: string[];
+                confidence: number | null;
+                /** @enum {string} */
+                source: "GEMINI" | "DEMO_FIXTURE";
+                /** @constant */
+                human_review_required: true;
+                review_status: ("ACCEPTED" | "ADJUSTED" | "REJECTED") | null;
+            } | null;
         } & {
             [key: string]: unknown;
         };
@@ -7263,6 +7309,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    expected_version: number;
                     /** @enum {string} */
                     decision: "ACCEPTED" | "ADJUSTED" | "REJECTED";
                     note?: string;

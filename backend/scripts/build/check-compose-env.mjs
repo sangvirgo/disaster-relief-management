@@ -33,7 +33,7 @@ const expectedEnvironment = {
     'SOS_HARD_LIMIT_PER_IP', 'SOS_GLOBAL_PER_MIN', 'PROXY_OPEN_CAP', 'PROXY_DAILY_SOFT_LIMIT',
     'VERIFY_OVERDUE_MINUTES', 'OFFER_OVERDUE_MINUTES', 'TEAM_POSITION_FRESH_MINUTES', 'TEAM_SEARCH_RADIUS_M',
     'TEAM_BAND_TOLERANCE_M', 'TEAM_BAND_TOLERANCE_P2_M', 'TEAM_BAND_TOLERANCE_P1_M', 'SIGNED_URL_TTL_S',
-    'SCHEDULER_ENABLED', 'RESOLUTION_RECOVERY_ENABLED', 'INTROSPECT_TIMEOUT_MS', 'DEMO_INTAKE_ORGANIZATION_ID', 'GEMINI_API_KEY', 'GEMINI_MODEL',
+    'SCHEDULER_ENABLED', 'GEMINI_ADVISORY_WORKER_ENABLED', 'GEMINI_ADVISORY_INCLUDE_REDACTED_TEXT', 'RESOLUTION_RECOVERY_ENABLED', 'INTROSPECT_TIMEOUT_MS', 'DEMO_INTAKE_ORGANIZATION_ID', 'GEMINI_API_KEY', 'GEMINI_MODEL',
   ],
   'logistics-api': [
     'NODE_ENV', 'PORT', 'DATABASE_URL', 'DB_POOL_MAX', 'DB_LOCK_TIMEOUT_MS', 'DB_STATEMENT_TIMEOUT_MS', 'LOG_LEVEL', 'C48_SCHEMA_DIR',
@@ -47,7 +47,7 @@ const expectedEnvironment = {
   'minio-init': ['MINIO_ROOT_USER', 'MINIO_ROOT_PASSWORD', 'S3_RESPONSE_ACCESS_KEY', 'S3_RESPONSE_SECRET_KEY', 'S3_LOGISTICS_ACCESS_KEY', 'S3_LOGISTICS_SECRET_KEY'],
   seed: [
     'NODE_ENV', 'PGHOST', 'PGPORT', 'IDENTITY_MIGRATOR_PASSWORD', 'RESPONSE_MIGRATOR_PASSWORD', 'LOGISTICS_MIGRATOR_PASSWORD',
-    'SEED_PASSWORD', 'ARGON2_MEMORY_KIB', 'ARGON2_TIME_COST', 'ARGON2_PARALLELISM',
+    'SEED_PASSWORD', 'SECRET_HASH_PEPPER_DONATION', 'ARGON2_MEMORY_KIB', 'ARGON2_TIME_COST', 'ARGON2_PARALLELISM',
   ],
 };
 const expectedServices = Object.keys(expectedEnvironment);
@@ -97,11 +97,10 @@ const s3BackupPorts = compose.services.minio.ports.filter((port) => port.target 
 assert.equal(s3BackupPorts.length, 1, 'the existing MinIO service must expose one S3 backup port');
 assert.equal(s3BackupPorts[0].host_ip, '127.0.0.1', 'the S3 backup transport must bind only to loopback');
 assert.equal(s3BackupPorts[0].published, '59000');
-assert.equal(compose.services.minio.image, 'quay.io/minio/aistor/minio:RELEASE.2026-09-19T17-05-25Z');
-assert.equal(compose.services['minio-init'].image, 'quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z');
-assert.ok(compose.services.minio.volumes.some((volume) =>
-  volume.target === '/minio.license' && volume.read_only && volume.bind?.create_host_path === false),
-'AIStor license must be mounted read-only and must already exist on the host');
+assert.match(compose.services.minio.image, /\/minio:RELEASE\.2025-10-15T17-29-55Z$/);
+assert.match(compose.services['minio-init'].image, /\/minio-mc:RELEASE\.2025-08-13T08-35-41Z$/);
+assert.ok(!compose.services.minio.volumes.some((volume) => volume.target === '/minio.license'),
+  'MinIO Community needs no license mount');
 assert.deepEqual(Object.keys(compose.services.web.build.args).sort(), ['VITE_GOOGLE_CLIENT_ID', 'VITE_GOOGLE_MAPS_API_KEY']);
 assert.equal(compose.services.web.ports?.length ?? 0, 0, 'web must be reachable only through the Nginx ingress');
 assert.equal(compose.services.nginx.depends_on.web.condition, 'service_healthy');

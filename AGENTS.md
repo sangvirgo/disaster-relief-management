@@ -10,7 +10,7 @@ Before analysis, design, implementation, or further research, read:
 2. [Technology and delivery plan](docs/c48-technology-and-delivery-plan.md): the primary English technical baseline, including framework/database comparisons, requirements, architecture, and delivery plan.
 3. Appendix A of the plan: implementation invariants, unresolved design issues, research protocol, and session handoff instructions.
 4. For backend implementation, read `docs/backend/README.md` and follow its task order; its schema and API contracts take precedence over the plan's Mermaid column lists.
-5. For file storage or AI work, read Sections 6.3 and 12 of the plan, including the MinIO AIStor Free decision and its implementation limits.
+5. For file storage or AI work, read Sections 6.3 and 12 of the plan, including the MinIO Community decision and its implementation limits.
 
 ## Main scope
 
@@ -21,8 +21,9 @@ Before analysis, design, implementation, or further research, read:
 
 ## Working conventions
 
+- Prioritize the SOS → human verification/priority → team assignment/progress → resolution workflow. AI is optional support for coordinators. Following the user's 2026-10-27 scope direction, donations and Logistics are supporting capabilities: keep their demo short and optional; do not expand warehouse/donation depth or require every API operation in Postman. Necessary repeated login, version reads, and state transitions are allowed. Preserve existing stock accounting, independent review, ownership boundaries, and resolution guards when those capabilities are used.
 - Maintain project documentation, code identifiers, and technical contracts in English. Apply the mandatory Vietnamese language policy below to communication and all user-facing product content.
-- Use the technical comparison in the plan to explain technology choices. NestJS/TypeScript was selected after comparison with Spring Boot, Django/DRF, FastAPI, and Flask. The implementation baseline is NestJS with TypeORM and PostgreSQL/PostGIS; do not introduce a Python service or runtime. MinIO AIStor Free single-node is the selected capstone object store, subject to its current license terms and documented tier limits.
+- Use the technical comparison in the plan to explain technology choices. NestJS/TypeScript was selected after comparison with Spring Boot, Django/DRF, FastAPI, and Flask. The implementation baseline is NestJS with TypeORM and PostgreSQL/PostGIS; do not introduce a Python service or runtime. MinIO Community (AGPLv3), built from the upstream source tag by `backend/infra/minio/Dockerfile`, is the selected single-node capstone object store; no license file is needed. Upstream is archived, so treat it as a frozen lab dependency.
 - Distinguish source requirements, design decisions, proposals, and unresolved policies. Detailed API contracts, providers, performance thresholds, retention, and some business rules remain open.
 - Preserve UR/FR/NFR/UC/TC identifiers and maintain traceability as implementation progresses.
 - Keep Web, Mobile, APIs, events, state transitions, authorization, and data ownership consistent.
@@ -33,6 +34,7 @@ Before analysis, design, implementation, or further research, read:
 ## Backend Compose and database test invariant
 
 - `backend/infra/compose.yaml` is the only Compose file. Do not add a separate test database, Compose project, test/helper/runner container, API variant, or test-only Docker resource.
+- MinIO Community is built from `backend/infra/minio/Dockerfile` in the main stack. Do not add a second MinIO file or container, and do not enable MinIO outside the `storage` profile.
 - Run backend integration and smoke checks from the host against the main C48 APIs and the same primary PostgreSQL service/databases: `c48_identity`, `c48_response`, and `c48_logistics`. Use the loopback-published ports and `C48_*_DATABASE_URL` variables; do not create transient databases or schemas for checks.
 - Migration and seed jobs remain the declared main-stack services. SQL checks may use `docker compose exec postgres` against the primary databases.
 - Reset PostgreSQL only through an explicit `--reset` command (`bash backend/scripts/db/test-db --reset` or `bash backend/scripts/db/reset-demo --reset`). The reset path may remove only the `c48_pgdata` volume; preserve `c48_minio-data` and all MinIO objects. Normal startup must never remove volumes.

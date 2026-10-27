@@ -1,0 +1,47 @@
+{
+  "fixture_id": "af1",
+  "model": "gemini-3.1-flash-lite",
+  "prompt_version": "v3",
+  "schema_version": "v3",
+  "input": {
+    "incident_category_code": "FIRE",
+    "description": "",
+    "people_affected": 6,
+    "children_count": 2,
+    "elderly_count": 1,
+    "reporter_declared_danger": true,
+    "needs_rescue": true,
+    "needs_relief_supplies": false
+  },
+  "extracted_json": {
+    "summary": "Một vụ hỏa hoạn đang xảy ra ảnh hưởng đến 6 người, trong đó có 2 trẻ em và 1 người cao tuổi, yêu cầu cứu hộ khẩn cấp.",
+    "indicators": [
+      "FIRE",
+      "needs_rescue",
+      "children_count",
+      "elderly_count"
+    ],
+    "facts": {
+      "children_count": 2,
+      "elderly_count": 1,
+      "life_threat": true,
+      "needs_relief_supplies": false,
+      "needs_rescue": true,
+      "people_affected": 6
+    },
+    "priority_score": 90,
+    "priority_reasons": [
+      "Sự cố hỏa hoạn đe dọa trực tiếp đến tính mạng",
+      "Có sự hiện diện của trẻ em trong khu vực nguy hiểm",
+      "Có người cao tuổi cần hỗ trợ đặc biệt",
+      "Tổng số người bị ảnh hưởng là 6",
+      "Yêu cầu cứu hộ khẩn cấp đã được xác nhận"
+    ],
+    "confidence": 0.95
+  },
+  "provenance": {
+    "source": "single Gemini generateContent response",
+    "requested_at": "2026-10-27T13:10:27.946Z",
+    "data_classification": "synthetic"
+  }
+}

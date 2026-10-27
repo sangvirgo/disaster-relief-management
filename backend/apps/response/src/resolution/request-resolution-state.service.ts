@@ -8,6 +8,7 @@ import { hasPermission } from '../../../../packages/identity-contracts/src/permi
 import { checkVersion, cleanText } from '../operations/request-operations.helpers';
 import { ReporterSessionService, type ReporterSession } from '../requests/reporter-session';
 import type { ReopenRequestDto, RequestVersionDto } from './request-resolution.dto';
+import { enqueueAiAdvisory } from '../ai/ai-advisory-input';
 
 interface RequestStateRow {
   id: string;
@@ -148,6 +149,7 @@ export class RequestResolutionStateService {
         previous_region_code: row.region_code, region_code: result.region_code,
       })],
     );
+    await enqueueAiAdvisory(manager, requestId);
     await this.notifyReporter(manager, result, 'REQUEST_REOPENED');
     return { status: 200, value: this.view(result), resource: { type: 'assistance_request', id: requestId } };
   }

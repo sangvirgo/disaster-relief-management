@@ -61,10 +61,10 @@ INSERT INTO donation_delivery (id, public_code, drive_id, organization_id, donor
 SELECT fixture.id, fixture.public_code, drive.id, drive.organization_id, fixture.donor_name, fixture.donor_phone,
        fixture.capability_hash, 'DECLARED', now() - fixture.age
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000a7011'::uuid, 'GD7K2N01', 'Nhà hảo tâm giả lập 11', '0900000301', 'demo-capability-hash-seed-11', interval '3 hours'),
-    ('00000000-0000-4000-8000-0000000a7012'::uuid, 'GD7K2N02', 'Nhà hảo tâm giả lập 12', '0900000302', 'demo-capability-hash-seed-12', interval '2 hours'),
-    ('00000000-0000-4000-8000-0000000a7013'::uuid, 'GD7K2N03', 'Nhà hảo tâm giả lập 13', '0900000303', 'demo-capability-hash-seed-13', interval '90 minutes'),
-    ('00000000-0000-4000-8000-0000000a7014'::uuid, 'GD7K2N04', 'Nhà hảo tâm giả lập 14', '0900000304', 'demo-capability-hash-seed-14', interval '1 hour')
+    ('00000000-0000-4000-8000-0000000a7011'::uuid, 'GD7K2N01', 'Nhà hảo tâm giả lập 11', '0900000301', '{{donation_capability_hash}}', interval '3 hours'),
+    ('00000000-0000-4000-8000-0000000a7012'::uuid, 'GD7K2N02', 'Nhà hảo tâm giả lập 12', '0900000302', NULL::text, interval '2 hours'),
+    ('00000000-0000-4000-8000-0000000a7013'::uuid, 'GD7K2N03', 'Nhà hảo tâm giả lập 13', '0900000303', NULL::text, interval '90 minutes'),
+    ('00000000-0000-4000-8000-0000000a7014'::uuid, 'GD7K2N04', 'Nhà hảo tâm giả lập 14', '0900000304', NULL::text, interval '1 hour')
   ) AS fixture(id, public_code, donor_name, donor_phone, capability_hash, age)
   JOIN donation_drive drive ON drive.id = '00000000-0000-4000-8000-0000000a6010'
                            AND drive.title = 'Quyên góp nhu yếu phẩm khu vực Bắc Demo C'
@@ -74,6 +74,15 @@ SELECT fixture.id, fixture.public_code, drive.id, drive.organization_id, fixture
                            AND drive.campaign_status = 'ACTIVE' AND drive.status = 'OPEN'
  WHERE true
 ON CONFLICT DO NOTHING;
+
+-- Repair only the old invalid placeholder. A claimed or recovered donation has a different hash (or NULL).
+UPDATE donation_delivery
+   SET capability_hash='{{donation_capability_hash}}'
+ WHERE id='00000000-0000-4000-8000-0000000a7011'
+   AND public_code='GD7K2N01'
+   AND status='DECLARED'
+   AND donor_user_id IS NULL
+   AND capability_hash='demo-capability-hash-seed-11';
 
 INSERT INTO donation_declaration (delivery_id, revision, created_by_kind, created_at)
 SELECT delivery.id, 1, 'DONOR', now() - fixture.age
