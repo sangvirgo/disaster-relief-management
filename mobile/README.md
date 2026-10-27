@@ -11,11 +11,11 @@
 | **`EmergencyHomeScreen`** | Trang chủ khẩn cấp, nút SOS lớn trung tâm, tra cứu nhanh bằng mã, hướng dẫn đường dây nóng 113/114/115 | Tất cả người dân |
 | **`CreateSOSScreen`** | Gửi yêu cầu cứu nạn khẩn cấp tại chỗ (`SELF`), tự động bắt GPS, chọn số người, đánh dấu nguy cơ tính mạng tức thời | Nạn nhân tại hiện trường (Không cần đăng nhập) |
 | **`ProxySOSScreen`** | Báo cứu trợ từ xa cho hộ gia đình người thân (`PROXY`), chọn tọa độ hộ gia đình trên bản đồ, ghi chú liên lạc | Người thân có tài khoản công dân |
-| **`SOSTrackingScreen`** | Tra cứu tiến trình xử lý cứu hộ theo Timeline (Tiếp nhận ➔ Xác minh ➔ Phân loại ➔ Điều phối ➔ Đang cứu ➔ Hoàn thành), bổ sung thông tin | Người dân đã gửi SOS |
+| **`SOSTrackingScreen`** | Tra cứu tiến trình xử lý cứu hộ theo Timeline, xem các cập nhật cũ hơn, bổ sung ghi chú và ảnh/video hiện trường | Người dân đã gửi SOS |
 | **`DonationScreen`** | Xem các đợt tiếp nhận hàng cứu trợ mở, khai báo bàn giao hiện vật (mì tôm, nước suối, áo phao...), tra cứu kiểm đếm | Người hảo tâm / Quyên góp |
 | **`LoginScreen`** | Đăng nhập tài khoản hệ thống (hỗ trợ cả Công dân và Đội cứu hộ/Tình nguyện viên) | Tất cả người dùng |
 | **`RegisterScreen`** | Đăng ký tài khoản Công dân mới, chuẩn hóa NFC, tự động cấp quyền `CITIZEN` | Người dân tự tạo tài khoản |
-| **`TeamDashboardScreen`** | Bảng điều khiển đội cứu hộ, bật/tắt trạng thái Sẵn sàng nhận lệnh, phát tín hiệu tọa độ GPS di quân của đội | Đội trưởng / Thành viên đội |
+| **`TeamDashboardScreen`** | Bảng điều khiển đội cứu hộ, cập nhật tên/kỹ năng, trạng thái sẵn sàng và vị trí GPS hoặc ghim thủ công; thêm, gỡ thành viên và chuyển quyền đội trưởng bằng mã tài khoản | Đội trưởng / Thành viên đội |
 | **`MissionListScreen`** | Danh sách nhiệm vụ cứu trợ được chỉ định (Tab: Mới nhận, Đang cứu, Lịch sử) | Đội cứu hộ |
 | **`MissionDetailScreen`** | Chi tiết hiện trường nạn nhân, mở bản đồ chỉ đường Google Maps, gọi điện thoại, Tiếp nhận / Bắt đầu di chuyển / Đã tiếp cận / Hoàn thành | Đội trưởng cứu nạn |
 

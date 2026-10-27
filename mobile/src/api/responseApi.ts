@@ -15,6 +15,7 @@ import {
   CollectionPage,
   PublicCampaign,
   TeamMemberItem,
+  TeamSkillOption,
 } from '../types/api';
 import { generateUUID } from '../utils/secureStore';
 
@@ -289,6 +290,11 @@ export const ResponseApi = {
     return response.data;
   },
 
+  async getTeamSkills(): Promise<{ items: TeamSkillOption[] }> {
+    const response = await apiClient.get<{ items: TeamSkillOption[] }>('/response/skills');
+    return response.data;
+  },
+
   // Cập nhật vị trí di quân hiện tại của Đội cứu hộ (PUT /response/teams/:id/position)
   async updateTeamPosition(teamId: string, location: GeoLocation, note?: string): Promise<void> {
     await apiClient.put(`/response/teams/${teamId}/position`, {
@@ -309,8 +315,8 @@ export const ResponseApi = {
     expectedVersion: number,
     availability: 'AVAILABLE' | 'UNAVAILABLE',
     idempotencyKey?: string
-  ): Promise<void> {
-    await apiClient.patch(
+  ): Promise<RescueTeamDetail> {
+    const response = await apiClient.patch<RescueTeamDetail>(
       `/response/teams/${teamId}`,
       {
         expected_version: expectedVersion,
@@ -322,21 +328,35 @@ export const ResponseApi = {
         },
       }
     );
+    return response.data;
   },
 
-  async confirmTeamReadiness(
+  async updateTeamProfile(
     teamId: string,
     expectedVersion: number,
-    confirmationBasis: 'RADIO' | 'PHONE' | 'IN_PERSON' | 'OTHER',
-    reportedBy?: string,
-    idempotencyKey = generateUUID()
-  ): Promise<void> {
-    await apiClient.post(`/response/teams/${teamId}/ready`, {
-      expected_version: expectedVersion,
-      confirmation_basis: confirmationBasis,
-      ...(reportedBy?.trim() ? { reported_by: reportedBy.trim() } : {}),
-      occurred_at: new Date().toISOString(),
-    }, { headers: { 'Idempotency-Key': idempotencyKey } });
+    patch: { name?: string; skill_codes?: string[] },
+    idempotencyKey?: string,
+  ): Promise<RescueTeamDetail> {
+    const response = await apiClient.patch<RescueTeamDetail>(
+      `/response/teams/${teamId}`,
+      { expected_version: expectedVersion, ...patch },
+      { headers: { 'Idempotency-Key': idempotencyKey || generateUUID() } },
+    );
+    return response.data;
+  },
+
+  async transferTeamLeader(
+    teamId: string,
+    userId: string,
+    expectedVersion: number,
+    idempotencyKey?: string,
+  ): Promise<{ team_id: string; leader_user_id: string; version: number }> {
+    const response = await apiClient.post<{ team_id: string; leader_user_id: string; version: number }>(
+      `/response/teams/${teamId}/leader`,
+      { user_id: userId.trim(), expected_version: expectedVersion },
+      { headers: { 'Idempotency-Key': idempotencyKey || generateUUID() } },
+    );
+    return response.data;
   },
 
   // === THÔNG BÁO ĐIỀU PHỐI (NOTICES) & CHIẾN DỊCH (CAMPAIGNS) ===

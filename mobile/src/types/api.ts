@@ -210,6 +210,11 @@ export interface TeamMemberItem {
   joined_at: string;
 }
 
+export interface TeamSkillOption {
+  code: string;
+  display_name: string;
+}
+
 export interface RegionItem {
   code: string;
   name: string;

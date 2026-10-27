@@ -32,6 +32,7 @@ interface LocationPickerModalProps {
   initialAddressNote?: string;
   title?: string;
   confirmButtonText?: string;
+  disableExternalGeocoding?: boolean;
   onClose: () => void;
   onConfirm: (coordinates: [number, number], addressNote?: string) => void;
 }
@@ -83,6 +84,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   initialAddressNote = "",
   title = "Ghim Vị Trí Cứu Nạn",
   confirmButtonText = "Xác nhận vị trí này",
+  disableExternalGeocoding = false,
   onClose,
   onConfirm,
 }) => {
@@ -123,6 +125,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   const addressLookupRequestRef = useRef(0);
 
   const resolveSelectedAddress = useCallback(async (lat: number, lng: number) => {
+    if (disableExternalGeocoding) return;
     const requestId = ++addressLookupRequestRef.current;
     setDetectedAddress("");
     setAddressLookupError(false);
@@ -157,7 +160,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     } finally {
       if (requestId === addressLookupRequestRef.current) setIsResolvingAddress(false);
     }
-  }, []);
+  }, [disableExternalGeocoding]);
 
   // Cập nhật khi mở modal hoặc initialCoordinates thay đổi
   useEffect(() => {
@@ -196,6 +199,10 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   }, [visible, initialCoordinates, isMapReady]);
 
   useEffect(() => {
+    if (disableExternalGeocoding) {
+      addressLookupRequestRef.current += 1;
+      return;
+    }
     if (!visible || !initialCoordinates) {
       addressLookupRequestRef.current += 1;
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -205,7 +212,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       return;
     }
     void resolveSelectedAddress(initialCoordinates[1], initialCoordinates[0]);
-  }, [visible, initialCoordinates, resolveSelectedAddress]);
+  }, [visible, initialCoordinates, resolveSelectedAddress, disableExternalGeocoding]);
 
   // Xử lý message từ Leaflet Map trong WebView
   const handleWebViewMessage = (event: any) => {
@@ -230,7 +237,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
           setIsLocationSelected(true);
           setLatInput(newLat.toFixed(6));
           setLngInput(newLng.toFixed(6));
-          void resolveSelectedAddress(newLat, newLng);
+          if (!disableExternalGeocoding) void resolveSelectedAddress(newLat, newLng);
         }
       }
     } catch {
@@ -240,6 +247,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
   // Xử lý tìm kiếm địa chỉ bằng Photon API
   const handleSearch = async () => {
+    if (disableExternalGeocoding) return;
     const q = searchQuery.trim();
     if (!q) return;
 
@@ -334,7 +342,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       setIsLocationSelected(true);
       setLatInput(newLat.toFixed(6));
       setLngInput(newLng.toFixed(6));
-      void resolveSelectedAddress(newLat, newLng);
+      if (!disableExternalGeocoding) void resolveSelectedAddress(newLat, newLng);
 
       // Di chuyển bản đồ tới tọa độ GPS mới
       webViewRef.current?.injectJavaScript(`
@@ -369,7 +377,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     setLongitude(parsedLng);
     setLatitude(parsedLat);
     setIsLocationSelected(true);
-    void resolveSelectedAddress(parsedLat, parsedLng);
+    if (!disableExternalGeocoding) void resolveSelectedAddress(parsedLat, parsedLng);
     webViewRef.current?.injectJavaScript(`
       if (typeof window.updateMapLocation === 'function') {
         window.updateMapLocation(${parsedLat}, ${parsedLng}, 16);
@@ -533,7 +541,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
         </View>
 
         {/* Thanh Tìm Kiếm Địa Điểm Thông Minh (Search Bar) */}
-        <View style={styles.searchSection}>
+        {!disableExternalGeocoding ? <View style={styles.searchSection}>
           <View style={styles.searchBar}>
             <Search size={18} color={THEME.colors.text.muted} />
             <TextInput
@@ -610,7 +618,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
           {searchError ? (
             <Text style={styles.searchErrorText}>{searchError}</Text>
           ) : null}
-        </View>
+        </View> : null}
 
         {/* Khu vực Bản đồ Tương tác Leaflet / OpenStreetMap */}
         <View style={styles.mapContainer}>
@@ -658,7 +666,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
         </View>
 
         {/* Khung địa danh người dùng đã chọn từ tìm kiếm */}
-        <View style={styles.detectedAddressBox}>
+        {!disableExternalGeocoding ? <View style={styles.detectedAddressBox}>
           <View style={styles.detectedHeaderRow}>
             <Compass size={16} color={THEME.colors.primary.main} />
             <Text style={styles.detectedTitle}>ĐỊA BÀN CỦA VỊ TRÍ ĐANG GHIM:</Text>
@@ -680,7 +688,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               <ArrowRight size={13} color={THEME.colors.primary.main} />
             </TouchableOpacity>
           ) : null}
-        </View>
+        </View> : null}
 
         {/* Khu vực Nhập / Chỉnh sửa Chi tiết Tọa độ */}
         <ScrollView

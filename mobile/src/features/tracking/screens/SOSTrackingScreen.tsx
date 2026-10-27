@@ -53,6 +53,9 @@ export const SOSTrackingScreen: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [trackingCodeError, setTrackingCodeError] = useState<string | undefined>();
   const [trackingSecretError, setTrackingSecretError] = useState<string | undefined>();
+  const [eventsCursor, setEventsCursor] = useState<string | undefined>();
+  const [eventsMore, setEventsMore] = useState(false);
+  const [loadingOlderEvents, setLoadingOlderEvents] = useState(false);
 
   // State cho Modal bổ sung thông tin
   const [showSupplementModal, setShowSupplementModal] = useState<boolean>(false);
@@ -109,6 +112,8 @@ export const SOSTrackingScreen: React.FC = () => {
 
   const fetchTrackingData = useCallback(async () => {
     const normalizedCode = trackingCode.trim().toUpperCase();
+    setEventsCursor(undefined);
+    setEventsMore(false);
     if (!normalizedCode) {
       setLoading(false);
       setData(null);
@@ -161,9 +166,9 @@ export const SOSTrackingScreen: React.FC = () => {
       if (result?.id) {
         try {
           const eventsRes = await ResponseApi.getRequestEvents(result.id, normalizedCode, secret);
-          if (eventsRes?.items && eventsRes.items.length > 0) {
-            setData((prev) => (prev ? { ...prev, timeline: eventsRes.items as any } : prev));
-          }
+          setData((prev) => (prev ? { ...prev, timeline: [...eventsRes.items].reverse() as any } : prev));
+          setEventsCursor(eventsRes.cursor);
+          setEventsMore(eventsRes.more);
         } catch {
           // Nếu không tải được events nâng cao, vẫn dùng timeline mặc định từ result
         }
@@ -174,6 +179,27 @@ export const SOSTrackingScreen: React.FC = () => {
       setLoading(false);
     }
   }, [trackingCode, trackingSecret, isAuthenticated]);
+
+  const loadOlderEvents = async () => {
+    if (!data?.id || !eventsMore || !eventsCursor || loadingOlderEvents) return;
+    setLoadingOlderEvents(true);
+    try {
+      const code = trackingCode.trim().toUpperCase();
+      let secret = trackingSecret || undefined;
+      if (!secret) secret = (await StorageService.getSecretForTrackingCode(code)) || undefined;
+      const page = await ResponseApi.getRequestEvents(data.id, code, secret, eventsCursor);
+      const olderEvents = [...page.items].reverse();
+      setData((current) => current
+        ? { ...current, timeline: [...(olderEvents as any[]), ...(current.timeline || [])] }
+        : current);
+      setEventsCursor(page.cursor);
+      setEventsMore(page.more);
+    } catch (error) {
+      Alert.alert('Không thể tải lịch sử', getApiErrorMessage(error, 'Không thể tải các cập nhật trước đó. Vui lòng thử lại.'));
+    } finally {
+      setLoadingOlderEvents(false);
+    }
+  };
 
   useEffect(() => {
     if (initialCode && !initialFetchStarted.current) {
@@ -566,6 +592,19 @@ export const SOSTrackingScreen: React.FC = () => {
           {/* DÒNG THỜI GIAN TIẾN TRÌNH CỨU HỘ (TIMELINE THỜI GIAN THỰC) */}
           <View style={styles.timelineCard}>
             <Text style={styles.sectionTitle}>TIẾN TRÌNH ĐIỀU PHỐI & CỨU HỘ</Text>
+
+            {eventsMore && (
+              <TouchableOpacity
+                style={styles.olderEventsButton}
+                onPress={loadOlderEvents}
+                disabled={loadingOlderEvents}
+                activeOpacity={0.8}
+              >
+                {loadingOlderEvents
+                  ? <ActivityIndicator size="small" color={THEME.colors.primary.main} />
+                  : <Text style={styles.olderEventsButtonText}>Xem các cập nhật trước đó</Text>}
+              </TouchableOpacity>
+            )}
 
             {data.timeline && data.timeline.length > 0 ? (
               data.timeline.map((evt, idx) => {
@@ -1017,6 +1056,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: THEME.colors.surface.border,
     ...THEME.shadows.sm,
+  },
+  olderEventsButton: {
+    alignSelf: 'flex-start',
+    minHeight: 38,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+    backgroundColor: THEME.colors.surface.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  olderEventsButtonText: {
+    color: THEME.colors.primary.main,
+    fontSize: THEME.typography.fontSizes.xs + 1,
+    fontWeight: '700',
   },
   sectionTitle: {
     fontSize: THEME.typography.fontSizes.xs,

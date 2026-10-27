@@ -16,11 +16,12 @@ import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { FormFieldError } from '../../../components/common/FormFieldError';
 import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
+import { LocationPickerModal } from '../../../components/common/LocationPickerModal';
 import { useAuthStore } from '../../../store/authStore';
 import { useLocation } from '../../../hooks/useLocation';
 import { ResponseApi } from '../../../api/responseApi';
 import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
-import { RescueTeamDetail, Mission } from '../../../types/api';
+import { GeoLocation, RescueTeamDetail, Mission, TeamSkillOption } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
 import { isValidUuid } from '../../../utils/formValidation';
 import { RESCUE_TEAM_KIND_LABELS, RESCUE_SKILL_LABELS } from '../../../constants/labels';
@@ -43,8 +44,12 @@ import {
   Flag,
   Bell,
   UserPlus,
+  UserMinus,
+  Crown,
   X,
 } from 'lucide-react-native';
+
+type TeamMemberAction = 'ADD' | 'REMOVE' | 'TRANSFER_LEADER';
 
 export const TeamDashboardScreen: React.FC = () => {
   const router = useRouter();
@@ -59,18 +64,29 @@ export const TeamDashboardScreen: React.FC = () => {
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
   const [showUserIdModal, setShowUserIdModal] = useState<boolean>(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState<boolean>(false);
+  const [memberAction, setMemberAction] = useState<TeamMemberAction>('ADD');
   const [newMemberUserId, setNewMemberUserId] = useState<string>('');
   const [memberIdError, setMemberIdError] = useState<string | undefined>();
   const [isAddingMember, setIsAddingMember] = useState<boolean>(false);
+  const [teamSkills, setTeamSkills] = useState<TeamSkillOption[]>([]);
+  const [showTeamProfileModal, setShowTeamProfileModal] = useState(false);
+  const [teamNameDraft, setTeamNameDraft] = useState('');
+  const [teamSkillDraft, setTeamSkillDraft] = useState<string[]>([]);
+  const [teamSkillsChanged, setTeamSkillsChanged] = useState(false);
+  const [teamProfileError, setTeamProfileError] = useState<string | undefined>();
+  const [isSavingTeamProfile, setIsSavingTeamProfile] = useState(false);
+  const [showPositionPicker, setShowPositionPicker] = useState(false);
 
   const loadTeamData = async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const [teamsPage, missionsPage] = await Promise.all([
+      const [teamsPage, missionsPage, skillsResult] = await Promise.all([
         ResponseApi.getMyTeams(),
         ResponseApi.getMyMissions(),
+        ResponseApi.getTeamSkills().catch(() => ({ items: [] as TeamSkillOption[] })),
       ]);
+      setTeamSkills(skillsResult.items);
       const teamsData = teamsPage.items;
       const missionsData = missionsPage.items;
 
@@ -111,20 +127,13 @@ export const TeamDashboardScreen: React.FC = () => {
     const prevValue = isAvailable;
     setIsAvailable(nextValue);
     try {
-      await ResponseApi.updateTeamAvailability(
+      const updated = await ResponseApi.updateTeamAvailability(
         team.id,
         team.version,
         nextValue ? 'AVAILABLE' : 'UNAVAILABLE'
       );
-      setTeam((prev) =>
-        prev
-          ? {
-              ...prev,
-              availability: nextValue ? 'AVAILABLE' : 'UNAVAILABLE',
-              version: prev.version + 1,
-            }
-          : null
-      );
+      setTeam(updated);
+      setIsAvailable(updated.availability === 'AVAILABLE');
     } catch (err: any) {
       setIsAvailable(prevValue);
       if (isApiErrorCode(err, 'FORBIDDEN')) {
@@ -167,12 +176,124 @@ export const TeamDashboardScreen: React.FC = () => {
     }
   };
 
+  const handleManualPositionConfirm = async (coordinates: [number, number], addressNote?: string) => {
+    if (!team) return;
+    setShowPositionPicker(false);
+    setIsUpdatingPosition(true);
+    const manualLocation: GeoLocation = {
+      type: 'Point',
+      coordinates,
+      source: 'MANUAL_PIN',
+      captured_at: new Date().toISOString(),
+    };
+    try {
+      await ResponseApi.updateTeamPosition(team.id, manualLocation, addressNote);
+      Alert.alert('Đã cập nhật vị trí', 'Vị trí ghim thủ công của đội đã được ghi nhận.');
+      await loadTeamData();
+    } catch (err: any) {
+      Alert.alert('Lỗi cập nhật', getApiErrorMessage(err, 'Không thể cập nhật vị trí đội.'));
+    } finally {
+      setIsUpdatingPosition(false);
+    }
+  };
+
+  const openTeamProfileEditor = () => {
+    if (!team) return;
+    setTeamNameDraft(team.name);
+    setTeamSkillDraft([...team.skills]);
+    setTeamSkillsChanged(false);
+    setTeamProfileError(undefined);
+    setShowTeamProfileModal(true);
+  };
+
+  const toggleTeamSkill = (code: string) => {
+    setTeamSkillsChanged(true);
+    setTeamSkillDraft((current) => current.includes(code)
+      ? current.filter((item) => item !== code)
+      : [...current, code]);
+  };
+
+  const handleSaveTeamProfile = async () => {
+    if (!team) return;
+    const name = teamNameDraft.trim();
+    if (!name) {
+      setTeamProfileError('Vui lòng nhập tên đội cứu hộ.');
+      return;
+    }
+    if (name.length > 200) {
+      setTeamProfileError('Tên đội không được vượt quá 200 ký tự.');
+      return;
+    }
+    setTeamProfileError(undefined);
+    setIsSavingTeamProfile(true);
+    try {
+      const updated = await ResponseApi.updateTeamProfile(team.id, team.version, {
+        name,
+        ...(teamSkillsChanged ? { skill_codes: teamSkillDraft } : {}),
+      });
+      setTeam(updated);
+      setTeamNameDraft(updated.name);
+      setTeamSkillDraft([...updated.skills]);
+      setTeamSkillsChanged(false);
+      setShowTeamProfileModal(false);
+      Alert.alert('Đã lưu hồ sơ đội', 'Tên đội và kỹ năng chuyên môn đã được cập nhật.');
+    } catch (err: any) {
+      if (isApiErrorCode(err, 'VERSION_CONFLICT')) {
+        await loadTeamData();
+        setShowTeamProfileModal(false);
+        Alert.alert('Hồ sơ đội đã thay đổi', 'Dữ liệu mới đã được tải. Hãy mở lại phần chỉnh sửa trước khi lưu.');
+      } else {
+        setTeamProfileError(getApiErrorMessage(err, 'Không thể cập nhật hồ sơ đội.'));
+      }
+    } finally {
+      setIsSavingTeamProfile(false);
+    }
+  };
+
   const handleCopyUserId = () => {
     if (!user?.id) return;
     setShowUserIdModal(true);
   };
 
-  const handleAddMember = async () => {
+  const executeMemberAction = async (userId: string) => {
+    if (!team) return;
+    setIsAddingMember(true);
+    try {
+      if (memberAction === 'ADD') {
+        await ResponseApi.addTeamMember(team.id, userId);
+        Alert.alert('Thành công', 'Đã thêm thành viên mới vào đội cứu hộ.');
+      } else if (memberAction === 'REMOVE') {
+        await ResponseApi.removeTeamMember(team.id, userId);
+        Alert.alert('Đã gỡ thành viên', 'Tài khoản đã được gỡ khỏi đội cứu hộ.');
+      } else {
+        await ResponseApi.transferTeamLeader(team.id, userId, team.version);
+        Alert.alert('Đã chuyển quyền đội trưởng', 'Quyền đội trưởng đã được chuyển cho thành viên được chọn.');
+      }
+      setNewMemberUserId('');
+      setMemberIdError(undefined);
+      setShowAddMemberModal(false);
+      await loadTeamData();
+    } catch (err: unknown) {
+      if (isApiErrorCode(err, 'USER_IN_OTHER_TEAM')) {
+        Alert.alert('Không thể thêm', 'Tài khoản này hiện đang thuộc một đội cứu hộ khác.');
+      } else if (isApiErrorCode(err, 'NOT_FOUND')) {
+        Alert.alert('Không tìm thấy', 'Không tìm thấy tài khoản phù hợp. Hãy kiểm tra mã ID và vai trò thành viên.');
+      } else if (isApiErrorCode(err, 'FORBIDDEN', 'MISSION_NOT_LEADER')) {
+        Alert.alert('Chưa có quyền', 'Chỉ đội trưởng đang hoạt động mới có quyền quản lý thành viên của đội.');
+      } else if (isApiErrorCode(err, 'LEADER_REQUIRED')) {
+        Alert.alert('Không thể gỡ thành viên', 'Đội phải luôn có đội trưởng. Hãy chuyển quyền trước khi gỡ tài khoản này.');
+      } else if (isApiErrorCode(err, 'VERSION_CONFLICT')) {
+        Alert.alert('Dữ liệu đã thay đổi', 'Hãy tải lại thông tin đội trước khi chuyển quyền đội trưởng.');
+        await loadTeamData();
+      } else {
+        Alert.alert('Không thể cập nhật thành viên', getApiErrorMessage(err, 'Vui lòng thử lại.'));
+      }
+    } finally {
+      setIsAddingMember(false);
+    }
+  };
+
+  const handleMemberActionSubmit = () => {
     const trimmedId = newMemberUserId.trim();
     if (!team) return;
     if (!trimmedId) {
@@ -184,30 +305,35 @@ export const TeamDashboardScreen: React.FC = () => {
       return;
     }
     setMemberIdError(undefined);
-    setIsAddingMember(true);
-    try {
-      await ResponseApi.addTeamMember(team.id, trimmedId);
-      Alert.alert('Thành công', 'Đã thêm thành viên mới vào đội cứu hộ.');
-      setNewMemberUserId('');
-      setMemberIdError(undefined);
-      setShowAddMemberModal(false);
-      await loadTeamData();
-    } catch (err: unknown) {
-      if (isApiErrorCode(err, 'USER_IN_OTHER_TEAM')) {
-        Alert.alert('Không thể thêm', 'Tài khoản này hiện đang thuộc một đội cứu hộ khác.');
-      } else if (isApiErrorCode(err, 'NOT_FOUND')) {
-        Alert.alert('Không tìm thấy', 'Không tìm thấy tài khoản với mã ID đã nhập. Vui lòng kiểm tra lại.');
-      } else if (isApiErrorCode(err, 'FORBIDDEN', 'MISSION_NOT_LEADER')) {
-        Alert.alert('Chưa có quyền', 'Chỉ Đội trưởng đang hoạt động mới có quyền ghi danh thành viên vào đội.');
-      } else {
-        Alert.alert('Lỗi thêm thành viên', getApiErrorMessage(err, 'Không thể thêm thành viên vào đội. Vui lòng thử lại.'));
-      }
-    } finally {
-      setIsAddingMember(false);
+    const copy = {
+      ADD: { title: 'Xác nhận thêm thành viên', message: 'Thêm tài khoản này vào đội cứu hộ?', action: 'Thêm thành viên' },
+      REMOVE: { title: 'Xác nhận gỡ thành viên', message: 'Gỡ tài khoản này khỏi đội cứu hộ?', action: 'Gỡ thành viên' },
+      TRANSFER_LEADER: { title: 'Xác nhận chuyển quyền', message: 'Chuyển quyền đội trưởng cho tài khoản này? Thao tác chỉ dành cho thành viên đang có trong đội.', action: 'Chuyển quyền' },
+    }[memberAction];
+    if (memberAction === 'ADD') {
+      void executeMemberAction(trimmedId);
+      return;
     }
+    Alert.alert(copy.title, copy.message, [
+      { text: 'Hủy', style: 'cancel' },
+      { text: copy.action, style: memberAction === 'REMOVE' ? 'destructive' : 'default', onPress: () => void executeMemberAction(trimmedId) },
+    ]);
   };
 
-  const addMemberDisabled = isAddingMember || newMemberUserId.length > 36 || !isValidUuid(newMemberUserId);
+  const memberActionCopy = {
+    ADD: { title: 'Thêm thành viên vào đội', help: 'Nhập mã ID do tình nguyện viên cung cấp để ghi danh vào đội.', button: 'Ghi danh vào đội', placeholder: 'Mã ID tình nguyện viên (UUID)' },
+    REMOVE: { title: 'Gỡ thành viên khỏi đội', help: 'Nhập mã ID của thành viên cần gỡ. Đội trưởng hiện tại không thể tự gỡ nếu chưa chuyển quyền.', button: 'Gỡ khỏi đội', placeholder: 'Mã ID thành viên (UUID)' },
+    TRANSFER_LEADER: { title: 'Chuyển quyền đội trưởng', help: 'Nhập mã ID của thành viên đang có trong đội để chuyển quyền đội trưởng.', button: 'Chuyển quyền', placeholder: 'Mã ID thành viên mới (UUID)' },
+  }[memberAction];
+
+  const openMemberAction = (action: TeamMemberAction) => {
+    setMemberAction(action);
+    setNewMemberUserId('');
+    setMemberIdError(undefined);
+    setShowAddMemberModal(true);
+  };
+
+  const memberActionDisabled = isAddingMember || newMemberUserId.length > 36 || !isValidUuid(newMemberUserId);
 
   const handleLogout = async () => {
     Alert.alert('Xác nhận đăng xuất', 'Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?', [
@@ -440,7 +566,9 @@ export const TeamDashboardScreen: React.FC = () => {
               </View>
               <View style={styles.skillsList}>
                 {team.skills.map((skillItem, idx) => {
-                  const label = RESCUE_SKILL_LABELS[skillItem] || 'Kỹ năng chuyên môn khác';
+                  const label = teamSkills.find((skill) => skill.code === skillItem)?.display_name
+                    || RESCUE_SKILL_LABELS[skillItem]
+                    || 'Kỹ năng chuyên môn khác';
                   return (
                     <View key={`${skillItem}-${idx}`} style={styles.skillChip}>
                       <Text style={styles.skillChipText}>{label}</Text>
@@ -450,6 +578,14 @@ export const TeamDashboardScreen: React.FC = () => {
               </View>
             </View>
           )}
+
+          <TouchableOpacity
+            style={styles.profileEditButton}
+            onPress={openTeamProfileEditor}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.profileEditButtonText}>Chỉnh sửa tên đội và kỹ năng</Text>
+          </TouchableOpacity>
 
           {/* Trạng thái sẵn sàng nhận lệnh của đội */}
           <View style={styles.availabilityRow}>
@@ -480,26 +616,43 @@ export const TeamDashboardScreen: React.FC = () => {
             <Text style={styles.cardTitle}>TỌA ĐỘ VỊ TRÍ DI QUÂN CỦA ĐỘI</Text>
           </View>
           <Text style={styles.cardDesc}>
-            Vị trí đội được cập nhật từ GPS của thiết bị và được kiểm tra theo quyền hiện tại.
+            Cập nhật vị trí khi đội di chuyển. Bạn có thể gửi GPS hiện tại hoặc ghim vị trí thủ công; không bật theo dõi nền.
           </Text>
 
           <TouchableOpacity
-              style={[styles.beaconButton, isUpdatingPosition && { opacity: 0.7 }]}
-              onPress={handleBroadcastPosition}
-              disabled={isUpdatingPosition}
-              activeOpacity={0.85}
-            >
-              {isUpdatingPosition ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Radio size={20} color="#FFFFFF" />
-                  <Text style={styles.beaconButtonText}>Phát Tín Hiệu Vị Trí Hiện Tại</Text>
-                </>
-              )}
+            style={[styles.beaconButton, isUpdatingPosition && { opacity: 0.7 }]}
+            onPress={handleBroadcastPosition}
+            disabled={isUpdatingPosition}
+            activeOpacity={0.85}
+          >
+            {isUpdatingPosition ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Radio size={20} color="#FFFFFF" />
+                <Text style={styles.beaconButtonText}>Phát tín hiệu GPS hiện tại</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.manualPositionButton, isUpdatingPosition && { opacity: 0.7 }]}
+            onPress={() => setShowPositionPicker(true)}
+            disabled={isUpdatingPosition}
+            activeOpacity={0.85}
+          >
+            <MapPin size={18} color={THEME.colors.primary.main} />
+            <Text style={styles.manualPositionButtonText}>Ghim vị trí đội trên bản đồ</Text>
           </TouchableOpacity>
           {team.position?.age_s != null ? (
-            <Text style={styles.memberNote}>Lần cập nhật vị trí gần nhất: {team.position.age_s} giây trước.</Text>
+            <Text style={styles.memberNote}>
+              Lần cập nhật gần nhất: {team.position.age_s} giây trước · {
+                team.position.source === 'MANUAL_PIN'
+                  ? 'ghim thủ công'
+                  : team.position.source === 'COORDINATOR_REPORTED'
+                    ? 'điều phối viên ghi nhận'
+                    : 'GPS'
+              }
+            </Text>
           ) : null}
         </View>
 
@@ -559,17 +712,22 @@ export const TeamDashboardScreen: React.FC = () => {
             <Text style={styles.cardTitle}>QUẢN LÝ THÀNH VIÊN ĐỘI</Text>
           </View>
           <Text style={styles.cardDesc}>
-            Đội trưởng có thể ghi danh các tình nguyện viên tự do vào biên chế đội bằng Mã ID tài khoản của họ.
+            Sử dụng mã ID tài khoản do thành viên cung cấp để thêm, gỡ hoặc chuyển quyền đội trưởng. Máy chủ kiểm tra quyền và tư cách thành viên trước khi lưu.
           </Text>
-
-          <TouchableOpacity
-            style={styles.addMemberBtn}
-            onPress={() => setShowAddMemberModal(true)}
-            activeOpacity={0.85}
-          >
-            <UserPlus size={18} color="#FFFFFF" />
-            <Text style={styles.addMemberBtnText}>Thêm Thành Viên Vào Đội</Text>
-          </TouchableOpacity>
+          <View style={styles.memberActionsRow}>
+            <TouchableOpacity style={styles.memberActionButton} onPress={() => openMemberAction('ADD')} activeOpacity={0.85}>
+              <UserPlus size={16} color="#FFFFFF" />
+              <Text style={styles.memberActionButtonText}>Thêm</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.memberActionButton, styles.memberActionSecondary]} onPress={() => openMemberAction('REMOVE')} activeOpacity={0.85}>
+              <UserMinus size={16} color={THEME.colors.emergency.main} />
+              <Text style={styles.memberActionSecondaryText}>Gỡ</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.memberActionButton, styles.memberActionSecondary]} onPress={() => openMemberAction('TRANSFER_LEADER')} activeOpacity={0.85}>
+              <Crown size={16} color={THEME.colors.primary.main} />
+              <Text style={styles.memberActionSecondaryText}>Chuyển đội trưởng</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
 
@@ -578,18 +736,18 @@ export const TeamDashboardScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalTitle}>Thêm Thành Viên Vào Đội</Text>
+              <Text style={styles.modalTitle}>{memberActionCopy.title}</Text>
               <TouchableOpacity onPress={() => setShowAddMemberModal(false)} disabled={isAddingMember}>
                 <X size={20} color={THEME.colors.text.muted} />
               </TouchableOpacity>
             </View>
             <Text style={styles.modalSubtitle}>
-              Nhập mã định danh (User ID) do tình nguyện viên cung cấp để ghi danh vào đội cứu hộ.
+              {memberActionCopy.help}
             </Text>
             <Text style={styles.modalSubtitle}>Mã tài khoản (UUID) <RequiredAsterisk /></Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="Nhập mã ID tình nguyện viên (UUID)..."
+              placeholder={memberActionCopy.placeholder}
               placeholderTextColor={THEME.colors.text.muted}
               value={newMemberUserId}
               onChangeText={(value) => {
@@ -621,20 +779,99 @@ export const TeamDashboardScreen: React.FC = () => {
                 <Text style={styles.modalCancelText}>Hủy bỏ</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, addMemberDisabled && { opacity: 0.5 }]}
-                onPress={handleAddMember}
-                disabled={addMemberDisabled}
+                style={[styles.modalSubmitBtn, memberActionDisabled && { opacity: 0.5 }]}
+                onPress={handleMemberActionSubmit}
+                disabled={memberActionDisabled}
               >
                 {isAddingMember ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.modalSubmitText}>Ghi danh vào đội</Text>
+                  <Text style={styles.modalSubmitText}>{memberActionCopy.button}</Text>
                 )}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+      <Modal visible={showTeamProfileModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.profileModalBox}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>Chỉnh sửa hồ sơ đội</Text>
+              <TouchableOpacity onPress={() => setShowTeamProfileModal(false)} disabled={isSavingTeamProfile}>
+                <X size={20} color={THEME.colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalSubtitle}>Tên đội cứu hộ <RequiredAsterisk /></Text>
+              <TextInput
+                style={styles.modalInput}
+                value={teamNameDraft}
+                onChangeText={(value) => {
+                  setTeamNameDraft(value);
+                  setTeamProfileError(undefined);
+                }}
+                placeholder="Nhập tên đội"
+                placeholderTextColor={THEME.colors.text.muted}
+                maxLength={200}
+                editable={!isSavingTeamProfile}
+              />
+              <Text style={styles.skillPickerHeading}>KỸ NĂNG CHUYÊN MÔN</Text>
+              {teamSkills.length > 0 ? teamSkills.map((skill) => {
+                const selected = teamSkillDraft.includes(skill.code);
+                return (
+                  <TouchableOpacity
+                    key={skill.code}
+                    style={[styles.skillOption, selected && styles.skillOptionSelected]}
+                    onPress={() => toggleTeamSkill(skill.code)}
+                    disabled={isSavingTeamProfile}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.skillCheckbox, selected && styles.skillCheckboxSelected]}>
+                      {selected ? <Text style={styles.skillCheckboxMark}>✓</Text> : null}
+                    </View>
+                    <Text style={[styles.skillOptionText, selected && styles.skillOptionTextSelected]}>
+                      {skill.display_name || RESCUE_SKILL_LABELS[skill.code] || skill.code}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }) : (
+                <Text style={styles.skillLoadHint}>
+                  Chưa tải được danh mục kỹ năng. Bạn vẫn có thể lưu tên đội; danh sách kỹ năng sẽ được giữ nguyên.
+                </Text>
+              )}
+              <FormFieldError message={teamProfileError} />
+              <View style={styles.modalButtonRow}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => setShowTeamProfileModal(false)}
+                  disabled={isSavingTeamProfile}
+                >
+                  <Text style={styles.modalCancelText}>Hủy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalSubmitBtn, (isSavingTeamProfile || !teamNameDraft.trim()) && { opacity: 0.5 }]}
+                  onPress={handleSaveTeamProfile}
+                  disabled={isSavingTeamProfile || !teamNameDraft.trim()}
+                >
+                  {isSavingTeamProfile
+                    ? <ActivityIndicator size="small" color="#FFFFFF" />
+                    : <Text style={styles.modalSubmitText}>Lưu hồ sơ đội</Text>}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+      <LocationPickerModal
+        visible={showPositionPicker}
+        initialCoordinates={location?.coordinates}
+        disableExternalGeocoding
+        title="Ghim vị trí đội cứu hộ"
+        confirmButtonText="Cập nhật vị trí đội"
+        onClose={() => setShowPositionPicker(false)}
+        onConfirm={handleManualPositionConfirm}
+      />
       {showUserIdModal && user?.id ? (
         <CopyableInfoModal
           visible
@@ -943,6 +1180,20 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 6,
   },
+  profileEditButton: {
+    alignSelf: 'flex-start',
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: THEME.colors.primary.main,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 10,
+  },
+  profileEditButtonText: {
+    fontSize: THEME.typography.fontSizes.xs,
+    fontWeight: '700',
+    color: THEME.colors.primary.main,
+  },
 
   // THẺ CHUNG
   card: {
@@ -983,6 +1234,22 @@ const styles = StyleSheet.create({
   },
   beaconButtonText: {
     color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: THEME.typography.fontSizes.sm,
+    marginLeft: 8,
+  },
+  manualPositionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: THEME.colors.primary.main,
+    marginTop: 10,
+  },
+  manualPositionButtonText: {
+    color: THEME.colors.primary.main,
     fontWeight: '700',
     fontSize: THEME.typography.fontSizes.sm,
     marginLeft: 8,
@@ -1041,21 +1308,37 @@ const styles = StyleSheet.create({
     color: THEME.colors.primary.main,
     marginRight: 4,
   },
-  addMemberBtn: {
+  memberActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  memberActionButton: {
+    flex: 1,
+    minHeight: 42,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 9,
     backgroundColor: THEME.colors.primary.main,
-    borderRadius: 10,
-    marginTop: 10,
-    ...THEME.shadows.sm,
   },
-  addMemberBtnText: {
-    fontSize: THEME.typography.fontSizes.xs + 1,
+  memberActionSecondary: {
+    backgroundColor: THEME.colors.surface.background,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+  },
+  memberActionButtonText: {
+    marginLeft: 5,
+    fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
-    marginLeft: 6,
+  },
+  memberActionSecondaryText: {
+    marginLeft: 5,
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.colors.text.primary,
   },
   modalOverlay: {
     flex: 1,
@@ -1066,6 +1349,14 @@ const styles = StyleSheet.create({
   },
   modalBox: {
     width: '100%',
+    backgroundColor: THEME.colors.surface.card,
+    borderRadius: 16,
+    padding: 20,
+    ...THEME.shadows.md,
+  },
+  profileModalBox: {
+    width: '100%',
+    maxHeight: '88%',
     backgroundColor: THEME.colors.surface.card,
     borderRadius: 16,
     padding: 20,
@@ -1125,5 +1416,62 @@ const styles = StyleSheet.create({
     fontSize: THEME.typography.fontSizes.xs + 1,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  skillPickerHeading: {
+    color: THEME.colors.text.secondary,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    marginBottom: 8,
+  },
+  skillOption: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 9,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+    backgroundColor: THEME.colors.surface.background,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+  },
+  skillOptionSelected: {
+    backgroundColor: THEME.colors.primary.bg,
+    borderColor: THEME.colors.primary.main,
+  },
+  skillCheckbox: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: THEME.colors.text.muted,
+    marginRight: 10,
+  },
+  skillCheckboxSelected: {
+    backgroundColor: THEME.colors.primary.main,
+    borderColor: THEME.colors.primary.main,
+  },
+  skillCheckboxMark: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '800',
+  },
+  skillOptionText: {
+    flex: 1,
+    fontSize: THEME.typography.fontSizes.xs + 1,
+    color: THEME.colors.text.primary,
+  },
+  skillOptionTextSelected: {
+    fontWeight: '700',
+    color: THEME.colors.primary.dark,
+  },
+  skillLoadHint: {
+    color: THEME.colors.text.secondary,
+    fontSize: THEME.typography.fontSizes.xs,
+    lineHeight: 18,
+    paddingVertical: 8,
   },
 });
