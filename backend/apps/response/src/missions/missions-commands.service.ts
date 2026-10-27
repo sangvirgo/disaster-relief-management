@@ -6,7 +6,7 @@ import { AppError } from '../../../../packages/technical/src/errors/errors';
 import {
   canonicalRequestHash, IdempotencyService, IdempotentOutcome, IdempotentResult,
 } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';
 import { RequestOperationsService } from '../operations/request-operations.service';
 import { cleanText, checkVersion } from '../operations/request-operations.helpers';

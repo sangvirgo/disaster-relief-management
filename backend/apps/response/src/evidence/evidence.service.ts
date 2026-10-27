@@ -5,7 +5,7 @@ import type { Request } from 'express';
 import { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { JobRunner } from '../../../../packages/technical/src/persistence/jobs';
 import { hashPurposeBoundSecret } from '../../../../packages/technical/src/security/secret-hash';
 import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';

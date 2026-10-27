@@ -18,7 +18,9 @@ Usage: PGSERVICE_IDENTITY=c48-recovery-identity \
 
 Restores the three PostgreSQL custom dumps into an existing empty database
 whose name starts with c48_recovery_. It never creates or drops a database and
-refuses the primary C48 database names. Evidence objects are restored separately
+refuses the primary C48 database names. Requires pre-provisioned service roles,
+fresh recovery credentials, database ownership, and a recovery superuser; archive
+ownership and grants are retained and checked. Evidence objects are restored separately
 with the matching isolated MinIO endpoint, as described in docs/backend/t18-hardening.md.
 USAGE
 }
@@ -45,6 +47,7 @@ case "$backup_dir/" in
 esac
 [[ -f "$backup_dir/manifest.txt" && -f "$backup_dir/manifest.sha256" ]] || fail 'the backup manifest is missing'
 (cd -- "$backup_dir" && sha256sum --check --strict manifest.sha256 >/dev/null) || fail 'backup checksum validation failed'
+grep -qx 'database_security=owners-and-acls-v1' "$backup_dir/manifest.txt" || fail 'legacy backup does not certify preserved ownership and ACLs; create a new backup'
 
 service_file="$(realpath -e -- "$PGSERVICEFILE")"
 case "$service_file/" in
@@ -193,6 +196,10 @@ SQL
   target_user_object_count="${target_user_object_count//[[:space:]]/}"
   [[ "$target_user_object_count" =~ ^[0-9]+$ ]] || fail 'could not verify recovery database has no user-created objects'
   [[ "$target_user_object_count" == '0' ]] || fail "$target_database is not empty"
+  if ! roles_ok="$(psql "$connection" --no-psqlrc --quiet --tuples-only --no-align --set=ON_ERROR_STOP=1 --set="service=$service_suffix" --file="$script_dir/recovery-roles.sql" 2>/dev/null)"; then
+    fail 'could not verify recovery roles and database ownership'
+  fi
+  [[ "$roles_ok" == 't' ]] || fail 'provision the required recovery roles, memberships, and database ownership before restore'
   archive="$backup_dir/$database.dump"
   [[ -f "$archive" ]] || fail "missing archive for $database"
   pg_restore --list "$archive" >/dev/null || fail "invalid archive for $database"
@@ -203,6 +210,10 @@ for database in c48_identity c48_response c48_logistics; do
   service_variable="PGSERVICE_${service_suffix^^}"
   service_name="${!service_variable}"
   printf 'Restoring %s into the isolated destination.\n' "$database"
-  pg_restore --exit-on-error --no-owner --no-acl --dbname="service=$service_name" "$backup_dir/$database.dump"
+  pg_restore --exit-on-error --single-transaction --dbname="service=$service_name" "$backup_dir/$database.dump"
+  if ! privileges_ok="$(psql "service=$service_name" --no-psqlrc --quiet --tuples-only --no-align --set=ON_ERROR_STOP=1 --set="service=$service_suffix" --file="$script_dir/recovery-privileges.sql" 2>/dev/null)"; then
+    fail 'could not verify restored privileges and stock writer ownership; keep recovery isolated'
+  fi
+  [[ "$privileges_ok" == 't' ]] || fail 'restored privileges or ownership are invalid; keep recovery isolated'
 done
 printf 'Database archives restored. Follow the runbook to restore matching evidence objects and verify metadata-to-object consistency.\n'

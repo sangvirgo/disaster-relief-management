@@ -1,7 +1,7 @@
 import type { Request } from 'express';
 import { jest } from '@jest/globals';
 import type { DataSource } from 'typeorm';
-import type { Grant } from '../../../packages/technical/src/security/permissions';
+import type { Grant } from '../../../packages/identity-contracts/src/permissions';
 import { MapService } from '../src/map/map.service';
 
 const organizationId = '00000000-0000-4000-8000-000000000001';

@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "b794aaf5-169e-470b-a0c4-9a2176a8c480",
     "name": "C48 Backend · API client qua Nginx",
-    "description": "## Bắt đầu\n\n1. Import collection này. Nếu có file environment `C48-Local-Demo.postman_environment.json` trên máy, hãy import và chọn nó; nếu thiếu, tạo environment `C48 Local Demo` rồi đặt `seedPassword` bằng giá trị `SEED_PASSWORD` trong `backend/.env`.\n2. Mặc định, API gọi qua Nginx tại `http://127.0.0.1:8080`. Đảm bảo stack chính đã chạy và đã nạp dữ liệu demo nếu cần tài khoản mẫu.\n3. Mở folder actor, gửi request đăng nhập trước, sau đó gửi từng request theo luồng. Collection tự lưu token, ID và version khi response có các giá trị đó.\n4. Đọc body trước mỗi lệnh ghi: các thay đổi được lưu vào database demo chính. Không chạy hai request đăng ký công dân cho cùng một email.\n\n## Luồng xác thực\n\n- Đăng ký công dân cần `citizenEmail` là email chưa đăng ký và có thể nhận thư. `challengeId` được lưu tự động; nhập mã OTP nhận được vào `emailOtpCode`. Cần cấu hình SMTP.\n- Đăng nhập Google/liên kết Google cần `GOOGLE_CLIENT_IDS` và Google ID token hợp lệ trong `googleIdToken`.\n- Đăng nhập Native dùng Bearer token. Các request phiên WEB riêng cần Origin được allowlist, HTTPS, CookieJar và CSRF.\n\n## Quy ước\n\n- Mọi URL API đi qua Nginx: `/api/v1/identity`, `/api/v1/response`, `/api/v1/logistics`. Collection bỏ qua health check và `/internal/`.\n- SOS dùng `X-Tracking-Code` và `X-Tracking-Secret`; quyên góp công khai dùng `X-Donation-Secret` cho các thao tác cần quyền sở hữu.\n- Request evidence tự bỏ qua khi `aiStorAvailable` chưa được đặt thành `true`; chỉ bật sau khi xác nhận storage đang chạy.\n- Gemini là tùy chọn và advisory luôn cần con người rà soát. Token, OTP và credential không nên được lưu hoặc chia sẻ trong collection đã export.",
+    "description": "## Bắt đầu\n\n1. Chỉ import collection này. URL, tài khoản seed và mật khẩu demo đã có sẵn trong collection; không cần import environment riêng.\n2. Mặc định, API gọi qua Nginx tại `http://127.0.0.1:8080`. Đảm bảo stack chính đã chạy và đã nạp dữ liệu demo nếu cần tài khoản mẫu.\n3. Mở folder actor, gửi request đăng nhập trước, sau đó gửi từng request theo luồng. Collection tự lưu token, ID và version khi response có các giá trị đó.\n4. Đọc body trước mỗi lệnh ghi: các thay đổi được lưu vào database demo chính. Không chạy hai request đăng ký công dân cho cùng một email.\n\n## Luồng xác thực\n\n- Đăng ký công dân cần `citizenEmail` là email chưa đăng ký và có thể nhận thư. `challengeId` được lưu tự động; nhập mã OTP nhận được vào `emailOtpCode`. Cần cấu hình SMTP.\n- Đăng nhập Google/liên kết Google cần `GOOGLE_CLIENT_IDS` và Google ID token hợp lệ trong `googleIdToken`.\n- Đăng nhập Native dùng Bearer token và tự dọn cookie cũ. Nếu Postman báo Cookie Jar chưa được allowlist, thêm `127.0.0.1` trong Cookies > Domains Allowlist hoặc xóa cookie thủ công. Các request phiên WEB riêng cần Origin được allowlist, HTTPS, CookieJar và CSRF.\n\n## Quy ước\n\n- Mọi URL API đi qua Nginx: `/api/v1/identity`, `/api/v1/response`, `/api/v1/logistics`. Collection bỏ qua health check và `/internal/`.\n- SOS dùng `X-Tracking-Code` và `X-Tracking-Secret`; quyên góp công khai dùng `X-Donation-Secret` cho các thao tác cần quyền sở hữu.\n- Request evidence tự bỏ qua khi `aiStorAvailable` chưa được đặt thành `true`; chỉ bật sau khi xác nhận storage đang chạy.\n- Gemini là tùy chọn và advisory luôn cần con người rà soát. Token và OTP không được lưu trong collection. `seedPassword` là mật khẩu demo từ seeder, chỉ dùng với dữ liệu local; không tái sử dụng trên môi trường thật.\n## Tài khoản demo từ seeder\n\nTất cả tài khoản dưới đây được tạo bởi `docs/backend/seed/seed-identity.sql` và dùng chung mật khẩu demo `{{seedPassword}}` đã điền sẵn trong collection. Chỉ dùng collection này với dữ liệu demo local.\n\n| Luồng nghiệp vụ | Tài khoản |\n|---|---|\n| Công dân tự gửi SOS (SELF) | `citizen1` |\n| Công dân gửi thay (PROXY) | `citizen2` |\n| Điều phối viên tổ chức | `coord1`, `coord2` |\n| Điều phối viên vùng DEMO_A | `coord_regional` |\n| Quản lý chiến dịch | `campaign_mgr` |\n| Quản lý vận hành | `ops_mgr` |\n| Tiếp nhận | `intake1`, `intake2` |\n| Duyệt độc lập | `reviewer1`, `reviewer2` |\n| Phân phối | `dist1`, `dist2` |\n| Tình nguyện viên | `vol_leader1`, `vol_leader2`, `vol_member1` |\n| Quản trị hệ thống | `admin` |\n\nMỗi luồng actor có một request login riêng; mỗi request lưu access token và refresh token vào biến riêng của luồng đó. Gửi login trước các request nghiệp vụ trong cùng folder. Các username phụ là lựa chọn thay thế: đặt biến username chính của luồng bằng username phụ rồi gửi login. Tài khoản seed có `must_change_password=true`; chỉ chạy request đổi mật khẩu khi chủ động muốn thay đổi tài khoản demo.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -46,25 +46,13 @@
       "key": "citizenAccessToken",
       "value": "",
       "type": "string",
-      "description": "Filled by the citizen login request during the current Postman session."
-    },
-    {
-      "key": "refreshToken",
-      "value": "",
-      "type": "string",
-      "description": "Rotated by Native login/refresh; clear it after the demo and do not export it."
-    },
-    {
-      "key": "authTokenTarget",
-      "value": "operationsManagerAccessToken",
-      "type": "string",
-      "description": "Collection variable tracking which access-token variable the latest login refreshed."
+      "description": "Access token riêng của flow: Công dân citizen1 trong luồng SELF."
     },
     {
       "key": "operationsManagerAccessToken",
       "value": "",
       "type": "string",
-      "description": "Filled by staff login when valid local credentials are supplied."
+      "description": "Access token riêng của flow: Quản lý vận hành ops_mgr."
     },
     {
       "key": "csrfToken",
@@ -88,7 +76,37 @@
       "key": "requestId",
       "value": "",
       "type": "string",
-      "description": "Captured from a successful SOS creation response; replace manually for another request."
+      "description": "Tự lưu từ response tạo SOS hoặc yêu cầu đầu tiên trong GET /requests."
+    },
+    {
+      "key": "priorityAdvisoryScore",
+      "value": "",
+      "type": "string",
+      "description": "Điểm rủi ro theo quy tắc backend; tự cập nhật khi chạy GET /requests hoặc GET /requests/{id}."
+    },
+    {
+      "key": "priorityAdvisoryLevel",
+      "value": "",
+      "type": "string",
+      "description": "Mức gợi ý: CRITICAL ≥70, HIGH 45–69, ELEVATED 20–44, STANDARD 0–19."
+    },
+    {
+      "key": "priorityAdvisoryReasonCodes",
+      "value": "",
+      "type": "string",
+      "description": "Mảng JSON mã lý do của gợi ý; tự lấy từ priority_advisory.reason_codes."
+    },
+    {
+      "key": "priorityAdvisorySource",
+      "value": "",
+      "type": "string",
+      "description": "Nguồn tính gợi ý, ví dụ BACKEND_RULES."
+    },
+    {
+      "key": "priorityAdvisoryRulesVersion",
+      "value": "",
+      "type": "string",
+      "description": "Phiên bản bộ quy tắc tính gợi ý."
     },
     {
       "key": "requestVersion",
@@ -164,9 +182,9 @@
     },
     {
       "key": "regionCode",
-      "value": "",
+      "value": "DEMO_A",
       "type": "string",
-      "description": "Active region code from Identity regions."
+      "description": "Mã vùng demo đang hoạt động, dùng để lọc heatmap và request theo vùng."
     },
     {
       "key": "itemId",
@@ -292,7 +310,7 @@
       "key": "publicCode",
       "value": "",
       "type": "string",
-      "description": "Recovery code shown only once by the API; enter it locally when redeeming."
+      "description": "Public code của khoản quyên góp; cần nhập cùng recoveryCode khi khôi phục quyền truy cập."
     },
     {
       "key": "recoveryCode",
@@ -472,7 +490,7 @@
       "key": "coordinatorAccessToken",
       "value": "",
       "type": "string",
-      "description": "Tự lưu sau request đăng nhập điều phối."
+      "description": "Access token riêng của flow: Điều phối viên coord1."
     },
     {
       "key": "skipCitizenRegistration",
@@ -494,123 +512,123 @@
     },
     {
       "key": "seedPassword",
-      "value": "",
+      "value": "C48Demo-2026!Seed",
       "type": "string",
-      "description": "Lấy từ SEED_PASSWORD trong backend/.env qua environment C48 Local Demo (file local bị Git ignore)."
+      "description": "Mật khẩu demo dùng chung cho các tài khoản seed local."
     },
     {
       "key": "citizenSeedUsername",
       "value": "citizen1",
       "type": "string",
-      "description": "Tài khoản công dân gửi SELF."
+      "description": "Công dân gửi SOS cho chính mình (SELF); tài khoản lấy từ docs/backend/seed/seed-identity.sql."
     },
     {
       "key": "proxyCitizenSeedUsername",
       "value": "citizen2",
       "type": "string",
-      "description": "Tài khoản công dân gửi PROXY."
+      "description": "Công dân gửi SOS thay người thân (PROXY); tài khoản lấy từ docs/backend/seed/seed-identity.sql."
     },
     {
       "key": "coordinatorSeedUsername",
       "value": "coord1",
       "type": "string",
-      "description": "Điều phối viên phạm vi tổ chức."
+      "description": "Điều phối viên tổ chức 1; tài khoản lấy từ docs/backend/seed/seed-identity.sql."
     },
     {
       "key": "campaignManagerSeedUsername",
       "value": "campaign_mgr",
       "type": "string",
-      "description": "Quản lý chiến dịch."
+      "description": "Quản lý chiến dịch; tài khoản lấy từ docs/backend/seed/seed-identity.sql."
     },
     {
       "key": "operationsManagerSeedUsername",
       "value": "ops_mgr",
       "type": "string",
-      "description": "Quản lý vận hành."
+      "description": "Quản lý vận hành; tài khoản lấy từ docs/backend/seed/seed-identity.sql."
     },
     {
       "key": "intakeSeedUsername",
       "value": "intake1",
       "type": "string",
-      "description": "Nhân viên tiếp nhận."
+      "description": "Nhân viên tiếp nhận 1; tài khoản lấy từ docs/backend/seed/seed-identity.sql."
     },
     {
       "key": "reviewerSeedUsername",
       "value": "reviewer1",
       "type": "string",
-      "description": "Người duyệt độc lập."
+      "description": "Người duyệt độc lập 1; tài khoản lấy từ docs/backend/seed/seed-identity.sql."
     },
     {
       "key": "distributionSeedUsername",
       "value": "dist1",
       "type": "string",
-      "description": "Nhân viên phân phối."
+      "description": "Nhân viên phân phối 1; tài khoản lấy từ docs/backend/seed/seed-identity.sql."
     },
     {
       "key": "volunteerSeedUsername",
       "value": "vol_leader1",
       "type": "string",
-      "description": "Đội trưởng tình nguyện."
+      "description": "Đội trưởng tình nguyện 1; tài khoản lấy từ docs/backend/seed/seed-identity.sql."
     },
     {
       "key": "adminSeedUsername",
       "value": "admin",
       "type": "string",
-      "description": "Quản trị viên hệ thống."
+      "description": "Quản trị hệ thống; tài khoản lấy từ docs/backend/seed/seed-identity.sql."
     },
     {
       "key": "proxyCitizenAccessToken",
       "value": "",
       "type": "string",
-      "description": "Access token của actor tương ứng; được điền tự động sau login."
+      "description": "Access token riêng của flow: Công dân citizen2 trong luồng PROXY."
     },
     {
       "key": "campaignManagerAccessToken",
       "value": "",
       "type": "string",
-      "description": "Access token của actor tương ứng; được điền tự động sau login."
+      "description": "Access token riêng của flow: Quản lý chiến dịch campaign_mgr."
     },
     {
       "key": "intakeAccessToken",
       "value": "",
       "type": "string",
-      "description": "Access token của actor tương ứng; được điền tự động sau login."
+      "description": "Access token riêng của flow: Nhân viên tiếp nhận intake1."
     },
     {
       "key": "reviewerAccessToken",
       "value": "",
       "type": "string",
-      "description": "Access token của actor tương ứng; được điền tự động sau login."
+      "description": "Access token riêng của flow: Người duyệt độc lập reviewer1."
     },
     {
       "key": "distributionAccessToken",
       "value": "",
       "type": "string",
-      "description": "Access token của actor tương ứng; được điền tự động sau login."
+      "description": "Access token riêng của flow: Nhân viên phân phối dist1."
     },
     {
       "key": "volunteerAccessToken",
       "value": "",
       "type": "string",
-      "description": "Access token của actor tương ứng; được điền tự động sau login."
+      "description": "Access token riêng của flow: Đội trưởng tình nguyện vol_leader1."
     },
     {
       "key": "adminAccessToken",
       "value": "",
       "type": "string",
-      "description": "Access token của actor tương ứng; được điền tự động sau login."
+      "description": "Access token riêng của flow: Quản trị viên admin."
     },
     {
       "key": "regionalCoordinatorSeedUsername",
       "value": "coord_regional",
       "type": "default",
-      "description": "Tài khoản seeded COORDINATOR có scope REGION DEMO_A."
+      "description": "Điều phối viên vùng DEMO_A; tài khoản lấy từ docs/backend/seed/seed-identity.sql."
     },
     {
       "key": "regionalCoordinatorAccessToken",
       "value": "",
       "type": "default",
-      "description": "Access token của coord_regional."
+      "description": "Access token riêng của flow: Điều phối viên vùng coord_regional."
     },
     {
       "key": "newPassword",
@@ -647,6 +665,156 @@
       "value": "",
       "type": "string",
       "description": "ID advisory AI trong chi tiết yêu cầu; nhập để kiểm thử bước rà soát."
+    },
+    {
+      "key": "coordinator2SeedUsername",
+      "value": "coord2",
+      "type": "string",
+      "description": "Tài khoản điều phối viên thứ hai; đặt coordinatorSeedUsername bằng giá trị này trước khi gửi login của luồng điều phối."
+    },
+    {
+      "key": "intake2SeedUsername",
+      "value": "intake2",
+      "type": "string",
+      "description": "Tài khoản tiếp nhận thứ hai; đặt intakeSeedUsername bằng giá trị này trước khi gửi login của luồng tiếp nhận."
+    },
+    {
+      "key": "reviewer2SeedUsername",
+      "value": "reviewer2",
+      "type": "string",
+      "description": "Tài khoản duyệt thứ hai; đặt reviewerSeedUsername bằng giá trị này trước khi gửi login của luồng duyệt."
+    },
+    {
+      "key": "distribution2SeedUsername",
+      "value": "dist2",
+      "type": "string",
+      "description": "Tài khoản phân phối thứ hai; đặt distributionSeedUsername bằng giá trị này trước khi gửi login của luồng phân phối."
+    },
+    {
+      "key": "volunteerLeader2SeedUsername",
+      "value": "vol_leader2",
+      "type": "string",
+      "description": "Đội trưởng thứ hai; đặt volunteerSeedUsername bằng giá trị này trước khi gửi login của luồng tình nguyện."
+    },
+    {
+      "key": "volunteerMemberSeedUsername",
+      "value": "vol_member1",
+      "type": "string",
+      "description": "Thành viên tình nguyện; đặt volunteerSeedUsername bằng giá trị này trước khi gửi login của luồng tình nguyện."
+    },
+    {
+      "key": "identitySampleAccessToken",
+      "value": "",
+      "type": "string",
+      "description": "Access token riêng của flow: Đăng nhập mẫu Identity dùng ops_mgr."
+    },
+    {
+      "key": "identitySampleRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của flow: Đăng nhập mẫu Identity dùng ops_mgr."
+    },
+    {
+      "key": "registeredCitizenAccessToken",
+      "value": "",
+      "type": "string",
+      "description": "Access token riêng của flow: Công dân vừa đăng ký; tách khỏi citizen1 SELF."
+    },
+    {
+      "key": "registeredCitizenRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của flow: Công dân vừa đăng ký; tách khỏi citizen1 SELF."
+    },
+    {
+      "key": "googleCitizenAccessToken",
+      "value": "",
+      "type": "string",
+      "description": "Access token riêng của flow: Phiên đăng nhập Google; tách khỏi các tài khoản seed."
+    },
+    {
+      "key": "googleCitizenRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của flow: Phiên đăng nhập Google; tách khỏi các tài khoản seed."
+    },
+    {
+      "key": "citizenRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của flow: Công dân citizen1 trong luồng SELF."
+    },
+    {
+      "key": "proxyCitizenRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của flow: Công dân citizen2 trong luồng PROXY."
+    },
+    {
+      "key": "coordinatorRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của flow: Điều phối viên coord1."
+    },
+    {
+      "key": "regionalCoordinatorRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của flow: Điều phối viên vùng coord_regional."
+    },
+    {
+      "key": "campaignManagerRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của flow: Quản lý chiến dịch campaign_mgr."
+    },
+    {
+      "key": "operationsManagerRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của flow: Quản lý vận hành ops_mgr."
+    },
+    {
+      "key": "intakeRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của flow: Nhân viên tiếp nhận intake1."
+    },
+    {
+      "key": "reviewerRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của flow: Người duyệt độc lập reviewer1."
+    },
+    {
+      "key": "distributionRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của flow: Nhân viên phân phối dist1."
+    },
+    {
+      "key": "volunteerRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của flow: Đội trưởng tình nguyện vol_leader1."
+    },
+    {
+      "key": "adminRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của flow: Quản trị viên admin."
+    },
+    {
+      "key": "donorAccessToken",
+      "value": "",
+      "type": "string",
+      "description": "Access token riêng của luồng người quyên góp."
+    },
+    {
+      "key": "donorRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token riêng của luồng người quyên góp."
     }
   ],
   "item": [
@@ -873,7 +1041,7 @@
                           "script": {
                             "type": "text/javascript",
                             "exec": [
-                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"operationsManagerAccessToken\\\"}\");"
+                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"identitySampleAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"identitySampleRefreshToken\\\"}\");"
                             ]
                           }
                         }
@@ -901,7 +1069,7 @@
                         "description": "## Mục đích\nRotate a refresh token\n\n## Quyền và điều kiện\nKhông yêu cầu đăng nhập theo contract.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /auth/refresh` · Operation: `refreshSession` · Service: `identity`.\n\n---\n\n## Ghi chú chạy tay\nKhông cần đăng nhập cho route public.",
                         "body": {
                           "mode": "raw",
-                          "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}",
+                          "raw": "{\n  \"refresh_token\": \"{{identitySampleRefreshToken}}\"\n}",
                           "options": {
                             "raw": {
                               "language": "json"
@@ -915,7 +1083,7 @@
                           "script": {
                             "type": "text/javascript",
                             "exec": [
-                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"refreshSession\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/refresh\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"operationsManagerAccessToken\\\"}\");"
+                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"refreshSession\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/refresh\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"identitySampleAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"identitySampleRefreshToken\\\"}\");"
                             ]
                           }
                         }
@@ -936,11 +1104,11 @@
                           },
                           {
                             "key": "Authorization",
-                            "value": "Bearer {{operationsManagerAccessToken}}"
+                            "value": "Bearer {{identitySampleAccessToken}}"
                           }
                         ],
                         "url": "{{identityBaseUrl}}/auth/logout",
-                        "description": "## Mục đích\nRevoke the current session family\n\n## Quyền và điều kiện\nCần access token phù hợp với tài khoản đang thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 204.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /auth/logout` · Operation: `logout` · Service: `identity`.\n\n---\n\n## Ghi chú chạy tay\nMẫu dùng {{operationsManagerAccessToken}}; cần quyền/scope phù hợp với route."
+                        "description": "## Mục đích\nRevoke the current session family\n\n## Quyền và điều kiện\nCần access token phù hợp với tài khoản đang thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 204.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /auth/logout` · Operation: `logout` · Service: `identity`.\n\n---\n\n## Ghi chú chạy tay\nMẫu dùng {{identitySampleAccessToken}}; cần quyền/scope phù hợp với route."
                       },
                       "event": [
                         {
@@ -948,7 +1116,7 @@
                           "script": {
                             "type": "text/javascript",
                             "exec": [
-                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"logout\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/logout\\\",\\\"expectedStatus\\\":204,\\\"strategy\\\":[\\\"NativeBearer\\\"],\\\"tokenTarget\\\":\\\"operationsManagerAccessToken\\\"}\");"
+                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"logout\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/logout\\\",\\\"expectedStatus\\\":204,\\\"strategy\\\":[\\\"NativeBearer\\\"],\\\"tokenTarget\\\":\\\"identitySampleAccessToken\\\"}\");"
                             ]
                           }
                         }
@@ -969,7 +1137,7 @@
                           },
                           {
                             "key": "Authorization",
-                            "value": "Bearer {{operationsManagerAccessToken}}"
+                            "value": "Bearer {{identitySampleAccessToken}}"
                           },
                           {
                             "key": "Content-Type",
@@ -977,7 +1145,7 @@
                           }
                         ],
                         "url": "{{identityBaseUrl}}/auth/change-password",
-                        "description": "## Mục đích\nChange the authenticated user's password\n\n## Quyền và điều kiện\nCần access token phù hợp với tài khoản đang thao tác.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 204.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /auth/change-password` · Operation: `changePassword` · Service: `identity`.\n\n---\n\n## Ghi chú chạy tay\nMẫu dùng {{operationsManagerAccessToken}}; cần quyền/scope phù hợp với route.\n\n## Lưu ý tác động\nRequest đổi mật khẩu actor đang đăng nhập. Mật khẩu mới là {{newPassword}} trong environment local; chạy seeder để khôi phục mật khẩu seed.",
+                        "description": "## Mục đích\nChange the authenticated user's password\n\n## Quyền và điều kiện\nCần access token phù hợp với tài khoản đang thao tác.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 204.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /auth/change-password` · Operation: `changePassword` · Service: `identity`.\n\n---\n\n## Ghi chú chạy tay\nMẫu dùng {{identitySampleAccessToken}}; cần quyền/scope phù hợp với route.\n\n## Lưu ý tác động\nRequest đổi mật khẩu actor đang đăng nhập. Mật khẩu mới là {{newPassword}} trong environment local; chạy seeder để khôi phục mật khẩu seed.",
                         "body": {
                           "mode": "raw",
                           "raw": "{\n  \"current_password\": \"{{seedPassword}}\",\n  \"new_password\": \"{{newPassword}}\"\n}",
@@ -994,7 +1162,7 @@
                           "script": {
                             "type": "text/javascript",
                             "exec": [
-                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"changePassword\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/change-password\\\",\\\"expectedStatus\\\":204,\\\"strategy\\\":[\\\"NativeBearer\\\"],\\\"tokenTarget\\\":\\\"operationsManagerAccessToken\\\"}\");"
+                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"changePassword\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/change-password\\\",\\\"expectedStatus\\\":204,\\\"strategy\\\":[\\\"NativeBearer\\\"],\\\"tokenTarget\\\":\\\"identitySampleAccessToken\\\"}\");"
                             ]
                           }
                         }
@@ -1108,7 +1276,7 @@
                           "script": {
                             "type": "text/javascript",
                             "exec": [
-                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"citizenAccessToken\\\"}\");"
+                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"registeredCitizenAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"registeredCitizenRefreshToken\\\"}\");"
                             ]
                           }
                         }
@@ -1146,7 +1314,7 @@
                           "script": {
                             "type": "text/javascript",
                             "exec": [
-                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"identityAuthGoogleLogin\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/google\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"citizenAccessToken\\\"}\");"
+                              "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"identityAuthGoogleLogin\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/google\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"googleCitizenAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"googleCitizenRefreshToken\\\"}\");"
                             ]
                           }
                         }
@@ -1271,7 +1439,7 @@
                         "description": "## Mục đích\nCreate a PROXY assistance request\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 201.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /requests/proxy` · Operation: `createProxyRequest` · Service: `response`.\n\n---\n\n## Ghi chú chạy tay\nMẫu dùng {{operationsManagerAccessToken}}; cần quyền/scope phù hợp với route.",
                         "body": {
                           "mode": "raw",
-                          "raw": "{\n  \"incident_category_code\": \"FLOOD\",\n  \"location\": {\n    \"type\": \"Point\",\n    \"coordinates\": [\n      106.7009,\n      10.7769\n    ],\n    \"source\": \"GPS\"\n  },\n  \"relationship\": \"C48 demo\",\n  \"information_source\": \"C48 demo\",\n  \"last_known_situation_at\": \"{{$isoTimestamp}}\",\n  \"contactability\": \"REACHABLE\"\n}",
+                          "raw": "{\n  \"incident_category_code\": \"FLOOD\",\n  \"location\": {\n    \"type\": \"Point\",\n    \"coordinates\": [\n      106.7009,\n      10.7769\n    ],\n    \"source\": \"GPS\",\n    \"accuracy_m\": 8,\n    \"captured_at\": \"{{$isoTimestamp}}\"\n  },\n  \"relationship\": \"C48 demo\",\n  \"information_source\": \"C48 demo\",\n  \"last_known_situation_at\": \"{{$isoTimestamp}}\",\n  \"contactability\": \"REACHABLE\"\n}",
                           "options": {
                             "raw": {
                               "language": "json"
@@ -1617,6 +1785,73 @@
           "description": "Request này dùng CookieJar cho client WEB, không dùng access token NATIVE.",
           "item": [
             {
+              "name": "GET /auth/csrf · bắt đầu phiên WEB",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{identityBaseUrl}}/auth/csrf",
+                "description": "Lấy cookie CSRF trước khi đăng nhập WEB. Cần HTTPS và webOrigin đã được allowlist; CookieJar giữ cookie cho request tiếp theo."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"getAuthCsrf\\\",\\\"method\\\":\\\"GET\\\",\\\"routePath\\\":\\\"/auth/csrf\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"operationsManagerAccessToken\\\"}\");"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /auth/login · phiên WEB",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{$guid}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{identityBaseUrl}}/auth/login",
+                "description": "Đăng nhập WEB bằng ops_mgr sau GET /auth/csrf. Phiên được lưu trong CookieJar dưới dạng cookie Secure; cần HTTPS, webOrigin đã allowlist và csrfToken.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"{{operationsManagerSeedUsername}}\",\n  \"password\": \"{{seedPassword}}\",\n  \"client_kind\": \"WEB\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"clientKind\\\":\\\"WEB\\\"}\");"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
               "name": "POST /auth/refresh · session WEB không body",
               "request": {
                 "method": "POST",
@@ -1640,11 +1875,19 @@
                     "type": "text/javascript",
                     "exec": [
                       "if (!pm.cookies.get('c48_refresh')) { console.warn('Bỏ qua refresh WEB vì chưa có phiên trình duyệt.'); pm.execution.skipRequest(); }",
-                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"refreshSession\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/refresh\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"operationsManagerAccessToken\\\"}\");"
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"refreshSession\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/refresh\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"clientKind\\\":\\\"WEB\\\"}\");"
                     ]
                   }
                 }
               ]
+            }
+          ],
+          "variable": [
+            {
+              "key": "clientKind",
+              "value": "WEB",
+              "type": "string",
+              "description": "Phiên cookie WEB cho riêng luồng này."
             }
           ]
         }
@@ -1694,7 +1937,7 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"citizenAccessToken\\\"}\");"
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"citizenAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"citizenRefreshToken\\\"}\");"
                     ]
                   }
                 }
@@ -2394,7 +2637,7 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"proxyCitizenAccessToken\\\"}\");"
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"proxyCitizenAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"proxyCitizenRefreshToken\\\"}\");"
                     ]
                   }
                 }
@@ -2426,7 +2669,7 @@
                 "description": "## Actor và header\nCông dân đã đăng nhập gửi giúp người thân. Tài khoản mẫu: `citizen2`.\n\n`Authorization: Bearer {{proxyCitizenAccessToken}}` · `Idempotency-Key: {{$guid}}` được Postman tạo tự động.\n\n## Dữ liệu\nBody có sẵn quan hệ, nguồn tin, thời điểm biết tình hình và khả năng liên lạc; vị trí mẫu dùng tọa độ demo. Gửi thành công sẽ tạo yêu cầu PROXY bền vững trong database chính.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"incident_category_code\": \"FLOOD\",\n  \"location\": {\n    \"type\": \"Point\",\n    \"coordinates\": [\n      106.7009,\n      10.7769\n    ],\n    \"source\": \"GPS\"\n  },\n  \"relationship\": \"C48 demo\",\n  \"information_source\": \"C48 demo\",\n  \"last_known_situation_at\": \"{{$isoTimestamp}}\",\n  \"contactability\": \"REACHABLE\"\n}",
+                  "raw": "{\n  \"incident_category_code\": \"FLOOD\",\n  \"location\": {\n    \"type\": \"Point\",\n    \"coordinates\": [\n      106.7009,\n      10.7769\n    ],\n    \"source\": \"GPS\",\n    \"accuracy_m\": 8,\n    \"captured_at\": \"{{$isoTimestamp}}\"\n  },\n  \"relationship\": \"C48 demo\",\n  \"information_source\": \"C48 demo\",\n  \"last_known_situation_at\": \"{{$isoTimestamp}}\",\n  \"contactability\": \"REACHABLE\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -2510,7 +2753,7 @@
                     "description": "## Mục đích\nCreate a PROXY assistance request\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 201.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /requests/proxy` · Operation: `createProxyRequest` · Service: `response`.\n\n---\n\n## Ghi chú chạy tay\nActor: 02 · Công dân · gửi thay người thân (PROXY). Authorization: Bearer {{proxyCitizenAccessToken}}.",
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"incident_category_code\": \"FLOOD\",\n  \"location\": {\n    \"type\": \"Point\",\n    \"coordinates\": [\n      106.7009,\n      10.7769\n    ],\n    \"source\": \"GPS\"\n  },\n  \"relationship\": \"C48 demo\",\n  \"information_source\": \"C48 demo\",\n  \"last_known_situation_at\": \"{{$isoTimestamp}}\",\n  \"contactability\": \"REACHABLE\"\n}",
+                      "raw": "{\n  \"incident_category_code\": \"FLOOD\",\n  \"location\": {\n    \"type\": \"Point\",\n    \"coordinates\": [\n      106.7009,\n      10.7769\n    ],\n    \"source\": \"GPS\",\n    \"accuracy_m\": 8,\n    \"captured_at\": \"{{$isoTimestamp}}\"\n  },\n  \"relationship\": \"C48 demo\",\n  \"information_source\": \"C48 demo\",\n  \"last_known_situation_at\": \"{{$isoTimestamp}}\",\n  \"contactability\": \"REACHABLE\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -2538,12 +2781,55 @@
     },
     {
       "name": "03 · Người quyên góp · khai báo và theo dõi",
-      "description": "Người quyên góp dùng các API public và mã capability; không gắn access token. Không cần đăng nhập cho các thao tác công khai.",
+      "description": "Luồng người quyên góp: tạo và theo dõi khai báo bằng mã công khai và donation secret. Claim để gắn khoản quyên góp vào tài khoản và recover để khôi phục quyền truy cập đều cần đăng nhập. Login mẫu dùng citizen1 từ seeder và tạo token riêng donorAccessToken.",
       "item": [
         {
           "name": "00 · Luồng gợi ý · đăng nhập rồi chạy từng request",
-          "description": "Các thao tác công khai dùng mã bí mật ở body/header; không cần access token.",
+          "description": "Gửi đăng nhập trước để tạo token riêng cho luồng. Tạo/theo dõi dùng donation secret; claim cần token và donation secret; recover cần token, mã khôi phục trong header và public code trong body.",
           "item": [
+            {
+              "name": "POST Đăng nhập người quyên góp · citizen1",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{$guid}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{identityBaseUrl}}/auth/login",
+                "description": "## Actor và tài khoản\nNgười quyên góp demo dùng tài khoản công dân citizen1 từ seeder. Mật khẩu lấy từ biến collection seedPassword.\n\n## Cách chạy\nGửi request này trước; access token và refresh token được lưu riêng cho luồng người quyên góp.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"{{citizenSeedUsername}}\",\n  \"password\": \"{{seedPassword}}\",\n  \"client_kind\": \"NATIVE\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"donorAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"donorRefreshToken\\\"}\");"
+                    ]
+                  }
+                }
+              ],
+              "id": "5791ea48-30fc-445b-9d71-e091eb1ceed9"
+            },
             {
               "name": "POST Tạo khai báo quyên góp",
               "request": {
@@ -2559,7 +2845,7 @@
                   },
                   {
                     "key": "X-Donation-Secret",
-                    "value": "{{donationSecret}}"
+                    "value": "{{pendingDonationSecret}}"
                   },
                   {
                     "key": "Content-Type",
@@ -2693,7 +2979,7 @@
                       },
                       {
                         "key": "X-Donation-Secret",
-                        "value": "{{donationSecret}}"
+                        "value": "{{pendingDonationSecret}}"
                       },
                       {
                         "key": "Content-Type",
@@ -2792,12 +3078,16 @@
                         "value": "{{$guid}}"
                       },
                       {
+                        "key": "Authorization",
+                        "value": "Bearer {{donorAccessToken}}"
+                      },
+                      {
                         "key": "X-Donation-Secret",
                         "value": "{{donationSecret}}"
                       }
                     ],
                     "url": "{{logisticsBaseUrl}}/public/donations/{{donationId}}/claim",
-                    "description": "## Mục đích\nDonationsController.claim\n\n## Quyền và điều kiện\nCần access token phù hợp với tài khoản đang thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /public/donations/{id}/claim` · Operation: `logisticsDonationsClaim` · Service: `logistics`.\n\n---\n\n## Ghi chú chạy tay\nActor: 03 · Người quyên góp · khai báo và theo dõi. Route public, không dùng bearer token."
+                    "description": "## Mục đích\nDonationsController.claim\n\n## Quyền và điều kiện\nCần access token phù hợp với tài khoản đang thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /public/donations/{id}/claim` · Operation: `logisticsDonationsClaim` · Service: `logistics`.\n\n---\n\n## Ghi chú chạy tay\nActor: 03 · Người quyên góp · khai báo và theo dõi. Gửi đăng nhập trong luồng này trước; request cần Bearer token và X-Donation-Secret để gắn khoản quyên góp vào tài khoản."
                   },
                   "event": [
                     {
@@ -2837,7 +3127,7 @@
                     "description": "## Mục đích\nDonationsController.reviseDeclaration\n\n## Quyền và điều kiện\nCần donation secret còn hiệu lực của lượt quyên góp.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /public/donations/{id}/declarations` · Operation: `logisticsDonationsReviseDeclaration` · Service: `logistics`.\n\n---\n\n## Ghi chú chạy tay\nActor: 03 · Người quyên góp · khai báo và theo dõi. Route public, không dùng bearer token.",
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"expected_version\": {{donationVersion}},\n  \"lines\": [\n    {\n      \"item_id\": \"{{donationItemId}}\",\n      \"declared_quantity\": \"1.00\"\n    }\n  ]\n}",
+                      "raw": "{\n  \"expected_version\": 1,\n  \"lines\": [\n    {\n      \"item_id\": \"{{donationItemId}}\",\n      \"declared_quantity\": \"1\"\n    }\n  ]\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -2959,6 +3249,10 @@
                         "value": "{{$guid}}"
                       },
                       {
+                        "key": "Authorization",
+                        "value": "Bearer {{donorAccessToken}}"
+                      },
+                      {
                         "key": "X-Recovery-Code",
                         "value": "{{recoveryCode}}"
                       },
@@ -2968,10 +3262,10 @@
                       }
                     ],
                     "url": "{{logisticsBaseUrl}}/public/donations/recover",
-                    "description": "## Mục đích\nDonationsController.recover\n\n## Quyền và điều kiện\nCần access token phù hợp với tài khoản đang thao tác.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /public/donations/recover` · Operation: `logisticsDonationsRecover` · Service: `logistics`.\n\n---\n\n## Ghi chú chạy tay\nActor: 03 · Người quyên góp · khai báo và theo dõi. Route public, không dùng bearer token.",
+                    "description": "## Mục đích\nDonationsController.recover\n\n## Quyền và điều kiện\nCần access token phù hợp với tài khoản đang thao tác.\n\n## Dữ liệu và kết quả\nMẫu body theo schema OpenAPI; thay ID/version bằng giá trị nhận được ở các bước trước. Mong đợi HTTP 200.\n\n## Tác động\nCó thể tạo hoặc thay đổi dữ liệu bền vững trong cơ sở dữ liệu chính.\n\nRoute: `POST /public/donations/recover` · Operation: `logisticsDonationsRecover` · Service: `logistics`.\n\n---\n\n## Ghi chú chạy tay\nActor: 03 · Người quyên góp · khai báo và theo dõi. Gửi đăng nhập trong luồng này trước. publicCode nằm trong body; recoveryCode là header X-Recovery-Code do cán bộ cấp.",
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"public_code\": \"{{publicCode}}\"\n}",
+                      "raw": "{\n  \"public_code\": \"{{donationPublicCode}}\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -3070,7 +3364,7 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"coordinatorAccessToken\\\"}\");"
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"coordinatorAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"coordinatorRefreshToken\\\"}\");"
                     ]
                   }
                 }
@@ -3091,7 +3385,7 @@
                   }
                 ],
                 "url": "{{responseBaseUrl}}/requests?limit=10",
-                "description": "## Mục đích\nList scoped coordinator requests\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /requests` · Operation: `listRequestQueue` · Service: `response`."
+                "description": "## Mục đích\nList scoped coordinator requests\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mỗi item có `priority_advisory` gồm điểm, mức, mã lý do, nguồn và phiên bản quy tắc. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi. Sau khi gửi request, collection tự lưu `requestId` đầu tiên cùng các biến `priorityAdvisory*` để chạy tiếp request chi tiết.\n\nRoute: `GET /requests` · Operation: `listRequestQueue` · Service: `response`."
               },
               "event": [
                 {
@@ -3119,8 +3413,8 @@
                     "value": "Bearer {{coordinatorAccessToken}}"
                   }
                 ],
-                "url": "{{responseBaseUrl}}/map/heatmap?from={{reportFrom}}&to={{reportTo}}",
-                "description": "## Mục đích\nAggregate requests into map cells\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /map/heatmap` · Operation: `getRequestHeatmap` · Service: `response`."
+                "url": "{{responseBaseUrl}}/map/heatmap?from={{reportFrom}}&to={{reportTo}}&region_code={{regionCode}}",
+                "description": "## Mục đích\nAggregate requests into map cells\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /map/heatmap` · Operation: `getRequestHeatmap` · Service: `response`.\n\nBộ lọc demo: `region_code=DEMO_A`; API yêu cầu region_code hoặc campaign_id."
               },
               "event": [
                 {
@@ -3158,7 +3452,7 @@
                       }
                     ],
                     "url": "{{responseBaseUrl}}/requests?limit=10",
-                    "description": "## Mục đích\nList scoped coordinator requests\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /requests` · Operation: `listRequestQueue` · Service: `response`.\n\n---\n\n## Ghi chú chạy tay\nActor: 04 · Điều phối viên (COORDINATOR). Authorization: Bearer {{coordinatorAccessToken}}."
+                    "description": "## Mục đích\nList scoped coordinator requests\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mỗi item có `priority_advisory` gồm điểm, mức, mã lý do, nguồn và phiên bản quy tắc. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi. Sau khi gửi request, collection tự lưu `requestId` đầu tiên cùng các biến `priorityAdvisory*` để chạy tiếp request chi tiết.\n\nRoute: `GET /requests` · Operation: `listRequestQueue` · Service: `response`.\n\n---\n\n## Ghi chú chạy tay\nActor: 04 · Điều phối viên (COORDINATOR). Authorization: Bearer {{coordinatorAccessToken}}."
                   },
                   "event": [
                     {
@@ -3216,7 +3510,7 @@
                       }
                     ],
                     "url": "{{responseBaseUrl}}/requests/{{requestId}}",
-                    "description": "## Mục đích\nGet scoped staff request detail\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /requests/{id}` · Operation: `getStaffRequestDetail` · Service: `response`.\n\n---\n\n## Ghi chú chạy tay\nActor: 04 · Điều phối viên (COORDINATOR). Authorization: Bearer {{coordinatorAccessToken}}."
+                    "description": "## Mục đích\nGet scoped staff request detail\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Response có `priority_advisory` gồm `score`, `level`, `reason_codes`, `source`, `rules_version`; hồ sơ cũng trả cờ nguy hiểm riêng và các dữ kiện đầu vào. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi. Sau khi gửi request, các biến `priorityAdvisory*` được cập nhật theo SOS đang xem.\n\nRoute: `GET /requests/{id}` · Operation: `getStaffRequestDetail` · Service: `response`.\n\n---\n\n## Ghi chú chạy tay\nActor: 04 · Điều phối viên (COORDINATOR). Authorization: Bearer {{coordinatorAccessToken}}."
                   },
                   "event": [
                     {
@@ -3887,7 +4181,7 @@
                       }
                     ],
                     "url": "{{responseBaseUrl}}/requests/{{requestId}}/ai-advisories/{{advisoryId}}/review",
-                    "description": "## Cách chạy\nCần coordinator có quyền và advisory đã được tạo. Lấy `advisoryId` từ chi tiết yêu cầu; Gemini phải được bật nếu muốn tạo advisory trong môi trường demo. AI chỉ là gợi ý; quyết định này do người dùng gửi.\n\nMong đợi HTTP 200.\n\nRoute: `POST /requests/{id}/ai-advisories/{advisoryId}/review` · Operation: `responseRequestOperationsReviewAiAdvisory`.",
+                    "description": "## Cách chạy\n`advisoryId` là ID bản ghi gợi ý AI gắn với yêu cầu SOS, không phải `requestId`. Chạy request GET `/requests/{id}` · `getStaffRequestDetail` trước; collection tự lấy `ai_advisory.id` trong response và lưu vào biến `advisoryId`.\n\nChỉ gửi request này khi response chi tiết có `ai_advisory`, `status` là `COMPLETED` và `review_status` còn `null`. Nếu `ai_advisory` là `null`, yêu cầu chưa có bản ghi để rà soát; không tự điền ID. Nếu trạng thái chưa `COMPLETED`, chờ worker xử lý rồi chạy lại request chi tiết.\n\nCần coordinator có quyền. AI chỉ đưa ra gợi ý; quyết định rà soát do con người gửi. Mong đợi HTTP 200.\n\nRoute: `POST /requests/{id}/ai-advisories/{advisoryId}/review` · Operation: `responseRequestOperationsReviewAiAdvisory`.",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"decision\": \"REJECTED\",\n  \"note\": \"Kiểm thử thao tác rà soát AI qua Postman.\"\n}",
@@ -5524,8 +5818,8 @@
                         "value": "Bearer {{coordinatorAccessToken}}"
                       }
                     ],
-                    "url": "{{responseBaseUrl}}/map/heatmap?from={{reportFrom}}&to={{reportTo}}",
-                    "description": "## Mục đích\nAggregate requests into map cells\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /map/heatmap` · Operation: `getRequestHeatmap` · Service: `response`.\n\n---\n\n## Ghi chú chạy tay\nActor: 04 · Điều phối viên (COORDINATOR). Authorization: Bearer {{coordinatorAccessToken}}."
+                    "url": "{{responseBaseUrl}}/map/heatmap?from={{reportFrom}}&to={{reportTo}}&region_code={{regionCode}}",
+                    "description": "## Mục đích\nAggregate requests into map cells\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /map/heatmap` · Operation: `getRequestHeatmap` · Service: `response`.\n\n---\n\n## Ghi chú chạy tay\nActor: 04 · Điều phối viên (COORDINATOR). Authorization: Bearer {{coordinatorAccessToken}}.\n\nBộ lọc demo: region_code={{regionCode}}. API yêu cầu region_code hoặc campaign_id."
                   },
                   "event": [
                     {
@@ -5993,7 +6287,7 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"regionalCoordinatorAccessToken\\\"}\");"
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"regionalCoordinatorAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"regionalCoordinatorRefreshToken\\\"}\");"
                     ]
                   }
                 }
@@ -6042,8 +6336,8 @@
                     "value": "Bearer {{regionalCoordinatorAccessToken}}"
                   }
                 ],
-                "url": "{{responseBaseUrl}}/map/heatmap?from={{reportFrom}}&to={{reportTo}}",
-                "description": "## Mục đích\nAggregate requests into map cells\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /map/heatmap` · Operation: `getRequestHeatmap` · Service: `response`.\n\n---\n\n## Ghi chú chạy tay\nTài khoản coord_regional có scope REGION DEMO_A; kết quả phải bị giới hạn trong vùng đó."
+                "url": "{{responseBaseUrl}}/map/heatmap?from={{reportFrom}}&to={{reportTo}}&region_code={{regionCode}}",
+                "description": "## Mục đích\nAggregate requests into map cells\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /map/heatmap` · Operation: `getRequestHeatmap` · Service: `response`.\n\n---\n\n## Ghi chú chạy tay\nTài khoản coord_regional có scope REGION DEMO_A; kết quả phải bị giới hạn trong vùng đó.\n\nBộ lọc demo: region_code={{regionCode}}. API yêu cầu region_code hoặc campaign_id."
               },
               "event": [
                 {
@@ -6105,7 +6399,7 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"campaignManagerAccessToken\\\"}\");"
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"campaignManagerAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"campaignManagerRefreshToken\\\"}\");"
                     ]
                   }
                 }
@@ -7006,7 +7300,7 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"operationsManagerAccessToken\\\"}\");"
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"operationsManagerAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"operationsManagerRefreshToken\\\"}\");"
                     ]
                   }
                 }
@@ -7404,8 +7698,8 @@
                         "value": "Bearer {{operationsManagerAccessToken}}"
                       }
                     ],
-                    "url": "{{responseBaseUrl}}/map/heatmap?from={{reportFrom}}&to={{reportTo}}",
-                    "description": "## Mục đích\nAggregate requests into map cells\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /map/heatmap` · Operation: `getRequestHeatmap` · Service: `response`.\n\n---\n\n## Ghi chú chạy tay\nActor: 06 · Quản lý vận hành (OPERATIONS_MANAGER). Authorization: Bearer {{operationsManagerAccessToken}}."
+                    "url": "{{responseBaseUrl}}/map/heatmap?from={{reportFrom}}&to={{reportTo}}&region_code={{regionCode}}",
+                    "description": "## Mục đích\nAggregate requests into map cells\n\n## Quyền và điều kiện\nCần access token cán bộ phù hợp với quyền và scope của thao tác.\n\n## Dữ liệu và kết quả\nKhông có request body. Mong đợi HTTP 200.\n\n## Tác động\nĐọc dữ liệu; không tạo bản ghi.\n\nRoute: `GET /map/heatmap` · Operation: `getRequestHeatmap` · Service: `response`.\n\n---\n\n## Ghi chú chạy tay\nActor: 06 · Quản lý vận hành (OPERATIONS_MANAGER). Authorization: Bearer {{operationsManagerAccessToken}}.\n\nBộ lọc demo: region_code={{regionCode}}. API yêu cầu region_code hoặc campaign_id."
                   },
                   "event": [
                     {
@@ -9544,7 +9838,7 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"intakeAccessToken\\\"}\");"
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"intakeAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"intakeRefreshToken\\\"}\");"
                     ]
                   }
                 }
@@ -10309,7 +10603,7 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"reviewerAccessToken\\\"}\");"
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"reviewerAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"reviewerRefreshToken\\\"}\");"
                     ]
                   }
                 }
@@ -10932,7 +11226,7 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"distributionAccessToken\\\"}\");"
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"distributionAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"distributionRefreshToken\\\"}\");"
                     ]
                   }
                 }
@@ -11382,8 +11676,8 @@
       ]
     },
     {
-      "name": "10 · Đội trưởng tình nguyện (VOLUNTEER)",
-      "description": "Đội trưởng tình nguyện xem và cập nhật nhiệm vụ/đội theo quan hệ thành viên hoặc đội trưởng. Đăng nhập bằng {{volunteerSeedUsername}} / {{seedPassword}}; token lưu vào {{volunteerAccessToken}}.",
+      "name": "10 · Tình nguyện viên (VOLUNTEER)",
+      "description": "Đội trưởng vol_leader1/vol_leader2 và thành viên vol_member1; thao tác theo quyền và quan hệ thành viên. Mỗi tài khoản có request đăng nhập và token riêng.",
       "item": [
         {
           "name": "00 · Luồng gợi ý · đăng nhập rồi chạy từng request",
@@ -11425,7 +11719,7 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"volunteerAccessToken\\\"}\");"
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"volunteerAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"volunteerRefreshToken\\\"}\");"
                     ]
                   }
                 }
@@ -12075,7 +12369,7 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"adminAccessToken\\\"}\");"
+                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"login\\\",\\\"method\\\":\\\"POST\\\",\\\"routePath\\\":\\\"/auth/login\\\",\\\"expectedStatus\\\":200,\\\"strategy\\\":[],\\\"tokenTarget\\\":\\\"adminAccessToken\\\",\\\"refreshTokenTarget\\\":\\\"adminRefreshToken\\\"}\");"
                     ]
                   }
                 }
@@ -13036,12 +13330,26 @@
           "if (method === 'POST' && url.endsWith('/auth/register') && pm.variables.get('skipCitizenRegistration') !== 'true') { const suffix = Date.now().toString(36) + pm.variables.replaceIn('{{$guid}}').replace(/-/g, '').slice(0, 8).toLowerCase(); pm.collectionVariables.set('citizenUsername', 'c48_demo_' + suffix); pm.collectionVariables.set('citizenPassword', 'C48-Demo-' + suffix + '!'); }",
           "if (pm.variables.get('clientKind') === 'WEB' && (url.endsWith('/auth/csrf') || url.endsWith('/auth/login') || url.endsWith('/auth/refresh'))) { const isCsrf = url.endsWith('/auth/csrf'); const origin = pm.variables.get('webOrigin'); const csrf = pm.variables.get('csrfToken'); if (!resolvedUrl.toLowerCase().startsWith('https://')) { console.warn('Bỏ qua request WEB; cookie Secure yêu cầu Identity qua HTTPS.'); pm.execution.skipRequest(); } else if (!origin || (!isCsrf && !csrf)) { console.warn('Bỏ qua request WEB; cần webOrigin được allowlist và CSRF lấy từ GET /auth/csrf.'); pm.execution.skipRequest(); } else { pm.request.headers.upsert({ key: 'Origin', value: origin }); if (!isCsrf) pm.request.headers.upsert({ key: 'X-CSRF-Token', value: csrf }); } }",
           "if (method === 'POST' && url.endsWith('/requests')) pm.collectionVariables.set('trackingSecret', makeSecret());",
-          "if (method === 'POST' && url.includes('/public/donation-drives/') && url.endsWith('/deliveries')) pm.collectionVariables.set('donationSecret', makeSecret());",
+          "if (method === 'POST' && url.includes('/public/donation-drives/') && url.endsWith('/deliveries')) pm.variables.set('pendingDonationSecret', makeSecret());",
           "pm.collectionVariables.set('demoSuffix', Date.now().toString(36).toUpperCase()); pm.collectionVariables.set('reportFrom', new Date(Date.now() - 7 * 86400000).toISOString()); pm.collectionVariables.set('reportTo', new Date().toISOString());",
           "if (url.includes('/evidence') && pm.collectionVariables.get('aiStorAvailable') !== 'true') { console.warn('Bỏ qua request; AIStor chính chưa được bật.'); pm.execution.skipRequest(); }",
           "const body = pm.request.body && pm.request.body.mode === 'raw' ? pm.request.body.raw : ''; const headers = ['Authorization','X-Tracking-Secret','X-Tracking-Code','X-Donation-Secret','X-Recovery-Code','X-CSRF-Token'].map((name) => pm.request.headers.get(name) || '').join(' ');",
           "const unresolved = [...(url + ' ' + body + ' ' + headers).matchAll(/\\{\\{([A-Za-z][A-Za-z0-9_.-]*)\\}\\}/g)].map((match) => match[1]).filter((name) => { const value = pm.variables.get(name); return value === undefined || value === null || String(value).trim() === ''; });",
-          "if (unresolved.length) { console.warn('Bỏ qua request; điền biến hoặc chạy request tạo dữ liệu trước: ' + [...new Set(unresolved)].join(', ')); pm.execution.skipRequest(); }"
+          "if (unresolved.length) { console.warn('Bỏ qua request; điền biến hoặc chạy request tạo dữ liệu trước: ' + [...new Set(unresolved)].join(', ')); pm.execution.skipRequest(); }",
+          "let nativeLoginBody = {};",
+          "if (method === 'POST' && url.endsWith('/auth/login')) {",
+          "  try { nativeLoginBody = JSON.parse(pm.request.body?.raw || '{}'); } catch (_) {}",
+          "}",
+          "if (nativeLoginBody.client_kind === 'NATIVE') {",
+          "  pm.request.headers.remove('Origin');",
+          "  pm.request.headers.remove('Cookie');",
+          "  const existingCookies = pm.cookies.toObject();",
+          "  if (Object.keys(existingCookies).length > 0) {",
+          "    pm.cookies.jar().clear(pm.request.url.toString(), function (error) {",
+          "      if (error) console.warn('Không tự dọn được Cookie Jar. Thêm 127.0.0.1 vào Cookies > Domains Allowlist hoặc xóa cookie thủ công.');",
+          "    });",
+          "  }",
+          "}"
         ]
       }
     },
@@ -13051,23 +13359,27 @@
         "type": "text/javascript",
         "exec": [
           "let meta = {}; try { meta = JSON.parse(pm.variables.get('_c48') || '{}'); } catch (_) {}",
+          "const setPriorityAdvisoryVariables = (advisory) => { const fields = { priorityAdvisoryScore: advisory && advisory.score, priorityAdvisoryLevel: advisory && advisory.level, priorityAdvisoryReasonCodes: advisory && advisory.reason_codes, priorityAdvisorySource: advisory && advisory.source, priorityAdvisoryRulesVersion: advisory && advisory.rules_version }; Object.entries(fields).forEach(([key, value]) => { if (value === undefined || value === null) pm.collectionVariables.unset(key); else pm.collectionVariables.set(key, typeof value === 'string' ? value : JSON.stringify(value)); }); };",
           "if (meta.expectedStatus) pm.test('HTTP ' + meta.expectedStatus + ' theo contract', function () { pm.response.to.have.status(meta.expectedStatus); });",
           "if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.text()) {",
           "  let body; try { body = pm.response.json(); } catch (_) { body = null; }",
           "  if (body && typeof body === 'object') {",
-          "    if (meta.operationId === 'login') { const target = meta.tokenTarget || 'operationsManagerAccessToken'; pm.collectionVariables.set('authTokenTarget', target); if (body.access_token) pm.collectionVariables.set(target, body.access_token); if (body.refresh_token) pm.collectionVariables.set('refreshToken', body.refresh_token); }",
-          "    if (meta.operationId === 'refreshSession') { const target = pm.collectionVariables.get('authTokenTarget') || meta.tokenTarget || 'operationsManagerAccessToken'; if (body.access_token) pm.collectionVariables.set(target, body.access_token); if (body.refresh_token) pm.collectionVariables.set('refreshToken', body.refresh_token); }",
-          "if (meta.operationId === 'getAuthCsrf' && body.csrf_token) { pm.collectionVariables.set('csrfToken', body.csrf_token); if (pm.variables.get('clientKind') !== 'WEB') pm.cookies.jar().clear(pm.request.url.toString(), function () {}); }",
+          "    if (meta.operationId === 'login') { const target = meta.tokenTarget; const refreshTarget = meta.refreshTokenTarget; if (target && body.access_token) pm.collectionVariables.set(target, body.access_token); if (refreshTarget && body.refresh_token) pm.collectionVariables.set(refreshTarget, body.refresh_token); }",
+          "    if (meta.operationId === 'refreshSession') { const target = meta.tokenTarget; const refreshTarget = meta.refreshTokenTarget; if (target && body.access_token) pm.collectionVariables.set(target, body.access_token); if (refreshTarget && body.refresh_token) pm.collectionVariables.set(refreshTarget, body.refresh_token); }",
+          "if (meta.operationId === 'getAuthCsrf' && body.csrf_token) { pm.collectionVariables.set('csrfToken', body.csrf_token); if (pm.variables.get('clientKind') !== 'WEB' && Object.keys(pm.cookies.toObject()).length) pm.cookies.jar().clear(pm.request.url.toString(), function (error) { if (error) console.warn('Không tự dọn được Cookie Jar. Thêm 127.0.0.1 vào Cookies > Domains Allowlist hoặc xóa cookie thủ công.'); }); }",
           "if (meta.operationId === 'logisticsCatalogCreateItemType' && body.code) pm.collectionVariables.set('itemTypeCode', body.code);",
           "if (meta.operationId === 'logisticsCatalogCreateUnit' && body.code) pm.collectionVariables.set('unitCode', body.code);",
+          "    if (meta.operationId === \"registerCitizen\") pm.test(\"Mã OTP đã được gửi qua email\", function () { pm.expect(body.email_sent).to.eql(true); });",
           "    if (meta.operationId === 'registerCitizen') { const user = body.user || body; if (user.id) pm.collectionVariables.set('citizenUserId', user.id); if (body.verification && body.verification.challenge_id) pm.collectionVariables.set('challengeId', body.verification.challenge_id); }",
           "    if (meta.operationId === 'identityAuthResendEmailOtp' && body.challenge_id) pm.collectionVariables.set('challengeId', body.challenge_id);",
-          "    if (meta.operationId === 'identityAuthGoogleLogin') { pm.collectionVariables.set('authTokenTarget', 'citizenAccessToken'); if (body.access_token) pm.collectionVariables.set('citizenAccessToken', body.access_token); if (body.refresh_token) pm.collectionVariables.set('refreshToken', body.refresh_token); }",
-          "    if (meta.operationId === 'getStaffRequestDetail' && body.ai_advisory && body.ai_advisory.id) pm.collectionVariables.set('advisoryId', body.ai_advisory.id);",
+          "    if (meta.operationId === 'identityAuthGoogleLogin') { const target = meta.tokenTarget; const refreshTarget = meta.refreshTokenTarget; if (target && body.access_token) pm.collectionVariables.set(target, body.access_token); if (refreshTarget && body.refresh_token) pm.collectionVariables.set(refreshTarget, body.refresh_token); }",
+          "    if (meta.operationId === 'getStaffRequestDetail') { if (body.ai_advisory && body.ai_advisory.id) pm.collectionVariables.set('advisoryId', body.ai_advisory.id); else pm.collectionVariables.unset('advisoryId'); setPriorityAdvisoryVariables(body.priority_advisory); }",
           "    if (meta.operationId === 'createSelfRequest') { if (body.id) pm.collectionVariables.set('requestId', body.id); if (body.tracking_code) pm.collectionVariables.set('trackingCode', body.tracking_code); }",
+          "    if (meta.operationId === 'listRequestQueue') { if (Array.isArray(body.items) && body.items[0] && body.items[0].id) { const firstRequest = body.items[0]; pm.collectionVariables.set('requestId', firstRequest.id); if (firstRequest.version !== undefined) pm.collectionVariables.set('requestVersion', String(firstRequest.version)); setPriorityAdvisoryVariables(firstRequest.priority_advisory); } else { pm.collectionVariables.unset('requestId'); pm.collectionVariables.unset('requestVersion'); setPriorityAdvisoryVariables(null); } }",
           "    if (meta.operationId === 'logisticsDrivesPublicList') { pm.collectionVariables.unset('donationDriveId'); pm.collectionVariables.unset('donationItemId'); }",
           "    if (meta.operationId === 'logisticsDrivesPublicList' || meta.operationId === 'logisticsDrivesPublicDetail') { const drive = Array.isArray(body.items) ? body.items[0] : body; if (drive && drive.id) pm.collectionVariables.set('donationDriveId', drive.id); if (drive && Array.isArray(drive.items) && drive.items[0]) pm.collectionVariables.set('donationItemId', drive.items[0].item_id || drive.items[0].id); }",
-          "    if (meta.operationId === 'logisticsDonationsCreateDelivery') { if (body.id) pm.collectionVariables.set('donationId', body.id); if (body.public_code) pm.collectionVariables.set('donationPublicCode', body.public_code); }",
+          "    if (meta.operationId === 'logisticsDonationsCreateDelivery') { if (body.id) pm.collectionVariables.set('donationId', body.id); if (body.public_code) pm.collectionVariables.set('donationPublicCode', body.public_code); const pendingSecret = pm.variables.get('pendingDonationSecret'); if (body.id && pendingSecret) pm.collectionVariables.set('donationSecret', pendingSecret); }",
+          "    if (meta.operationId === 'logisticsDonationsIssueRecovery' && body.recovery_code) pm.collectionVariables.set('recoveryCode', body.recovery_code);",
           "    if (meta.operationId === 'logisticsDonationReceiptsCreate' && body.id) pm.collectionVariables.set('donationReceiptId', body.id);",
           "    if (meta.operationId === 'logisticsDistributionsCreateHandoff' && body.id) pm.collectionVariables.set('handoffId', body.id);",
           "    if (['uploadRequestEvidence','uploadMissionEvidence','logisticsDonationsUploadEvidence','logisticsDistributionsUploadHandoffEvidence'].includes(meta.operationId) && body.id) pm.collectionVariables.set('evidenceId', body.id);",

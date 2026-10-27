@@ -47,6 +47,7 @@ function prepareSql(
   for (const [marker, include] of [
     ['-- @include campaign support', 'seed-campaign-support.sql'],
     ['-- @include demo campaigns', 'seed-campaigns.sql'],
+    ['-- @include demo expansion', 'seed-expansion-' + service + '.sql'],
   ]) {
     if (source.includes(marker)) source = source.replace(marker, readFileSync(resolve('seed', include), 'utf8'));
   }
@@ -146,13 +147,60 @@ try {
       process.stdout.write('Seeded synthetic ' + service + ' data.\n');
     }
   } else {
+    passwordHash = await createPasswordHash();
     await runTransaction(clients.get('identity'), prepareSql('identity', 'seed-campaign-support.sql'));
+    await runTransaction(clients.get('identity'), prepareSql('identity', 'seed-expansion-identity.sql'));
+    const identityPrerequisites = await clients.get('identity').query(`
+      WITH fixture(user_id, username, role_code, scope_type, organization_id, requires_membership) AS (VALUES
+        ('00000000-0000-4000-8000-000000000112'::uuid, 'ops_seed', 'OPERATIONS_MANAGER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, true),
+        ('00000000-0000-4000-8000-000000000113'::uuid, 'citizen3', 'CITIZEN', 'SYSTEM', NULL::uuid, false),
+        ('00000000-0000-4000-8000-000000000114'::uuid, 'vol_leader3', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000002'::uuid, true),
+        ('00000000-0000-4000-8000-000000000115'::uuid, 'vol_member3', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000002'::uuid, true),
+        ('00000000-0000-4000-8000-000000000116'::uuid, 'vol_leader4', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000002'::uuid, true),
+        ('00000000-0000-4000-8000-000000000117'::uuid, 'vol_member4', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000002'::uuid, true),
+        ('00000000-0000-4000-8000-000000000118'::uuid, 'coord_seed', 'COORDINATOR', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, true)
+      )
+      SELECT
+        (SELECT count(*)::int
+           FROM fixture f
+           JOIN app_user u ON u.id = f.user_id AND u.username::text = f.username
+                          AND u.status = 'ACTIVE' AND u.must_change_password
+           JOIN role_grant g ON g.user_id = f.user_id AND g.role_code = f.role_code AND g.scope_type = f.scope_type
+                            AND g.organization_id IS NOT DISTINCT FROM f.organization_id
+                            AND g.region_code IS NULL AND g.campaign_id IS NULL AND g.revoked_at IS NULL
+           LEFT JOIN membership m ON m.user_id = f.user_id AND m.organization_id = f.organization_id AND m.status = 'ACTIVE'
+          WHERE NOT f.requires_membership OR m.user_id IS NOT NULL) AS users_ready,
+        (SELECT count(*)::int FROM region WHERE status = 'ACTIVE' AND (
+            (code = 'DEMO_A' AND name = 'Khu vực Nam (demo)') OR
+            (code = 'DEMO_B' AND name = 'Khu vực Trung (demo)') OR
+            (code = 'DEMO_C' AND name = 'Khu vực Bắc (demo)'))) AS regions_ready,
+        (SELECT count(*)::int FROM organization WHERE status = 'ACTIVE' AND (
+            (id = '00000000-0000-4000-8000-000000000001' AND name = 'Trung tâm điều phối C48 (demo)' AND organization_kind = 'COORDINATION') OR
+            (id = '00000000-0000-4000-8000-000000000002' AND name = 'Hội tình nguyện miền Nam (demo)' AND organization_kind = 'VOLUNTEER'))) AS organizations_ready
+    `);
+    const identityReady = identityPrerequisites.rows[0];
+    if (identityReady.users_ready !== 7 || identityReady.regions_ready !== 3 || identityReady.organizations_ready !== 2) {
+      throw new Error('Demo fixture ID or scope conflicts in Identity; dependent Response and Logistics fixtures were not seeded.');
+    }
     const creators = await clients.get('identity').query(
       "SELECT id FROM app_user WHERE status = 'ACTIVE' ORDER BY created_at, id LIMIT 1",
     );
     const campaignCreatorId = creators.rows[0]?.id ?? '00000000-0000-4000-8000-000000000104';
     await runTransaction(clients.get('response'), prepareSql('response', 'seed-campaigns.sql', campaignCreatorId));
-    process.stdout.write('Ensured demo campaign support and campaigns without changing existing records.\n');
+    const logisticsCampaign = await clients.get('response').query(
+      `SELECT 1 FROM campaign
+        WHERE id = '00000000-0000-4000-8000-0000000000c3'
+          AND organization_id = '00000000-0000-4000-8000-000000000001'
+          AND region_code = 'DEMO_A'
+          AND name = 'Hỗ trợ khẩn cấp khu vực Nam'
+          AND status = 'ACTIVE'`,
+    );
+    if (logisticsCampaign.rowCount !== 1) {
+      throw new Error('Demo campaign ...0c3 conflicts in Response; Response expansion and dependent Logistics fixtures were not seeded.');
+    }
+    await runTransaction(clients.get('response'), prepareSql('response', 'seed-expansion-response.sql'));
+    await runTransaction(clients.get('logistics'), prepareSql('logistics', 'seed-expansion-logistics.sql'));
+    process.stdout.write('Ensured synthetic Identity, Response, Logistics, and campaign fixtures with idempotent seed updates.\n');
   }
 } finally {
   await Promise.all([...clients.values()].map((client) => client.end()));

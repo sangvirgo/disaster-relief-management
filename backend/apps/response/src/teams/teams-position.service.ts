@@ -3,7 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { hasPermission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { ReporterSessionService } from '../requests/reporter-session';
 import { SetTeamPositionDto } from './teams.dto';
 

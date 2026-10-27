@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Request } from 'express';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import type { IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { ReporterSessionService } from '../requests/reporter-session';
 import { AuthorityReferralDto, CorrectRegionDto, DuplicateRequestDto } from './request-operations.dto';
 import { RequestOperationsCommandRunner } from './request-operations.command-runner.service';

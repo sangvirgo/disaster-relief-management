@@ -2,7 +2,7 @@ import { jest } from '@jest/globals';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../packages/technical/src/errors/errors';
-import type { Grant } from '../../../packages/technical/src/security/permissions';
+import type { Grant } from '../../../packages/identity-contracts/src/permissions';
 import { NeedsService } from '../src/needs/needs.service';
 import type { CreateNeedDto } from '../src/needs/needs.dto';
 import type { LogisticsSessionService } from '../src/auth/logistics-session.service';

@@ -3,7 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { withDatabaseRetry } from '../../../../packages/technical/src/persistence/postgres-errors';
-import { hasPermission, type Permission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission, type Permission } from '../../../../packages/identity-contracts/src/permissions';
 import { LogisticsCycleClient } from '../integrations/logistics/logistics-cycle.client';
 import { ReporterSessionService, type RequestCoordinatorGrant } from '../requests/reporter-session';
 

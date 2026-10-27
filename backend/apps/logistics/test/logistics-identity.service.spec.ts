@@ -26,7 +26,7 @@ describe('Logistics Identity region lookup', () => {
   });
 
   it('requires an active exact region and forwards the verified user transport', async () => {
-    const client = { get: jest.fn().mockResolvedValue({
+    const client = { get: jest.fn<() => Promise<unknown>>().mockResolvedValue({
       status: 200,
       body: { items: [{ code: 'R01', status: 'ACTIVE', name: 'Khu vực 1' }], next_cursor: null },
     }) };
@@ -38,7 +38,7 @@ describe('Logistics Identity region lookup', () => {
   });
 
   it('rejects an inactive region using the existing validation error', async () => {
-    const client = { get: jest.fn().mockResolvedValue({
+    const client = { get: jest.fn<() => Promise<unknown>>().mockResolvedValue({
       status: 200,
       body: { items: [{ code: 'R01', status: 'INACTIVE', name: 'Khu vực 1' }], next_cursor: null },
     }) };
@@ -49,7 +49,7 @@ describe('Logistics Identity region lookup', () => {
   });
 
   it('turns Identity transport failures into the existing Vietnamese API error code', async () => {
-    const client = { get: jest.fn().mockRejectedValue(new Error('network details')) };
+    const client = { get: jest.fn<() => Promise<unknown>>().mockRejectedValue(new Error('network details')) };
     const identity = new LogisticsIdentityService(client as never, config);
 
     await expect(identity.assertActiveRegion('R01', { authorization: 'Bearer verified-token' }))

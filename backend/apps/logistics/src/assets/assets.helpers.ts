@@ -1,5 +1,5 @@
 import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { hasPermission, ROLE_PERMISSIONS } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission, ROLE_PERMISSIONS } from '../../../../packages/identity-contracts/src/permissions';
 import type { AuthenticatedLogisticsSession } from '../auth/logistics-session.service';
 import type { AssetPointDto } from './assets.dto';
 

@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import type { DataSource, EntityManager } from 'typeorm';
 import type { DistributionContext } from '../src/distributions/distributions.read';
-import type { Grant } from '../../../packages/technical/src/security/permissions';
+import type { Grant } from '../../../packages/identity-contracts/src/permissions';
 
 await jest.unstable_mockModule('../src/distributions/handoffs.read', () => ({
   readHandoffView: jest.fn().mockResolvedValue({ id: 'handoff-1' }),

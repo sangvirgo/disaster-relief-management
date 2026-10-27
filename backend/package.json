@@ -70,5 +70,9 @@
     "argon2": true,
     "unrs-resolver": true,
     "@parcel/watcher": true
+  },
+  "overrides": {
+    "body-parser": "2.4.0",
+    "multer": "2.5.0"
   }
 }

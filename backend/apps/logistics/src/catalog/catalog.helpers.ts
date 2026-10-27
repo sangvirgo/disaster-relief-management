@@ -1,4 +1,4 @@
-import { hasPermission, Grant } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission, Grant } from '../../../../packages/identity-contracts/src/permissions';
 
 export function hasCatalogManageGrant(grants: readonly Grant[]): boolean {
   return grants.some((grant) => grant.role_code === 'OPERATIONS_MANAGER' &&

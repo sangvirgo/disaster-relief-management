@@ -5,7 +5,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
-import { hasPermission, ROLE_PERMISSIONS } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission, ROLE_PERMISSIONS } from '../../../../packages/identity-contracts/src/permissions';
 import { hashPurposeBoundSecret } from '../../../../packages/technical/src/security/secret-hash';
 import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from '../requests/request-intake.service';
@@ -332,7 +332,8 @@ export class TrackingService {
           if (sets.length) await manager.query(`UPDATE request_subject SET ${sets.join(', ')} WHERE request_id = $1`, values);
           const nextDescription = Object.hasOwn(dto, 'description') ? dto.description ?? null : row.description;
           const risk = scoreRequestRisk({ description: nextDescription, reporterDeclaredDanger: dto.reporter_declared_danger ?? row.reporter_declared_danger,
-            childrenCount: nextChildren, elderlyCount: nextElderly, needsRescue: nextNeedsRescue, needsReliefSupplies: nextNeedsRelief });
+            peopleAffected: nextPeople, childrenCount: nextChildren, elderlyCount: nextElderly,
+            needsRescue: nextNeedsRescue, needsReliefSupplies: nextNeedsRelief });
           await manager.query(
             `UPDATE ai_advisory SET risk_score=$2,reason_codes=$3 WHERE id=(SELECT id FROM ai_advisory WHERE request_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1)`,
             [row.id, risk.score, risk.reasonCodes],

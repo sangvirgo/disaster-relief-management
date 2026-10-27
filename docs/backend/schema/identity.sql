@@ -71,6 +71,29 @@ CREATE INDEX email_challenge_user_live_idx ON email_verification_challenge (user
 CREATE INDEX email_challenge_expiry_idx ON email_verification_challenge (expires_at)
   WHERE consumed_at IS NULL;
 
+-- Ephemeral signup attempts are not accounts and never reserve account identifiers.
+CREATE TABLE email_registration (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(), -- prospective app_user id, no FK
+  challenge_id    uuid NOT NULL UNIQUE,
+  username        citext NOT NULL CHECK (username::text ~ '^[A-Za-z0-9._-]{3,64}$'),
+  display_name    text NOT NULL CHECK (is_clean_text(display_name)),
+  email           text NOT NULL,
+  password_hash   text,
+  code_hash       text,
+  attempts        int NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 5),
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  expires_at      timestamptz NOT NULL,
+  code_expires_at timestamptz NOT NULL,
+  last_sent_at    timestamptz NOT NULL DEFAULT now(),
+  confirmed_at    timestamptz,
+  CONSTRAINT email_registration_lifetime CHECK (expires_at = created_at + interval '10 minutes'),
+  CONSTRAINT email_registration_code_expiry CHECK (code_expires_at > created_at AND code_expires_at <= expires_at),
+  CONSTRAINT email_registration_confirmation CHECK (
+    (confirmed_at IS NULL AND password_hash IS NOT NULL AND code_hash IS NOT NULL) OR
+    (confirmed_at IS NOT NULL AND confirmed_at >= created_at AND password_hash IS NULL AND code_hash IS NULL))
+);
+CREATE INDEX email_registration_expiry_idx ON email_registration (expires_at,id); -- bounded cleanup, including confirmed attempts
+
 -- organization roster and the ORGANIZATION_IN_USE guard; endpoints address a membership by (organization, user), so the pair is the key
 CREATE TABLE membership (
   user_id         uuid NOT NULL REFERENCES app_user(id),
@@ -182,7 +205,8 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE CREATE ON SCHEMA public FROM c48_identity_app;
 GRANT USAGE ON SCHEMA public TO c48_identity_app;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO c48_identity_app;
-GRANT INSERT, UPDATE ON region, organization, app_user, membership, role_grant, session_family, refresh_session, idempotency_record, email_verification_challenge TO c48_identity_app;
+GRANT INSERT, UPDATE ON region, organization, app_user, membership, role_grant, session_family, refresh_session, idempotency_record TO c48_identity_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON email_registration TO c48_identity_app; -- ephemeral registration only; no account deletion
 GRANT INSERT ON external_identity TO c48_identity_app;
 GRANT INSERT ON audit_log TO c48_identity_app;                          -- append-only: no UPDATE, DELETE or TRUNCATE
 GRANT DELETE ON refresh_session, session_family, idempotency_record TO c48_identity_app;   -- retention cleanup only (children before family)

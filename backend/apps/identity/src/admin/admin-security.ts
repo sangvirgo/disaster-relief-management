@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import { DataSource, EntityManager } from 'typeorm';
-import { hasPermission, Permission, Grant } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission, Permission, Grant } from '../../../../packages/identity-contracts/src/permissions';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { IDENTITY_SERVICE_TOKEN_CONFIG, ServiceTokenConfig, ServiceTokenClaims, verifyServiceToken } from '../auth/service-tokens';
 import { AuthContext } from '../auth/auth.guard';

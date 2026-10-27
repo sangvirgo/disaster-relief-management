@@ -2,11 +2,13 @@ import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import type { Request } from 'express';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { CircuitBreakerClient } from '../../../../packages/technical/src/http/service-client';
-import type { Grant } from '../../../../packages/technical/src/security/permissions';
+import { Grant, validGrant } from '../../../../packages/identity-contracts/src/permissions';
+import { ServiceTokenCache } from '../../../../packages/technical/src/http/service-token-cache';
 import type { ServiceName } from '../../../../packages/technical/src/security/service-token';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from './request-intake.service';
 import { reporterAccessClaims, ReporterAccessTokenClaims } from './reporter-token';
 
+export const REPORTER_SESSION_CLIENT = Symbol('REPORTER_SESSION_CLIENT');
 export const REPORTER_SESSION_CONFIG = Symbol('REPORTER_SESSION_CONFIG');
 
 export interface ReporterSessionConfig {
@@ -40,27 +42,10 @@ export type ActiveUserCheck =
   | { active: true }
   | { active: false; reason: 'USER_NOT_FOUND' | 'USER_INACTIVE' };
 
-interface IdentityServiceToken {
-  access_token: string;
-  expires_in: number;
-}
-
-const roles = new Set(['CITIZEN', 'VOLUNTEER', 'COORDINATOR', 'CAMPAIGN_MANAGER', 'OPERATIONS_MANAGER', 'INTAKE_STAFF', 'REVIEWER', 'DISTRIBUTION_STAFF', 'ADMIN']);
-const scopeTypes = new Set(['SYSTEM', 'ORGANIZATION', 'REGION', 'CAMPAIGN']);
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function unavailable(): AppError {
   return new AppError('IDENTITY_UNAVAILABLE', { status: 503, retryAfterSeconds: 1 });
-}
-
-function validGrant(value: unknown): value is Grant {
-  if (!value || typeof value !== 'object') return false;
-  const grant = value as Record<string, unknown>;
-  return typeof grant.role_code === 'string' && roles.has(grant.role_code) &&
-    typeof grant.scope_type === 'string' && scopeTypes.has(grant.scope_type) &&
-    (grant.organization_id === null || (typeof grant.organization_id === 'string' && uuidPattern.test(grant.organization_id))) &&
-    (grant.region_code === null || grant.region_code === undefined || (typeof grant.region_code === 'string' && grant.region_code.length <= 80)) &&
-    (grant.campaign_id === null || grant.campaign_id === undefined || (typeof grant.campaign_id === 'string' && uuidPattern.test(grant.campaign_id)));
 }
 
 export function loadReporterSessionConfig(env: Record<string, string | undefined> = process.env): ReporterSessionConfig {
@@ -80,16 +65,15 @@ export function loadReporterSessionConfig(env: Record<string, string | undefined
 
 @Injectable()
 export class ReporterSessionService implements OnModuleDestroy {
-  private readonly client: CircuitBreakerClient;
-  private readonly serviceTokens = new Map<ServiceName, { value: string; refreshAt: number }>();
-  private readonly tokenRequests = new Map<ServiceName, Promise<string>>();
+  private readonly serviceTokens: ServiceTokenCache;
   private readonly inFlight = new Map<string, Promise<ReporterSession>>();
 
   constructor(
-    @Inject(REPORTER_SESSION_CONFIG) private readonly config: ReporterSessionConfig,
+    @Inject(REPORTER_SESSION_CONFIG) config: ReporterSessionConfig,
     @Inject(REQUEST_INTAKE_CONFIG) private readonly intakeConfig: RequestIntakeConfig,
+    @Inject(REPORTER_SESSION_CLIENT) private readonly client: CircuitBreakerClient,
   ) {
-    this.client = new CircuitBreakerClient(config.identityBaseUrl, 'IDENTITY_UNAVAILABLE', { timeoutMs: config.timeoutMs, maxSockets: 30 });
+    this.serviceTokens = new ServiceTokenCache(client, config);
   }
 
   async optional(request: Request, hasTrackingCapability = false): Promise<ReporterSession | null> {
@@ -105,11 +89,11 @@ export class ReporterSessionService implements OnModuleDestroy {
   }
 
   serviceToken(audience: ServiceName): Promise<string> {
-    return this.getServiceToken(audience);
+    return this.serviceTokens.get(audience);
   }
 
   async requestCoordinatorGrants(organizationId: string): Promise<RequestCoordinatorGrant[]> {
-    const token = await this.getServiceToken();
+    const token = await this.serviceTokens.get();
     let result;
     try {
       result = await this.client.post<unknown>('/api/v1/identity/internal/request-coordinators', { organization_id: organizationId }, {
@@ -141,7 +125,7 @@ export class ReporterSessionService implements OnModuleDestroy {
     const requested = [...new Set(codes)];
     if (!requested.length) return new Map();
 
-    const token = await this.getServiceToken();
+    const token = await this.serviceTokens.get();
     let result;
     try {
       result = await this.client.post<unknown>('/api/v1/identity/internal/regions:lookup', { codes: requested }, {
@@ -168,7 +152,7 @@ export class ReporterSessionService implements OnModuleDestroy {
   }
 
   async teamLeaderEligibility(userId: string, organizationId: string): Promise<TeamLeaderEligibility> {
-    const token = await this.getServiceToken();
+    const token = await this.serviceTokens.get();
     let result;
     try {
       result = await this.client.post<unknown>('/api/v1/identity/internal/team-leader-eligibility', {
@@ -195,7 +179,7 @@ export class ReporterSessionService implements OnModuleDestroy {
   }
 
   async activeUserCheck(userId: string): Promise<ActiveUserCheck> {
-    const token = await this.getServiceToken();
+    const token = await this.serviceTokens.get();
     let result;
     try {
       result = await this.client.post<unknown>('/api/v1/identity/internal/users:check-active', { user_id: userId }, {
@@ -230,7 +214,7 @@ export class ReporterSessionService implements OnModuleDestroy {
   }
 
   private async fetchIntrospection(claims: ReporterAccessTokenClaims): Promise<ReporterSession> {
-    const token = await this.getServiceToken();
+    const token = await this.serviceTokens.get();
     let result;
     try {
       result = await this.client.post<unknown>('/api/v1/identity/internal/introspect', { sid: claims.sid, sub: claims.sub }, {
@@ -248,26 +232,4 @@ export class ReporterSessionService implements OnModuleDestroy {
     return { userId: claims.sub, grants: value.grants as Grant[] };
   }
 
-  private async getServiceToken(audience: ServiceName = 'identity'): Promise<string> {
-    const cached = this.serviceTokens.get(audience);
-    if (cached && cached.refreshAt > Date.now()) return cached.value;
-    const pending = this.tokenRequests.get(audience);
-    if (pending) return pending;
-    const operation = this.client.post<unknown>('/api/v1/identity/internal/token', {
-      client_id: this.config.clientId,
-      client_secret: this.config.clientSecret,
-      audience,
-    }).then((result) => {
-      if (result.status !== 200 || !result.body || typeof result.body !== 'object') throw unavailable();
-      const value = result.body as Partial<IdentityServiceToken>;
-      if (typeof value.access_token !== 'string' || !Number.isInteger(value.expires_in) || value.expires_in! < 1) throw unavailable();
-      this.serviceTokens.set(audience, { value: value.access_token, refreshAt: Date.now() + Math.max(1, value.expires_in! - 30) * 1_000 });
-      return value.access_token;
-    }).catch((error: unknown) => {
-      if (error instanceof AppError) throw error;
-      throw unavailable();
-    }).finally(() => { this.tokenRequests.delete(audience); });
-    this.tokenRequests.set(audience, operation);
-    return operation;
-  }
 }

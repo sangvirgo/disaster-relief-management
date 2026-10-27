@@ -87,14 +87,18 @@ test('mc configuration rejects a non-regular config.json', async () => {
   }
 });
 
-test('MinIO alias verification accepts only the selected alias URL matching response-api S3_PUBLIC_ENDPOINT', () => {
-  const compose = JSON.stringify({ services: { 'response-api': { environment: { S3_PUBLIC_ENDPOINT: 'http://minio:9000/' } } } });
-  const matchingAlias = JSON.stringify({ aliases: { primary: { url: 'http://minio:9000', accessKey: 'private-access', secretKey: 'private-secret' } } });
-  const mismatchingAlias = JSON.stringify({ aliases: { primary: { url: 'http://127.0.0.1:9000', accessKey: 'private-access', secretKey: 'private-secret' } } });
-
-  assert.doesNotThrow(() => assertMinioAliasMatchesComposeEndpoint(compose, matchingAlias, 'primary'));
-  assert.throws(() => assertMinioAliasMatchesComposeEndpoint(compose, mismatchingAlias, 'primary'), /endpoints do not match/u);
-  assert.throws(() => assertMinioAliasMatchesComposeEndpoint(compose, compose, 'missing'), /selected alias URL is missing/u);
+test('MinIO backup alias uses only the main service loopback S3 port, never public ingress', () => {
+  const compose = JSON.stringify({ services: {
+    'response-api': { environment: { S3_PUBLIC_ENDPOINT: 'http://localhost:8080' } },
+    minio: { ports: [{ host_ip: '127.0.0.1', target: 9000, published: '59000', protocol: 'tcp' }] },
+  } });
+  const alias = (url) => JSON.stringify({ aliases: { primary: { url } } });
+  assert.doesNotThrow(() => assertMinioAliasMatchesComposeEndpoint(compose, alias('http://127.0.0.1:59000'), 'primary'));
+  for (const url of ['http://localhost:8080', 'http://minio:9000', 'http://127.0.0.1:9001', 'http://127.0.0.1:59000/bucket']) {
+    assert.throws(() => assertMinioAliasMatchesComposeEndpoint(compose, alias(url), 'primary'));
+  }
+  assert.throws(() => assertMinioAliasMatchesComposeEndpoint(compose.replace('127.0.0.1', '0.0.0.0'), alias('http://0.0.0.0:59000'), 'primary'));
+  assert.throws(() => assertMinioAliasMatchesComposeEndpoint(compose, compose, 'missing'));
 });
 
 test('object inventory records each bucket key, byte size, and streamed SHA-256', async () => {

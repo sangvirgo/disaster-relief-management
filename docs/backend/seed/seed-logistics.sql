@@ -267,6 +267,8 @@ INSERT INTO notice (id, recipient_user_id, source_id, source_version, notice_typ
   ('00000000-0000-4000-8000-0000000d1004', '00000000-0000-4000-8000-000000000105', '00000000-0000-4000-8000-0000000a9001', 1, 'DONATION_DISPUTE_OPENED',
    '{"title": "Có khiếu nại về số lượng tiếp nhận", "message": "Người quyên góp phiếu GD7K2M02 đề nghị đối chiếu lại số lượng đã đếm."}'::jsonb, now() - interval '5 days 10 hours');
 
+-- @include demo expansion
+
 -- ---------- assertions (any mismatch aborts the load) ----------
 DO $$
 DECLARE n int; v numeric;

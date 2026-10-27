@@ -1,3 +1,4 @@
+import { hasPermission, ROLE_PERMISSIONS } from '../../identity-contracts/src/permissions';
 import { BadRequestException, ArgumentsHost, ConflictException, ForbiddenException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { describe, expect, it, jest } from '@jest/globals';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -16,7 +17,6 @@ import {
   encodeKeysetCursor,
   getCorrelationId,
   hashPurposeBoundSecret,
-  hasPermission,
   jitteredInterval,
   loadErrorCatalog,
   LOG_REDACT_PATHS,
@@ -27,7 +27,6 @@ import {
   JobRunner,
   PinoNestLogger,
   postgresOptions,
-  ROLE_PERMISSIONS,
   validateEnvironment,
   verifyPurposeBoundSecret,
   withDatabaseRetry,

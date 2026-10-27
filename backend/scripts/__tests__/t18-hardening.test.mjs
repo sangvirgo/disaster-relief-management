@@ -12,7 +12,19 @@ test('the ingress keeps required security headers and excludes query strings fro
   assert.doesNotMatch(accessLog, /\$(?:request|request_uri|args|remote_addr|remote_user|http_x_forwarded_for|http_user_agent|http_referer)\b/u);
   assert.match(nginx, /add_header X-Content-Type-Options nosniff always;/u);
   assert.match(nginx, /add_header Referrer-Policy no-referrer always;/u);
-  assert.match(nginx, /add_header Content-Security-Policy "default-src 'self'; frame-ancestors 'none'" always;/u);
+  const policies = [...nginx.matchAll(/add_header Content-Security-Policy "([^"]+)" always;/gu)];
+  assert.ok(policies.length > 0);
+  for (const [, policy] of policies) {
+    const directives = new Map(policy.split(';').map((entry) => {
+      const [name, ...sources] = entry.trim().split(/\s+/u);
+      return [name, sources];
+    }));
+    for (const [name, required] of [['default-src', "'self'"], ['base-uri', "'self'"], ['object-src', "'none'"], ['frame-ancestors', "'none'"]]) {
+      assert.deepEqual(directives.get(name), [required]);
+    }
+    assert.ok(directives.get('script-src')?.includes("'self'"));
+    assert.ok(!directives.get('script-src')?.includes("'unsafe-inline'"));
+  }
   assert.match(nginx, /add_header Cache-Control no-store always;/u);
 });
 
@@ -39,7 +51,7 @@ test('database backups are private and use only the existing main Compose servic
   assert.match(backup, /c48_identity[\s\S]*c48_response[\s\S]*c48_logistics/u);
   assert.match(backup, /c48-response-evidence[\s\S]*c48-logistics-evidence/u);
   assert.match(backup, /outside the repository/u);
-  assert.match(endpointVerifier, /services\?\.\['response-api'\]\?\.environment\?\.S3_PUBLIC_ENDPOINT/u);
+  assert.match(endpointVerifier, /services\?\.minio\?\.ports/u);
   assert.match(endpointVerifier, /aliases\?\.\[alias\]\?\.url/u);
   assert.doesNotMatch(endpointVerifier, /accessKey|secretKey/u);
   assert.match(objectInventory, /bucket,/u);

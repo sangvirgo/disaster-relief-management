@@ -164,6 +164,26 @@
                            }
                          }
                        },
+                       "410": {
+                         "description": "Documented error response; clients branch on the stable code.",
+                         "content": {
+                           "application/json": {
+                             "schema": {
+                               "$ref": "#/components/schemas/ErrorEnvelope"
+                             },
+                             "examples": {
+                               "REGISTRATION_EXPIRED": {
+                                 "summary": "REGISTRATION_EXPIRED",
+                                 "value": {
+                                   "code": "REGISTRATION_EXPIRED",
+                                   "message": "Phiên đăng ký đã hết hạn. Vui lòng đăng ký lại.",
+                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
+                                 }
+                               }
+                             }
+                           }
+                         }
+                       },
                        "429": {
                          "description": "Vietnamese error message; clients branch on the stable code.",
                          "content": {
@@ -4194,326 +4214,374 @@
     },
     "/auth/email/resend": {
       "post": {
-        "operationId": "identityAuthResendEmailOtp",
-        "summary": "Resend the email verification code.",
-        "description": "Route exported from backend/apps/identity/src/auth/auth.controller.ts#AuthController.resendEmailOtp. Detailed request, response, and error contract: docs/backend/02-identity-api.md. This export does not infer payload schemas.",
-        "responses": {
-          "200": {
-            "description": "Documented response shape.",
+          "operationId": "identityAuthResendEmailOtp",
+          "summary": "Resend the email verification code.",
+          "description": "Rotates the challenge after the resend cooldown while the registration is still live. The new code expires after five minutes or at the original ten-minute registration deadline, whichever comes first. Unknown or expired requests return no usable challenge.",
+          "responses": {
+            "200": {
+              "description": "Documented response shape.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "challenge_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "email_sent": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "challenge_id",
+                      "email_sent"
+                    ]
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "EMAIL_OTP_INVALID": {
+                      "summary": "EMAIL_OTP_INVALID",
+                      "value": {
+                        "code": "EMAIL_OTP_INVALID",
+                        "message": "Mã xác minh email không hợp lệ hoặc đã hết hạn.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "429": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "RATE_LIMITED": {
+                      "summary": "RATE_LIMITED",
+                      "value": {
+                        "code": "RATE_LIMITED",
+                        "message": "Bạn thao tác quá nhanh. Vui lòng thử lại sau.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "503": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "EMAIL_OTP_UNAVAILABLE": {
+                      "summary": "EMAIL_OTP_UNAVAILABLE",
+                      "value": {
+                        "code": "EMAIL_OTP_UNAVAILABLE",
+                        "message": "Dịch vụ xác minh email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/02-identity-api.md",
+          "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.resendEmailOtp",
+          "security": [
+            {
+              "WebPreSessionCookie": [],
+              "CsrfToken": []
+            },
+            {}
+          ],
+          "x-c48-conditional-security": {
+            "access_token_required": false,
+            "web": {
+              "required": [
+                "Origin allowed by Identity",
+                "cookie c48_pre",
+                "header X-CSRF-Token"
+              ]
+            },
+            "native": {
+              "required": [],
+              "forbidden": [
+                "Cookie",
+                "Origin"
+              ]
+            }
+          },
+          "requestBody": {
+            "required": true,
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "challenge_id": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "email_sent": {
-                      "type": "boolean"
+                      "type": "string",
+                      "format": "uuid"
                     }
                   },
                   "required": [
-                    "challenge_id",
-                    "email_sent"
+                    "challenge_id"
                   ]
                 }
               }
             }
-          },
-          "400": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "EMAIL_OTP_INVALID": {
-                    "summary": "EMAIL_OTP_INVALID",
-                    "value": {
-                      "code": "EMAIL_OTP_INVALID",
-                      "message": "Mã xác minh email không hợp lệ hoặc đã hết hạn.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "CSRF_INVALID": {
-                    "summary": "CSRF_INVALID",
-                    "value": {
-                      "code": "CSRF_INVALID",
-                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "RATE_LIMITED": {
-                    "summary": "RATE_LIMITED",
-                    "value": {
-                      "code": "RATE_LIMITED",
-                      "message": "Bạn thao tác quá nhanh. Vui lòng thử lại sau.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "EMAIL_OTP_UNAVAILABLE": {
-                    "summary": "EMAIL_OTP_UNAVAILABLE",
-                    "value": {
-                      "code": "EMAIL_OTP_UNAVAILABLE",
-                      "message": "Dịch vụ xác minh email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-c48-contract-source": "docs/backend/02-identity-api.md",
-        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.resendEmailOtp",
-        "security": [
-          {
-            "WebPreSessionCookie": [],
-            "CsrfToken": []
-          },
-          {}
-        ],
-        "x-c48-conditional-security": {
-          "access_token_required": false,
-          "web": {
-            "required": [
-              "Origin allowed by Identity",
-              "cookie c48_pre",
-              "header X-CSRF-Token"
-            ]
-          },
-          "native": {
-            "required": [],
-            "forbidden": [
-              "Cookie",
-              "Origin"
-            ]
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "challenge_id": {
-                    "type": "string",
-                    "format": "uuid"
-                  }
-                },
-                "required": [
-                  "challenge_id"
-                ]
-              }
-            }
           }
         }
-      }
     },
     "/auth/email/verify": {
       "post": {
-        "operationId": "identityAuthVerifyEmail",
-        "summary": "Verify a citizen email address.",
-        "description": "Route exported from backend/apps/identity/src/auth/auth.controller.ts#AuthController.verifyEmail. Detailed request, response, and error contract: docs/backend/02-identity-api.md. This export does not infer payload schemas.",
-        "responses": {
-          "200": {
-            "description": "Documented response shape.",
+          "operationId": "identityAuthVerifyEmail",
+          "summary": "Verify a citizen email address.",
+          "description": "A valid unconsumed code creates the account and CITIZEN grant in one transaction. Expired registration requests and expired, wrong or consumed codes never activate an account. Username/email conflicts are checked against existing accounts at verification time.",
+          "responses": {
+            "200": {
+              "description": "Documented response shape.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "verified": {
+                        "type": "boolean",
+                        "const": true
+                      },
+                      "user": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "display_name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "username",
+                          "display_name"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "verified",
+                      "user"
+                    ]
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "EMAIL_OTP_INVALID": {
+                      "summary": "EMAIL_OTP_INVALID",
+                      "value": {
+                        "code": "EMAIL_OTP_INVALID",
+                        "message": "Mã xác minh email không hợp lệ hoặc đã hết hạn.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "USERNAME_TAKEN": {
+                      "summary": "USERNAME_TAKEN",
+                      "value": {
+                        "code": "USERNAME_TAKEN",
+                        "message": "Tên đăng nhập đã được sử dụng.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "EMAIL_TAKEN": {
+                      "summary": "EMAIL_TAKEN",
+                      "value": {
+                        "code": "EMAIL_TAKEN",
+                        "message": "Địa chỉ email đã được sử dụng.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "429": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "RATE_LIMITED": {
+                      "summary": "RATE_LIMITED",
+                      "value": {
+                        "code": "RATE_LIMITED",
+                        "message": "Bạn thao tác quá nhanh. Vui lòng thử lại sau.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "503": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "EMAIL_OTP_UNAVAILABLE": {
+                      "summary": "EMAIL_OTP_UNAVAILABLE",
+                      "value": {
+                        "code": "EMAIL_OTP_UNAVAILABLE",
+                        "message": "Dịch vụ xác minh email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/02-identity-api.md",
+          "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.verifyEmail",
+          "security": [
+            {
+              "WebPreSessionCookie": [],
+              "CsrfToken": []
+            },
+            {}
+          ],
+          "x-c48-conditional-security": {
+            "access_token_required": false,
+            "web": {
+              "required": [
+                "Origin allowed by Identity",
+                "cookie c48_pre",
+                "header X-CSRF-Token"
+              ]
+            },
+            "native": {
+              "required": [],
+              "forbidden": [
+                "Cookie",
+                "Origin"
+              ]
+            }
+          },
+          "requestBody": {
+            "required": true,
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "verified": {
-                      "type": "boolean",
-                      "const": true
+                    "challenge_id": {
+                      "type": "string",
+                      "format": "uuid"
                     },
-                    "user": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "username": {
-                          "type": "string"
-                        },
-                        "display_name": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "username",
-                        "display_name"
-                      ]
+                    "code": {
+                      "type": "string",
+                      "pattern": "^\\d{6}$"
                     }
                   },
                   "required": [
-                    "verified",
-                    "user"
+                    "challenge_id",
+                    "code"
                   ]
                 }
               }
             }
-          },
-          "400": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "EMAIL_OTP_INVALID": {
-                    "summary": "EMAIL_OTP_INVALID",
-                    "value": {
-                      "code": "EMAIL_OTP_INVALID",
-                      "message": "Mã xác minh email không hợp lệ hoặc đã hết hạn.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "CSRF_INVALID": {
-                    "summary": "CSRF_INVALID",
-                    "value": {
-                      "code": "CSRF_INVALID",
-                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "RATE_LIMITED": {
-                    "summary": "RATE_LIMITED",
-                    "value": {
-                      "code": "RATE_LIMITED",
-                      "message": "Bạn thao tác quá nhanh. Vui lòng thử lại sau.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-c48-contract-source": "docs/backend/02-identity-api.md",
-        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.verifyEmail",
-        "security": [
-          {
-            "WebPreSessionCookie": [],
-            "CsrfToken": []
-          },
-          {}
-        ],
-        "x-c48-conditional-security": {
-          "access_token_required": false,
-          "web": {
-            "required": [
-              "Origin allowed by Identity",
-              "cookie c48_pre",
-              "header X-CSRF-Token"
-            ]
-          },
-          "native": {
-            "required": [],
-            "forbidden": [
-              "Cookie",
-              "Origin"
-            ]
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "challenge_id": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "code": {
-                    "type": "string",
-                    "pattern": "^\\d{6}$"
-                  }
-                },
-                "required": [
-                  "challenge_id",
-                  "code"
-                ]
-              }
-            }
           }
         }
-      }
     },
     "/auth/google": {
       "post": {

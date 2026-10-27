@@ -40,3 +40,14 @@ test('presigned object downloads forward only the headers MinIO needs', () => {
     assert.doesNotMatch(storageProxy, new RegExp(`proxy_set_header\\s+${header}\\b`, 'iu'));
   }
 });
+
+
+test('API and Web upstreams refresh Docker DNS after a container changes address', () => {
+  assert.match(nginx, /resolver 127\.0\.0\.11 valid=5s ipv6=off;/u);
+  for (const [upstream, address] of [['identity_api', 'identity-api:3001'], ['response_api', 'response-api:3002'], ['logistics_api', 'logistics-api:3003'], ['web_app', 'web:80']]) {
+    const block = nginx.split(`upstream ${upstream} {`)[1]?.split('}')[0];
+    assert.ok(block);
+    assert.ok(block.includes(`zone ${upstream} 64k;`));
+    assert.ok(block.includes(`server ${address} resolve;`));
+  }
+});
