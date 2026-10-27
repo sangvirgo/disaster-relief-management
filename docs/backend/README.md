@@ -47,7 +47,7 @@ The selected scenarios need no SMTP, Google sign-in, MinIO, or Gemini unless you
 | Response | [response.json](../../contracts/openapi/response.json) | [Response API](03-response-api.md) |
 | Logistics | [logistics.json](../../contracts/openapi/logistics.json) | [Logistics API](04-logistics-api.md) |
 
-The API snapshots currently describe **204 operations**: 37 Identity, 81 Response, and 86 Logistics. `contracts:check` checks exported route coverage, operation IDs, path parameters, local references, source provenance, and security declarations. The contracts and API examples use stable English codes and identifiers; backend messages shown to people are Vietnamese.
+The API snapshots currently describe **205 operations**: 37 Identity, 82 Response, and 86 Logistics. `contracts:check` checks exported route coverage, operation IDs, path parameters, local references, source provenance, and security declarations. The contracts and API examples use stable English codes and identifiers; backend messages shown to people are Vietnamese.
 
 The main implementation references are:
 

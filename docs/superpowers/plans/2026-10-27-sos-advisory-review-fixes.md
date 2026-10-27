@@ -4,7 +4,7 @@
 
 **Goal:** Correct the reviewed advisory and Postman defects while keeping SOS coordination central and donations a small supporting workflow.
 
-**Architecture:** Keep the three existing services and manual priority/dispatch. Reuse the Response advisory table and existing state transitions; no new service, runtime, dependency, or test database. External advisory input defaults to structured facts, with narrative excluded unless explicitly enabled for synthetic demonstrations. Main Postman scenarios preserve aggregate identity, actor boundaries, current versions, and necessary repeated operations. Existing Logistics APIs and accounting safeguards remain available; the demo does not need to exercise all public operations.
+**Architecture:** Keep the three existing services and manual priority/dispatch. Reuse the Response advisory table and existing state transitions; no new service, runtime, dependency, or test database. External advisory input defaults to structured facts, with narrative excluded unless explicitly enabled for synthetic demonstrations. Automatic retries are limited by `GEMINI_MAX_RETRIES`; expired leases can be reclaimed with claim-token fencing, and a scoped coordinator can explicitly retry a current failed advisory through an idempotent endpoint. Main Postman scenarios preserve aggregate identity, actor boundaries, current versions, and necessary repeated operations. Existing Logistics APIs and accounting safeguards remain available; the demo does not need to exercise all public operations.
 
 **Tech Stack:** NestJS/TypeScript, PostgreSQL/PostGIS, React, Postman v2.1, existing Jest and Node script tests.
 
@@ -43,3 +43,19 @@ The user authorized implementing the preceding review recommendations and reduci
 - [ ] Update OpenAPI generation details and snapshots for any advisory response/review changes.
 - [ ] Inspect the complete diff and run relevant unit/script/contract/type checks that need neither builds nor live services.
 - [ ] Record actual checks and explicitly identify all live integration verification not performed.
+
+### Follow-up: Retry control and coordinator retry endpoint
+
+- [x] Set `GEMINI_MAX_RETRIES=3` by default and allow a finite, environment-configured retry budget.
+- [x] Requeue expired processing leases while budget remains; fence every result write with the current claim token.
+- [x] Add an idempotent `REQUEST_VERIFY`-scoped endpoint to retry only the latest fresh `FAILED` advisory, resetting its budget and writing a staff audit event.
+- [x] Update the database migration/schema, OpenAPI, Vietnamese timeline label, API guide, and regression tests.
+
+### Verification record (2026-10-28)
+
+- `npm test` (backend): 120 Jest suites / 631 tests passed; 111 Node script tests passed.
+- `npm run build` (backend) and `npm run build` (frontend/web) passed. The frontend build reports its existing large-chunk advisory.
+- `npm run contracts:check` passed: 37 Identity, 82 Response, and 86 Logistics operations.
+- `npm run check:compose-env` passed for all 13 primary Compose services.
+- `git diff --check` passed. Verification ran under Node 26.11.1, outside the documented Node 24 engine range.
+- No primary database migration or live Gemini request was run; those require the main stack/provider configuration.

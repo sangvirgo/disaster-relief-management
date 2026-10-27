@@ -25,7 +25,7 @@ describe('Gemini assessment input', () => {
     });
   });
 
-  it('includes incident narrative by default while masking direct identifiers', () => {
+  it('excludes narrative by default and masks direct identifiers only when explicitly enabled', () => {
     const facts = {
       incidentCategoryCode: 'FLOOD',
       description: 'Nước lũ dâng nhanh, 4 người mắc kẹt. Tôi tên là Nguyễn Văn An, email an@example.com.',
@@ -37,9 +37,11 @@ describe('Gemini assessment input', () => {
       needsReliefSupplies: false,
     };
 
-    const serialized = serializeAiAssessmentInput(facts);
+    const serialized = serializeAiAssessmentInput(facts, true);
 
-    expect(serialized).toBe(serializeAiAssessmentInput(facts));
+    expect(buildAiAssessmentInput(facts).description).toBe('');
+    expect(serializeAiAssessmentInput(facts)).not.toContain(facts.description);
+    expect(serialized).toBe(serializeAiAssessmentInput(facts, true));
     expect(serialized).not.toContain('Nguyễn Văn An');
     expect(serialized).not.toContain('an@example.com');
     expect(JSON.parse(serialized)).toMatchObject({
@@ -49,9 +51,10 @@ describe('Gemini assessment input', () => {
     });
   });
 
-  it('preserves title-case emergency facts in the default narrative', () => {
+  it('preserves title-case emergency facts only in explicitly enabled synthetic narratives', () => {
     expect(sanitizeAiDescription('Nước Đang Dâng; Cần Cấp Cứu')).toBe('Nước Đang Dâng; Cần Cấp Cứu');
-    expect(buildAiAssessmentInput({ incidentCategoryCode: 'FLOOD', description: 'Nước Đang Dâng' }).description).toBe('Nước Đang Dâng');
+    expect(buildAiAssessmentInput({ incidentCategoryCode: 'FLOOD', description: 'Nước Đang Dâng' }).description).toBe('');
+    expect(buildAiAssessmentInput({ incidentCategoryCode: 'FLOOD', description: 'Nước Đang Dâng' }, true).description).toBe('Nước Đang Dâng');
   });
 
   it('masks exact coordinates, signed URLs, and credential assignments', () => {

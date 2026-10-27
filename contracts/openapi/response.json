@@ -12775,6 +12775,230 @@
           }
         }
       }
+    },
+    "/requests/{id}/ai-advisories/{advisoryId}/retry": {
+      "post": {
+        "operationId": "responseRequestOperationsRetryAiAdvisory",
+        "summary": "Queue a coordinator-requested retry for a failed AI advisory.",
+        "description": "Requires REQUEST_VERIFY scope, the current request expected_version, an idempotency key, a configured Gemini API key, and the latest advisory to be FAILED and fresh for current SOS facts. Resets that advisory retry budget, appends a staff timeline event, and returns 202. A stale or superseded advisory is not retried. This does not change request facts, official priority, or team assignment.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RequestId"
+          },
+          {
+            "name": "advisoryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "AI advisory queued for a coordinator-requested retry.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              },
+              "Idempotent-Replay": {
+                "$ref": "#/components/headers/IdempotentReplay"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "request_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "advisory_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "const": "QUEUED"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "advisory_id",
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "IDEMPOTENCY_KEY_INVALID": {
+                    "summary": "IDEMPOTENCY_KEY_INVALID",
+                    "value": {
+                      "code": "IDEMPOTENCY_KEY_INVALID",
+                      "message": "Mã yêu cầu không hợp lệ.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "CSRF_INVALID": {
+                    "summary": "CSRF_INVALID",
+                    "value": {
+                      "code": "CSRF_INVALID",
+                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "NOT_FOUND": {
+                    "summary": "NOT_FOUND",
+                    "value": {
+                      "code": "NOT_FOUND",
+                      "message": "Không tìm thấy dữ liệu yêu cầu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "STATE_TRANSITION_INVALID": {
+                    "summary": "STATE_TRANSITION_INVALID",
+                    "value": {
+                      "code": "STATE_TRANSITION_INVALID",
+                      "message": "Trạng thái hiện tại không cho phép thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "VERSION_CONFLICT": {
+                    "summary": "VERSION_CONFLICT",
+                    "value": {
+                      "code": "VERSION_CONFLICT",
+                      "message": "Dữ liệu đã được cập nhật. Vui lòng tải lại trước khi tiếp tục.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "IDEMPOTENCY_KEY_REUSED": {
+                    "summary": "IDEMPOTENCY_KEY_REUSED",
+                    "value": {
+                      "code": "IDEMPOTENCY_KEY_REUSED",
+                      "message": "Mã yêu cầu đã được dùng cho nội dung khác.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/03-response-api.md",
+        "x-c48-controller-source": "backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.retryAiAdvisory",
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expected_version": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "expected_version"
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

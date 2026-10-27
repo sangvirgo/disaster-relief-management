@@ -126,6 +126,7 @@ export const statusLabels: Record<string, string> = {
   MANUAL_PIN: 'Ghim trên bản đồ',
   COORDINATOR_REPORTED: 'Điều phối viên cập nhật',
   AI_ADVISORY_REVIEW: 'Điều phối viên đã rà soát gợi ý AI',
+  AI_ADVISORY_RETRY: 'Điều phối viên đã yêu cầu thử lại gợi ý AI',
 };
 export const label = (value: unknown): string =>
   value == null || value === ''

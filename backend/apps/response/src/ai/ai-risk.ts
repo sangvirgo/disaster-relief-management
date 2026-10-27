@@ -27,10 +27,14 @@ export interface AiAssessmentInput {
 
 const introducedName = /((?:[Tt]ôi\s+[Tt]ên(?:\s+[lL][àÀ])?|[Tt]ên\s+[Tt]ôi\s+[lL][àÀ]|[Nn]gười\s+[Tt]ên|(?:[Tt]ôi|[Mm]ình|[Ee]m|[Aa]nh|[Cc]hị)\s+[lL][àÀ])\s+)([\p{L}]+(?:\s+[\p{L}]+){0,3})/gu;
 
-export function buildAiAssessmentInput(facts: AiAssessmentFacts): AiAssessmentInput {
+export function includeSyntheticDemoNarrative(): boolean {
+  return process.env.GEMINI_INCLUDE_SYNTHETIC_DEMO_NARRATIVE === 'true';
+}
+
+export function buildAiAssessmentInput(facts: AiAssessmentFacts, includeNarrative = includeSyntheticDemoNarrative()): AiAssessmentInput {
   return {
     incident_category_code: facts.incidentCategoryCode,
-    description: sanitizeAiDescription(facts.description ?? ''),
+    description: includeNarrative ? sanitizeAiDescription(facts.description ?? '') : '',
     people_affected: facts.peopleAffected ?? null,
     children_count: facts.childrenCount ?? null,
     elderly_count: facts.elderlyCount ?? null,
@@ -40,8 +44,8 @@ export function buildAiAssessmentInput(facts: AiAssessmentFacts): AiAssessmentIn
   };
 }
 
-export function serializeAiAssessmentInput(facts: AiAssessmentFacts): string {
-  return JSON.stringify(buildAiAssessmentInput(facts));
+export function serializeAiAssessmentInput(facts: AiAssessmentFacts, includeNarrative = includeSyntheticDemoNarrative()): string {
+  return JSON.stringify(buildAiAssessmentInput(facts, includeNarrative));
 }
 
 export function scoreRequestRisk(facts: RiskFacts): { score: number | null; reasonCodes: string[] } {

@@ -2,6 +2,7 @@ import type { QueryRunner } from 'typeorm';
 import { AllowAiAdvisoryRetries1793116235000 } from '../src/database/migrations/AllowAiAdvisoryRetries1793116235000';
 import { AllowAiAdvisoryRetryAttempts1793117000000 } from '../src/database/migrations/AllowAiAdvisoryRetryAttempts1793117000000';
 import { GrantAiAdvisoryRead1792953600002 } from '../src/database/migrations/GrantAiAdvisoryRead1792953600002';
+import { AddAiAdvisoryClaimToken1793122000000 } from '../src/database/migrations/AddAiAdvisoryClaimToken1793122000000';
 
 describe('unbounded retry counter migration', () => {
   it('allows a non-negative attempt counter for durable provider retries', async () => {
@@ -78,5 +79,28 @@ describe('AI advisory runtime read grants', () => {
     await new GrantAiAdvisoryRead1792953600002().down(queryRunner);
 
     expect(statements).toContain('REVOKE SELECT ON ai_advisory, ai_daily_usage FROM c48_response_app');
+  });
+});
+
+describe('AI advisory lease fencing migration', () => {
+  it('adds a claim token for fencing expired worker results', async () => {
+    const statements: string[] = [];
+    const queryRunner = { query: async (sql: string) => { statements.push(sql); return []; } } as unknown as QueryRunner;
+
+    await new AddAiAdvisoryClaimToken1793122000000().up(queryRunner);
+
+    expect(statements).toEqual(['ALTER TABLE ai_advisory ADD COLUMN IF NOT EXISTS claim_token uuid']);
+  });
+
+  it('requeues in-flight jobs before removing their fencing token on rollback', async () => {
+    const statements: string[] = [];
+    const queryRunner = { query: async (sql: string) => { statements.push(sql); return []; } } as unknown as QueryRunner;
+
+    await new AddAiAdvisoryClaimToken1793122000000().down(queryRunner);
+
+    expect(statements).toEqual([
+      "UPDATE ai_advisory SET status='QUEUED',lease_until=NULL WHERE status='PROCESSING'",
+      'ALTER TABLE ai_advisory DROP COLUMN IF EXISTS claim_token',
+    ]);
   });
 });

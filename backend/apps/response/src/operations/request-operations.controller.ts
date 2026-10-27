@@ -106,6 +106,22 @@ export class RequestOperationsController {
     return result.value;
   }
 
+  @Post('requests/:id/ai-advisories/:advisoryId/retry')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async retryAiAdvisory(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Param('advisoryId', new ParseUUIDPipe({ version: 'all' })) advisoryId: string,
+    @Body() dto: RequestVersionDto,
+    @Req() request: OperationRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.aiAdvisory.retry(id, advisoryId, dto, key(request), request);
+    replay(response, result.replay);
+    return result.value;
+  }
+
   @Post('requests/:id/start-verification')
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(IdempotencyKeyInterceptor)

@@ -779,7 +779,7 @@ export function Coordinator({ page }: { page: string }) {
                 <p>
                   {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
                     ? 'Dữ liệu này dùng để minh họa và không phải phản hồi từ Gemini.'
-                    : 'Gemini hỗ trợ đánh giá các dữ kiện SOS không định danh được cung cấp. Mô tả tự do không được gửi theo cấu hình mặc định. Điều phối viên cần đối chiếu với người báo tin.'}
+                    : 'Mặc định, Gemini chỉ nhận dữ kiện SOS có cấu trúc; mô tả tự do, thông tin liên hệ, vị trí chính xác và tệp bằng chứng không được gửi. Chỉ bật gửi mô tả đã khử một số định danh cho dữ liệu minh họa tổng hợp; biện pháp này có thể bỏ sót thông tin nhận dạng và không được dùng với SOS thật. Điều phối viên cần đối chiếu với người báo tin.'}
                 </p>
                 <p>
                   <strong>Trạng thái:</strong>{' '}

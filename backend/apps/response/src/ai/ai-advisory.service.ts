@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
+import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
 import { buildAiAssessmentInput } from './ai-risk';
 import { isAiAdvisoryFresh } from './ai-advisory-input';
@@ -9,6 +10,7 @@ interface AdvisoryJob {
   request_id: string;
   input_hash: string;
   attempts: number;
+  claim_token: string;
   request_version: number;
   workCycle: number;
   latest_id: string;
@@ -45,6 +47,17 @@ const responseSchema = {
   },
   required: ['summary', 'indicators', 'facts', 'priority_score', 'priority_reasons', 'confidence'],
 };
+
+function maxRetries(): number {
+  const value = process.env.GEMINI_MAX_RETRIES;
+  if (value === undefined) return 3;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 3;
+}
+
+function retryDelaySeconds(attempt: number): number {
+  return Math.min(900, 30 * 4 ** Math.max(0, attempt - 1));
+}
 
 const indicatorLabels: Readonly<Record<string, string>> = {
   FIRE: 'Cháy',
@@ -117,23 +130,23 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
         const providerStatus = error instanceof Error
           ? /^AI_PROVIDER_(?:RETRYABLE|ERROR):(\d{3}|NETWORK)$/u.exec(error.message)?.[1]
           : undefined;
-        if (error instanceof Error && error.message.startsWith('AI_PROVIDER_RETRYABLE:')) {
-          const delaySeconds = Math.min(900, 30 * 4 ** Math.max(0, job.attempts - 1));
+        if (error instanceof Error && error.message.startsWith('AI_PROVIDER_RETRYABLE:') && job.attempts <= maxRetries()) {
+          const delaySeconds = retryDelaySeconds(job.attempts);
           this.logger.warn('AI_PROVIDER_RETRY_SCHEDULED', `job:${job.id} attempt:${job.attempts} delay_seconds:${delaySeconds} provider_status:${providerStatus ?? 'UNKNOWN'}`);
           await this.persistResult(job.id,
-            `UPDATE ai_advisory SET status='QUEUED',error_code=NULL,completed_at=NULL,lease_until=now()+($2 * interval '1 second')
-              WHERE id=$1 AND status='PROCESSING' AND lease_until>now()`, [job.id, delaySeconds]);
+            `UPDATE ai_advisory SET status='QUEUED',error_code=NULL,completed_at=NULL,lease_until=now()+($2 * interval '1 second'),claim_token=NULL
+              WHERE id=$1 AND status='PROCESSING' AND claim_token=$3 AND lease_until>now()`, [job.id, delaySeconds, job.claim_token]);
           return;
         }
         this.logger.warn(code, providerStatus ? `job:${job.id} provider_status:${providerStatus}` : `job:${job.id}`);
         await this.persistResult(job.id,
-          `UPDATE ai_advisory SET status='FAILED',error_code=$2,completed_at=now(),lease_until=NULL
-            WHERE id=$1 AND status='PROCESSING' AND lease_until>now()`, [job.id, code]);
+          `UPDATE ai_advisory SET status='FAILED',error_code=$2,completed_at=now(),lease_until=NULL,claim_token=NULL
+            WHERE id=$1 AND status='PROCESSING' AND claim_token=$3 AND lease_until>now()`, [job.id, code, job.claim_token]);
         return;
       }
       await this.persistResult(job.id,
-        `UPDATE ai_advisory SET status='COMPLETED',extracted_json=$2::jsonb,error_code=NULL,completed_at=now(),lease_until=NULL
-          WHERE id=$1 AND status='PROCESSING' AND lease_until>now()`, [job.id, JSON.stringify(extracted)]);
+        `UPDATE ai_advisory SET status='COMPLETED',extracted_json=$2::jsonb,error_code=NULL,completed_at=now(),lease_until=NULL,claim_token=NULL
+          WHERE id=$1 AND status='PROCESSING' AND claim_token=$3 AND lease_until>now()`, [job.id, JSON.stringify(extracted), job.claim_token]);
     } catch {
       this.logger.warn('AI_ADVISORY_CLAIM_FAILED');
     } finally {
@@ -156,7 +169,17 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
 
   private async claimJob(): Promise<AdvisoryJob | undefined> {
     return this.dataSource.transaction(async (manager) => {
-      await manager.query("UPDATE ai_advisory SET status='FAILED',error_code='AI_PROVIDER_ERROR',completed_at=now(),lease_until=NULL WHERE status='PROCESSING' AND lease_until<now()");
+      await manager.query(
+        `UPDATE ai_advisory
+            SET status=CASE WHEN attempts<=$1 THEN 'QUEUED' ELSE 'FAILED' END,
+                error_code=CASE WHEN attempts<=$1 THEN NULL ELSE 'AI_PROVIDER_ERROR' END,
+                completed_at=CASE WHEN attempts<=$1 THEN NULL ELSE now() END,
+                lease_until=CASE WHEN attempts<=$1
+                  THEN now()+(LEAST(900,30*POWER(4,GREATEST(0,attempts-1)))*interval '1 second')
+                  ELSE NULL END,
+                claim_token=NULL
+          WHERE status='PROCESSING' AND lease_until<now()`, [maxRetries()],
+      );
       const rows = await manager.query(
         `SELECT a.id,a.request_id,a.input_hash,a.attempts,a.model,a.request_version,r.work_cycle AS "workCycle",
                   (SELECT id FROM ai_advisory WHERE request_id=a.request_id ORDER BY created_at DESC,id DESC LIMIT 1) AS latest_id,
@@ -194,8 +217,13 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
         this.logger.warn('AI_DAILY_LIMIT_RETRY_SCHEDULED', `job:${job.id}`);
         return undefined;
       }
-      await manager.query("UPDATE ai_advisory SET status='PROCESSING',attempts=attempts+1,lease_until=now()+interval '45 seconds' WHERE id=$1", [job.id]);
+      const claimToken = randomUUID();
+      await manager.query(
+        "UPDATE ai_advisory SET status='PROCESSING',attempts=attempts+1,lease_until=now()+interval '45 seconds',claim_token=$2 WHERE id=$1 AND status='QUEUED'",
+        [job.id, claimToken],
+      );
       job.attempts = Number(job.attempts) + 1;
+      job.claim_token = claimToken;
       return job;
     });
   }
