@@ -10,8 +10,9 @@ export interface StoredAssessmentFacts extends AiAssessmentFacts {
 export function aiAssessmentHash(facts: AiAssessmentFacts, requestVersion: number, workCycle: number): string {
   return aiInputHash(JSON.stringify({
     schema_version: 'v3', request_version: Number(requestVersion), work_cycle: Number(workCycle),
-    include_redacted_text: process.env.GEMINI_ADVISORY_INCLUDE_REDACTED_TEXT === 'true',
-    input: buildAiAssessmentInput(facts, true),
+    // Keep the legacy false marker so queued jobs created before narrative delivery stay fresh.
+    include_redacted_text: false,
+    input: buildAiAssessmentInput(facts),
   }));
 }
 

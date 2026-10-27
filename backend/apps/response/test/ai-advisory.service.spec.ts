@@ -22,10 +22,8 @@ describe('AI advisory worker lifecycle', () => {
     jest.restoreAllMocks();
     delete process.env.GEMINI_API_KEY;
     delete process.env.SCHEDULER_ENABLED;
-    delete process.env.GEMINI_ADVISORY_WORKER_ENABLED;
   });
-  it('claims AI jobs even when the legacy worker toggle is false and other schedulers are disabled', () => {
-    process.env.GEMINI_ADVISORY_WORKER_ENABLED = 'false';
+  it('claims AI jobs when other schedulers are disabled', () => {
     process.env.SCHEDULER_ENABLED = 'false';
     const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
     const transaction = jest.fn((work: (manager: { query: typeof query }) => Promise<unknown>) => work({ query }));
@@ -69,9 +67,9 @@ describe('AI advisory worker lifecycle', () => {
       expect(saved.priority_score).toBe(fixture.value.priority_score);
     }
   });
-  it('claims an actually enqueued hash and sends only structured input by default', async () => {
+  it('claims an actually enqueued hash and sends incident narrative with structured facts', async () => {
     process.env.GEMINI_API_KEY = 'unit-test';
-    const facts = { version: 2, workCycle: 1, incidentCategoryCode: 'FLOOD', description: 'Bí mật cần giữ tại máy chủ',
+    const facts = { version: 2, workCycle: 1, incidentCategoryCode: 'FLOOD', description: 'Nước lũ dâng nhanh; 4 người mắc kẹt.',
       peopleAffected: 3, childrenCount: 1, elderlyCount: 0, reporterDeclaredDanger: true, needsRescue: true, needsReliefSupplies: false };
     let inputHash = '';
     const query = jest.fn(async (sql: string, parameters: unknown[] = []) => {
@@ -86,7 +84,7 @@ describe('AI advisory worker lifecycle', () => {
     const extract = jest.spyOn(worker as unknown as { extract(job: unknown, text: string): Promise<typeof extraction> }, 'extract').mockResolvedValue(extraction);
     await worker['processOne']();
     expect(extract).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(extract.mock.calls[0]![1])).toMatchObject({ incident_category_code: 'FLOOD', reporter_declared_danger: true, description: '' });
+    expect(JSON.parse(extract.mock.calls[0]![1])).toMatchObject({ incident_category_code: 'FLOOD', reporter_declared_danger: true, description: facts.description });
     expect(inputHash).toBe(aiAssessmentHash(facts, 2, 1));
   });
   it('logs claim failure without database details and can run again', async () => {

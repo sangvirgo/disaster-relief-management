@@ -25,10 +25,12 @@ export interface AiAssessmentInput {
   needs_relief_supplies: boolean;
 }
 
-export function buildAiAssessmentInput(facts: AiAssessmentFacts, includeText = process.env.GEMINI_ADVISORY_INCLUDE_REDACTED_TEXT === 'true'): AiAssessmentInput {
+const introducedName = /((?:[Tt]ôi\s+[Tt]ên(?:\s+[lL][àÀ])?|[Tt]ên\s+[Tt]ôi\s+[lL][àÀ]|[Nn]gười\s+[Tt]ên|(?:[Tt]ôi|[Mm]ình|[Ee]m|[Aa]nh|[Cc]hị)\s+[lL][àÀ])\s+)([\p{L}]+(?:\s+[\p{L}]+){0,3})/gu;
+
+export function buildAiAssessmentInput(facts: AiAssessmentFacts): AiAssessmentInput {
   return {
     incident_category_code: facts.incidentCategoryCode,
-    description: includeText ? sanitizeAiDescription(facts.description ?? '') : '',
+    description: sanitizeAiDescription(facts.description ?? ''),
     people_affected: facts.peopleAffected ?? null,
     children_count: facts.childrenCount ?? null,
     elderly_count: facts.elderlyCount ?? null,
@@ -75,16 +77,23 @@ export function riskAttentionLevel(score: number | null): RiskAttentionLevel | n
 }
 
 export function sanitizeAiDescription(value: string): string {
-  return value.slice(0, 2_000)
-    .replace(/(?:tôi\s+tên(?:\s+là)?|tên\s+tôi\s+là|người\s+tên)\s+[\p{L}]+(?:\s+[\p{L}]+){0,3}/giu, '[đã ẩn tên]')
-    .replace(/\b(?:tôi|mình|em|anh|chị)\s+là\s+\p{Lu}\p{Ll}+(?:\s+(?:\p{Lu}\p{Ll}+|\p{Lu})){0,3}/gu, '[đã ẩn tên]')
+  return value
+    .replace(introducedName, (_match, _intro: string, name: string) => {
+      const words = name.split(/\s+/u);
+      let nameWordCount = 1;
+      while (nameWordCount < words.length && /^\p{Lu}/u.test(words[nameWordCount]!)) nameWordCount++;
+      return ['[đã ẩn tên]', ...words.slice(nameWordCount)].join(' ');
+    })
     .replace(/(?:địa\s+chỉ|số\s+nhà|ở\s+số)\s*[:#]?\s*[^,;\n]{1,100}/giu, '[đã ẩn địa chỉ]')
     .replace(/(?:tọa\s*độ|gps|coordinates?)\s*[:=]?\s*[+-]?\d{1,3}(?:\.\d+)?\s*[,; ]+\s*[+-]?\d{1,3}(?:\.\d+)?/giu, '[đã ẩn tọa độ]')
+    .replace(/\b(?:https?|s3):\/\/[^\s<>"'`]+/giu, '[đã ẩn liên kết]')
+    .replace(/\b(?:authorization|(?:x-)?tracking[-_ ]?(?:secret|code)|(?:access|refresh)[-_ ]?token|api[-_ ]?key|secret|token)["']?\s*[:=]\s*["']?(?:bearer\s+)?[^\s,;}"']+/giu, '[đã ẩn thông tin xác thực]')
+    .replace(/\bbearer\s+[A-Za-z0-9._~+/-]+=*/giu, '[đã ẩn thông tin xác thực]')
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/giu, '[đã ẩn email]')
-    .replace(/(?<!\d)(?:\+?84|0)?(?:\d[ ()-]?){7,14}\d(?!\d)/gu, '[đã ẩn số điện thoại]')
+    .replace(/(?<![\p{L}\p{N}_])(?:\+?84|0)?(?:\d[ ()-]?){7,14}\d(?![\p{L}\p{N}_])/gu, '[đã ẩn số điện thoại]')
     .replace(/(?<!\d)\d{9,12}(?!\d)/gu, '[đã ẩn dãy số]')
     .replace(/(?<![A-Z0-9])[0-9A-HJKMNP-TV-Z]{10,16}(?![A-Z0-9])/giu, '[đã ẩn mã theo dõi]')
-    .replace(/-?\d{1,3}\.\d{3,}\s*[,;/]\s*-?\d{1,3}\.\d{3,}/gu, '[đã ẩn tọa độ]')
+    .replace(/(?<![\d.])[+-]?\d{1,3}\.\d{3,}(?:\s*[,;/]\s*|\s+)[+-]?\d{1,3}\.\d{3,}(?![\d.])/gu, '[đã ẩn tọa độ]')
     .replace(/\s+/gu, ' ')
     .trim();
 }
