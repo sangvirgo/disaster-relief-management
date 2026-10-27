@@ -17,6 +17,13 @@ type QueueItem = {
   declared_danger: boolean;
   people_affected?: number | null;
   region_code?: string | null;
+  priority_advisory?: {
+    score: number;
+    level: 'CRITICAL' | 'HIGH' | 'ELEVATED' | 'STANDARD';
+    reason_codes: string[];
+    source: 'BACKEND_RULES';
+    rules_version: string;
+  };
 };
 type Queue = { items: QueueItem[]; cursor?: string; more: boolean; generated_at: string };
 type Event = {
@@ -158,9 +165,16 @@ const advisoryReasonLabels: Record<string, string> = {
   FLOOD_OR_TRAPPED: 'Có dấu hiệu ngập lụt hoặc mắc kẹt',
   CHILDREN_PRESENT: 'Có trẻ em',
   ELDERLY_PRESENT: 'Có người cao tuổi',
+  LARGE_GROUP_AFFECTED: 'Có nhiều người cần hỗ trợ',
   INJURY_OR_MEDICAL: 'Có dấu hiệu chấn thương hoặc cần cấp cứu',
   RESCUE_REQUESTED: 'Có yêu cầu cứu hộ',
   RELIEF_SUPPLIES_ONLY: 'Chỉ yêu cầu hàng cứu trợ',
+};
+const advisoryLevelLabels: Record<string, string> = {
+  CRITICAL: 'Rất khẩn cấp',
+  HIGH: 'Nguy cơ cao',
+  ELEVATED: 'Cần ưu tiên rà soát',
+  STANDARD: 'Theo dõi thông thường',
 };
 const advisoryReviewLabels: Record<string, string> = {
   ACCEPTED: 'Ghi nhận',
@@ -433,6 +447,13 @@ export function Coordinator({ page }: { page: string }) {
                     <small>
                       {label(item.category)} · {timeLabel(item.received_at)}
                     </small>
+                    {item.priority_advisory && (
+                      <small>
+                        Gợi ý theo quy tắc: {advisoryLevelLabels[item.priority_advisory.level]} ·{' '}
+                        {item.priority_advisory.score}/100
+                      </small>
+                    )}
+                    {item.declared_danger && <small>Có khai báo nguy hiểm tính mạng</small>}
                   </span>
                   <span className="chip">
                     {label(item.status)}
@@ -594,27 +615,44 @@ export function Coordinator({ page }: { page: string }) {
                 Có tín hiệu hoạt động báo hộ cần rà soát. Đây không phải kết luận gian lận.
               </p>
             )}
+            {detail.priority_advisory && (
+              <section className="notice warning">
+                <h3>Gợi ý ưu tiên theo quy tắc backend</h3>
+                <p>
+                  <strong>{advisoryLevelLabels[detail.priority_advisory.level]}</strong> ·{' '}
+                  {detail.priority_advisory.score}/100
+                </p>
+                <p>
+                  <strong>Dấu hiệu:</strong>{' '}
+                  {detail.priority_advisory.reason_codes
+                    .map((code) => advisoryReasonLabels[code] || 'Có dữ kiện cần rà soát')
+                    .join(' · ') || 'Chưa ghi nhận dấu hiệu theo bộ quy tắc.'}
+                </p>
+                <p>
+                  Đây là gợi ý từ dữ liệu SOS đã cung cấp, cần điều phối viên xác minh. Gợi ý không
+                  thay đổi mức ưu tiên P1–P4 và không tự giao đội. Nếu Gemini quá tải hoặc hết hạn
+                  mức, gợi ý quy tắc này vẫn hoạt động.
+                </p>
+                {detail.declared_danger && (
+                  <p>
+                    <strong>Cảnh báo riêng:</strong> người báo tin khai có nguy hiểm tính mạng; cần
+                    kiểm tra ngay. Cờ này không tự cộng điểm.
+                  </p>
+                )}
+              </section>
+            )}
             {detail.ai_advisory && (
               <section className="notice">
-                <h3>Gợi ý trích xuất và rủi ro từ AI</h3>
+                <h3>Trích xuất thông tin bằng Gemini</h3>
                 <p>
-                  AI chỉ hỗ trợ tổng hợp thông tin. Điều phối viên phải tự xác minh; điểm này không
-                  thay thế mức ưu tiên P1–P4 và không tự giao đội.
+                  Gemini chỉ hỗ trợ tóm tắt và trích xuất dữ kiện từ mô tả đã lọc thông tin nhận
+                  dạng. Điều phối viên cần đối chiếu với người báo tin.
                 </p>
                 <p>
                   <strong>Trạng thái:</strong> {label(detail.ai_advisory.status)}
                 </p>
                 {detail.ai_advisory.status === 'COMPLETED' && (
                   <>
-                    <p>
-                      <strong>Điểm rủi ro tham khảo:</strong> {detail.ai_advisory.risk_score}/100
-                    </p>
-                    <p>
-                      <strong>Dấu hiệu theo quy tắc:</strong>{' '}
-                      {detail.ai_advisory.reason_codes
-                        .map((code) => advisoryReasonLabels[code] || 'Có dấu hiệu cần rà soát')
-                        .join(' · ') || 'Không có'}
-                    </p>
                     {detail.ai_advisory.extracted_json?.summary && (
                       <p>
                         <strong>Tóm tắt:</strong> {detail.ai_advisory.extracted_json.summary}
@@ -696,7 +734,8 @@ export function Coordinator({ page }: { page: string }) {
                 )}
                 {['FAILED', 'SKIPPED'].includes(detail.ai_advisory.status) && (
                   <p>
-                    Không có kết quả AI cho mô tả này. Hãy tiếp tục quy trình xác minh thủ công.
+                    Gemini chưa trả kết quả cho mô tả này. Gợi ý theo quy tắc backend vẫn hiển thị ở
+                    mục trên; hãy tiếp tục xác minh thủ công.
                   </p>
                 )}
               </section>

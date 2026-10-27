@@ -1,5 +1,5 @@
 import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { hasPermission, Permission, Grant } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission, Permission, Grant } from '../../../../packages/identity-contracts/src/permissions';
 
 export type CampaignStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'CLOSED';
 export type CampaignAction = 'activate' | 'pause' | 'resume' | 'close';

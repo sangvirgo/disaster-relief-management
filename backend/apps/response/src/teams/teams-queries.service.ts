@@ -4,7 +4,7 @@ import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
-import { hasPermission, ROLE_PERMISSIONS } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission, ROLE_PERMISSIONS } from '../../../../packages/identity-contracts/src/permissions';
 import { ReporterSessionService } from '../requests/reporter-session';
 import { TeamPageQueryDto } from './teams.dto';
 import { teamView, TeamRow } from './teams.helpers';

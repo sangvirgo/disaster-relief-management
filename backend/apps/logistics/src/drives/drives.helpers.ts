@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { Grant, hasPermission, Permission } from '../../../../packages/technical/src/security/permissions';
+import { Grant, hasPermission, Permission } from '../../../../packages/identity-contracts/src/permissions';
 import type { AuthenticatedLogisticsSession } from '../auth/logistics-session.service';
 
 export interface DriveScope {

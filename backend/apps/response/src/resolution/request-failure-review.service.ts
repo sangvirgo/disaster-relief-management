@@ -4,7 +4,7 @@ import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { canonicalRequestHash, IdempotencyService, type IdempotentOutcome, type IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { checkVersion, cleanText } from '../operations/request-operations.helpers';
 import { ReporterSessionService, type ReporterSession } from '../requests/reporter-session';
 import type { FailureReviewDto } from './request-resolution.dto';

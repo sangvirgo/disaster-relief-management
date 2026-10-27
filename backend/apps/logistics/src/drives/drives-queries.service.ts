@@ -4,7 +4,7 @@ import type { Request } from 'express';
 import { DataSource } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
-import { Permission } from '../../../../packages/technical/src/security/permissions';
+import { Permission } from '../../../../packages/identity-contracts/src/permissions';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { DrivePageQueryDto } from './drives.dto';
 import { driveScopeSql } from './drives.helpers';

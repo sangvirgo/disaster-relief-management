@@ -318,15 +318,23 @@ services:
 
   minio:
     container_name: reliva-minio
-    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-09-07T16-13-09Z}
+    image: quay.io/minio/aistor/minio:RELEASE.2026-09-19T17-05-25Z
     profiles: [storage]
-    command: ["server", "/mnt/data", "--console-address", ":9001"]
+    command: ["server", "/mnt/data", "--console-address", ":9001", "--license", "/minio.license"]
     environment:
       MINIO_ROOT_USER: '${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in backend/.env}'
       MINIO_ROOT_PASSWORD: '${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in backend/.env}'
     volumes:
       - minio-data:/mnt/data
+      - type: bind
+        source: ${AISTOR_LICENSE_PATH:?Set AISTOR_LICENSE_PATH in backend/.env}
+        target: /minio.license
+        read_only: true
+        bind:
+          create_host_path: false
     ports:
+      # Host backup clients use S3 directly; never send app credentials through the public ingress.
+      - "127.0.0.1:${MINIO_BACKUP_HOST_PORT:-59000}:9000"
       - "127.0.0.1:${MINIO_CONSOLE_PORT:-9005}:9001"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/ready >/dev/null"]
@@ -337,7 +345,7 @@ services:
 
   minio-init:
     container_name: reliva-minio-init
-    image: ${MINIO_MC_IMAGE:-minio/mc:RELEASE.2025-08-13T08-35-41Z}
+    image: quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z
     profiles: [storage]
     entrypoint: ["/bin/sh", "-ec"]
     command:

@@ -5,7 +5,7 @@ import type { Request } from 'express';
 import { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { canonicalRequestHash, IdempotentResult, ResourceRef } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { EvidenceMime } from '../../../../packages/technical/src/media/evidence-media';
 import { AuthenticatedLogisticsSession, LogisticsSessionService } from '../auth/logistics-session.service';
 import {

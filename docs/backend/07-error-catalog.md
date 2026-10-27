@@ -35,6 +35,7 @@ Every error the API can return has one row here. The implementation loads this t
 | `SCOPE_INVALID` | 400 | Identity | Phạm vi quyền không hợp lệ. |
 | `USERNAME_TAKEN` | 409 | Identity | Tên đăng nhập đã được sử dụng. |
 | `EMAIL_TAKEN` | 409 | Identity | Địa chỉ email đã được sử dụng. |
+| `REGISTRATION_EXPIRED` | 410 | Identity | Phiên đăng ký đã hết hạn. Vui lòng đăng ký lại. |
 | `EMAIL_OTP_INVALID` | 400 | Identity | Mã xác minh email không hợp lệ hoặc đã hết hạn. |
 | `EMAIL_OTP_UNAVAILABLE` | 503 | Identity | Dịch vụ xác minh email tạm thời chưa sẵn sàng. Vui lòng thử lại sau. |
 | `GOOGLE_LOGIN_UNAVAILABLE` | 503 | Identity | Đăng nhập Google chưa được cấu hình. Vui lòng thử bằng tài khoản và mật khẩu. |

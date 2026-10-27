@@ -15,7 +15,7 @@ Creates custom-format dumps for c48_identity, c48_response, and c48_logistics,
 then mirrors both evidence buckets to a new timestamped directory. The output
 must be outside the repository. Requires the existing Postgres service to be
 running, backend/.env, mc, MC_CONFIG_DIR, and C48_MINIO_ALIAS configured for
-the primary MinIO endpoint. No service is started or stopped.
+the primary loopback S3 backup endpoint. No service is started or stopped.
 USAGE
 }
 
@@ -37,7 +37,7 @@ compose() {
 }
 
 if ! compose config --format json 2>/dev/null | node "$script_dir/verify-minio-endpoint.mjs" "$mc_config_file" "$C48_MINIO_ALIAS" >/dev/null 2>&1; then
-  fail 'configured MinIO alias endpoint could not be verified against response-api S3_PUBLIC_ENDPOINT'
+  fail 'configured MinIO alias endpoint could not be verified against the primary MinIO loopback S3 backup port'
 fi
 
 destination_root="$(realpath -m -- "$1")"
@@ -58,7 +58,7 @@ trap 'if [[ -n "${temporary_file:-}" ]]; then rm -f -- "$temporary_file"; fi' EX
 
 for database in c48_identity c48_response c48_logistics; do
   temporary_file="$output_dir/.${database}.dump.partial"
-  compose exec -T postgres pg_dump --username=postgres --format=custom --no-owner --no-acl --dbname "$database" > "$temporary_file"
+  compose exec -T postgres pg_dump --username=postgres --format=custom --dbname "$database" > "$temporary_file"
   chmod 600 -- "$temporary_file"
   mv -- "$temporary_file" "$output_dir/$database.dump"
   temporary_file=''
@@ -72,6 +72,7 @@ done
 node "$script_dir/object-inventory.mjs" "$output_dir/objects" "$output_dir/object_inventory.jsonl" || fail 'could not create the object inventory manifest'
 
 {
+  printf 'database_security=owners-and-acls-v1\n'
   printf 'created_utc=%s\n' "$(date -u +%FT%TZ)"
   printf 'source=backend/infra/compose.yaml postgres service and configured MinIO alias\n'
   printf 'format=PostgreSQL custom dumps; current objects mirrored with mc --preserve; object_inventory.jsonl records bucket, key, size_bytes, sha256\n'

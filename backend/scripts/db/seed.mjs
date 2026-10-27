@@ -200,7 +200,7 @@ try {
     }
     await runTransaction(clients.get('response'), prepareSql('response', 'seed-expansion-response.sql'));
     await runTransaction(clients.get('logistics'), prepareSql('logistics', 'seed-expansion-logistics.sql'));
-    process.stdout.write('Ensured synthetic Identity, Response, Logistics, and campaign fixtures using insert-only operations.\n');
+    process.stdout.write('Ensured synthetic Identity, Response, Logistics, and campaign fixtures with idempotent seed updates.\n');
   }
 } finally {
   await Promise.all([...clients.values()].map((client) => client.end()));

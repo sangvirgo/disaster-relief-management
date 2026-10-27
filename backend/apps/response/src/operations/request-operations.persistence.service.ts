@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { hasPermission, Permission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission, Permission } from '../../../../packages/identity-contracts/src/permissions';
 import type { ReporterSession } from '../requests/reporter-session';
 import type { OperationRequestRow } from './request-operations.types';
 

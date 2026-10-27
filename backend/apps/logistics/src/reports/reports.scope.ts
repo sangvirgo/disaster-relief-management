@@ -1,6 +1,6 @@
 import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { hasPermission, ROLE_PERMISSIONS } from '../../../../packages/technical/src/security/permissions';
-import type { Grant, Permission, ScopeType } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission, ROLE_PERMISSIONS } from '../../../../packages/identity-contracts/src/permissions';
+import type { Grant, Permission, ScopeType } from '../../../../packages/identity-contracts/src/permissions';
 
 type ReportScope = Extract<ScopeType, 'SYSTEM' | 'ORGANIZATION' | 'REGION' | 'CAMPAIGN'>;
 

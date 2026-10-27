@@ -2,7 +2,7 @@
 
 Reliva runs three NestJS APIs: **Identity** owns accounts and permissions, **Response** owns SOS reports and rescue missions, and **Logistics** owns donations, stock, and distribution. Each service has its own PostgreSQL database. The APIs communicate over versioned REST contracts.
 
-> **Project status · 26 October 2026:** the repository contains the T20 Identity and Response work, including email OTP, Google sign-in/linking, reporter updates, and coordinator review of AI advisories. The latest recorded backend build and contract checks were run on Node 26.11.1, outside the declared Node 24 range. T20 tests, migrations, and seeding were not run. This remains an academic prototype; coordinators retain authority over verification, priority, and dispatch.
+> **Project status · 26 October 2026:** the backend review fixes and ten-minute pending-registration flow are implemented. Local builds, unit/script tests, OpenAPI and Compose checks passed under Node 24.15.0. The main Compose stack is running with healthy PostgreSQL, migrations, APIs, Web, and Nginx; the new Identity migration has applied. The storage profile is not running because the configured AIStor license file is absent. Live OTP flows, object writes, and recovery remain unverified. This remains an academic prototype; coordinators retain authority over verification, priority, and dispatch.
 
 ## Start a local demo
 
@@ -15,12 +15,15 @@ cp -n .env.example .env
 node scripts/dev/gen-keys.mjs
 ```
 
-Fill the required local values in `.env`, including `SEED_PASSWORD` and `EMAIL_OTP_PEPPER`. Then start the existing Compose stack and load its declared demo seed job:
+Fill the required local values in `.env`, including `SEED_PASSWORD` and `EMAIL_OTP_PEPPER`. From `backend/`, build and start the stack, run its migrations, and load the declared demo seed with one command:
 
 ```bash
-docker compose up --build -d
-docker compose --profile seed up seed
+docker compose -p c48 --env-file .env -f infra/compose.yaml --profile seed up --build -d
 ```
+
+Private evidence storage uses the optional `storage` profile. Obtain an AIStor Free license, set `AISTOR_LICENSE_PATH` to that file in `.env`, then run `docker compose --profile storage up --build -d`. The pinned AIStor image requires a valid license for S3 writes.
+
+Existing databases need `AddPendingEmailRegistration1792953600001` through the declared `identity-migrate` job before the updated Identity API serves registration requests. The migration preserves active accounts and converts only unused legacy placeholders; review the [Identity lifecycle and rollback notes](02-identity-api.md) before applying it to an existing dataset.
 
 Open **<http://127.0.0.1:8080>**. The public API paths are `/api/v1/identity`, `/api/v1/response`, and `/api/v1/logistics` on the same Nginx origin. Normal startup and seeding do not reset database volumes. Only use a documented reset command when intentionally discarding the primary demo database; MinIO data must be preserved.
 

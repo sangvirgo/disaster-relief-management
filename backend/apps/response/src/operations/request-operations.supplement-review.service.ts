@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import type { EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import type { IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { ReporterSessionService } from '../requests/reporter-session';
 import type { SupplementReviewDto } from './request-operations.dto';
 import { asObject, checkVersion, cleanText } from './request-operations.helpers';
@@ -54,6 +54,9 @@ export class RequestOperationsSupplementReviewService {
               WHERE ST_Covers(geom,ST_SetSRID(ST_MakePoint($1,$2),4326)) HAVING count(*)=1`, [longitude, latitude],
           ) as Array<{ region_code: string }>;
           nextRegion = regionRows[0]?.region_code ?? null;
+          if (row.attribution_locked_at !== null && nextRegion !== row.region_code) {
+            throw new AppError('ATTRIBUTION_LOCKED', { status: 409 });
+          }
           if (!hasPermission(session.grants, 'REQUEST_VERIFY', { organizationId: row.organization_id, regionCode: nextRegion, campaignId: row.campaign_id })) {
             throw new AppError('FORBIDDEN', { status: 403 });
           }

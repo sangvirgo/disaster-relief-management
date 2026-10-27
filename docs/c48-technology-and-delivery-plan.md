@@ -1983,7 +1983,7 @@ backend/
     response/src/
     logistics/src/
   packages/
-    contracts/src/          # only if a contract is shared by two services
+    identity-contracts/src/ # Identity-owned grant/policy contract shared by the three services
     technical/src/          # proven technical helpers only, e.g. purpose-bound secret hashing, error envelope, idempotency utilities; no business rules or messages
   infra/                   # Compose, Nginx, database initialization
   scripts/                 # migration, seed, backup/restore commands
@@ -1995,12 +1995,14 @@ Each app owns `main.ts`, `app.module.ts`, `config/`, `database/data-source.ts`, 
 - Controllers parse validated DTOs, invoke use cases, and map responses; they contain no SQL or business state transitions. Services own business guards, transaction boundaries, and authorization of actions/objects. List/map queries apply scope before pagination or aggregation.
 - Use TypeORM repositories/QueryBuilder and the transaction's EntityManager directly. Add a dedicated query/persistence component only when real complexity warrants it; no generic base repository, one-implementation interface, or pass-through layer.
 - Never return entities directly as public response contracts. Explicit DTO mapping avoids credentials/internal fields leaking and keeps OpenAPI stable.
-- Keep entities/migrations/domain rules in their owner app. Share transport schemas and proven technical code only; no shared business services or database connection module. Do not build a platform package ahead of actual reuse.
+- Keep entities/migrations/domain rules in their owner app. Share transport schemas and proven technical code only; no shared business services or database connection module. Do not build a platform package ahead of actual reuse. The existing role/action map and scope evaluator are a narrow Identity-owned policy contract in `packages/identity-contracts`, consumed unchanged by all services; they are not generic technical helpers. Identity owns changes to this contract and its authorization compatibility tests.
 - Enable TypeScript strict checks, ESLint and formatting. Avoid untyped `any`, swallowed errors, magic status strings, circular module dependencies, and runtime schema synchronization. Use named enums/types, bounded DTO validation, parameterized SQL, DB constraints, and reviewed migrations.
 - Centralize Vietnamese exception/validation copy and stable error codes, including 404, 413, 429, auth, provider, and worker paths. Log technical codes/correlation IDs without passwords, tokens, signed links, or unnecessary PII.
 - Every nontrivial slice includes meaningful automated checks for its invariants. PostgreSQL/PostGIS and API integration checks cover actual concurrency and service-boundary behavior; mocks do not establish those guarantees. Run the relevant checks before recording completion.
 
 ### 22.2 Identity, scope, and request decisions
+
+**Email registration lifecycle — owner decision, 2026-10-26:** an unverified signup is a temporary `email_registration` request, not an `app_user` account. Its fixed lifetime is ten minutes; each OTP lasts at most five minutes and never outlives the request. Resend does not extend the request. Pending requests do not reserve account usernames/emails. A valid unconsumed OTP creates the ACTIVE account and SYSTEM CITIZEN grant atomically; existing-account uniqueness is checked again at that boundary. Cleanup removes expired registration requests only and never removes verified accounts. The response retains the existing `user` preview shape with a prospective account UUID. See the Identity API and physical schema for retry, cleanup, and legacy-conversion contracts.
 
 | Area | Capstone implementation decision |
 |---|---|

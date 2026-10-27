@@ -7,7 +7,18 @@ const intentId = '50000000-0000-4000-8000-000000000001';
 const userId = '60000000-0000-4000-8000-000000000001';
 
 describe('RequestResolutionService', () => {
-  it('persists the pending intent, request barrier, and basis event before driving finalization', async () => {
+  it.each([
+    { name: 'accepts SQL completion evidence', missions: [{ status: 'COMPLETED', version: 3, has_outcome_evidence: true, failure_reviewed: false }], blockedReason: undefined },
+    { name: 'accepts a reviewed failure with completed replacement', missions: [
+      { status: 'FAILED', version: 2, has_outcome_evidence: false, failure_reviewed: true },
+      { status: 'COMPLETED', version: 3, has_outcome_evidence: true, failure_reviewed: false },
+    ], blockedReason: undefined },
+    { name: 'blocks a completion without SQL evidence', missions: [{ status: 'COMPLETED', version: 3, has_outcome_evidence: false, failure_reviewed: false }], blockedReason: 'NO_COMPLETED_MISSION_EVIDENCE' },
+    { name: 'blocks an unreviewed SQL failure', missions: [
+      { status: 'FAILED', version: 2, has_outcome_evidence: false, failure_reviewed: false },
+      { status: 'COMPLETED', version: 3, has_outcome_evidence: true, failure_reviewed: false },
+    ], blockedReason: 'FAILED_MISSION_REVIEW_REQUIRED' },
+  ])('$name before writing the resolution barrier', async ({ missions, blockedReason }) => {
     const statements: Array<{ sql: string; parameters: unknown[] }> = [];
     const manager = {
       query: jest.fn(async (sql: string, parameters: unknown[] = []) => {
@@ -17,7 +28,7 @@ describe('RequestResolutionService', () => {
           region_code: 'DEMO_A', campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
         }];
         if (sql.includes('FROM request_event') && sql.includes('pending_review')) return [];
-        if (sql.includes('FROM mission m')) return [{ status: 'COMPLETED', hasOutcomeEvidence: true, failureReviewed: false }];
+        if (sql.includes('FROM mission m')) return missions;
         if (sql.includes('INSERT INTO resolution_intent')) return [{ id: intentId }];
         if (sql.includes('UPDATE assistance_request')) return [[{ id: requestId, version: 9 }], 1];
         return [];
@@ -39,10 +50,17 @@ describe('RequestResolutionService', () => {
     const service = new RequestResolutionService(dataSource as never, idempotency as never, sessions as never, logistics as never, finalizer as never);
     const request = { headers: {}, method: 'POST' } as never;
 
-    const result = await service.resolve(requestId, {
+    const resolution = service.resolve(requestId, {
       expected_version: 8, resolution_reason: 'Đã hoàn tất', outcome_basis: 'RESCUE_COMPLETED',
     }, '80000000-0000-4000-8000-000000000001', request);
 
+    if (blockedReason) {
+      await expect(resolution).rejects.toMatchObject({ code: 'RESOLUTION_BLOCKED', details: { reasons: [blockedReason] } });
+      expect(statements.some(({ sql }) => /^(INSERT|UPDATE)/u.test(sql))).toBe(false);
+      expect(finalizer.completePending).not.toHaveBeenCalled();
+      return;
+    }
+    const result = await resolution;
     expect(result).toMatchObject({ status: 202, replay: false, value: { operation_id: intentId, state: 'PENDING' } });
     expect(statements.map(({ sql }) => sql)).toEqual(expect.arrayContaining([
       expect.stringContaining('INSERT INTO resolution_intent'),

@@ -331,7 +331,8 @@ export class RequestIntakeService {
         );
         const safeDescription = sanitizeAiDescription(dto.description ?? '');
         if (safeDescription) {
-          const risk = scoreRequestRisk({ description: safeDescription, reporterDeclaredDanger: dto.reporter_declared_danger ?? false, childrenCount, elderlyCount, needsRescue, needsReliefSupplies });
+          const risk = scoreRequestRisk({ description: safeDescription, reporterDeclaredDanger: dto.reporter_declared_danger ?? false,
+            peopleAffected: dto.people_affected ?? null, childrenCount, elderlyCount, needsRescue, needsReliefSupplies });
           await manager.query(
             `INSERT INTO ai_advisory (request_id,request_version,input_hash,model,prompt_version,schema_version,risk_score,reason_codes)
              VALUES ($1,$2,$3,$4,'v1','v1',$5,$6) ON CONFLICT (request_id,input_hash) DO NOTHING`,

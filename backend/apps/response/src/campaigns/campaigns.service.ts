@@ -5,7 +5,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '../../../../packages/technical/src/idempotency/idempotency';
 import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
-import { Grant, hasPermission } from '../../../../packages/technical/src/security/permissions';
+import { Grant, hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { CampaignActionDto, CampaignCreateDto, CampaignPageQueryDto, CampaignPatchDto, CampaignReasonActionDto } from './campaigns.dto';
 import {
   campaignNextStatus, campaignScopePredicate, campaignView, cleanCampaignName, CampaignAction, CampaignRow,

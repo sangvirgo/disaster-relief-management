@@ -4,7 +4,7 @@ import type { Request } from 'express';
 import type { DataSource } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import type { IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { ReporterSessionService } from '../requests/reporter-session';
 import type { RequestCoordinatorGrant } from '../requests/reporter-session';
 import type { ContactAttemptDto, ConcurRequestDto, RejectRequestDto, RequestVersionDto, VerifyRequestDto } from "./request-operations.dto";

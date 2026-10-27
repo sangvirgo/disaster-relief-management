@@ -5,7 +5,7 @@ import type { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '../../../../packages/technical/src/idempotency/idempotency';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
-import { hasPermission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { requireWarehousePermission, hasWarehouseScope } from '../stock/stock.scope';
 import { decimalFromUnits } from '../common/quantity';
 import {

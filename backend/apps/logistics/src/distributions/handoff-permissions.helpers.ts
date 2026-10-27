@@ -1,6 +1,6 @@
 import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { hasPermission } from '../../../../packages/technical/src/security/permissions';
-import type { Grant, Permission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import type { Grant, Permission } from '../../../../packages/identity-contracts/src/permissions';
 import { hasWarehouseScope, requireWarehousePermission } from '../stock/stock.scope';
 import type { DistributionContext } from './distributions.read';
 import type { DistributionHandoffKind } from './distributions.helpers';

@@ -12,7 +12,6 @@ export * from './idempotency/idempotency.interceptor';
 export * from './persistence/jobs';
 export * from './pagination/keyset';
 export * from './observability/logger';
-export * from './security/permissions';
 export * from './persistence/postgres-errors';
 export * from './security/secret-hash';
 export * from './http/service-client';

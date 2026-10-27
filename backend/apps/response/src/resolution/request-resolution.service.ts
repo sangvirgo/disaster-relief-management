@@ -4,7 +4,7 @@ import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { canonicalRequestHash, IdempotencyService, type IdempotentOutcome, type IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { LogisticsCycleClient, type FulfillmentNeedEvidence, type ResolutionOutcomeBasis } from '../integrations/logistics/logistics-cycle.client';
 import { ReporterSessionService, type ReporterSession } from '../requests/reporter-session';
 import { cleanText } from '../operations/request-operations.helpers';
@@ -24,7 +24,11 @@ interface RequestRow {
   reporter_user_id: string | null;
   logistics_admitted_at: Date | string | null;
 }
-interface MissionEvidenceRow extends ResolutionMissionEvidence {}
+interface MissionEvidenceRow {
+  status: string;
+  has_outcome_evidence: boolean;
+  failure_reviewed: boolean;
+}
 interface InternalOperation {
   id: string;
   kind: 'RESOLUTION' | 'CANCELLATION';
@@ -186,7 +190,12 @@ export class RequestResolutionService {
                 AND review.payload->>'mission_version'=m.version::text) AS failure_reviewed
          FROM mission m WHERE m.request_id=$1 AND m.work_cycle=$2 ORDER BY m.id`, [requestId, row.work_cycle],
     ) as MissionEvidenceRow[];
-    assertResolutionReady({ basis, reason, hasPendingSupplement: pendingSupplements.length > 0, missions: missionRows, needs });
+    const missions: ResolutionMissionEvidence[] = missionRows.map((mission) => ({
+      status: mission.status,
+      hasOutcomeEvidence: mission.has_outcome_evidence,
+      failureReviewed: mission.failure_reviewed,
+    }));
+    assertResolutionReady({ basis, reason, hasPendingSupplement: pendingSupplements.length > 0, missions, needs });
 
     const intents = await manager.query(
       `INSERT INTO resolution_intent

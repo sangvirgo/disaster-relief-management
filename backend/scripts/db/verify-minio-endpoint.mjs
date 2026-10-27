@@ -30,13 +30,14 @@ function normalizeEndpoint(value) {
 export function assertMinioAliasMatchesComposeEndpoint(composeConfigText, aliasConfigText, alias) {
   const compose = parseConfig(composeConfigText);
   const mc = parseConfig(aliasConfigText);
-  const primaryEndpoint = compose.services?.['response-api']?.environment?.S3_PUBLIC_ENDPOINT;
-  const aliasEndpoint = mc.aliases?.[alias]?.url;
-  if (typeof primaryEndpoint !== 'string' || typeof aliasEndpoint !== 'string') {
-    throw new Error('primary endpoint or selected alias URL is missing');
+  const bindings = compose.services?.minio?.ports?.filter((port) => port.target === 9000 && port.protocol === 'tcp') ?? [];
+  if (bindings.length !== 1 || bindings[0].host_ip !== '127.0.0.1' || !/^[0-9]+$/u.test(String(bindings[0].published))) {
+    throw new Error('primary MinIO must expose exactly one loopback S3 backup port');
   }
+  const primaryEndpoint = `http://127.0.0.1:${bindings[0].published}`;
+  const aliasEndpoint = mc.aliases?.[alias]?.url;
   if (normalizeEndpoint(primaryEndpoint) !== normalizeEndpoint(aliasEndpoint)) {
-    throw new Error('MinIO alias and primary S3_PUBLIC_ENDPOINT endpoints do not match');
+    throw new Error('MinIO alias and primary loopback S3 backup endpoints do not match');
   }
 }
 

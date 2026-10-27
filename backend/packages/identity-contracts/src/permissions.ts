@@ -58,3 +58,17 @@ export function hasPermission(grants: readonly Grant[], permission: Permission, 
     return permissions.includes(permission) && matchesScope(grant, target, permission);
   });
 }
+
+const scopes = new Set(['SYSTEM', 'ORGANIZATION', 'REGION', 'CAMPAIGN']);
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+/** Validate transport shape only; authorization still evaluates role, action and scope. */
+export function validGrant(value: unknown): value is Grant {
+  if (!value || typeof value !== 'object') return false;
+  const grant = value as Record<string, unknown>;
+  return typeof grant.role_code === 'string' && Object.hasOwn(ROLE_PERMISSIONS, grant.role_code) &&
+    typeof grant.scope_type === 'string' && scopes.has(grant.scope_type) &&
+    (grant.organization_id === null || (typeof grant.organization_id === 'string' && uuidPattern.test(grant.organization_id))) &&
+    (grant.region_code === null || grant.region_code === undefined || (typeof grant.region_code === 'string' && grant.region_code.length <= 80)) &&
+    (grant.campaign_id === null || grant.campaign_id === undefined || (typeof grant.campaign_id === 'string' && uuidPattern.test(grant.campaign_id)));
+}

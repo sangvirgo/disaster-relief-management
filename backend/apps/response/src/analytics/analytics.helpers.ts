@@ -1,6 +1,6 @@
 import { isDateString, isUUID } from 'class-validator';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
-import type { Grant } from '../../../../packages/technical/src/security/permissions';
+import type { Grant } from '../../../../packages/identity-contracts/src/permissions';
 
 const utcTimestampPattern = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z$/;
 

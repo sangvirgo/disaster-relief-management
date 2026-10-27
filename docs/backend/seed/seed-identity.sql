@@ -6,6 +6,7 @@
 -- the password hash through the psql variable :seed_password_hash. When it is not supplied the placeholder
 -- 'CHANGE_ME_HASH_FROM_APP' is stored, which can never verify, so those accounts cannot log in until reset.
 -- Every account has must_change_password = true and status ACTIVE.
+-- Demo addresses use a stable unique suffix at the reserved example.test domain and are marked verified.
 --
 -- All data is fictional. Phones elsewhere in the demo use the 0900000xxx style; no real people are represented.
 -- IDs: UUID prefix 00000000-0000-4000-8000- + the 12-hex-digit suffix shown below (shared with the Response and Logistics seeds).
@@ -48,8 +49,10 @@ INSERT INTO organization (id, name, organization_kind) VALUES
   (pg_temp.u('2'), 'Hội tình nguyện miền Nam (demo)', 'VOLUNTEER')
 ON CONFLICT DO NOTHING;
 
-INSERT INTO app_user (id, username, display_name, password_hash, status, must_change_password)
-SELECT pg_temp.u(v.suffix), v.username, v.display_name, :'seed_password_hash', 'ACTIVE', true
+INSERT INTO app_user (id, username, display_name, email, email_verified_at, password_hash, status, must_change_password)
+SELECT pg_temp.u(v.suffix), v.username, v.display_name,
+       v.username || '+' || substr(md5(pg_temp.u(v.suffix)::text), 1, 10) || '@example.test',
+       now(), :'seed_password_hash', 'ACTIVE', true
 FROM (VALUES
   ('101', 'admin',          'Quản trị hệ thống (demo)'),
   ('102', 'coord1',         'Điều phối viên 1 (demo)'),

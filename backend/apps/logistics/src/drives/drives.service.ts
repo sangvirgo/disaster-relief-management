@@ -4,7 +4,7 @@ import type { Request } from 'express';
 import { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { validateQuantity } from '../common/quantity';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { DriveItemDto, CreateDriveDto, PatchDriveDto, DriveReasonActionDto, DriveVersionActionDto } from './drives.dto';

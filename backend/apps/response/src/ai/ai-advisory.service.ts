@@ -1,6 +1,6 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import type { DataSource, EntityManager } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { aiInputHash, sanitizeAiDescription } from './ai-risk';
 
 interface AdvisoryJob {
@@ -34,12 +34,14 @@ const responseSchema = {
 
 @Injectable()
 export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(AiAdvisoryService.name);
   private timer?: NodeJS.Timeout;
   private running = false;
 
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   onModuleInit(): void {
+    if (process.env.SCHEDULER_ENABLED !== 'true') return;
     this.timer = setInterval(() => void this.processOne(), 2_000);
     this.timer.unref();
     void this.processOne();
@@ -52,27 +54,41 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
   private async processOne(): Promise<void> {
     if (this.running) return;
     this.running = true;
+    let job: AdvisoryJob | undefined;
     try {
-      const job = await this.claimJob();
+      job = await this.claimJob();
       if (!job) return;
-      const extracted = await this.extract(job, sanitizeAiDescription(job.description));
-      await this.dataSource.query(
-        `UPDATE ai_advisory SET status='COMPLETED',extracted_json=$2::jsonb,error_code=NULL,completed_at=now(),lease_until=NULL
-          WHERE id=$1 AND status='PROCESSING'`,
-        [job.id, JSON.stringify(extracted)],
-      );
-    } catch (error) {
-      const job = (error as { advisoryJob?: AdvisoryJob }).advisoryJob;
-      if (job) {
-        const invalid = error instanceof Error && error.message === 'AI_INVALID_OUTPUT';
-        await this.dataSource.query(
+      let extracted: Record<string, unknown>;
+      try {
+        extracted = await this.extract(job, sanitizeAiDescription(job.description));
+      } catch (error) {
+        const code = error instanceof Error && error.message === 'AI_INVALID_OUTPUT' ? 'AI_INVALID_OUTPUT' : 'AI_PROVIDER_ERROR';
+        this.logger.warn(code, `job:${job.id}`);
+        await this.persistResult(job.id,
           `UPDATE ai_advisory SET status='FAILED',error_code=$2,completed_at=now(),lease_until=NULL
-            WHERE id=$1 AND status='PROCESSING'`,
-          [job.id, invalid ? 'AI_INVALID_OUTPUT' : 'AI_PROVIDER_ERROR'],
-        ).catch(() => undefined);
+            WHERE id=$1 AND status='PROCESSING' AND lease_until>now()`, [job.id, code]);
+        return;
       }
+      await this.persistResult(job.id,
+        `UPDATE ai_advisory SET status='COMPLETED',extracted_json=$2::jsonb,error_code=NULL,completed_at=now(),lease_until=NULL
+          WHERE id=$1 AND status='PROCESSING' AND lease_until>now()`, [job.id, JSON.stringify(extracted)]);
+    } catch {
+      this.logger.warn('AI_ADVISORY_CLAIM_FAILED');
     } finally {
       this.running = false;
+    }
+  }
+
+  private async persistResult(jobId: string, sql: string, parameters: unknown[]): Promise<void> {
+    // The provider is called once. If writes remain unavailable, the durable lease expires
+    // and claimJob marks the abandoned attempt failed without calling the provider again.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await this.dataSource.query(sql, parameters);
+        return;
+      } catch {
+        this.logger.warn('AI_ADVISORY_PERSIST_FAILED', `job:${jobId}`);
+      }
     }
   }
 
@@ -82,7 +98,7 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
       const rows = await manager.query(
         `SELECT a.id,a.request_id,a.input_hash,a.model,r.description
            FROM ai_advisory a JOIN assistance_request r ON r.id=a.request_id
-          WHERE a.status='QUEUED' ORDER BY a.created_at,a.id FOR UPDATE OF a SKIP LOCKED LIMIT 1`,
+          WHERE a.status='QUEUED' AND a.attempts=0 ORDER BY a.created_at,a.id FOR UPDATE OF a SKIP LOCKED LIMIT 1`,
       ) as AdvisoryJob[];
       const job = rows[0];
       if (!job) return undefined;
@@ -128,8 +144,8 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
       if (!this.validExtraction(value)) throw new Error('AI_INVALID_OUTPUT');
       return value;
     } catch (error) {
-      if (error instanceof Error && error.message === 'AI_INVALID_OUTPUT') throw Object.assign(error, { advisoryJob: job });
-      throw Object.assign(new Error('AI_PROVIDER_ERROR'), { advisoryJob: job });
+      if (error instanceof Error && error.message === 'AI_INVALID_OUTPUT') throw error;
+      throw new Error('AI_PROVIDER_ERROR');
     }
   }
 

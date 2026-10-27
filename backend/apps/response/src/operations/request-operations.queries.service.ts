@@ -4,7 +4,9 @@ import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
-import { hasPermission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import { riskAttentionLevel, scoreRequestRisk } from '../ai/ai-risk';
+import type { RiskFacts } from '../ai/ai-risk';
 import { ReporterSessionService } from '../requests/reporter-session';
 import type { ReporterSession } from '../requests/reporter-session';
 import type { RequestOperationPageDto, RequestQueueQueryDto } from './request-operations.dto';
@@ -13,6 +15,29 @@ import { asObject, filtersHash, openDangerStatuses, parseBbox, relatedRequestIds
 import type { OperationRequestRow, QueueRow, RequestEventRow, RequestOperationsConfig } from './request-operations.types';
 import { decisionView, eventView } from './request-operations.mapper';
 import { RequestOperationsPersistenceService } from './request-operations.persistence.service';
+
+type ScoredQueueRow = QueueRow & {
+  description: string | null;
+  children_count: number | null;
+  elderly_count: number | null;
+  needs_rescue: boolean;
+  needs_relief_supplies: boolean;
+};
+
+function priorityAdvisory(facts: RiskFacts): Record<string, unknown> {
+  const risk = scoreRequestRisk(facts);
+  return {
+    score: risk.score,
+    level: riskAttentionLevel(risk.score),
+    reason_codes: risk.reasonCodes,
+    source: 'BACKEND_RULES',
+    rules_version: 'v1',
+  };
+}
+
+function countOrNull(value: unknown): number | null {
+  return value == null ? null : Number(value);
+}
 
 @Injectable()
 export class RequestOperationsQueriesService {
@@ -54,7 +79,8 @@ export class RequestOperationsQueriesService {
     values.push(limit + 1);
     const rows = await this.dataSource.query(
       `SELECT r.id,r.tracking_code,r.status,r.priority,r.review_lane,r.incident_category_code AS category,
-              s.people_affected,r.region_code,r.received_at,
+              r.description,r.needs_rescue,r.needs_relief_supplies,
+              s.people_affected,s.children_count,s.elderly_count,r.region_code,r.received_at,
               to_char(r.received_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_received_at,
               r.reporter_declared_danger AS declared_danger,${overdue} AS overdue,
               CASE WHEN r.reporter_contact_phone IS NULL THEN NULL ELSE '******'||right(r.reporter_contact_phone,4) END AS reporter_contact_phone,
@@ -65,13 +91,22 @@ export class RequestOperationsQueriesService {
         WHERE ${conditions.join(' AND ')}
         ORDER BY r.received_at ASC,r.id ASC LIMIT $${values.length}`,
       values,
-    ) as QueueRow[];
+    ) as ScoredQueueRow[];
     const more = rows.length > limit;
     const page = rows.slice(0, limit);
     const items = page.map((row) => ({
       id: row.id, tracking_code: row.tracking_code, status: row.status, priority: row.priority,
       review_lane: row.review_lane, category: row.category, people_affected: row.people_affected,
       region_code: row.region_code, received_at: toIso(row.received_at), declared_danger: row.declared_danger,
+      priority_advisory: priorityAdvisory({
+        description: row.description,
+        reporterDeclaredDanger: row.declared_danger,
+        peopleAffected: countOrNull(row.people_affected),
+        childrenCount: countOrNull(row.children_count),
+        elderlyCount: countOrNull(row.elderly_count),
+        needsRescue: row.needs_rescue,
+        needsReliefSupplies: row.needs_relief_supplies,
+      }),
       overdue: row.overdue, reporter_contact_phone: row.reporter_contact_phone,
       approx_location: { longitude: Number(row.longitude), latitude: Number(row.latitude) },
       staff_flags: row.proxy_activity_flags ?? [],
@@ -149,6 +184,15 @@ export class RequestOperationsQueriesService {
     ]);
     const subject = subjectRows[0];
     if (!subject) throw new AppError('INTERNAL_ERROR', { status: 500 });
+    const requestPriorityAdvisory = priorityAdvisory({
+      description: row.description,
+      reporterDeclaredDanger: row.reporter_declared_danger,
+      peopleAffected: countOrNull(subject.people_affected),
+      childrenCount: countOrNull(subject.children_count),
+      elderlyCount: countOrNull(subject.elderly_count),
+      needsRescue: row.needs_rescue,
+      needsReliefSupplies: row.needs_relief_supplies,
+    });
     const safeEvents = await this.restrictEvents(eventPage.items, session);
     const flagViews = safeEvents.filter((event) => event.event_type === 'PROXY_ACTIVITY_FLAG').map((event) => ({
       event_id: event.id, occurred_at: event.occurred_at,
@@ -166,6 +210,7 @@ export class RequestOperationsQueriesService {
       region_code: row.region_code, campaign_id: row.campaign_id, received_at: toIso(row.received_at),
       declared_danger: row.reporter_declared_danger,
       needs_rescue: row.needs_rescue, needs_relief_supplies: row.needs_relief_supplies,
+      priority_advisory: requestPriorityAdvisory,
       reporter: { user_id: row.reporter_user_id, name: row.reporter_name, contact_phone: row.reporter_contact_phone },
       subject: {
         people_affected: subject.people_affected,

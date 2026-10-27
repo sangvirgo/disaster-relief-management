@@ -62,16 +62,18 @@ const requestCampaignAssociationViewSchema = object({
 }, ['id', 'status', 'version', 'region_code', 'campaign_id']);
 const identityDetails = {
   registerCitizen: {
-    summary: 'Register a citizen account and send an email verification code.',
-    description: 'Creates a PENDING_EMAIL account and sends a six-digit code. The account receives its CITIZEN grant only after email verification. WEB requests require the pre-session cookie and CSRF token; NATIVE requests send no cookies or Origin.',
+    summary: 'Start a citizen registration and send an email verification code.',
+    description: 'Creates a pending registration request valid for ten minutes, without creating an account or reserving its username/email. The user object previews the prospective account UUID. A valid six-digit OTP creates the account and its CITIZEN grant atomically. Codes last five minutes, capped by the fixed registration deadline; resend never extends that deadline. Replaying an expired registration key returns REGISTRATION_EXPIRED; start again with a new key. WEB requests require the pre-session cookie and CSRF token; NATIVE requests send no cookies or Origin.',
   },
   identityAuthVerifyEmail: {
     summary: 'Verify a citizen email address.',
+    description: 'A valid unconsumed code creates the account and CITIZEN grant in one transaction. Expired registration requests and expired, wrong or consumed codes never activate an account. Username/email conflicts are checked against existing accounts at verification time.',
     request: request(object({ challenge_id: id, code: { type: 'string', pattern: '^\\d{6}$' } }, ['challenge_id', 'code'])),
     response: response(object({ verified: { type: 'boolean', const: true }, user: object({ id, username: text, display_name: text }, ['id', 'username', 'display_name']) }, ['verified', 'user'])),
   },
   identityAuthResendEmailOtp: {
     summary: 'Resend the email verification code.',
+    description: 'Rotates the challenge after the resend cooldown while the registration is still live. The new code expires after five minutes or at the original ten-minute registration deadline, whichever comes first. Unknown or expired requests return no usable challenge.',
     request: request(object({ challenge_id: id }, ['challenge_id'])),
     response: response(object({ challenge_id: { anyOf: [id, { type: 'null' }] }, email_sent: boolean() }, ['challenge_id', 'email_sent'])),
   },
@@ -757,9 +759,9 @@ const errorCatalog = new Map([...fs.readFileSync(errorCatalogPath, 'utf8').match
 const routeErrorCodes = {
   identityInternalActiveUserCheck: ['FORBIDDEN'],
   identityInternalTeamLeaderEligibility: ['FORBIDDEN'],
-  registerCitizen: ['USERNAME_TAKEN', 'EMAIL_TAKEN', 'PASSWORD_WEAK', 'EMAIL_OTP_UNAVAILABLE', 'RATE_LIMITED', 'CSRF_INVALID'],
+  registerCitizen: ['USERNAME_TAKEN', 'EMAIL_TAKEN', 'PASSWORD_WEAK', 'EMAIL_OTP_UNAVAILABLE', 'REGISTRATION_EXPIRED', 'RATE_LIMITED', 'CSRF_INVALID'],
   login: ['INVALID_CREDENTIALS', 'RATE_LIMITED', 'CSRF_INVALID'],
-  identityAuthVerifyEmail: ['EMAIL_OTP_INVALID', 'RATE_LIMITED', 'CSRF_INVALID'],
+  identityAuthVerifyEmail: ['EMAIL_OTP_INVALID', 'EMAIL_OTP_UNAVAILABLE', 'USERNAME_TAKEN', 'EMAIL_TAKEN', 'RATE_LIMITED', 'CSRF_INVALID'],
   identityAuthResendEmailOtp: ['EMAIL_OTP_INVALID', 'EMAIL_OTP_UNAVAILABLE', 'RATE_LIMITED', 'CSRF_INVALID'],
   identityAuthGoogleLogin: ['GOOGLE_TOKEN_INVALID', 'GOOGLE_LOGIN_UNAVAILABLE', 'GOOGLE_ACCOUNT_LINK_REQUIRED', 'USERNAME_TAKEN', 'RATE_LIMITED', 'CSRF_INVALID'],
   identityAuthLinkGoogle: ['GOOGLE_TOKEN_INVALID', 'GOOGLE_LOGIN_UNAVAILABLE', 'GOOGLE_IDENTITY_IN_USE', 'GOOGLE_ALREADY_LINKED', 'SESSION_REAUTH_REQUIRED', 'CSRF_INVALID'],

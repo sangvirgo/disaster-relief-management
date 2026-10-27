@@ -1,16 +1,33 @@
-import { Inject, Injectable, OnModuleInit, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import argon2 from 'argon2';
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '../../../../packages/technical/src/idempotency/idempotency';
+import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
+import { JobRunner } from '../../../../packages/technical/src/persistence/jobs';
+import { withDatabaseRetry } from '../../../../packages/technical/src/persistence/postgres-errors';
 import { hashPurposeBoundSecret } from '../../../../packages/technical/src/security/secret-hash';
 import { LoginDto, RegisterDto, ChangePasswordDto, GoogleLoginDto } from './auth.dto';
 import { IDENTITY_AUTH_CONFIG, AuthContext } from './auth.guard';
 import { IdentityAuthConfig, assertStrongPassword, issueAccessToken, WindowRateLimiter } from './auth-security';
 import { EmailSenderService } from './email-sender.service';
+
+interface EmailRegistrationRow {
+  id: string;
+  challenge_id: string;
+  username: string;
+  display_name: string;
+  email: string;
+  password_hash: string | null;
+  code_hash: string | null;
+  attempts: number;
+  expires_at: Date | string;
+  code_expires_at: Date | string;
+  last_sent_at: Date | string;
+  confirmed_at: Date | string | null;
+}
 
 interface UserRow {
   id: string;
@@ -51,7 +68,10 @@ interface RefreshFailure {
 }
 
 @Injectable()
-export class AuthService implements OnModuleInit {
+export class AuthService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(AuthService.name);
+  private readonly jobs: JobRunner;
+  private stopCleanup?: () => void;
   private dummyPasswordHash = '';
   private readonly rateLimiter = new WindowRateLimiter();
   private activeArgonOperations = 0;
@@ -62,11 +82,21 @@ export class AuthService implements OnModuleInit {
     private readonly idempotency: IdempotencyService,
     @Inject(IDENTITY_AUTH_CONFIG) private readonly config: IdentityAuthConfig,
     @Optional() private readonly emailSender?: EmailSenderService,
-  ) {}
+  ) {
+    this.jobs = new JobRunner(dataSource, () => this.logger.warn('SCHEDULED_JOB_FAILED identity.email-registration.cleanup'));
+  }
 
   async onModuleInit(): Promise<void> {
     this.dummyPasswordHash = await this.hashPassword(randomBytes(32).toString('base64url'));
+    this.stopCleanup = this.jobs.schedule('identity.email-registration.cleanup', 60_000, async (manager) => {
+      await manager.query(`WITH expired AS (
+        SELECT id FROM email_registration WHERE expires_at<=clock_timestamp()
+        ORDER BY expires_at,id LIMIT 100 FOR UPDATE SKIP LOCKED
+      ) DELETE FROM email_registration r USING expired WHERE r.id=expired.id`);
+    });
   }
+
+  onModuleDestroy(): void { this.stopCleanup?.(); }
 
   async register(dto: RegisterDto, idempotencyKey: string, ip: string): Promise<IdempotentResult<{ user: { id: string; username: string; display_name: string }; verification: { challenge_id: string }; email_sent: boolean }>> {
     this.consumeRate(`register:${ip}`, 3, 60 * 60_000);
@@ -78,34 +108,33 @@ export class AuthService implements OnModuleInit {
     const email = dto.email.trim().normalize('NFC').toLowerCase();
     this.consumeRate(`register-email:${email}`, 3, 60 * 60_000);
     const passwordHash = await this.hashPassword(dto.password);
+    const registrationId = randomUUID();
     const challengeId = randomUUID();
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
-    const codeHash = this.emailOtpHash(challengeId, code);
     const passwordBinding = hashPurposeBoundSecret(dto.password, 'identity-register-idempotency', this.config.refreshPeppers, this.config.currentRefreshPepperVersion);
     const result = await this.idempotency.execute<{ user: { id: string; username: string; display_name: string }; verification: { challenge_id: string }; email_sent: boolean }>(this.dataSource, {
-      scopeKey: 'anon:register',
-      command: 'identity.auth.register',
-      key: idempotencyKey,
+      scopeKey: 'anon:register', command: 'identity.auth.register', key: idempotencyKey,
       requestHash: canonicalRequestHash({ username: dto.username, display_name: dto.display_name, email, password_binding: passwordBinding }),
-      databaseErrorMappings: { unique: { app_user_username_key: 'USERNAME_TAKEN', app_user_email_lower_uq: 'EMAIL_TAKEN' } },
       execute: async (manager) => {
+        const owners = await manager.query('SELECT username,email FROM app_user WHERE username=$1 OR lower(email)=$2', [dto.username, email]) as Array<{ username: string; email: string | null }>;
+        if (owners.some((owner) => owner.username.toLowerCase() === dto.username.toLowerCase())) throw new AppError('USERNAME_TAKEN', { status: 409 });
+        if (owners.length) throw new AppError('EMAIL_TAKEN', { status: 409 });
         const rows = await manager.query(
-          "INSERT INTO app_user (username, display_name, email, password_hash, status) VALUES ($1, $2, $3, $4, 'PENDING_EMAIL') RETURNING id, username, display_name",
-          [dto.username, dto.display_name, email, passwordHash],
+          `INSERT INTO email_registration (id,challenge_id,username,display_name,email,password_hash,code_hash,expires_at,code_expires_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,now()+interval '10 minutes',now()+interval '5 minutes')
+           RETURNING id,username,display_name`,
+          [registrationId, challengeId, dto.username, dto.display_name, email, passwordHash, this.emailOtpHash(challengeId, code)],
         ) as Array<{ id: string; username: string; display_name: string }>;
-        const user = rows[0];
-        if (!user) throw new AppError('INTERNAL_ERROR', { status: 500 });
-        await manager.query(
-          'INSERT INTO email_verification_challenge (id, user_id, email, code_hash, expires_at) VALUES ($1,$2,$3,$4,now()+interval \'5 minutes\')',
-          [challengeId, user.id, email, codeHash],
-        );
-        return { status: 201, value: { user, verification: { challenge_id: challengeId }, email_sent: false }, resource: { type: 'app_user', id: user.id } };
+        if (!rows[0]) throw new AppError('INTERNAL_ERROR', { status: 500 });
+        return { status: 201, value: { user: rows[0], verification: { challenge_id: challengeId }, email_sent: false }, resource: { type: 'email_registration', id: registrationId } };
       },
       replay: async (manager, resource) => {
-        const user = await this.readRegisteredUser(manager, resource);
-        const rows = await manager.query('SELECT id FROM email_verification_challenge WHERE user_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1', [user.id]) as Array<{ id: string }>;
-        if (!rows[0]) throw new AppError('INTERNAL_ERROR', { status: 500 });
-        return { user, verification: { challenge_id: rows[0].id }, email_sent: false };
+        // Old keys point at legacy account placeholders; never recreate or disclose them.
+        if (resource?.type !== 'email_registration') throw new AppError('REGISTRATION_EXPIRED', { status: 410 });
+        const rows = await manager.query('SELECT id,username,display_name,challenge_id,expires_at FROM email_registration WHERE id=$1', [resource.id]) as EmailRegistrationRow[];
+        const row = rows[0];
+        if (!row || new Date(row.expires_at).getTime() <= Date.now()) throw new AppError('REGISTRATION_EXPIRED', { status: 410 });
+        return { user: { id: row.id, username: row.username, display_name: row.display_name }, verification: { challenge_id: row.challenge_id }, email_sent: false };
       },
     });
     if (result.replay) return result;
@@ -116,71 +145,53 @@ export class AuthService implements OnModuleInit {
   async verifyEmail(challengeId: string, code: string, ip: string): Promise<{ verified: true; user: { id: string; username: string; display_name: string } }> {
     this.consumeRate(`email-otp-verify:${ip}`, 10, 60_000);
     if (!this.config.emailOtpPepper) throw new AppError('EMAIL_OTP_UNAVAILABLE', { status: 503 });
-    const result = await this.dataSource.transaction(async (manager) => {
-      const rows = await manager.query(
-        `SELECT c.id,c.user_id,c.email,c.code_hash,c.attempts,c.expires_at,c.consumed_at,
-                u.username,u.display_name,u.status,u.email_verified_at
-           FROM email_verification_challenge c JOIN app_user u ON u.id=c.user_id
-          WHERE c.id=$1 FOR UPDATE OF c,u`, [challengeId],
-      ) as Array<{ id: string; user_id: string; email: string; code_hash: string; attempts: number; expires_at: Date; consumed_at: Date | null; username: string; display_name: string; status: string; email_verified_at: Date | null }>;
-      const challenge = rows[0];
-      if (!challenge) return undefined;
-      if (challenge.status === 'ACTIVE' && challenge.email_verified_at && challenge.consumed_at) {
-        return { id: challenge.user_id, username: challenge.username, display_name: challenge.display_name };
-      }
-      if (challenge.status !== 'PENDING_EMAIL' || challenge.consumed_at || new Date(challenge.expires_at).getTime() <= Date.now() || Number(challenge.attempts) >= 5) {
-        if (!challenge.consumed_at) await manager.query('UPDATE email_verification_challenge SET consumed_at=now() WHERE id=$1', [challenge.id]);
+    const result = await withDatabaseRetry(() => this.dataSource.transaction(async (manager) => {
+      const rows = await manager.query('SELECT * FROM email_registration WHERE challenge_id=$1 FOR UPDATE', [challengeId]) as EmailRegistrationRow[];
+      const row = rows[0];
+      if (!row) return undefined;
+      if (new Date(row.expires_at).getTime() <= Date.now()) return undefined;
+      if (row.confirmed_at || !row.code_hash || !row.password_hash || Number(row.attempts) >= 5 || new Date(row.code_expires_at).getTime() <= Date.now()) return undefined;
+      const actual = Buffer.from(this.emailOtpHash(challengeId, code));
+      const expected = Buffer.from(row.code_hash);
+      if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+        await manager.query('UPDATE email_registration SET attempts=attempts+1 WHERE id=$1', [row.id]);
         return undefined;
       }
-      const actual = Buffer.from(this.emailOtpHash(challenge.id, code));
-      const expected = Buffer.from(challenge.code_hash);
-      const valid = actual.length === expected.length && timingSafeEqual(actual, expected);
-      if (!valid) {
-        await manager.query(
-          'UPDATE email_verification_challenge SET attempts=attempts+1, consumed_at=CASE WHEN attempts+1>=5 THEN now() ELSE consumed_at END WHERE id=$1',
-          [challenge.id],
-        );
-        return undefined;
-      }
-      await manager.query('UPDATE email_verification_challenge SET consumed_at=now() WHERE id=$1', [challenge.id]);
-      const activated = await manager.query(
-        "UPDATE app_user SET status='ACTIVE',email_verified_at=coalesce(email_verified_at,now()),version=version+1 WHERE id=$1 AND status='PENDING_EMAIL' AND email=$2 RETURNING id",
-        [challenge.user_id, challenge.email],
-      ) as Array<{ id: string }>;
-      if (activated.length !== 1) return undefined;
-      await manager.query("INSERT INTO role_grant (user_id,role_code,scope_type) VALUES ($1,'CITIZEN','SYSTEM') ON CONFLICT DO NOTHING", [challenge.user_id]);
-      return { id: challenge.user_id, username: challenge.username, display_name: challenge.display_name };
-    });
+      const users = await manager.query(
+        `INSERT INTO app_user (id,username,display_name,email,password_hash,status,email_verified_at)
+         VALUES ($1,$2,$3,$4,$5,'ACTIVE',now()) RETURNING id,username,display_name`,
+        [row.id, row.username, row.display_name, row.email, row.password_hash],
+      ) as Array<{ id: string; username: string; display_name: string }>;
+      if (!users[0]) throw new AppError('INTERNAL_ERROR', { status: 500 });
+      await manager.query("INSERT INTO role_grant (user_id,role_code,scope_type) VALUES ($1,'CITIZEN','SYSTEM')", [row.id]);
+      await manager.query('UPDATE email_registration SET confirmed_at=now(),password_hash=NULL,code_hash=NULL WHERE id=$1', [row.id]);
+      return users[0];
+    }), { mappings: { unique: { app_user_username_key: 'USERNAME_TAKEN', app_user_email_lower_uq: 'EMAIL_TAKEN' } } });
     if (!result) throw new AppError('EMAIL_OTP_INVALID', { status: 400 });
     return { verified: true, user: result };
   }
 
   async resendEmailOtp(challengeId: string, ip: string): Promise<{ challenge_id: string | null; email_sent: boolean }> {
-    this.consumeRate(`email-otp-resend:${ip}`, 6, 60 * 60_000);
+    this.consumeRate(`email-otp-resend:${ip}`, 3, 60 * 60_000);
     if (!this.config.emailOtpPepper) throw new AppError('EMAIL_OTP_UNAVAILABLE', { status: 503 });
     const nextId = randomUUID();
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const outcome = await this.dataSource.transaction(async (manager) => {
-      const rows = await manager.query(
-        `SELECT c.user_id,
-                (SELECT latest.created_at FROM email_verification_challenge latest
-                  WHERE latest.user_id=c.user_id ORDER BY latest.created_at DESC,latest.id DESC LIMIT 1) AS latest_created_at,
-                u.email,u.status
-           FROM email_verification_challenge c JOIN app_user u ON u.id=c.user_id
-          WHERE c.id=$1 FOR UPDATE OF c,u`, [challengeId],
-      ) as Array<{ user_id: string; latest_created_at: Date; email: string; status: string }>;
+      const rows = await manager.query('SELECT * FROM email_registration WHERE challenge_id=$1 FOR UPDATE', [challengeId]) as EmailRegistrationRow[];
       const row = rows[0];
-      if (!row || row.status !== 'PENDING_EMAIL') return undefined;
-      const seconds = Math.ceil((60_000 - (Date.now() - new Date(row.latest_created_at).getTime())) / 1_000);
-      if (seconds > 0) return { retryAfter: seconds };
-      await manager.query('UPDATE email_verification_challenge SET consumed_at=coalesce(consumed_at,now()) WHERE user_id=$1 AND consumed_at IS NULL', [row.user_id]);
+      if (!row) return undefined;
+      if (new Date(row.expires_at).getTime() <= Date.now()) return undefined;
+      if (row.confirmed_at) return undefined;
+      const seconds = Math.ceil((60_000 - (Date.now() - new Date(row.last_sent_at).getTime())) / 1_000);
+      if (seconds > 0) throw new AppError('RATE_LIMITED', { status: 429, retryAfterSeconds: seconds });
+      this.consumeRate(`email-otp-resend-email:${row.email}`, 3, 60 * 60_000);
       await manager.query(
-        'INSERT INTO email_verification_challenge (id,user_id,email,code_hash,expires_at) VALUES ($1,$2,$3,$4,now()+interval \'5 minutes\')',
-        [nextId, row.user_id, row.email, this.emailOtpHash(nextId, code)],
+        `UPDATE email_registration SET challenge_id=$2,code_hash=$3,attempts=0,last_sent_at=now(),
+           code_expires_at=LEAST(now()+interval '5 minutes',expires_at) WHERE id=$1`,
+        [row.id, nextId, this.emailOtpHash(nextId, code)],
       );
       return { email: row.email };
     });
-    if (outcome && 'retryAfter' in outcome) throw new AppError('RATE_LIMITED', { status: 429, retryAfterSeconds: outcome.retryAfter });
     if (!outcome) return { challenge_id: null, email_sent: false };
     const emailSent = await this.emailSender?.sendVerificationCode(outcome.email, code) ?? false;
     return { challenge_id: nextId, email_sent: emailSent };
@@ -441,13 +452,6 @@ export class AuthService implements OnModuleInit {
 
   hashTemporaryPasswordBinding(password: string): string {
     return hashPurposeBoundSecret(password, 'identity-admin-temporary-password-idempotency', this.config.refreshPeppers, this.config.currentRefreshPepperVersion);
-  }
-
-  private async readRegisteredUser(manager: EntityManager, resource: ResourceRef | null): Promise<{ id: string; username: string; display_name: string }> {
-    if (!resource || resource.type !== 'app_user') throw new AppError('INTERNAL_ERROR', { status: 500 });
-    const rows = await manager.query('SELECT id, username, display_name FROM app_user WHERE id = $1', [resource.id]) as Array<{ id: string; username: string; display_name: string }>;
-    if (!rows[0]) throw new AppError('INTERNAL_ERROR', { status: 500 });
-    return rows[0];
   }
 
   private async startSession(user: UserRow, clientKind: 'WEB' | 'NATIVE'): Promise<IssuedSession> {

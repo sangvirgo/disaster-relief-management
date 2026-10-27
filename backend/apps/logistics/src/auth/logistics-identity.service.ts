@@ -2,7 +2,8 @@ import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { CircuitBreakerClient } from '../../../../packages/technical/src/http/service-client';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import type { ServiceName } from '../../../../packages/technical/src/security/service-token';
-import type { Grant } from '../../../../packages/technical/src/security/permissions';
+import { Grant, validGrant } from '../../../../packages/identity-contracts/src/permissions';
+import { ServiceTokenCache } from '../../../../packages/technical/src/http/service-token-cache';
 import type { LogisticsAccessTokenClaims } from './logistics-auth';
 
 export const LOGISTICS_IDENTITY_CONFIG = Symbol('LOGISTICS_IDENTITY_CONFIG');
@@ -20,27 +21,8 @@ export interface LogisticsSession {
   grants: Grant[];
 }
 
-interface ServiceTokenResponse {
-  access_token: string;
-  expires_in: number;
-}
-
-const roles = new Set(['CITIZEN', 'VOLUNTEER', 'COORDINATOR', 'CAMPAIGN_MANAGER', 'OPERATIONS_MANAGER', 'INTAKE_STAFF', 'REVIEWER', 'DISTRIBUTION_STAFF', 'ADMIN']);
-const scopes = new Set(['SYSTEM', 'ORGANIZATION', 'REGION', 'CAMPAIGN']);
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-
 function unavailable(): AppError {
   return new AppError('IDENTITY_UNAVAILABLE', { status: 503, retryAfterSeconds: 1 });
-}
-
-function validGrant(value: unknown): value is Grant {
-  if (!value || typeof value !== 'object') return false;
-  const grant = value as Record<string, unknown>;
-  return typeof grant.role_code === 'string' && roles.has(grant.role_code) &&
-    typeof grant.scope_type === 'string' && scopes.has(grant.scope_type) &&
-    (grant.organization_id === null || (typeof grant.organization_id === 'string' && uuidPattern.test(grant.organization_id))) &&
-    (grant.region_code === null || grant.region_code === undefined || (typeof grant.region_code === 'string' && grant.region_code.length <= 80)) &&
-    (grant.campaign_id === null || grant.campaign_id === undefined || (typeof grant.campaign_id === 'string' && uuidPattern.test(grant.campaign_id)));
 }
 
 export function loadLogisticsIdentityConfig(env: Record<string, string | undefined> = process.env): LogisticsIdentityConfig {
@@ -62,14 +44,13 @@ export function loadLogisticsIdentityConfig(env: Record<string, string | undefin
 
 @Injectable()
 export class LogisticsIdentityService implements OnModuleDestroy {
-  private readonly serviceTokens = new Map<ServiceName, { value: string; refreshAt: number }>();
-  private readonly tokenRequests = new Map<ServiceName, Promise<string>>();
+  private readonly serviceTokens: ServiceTokenCache;
   private readonly introspections = new Map<string, Promise<LogisticsSession>>();
 
   constructor(
     @Inject(LOGISTICS_IDENTITY_CLIENT) private readonly client: CircuitBreakerClient,
-    @Inject(LOGISTICS_IDENTITY_CONFIG) private readonly config: LogisticsIdentityConfig,
-  ) {}
+    @Inject(LOGISTICS_IDENTITY_CONFIG) config: LogisticsIdentityConfig,
+  ) { this.serviceTokens = new ServiceTokenCache(client, config); }
 
   async introspect(claims: LogisticsAccessTokenClaims): Promise<LogisticsSession> {
     const key = `${claims.sid}:${claims.sub}`;
@@ -119,7 +100,7 @@ export class LogisticsIdentityService implements OnModuleDestroy {
   }
 
   serviceToken(audience: ServiceName): Promise<string> {
-    return this.getServiceToken(audience);
+    return this.serviceTokens.get(audience);
   }
 
   onModuleDestroy(): void {
@@ -127,7 +108,7 @@ export class LogisticsIdentityService implements OnModuleDestroy {
   }
 
   private async fetchIntrospection(claims: LogisticsAccessTokenClaims): Promise<LogisticsSession> {
-    const token = await this.getServiceToken('identity');
+    const token = await this.serviceTokens.get('identity');
     let result;
     try {
       result = await this.client.post<unknown>('/api/v1/identity/internal/introspect', { sid: claims.sid, sub: claims.sub }, {
@@ -144,26 +125,4 @@ export class LogisticsIdentityService implements OnModuleDestroy {
     return { userId: claims.sub, grants: value.grants as Grant[] };
   }
 
-  private async getServiceToken(audience: ServiceName): Promise<string> {
-    const cached = this.serviceTokens.get(audience);
-    if (cached && cached.refreshAt > Date.now()) return cached.value;
-    const pending = this.tokenRequests.get(audience);
-    if (pending) return pending;
-    const operation = this.client.post<unknown>('/api/v1/identity/internal/token', {
-      client_id: this.config.clientId,
-      client_secret: this.config.clientSecret,
-      audience,
-    }).then((result) => {
-      if (result.status !== 200 || !result.body || typeof result.body !== 'object') throw unavailable();
-      const value = result.body as Partial<ServiceTokenResponse>;
-      if (typeof value.access_token !== 'string' || !Number.isInteger(value.expires_in) || value.expires_in! < 1) throw unavailable();
-      this.serviceTokens.set(audience, { value: value.access_token, refreshAt: Date.now() + Math.max(1, value.expires_in! - 30) * 1_000 });
-      return value.access_token;
-    }).catch((error: unknown) => {
-      if (error instanceof AppError) throw error;
-      throw unavailable();
-    }).finally(() => { this.tokenRequests.delete(audience); });
-    this.tokenRequests.set(audience, operation);
-    return operation;
-  }
 }

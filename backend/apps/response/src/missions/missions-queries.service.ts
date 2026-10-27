@@ -4,7 +4,7 @@ import type { DataSource } from 'typeorm';
 import type { Request } from 'express';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
-import { hasPermission } from '../../../../packages/technical/src/security/permissions';
+import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { ReporterSessionService } from '../requests/reporter-session';
 import { asObject, filtersHash, scopeSql, toIso } from '../operations/request-operations.helpers';
 import { MissionPageQueryDto } from './missions.dto';
