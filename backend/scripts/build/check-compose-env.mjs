@@ -97,11 +97,10 @@ const s3BackupPorts = compose.services.minio.ports.filter((port) => port.target 
 assert.equal(s3BackupPorts.length, 1, 'the existing MinIO service must expose one S3 backup port');
 assert.equal(s3BackupPorts[0].host_ip, '127.0.0.1', 'the S3 backup transport must bind only to loopback');
 assert.equal(s3BackupPorts[0].published, '59000');
-assert.equal(compose.services.minio.image, 'quay.io/minio/aistor/minio:RELEASE.2026-09-19T17-05-25Z');
-assert.equal(compose.services['minio-init'].image, 'quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z');
-assert.ok(compose.services.minio.volumes.some((volume) =>
-  volume.target === '/minio.license' && volume.read_only && volume.bind?.create_host_path === false),
-'AIStor license must be mounted read-only and must already exist on the host');
+assert.match(compose.services.minio.image, /\/minio:RELEASE\.2025-10-15T17-29-55Z$/);
+assert.match(compose.services['minio-init'].image, /\/minio-mc:RELEASE\.2025-08-13T08-35-41Z$/);
+assert.ok(!compose.services.minio.volumes.some((volume) => volume.target === '/minio.license'),
+  'MinIO Community needs no license mount');
 assert.deepEqual(Object.keys(compose.services.web.build.args).sort(), ['VITE_GOOGLE_CLIENT_ID', 'VITE_GOOGLE_MAPS_API_KEY']);
 assert.equal(compose.services.web.ports?.length ?? 0, 0, 'web must be reachable only through the Nginx ingress');
 assert.equal(compose.services.nginx.depends_on.web.condition, 'service_healthy');
