@@ -102,7 +102,7 @@ Run frontend typecheck/build and focused tests for business-critical flows. Veri
 - **Citizen severity suggestion:** there is no citizen scoring API. No numeric AI score or official P1–P4 before coordinator verification and decision.
 - **CSV export:** no backend route in the current T19 inventory. Do not wire the prototype's visual export affordance as a real download.
 - **Offline queue, push, payments, procurement, warehouse transfers, full stocktakes:** outside current committed Web/backend scope unless the project plan and contracts change.
-- **Storage and operational evidence:** AIStor private evidence/restore, periodic scheduler, representative HTTP timing, report-scale/UI evidence, and some T18 runtime checks remain open backend acceptance gates. The Web must handle temporary unavailability rather than claim them complete.
+- **Storage and operational evidence:** MinIO private evidence/restore, periodic scheduler, representative HTTP timing, report-scale/UI evidence, and some T18 runtime checks remain open backend acceptance gates. The Web must handle temporary unavailability rather than claim them complete.
 
 ## 7. Next session: first concrete task
 

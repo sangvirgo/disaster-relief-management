@@ -129,7 +129,7 @@
         <mxCell id="ldb" value="Logistics database&#10;Own credentials / migrations" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ffffff;strokeColor=#334155;" vertex="1" parent="1">
           <mxGeometry x="810" y="770" width="285" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="files" value="Private MinIO AIStor Free&#10;Separate Response / Logistics access" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ffffff;strokeColor=#334155;" vertex="1" parent="1">
+        <mxCell id="files" value="Private MinIO Community&#10;Separate Response / Logistics access" style="rounded=0;whiteSpace=wrap;html=0;fontSize=15;fillColor=#ffffff;strokeColor=#334155;" vertex="1" parent="1">
           <mxGeometry x="425" y="965" width="520" height="80" as="geometry" />
         </mxCell>
         <mxCell id="note0" value="One demo host; separate service databases. No cross-service SQL or foreign keys." style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=#ffffff;align=center;fontSize=12;" vertex="1" parent="1">

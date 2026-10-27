@@ -36,7 +36,7 @@ Tài liệu OCHA/IFRC cung cấp thông tin tham khảo cho thiết kế quy tr�
 | Giao tiếp giữa dịch vụ | REST/JSON cho lệnh từ người dùng và lệnh liên dịch vụ; giao dịch cơ sở dữ liệu cục bộ | Quy trình có nhịp độ do con người xử lý và cần phản hồi tức thì. Chỉ xem xét nhắn tin qua broker khi có trường hợp sử dụng được đo lường cần phát tán sự kiện, phát lại hoặc nhiều bên nhận độc lập. |
 | Web | React + TypeScript + Vite | Phù hợp với bảng điều hành; các màn hình cần đăng nhập không đòi hỏi SSR/SEO. [Hướng dẫn Vite](https://vite.dev/guide/) |
 | Mobile | React Native + Expo + TypeScript | Dùng chung kiến thức TypeScript và hỗ trợ GPS, ảnh, thông báo. Chỉ xin quyền vị trí khi cần; mặc định không theo dõi nền. [TypeScript trong React Native](https://reactnative.dev/docs/typescript), [Expo Location](https://docs.expo.dev/versions/latest/sdk/location/) |
-| Tệp | MinIO AIStor Free, triển khai một nút trong phòng lab, qua AWS SDK for JavaScript S3 client | Lựa chọn cuối cùng cho đồ án với dữ liệu demo tổng hợp. Nhận và sử dụng phần mềm theo điều khoản giấy phép hiện hành; không phân phối lại phần mềm. Gói miễn phí không có HA/SLA và không bao gồm mã hóa dữ liệu lưu trữ; duy trì quyền truy cập riêng tư và bản sao lưu đã kiểm thử. |
+| Tệp | MinIO Community build từ source upstream, triển khai một nút trong phòng lab, qua AWS SDK for JavaScript S3 client | Lựa chọn cuối cùng cho đồ án với dữ liệu demo tổng hợp (sửa ngày 2026-10-27 từ AIStor Free vì nhóm không có file giấy phép). AGPLv3, không cần file giấy phép; image được build cục bộ, không phân phối lại. Không có HA/SLA hay mã hóa dữ liệu lưu trữ; duy trì quyền truy cập riêng tư và bản sao lưu đã kiểm thử. |
 | Triển khai | Docker Compose trên một máy chủ demo; Nginx reverse proxy | Nhiều container không đòi hỏi nhiều máy vật lý. [Docker Compose trong môi trường production](https://docs.docker.com/compose/how-tos/production/) |
 | AI | Công cụ tư vấn có giải thích; điều phối viên là người ra quyết định | Hướng nghiên cứu tùy chọn; không tự động thay đổi mức ưu tiên hoặc điều động cứu hộ. |
 
@@ -390,18 +390,18 @@ Mỗi nhiệm vụ có đúng một đội; đội bổ sung nhận nhiệm vụ
 - Lưu tệp trong kho đối tượng. Cơ sở dữ liệu giữ object key, loại/ID chủ sở hữu, MIME đã xác thực, kích thước, checksum, người tải lên, thời gian và phạm vi hiển thị. Giữ bucket ở chế độ riêng tư; nếu truy cập trực tiếp thì dùng URL ký số có thời hạn ngắn.
 - Xác thực MIME thực tế, phần mở rộng và kích thước; không tin tên/MIME do client cung cấp. Tải lên phải được phân quyền dựa trên đối tượng nghiệp vụ sở hữu tệp.
 - Dữ liệu demo phải là dữ liệu tổng hợp; không dùng ảnh hay thông tin cá nhân của nạn nhân thật.
-- Dùng AWS SDK for JavaScript v3 S3 client từ dịch vụ NestJS sở hữu tệp. Cấu hình thông tin xác thực dịch vụ riêng và bucket riêng tư cho Response và Logistics. Unit test có thể mock S3; kiểm tra tích hợp nhà cung cấp và phục hồi phải dùng máy MinIO AIStor Free lab đã chọn.
+- Dùng AWS SDK for JavaScript v3 S3 client từ dịch vụ NestJS sở hữu tệp. Cấu hình thông tin xác thực dịch vụ riêng và bucket riêng tư cho Response và Logistics. Unit test có thể mock S3; kiểm tra tích hợp nhà cung cấp và phục hồi phải dùng máy MinIO Community lab đã chọn.
 
-#### Lựa chọn kho đối tượng: MinIO AIStor Free
+#### Lựa chọn kho đối tượng: MinIO Community (build từ source)
 
-**Lựa chọn cuối cùng cho đồ án: MinIO AIStor Free, triển khai một nút trong phòng lab, dùng dữ liệu tổng hợp.** Không chọn MinIO Community: repository của phiên bản này đã lưu trữ và được đánh dấu không còn bảo trì. AIStor Free là sản phẩm độc quyền riêng; thỏa thuận cho phép dùng độc lập phục vụ giáo dục/nghiên cứu, còn tài liệu vận hành quy định giới hạn riêng theo từng edition. Đây là lựa chọn cho môi trường lab, không phải khuyến nghị production. Kế hoạch này chưa cài đặt hay xác minh artifact/giấy phép MinIO, tích hợp ứng dụng hoặc kiểm thử phục hồi nào. [Repository Community](https://github.com/minio/minio), [Thỏa thuận AIStor Free](https://www.min.io/legal/aistor-free-agreement), [Vận hành giấy phép AIStor](https://docs.min.io/aistor/operations/licenses/)
+**Lựa chọn đã sửa (2026-10-27): MinIO Community, triển khai một nút trong phòng lab, dùng dữ liệu tổng hợp.** Lựa chọn AIStor Free trước đó bị bỏ vì AIStor cần file giấy phép mà nhóm không có. MinIO Community theo AGPLv3 và không cần giấy phép, nhưng repository upstream đã lưu trữ, không còn bảo trì và không có image chính thức nào pull được (Docker Hub đã gỡ; quay.io trả về unauthorized). Vì vậy Reliva build server và `mc` từ source tag upstream trong `backend/infra/minio/Dockerfile`. Đây là lựa chọn cho môi trường lab, không phải khuyến nghị production. [Repository Community](https://github.com/minio/minio)
 
 | Quyết định | Cơ sở Reliva |
 |---|---|
-| Sản phẩm/edition | MinIO AIStor Free; không thay bằng image Community hoặc bản dựng lại của bên thứ ba |
+| Sản phẩm/edition | MinIO Community, server tag `RELEASE.2025-10-15T17-29-55Z`, `mc` tag `RELEASE.2025-08-13T08-35-41Z`, build cục bộ bằng Go; không dùng image hay giấy phép AIStor |
 | Cấu trúc/dữ liệu | Một nút cho lab; chỉ dùng dữ liệu demo tổng hợp; không tuyên bố có HA hoặc khả dụng production |
-| Giấy phép/gói phần mềm | Người vận hành phải nhận và sử dụng sản phẩm theo thỏa thuận hiện hành cùng giấy phép còn hiệu lực. Không sửa đổi hay phân phối lại binary/image AIStor hoặc giấy phép trong repository/bài nộp, trừ khi điều khoản áp dụng cho phép rõ ràng. Ghi lại bản phát hành chính xác và hiệu lực giấy phép trước buổi demo. |
-| Giới hạn gói miễn phí | Không phụ thuộc vào triển khai phân tán, replication, chuyển đổi lifecycle, xóa theo phiên bản, mã hóa dữ liệu lưu trữ hoặc SLA/SLO. Tài liệu hiện tại ghi AIStor Free bắt đầu hỗ trợ từ `minio.RELEASE.2025-12-20T04-58-37Z`; cần kiểm tra lại yêu cầu này với bản phát hành được chọn lúc thiết lập. |
+| Giấy phép/gói phần mềm | Source upstream AGPLv3, không sửa đổi; image được build cục bộ và không phân phối lại. Không mount hay lưu file giấy phép trong repository. |
+| Giới hạn | Upstream đã lưu trữ: không có bản vá bảo mật; edition Community không có web console quản trị (dùng `mc`). Không phụ thuộc vào replication, mã hóa dữ liệu lưu trữ hoặc SLA/SLO. Giữ cổng ở loopback và bucket riêng tư. |
 | Tích hợp ứng dụng | API S3 riêng tư; AWS SDK for JavaScript v3; thông tin xác thực/bucket Response và Logistics riêng theo nguyên tắc đặc quyền tối thiểu; không cấp quyền chung cho dịch vụ khác |
 
 Với triển khai đầu tiên, mọi tệp đi qua dịch vụ NestJS sở hữu. Phân quyền đối tượng nghiệp vụ, ghi trạng thái tệp đính kèm PENDING trong giao dịch cơ sở dữ liệu ngắn, xác thực rồi truyền luồng nội dung có giới hạn đến key bất biến được tạo tự động ở ngoài giao dịch, sau đó ghi READY trong giao dịch ngắn thứ hai. Khi lỗi, giữ lại SOS và cho biết tệp đính kèm FAILED/PENDING có thể thử lại; đối soát trường hợp tiến trình dừng giữa lúc tải đối tượng lên và commit metadata. Áp dụng quy tắc phần mở rộng/loại/kích thước theo nội dung nhận diện được, không dựa vào MIME/tên tệp client gửi. Không giữ khóa cơ sở dữ liệu trong lúc gọi S3 và không tuyên bố có giao dịch nguyên tử xuyên cơ sở dữ liệu/kho đối tượng. [S3 client cho AWS SDK for JavaScript](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/), [Hướng dẫn tải tệp của OWASP](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
@@ -1050,7 +1050,7 @@ flowchart TD
 - **Quyết định do con người nắm giữ:** trích xuất chỉ đề xuất dữ kiện; quy tắc chỉ gợi ý ưu tiên hoặc nhu cầu xác minh. Không bên nào sửa dữ kiện đã xác minh, P1–P4 chính thức, trạng thái nhiệm vụ hoặc phân công. Quy trình thủ công vẫn dùng được khi AI tắt/không khả dụng.
 - **Chỉ dùng ngữ cảnh được hỗ trợ:** giữ tổng chưa biết, nhóm chồng lấp, phủ định và cập nhật mâu thuẫn theo Mục 12.4. Feature hiểm họa tùy chọn tính cục bộ; quản lý phiên bản và hết hạn kết quả phụ thuộc thời gian/hiểm họa. `peopleCount=4` không có căn cứ và `semanticUrgency=0.95` chưa hiệu chỉnh trong PDF là phản ví dụ, không phải mặc định hợp đồng.
 - **Tách advisor vận hành và thí nghiệm:** quy tắc là advisor cơ sở; rule+LLM tùy chọn hỗ trợ trích xuất/tóm tắt. Weighted scoring là bộ so sánh nghiên cứu, có giới hạn pha loãng được ghi rõ, confidence riêng và nhãn rà soát độc lập. Hybrid tương lai cần đánh giá và sửa policy tường minh trước khi đủ điều kiện cho bước rà soát.
-- **Hoãn các phần mở rộng liền kề:** theo dõi trực tiếp/nền, phát lại lộ trình, feed dự báo, định tuyến xét ETA/hiểm họa, Redis/WebSocket và ranh giới dịch vụ bổ sung không được tích hợp AI này chấp nhận. Phạm vi đội, kỹ năng bắt buộc và tình trạng sẵn sàng vẫn là điều kiện cứng trong truy vấn Response thông thường. Ngăn xếp đã chọn vẫn là ba dịch vụ NestJS với TypeORM, PostgreSQL/PostGIS và MinIO AIStor Free; không bổ sung runtime Python hay broker.
+- **Hoãn các phần mở rộng liền kề:** theo dõi trực tiếp/nền, phát lại lộ trình, feed dự báo, định tuyến xét ETA/hiểm họa, Redis/WebSocket và ranh giới dịch vụ bổ sung không được tích hợp AI này chấp nhận. Phạm vi đội, kỹ năng bắt buộc và tình trạng sẵn sàng vẫn là điều kiện cứng trong truy vấn Response thông thường. Ngăn xếp đã chọn vẫn là ba dịch vụ NestJS với TypeORM, PostgreSQL/PostGIS và MinIO Community; không bổ sung runtime Python hay broker.
 
 Trước khi bật phần mở rộng này, chốt schema provenance trích xuất, taxonomy/thứ tự ưu tiên rule, giới hạn trường, kiểm tra thời hạn/phiên bản ngữ cảnh, ánh xạ lý do tiếng Việt, quyết định nhà cung cấp/chuyển dữ liệu khi có và các kiểm thử ở Mục 12.8. Trọng số/ví dụ quy tắc khẩn cấp trong PDF là đề xuất nghiên cứu chưa được kiểm chứng, không phải chính sách cơ quan cứu hộ. Triển khai cốt lõi tiến hành độc lập với tích hợp tùy chọn này.
 
@@ -1184,7 +1184,7 @@ Trình duyệt / Mobile
     -> Nginx (một máy demo)
     -> Identity, Response, Logistics (3 dịch vụ ứng dụng)
     -> PostgreSQL/PostGIS (database/user riêng cho từng dịch vụ)
-    -> MinIO AIStor Free S3 API (lab một nút)
+    -> MinIO Community S3 API (lab một nút)
     -> Prometheus/Grafana (profile tùy chọn)
 ```
 
@@ -1283,14 +1283,14 @@ Demo chứng minh quy trình, phân quyền, GIS, tính toàn vẹn tồn kho v�
 | Loại/kích thước/thời hạn lưu tệp? | Mục 23.5 chốt giới hạn media demo và TTL link ký số; lưu trữ dữ liệu thật quyết định riêng | Giới hạn demo đã chốt; thời hạn lưu trước pilot |
 | Thời gian lưu vị trí/ảnh/audit/bản sao? | Không tự đặt policy chính thức; xác nhận trước pilot | Trước triển khai thật |
 | Mục tiêu tải/phần cứng demo? | Mục 23.6 chốt workload/ngưỡng số demo; ghi chi tiết host và số đo thực tế | Phần cứng khi thiết lập; kết quả trước nghiệm thu hiệu năng |
-| Edition/nhà cung cấp lưu trữ và giấy phép? | Chọn MinIO AIStor Free một nút cho lab; thành viên nhóm nhận theo điều khoản hiện hành; xác minh quyền riêng tư và phục hồi trước demo | Trước tích hợp lưu trữ |
+| Edition/nhà cung cấp lưu trữ và giấy phép? | Chọn MinIO Community một nút cho lab (build từ source, không cần giấy phép); đã xác minh quyền riêng tư ngày 2026-10-27; xác minh phục hồi trước demo | Trước tích hợp lưu trữ |
 | Dữ liệu AI có nhãn? | Không giả định có sẵn; quy tắc giải thích được là đủ cho PoC; mặc định tắt AI | Trước đánh giá tùy chọn |
 | Chính sách đáp ứng một phần? | Demo dùng nhu cầu do điều phối viên tạo và giao hàng đã xác nhận; xác thực luồng thật với người rà soát miền | Trước khi tuyên bố là policy vận hành |
 | Kafka/event broker? | Không thuộc cơ sở; chỉ xem xét nếu chứng minh được tiêu chí ở Mục 4.4 | Chỉ sau khi đo được nhu cầu |
 
 ## 20. Kết luận thiết kế
 
-Cơ sở đề xuất là **NestJS/TypeScript + TypeORM + PostgreSQL/PostGIS + React/Vite + React Native/Expo**, với ba dịch vụ: Identity, Response và Logistics. REST xử lý thao tác tức thời; mỗi dịch vụ sở hữu cơ sở dữ liệu và báo cáo riêng; Logistics liên kết cam kết cứu trợ một phần với ID yêu cầu không hàm nghĩa. Compose chạy demo trên một máy chủ. Hoãn Kafka, dịch vụ Notification/Reporting độc lập và saga đặt trước tồn kho phân tán. MinIO AIStor Free là kho đối tượng lab một nút được chọn. AI là tùy chọn, chỉ cung cấp gợi ý do điều phối viên rà soát.
+Cơ sở đề xuất là **NestJS/TypeScript + TypeORM + PostgreSQL/PostGIS + React/Vite + React Native/Expo**, với ba dịch vụ: Identity, Response và Logistics. REST xử lý thao tác tức thời; mỗi dịch vụ sở hữu cơ sở dữ liệu và báo cáo riêng; Logistics liên kết cam kết cứu trợ một phần với ID yêu cầu không hàm nghĩa. Compose chạy demo trên một máy chủ. Hoãn Kafka, dịch vụ Notification/Reporting độc lập và saga đặt trước tồn kho phân tán. MinIO Community là kho đối tượng lab một nút được chọn. AI là tùy chọn, chỉ cung cấp gợi ý do điều phối viên rà soát.
 
 Cơ sở này cùng Mục 22 hỗ trợ triển khai backend tăng dần. Các bổ sung quy trình là đề xuất tham khảo từ nền tảng nhân đạo và mô hình đồ án tương tự, không phải chính sách ứng phó khẩn cấp chính thức. Mỗi lát vẫn cần hợp đồng API/dữ liệu được rà soát và bằng chứng chấp nhận đã thực hiện trước khi gọi là hoàn tất.
 
@@ -1338,8 +1338,6 @@ Cơ sở này cùng Mục 22 hỗ trợ triển khai backend tăng dần. Các b
 - [Rà soát/kiểm duyệt dữ liệu đầu vào Ushahidi](https://docs.ushahidi.com/platform-user-manual/6.-managing-data-in-your-deployment)
 - [Tìm kiếm đã lưu trong Ushahidi](https://docs.ushahidi.com/platform-user-manual/7.-analysing-data-on-your-deployment/7.1-saved-searches)
 - [Trạng thái repository MinIO Community](https://github.com/minio/minio)
-- [Thỏa thuận MinIO AIStor Free](https://www.min.io/legal/aistor-free-agreement)
-- [Giới hạn tính năng và vận hành giấy phép MinIO AIStor](https://docs.min.io/aistor/operations/licenses/)
 - [S3 client AWS SDK for JavaScript v3](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/)
 - [Cách hoạt động URL ký sẵn Amazon S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
 - [Hướng dẫn tải tệp OWASP](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
@@ -1353,7 +1351,7 @@ Cơ sở này cùng Mục 22 hỗ trợ triển khai backend tăng dần. Các b
 
 ### Ghi chú nghiên cứu
 
-- Nghiên cứu ban đầu thực hiện ngày 2026-09-29; so sánh framework NestJS và quyết định MinIO AIStor Free được kiểm tra với nguồn chính đã liên kết vào ngày 2026-09-30. Phiên bản, lịch hỗ trợ, API, điều khoản giấy phép và trạng thái dự án có thể thay đổi. Trước khi triển khai cần kiểm tra lại tính tương thích bản phát hành và điều khoản AIStor hiện hành.
+- Nghiên cứu ban đầu thực hiện ngày 2026-09-29; so sánh framework NestJS và quyết định MinIO được kiểm tra lần đầu với nguồn chính đã liên kết vào ngày 2026-09-30. Phiên bản, lịch hỗ trợ, API, điều khoản giấy phép và trạng thái dự án có thể thay đổi. Trước khi triển khai cần kiểm tra lại tính tương thích bản phát hành; lựa chọn kho lưu trữ được sửa thành MinIO Community ngày 2026-10-27.
 - NestJS/TypeScript được chọn sau khi so sánh định tính với Spring Boot, Django/DRF, FastAPI và Flask. Đây không phải benchmark hiệu năng; cần xác nhận mức độ quen thuộc của nhóm trong giai đoạn thiết lập.
 
 ## 22. Cơ sở triển khai backend do một người phụ trách
@@ -1466,7 +1464,7 @@ Các ca dự kiến này mở rộng ID hiện tại mà không đánh số lạ
 
 Repository hiện chỉ có tài liệu. Chỉnh sửa kế hoạch này không xác nhận đã có workspace NestJS, migration, artifact OpenAPI, dịch vụ đang chạy hay kiểm thử sản phẩm đã thực hiện. Mục 22 thống nhất các bất nhất thiết kế và xác định đường triển khai; đó không phải bằng chứng backend đang hoạt động.
 
-Trước khi thiết lập, xác minh tương thích runtime/image/client bằng nguồn chính và gói/giấy phép AIStor hiện hành. Mục 23 chốt phương thức truyền xác thực, seal giải quyết, quy tắc số lượng, phạm vi tài sản/media, giới hạn tệp và mục tiêu hiệu năng bằng số. Trước tích hợp, chuyển quyết định thành OpenAPI/migration có phiên bản; trước nghiệm thu, ghi cấu hình máy thực tế và kết quả đã chạy. Nhà cung cấp bản đồ/push/email/LLM bên ngoài vẫn chưa được chọn. Ưu tiên/SLA chính thức, thời hạn lưu, quyền riêng tư dữ liệu thật và policy cơ quan ứng phó cần được xác nhận riêng trước triển khai thực tế. Các giới hạn này không cản trở những lát demo tổng hợp độc lập.
+Trước khi thiết lập, xác minh tương thích runtime/image/client bằng nguồn chính. Mục 23 chốt phương thức truyền xác thực, seal giải quyết, quy tắc số lượng, phạm vi tài sản/media, giới hạn tệp và mục tiêu hiệu năng bằng số. Trước tích hợp, chuyển quyết định thành OpenAPI/migration có phiên bản; trước nghiệm thu, ghi cấu hình máy thực tế và kết quả đã chạy. Nhà cung cấp bản đồ/push/email/LLM bên ngoài vẫn chưa được chọn. Ưu tiên/SLA chính thức, thời hạn lưu, quyền riêng tư dữ liệu thật và policy cơ quan ứng phó cần được xác nhận riêng trước triển khai thực tế. Các giới hạn này không cản trở những lát demo tổng hợp độc lập.
 
 ## 23. Quyết định sau rà soát kiến trúc — 2026-10-01
 
@@ -1525,7 +1523,7 @@ Bộ dữ liệu hiệu năng: 10.000 yêu cầu lưu tổng hợp trên các kh
 
 Node 24 LTS là baseline setup; cố định patch còn được hỗ trợ, phiên bản Nest/TypeORM tương thích và digest image PostgreSQL/PostGIS chính xác sau thử nghiệm tương thích migration/truy vấn không gian/khóa/OpenAPI. Chọn CommonJS và Jest theo hướng kiểm thử đã ghi nhận; xác minh với major Nest được chọn. Tài liệu Nest hiện hành phân biệt yêu cầu runtime của ứng dụng và CLI. [Các bản Node](https://nodejs.org/en/about/previous-releases), [Hướng dẫn chuyển phiên bản Nest](https://docs.nestjs.com/migration-guide).
 
-Giữ MinIO AIStor Free như lựa chọn. Trước nghiệm thu, xác minh giấy phép Free thực tế, S3 đọc/ghi, policy riêng tư và phục hồi cô lập; license Free hiện tại ghi không hết hạn, không nên nhầm với bản dùng thử. Gói Free vẫn thiếu mã hóa dữ liệu lưu trữ/HA/SLA của MinIO. [Thông tin license AIStor](https://docs.min.io/aistor/reference/cli/mc-license/mc-license-info/), [Giới hạn license AIStor](https://docs.min.io/aistor/operations/licenses/). Mua sắm dịch vụ bản đồ/nhà cung cấp và policy dữ liệu thật là các cổng riêng; push/email/LLM tùy chọn không cần cho demo cốt lõi. AI vẫn tắt cho đến khi đạt cổng hợp đồng/đánh giá riêng.
+Giữ MinIO Community như lựa chọn (sửa ngày 2026-10-27). S3 đọc/ghi, policy riêng tư theo từng dịch vụ và chặn truy cập chéo bucket đã được xác minh trên stack chính ngày 2026-10-27; phục hồi cô lập vẫn cần kiểm tra trước nghiệm thu. Không có mã hóa dữ liệu lưu trữ/HA/SLA và upstream đã lưu trữ. Mua sắm dịch vụ bản đồ/nhà cung cấp và policy dữ liệu thật là các cổng riêng; push/email/LLM tùy chọn không cần cho demo cốt lõi. AI vẫn tắt cho đến khi đạt cổng hợp đồng/đánh giá riêng.
 
 ### 23.7. Ca chấp nhận dự kiến bổ sung
 
@@ -1566,7 +1564,7 @@ Cổng lát ở Mục 22.5 còn cần TC-BE-20 cho Identity; TC-BE-17/18/19/21/2
 | R-02 | SRS/SDD/ca kiểm thử/hướng dẫn người dùng chưa tách thành tài liệu riêng | Cao / Cao | Tạo SRS/SDD từ kế hoạch này; giữ ID; Mục 7, 9, 13 ánh xạ trực tiếp sang SRS; Mục 5, 6, 10, 22, 23 sang SDD | Cả nhóm |
 | R-03 | Thiết kế ba dịch vụ và giao thức seal/intent (Mục 23.2) là phần phức tạp nhất; dễ có lỗi | Trung bình / Cao | Triển khai/kiểm thử TC-BE-17/18 sớm trên PostgreSQL thật. Seal là phạm vi được bảo vệ: kiểm tra rồi ghi (đọc nhu cầu mở, sau đó ghi RESOLVED) **không tương đương**, vì Logistics có thể tạo need giữa lúc đọc và ghi, nên không được chấp nhận làm phương án dự phòng. Nếu thiếu thời gian, cắt phạm vi khác trước theo thứ tự Mục 16; chỉ khi vẫn không hoàn thiện seal mới tắt lệnh RESOLVE cho yêu cầu có need Logistics liên kết (cắt tính năng, ghi là giới hạn), đồng thời sửa FR-REQ-09, TC-BE-17/18, kịch bản demo và nội dung bảo vệ. Không bao giờ tuyên bố có tính nguyên tử phân tán | Người phụ trách backend |
 | R-04 | Chưa xác minh hành vi TypeORM + PostGIS + khóa dòng | Trung bình / Cao | Thử nghiệm tương thích một ngày trước Lát 1 (migration geometry, ST_DWithin, SELECT FOR UPDATE, kiểm thử đồng thời); chỉ đổi ORM nếu thử nghiệm thất bại | Người phụ trách backend |
-| R-05 | Chưa xác minh license, artifact, hành vi S3 và phục hồi MinIO AIStor Free | Trung bình / Trung bình | Trước khi dùng, kiểm tra điều khoản hiện hành từ nguồn chính; viết qua S3 client để có thể thay kho; giữ phương án cục bộ dự phòng cho phát triển; không phân phối lại binary | Người phụ trách backend |
+| R-05 | MinIO Community đã lưu trữ upstream (không có bản vá), không có image chính thức, chưa xác minh phục hồi | Trung bình / Trung bình | Build từ source tag upstream đã ghim; viết qua S3 client để có thể thay kho; chỉ dùng dữ liệu tổng hợp, cổng loopback; không phân phối lại image | Người phụ trách backend |
 | R-06 | Chưa chọn nhà cung cấp bản đồ/tile | Trung bình / Trung bình | Chọn trước lát bản đồ điều phối viên; adapter giúp thay lựa chọn được | Người phụ trách Web |
 | R-07 | Taxonomy ưu tiên, quy tắc xác minh/đóng là đề xuất nhóm, không phải policy cơ quan cứu hộ | Cao / Trung bình | Nêu rõ điều này; nếu có thể thì phỏng vấn/khảo sát người có chuyên môn; giữ mọi nhãn có thể cấu hình và ở trạng thái “dự thảo” | Cả nhóm |
 | R-08 | SOS khách có thể dẫn đến spam/báo cáo độc hại | Trung bình / Trung bình | Giới hạn tần suất, xác thực nghiêm, cổng xác minh, hash tracking secret client tạo; chỉ thêm captcha nếu quan sát thấy lạm dụng; quota upload khách thấp hơn | Người phụ trách backend |
@@ -1789,7 +1787,7 @@ Các cổng triển khai còn lại: schema/ràng buộc chính xác, tiêu chí
 
 Cơ sở kỹ thuật hiện tại là NestJS/TypeScript, ba dịch vụ (Identity, Response, Logistics), REST/JSON, TypeORM, PostgreSQL/PostGIS, React/Vite và React Native/Expo. Mục 4 ghi lý do chọn/phương án thay thế. Đề cương dự án xác định phạm vi; lựa chọn công nghệ là quyết định thiết kế, không phải yêu cầu do đề cương áp đặt.
 
-Nginx và ba ranh giới dịch vụ NestJS là cơ sở đang dùng. MinIO AIStor Free là kho đối tượng lab một nút đã chọn; mỗi người vận hành phải tự nhận/dùng theo điều khoản hiện hành, nhóm phải xác minh artifact, truy cập riêng và đường phục hồi. AI vẫn tùy chọn. Quy tắc nghiệp vụ dự thảo, mục tiêu số và policy nhà cung cấp/lưu giữ còn mở ở chỗ được đánh dấu.
+Nginx và ba ranh giới dịch vụ NestJS là cơ sở đang dùng. MinIO Community build từ source upstream là kho đối tượng lab một nút đã chọn; nhóm phải xác minh đường phục hồi. AI vẫn tùy chọn. Quy tắc nghiệp vụ dự thảo, mục tiêu số và policy nhà cung cấp/lưu giữ còn mở ở chỗ được đánh dấu.
 
 Dùng cơ sở đã ghi cho triển khai. Chỉ xem xét lại khi có bằng chứng mới làm thay đổi đáng kể đánh đổi, thay vì liên tục mở lại quyết định đã chốt. Ghi nhận quyết định mới và chỉ hỏi thông tin/ủy quyền thực sự còn thiếu cho phần việc liên quan. Có thể tự xử lý lựa chọn triển khai thông thường, đảo ngược được, bằng giả định đã ghi.
 

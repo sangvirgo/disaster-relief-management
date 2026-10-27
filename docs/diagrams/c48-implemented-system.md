@@ -40,7 +40,7 @@ flowchart LR
     IdentityDB[("c48_identity")]
     ResponseDB[("c48_response")]
     LogisticsDB[("c48_logistics")]
-    MinIO[("MinIO AIStor<br/>optional evidence storage")]
+    MinIO[("MinIO Community<br/>optional evidence storage")]
 
     PostgreSQL --- IdentityDB
     PostgreSQL --- ResponseDB

@@ -569,7 +569,7 @@ export interface paths {
         put?: never;
         /**
          * Resend the email verification code.
-         * @description Route exported from backend/apps/identity/src/auth/auth.controller.ts#AuthController.resendEmailOtp. Detailed request, response, and error contract: docs/backend/02-identity-api.md. This export does not infer payload schemas.
+         * @description Rotates the challenge after the resend cooldown while the registration is still live. The new code expires after five minutes or at the original ten-minute registration deadline, whichever comes first. Unknown or expired requests return no usable challenge.
          */
         post: operations["identityAuthResendEmailOtp"];
         delete?: never;
@@ -589,7 +589,7 @@ export interface paths {
         put?: never;
         /**
          * Verify a citizen email address.
-         * @description Route exported from backend/apps/identity/src/auth/auth.controller.ts#AuthController.verifyEmail. Detailed request, response, and error contract: docs/backend/02-identity-api.md. This export does not infer payload schemas.
+         * @description A valid unconsumed code creates the account and CITIZEN grant in one transaction. Expired registration requests and expired, wrong or consumed codes never activate an account. Username/email conflicts are checked against existing accounts at verification time.
          */
         post: operations["identityAuthVerifyEmail"];
         delete?: never;
@@ -1062,6 +1062,15 @@ export interface operations {
             409: {
                 headers: {
                     "Cache-Control": components["headers"]["CacheControlNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            410: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {
@@ -2906,7 +2915,25 @@ export interface operations {
                 };
             };
             /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

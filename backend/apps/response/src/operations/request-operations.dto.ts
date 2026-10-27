@@ -165,7 +165,7 @@ export class SupplementReviewDto extends RequestVersionDto {
   declare source_note?: string;
 }
 
-export class AiAdvisoryReviewDto {
+export class AiAdvisoryReviewDto extends RequestVersionDto {
   @IsIn(['ACCEPTED', 'ADJUSTED', 'REJECTED'])
   decision!: 'ACCEPTED' | 'ADJUSTED' | 'REJECTED';
 

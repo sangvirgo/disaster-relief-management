@@ -335,7 +335,7 @@ try {
       actor: donor, file: png, idempotencyKey: key(),
     });
     if (evidence.status === 503 && evidence.value?.code === 'STORAGE_UNAVAILABLE') {
-      throw new Error('Logistics T12 attachment integration returned STORAGE_UNAVAILABLE; verify AIStor configuration/availability and the attachment READY update');
+      throw new Error('Logistics T12 attachment integration returned STORAGE_UNAVAILABLE; verify MinIO configuration/availability and the attachment READY update');
     }
     expectSuccess(evidence, 201);
     assert.equal(evidence.value.state, 'READY');

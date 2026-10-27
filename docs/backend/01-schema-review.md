@@ -73,7 +73,7 @@ Indexes deliberately **not** created: `assistance_request(status)` alone (low se
 - **Warehouse depth (plan §R-18).** The schema keeps every table the core flows need. Cut candidates, all isolated: `donation_dispute` (+ attachment owner), `handoff_record.kind IN (POINT_RECEIPT, HOUSEHOLD_HANDOUT)` custody, two-person approval of direct campaign distributions. Removing them deletes tables/endpoints without touching others.
 - **Projection for the heatmap** (EPSG:32648 assumed, correct for ~102–108°E; Da Nang and east coast fall in zone 49 → EPSG:32649). Decide with the region seed.
 - **Retention/erasure** of phones, names, locations and evidence (plan R-13); no column is added for it until a policy exists.
-- **PII at rest:** the database holds phones in clear text; MinIO AIStor Free has no encryption at rest. Use disk-level encryption on the demo host and say so.
+- **PII at rest:** the database holds phones in clear text; MinIO Community has no encryption at rest. Use disk-level encryption on the demo host and say so.
 
 ## 6. Round 2 — four independent reviewers (2026-10-07)
 

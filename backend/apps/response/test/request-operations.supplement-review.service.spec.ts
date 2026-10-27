@@ -29,6 +29,7 @@ function fixture(options: { locked?: boolean; nextRegion?: string | null; region
       if (sql.includes("event_type='REPORTER_SUPPLEMENT'")) return [{ id: eventId, payload: { pending_review: true, reported_facts: reported } }];
       if (sql.includes("event_type='SUPPLEMENT_REVIEW'")) return [];
       if (sql.includes('FROM region_boundary')) return options.nextRegion === null ? [] : [{ region_code: options.nextRegion ?? 'DEMO_A' }];
+      if (sql.includes('SELECT r.version')) return [{ version: 5, workCycle: 1, incidentCategoryCode: 'FLOOD', description: row.description, reporterDeclaredDanger: true, needsRescue: true, needsReliefSupplies: false, peopleAffected: null, childrenCount: null, elderlyCount: null }];
       if (sql.includes('FROM assistance_request r JOIN request_subject')) return [{ ...row, longitude: 106.6, latitude: 10.76 }];
       if (sql.includes('INSERT INTO request_event')) return [{ id: reviewId }];
       if (sql.includes('UPDATE assistance_request')) return [[{ status: row.status, version: 5, verification_revision: reviewId }], 1];
@@ -70,6 +71,7 @@ describe('supplement review attribution', () => {
     expect(subjectUpdate?.[1]?.slice(5, 9)).toEqual([true, 106.7, 10.77, 'MANUAL_PIN']);
     const requestUpdate = manager.query.mock.calls.find(([sql]) => sql.includes('UPDATE assistance_request'));
     expect(requestUpdate?.[1]?.slice(4, 10)).toEqual([true, true, true, 'DEMO_A', true, reviewId]);
+    expect(manager.query.mock.calls.some(([sql]) => sql.includes('INSERT INTO ai_advisory'))).toBe(true);
   });
 
   it('accepts a permitted region change before attribution is locked', async () => {

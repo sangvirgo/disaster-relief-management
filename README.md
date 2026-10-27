@@ -120,7 +120,7 @@ Each NestJS service owns its database, credentials, migrations, and business rec
 | Web | React, TypeScript, Vite |
 | Mobile | React Native, Expo, TypeScript |
 | Ingress and local stack | Nginx and Docker Compose |
-| Evidence storage | MinIO AIStor Free, selected for a single-node academic lab, subject to its license and tier limits |
+| Evidence storage | MinIO Community built from the upstream source tag, single-node academic lab, no license needed |
 | Optional AI provider | Gemini, with schema-constrained output and coordinator review |
 
 NestJS/TypeScript was selected after comparison with Spring Boot, Django REST Framework, FastAPI, and Flask. The shared TypeScript stack supports the backend and clients; PostgreSQL/PostGIS provides relational transactions and spatial queries. These are design choices for the project, not requirements from the original brief.
@@ -186,7 +186,7 @@ Load synthetic demo data from `backend/`:
 docker compose --profile seed up seed
 ```
 
-On empty databases, the seed job loads the full fixtures. On populated databases, it adds deterministic demo users, regions, campaigns, teams, reports, and relief records with insert-only statements. It does not reset existing data. The optional `storage` profile requires a separately obtained AIStor Free license; see [technology plan §6.3](docs/c48-technology-and-delivery-plan.md#63-gps-and-evidence-files).
+On empty databases, the seed job loads the full fixtures. On populated databases, it adds deterministic demo users, regions, campaigns, teams, reports, and relief records with insert-only statements. It does not reset existing data. The optional `storage` profile builds MinIO Community locally and needs no license; see [technology plan §6.3](docs/c48-technology-and-delivery-plan.md#63-gps-and-evidence-files).
 
 Do not use `docker compose down -v`. For an intentional demo reset, use only `bash scripts/db/reset-demo --reset` or `bash scripts/db/test-db --reset` from `backend/`; these reset only PostgreSQL data and preserve MinIO data and its objects.
 

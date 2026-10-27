@@ -12270,41 +12270,222 @@
     },
     "/requests/{id}/ai-advisories/{advisoryId}/review": {
       "post": {
-        "operationId": "responseRequestOperationsReviewAiAdvisory",
-        "summary": "Record a human decision on an AI advisory.",
-        "description": "Accepts, adjusts or rejects a completed advisory and appends a staff timeline event. It does not modify SOS facts, official priority, or team assignment. An ADJUSTED decision requires a note.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/RequestId"
-          },
-          {
-            "name": "advisoryId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
+          "operationId": "responseRequestOperationsReviewAiAdvisory",
+          "summary": "Record a human decision on an AI advisory.",
+          "description": "Accepts, adjusts or rejects a completed advisory and appends a staff timeline event. The advisory must still match the current SOS facts and expected_version; stale decisions return VERSION_CONFLICT. It does not modify SOS facts, official priority, or team assignment. An ADJUSTED decision requires a note.",
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/RequestId"
+            },
+            {
+              "name": "advisoryId",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            {
+              "$ref": "#/components/parameters/IdempotencyKey"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Documented response shape.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "request_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "advisory_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "decision": {
+                        "type": "string",
+                        "enum": [
+                          "ACCEPTED",
+                          "ADJUSTED",
+                          "REJECTED"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "request_id",
+                      "advisory_id",
+                      "decision"
+                    ]
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "VALIDATION_FAILED": {
+                      "summary": "VALIDATION_FAILED",
+                      "value": {
+                        "code": "VALIDATION_FAILED",
+                        "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "IDEMPOTENCY_KEY_INVALID": {
+                      "summary": "IDEMPOTENCY_KEY_INVALID",
+                      "value": {
+                        "code": "IDEMPOTENCY_KEY_INVALID",
+                        "message": "Mã yêu cầu không hợp lệ.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "NOT_FOUND": {
+                      "summary": "NOT_FOUND",
+                      "value": {
+                        "code": "NOT_FOUND",
+                        "message": "Không tìm thấy dữ liệu yêu cầu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "STATE_TRANSITION_INVALID": {
+                      "summary": "STATE_TRANSITION_INVALID",
+                      "value": {
+                        "code": "STATE_TRANSITION_INVALID",
+                        "message": "Trạng thái hiện tại không cho phép thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "IDEMPOTENCY_KEY_REUSED": {
+                      "summary": "IDEMPOTENCY_KEY_REUSED",
+                      "value": {
+                        "code": "IDEMPOTENCY_KEY_REUSED",
+                        "message": "Mã yêu cầu đã được dùng cho nội dung khác.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "VERSION_CONFLICT": {
+                      "summary": "VERSION_CONFLICT",
+                      "value": {
+                        "code": "VERSION_CONFLICT",
+                        "message": "Dữ liệu đã được cập nhật. Vui lòng tải lại trước khi tiếp tục.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
             }
           },
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Documented response shape.",
+          "x-c48-contract-source": "docs/backend/03-response-api.md",
+          "x-c48-controller-source": "backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.reviewAiAdvisory",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": [],
+              "CsrfToken": []
+            }
+          ],
+          "requestBody": {
+            "required": true,
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "request_id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "advisory_id": {
-                      "type": "string",
-                      "format": "uuid"
+                    "expected_version": {
+                      "type": "integer",
+                      "minimum": 1
                     },
                     "decision": {
                       "type": "string",
@@ -12313,189 +12494,21 @@
                         "ADJUSTED",
                         "REJECTED"
                       ]
+                    },
+                    "note": {
+                      "type": "string",
+                      "maxLength": 1000
                     }
                   },
                   "required": [
-                    "request_id",
-                    "advisory_id",
+                    "expected_version",
                     "decision"
                   ]
                 }
               }
             }
-          },
-          "400": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "VALIDATION_FAILED": {
-                    "summary": "VALIDATION_FAILED",
-                    "value": {
-                      "code": "VALIDATION_FAILED",
-                      "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "IDEMPOTENCY_KEY_INVALID": {
-                    "summary": "IDEMPOTENCY_KEY_INVALID",
-                    "value": {
-                      "code": "IDEMPOTENCY_KEY_INVALID",
-                      "message": "Mã yêu cầu không hợp lệ.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "CSRF_INVALID": {
-                    "summary": "CSRF_INVALID",
-                    "value": {
-                      "code": "CSRF_INVALID",
-                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "NOT_FOUND": {
-                    "summary": "NOT_FOUND",
-                    "value": {
-                      "code": "NOT_FOUND",
-                      "message": "Không tìm thấy dữ liệu yêu cầu.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "STATE_TRANSITION_INVALID": {
-                    "summary": "STATE_TRANSITION_INVALID",
-                    "value": {
-                      "code": "STATE_TRANSITION_INVALID",
-                      "message": "Trạng thái hiện tại không cho phép thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "IDEMPOTENCY_KEY_REUSED": {
-                    "summary": "IDEMPOTENCY_KEY_REUSED",
-                    "value": {
-                      "code": "IDEMPOTENCY_KEY_REUSED",
-                      "message": "Mã yêu cầu đã được dùng cho nội dung khác.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-c48-contract-source": "docs/backend/03-response-api.md",
-        "x-c48-controller-source": "backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.reviewAiAdvisory",
-        "security": [
-          {
-            "NativeBearer": []
-          },
-          {
-            "WebAccessCookie": [],
-            "CsrfToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "decision": {
-                    "type": "string",
-                    "enum": [
-                      "ACCEPTED",
-                      "ADJUSTED",
-                      "REJECTED"
-                    ]
-                  },
-                  "note": {
-                    "type": "string",
-                    "maxLength": 1000
-                  }
-                },
-                "required": [
-                  "decision"
-                ]
-              }
-            }
           }
         }
-      }
     },
     "/requests/{id}/report": {
       "put": {
@@ -13336,108 +13349,277 @@
         }
       },
       "RequestQueueItem": {
-        "type": "object",
-        "required": [
-          "id",
-          "tracking_code",
-          "status",
-          "review_lane",
-          "category",
-          "received_at",
-          "declared_danger",
-          "overdue",
-          "approx_location",
-          "staff_flags"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "tracking_code": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "priority": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "P1",
-              "P2",
-              "P3",
-              "P4",
-              null
-            ]
-          },
-          "review_lane": {
-            "type": "string",
-            "enum": [
-              "NORMAL",
-              "RATE_LIMITED_REVIEW",
-              "PROXY_QUOTA_REVIEW"
-            ]
-          },
-          "category": {
-            "type": "string"
-          },
-          "people_affected": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "region_code": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "received_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "declared_danger": {
-            "type": "boolean"
-          },
-          "overdue": {
-            "type": "boolean"
-          },
-          "reporter_contact_phone": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Masked phone only."
-          },
-          "approx_location": {
-            "type": "object",
-            "required": [
-              "longitude",
-              "latitude"
-            ],
-            "properties": {
-              "longitude": {
-                "type": "number"
-              },
-              "latitude": {
-                "type": "number"
-              }
-            },
-            "additionalProperties": false
-          },
-          "staff_flags": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "additionalProperties": false
-      },
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "tracking_code",
+                              "status",
+                              "review_lane",
+                              "category",
+                              "received_at",
+                              "declared_danger",
+                              "overdue",
+                              "approx_location",
+                              "staff_flags",
+                              "priority_advisory",
+                              "ai_priority_advisory"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "tracking_code": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "priority": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "enum": [
+                                  "P1",
+                                  "P2",
+                                  "P3",
+                                  "P4",
+                                  null
+                                ]
+                              },
+                              "review_lane": {
+                                "type": "string",
+                                "enum": [
+                                  "NORMAL",
+                                  "RATE_LIMITED_REVIEW",
+                                  "PROXY_QUOTA_REVIEW"
+                                ]
+                              },
+                              "category": {
+                                "type": "string"
+                              },
+                              "people_affected": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "region_code": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "received_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "declared_danger": {
+                                "type": "boolean"
+                              },
+                              "overdue": {
+                                "type": "boolean"
+                              },
+                              "reporter_contact_phone": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "Masked phone only."
+                              },
+                              "approx_location": {
+                                "type": "object",
+                                "required": [
+                                  "longitude",
+                                  "latitude"
+                                ],
+                                "properties": {
+                                  "longitude": {
+                                    "type": "number"
+                                  },
+                                  "latitude": {
+                                    "type": "number"
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "staff_flags": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "priority_advisory": {
+                                "type": "object",
+                                "properties": {
+                                  "outcome": {
+                                    "type": "string",
+                                    "enum": [
+                                      "SUGGESTION",
+                                      "INSUFFICIENT_DATA"
+                                    ]
+                                  },
+                                  "score": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 100
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "level": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "CRITICAL",
+                                          "HIGH",
+                                          "ELEVATED",
+                                          "STANDARD"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "reason_codes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "source": {
+                                    "type": "string",
+                                    "const": "BACKEND_RULES"
+                                  },
+                                  "rules_version": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "outcome",
+                                  "score",
+                                  "level",
+                                  "reason_codes",
+                                  "source",
+                                  "rules_version"
+                                ]
+                              },
+                              "ai_priority_advisory": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "status": {
+                                        "type": "string",
+                                        "enum": [
+                                          "QUEUED",
+                                          "PROCESSING",
+                                          "COMPLETED",
+                                          "SKIPPED",
+                                          "FAILED",
+                                          "STALE",
+                                          "UNKNOWN"
+                                        ]
+                                      },
+                                      "score": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "level": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "CRITICAL",
+                                              "HIGH",
+                                              "ELEVATED",
+                                              "STANDARD"
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "reasons": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "confidence": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "maximum": 1
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "source": {
+                                        "type": "string",
+                                        "enum": [
+                                          "GEMINI",
+                                          "DEMO_FIXTURE"
+                                        ]
+                                      },
+                                      "human_review_required": {
+                                        "type": "boolean",
+                                        "const": true
+                                      },
+                                      "review_status": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "ACCEPTED",
+                                              "ADJUSTED",
+                                              "REJECTED"
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "status",
+                                      "score",
+                                      "level",
+                                      "reasons",
+                                      "confidence",
+                                      "source",
+                                      "human_review_required",
+                                      "review_status"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          },
       "RequestQueuePage": {
         "type": "object",
         "required": [
@@ -13534,7 +13716,9 @@
                                 "subject",
                                 "timeline",
                                 "contact_attempts",
-                                "proxy_activity_flags"
+                                "proxy_activity_flags",
+                                "priority_advisory",
+                                "ai_priority_advisory"
                               ],
                               "properties": {
                                 "id": {
@@ -13894,7 +14078,8 @@
                                             "PROCESSING",
                                             "COMPLETED",
                                             "FAILED",
-                                            "SKIPPED"
+                                            "SKIPPED",
+                                            "STALE"
                                           ]
                                         },
                                         "risk_score": {
@@ -13971,6 +14156,173 @@
                                         "reason_codes",
                                         "human_review_required"
                                       ]
+                                    }
+                                  ]
+                                },
+                                "priority_advisory": {
+                                  "type": "object",
+                                  "properties": {
+                                    "outcome": {
+                                      "type": "string",
+                                      "enum": [
+                                        "SUGGESTION",
+                                        "INSUFFICIENT_DATA"
+                                      ]
+                                    },
+                                    "score": {
+                                      "anyOf": [
+                                        {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 100
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "level": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "CRITICAL",
+                                            "HIGH",
+                                            "ELEVATED",
+                                            "STANDARD"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "reason_codes": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "source": {
+                                      "type": "string",
+                                      "const": "BACKEND_RULES"
+                                    },
+                                    "rules_version": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "outcome",
+                                    "score",
+                                    "level",
+                                    "reason_codes",
+                                    "source",
+                                    "rules_version"
+                                  ]
+                                },
+                                "ai_priority_advisory": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "QUEUED",
+                                            "PROCESSING",
+                                            "COMPLETED",
+                                            "SKIPPED",
+                                            "FAILED",
+                                            "STALE",
+                                            "UNKNOWN"
+                                          ]
+                                        },
+                                        "score": {
+                                          "anyOf": [
+                                            {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 100
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "level": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "enum": [
+                                                "CRITICAL",
+                                                "HIGH",
+                                                "ELEVATED",
+                                                "STANDARD"
+                                              ]
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "reasons": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "confidence": {
+                                          "anyOf": [
+                                            {
+                                              "type": "number",
+                                              "minimum": 0,
+                                              "maximum": 1
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "source": {
+                                          "type": "string",
+                                          "enum": [
+                                            "GEMINI",
+                                            "DEMO_FIXTURE"
+                                          ]
+                                        },
+                                        "human_review_required": {
+                                          "type": "boolean",
+                                          "const": true
+                                        },
+                                        "review_status": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "enum": [
+                                                "ACCEPTED",
+                                                "ADJUSTED",
+                                                "REJECTED"
+                                              ]
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "status",
+                                        "score",
+                                        "level",
+                                        "reasons",
+                                        "confidence",
+                                        "source",
+                                        "human_review_required",
+                                        "review_status"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
                                     }
                                   ]
                                 }

@@ -1294,3 +1294,23 @@ test('Logistics audit OpenAPI records its DTO constraints and validation error',
   assert.deepEqual(successSchema(logistics, operation).required, ['items', 'next_cursor']);
   assert.equal(operation.responses['400'].content['application/json'].examples.VALIDATION_FAILED.value.code, 'VALIDATION_FAILED');
 });
+
+test('Response advisory contracts allow insufficient evidence and reject stale reviews', () => {
+  const response = exportService('response').document;
+  const detail = response.components.schemas.StaffRequestDetail.properties;
+  const rules = detail.priority_advisory;
+  const aiPriority = detail.ai_priority_advisory.anyOf.find((variant) => variant.type === 'object');
+  const aiRecord = detail.ai_advisory.anyOf.find((variant) => variant.type === 'object');
+
+  assert.deepEqual(rules.properties.outcome.enum, ['SUGGESTION', 'INSUFFICIENT_DATA']);
+  assert.ok(rules.properties.score.anyOf.some((variant) => variant.type === 'null'));
+  assert.ok(rules.properties.level.anyOf.some((variant) => variant.type === 'null'));
+  assert.ok(aiPriority.properties.status.enum.includes('STALE'));
+  assert.ok(aiRecord.properties.status.enum.includes('STALE'));
+
+  const review = operationById(response, 'responseRequestOperationsReviewAiAdvisory');
+  const body = review.requestBody.content['application/json'].schema;
+  assert.ok(body.required.includes('expected_version'));
+  assert.equal(body.properties.expected_version.minimum, 1);
+  assert.ok(review.responses['409']?.content?.['application/json']?.examples?.VERSION_CONFLICT);
+});
