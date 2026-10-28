@@ -13,7 +13,7 @@
       "get": {
         "operationId": "listRequestQueue",
         "summary": "List scoped coordinator requests",
-        "description": "Defaults to the NORMAL lane, except overdue=true without an explicit review_lane includes all lanes. Queue coordinates are rounded to about 100 m and phone numbers are masked.",
+        "description": "Defaults to the NORMAL lane, except overdue=true without an explicit review_lane includes all lanes. Requests are ordered by newest received first. Queue coordinates are rounded to about 100 m and phone numbers are masked.",
         "tags": [
           "Request operations"
         ],
