@@ -537,33 +537,39 @@ export function Volunteer({ page }: { page: string }) {
                 <div className="detail-grid mission-facts">
                   <p>
                     <strong>Tên đội</strong>
-                    <br />
-                    {selectedTeam.name}
+                    <span className="detail-value">
+                      {selectedTeam.name}
+                    </span>
                   </p>
                   <p>
                     <strong>Loại đội</strong>
-                    <br />
-                    {label(selectedTeam.kind)}
+                    <span className="detail-value">
+                      {label(selectedTeam.kind)}
+                    </span>
                   </p>
                   <p>
                     <strong>Tính khả dụng</strong>
-                    <br />
-                    {label(selectedTeam.availability)}
+                    <span className="detail-value">
+                      {label(selectedTeam.availability)}
+                    </span>
                   </p>
                   <p>
                     <strong>Chế độ báo cáo</strong>
-                    <br />
-                    {label(selectedTeam.reporting_mode)}
+                    <span className="detail-value">
+                      {label(selectedTeam.reporting_mode)}
+                    </span>
                   </p>
                   <p>
                     <strong>Trạng thái</strong>
-                    <br />
-                    {label(selectedTeam.status)}
+                    <span className="detail-value">
+                      {label(selectedTeam.status)}
+                    </span>
                   </p>
                   <p>
                     <strong>Phiên bản</strong>
-                    <br />
-                    {selectedTeam.version}
+                    <span className="detail-value">
+                      {selectedTeam.version}
+                    </span>
                   </p>
                 </div>
 
@@ -639,33 +645,39 @@ export function Volunteer({ page }: { page: string }) {
                 <div className="detail-grid mission-facts">
                   <p>
                     <strong>Đội thực hiện</strong>
-                    <br />
-                    {activeMission.team.name}
+                    <span className="detail-value">
+                      {activeMission.team.name}
+                    </span>
                   </p>
                   <p>
                     <strong>Trạng thái</strong>
-                    <br />
-                    <span className="chip">{label(activeMission.status)}</span>
+                    <span className="detail-value">
+                      <span className="chip">{label(activeMission.status)}</span>
+                    </span>
                   </p>
                   <p>
                     <strong>Loại sự cố</strong>
-                    <br />
-                    {label(activeMission.category)}
+                    <span className="detail-value">
+                      {label(activeMission.category)}
+                    </span>
                   </p>
                   <p>
                     <strong>Số người cần cứu</strong>
-                    <br />
-                    {activeMission.people_affected ?? 'Chưa rõ'}
+                    <span className="detail-value">
+                      {activeMission.people_affected ?? 'Chưa rõ'}
+                    </span>
                   </p>
                   <p>
                     <strong>Thời điểm giao</strong>
-                    <br />
-                    {timeLabel(activeMission.created_at)}
+                    <span className="detail-value">
+                      {timeLabel(activeMission.created_at)}
+                    </span>
                   </p>
                   <p>
                     <strong>Phiên bản</strong>
-                    <br />
-                    {activeMission.version}
+                    <span className="detail-value">
+                      {activeMission.version}
+                    </span>
                   </p>
                 </div>
 

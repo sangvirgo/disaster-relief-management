@@ -17,13 +17,6 @@ type QueueItem = {
   declared_danger: boolean;
   people_affected?: number | null;
   region_code?: string | null;
-  priority_advisory?: {
-    score: number;
-    level: 'CRITICAL' | 'HIGH' | 'ELEVATED' | 'STANDARD';
-    reason_codes: string[];
-    source: 'BACKEND_RULES';
-    rules_version: string;
-  };
 };
 type Queue = { items: QueueItem[]; cursor?: string; more: boolean; generated_at: string };
 type Event = {
@@ -165,16 +158,9 @@ const advisoryReasonLabels: Record<string, string> = {
   FLOOD_OR_TRAPPED: 'Có dấu hiệu ngập lụt hoặc mắc kẹt',
   CHILDREN_PRESENT: 'Có trẻ em',
   ELDERLY_PRESENT: 'Có người cao tuổi',
-  LARGE_GROUP_AFFECTED: 'Có nhiều người cần hỗ trợ',
   INJURY_OR_MEDICAL: 'Có dấu hiệu chấn thương hoặc cần cấp cứu',
   RESCUE_REQUESTED: 'Có yêu cầu cứu hộ',
   RELIEF_SUPPLIES_ONLY: 'Chỉ yêu cầu hàng cứu trợ',
-};
-const advisoryLevelLabels: Record<string, string> = {
-  CRITICAL: 'Rất khẩn cấp',
-  HIGH: 'Nguy cơ cao',
-  ELEVATED: 'Cần ưu tiên rà soát',
-  STANDARD: 'Theo dõi thông thường',
 };
 const advisoryReviewLabels: Record<string, string> = {
   ACCEPTED: 'Ghi nhận',
@@ -358,6 +344,14 @@ export function Coordinator({ page }: { page: string }) {
       setAiReviewBusy(false);
     }
   }
+  const aiFacts = detail?.ai_advisory?.extracted_json?.facts;
+  const aiNeedsMismatch = Boolean(
+    detail &&
+      ((typeof aiFacts?.needs_rescue === 'boolean' &&
+        aiFacts.needs_rescue !== detail.needs_rescue) ||
+        (typeof aiFacts?.needs_relief_supplies === 'boolean' &&
+          aiFacts.needs_relief_supplies !== detail.needs_relief_supplies))
+  );
   return (
     <div className="coordinator-layout">
       <section className="card">
@@ -447,13 +441,6 @@ export function Coordinator({ page }: { page: string }) {
                     <small>
                       {label(item.category)} · {timeLabel(item.received_at)}
                     </small>
-                    {item.priority_advisory && (
-                      <small>
-                        Gợi ý theo quy tắc: {advisoryLevelLabels[item.priority_advisory.level]} ·{' '}
-                        {item.priority_advisory.score}/100
-                      </small>
-                    )}
-                    {item.declared_danger && <small>Có khai báo nguy hiểm tính mạng</small>}
                   </span>
                   <span className="chip">
                     {label(item.status)}
@@ -498,105 +485,123 @@ export function Coordinator({ page }: { page: string }) {
             <div className="detail-grid">
               <p>
                 <strong>Mã</strong>
-                <br />
-                {detail.tracking_code}
+                <span className="detail-value">
+                  {detail.tracking_code}
+                </span>
               </p>
               <p>
                 <strong>Trạng thái</strong>
-                <br />
-                {label(detail.status)}
+                <span className="detail-value">
+                  {label(detail.status)}
+                </span>
               </p>
               <p>
                 <strong>Loại sự cố</strong>
-                <br />
-                {label(detail.category)}
+                <span className="detail-value">
+                  {label(detail.category)}
+                </span>
               </p>
               <p>
                 <strong>Ưu tiên</strong>
-                <br />
-                {detail.priority || 'Chưa quyết định'}
+                <span className="detail-value">
+                  {detail.priority || 'Chưa quyết định'}
+                </span>
               </p>
               <p>
                 <strong>Hình thức gửi</strong>
-                <br />
-                {detail.report_mode === 'PROXY'
-                  ? 'Báo hộ người ở nơi khác'
-                  : 'Báo cho bản thân hoặc gia đình'}
+                <span className="detail-value">
+                  {detail.report_mode === 'PROXY'
+                    ? 'Báo hộ người ở nơi khác'
+                    : 'Báo cho bản thân hoặc gia đình'}
+                </span>
               </p>
               <p>
                 <strong>Người cần hỗ trợ</strong>
-                <br />
-                {detail.subject.people_affected ?? 'Chưa rõ'} người
+                <span className="detail-value">
+                  {detail.subject.people_affected ?? 'Chưa rõ'} người
+                </span>
               </p>
               <p>
                 <strong>Trẻ em / người cao tuổi</strong>
-                <br />
-                {detail.subject.children_count ?? 0} trẻ em · {detail.subject.elderly_count ?? 0}{' '}
-                người cao tuổi
+                <span className="detail-value">
+                  {detail.subject.children_count ?? 0} trẻ em · {detail.subject.elderly_count ?? 0}{' '}
+                  người cao tuổi
+                </span>
               </p>
               <p>
                 <strong>Nhu cầu</strong>
-                <br />
-                {[
-                  ...(detail.needs_rescue ? ['Cứu hộ'] : []),
-                  ...(detail.needs_relief_supplies ? ['Hàng cứu trợ'] : []),
-                ].join(' · ') || 'Chưa khai báo'}
+                <span className="detail-value">
+                  {[
+                    ...(detail.needs_rescue ? ['Cứu hộ'] : []),
+                    ...(detail.needs_relief_supplies ? ['Hàng cứu trợ'] : []),
+                  ].join(' · ') || 'Chưa khai báo'}
+                </span>
               </p>
               <p>
                 <strong>Người báo</strong>
-                <br />
-                {detail.reporter.name || 'Chưa có tên'}
+                <span className="detail-value">
+                  {detail.reporter.name || 'Chưa có tên'}
+                </span>
               </p>
               <p>
                 <strong>Liên hệ</strong>
-                <br />
-                {detail.reporter.contact_phone || 'Chưa có số liên hệ'}
+                <span className="detail-value">
+                  {detail.reporter.contact_phone || 'Chưa có số liên hệ'}
+                </span>
               </p>
               <p>
                 <strong>Vị trí</strong>
-                <br />
-                {detail.subject.location?.coordinates?.join(', ') || 'Chưa có tọa độ'}
+                <span className="detail-value">
+                  {detail.subject.location?.coordinates?.join(', ') || 'Chưa có tọa độ'}
+                </span>
               </p>
               <p>
                 <strong>Quan hệ với người cần hỗ trợ</strong>
-                <br />
-                {detail.subject.reporter_relationship || 'Tự báo / chưa ghi rõ'}
+                <span className="detail-value">
+                  {detail.subject.reporter_relationship || 'Tự báo / chưa ghi rõ'}
+                </span>
               </p>
               <p>
                 <strong>Số liên hệ người cần hỗ trợ</strong>
-                <br />
-                {detail.subject.beneficiary_contact_phone || 'Chưa có'}
+                <span className="detail-value">
+                  {detail.subject.beneficiary_contact_phone || 'Chưa có'}
+                </span>
               </p>
               <p>
                 <strong>Liên hệ thay thế</strong>
-                <br />
-                {[detail.subject.alternate_contact?.name, detail.subject.alternate_contact?.phone]
-                  .filter(Boolean)
-                  .join(' · ') || 'Chưa có'}
+                <span className="detail-value">
+                  {[detail.subject.alternate_contact?.name, detail.subject.alternate_contact?.phone]
+                    .filter(Boolean)
+                    .join(' · ') || 'Chưa có'}
+                </span>
               </p>
               <p>
                 <strong>Nguồn thông tin / khả năng liên lạc</strong>
-                <br />
-                {[detail.subject.information_source, detail.subject.contactability]
-                  .filter(Boolean)
-                  .join(' · ') || 'Chưa ghi rõ'}
+                <span className="detail-value">
+                  {[detail.subject.information_source, detail.subject.contactability]
+                    .filter(Boolean)
+                    .join(' · ') || 'Chưa ghi rõ'}
+                </span>
               </p>
               {detail.subject.last_known_situation_at && (
                 <p>
                   <strong>Thời điểm biết tình hình gần nhất</strong>
-                  <br />
-                  {timeLabel(detail.subject.last_known_situation_at)}
+                  <span className="detail-value">
+                    {timeLabel(detail.subject.last_known_situation_at)}
+                  </span>
                 </p>
               )}
               <p>
                 <strong>Phiên bản</strong>
-                <br />
-                {detail.version}
+                <span className="detail-value">
+                  {detail.version}
+                </span>
               </p>
               <p>
                 <strong>Chiến dịch</strong>
-                <br />
-                {detail.campaign_id ? detail.campaign_id.slice(0, 8) : 'Chưa gắn'}
+                <span className="detail-value">
+                  {detail.campaign_id ? detail.campaign_id.slice(0, 8) : 'Chưa gắn'}
+                </span>
               </p>
             </div>
             {detail.description && <p>{detail.description}</p>}
@@ -615,44 +620,27 @@ export function Coordinator({ page }: { page: string }) {
                 Có tín hiệu hoạt động báo hộ cần rà soát. Đây không phải kết luận gian lận.
               </p>
             )}
-            {detail.priority_advisory && (
-              <section className="notice warning">
-                <h3>Gợi ý ưu tiên theo quy tắc backend</h3>
-                <p>
-                  <strong>{advisoryLevelLabels[detail.priority_advisory.level]}</strong> ·{' '}
-                  {detail.priority_advisory.score}/100
-                </p>
-                <p>
-                  <strong>Dấu hiệu:</strong>{' '}
-                  {detail.priority_advisory.reason_codes
-                    .map((code) => advisoryReasonLabels[code] || 'Có dữ kiện cần rà soát')
-                    .join(' · ') || 'Chưa ghi nhận dấu hiệu theo bộ quy tắc.'}
-                </p>
-                <p>
-                  Đây là gợi ý từ dữ liệu SOS đã cung cấp, cần điều phối viên xác minh. Gợi ý không
-                  thay đổi mức ưu tiên P1–P4 và không tự giao đội. Nếu Gemini quá tải hoặc hết hạn
-                  mức, gợi ý quy tắc này vẫn hoạt động.
-                </p>
-                {detail.declared_danger && (
-                  <p>
-                    <strong>Cảnh báo riêng:</strong> người báo tin khai có nguy hiểm tính mạng; cần
-                    kiểm tra ngay. Cờ này không tự cộng điểm.
-                  </p>
-                )}
-              </section>
-            )}
             {detail.ai_advisory && (
               <section className="notice">
-                <h3>Trích xuất thông tin bằng Gemini</h3>
+                <h3>Gợi ý trích xuất và rủi ro từ AI</h3>
                 <p>
-                  Gemini chỉ hỗ trợ tóm tắt và trích xuất dữ kiện từ mô tả đã lọc thông tin nhận
-                  dạng. Điều phối viên cần đối chiếu với người báo tin.
+                  AI chỉ hỗ trợ tổng hợp thông tin. Điều phối viên phải tự xác minh; điểm này không
+                  thay thế mức ưu tiên P1–P4 và không tự giao đội.
                 </p>
                 <p>
                   <strong>Trạng thái:</strong> {label(detail.ai_advisory.status)}
                 </p>
                 {detail.ai_advisory.status === 'COMPLETED' && (
                   <>
+                    <p>
+                      <strong>Điểm rủi ro tham khảo:</strong> {detail.ai_advisory.risk_score}/100
+                    </p>
+                    <p>
+                      <strong>Dấu hiệu theo quy tắc:</strong>{' '}
+                      {detail.ai_advisory.reason_codes
+                        .map((code) => advisoryReasonLabels[code] || 'Có dấu hiệu cần rà soát')
+                        .join(' · ') || 'Không có'}
+                    </p>
                     {detail.ai_advisory.extracted_json?.summary && (
                       <p>
                         <strong>Tóm tắt:</strong> {detail.ai_advisory.extracted_json.summary}
@@ -682,6 +670,12 @@ export function Coordinator({ page }: { page: string }) {
                           ))}
                       </div>
                     )}
+                    {aiNeedsMismatch && (
+                      <p role="status">
+                        <strong>Cần đối chiếu:</strong> AI ghi nhận nhu cầu cứu hộ hoặc hàng cứu trợ
+                        khác với phần người báo đã chọn. Giữ dữ liệu gốc và xác minh trước khi quyết định.
+                      </p>
+                    )}
                     <p>
                       <strong>Độ tin cậy mô hình tự báo cáo:</strong>{' '}
                       {Math.round((detail.ai_advisory.extracted_json?.confidence ?? 0) * 100)}% (chỉ
@@ -697,9 +691,10 @@ export function Coordinator({ page }: { page: string }) {
                       </p>
                     ) : (
                       <div>
-                        <label className="field">
+                        <label className="ai-review-note">
                           <span>Ghi chú khi điều chỉnh hoặc bác bỏ</span>
                           <textarea
+                            rows={4}
                             value={aiReviewNote}
                             onChange={(event) => setAiReviewNote(event.target.value)}
                             maxLength={1000}
@@ -734,8 +729,7 @@ export function Coordinator({ page }: { page: string }) {
                 )}
                 {['FAILED', 'SKIPPED'].includes(detail.ai_advisory.status) && (
                   <p>
-                    Gemini chưa trả kết quả cho mô tả này. Gợi ý theo quy tắc backend vẫn hiển thị ở
-                    mục trên; hãy tiếp tục xác minh thủ công.
+                    Không có kết quả AI cho mô tả này. Hãy tiếp tục quy trình xác minh thủ công.
                   </p>
                 )}
               </section>
@@ -1044,6 +1038,12 @@ export function Coordinator({ page }: { page: string }) {
                     </p>
                   )}
                   {!candidates && !candidateError && <p role="status">Đang tải đội phù hợp…</p>}
+                  {candidates?.items.length === 0 && (
+                    <p role="status">
+                      Hiện chưa có đội đủ điều kiện để giao yêu cầu này. Kiểm tra trạng thái và thời
+                      điểm cập nhật vị trí của đội.
+                    </p>
+                  )}
                   {candidates?.items.map((candidate) => (
                     <div className="candidate" key={candidate.team.id}>
                       <strong>{candidate.team.name}</strong>

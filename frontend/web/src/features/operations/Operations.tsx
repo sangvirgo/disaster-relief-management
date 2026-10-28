@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import { roles, type Me } from '../../auth/session';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { label, timeLabel } from '../../i18n/labels';
+import { formatQuantity } from '../../i18n/quantity';
 import { ReceiptCountForm } from './ReceiptCountForm';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { DetailCloseButton } from '../../components/DetailCloseButton';
@@ -49,7 +50,7 @@ const headings: Record<string, string> = {
 };
 const string = (value: unknown) => (typeof value === 'string' ? value : '');
 const number = (value: unknown) => (typeof value === 'number' ? value : undefined);
-const quantity = (value: unknown) => (value == null ? '—' : String(value));
+const quantity = formatQuantity;
 const distributionPages = new Set(['distribution', 'handoff']);
 function recordTitle(page: string, item: Row): string {
   if (distributionPages.has(page))
@@ -148,7 +149,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     };
   }, [path, ready, revision]);
   useEffect(() => {
-    if (!selected?.id) {
+    if (!selected) {
       setDetail(null);
       return;
     }
@@ -159,7 +160,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         ? selected.receipt_id
           ? `/donation-receipts/${selected.receipt_id}`
           : ''
-        : page === 'distribution' || page === 'handoff'
+        : (page === 'distribution' || page === 'handoff') && selected.id
           ? `/distributions/${selected.id}`
           : '';
     if (!detailPath) {
@@ -479,7 +480,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         )}
         <h2>
           {selected
-            ? 'Chi tiết và thao tác'
+            ? page === 'stock'
+              ? 'Chi tiết tồn kho'
+              : 'Chi tiết và thao tác'
             : ['drives', 'needs', 'assets', 'distribution'].includes(page)
               ? 'Tạo bản ghi'
               : 'Thông tin theo phạm vi'}
@@ -488,93 +491,145 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         {detail && (
           <>
             <div className="detail-grid">
+              {page === 'stock' && (
+                <>
+                  <p>
+                    <strong>Vật phẩm</strong>
+                    <span className="detail-value">
+                      {string(detail.item_name) || 'Chưa có tên'}
+                    </span>
+                  </p>
+                  <p>
+                    <strong>Đơn vị</strong>
+                    <span className="detail-value">
+                      {string(detail.unit) || string(detail.unit_code) || 'Chưa có'}
+                    </span>
+                  </p>
+                </>
+              )}
               {page === 'assets' && asset === 'vehicles' && Boolean(detail.identifier) && (
                 <p>
                   <strong>Biển số hoặc mã xe</strong>
-                  <br />
-                  {string(detail.identifier)}
+                  <span className="detail-value">
+                    {string(detail.identifier)}
+                  </span>
                 </p>
               )}
               {distributionPages.has(page) && Boolean(detail.purpose) && (
                 <p>
                   <strong>Mục đích phân phối</strong>
-                  <br />
-                  {label(detail.purpose)}
+                  <span className="detail-value">
+                    {label(detail.purpose)}
+                  </span>
                 </p>
               )}
               <p>
                 <strong>
                   {distributionPages.has(page)
                     ? 'Mã phiếu phân phối'
+                    : page === 'stock'
+                      ? 'Mã dòng tồn kho'
                     : page === 'intake'
                       ? 'Mã tiếp nhận'
                       : 'Mã bản ghi'}
                 </strong>
-                <br />
-                {string(selected?.id || selected?.balance_id || selected?.warehouse_id) ||
-                  'Không có mã riêng'}
+                <span className="detail-value">
+                  {string(selected?.id || selected?.balance_id || selected?.warehouse_id) ||
+                    'Không có mã riêng'}
+                </span>
               </p>
               {status && (
                 <p>
                   <strong>Trạng thái</strong>
-                  <br />
-                  {label(status)}
+                  <span className="detail-value">
+                    {label(status)}
+                  </span>
                 </p>
               )}
               {version != null && (
                 <p>
                   <strong>Phiên bản</strong>
-                  <br />
-                  {version}
+                  <span className="detail-value">
+                    {version}
+                  </span>
                 </p>
               )}
               {Boolean(detail.intake_warehouse_id) && (
                 <p>
                   <strong>Kho tiếp nhận</strong>
-                  <br />
-                  {string(detail.intake_warehouse_id)}
+                  <span className="detail-value">
+                    {string(detail.intake_warehouse_id)}
+                  </span>
                 </p>
               )}
               {Boolean(detail.warehouse_id) && (
                 <p>
                   <strong>Kho</strong>
-                  <br />
-                  {string(detail.warehouse_id)}
+                  <span className="detail-value">
+                    {string(detail.warehouse_id)}
+                  </span>
                 </p>
               )}
               {Boolean(detail.public_code) && (
                 <p>
                   <strong>Mã công khai</strong>
-                  <br />
-                  {string(detail.public_code)}
+                  <span className="detail-value">
+                    {string(detail.public_code)}
+                  </span>
                 </p>
               )}
-              {detail.on_hand != null && (
+              {page === 'stock' && detail.on_hand != null && (
+                <>
+                  <p>
+                    <strong>Tồn thực tế</strong>
+                    <span className="detail-value">
+                      {quantity(detail.on_hand)}
+                    </span>
+                  </p>
+                  <p>
+                    <strong>Đã giữ</strong>
+                    <span className="detail-value">
+                      {quantity(detail.reserved)}
+                    </span>
+                  </p>
+                  <p>
+                    <strong>Khả dụng</strong>
+                    <span className="detail-value">
+                      {quantity(detail.available)}
+                    </span>
+                  </p>
+                </>
+              )}
+              {page !== 'stock' && detail.on_hand != null && (
                 <p>
                   <strong>Tồn khả dụng</strong>
-                  <br />
-                  {quantity(detail.available)} / {quantity(detail.on_hand)}
+                  <span className="detail-value">
+                    {quantity(detail.available)} / {quantity(detail.on_hand)}
+                  </span>
                 </p>
               )}
               {detail.held != null && (
                 <p>
                   <strong>Tạm giữ</strong>
-                  <br />
-                  {quantity(detail.held)}
+                  <span className="detail-value">
+                    {quantity(detail.held)}
+                  </span>
                 </p>
               )}
               {detail.in_transit != null && (
                 <p>
                   <strong>Đang vận chuyển</strong>
-                  <br />
-                  {quantity(detail.in_transit)}
+                  <span className="detail-value">
+                    {quantity(detail.in_transit)}
+                  </span>
                 </p>
               )}
               {detail.delivered != null && (
                 <p>
                   <strong>Đã giao</strong>
-                  <br />
-                  {quantity(detail.delivered)}
+                  <span className="detail-value">
+                    {quantity(detail.delivered)}
+                  </span>
                 </p>
               )}
             </div>
@@ -863,13 +918,20 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     (rights.has('DISTRIBUTION_STAFF') ||
                       rights.has('INTAKE_STAFF') ||
                       rights.has('OPERATIONS_MANAGER')) &&
-                    command({
-                      title: 'Chuẩn bị từ cam kết',
-                      service: 'logistics',
-                      path: `/distributions/${id}/prepare-from-commitments`,
-                      version,
-                      warning: 'Thay thế các dòng phiếu bằng cam kết hiện có?',
-                    })}
+                    <>
+                      <p>
+                        Thao tác này lấy mọi cam kết còn hiệu lực trong cùng kho và tổ chức, kể cả
+                        cam kết của yêu cầu SOS khác. Kiểm tra các dòng hàng trước khi duyệt.
+                      </p>
+                      {command({
+                        title: 'Chuẩn bị từ cam kết',
+                        service: 'logistics',
+                        path: `/distributions/${id}/prepare-from-commitments`,
+                        version,
+                        warning:
+                          'Thay các dòng phiếu bằng mọi cam kết còn hiệu lực trong cùng kho và tổ chức, kể cả từ SOS khác?',
+                      })}
+                    </>}
                   {['DRAFT', 'APPROVED'].includes(status) &&
                     (detail.preparer_user_id === user.id || detail.approver_user_id === user.id) &&
                     command({

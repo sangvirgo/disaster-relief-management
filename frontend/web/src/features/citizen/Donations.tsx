@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
 import { label } from '../../i18n/labels';
+import { formatQuantity } from '../../i18n/quantity';
 import type { Me } from '../../auth/session';
 
 type DriveItem = {
@@ -442,7 +443,7 @@ export function Donations({
             <h3>Đã khai báo</h3>
             {tracking.declaration?.lines.map((line, i) => (
               <p key={i}>
-                {line.item_name}: {line.declared_quantity} {line.unit_name}
+                {line.item_name}: {formatQuantity(line.declared_quantity)} {line.unit_name}
               </p>
             ))}
             {tracking.receipt ? (
@@ -450,8 +451,10 @@ export function Donations({
                 <h3>Kết quả kiểm đếm và duyệt</h3>
                 {tracking.receipt.lines.map((line, i) => (
                   <p key={i}>
-                    Dòng {i + 1}: đã đếm {line.counted_quantity}, chấp nhận {line.accepted_quantity}
-                    , tạm giữ {line.held_quantity}, từ chối {line.rejected_quantity}
+                    Dòng {i + 1}: đã đếm {formatQuantity(line.counted_quantity)}, chấp nhận{' '}
+                    {formatQuantity(line.accepted_quantity)}, tạm giữ{' '}
+                    {formatQuantity(line.held_quantity)}, từ chối{' '}
+                    {formatQuantity(line.rejected_quantity)}
                   </p>
                 ))}
               </>
@@ -469,7 +472,7 @@ export function Donations({
             ) : (
               <p>Chưa có khiếu nại.</p>
             )}
-            <form className="form-stack" onSubmit={dispute}>
+            <form className="form-stack donation-dispute-form" onSubmit={dispute}>
               <label>
                 Nội dung cần rà soát
                 <textarea
@@ -481,14 +484,15 @@ export function Donations({
                   }}
                 />
               </label>
-              <button className="button secondary" disabled={loading}>
+              <button className="button donation-action" disabled={loading}>
                 Gửi khiếu nại
               </button>
             </form>
-            <form className="form-stack" onSubmit={attach}>
+            <form className="form-stack donation-evidence-form" onSubmit={attach}>
               <label>
                 Minh chứng riêng tư (JPEG, PNG hoặc MP4)
                 <input
+                  className="donation-file-input"
                   type="file"
                   required
                   accept="image/jpeg,image/png,video/mp4"
@@ -498,7 +502,7 @@ export function Donations({
                   }}
                 />
               </label>
-              <button className="button secondary" disabled={loading || !file}>
+              <button className="button donation-action" disabled={loading || !file}>
                 Tải minh chứng lên
               </button>
             </form>
@@ -546,13 +550,14 @@ export function Donations({
           <label>
             Chọn tệp ảnh (JPEG, PNG hoặc MP4)
             <input
+              className="donation-file-input"
               type="file"
               required
               accept="image/jpeg,image/png,video/mp4"
               onChange={(e) => setCreatedFile(e.target.files?.[0] || null)}
             />
           </label>
-          <button className="button secondary" disabled={loading || !createdFile}>
+          <button className="button donation-action" disabled={loading || !createdFile}>
             Tải ảnh kiện hàng lên
           </button>
           {createdUploadMessage && (
@@ -676,8 +681,8 @@ export function Donations({
             <div>
               {selected.items.map((item) => (
                 <p key={item.item_id}>
-                  {item.item_name} · đã chấp nhận {item.accepted_total} {item.unit_name} / mục tiêu{' '}
-                  {item.target_quantity}
+                  {item.item_name} · đã chấp nhận {formatQuantity(item.accepted_total)}{' '}
+                  {item.unit_name} / mục tiêu {formatQuantity(item.target_quantity)}
                 </p>
               ))}
             </div>
