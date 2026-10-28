@@ -33,7 +33,7 @@ import { Admin } from './features/admin/Admin';
 import { Operations } from './features/operations/Operations';
 import { OperationsDashboard } from './features/operations/Dashboard';
 import { AnalyticsRegionField, useAnalyticsRegion } from './components/AnalyticsRegion';
-import { CitizenAccount } from './features/citizen/CitizenAccount';
+import { CitizenAccount, CitizenRequests } from './features/citizen/CitizenAccount';
 import type { components as ResponseComponents } from './api/generated/response';
 import './style.css';
 
@@ -568,6 +568,31 @@ function Tracking({ user, initialCode = '' }: { user: Me | null; initialCode?: s
   const [recoveryCode, setRecoveryCode] = useState('');
   const [recoveryMessage, setRecoveryMessage] = useState('');
   const recoveryKey = useRef<string | null>(null);
+  const [showLookupForm, setShowLookupForm] = useState(!Boolean(user && initialCode));
+  useEffect(() => {
+    if (!user || !initialCode.trim()) return;
+    let active = true;
+    const version = ++lookupVersion.current;
+    const credentials = { code: initialCode.trim(), secret: '' };
+    setBusy(true);
+    api<ResponseComponents['schemas']['ReporterTracking']>('response', '/requests/track', {
+      headers: { 'X-Tracking-Code': credentials.code },
+    })
+      .then((result) => {
+        if (!active || version !== lookupVersion.current) return;
+        setVerified(credentials);
+        setData(result);
+      })
+      .catch((cause) => {
+        if (!active || version !== lookupVersion.current) return;
+        setError(cause instanceof Error ? cause.message : 'Không thể tải tiến độ yêu cầu.');
+        setShowLookupForm(true);
+      })
+      .finally(() => {
+        if (active && version === lookupVersion.current) setBusy(false);
+      });
+    return () => { active = false; };
+  }, [initialCode, user?.id]);
   async function refreshTracking(credentials = verified) {
     if (!credentials) return;
     const version = lookupVersion.current;
@@ -636,13 +661,22 @@ function Tracking({ user, initialCode = '' }: { user: Me | null; initialCode?: s
   return (
     <div className="grid-two">
       <section className="card">
-        <h2>Tra cứu riêng tư</h2>
-        <p>
-          Mã theo dõi được máy chủ cấp sau khi nhận SOS. Nếu gửi khi chưa đăng nhập, bạn còn nhận
-          một mã bảo mật chỉ hiện một lần; hãy giữ riêng mã này để tra cứu. Nếu đã đăng nhập khi
-          gửi, hãy dùng tài khoản của mình và mã theo dõi.
-        </p>
-        <form onSubmit={lookup} className="form-stack">
+        {user && initialCode && !showLookupForm ? (
+          <>
+            <h2>Yêu cầu {initialCode}</h2>
+            <p>Tiến độ của SOS gắn với tài khoản được mở tự động, không cần nhập mã.</p>
+            <button className="button secondary" type="button" onClick={() => setShowLookupForm(true)}>
+              Tra cứu yêu cầu khác
+            </button>
+          </>
+        ) : (
+          <>
+          <h2>Tra cứu riêng tư</h2>
+          <p>
+            SOS gắn với tài khoản có trong mục Yêu cầu của tôi. Nếu gửi khi chưa đăng nhập, bạn cần
+            mã theo dõi và mã bảo mật đã nhận để tra cứu riêng tư.
+          </p>
+          <form onSubmit={lookup} className="form-stack">
           <label>
             Mã theo dõi
             <input
@@ -674,13 +708,15 @@ function Tracking({ user, initialCode = '' }: { user: Me | null; initialCode?: s
           <button className="button" disabled={busy}>
             {busy ? 'Đang tra cứu…' : 'Xem tiến độ'}
           </button>
-        </form>
+          </form>
+          </>
+        )}
         {error && (
           <p role="alert" className="notice error">
             {error}
           </p>
         )}
-        {user && (
+        {user && showLookupForm && (
           <form className="form-stack command-form" onSubmit={recover}>
             <h3>Khôi phục quyền theo dõi</h3>
             <p>
@@ -1205,7 +1241,14 @@ function App() {
   }
 
   function changePage(id: string) {
+    if (id === 'track') setSelectedTrackingCode('');
     setPageId(id);
+    setMenuOpen(false);
+  }
+
+  function trackOwnedRequest(code: string) {
+    setSelectedTrackingCode(code);
+    setPageId('track');
     setMenuOpen(false);
   }
 
@@ -1373,6 +1416,11 @@ function App() {
                       <button className="button secondary" onClick={() => changePage('track')}>
                         Theo dõi SOS
                       </button>
+                      {user && (
+                        <button className="button secondary" onClick={() => changePage('mine')}>
+                          Yêu cầu của tôi
+                        </button>
+                      )}
                       <button className="button secondary" onClick={() => changePage('drives')}>
                         Xem đợt quyên góp
                       </button>
@@ -1410,12 +1458,15 @@ function App() {
                 ) : workspace === 'citizen' && selected.id === 'account' && user ? (
                   <CitizenAccount
                     user={user}
-                    onTrack={(code) => {
-                      setSelectedTrackingCode(code);
-                      changePage('track');
-                    }}
+                    onTrack={trackOwnedRequest}
                     onChangePassword={() => setShowPasswordModal(true)}
                     onLogout={signOut}
+                  />
+                ) : workspace === 'citizen' && selected.id === 'mine' && user ? (
+                  <CitizenRequests
+                    user={user}
+                    onTrack={trackOwnedRequest}
+                    onNewSos={() => changePage('sos')}
                   />
                 ) : workspace === 'citizen' && selected.id === 'sos' ? (
                   <SosForm user={user} onConfirmed={setLatestReceipt} />

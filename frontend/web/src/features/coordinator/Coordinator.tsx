@@ -918,7 +918,7 @@ export function Coordinator({ page }: { page: string }) {
                   </p>
                 )}
                 {['FAILED', 'SKIPPED'].includes(detail.ai_priority_advisory.status) && (
-                  <p>Hãy tiếp tục xác minh với người báo và xử lý SOS theo quy trình thủ công.</p>
+                  <p>AI chưa đánh giá được yêu cầu này. Hãy kiểm tra thông tin SOS và xử lý theo quy trình thủ công.</p>
                 )}
                 {detail.ai_priority_advisory.status === 'COMPLETED' &&
                   detail.ai_priority_advisory.review_status !== 'REJECTED' &&
@@ -945,7 +945,7 @@ export function Coordinator({ page }: { page: string }) {
                 <p>
                   {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
                     ? 'Dữ liệu này dùng để minh họa và không phải phản hồi từ Gemini.'
-                    : 'AI chỉ nhận các thông tin đã chọn trong biểu mẫu. Nội dung mô tả, liên hệ, vị trí chính xác và tệp đính kèm không được gửi. Hãy đối chiếu với người báo trước khi sử dụng.'}
+                    : 'AI chỉ nhận các thông tin đã chọn trong biểu mẫu. Nội dung mô tả, liên hệ, vị trí chính xác và tệp đính kèm không được gửi. Hãy đối chiếu với hồ sơ SOS trước khi sử dụng.'}
                 </p>
                 <p>
                   <strong>Trạng thái:</strong>{' '}

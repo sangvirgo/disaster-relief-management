@@ -33,6 +33,14 @@ export const pages: Record<Workspace, Page[]> = {
     },
     { id: 'track', title: 'Theo dõi SOS', icon: 'track' },
     {
+      id: 'mine',
+      title: 'Yêu cầu của tôi',
+      icon: 'track',
+      service: 'response',
+      path: '/requests/mine',
+      note: 'Xem các SOS đã gắn với tài khoản và tiến độ xử lý, không cần nhập mã.',
+    },
+    {
       id: 'campaigns',
       title: 'Chiến dịch cứu trợ',
       icon: 'campaign',
@@ -253,7 +261,7 @@ export function allowedWorkspaces(user: Me | null): Workspace[] {
 export function allowedPages(workspace: Workspace, user: Me | null): Page[] {
   const r = roles(user);
   return pages[workspace].filter((page) => {
-    if (workspace === 'citizen') return page.id !== 'account' || !!user;
+    if (workspace === 'citizen') return !['account', 'mine'].includes(page.id) || !!user;
     if (workspace === 'volunteer') return r.has('VOLUNTEER');
     if (workspace === 'coordinator') return r.has('COORDINATOR');
     if (workspace === 'admin') return r.has('ADMIN');

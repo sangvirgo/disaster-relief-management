@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { api, newCommandKey, upload } from '../../api/client';
+import { api, ApiError, newCommandKey, upload } from '../../api/client';
 import { label, timeLabel } from '../../i18n/labels';
 import type { components as ResponseComponents } from '../../api/generated/response';
 import { googleMapsDirectionsUrl } from '../../maps/googleMaps';
@@ -43,6 +43,15 @@ function positionAge(ageSeconds: number): string {
   if (ageSeconds < 3600) return `${Math.max(1, Math.round(ageSeconds / 60))} phút`;
   if (ageSeconds < 86400) return `${Math.round(ageSeconds / 3600)} giờ`;
   return `${Math.round(ageSeconds / 86400)} ngày`;
+}
+
+function missionEvidenceError(file: File): string | null {
+  if (!['image/jpeg', 'image/png', 'video/mp4'].includes(file.type))
+    return 'Chỉ chọn ảnh JPEG, PNG hoặc video MP4.';
+  const limit = file.type === 'video/mp4' ? 50 : 10;
+  if (file.size > limit * 1024 * 1024)
+    return `${file.type === 'video/mp4' ? 'Video' : 'Ảnh'} phải có dung lượng không quá ${limit} MB.`;
+  return null;
 }
 
 export function Notices() {
@@ -178,6 +187,8 @@ export function Volunteer({ page }: { page: string }) {
   const [showCompleteForm, setShowCompleteForm] = useState(false);
   const [showFailForm, setShowFailForm] = useState(false);
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [completionFile, setCompletionFile] = useState<File | null>(null);
+  const [completionPreviewUrl, setCompletionPreviewUrl] = useState('');
   const [evidenceUrls, setEvidenceUrls] = useState<Record<string, string>>({});
 
   // Team management state
@@ -187,6 +198,15 @@ export function Volunteer({ page }: { page: string }) {
   const [teamMessage, setTeamMessage] = useState('');
 
   const commandKeyRef = useRef<string | null>(null);
+  const completionUploadKeyRef = useRef<{ file: File; key: string } | null>(null);
+  const completionFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!completionFile || !completionFile.type.startsWith('image/')) return;
+    const url = URL.createObjectURL(completionFile);
+    setCompletionPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [completionFile]);
 
   // Load list of missions or teams
   useEffect(() => {
@@ -252,6 +272,27 @@ export function Volunteer({ page }: { page: string }) {
     setProgressNote('');
     setOutcomeNote('');
     setEvidenceFile(null);
+    setCompletionFile(null);
+    setCompletionPreviewUrl('');
+    completionUploadKeyRef.current = null;
+    if (completionFileInputRef.current) completionFileInputRef.current.value = '';
+  }
+
+  function selectMission(mission: Mission) {
+    setSelectedMission(mission);
+    setMissionDetail(null);
+    setActionMessage('');
+    setShowDeclineForm(false);
+    setShowCompleteForm(false);
+    setShowFailForm(false);
+    setProgressNote('');
+    setOutcomeNote('');
+    setEvidenceFile(null);
+    setCompletionFile(null);
+    setCompletionPreviewUrl('');
+    completionUploadKeyRef.current = null;
+    if (completionFileInputRef.current) completionFileInputRef.current.value = '';
+    commandKeyRef.current = null;
   }
 
   // --- Mission Actions ---
@@ -305,6 +346,18 @@ export function Volunteer({ page }: { page: string }) {
     setBusy(true);
     setActionMessage('');
     try {
+      if (to === 'COMPLETED' && completionFile) {
+        const validationError = missionEvidenceError(completionFile);
+        if (validationError) {
+          setActionMessage(validationError);
+          return;
+        }
+        if (completionUploadKeyRef.current?.file !== completionFile)
+          completionUploadKeyRef.current = { file: completionFile, key: newCommandKey() };
+        await upload('response', `/missions/${mission.id}/evidence`, completionFile, {
+          idempotencyKey: completionUploadKeyRef.current.key,
+        });
+      }
       commandKeyRef.current ||= newCommandKey();
       const body: Record<string, unknown> = {
         expected_version: mission.version,
@@ -322,8 +375,16 @@ export function Volunteer({ page }: { page: string }) {
       setActionMessage(`Đã cập nhật tiến độ: ${label(to)}.`);
       refreshAll();
     } catch (cause) {
+      if (cause instanceof ApiError && cause.code === 'STORAGE_UNAVAILABLE')
+        completionUploadKeyRef.current = null;
+      if (cause instanceof ApiError && cause.code === 'VERSION_CONFLICT') {
+        commandKeyRef.current = null;
+        setRevision((value) => value + 1);
+      }
       setActionMessage(
-        cause instanceof Error ? cause.message : 'Không thể cập nhật tiến độ nhiệm vụ.'
+        cause instanceof Error
+          ? `${cause.message}${to === 'COMPLETED' && completionFile ? ' Tệp đã chọn vẫn được giữ; hãy thử lại hoặc bỏ tệp để báo cáo không kèm ảnh.' : ''}`
+          : 'Không thể cập nhật tiến độ nhiệm vụ.'
       );
     } finally {
       setBusy(false);
@@ -333,6 +394,11 @@ export function Volunteer({ page }: { page: string }) {
   async function uploadMissionEvidence(event: FormEvent, missionId: string) {
     event.preventDefault();
     if (!evidenceFile) return;
+    const validationError = missionEvidenceError(evidenceFile);
+    if (validationError) {
+      setActionMessage(validationError);
+      return;
+    }
     setBusy(true);
     setActionMessage('');
     try {
@@ -436,6 +502,8 @@ export function Volunteer({ page }: { page: string }) {
   }
 
   const activeMission = missionDetail || selectedMission;
+  const canManageMission = Boolean(selectedMission &&
+    Object.prototype.hasOwnProperty.call(selectedMission, 'reporter_contact_phone'));
   const directionsUrl = activeMission && googleMapsDirectionsUrl(activeMission.location);
 
   return (
@@ -496,7 +564,7 @@ export function Volunteer({ page }: { page: string }) {
                   className={`record ${selectedMission?.id === mission.id ? 'selected' : ''}`}
                   key={mission.id}
                   style={{ cursor: 'pointer' }}
-                  onClick={() => setSelectedMission(mission)}
+                  onClick={() => selectMission(mission)}
                 >
                   <div>
                     <strong>{mission.team.name}</strong>
@@ -512,7 +580,7 @@ export function Volunteer({ page }: { page: string }) {
                   <button
                     className="button secondary"
                     type="button"
-                    onClick={() => setSelectedMission(mission)}
+                    onClick={(event) => { event.stopPropagation(); selectMission(mission); }}
                   >
                     Xem nhiệm vụ
                   </button>
@@ -749,9 +817,14 @@ export function Volunteer({ page }: { page: string }) {
 
                 <hr />
                 <h3>Thao tác điều hành nhiệm vụ</h3>
+                {!canManageMission && (
+                  <p className="notice">
+                    Bạn có thể xem nhiệm vụ và minh chứng. Đội trưởng phụ trách tiếp nhận, cập nhật tiến độ và báo cáo kết quả.
+                  </p>
+                )}
 
                 {/* 1. Trạng thái OFFERED: Tiếp nhận hoặc Từ chối */}
-                {activeMission.status === 'OFFERED' && (
+                {canManageMission && activeMission.status === 'OFFERED' && (
                   <div className="action-grid">
                     <button
                       className="button"
@@ -770,7 +843,7 @@ export function Volunteer({ page }: { page: string }) {
                   </div>
                 )}
 
-                {showDeclineForm && activeMission.status === 'OFFERED' && (
+                {canManageMission && showDeclineForm && activeMission.status === 'OFFERED' && (
                   <form
                     className="form-stack command-form"
                     onSubmit={(e) => declineMission(e, activeMission)}
@@ -791,7 +864,7 @@ export function Volunteer({ page }: { page: string }) {
                 )}
 
                 {/* 2. Trạng thái ACCEPTED: Bắt đầu di chuyển */}
-                {activeMission.status === 'ACCEPTED' && (
+                {canManageMission && activeMission.status === 'ACCEPTED' && (
                   <div className="action-grid">
                     <button
                       className="button"
@@ -804,7 +877,7 @@ export function Volunteer({ page }: { page: string }) {
                 )}
 
                 {/* 3. Trạng thái EN_ROUTE: Đã tới hiện trường */}
-                {activeMission.status === 'EN_ROUTE' && (
+                {canManageMission && activeMission.status === 'EN_ROUTE' && (
                   <div className="action-grid">
                     <button
                       className="button"
@@ -817,7 +890,7 @@ export function Volunteer({ page }: { page: string }) {
                 )}
 
                 {/* 4. Trạng thái EN_ROUTE hoặc ON_SCENE: Hoàn thành hoặc Thất bại */}
-                {['EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) && (
+                {canManageMission && ['EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) && (
                   <div className="action-grid">
                     <button
                       className="button"
@@ -842,7 +915,7 @@ export function Volunteer({ page }: { page: string }) {
                   </div>
                 )}
 
-                {showCompleteForm && ['EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) && (
+                {canManageMission && showCompleteForm && ['EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) && (
                   <form
                     className="form-stack command-form"
                     onSubmit={(e) => {
@@ -854,18 +927,48 @@ export function Volunteer({ page }: { page: string }) {
                       Ghi chú kết quả cứu nạn (bắt buộc):
                       <textarea
                         required
+                        maxLength={2000}
                         value={outcomeNote}
                         onChange={(e) => setOutcomeNote(e.target.value)}
                         placeholder="Mô tả kết quả (số người đã giải cứu an toàn, tình trạng sức khỏe, nơi chuyển đến...)"
                       />
                     </label>
+                    <label>
+                      Ảnh hoặc video hiện trường (không bắt buộc)
+                      <input
+                        ref={completionFileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,video/mp4"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] || null;
+                          setCompletionFile(file);
+                          setCompletionPreviewUrl('');
+                          completionUploadKeyRef.current = null;
+                          setActionMessage(file ? missionEvidenceError(file) || '' : '');
+                        }}
+                      />
+                    </label>
+                    {completionFile && (
+                      <div className="mission-evidence-preview">
+                        {completionPreviewUrl && <img src={completionPreviewUrl} alt="Ảnh hiện trường đã chọn" />}
+                        <span>{completionFile.name} · {(completionFile.size / (1024 * 1024)).toFixed(1)} MB</span>
+                        <button className="button secondary" type="button" onClick={() => {
+                          setCompletionFile(null);
+                          setCompletionPreviewUrl('');
+                          completionUploadKeyRef.current = null;
+                          if (completionFileInputRef.current) completionFileInputRef.current.value = '';
+                          setActionMessage('');
+                        }}>Bỏ tệp</button>
+                      </div>
+                    )}
+                    <p className="account-hint">Nếu chọn tệp, Web sẽ tải minh chứng trước rồi mới ghi nhận hoàn thành. Ảnh tối đa 10 MB; video MP4 tối đa 50 MB.</p>
                     <button className="button" disabled={busy || !outcomeNote.trim()}>
                       Xác nhận hoàn thành giải cứu
                     </button>
                   </form>
                 )}
 
-                {showFailForm && ['EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) && (
+                {canManageMission && showFailForm && ['EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) && (
                   <form
                     className="form-stack command-form"
                     onSubmit={(e) => {
@@ -889,7 +992,7 @@ export function Volunteer({ page }: { page: string }) {
                 )}
 
                 {/* 5. Tải ảnh minh chứng hiện trường giải cứu lên MinIO */}
-                {['ACCEPTED', 'EN_ROUTE', 'ON_SCENE', 'COMPLETED'].includes(
+                {canManageMission && ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE', 'COMPLETED'].includes(
                   activeMission.status
                 ) && (
                   <form
