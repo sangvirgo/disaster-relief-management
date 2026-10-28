@@ -474,6 +474,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       {item.public_code ? ` · Mã ${item.public_code}` : ''}
                     </small>
                   )}
+                  {page === 'review' && reviewTab === 'disputes' && Boolean(item.reason) && (
+                    <small>{string(item.reason)}</small>
+                  )}
                   <small>
                     {page !== 'intake' && item.donor_name
                       ? `Người đóng góp: ${item.donor_name} · `
@@ -541,6 +544,24 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         {detail && (
           <>
             <div className="detail-grid">
+              {page === 'review' && reviewTab === 'disputes' && (
+                <>
+                  <p>
+                    <strong>Đợt quyên góp</strong>
+                    <span className="detail-value">{string(detail.drive_title) || 'Chưa rõ'}</span>
+                  </p>
+                  <p>
+                    <strong>Nội dung cần rà soát</strong>
+                    <span className="detail-value">{string(detail.reason) || 'Chưa có nội dung'}</span>
+                  </p>
+                  {Boolean(detail.resolution_note) && (
+                    <p>
+                      <strong>Kết quả xử lý</strong>
+                      <span className="detail-value">{string(detail.resolution_note)}</span>
+                    </p>
+                  )}
+                </>
+              )}
               {page === 'stock' && (
                 <>
                   <p>
