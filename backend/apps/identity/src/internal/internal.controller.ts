@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post
 import type { Request, Response } from 'express';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { InternalService } from './internal.service';
-import { ActiveUserCheckDto, IntrospectDto, LookupUsersDto, RegionLookupDto, RequestCoordinatorQueryDto, ServiceTokenDto, TeamLeaderEligibilityDto } from './internal.dto';
+import { ActiveUserCheckDto, IntrospectDto, LookupUsersDto, RegionLookupDto, RequestCoordinatorQueryDto, SearchActiveUsersDto, ServiceTokenDto, TeamLeaderEligibilityDto } from './internal.dto';
 import { AdminRequest, IdentityServiceGuard } from '../admin/admin-security';
 
 function noStore(response: Response): void {
@@ -34,6 +34,19 @@ export class InternalController {
   async lookupUsers(@Body() dto: LookupUsersDto, @Res({ passthrough: true }) response: Response): Promise<Record<string, unknown>> {
     noStore(response);
     return this.internalService.lookupUsers(dto.ids);
+  }
+
+  @Post('users\\:search')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(IdentityServiceGuard)
+  async searchActiveUsers(
+    @Body() dto: SearchActiveUsersDto,
+    @Req() request: AdminRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<Record<string, unknown>> {
+    noStore(response);
+    if (request.serviceCaller !== 'response') throw new AppError('FORBIDDEN', { status: 403 });
+    return this.internalService.searchActiveUsers(dto.query, dto.cursor, dto.limit);
   }
 
   @Post('users\\:check-active')

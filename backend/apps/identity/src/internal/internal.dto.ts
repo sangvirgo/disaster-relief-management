@@ -1,4 +1,5 @@
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { ServiceName } from '../auth/service-tokens';
 
 export class ServiceTokenDto {
@@ -30,6 +31,18 @@ export class LookupUsersDto {
   @ArrayMaxSize(100)
   @IsUUID('all', { each: true })
   ids!: string[];
+}
+
+export class SearchActiveUsersDto {
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @IsString() @MinLength(2) @MaxLength(64) @Matches(/\S/u)
+  query!: string;
+
+  @IsOptional() @IsString() @MaxLength(2_048)
+  cursor?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit?: number;
 }
 
 export class ActiveUserCheckDto {

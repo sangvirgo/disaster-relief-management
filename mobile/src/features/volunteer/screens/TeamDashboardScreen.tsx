@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
+import { TeamMembersSection } from '../components/TeamMembersSection';
 import { useAuthStore } from '../../../store/authStore';
 import { useLocation } from '../../../hooks/useLocation';
 import { ResponseApi } from '../../../api/responseApi';
@@ -424,6 +425,8 @@ export const TeamDashboardScreen: React.FC = () => {
             Quyền thay đổi trạng thái được kiểm tra theo vai trò và trạng thái thành viên hiện tại.
           </Text>
         </View>
+
+        <TeamMembersSection key={team.id} teamId={team.id} />
 
         {/* 2. TỌA ĐỘ VỊ TRÍ DI QUÂN CỦA ĐỘI */}
         <View style={styles.card}>

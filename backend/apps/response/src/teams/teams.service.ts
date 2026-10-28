@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Request } from 'express';
 import type { IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { AddTeamMemberDto, CreateTeamDto, SetTeamPositionDto, TeamPageQueryDto, TransferTeamLeaderDto, UpdateTeamDto } from './teams.dto';
+import { AddTeamMemberDto, CreateTeamDto, SetTeamPositionDto, TeamMemberCandidatesQueryDto, TeamMembersPageQueryDto, TeamPageQueryDto, TransferTeamLeaderDto, UpdateTeamDto } from './teams.dto';
 import { TeamsProfileService } from './teams-profile.service';
 import { TeamsPositionService } from './teams-position.service';
 import { TeamsQueriesService } from './teams-queries.service';
@@ -42,6 +42,14 @@ export class TeamsService {
 
   addMember(teamId: string, dto: AddTeamMemberDto, key: string, request: Request) {
     return this.membership.addMember(teamId, dto, key, request as Request & { idempotencyKey?: string });
+  }
+
+  listMembers(teamId: string, query: TeamMembersPageQueryDto, request: Request) {
+    return this.membership.listMembers(teamId, query, request);
+  }
+
+  listMemberCandidates(teamId: string, query: TeamMemberCandidatesQueryDto, request: Request) {
+    return this.membership.listMemberCandidates(teamId, query, request);
   }
 
   removeMember(teamId: string, userId: string, key: string, request: Request) {

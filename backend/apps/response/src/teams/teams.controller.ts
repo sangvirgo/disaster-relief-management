@@ -4,7 +4,7 @@ import {
 import type { Request, Response } from 'express';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
-import { AddTeamMemberDto, CreateTeamDto, SetTeamPositionDto, TeamPageQueryDto, TransferTeamLeaderDto, UpdateTeamDto } from './teams.dto';
+import { AddTeamMemberDto, CreateTeamDto, SetTeamPositionDto, TeamMemberCandidatesQueryDto, TeamMembersPageQueryDto, TeamPageQueryDto, TransferTeamLeaderDto, UpdateTeamDto } from './teams.dto';
 import { TeamsService } from './teams.service';
 
 type TeamRequest = Request & { idempotencyKey?: string };
@@ -67,6 +67,28 @@ export class TeamsController {
     const result = await this.teams.update(id, dto, key(request), request);
     replayHeader(response, result.replay);
     return result.value;
+  }
+
+  @Get('teams/:id/members')
+  async listMembers(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Query() query: TeamMembersPageQueryDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    return this.teams.listMembers(id, query, request);
+  }
+
+  @Get('teams/:id/member-candidates')
+  async listMemberCandidates(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Query() query: TeamMemberCandidatesQueryDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    return this.teams.listMemberCandidates(id, query, request);
   }
 
   @Post('teams/:id/members')

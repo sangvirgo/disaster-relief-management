@@ -14,6 +14,8 @@ import {
   EvidenceDownload,
   CollectionPage,
   PublicCampaign,
+  TeamMemberCandidate,
+  TeamMembersPage,
 } from '../types/api';
 import { generateUUID } from '../utils/secureStore';
 
@@ -423,5 +425,31 @@ export const ResponseApi = {
   async getTeamDetail(teamId: string): Promise<RescueTeamDetail> {
     const response = await apiClient.get<RescueTeamDetail>(`/response/teams/${teamId}`);
     return response.data;
+  },
+
+  async getTeamMembers(teamId: string, limit = 50, cursor?: string): Promise<TeamMembersPage> {
+    const response = await apiClient.get<TeamMembersPage>(`/response/teams/${teamId}/members`, {
+      params: { limit, ...(cursor ? { cursor } : {}) },
+    });
+    return response.data;
+  },
+
+  async searchTeamMemberCandidates(
+    teamId: string,
+    query: string,
+    limit = 50,
+    cursor?: string
+  ): Promise<CollectionPage<TeamMemberCandidate>> {
+    const response = await apiClient.get<CollectionPage<TeamMemberCandidate>>(
+      `/response/teams/${teamId}/member-candidates`,
+      { params: { query, limit, ...(cursor ? { cursor } : {}) } }
+    );
+    return response.data;
+  },
+
+  async addTeamMember(teamId: string, userId: string, idempotencyKey = generateUUID()): Promise<void> {
+    await apiClient.post(`/response/teams/${teamId}/members`, { user_id: userId }, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
   },
 };

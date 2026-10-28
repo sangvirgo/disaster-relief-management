@@ -5008,6 +5008,178 @@
           }
         }
       }
+    },
+    "/internal/users:search": {
+      "post": {
+        "operationId": "identityInternalSearchActiveUsers",
+        "summary": "Search active accounts for Response team membership.",
+        "description": "Restricted to the Response service token. Searches active accounts by username or display-name prefix and returns only the fields needed by the team member picker. Results use a filter-bound keyset cursor and are not cached.",
+        "responses": {
+          "200": {
+            "description": "Active account search results.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "display_name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "username",
+                          "display_name"
+                        ]
+                      }
+                    },
+                    "more": {
+                      "type": "boolean"
+                    },
+                    "cursor": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "more"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "CURSOR_INVALID": {
+                    "summary": "CURSOR_INVALID",
+                    "value": {
+                      "code": "CURSOR_INVALID",
+                      "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "VALIDATION_FAILED": {
+                    "summary": "VALIDATION_FAILED",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/02-identity-api.md",
+        "x-c48-controller-source": "backend/apps/identity/src/internal/internal.controller.ts#InternalController.searchActiveUsers",
+        "security": [
+          {
+            "IdentityServiceBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 64
+                  },
+                  "cursor": {
+                    "type": "string",
+                    "maxLength": 2048
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 50
+                  }
+                },
+                "required": [
+                  "query"
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
