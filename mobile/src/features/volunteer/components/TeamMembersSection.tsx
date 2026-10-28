@@ -14,20 +14,35 @@ import {
 } from 'react-native';
 import { ChevronDown, Plus, RefreshCw, Search, UserMinus, Users, X } from 'lucide-react-native';
 import { ResponseApi } from '../../../api/responseApi';
-import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
+import { getApiErrorMessage, isApiErrorCode, MobileApiError } from '../../../api/client';
 import type { TeamMember, TeamMemberCandidate, TeamMembersPage } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
+import type { TeamMembershipRole } from '../utils/teamMembershipRole';
 
 const roleLabels = { LEADER: 'Đội trưởng', MEMBER: 'Thành viên' } as const;
 
-export const TeamMembersSection: React.FC<{ teamId: string }> = ({ teamId }) => {
+interface TeamMembersSectionProps {
+  teamId: string;
+  currentUserId?: string;
+  currentUserRole: TeamMembershipRole;
+  onCurrentUserRole: (role: TeamMembershipRole) => void;
+}
+
+export const TeamMembersSection: React.FC<TeamMembersSectionProps> = ({
+  teamId,
+  currentUserId,
+  currentUserRole,
+  onCurrentUserRole,
+}) => {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [canManage, setCanManage] = useState(false);
+  const [memberPermissionsLoaded, setMemberPermissionsLoaded] = useState(false);
   const [membersMore, setMembersMore] = useState(false);
   const [membersCursor, setMembersCursor] = useState<string>();
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [loadingMoreMembers, setLoadingMoreMembers] = useState(false);
   const [membersError, setMembersError] = useState<string | null>(null);
+  const [membersErrorDiagnostic, setMembersErrorDiagnostic] = useState<string | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [query, setQuery] = useState('');
   const [searchRetry, setSearchRetry] = useState(0);
@@ -41,12 +56,37 @@ export const TeamMembersSection: React.FC<{ teamId: string }> = ({ teamId }) => 
   const [adding, setAdding] = useState(false);
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const searchSequence = useRef(0);
+  const canManageMembers = memberPermissionsLoaded
+    ? canManage
+    : currentUserRole !== 'MEMBER';
+
+  const reportCurrentUserRole = useCallback(async (initialPage: TeamMembersPage) => {
+    if (!currentUserId) {
+      onCurrentUserRole('UNKNOWN');
+      return;
+    }
+
+    let page = initialPage;
+    while (true) {
+      const currentMember = page.items.find((member) => member.user_id === currentUserId);
+      if (currentMember) {
+        onCurrentUserRole(currentMember.member_role);
+        return;
+      }
+      if (!page.more || !page.cursor) {
+        onCurrentUserRole('UNKNOWN');
+        return;
+      }
+      page = await ResponseApi.getTeamMembers(teamId, 100, page.cursor);
+    }
+  }, [currentUserId, onCurrentUserRole, teamId]);
 
   const loadMembers = useCallback(async (cursor?: string, append = false) => {
     if (append) setLoadingMoreMembers(true);
     else {
       setLoadingMembers(true);
       setMembersError(null);
+      setMembersErrorDiagnostic(null);
     }
     try {
       const page: TeamMembersPage = await ResponseApi.getTeamMembers(teamId, 50, cursor);
@@ -54,15 +94,38 @@ export const TeamMembersSection: React.FC<{ teamId: string }> = ({ teamId }) => 
         ? [...current, ...page.items.filter((item) => !current.some((old) => old.user_id === item.user_id))]
         : page.items);
       setCanManage(page.can_manage_members);
+      setMemberPermissionsLoaded(true);
       setMembersMore(page.more);
       setMembersCursor(page.cursor);
+      if (!append) {
+        void reportCurrentUserRole(page).catch(() => {
+          // Giữ vai trò chưa xác định nếu không đọc được các trang thành viên tiếp theo.
+        });
+      }
     } catch (error) {
-      if (!append) setMembersError(getApiErrorMessage(error, 'Không thể tải danh sách thành viên.'));
+      if (!append) {
+        if (__DEV__) {
+          const apiError = error instanceof MobileApiError ? error : undefined;
+          setMembersErrorDiagnostic([
+            `Mã lỗi: ${apiError?.code ?? 'UNKNOWN'}`,
+            apiError?.status ? `HTTP ${apiError.status}` : null,
+            apiError?.correlationId ? `Mã truy vết: ${apiError.correlationId}` : null,
+          ].filter(Boolean).join(' · '));
+          console.warn('[TEAM_MEMBERS_LIST_FAILED]', {
+            code: apiError?.code ?? 'UNKNOWN',
+            status: apiError?.status ?? null,
+            correlation_id: apiError?.correlationId ?? null,
+          });
+        }
+        setMembersError(isApiErrorCode(error, 'NOT_FOUND')
+          ? 'Chưa tải được danh sách thành viên của đội. Vui lòng thử lại sau hoặc liên hệ Ban điều phối.'
+          : getApiErrorMessage(error, 'Không thể tải danh sách thành viên.'));
+      }
     } finally {
       setLoadingMembers(false);
       setLoadingMoreMembers(false);
     }
-  }, [teamId]);
+  }, [reportCurrentUserRole, teamId]);
 
   useEffect(() => {
     const timer = setTimeout(() => void loadMembers(), 0);
@@ -169,7 +232,7 @@ export const TeamMembersSection: React.FC<{ teamId: string }> = ({ teamId }) => 
   };
 
   const confirmRemoveMember = (member: TeamMember) => {
-    if (!canManage || member.member_role === 'LEADER' || removingUserId) return;
+    if (!canManageMembers || member.member_role === 'LEADER' || removingUserId) return;
 
     Alert.alert(
       'Xác nhận gỡ thành viên',
@@ -240,6 +303,9 @@ export const TeamMembersSection: React.FC<{ teamId: string }> = ({ teamId }) => 
       ) : membersError ? (
         <View style={styles.stateBlock}>
           <Text style={styles.errorText}>{membersError}</Text>
+          {__DEV__ && membersErrorDiagnostic ? (
+            <Text style={styles.errorDiagnostic}>{membersErrorDiagnostic}</Text>
+          ) : null}
           <TouchableOpacity style={styles.smallAction} onPress={() => void loadMembers()} accessibilityRole="button">
             <Text style={styles.smallActionText}>Thử lại</Text>
           </TouchableOpacity>
@@ -260,7 +326,7 @@ export const TeamMembersSection: React.FC<{ teamId: string }> = ({ teamId }) => 
               <Text style={[styles.role, member.member_role === 'LEADER' && styles.leaderRole]}>
                 {roleLabels[member.member_role]}
               </Text>
-              {canManage && member.member_role !== 'LEADER' ? (
+              {canManageMembers && member.member_role !== 'LEADER' ? (
                 <TouchableOpacity
                   style={styles.removeButton}
                   onPress={() => confirmRemoveMember(member)}
@@ -292,7 +358,7 @@ export const TeamMembersSection: React.FC<{ teamId: string }> = ({ teamId }) => 
         </>
       )}
 
-      {canManage ? (
+      {canManageMembers ? (
         <TouchableOpacity style={styles.addButton} onPress={openPicker} accessibilityRole="button">
           <Plus size={18} color="#FFFFFF" />
           <Text style={styles.addButtonText}>Thêm thành viên</Text>
@@ -423,6 +489,7 @@ const styles = StyleSheet.create({
   stateBlock: { alignItems: 'flex-start', paddingVertical: 8 },
   stateText: { color: THEME.colors.text.secondary, fontSize: 14, paddingVertical: 10 },
   errorText: { color: THEME.colors.emergency.dark, fontSize: 14, flex: 1 },
+  errorDiagnostic: { color: THEME.colors.text.muted, fontSize: 11, paddingTop: 5 },
   smallAction: { marginTop: 8, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: THEME.colors.primary.bg },
   smallActionText: { color: THEME.colors.primary.dark, fontSize: 13, fontWeight: '700' },
   memberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, borderTopWidth: 1, borderTopColor: THEME.colors.surface.border, gap: 10 },

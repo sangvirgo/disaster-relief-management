@@ -649,7 +649,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             <Compass size={16} color={THEME.colors.primary.main} />
             <Text style={styles.detectedTitle}>ĐỊA BÀN CỦA VỊ TRÍ ĐANG GHIM:</Text>
           </View>
-          <Text style={styles.detectedContentText} numberOfLines={2}>
+          <Text style={styles.detectedContentText}>
             {isResolvingAddress
               ? "Đang tra cứu tên địa bàn..."
               : detectedAddress || (addressLookupError

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Modal,
   Image,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
@@ -136,6 +137,8 @@ export const DonationScreen: React.FC = () => {
   // Báo cáo minh bạch quyên góp
   const [selectedReportDrive, setSelectedReportDrive] = useState<DonationDrive | null>(null);
   const [reportLoading, setReportLoading] = useState<boolean>(false);
+  const [reportLoadingMore, setReportLoadingMore] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
   const [reportData, setReportData] = useState<PublicDonationReportSummary | null>(null);
 
   // Xem ảnh phóng to
@@ -541,13 +544,39 @@ export const DonationScreen: React.FC = () => {
     setSelectedReportDrive(drive);
     setReportLoading(true);
     setReportData(null);
+    setReportError(null);
     try {
-      const rep = await LogisticsApi.getPublicDonationReportSummary({ drive_id: drive.id });
+      const rep = await LogisticsApi.getPublicDonationReportSummary({ drive_id: drive.id, limit: 50 });
       setReportData(rep);
-    } catch {
+    } catch (error) {
+      setReportError(getApiErrorMessage(error, 'Không thể tải báo cáo minh bạch. Vui lòng thử lại.'));
       Alert.alert('Báo cáo minh bạch', 'Chưa có dữ liệu báo cáo tổng hợp cho đợt quyên góp này.');
     } finally {
       setReportLoading(false);
+    }
+  };
+
+  const handleLoadMoreReport = async () => {
+    if (!selectedReportDrive || !reportData?.cursor || !reportData.more || reportLoadingMore) return;
+    setReportLoadingMore(true);
+    setReportError(null);
+    try {
+      const page = await LogisticsApi.getPublicDonationReportSummary({
+        drive_id: selectedReportDrive.id,
+        limit: 50,
+        cursor: reportData.cursor,
+      });
+      setReportData((current) => current ? {
+        ...current,
+        items: [...current.items, ...page.items],
+        more: page.more,
+        cursor: page.cursor,
+        generated_at: page.generated_at,
+      } : page);
+    } catch (error) {
+      setReportError(getApiErrorMessage(error, 'Không thể tải thêm số liệu báo cáo. Vui lòng thử lại.'));
+    } finally {
+      setReportLoadingMore(false);
     }
   };
 
@@ -1441,6 +1470,7 @@ export const DonationScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
+            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 4 }}>
             {reportLoading ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <ActivityIndicator size="large" color={THEME.colors.primary.main} />
@@ -1486,6 +1516,30 @@ export const DonationScreen: React.FC = () => {
                 </Text>
               </View>
             )}
+
+            {reportError ? <Text style={[styles.reportGeneratedAt, { color: THEME.colors.emergency.main }]}>{reportError}</Text> : null}
+            {reportError && !reportData && selectedReportDrive ? (
+              <TouchableOpacity
+                style={[styles.modalSubmitBtn, { marginTop: 8 }]}
+                onPress={() => void handleOpenReportModal(selectedReportDrive)}
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalSubmitText}>Thử tải lại báo cáo</Text>
+              </TouchableOpacity>
+            ) : null}
+            {reportData?.more ? (
+              <TouchableOpacity
+                style={[styles.modalSubmitBtn, { marginTop: 8 }]}
+                onPress={() => void handleLoadMoreReport()}
+                disabled={reportLoadingMore}
+                accessibilityRole="button"
+              >
+                {reportLoadingMore
+                  ? <ActivityIndicator color="#FFFFFF" />
+                  : <Text style={styles.modalSubmitText}>Tải thêm số liệu</Text>}
+              </TouchableOpacity>
+            ) : null}
+            </ScrollView>
 
             <TouchableOpacity
               style={[styles.modalSubmitBtn, { marginTop: 12 }]}

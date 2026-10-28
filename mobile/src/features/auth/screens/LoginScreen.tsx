@@ -278,7 +278,7 @@ export const LoginScreen: React.FC = () => {
       </View>
 
       <View style={styles.tipBox}>
-        <Text style={styles.tipHeader}>Gợi ý tài khoản kiểm thử (Backend thật):</Text>
+        <Text style={styles.tipHeader}>Gợi ý tài khoản kiểm thử (máy chủ thật):</Text>
         <Text style={styles.tipText}>
           • <Text style={{ fontWeight: '700' }}>Đội trưởng cứu hộ:</Text> <Text style={{ fontWeight: '700' }}>vol_leader1</Text> / Mật khẩu: <Text style={{ fontWeight: '700' }}>Password123!</Text>{'\n'}
           • <Text style={{ fontWeight: '700' }}>Thành viên cứu hộ:</Text> <Text style={{ fontWeight: '700' }}>vol_member1</Text> / Mật khẩu: <Text style={{ fontWeight: '700' }}>Password123!</Text>{'\n'}

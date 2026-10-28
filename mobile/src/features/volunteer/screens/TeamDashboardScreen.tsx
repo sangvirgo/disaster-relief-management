@@ -26,7 +26,7 @@ import { GeoLocation, RescueTeamDetail, Mission, TeamSkillOption } from '../../.
 import { THEME } from '../../../constants/theme';
 import { reverseGeocodeCoordinates } from '../../../utils/locationGeocoding';
 import { RESCUE_TEAM_KIND_LABELS, RESCUE_SKILL_LABELS } from '../../../constants/labels';
-import { getTeamRoleFromMissionList } from '../utils/teamMembershipRole';
+import { getTeamRoleFromMissionList, type TeamMembershipRole } from '../utils/teamMembershipRole';
 import {
   Shield,
   Radio,
@@ -68,6 +68,7 @@ export const TeamDashboardScreen: React.FC = () => {
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
   const [showUserIdModal, setShowUserIdModal] = useState<boolean>(false);
   const [teamSkills, setTeamSkills] = useState<TeamSkillOption[]>([]);
+  const [membershipRole, setMembershipRole] = useState<TeamMembershipRole>('UNKNOWN');
   const [showTeamProfileModal, setShowTeamProfileModal] = useState(false);
   const [teamNameDraft, setTeamNameDraft] = useState('');
   const [teamSkillDraft, setTeamSkillDraft] = useState<string[]>([]);
@@ -79,7 +80,9 @@ export const TeamDashboardScreen: React.FC = () => {
     coordinatesKey: string;
     address: string | null;
   } | null>(null);
-  const teamRole = getTeamRoleFromMissionList(missions);
+  const teamRole = membershipRole === 'UNKNOWN'
+    ? getTeamRoleFromMissionList(missions, team?.id)
+    : membershipRole;
   const isTeamLeader = teamRole === 'LEADER';
   const teamCoordinates = team?.position?.location?.coordinates;
   const teamLongitude = teamCoordinates?.[0] ?? null;
@@ -132,6 +135,7 @@ export const TeamDashboardScreen: React.FC = () => {
 
       if (teamsData.length > 0) {
         const firstTeam = teamsData[0];
+        setMembershipRole('UNKNOWN');
         setTeam(firstTeam);
         setIsAvailable(firstTeam.availability === 'AVAILABLE');
 
@@ -155,6 +159,22 @@ export const TeamDashboardScreen: React.FC = () => {
     }
   }, []);
 
+  const handleCurrentMemberRole = useCallback((role: TeamMembershipRole) => {
+    setMembershipRole(role);
+  }, []);
+
+  const recordTeamPositionLocally = useCallback((updatedLocation: GeoLocation) => {
+    setTeam((current) => current ? {
+      ...current,
+      position: {
+        location: { type: 'Point', coordinates: updatedLocation.coordinates },
+        age_s: 0,
+        accuracy_m: updatedLocation.accuracy_m ?? null,
+        source: updatedLocation.source,
+      },
+    } : current);
+  }, []);
+
   useEffect(() => {
     if (authLoading) return;
     if (!isAuthenticated || !isVolunteerOrLeader()) {
@@ -170,7 +190,7 @@ export const TeamDashboardScreen: React.FC = () => {
     void loadTeamData();
   }, [authLoading, isAuthenticated, isVolunteerOrLeader, loadTeamData, router, user?.must_change_password]);
 
-  // Đội trưởng cập nhật trạng thái sẵn sàng của đội lên Backend
+  // Đội trưởng cập nhật trạng thái sẵn sàng của đội
   const handleToggleAvailability = async (nextValue: boolean) => {
     if (!team || !isTeamLeader) return;
     const prevValue = isAvailable;
@@ -185,10 +205,18 @@ export const TeamDashboardScreen: React.FC = () => {
       setIsAvailable(updated.availability === 'AVAILABLE');
     } catch (err: any) {
       setIsAvailable(prevValue);
-      if (isApiErrorCode(err, 'FORBIDDEN')) {
+      if (nextValue && isApiErrorCode(err, 'TEAM_NOT_ELIGIBLE')) {
+        Alert.alert(
+          'Cần xác nhận trạng thái sẵn sàng',
+          'Đội cần được xác nhận lại trạng thái sẵn sàng trước khi nhận nhiệm vụ. Vui lòng liên hệ Ban điều phối để được hỗ trợ.'
+        );
+      } else if (isApiErrorCode(err, 'VERSION_CONFLICT')) {
+        await loadTeamData();
+        Alert.alert('Trạng thái đội đã thay đổi', 'Thông tin mới nhất của đội đã được tải. Hãy kiểm tra lại trước khi cập nhật.');
+      } else if (isApiErrorCode(err, 'FORBIDDEN')) {
         Alert.alert(
           'Chưa được phép cập nhật',
-          'Backend chỉ cho phép đội trưởng đang hoạt động hoặc điều phối viên có thẩm quyền cập nhật trạng thái đội.'
+          'Chỉ đội trưởng đang hoạt động hoặc điều phối viên có thẩm quyền mới được cập nhật trạng thái đội.'
         );
       } else {
         Alert.alert(
@@ -211,14 +239,13 @@ export const TeamDashboardScreen: React.FC = () => {
     setIsUpdatingPosition(true);
     try {
       await ResponseApi.updateTeamPosition(team.id, location);
-      const refreshedTeam = await ResponseApi.getTeamDetail(team.id).catch(() => null);
-      if (refreshedTeam) setTeam(refreshedTeam);
+      recordTeamPositionLocally(location);
       Alert.alert('Thành công', 'Đã phát tín hiệu tọa độ hiện tại của đội cứu trợ lên bản đồ điều phối.');
     } catch (err: any) {
       if (isApiErrorCode(err, 'FORBIDDEN')) {
         Alert.alert(
           'Chưa được phép cập nhật',
-          'Backend chỉ cho phép đội trưởng đang hoạt động hoặc điều phối viên có thẩm quyền cập nhật vị trí đội.'
+          'Chỉ đội trưởng đang hoạt động hoặc điều phối viên có thẩm quyền mới được cập nhật vị trí đội.'
         );
       } else {
         Alert.alert('Lỗi cập nhật', getApiErrorMessage(err, 'Không thể cập nhật vị trí.'));
@@ -231,6 +258,7 @@ export const TeamDashboardScreen: React.FC = () => {
   const handleManualPositionConfirm = async (
     coordinates: [number, number],
     addressNote?: string,
+    detectedAddress?: string,
   ) => {
     if (!team || !isTeamLeader) return;
     setShowPositionPicker(false);
@@ -243,8 +271,13 @@ export const TeamDashboardScreen: React.FC = () => {
     };
     try {
       await ResponseApi.updateTeamPosition(team.id, manualLocation, addressNote);
-      const refreshedTeam = await ResponseApi.getTeamDetail(team.id).catch(() => null);
-      if (refreshedTeam) setTeam(refreshedTeam);
+      recordTeamPositionLocally(manualLocation);
+      if (detectedAddress?.trim()) {
+        setTeamPositionAreaResult({
+          coordinatesKey: `${coordinates[0]},${coordinates[1]}`,
+          address: detectedAddress.trim(),
+        });
+      }
       Alert.alert('Đã cập nhật vị trí', 'Vị trí ghim thủ công của đội đã được ghi nhận.');
     } catch (err: any) {
       Alert.alert('Lỗi cập nhật', getApiErrorMessage(err, 'Không thể cập nhật vị trí đội.'));
@@ -612,7 +645,13 @@ export const TeamDashboardScreen: React.FC = () => {
             </Text>
           </View>
         ) : null}
-        <TeamMembersSection key={team.id} teamId={team.id} />
+        <TeamMembersSection
+          key={team.id}
+          teamId={team.id}
+          currentUserId={user?.id}
+          currentUserRole={teamRole}
+          onCurrentUserRole={handleCurrentMemberRole}
+        />
 
         {/* 2. TỌA ĐỘ VỊ TRÍ DI QUÂN CỦA ĐỘI */}
         <View style={styles.card}>
@@ -622,8 +661,8 @@ export const TeamDashboardScreen: React.FC = () => {
           </View>
           <Text style={styles.cardDesc}>
             {isTeamLeader
-              ? 'Cập nhật vị trí khi đội di chuyển. Bạn có thể gửi GPS hiện tại hoặc ghim vị trí thủ công; không bật theo dõi nền.'
-              : 'Vị trí đội chỉ được hiển thị khi tài khoản có quyền xem thông tin vị trí.'}
+              ? 'Tọa độ đã ghi nhận chỉ hiển thị với điều phối viên. Đội trưởng có thể gửi GPS hiện tại hoặc ghim vị trí mới; ứng dụng không bật theo dõi nền.'
+              : 'Tọa độ đội chỉ hiển thị với điều phối viên có thẩm quyền.'}
           </Text>
 
           {isTeamLeader && (
@@ -677,7 +716,7 @@ export const TeamDashboardScreen: React.FC = () => {
           ) : (
             <Text style={styles.teamPositionUnavailable}>
               {team.position
-                ? 'Tài khoản hiện không được cấp quyền xem vị trí đội.'
+                ? 'Đội đã ghi nhận vị trí, nhưng tọa độ đã lưu chỉ hiển thị với điều phối viên.'
                 : 'Đội chưa có vị trí di chuyển được ghi nhận.'}
             </Text>
           )}

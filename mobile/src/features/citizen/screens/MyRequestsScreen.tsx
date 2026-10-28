@@ -37,6 +37,9 @@ export const MyRequestsScreen: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<string | undefined>();
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Modal gắn yêu cầu ẩn danh vào tài khoản
   const [showClaimModal, setShowClaimModal] = useState<boolean>(false);
@@ -45,16 +48,26 @@ export const MyRequestsScreen: React.FC = () => {
   const [claimErrors, setClaimErrors] = useState<Record<string, string | undefined>>({});
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
 
-  const fetchMyRequests = useCallback(async () => {
+  const fetchMyRequests = useCallback(async (nextCursor?: string, append = false, retainContent = false) => {
     setErrorMsg(null);
+    if (append) setLoadingMore(true);
+    else if (!retainContent) setLoading(true);
     try {
-      const result = await ResponseApi.getMyRequests();
-      setItems(result.items || []);
+      const result = await ResponseApi.getMyRequests(50, nextCursor);
+      setItems((current) => append
+        ? [...current, ...result.items.filter((item) => !current.some((existing) => existing.id === item.id))]
+        : result.items || []);
+      setCursor(result.cursor);
+      setHasMore(result.more);
     } catch (err: any) {
-      setErrorMsg(getApiErrorMessage(err, 'Không thể tải danh sách yêu cầu. Vui lòng thử lại.'));
+      const message = getApiErrorMessage(err, 'Không thể tải danh sách yêu cầu. Vui lòng thử lại.');
+      if (append) Alert.alert('Không thể tải thêm yêu cầu', message);
+      else if (retainContent) Alert.alert('Không thể cập nhật danh sách', message);
+      else setErrorMsg(message);
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
   }, []);
 
@@ -66,7 +79,13 @@ export const MyRequestsScreen: React.FC = () => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchMyRequests();
+    fetchMyRequests(undefined, false, true);
+  };
+
+  const loadMoreRequests = () => {
+    if (!loadingMore && hasMore && cursor) {
+      void fetchMyRequests(cursor, true);
+    }
   };
 
   const handleClaim = async () => {
@@ -94,7 +113,7 @@ export const MyRequestsScreen: React.FC = () => {
       setClaimSecret('');
       setClaimErrors({});
       setShowClaimModal(false);
-      fetchMyRequests();
+      fetchMyRequests(undefined, false, true);
     } catch (err: any) {
       Alert.alert('Lỗi', getApiErrorMessage(err, 'Không thể gắn yêu cầu. Vui lòng kiểm tra lại mã và bí mật.'));
     } finally {
@@ -175,7 +194,7 @@ export const MyRequestsScreen: React.FC = () => {
         <View style={styles.centerContainer}>
           <AlertCircle size={44} color={THEME.colors.emergency.main} />
           <Text style={styles.errorText}>{errorMsg}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchMyRequests}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => void fetchMyRequests()}>
             <Text style={styles.retryText}>Thử lại</Text>
           </TouchableOpacity>
         </View>
@@ -208,6 +227,13 @@ export const MyRequestsScreen: React.FC = () => {
           }
           contentContainerStyle={{ paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
+          ListFooterComponent={hasMore ? (
+            <TouchableOpacity style={styles.loadMoreButton} onPress={loadMoreRequests} disabled={loadingMore || !cursor}>
+              {loadingMore
+                ? <ActivityIndicator size="small" color={THEME.colors.primary.main} />
+                : <Text style={styles.loadMoreText}>Tải thêm yêu cầu</Text>}
+            </TouchableOpacity>
+          ) : undefined}
         />
       )}
 
@@ -321,6 +347,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: THEME.colors.primary.main,
+  },
+  loadMoreButton: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  loadMoreText: {
+    color: THEME.colors.primary.main,
+    fontSize: 13,
+    fontWeight: '700',
   },
   card: {
     backgroundColor: THEME.colors.surface.card,

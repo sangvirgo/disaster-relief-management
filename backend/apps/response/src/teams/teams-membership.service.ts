@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
@@ -16,6 +16,7 @@ type MemberRole = 'LEADER' | 'MEMBER';
 type MemberRow = { user_id?: string; member_role: MemberRole; left_at: Date | string | null };
 type TeamMembershipView = { team_id: string; user_id: string; member_role: MemberRole; joined_at: string };
 type TeamMemberListRow = { user_id: string; member_role: MemberRole; joined_at: Date | string };
+type TeamMemberListStage = 'SESSION' | 'TEAM_LOOKUP' | 'AUTHORIZATION' | 'MEMBER_QUERY' | 'IDENTITY_LOOKUP' | 'RESPONSE_MAPPING';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -38,6 +39,8 @@ function timestamp(value: Date | string): string {
 
 @Injectable()
 export class TeamsMembershipService {
+  private readonly logger = new Logger(TeamsMembershipService.name);
+
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly idempotency: IdempotencyService,
@@ -46,49 +49,62 @@ export class TeamsMembershipService {
   ) {}
 
   async listMembers(teamId: string, dto: TeamMembersPageQueryDto, request: TeamCommandRequest) {
-    const session = await this.sessions.require(request);
-    const team = await this.findTeam(this.dataSource, teamId);
-    const canManageMembers = await this.canManage(team, session);
-    if (!canManageMembers) await this.assertCanRead(team, session);
+    let stage: TeamMemberListStage = 'SESSION';
+    try {
+      const session = await this.sessions.require(request);
+      stage = 'TEAM_LOOKUP';
+      const team = await this.findTeam(this.dataSource, teamId);
+      stage = 'AUTHORIZATION';
+      const canManageMembers = await this.canManage(team, session);
+      if (!canManageMembers) await this.assertCanRead(team, session);
 
-    const filters = { route: 'response.team.members', team_id: teamId, user_id: session.userId, grants: session.grants };
-    const cursor = dto.cursor ? decodeKeysetCursor(dto.cursor, filters) : undefined;
-    if (cursor && (cursor.sort.length !== 1 || typeof cursor.sort[0] !== 'string' ||
-        !uuidPattern.test(cursor.id) || String(cursor.sort[0]).toLowerCase() !== cursor.id.toLowerCase())) {
-      throw new AppError('CURSOR_INVALID', { status: 400 });
+      const filters = { route: 'response.team.members', team_id: teamId, user_id: session.userId, grants: session.grants };
+      const cursor = dto.cursor ? decodeKeysetCursor(dto.cursor, filters) : undefined;
+      if (cursor && (cursor.sort.length !== 1 || typeof cursor.sort[0] !== 'string' ||
+          !uuidPattern.test(cursor.id) || String(cursor.sort[0]).toLowerCase() !== cursor.id.toLowerCase())) {
+        throw new AppError('CURSOR_INVALID', { status: 400 });
+      }
+
+      stage = 'MEMBER_QUERY';
+      const limit = dto.limit ?? 50;
+      const rows = await this.dataSource.query(
+        `SELECT tm.user_id,tm.member_role,
+                COALESCE((SELECT a.created_at FROM audit_log a
+                           WHERE a.entity_type='team_member' AND a.entity_id=(tm.team_id::text || ':' || tm.user_id::text)
+                             AND a.action='TEAM_MEMBER_ADDED'
+                           ORDER BY a.created_at DESC,a.id DESC LIMIT 1),$3::timestamptz) AS joined_at
+           FROM team_member tm
+          WHERE tm.team_id=$1::uuid AND tm.left_at IS NULL
+            AND ($2::uuid IS NULL OR tm.user_id>$2::uuid)
+          ORDER BY tm.user_id ASC LIMIT $4`,
+        [teamId, cursor?.sort[0] ?? null, team.created_at, limit + 1],
+      ) as TeamMemberListRow[];
+      const more = rows.length > limit;
+      const page = rows.slice(0, limit);
+
+      stage = 'IDENTITY_LOOKUP';
+      const profiles = await this.sessions.lookupUsers(page.map(({ user_id }) => user_id));
+      const displayNames = new Map(profiles.map(({ id, display_name }) => [id, display_name]));
+      const last = page.at(-1);
+
+      stage = 'RESPONSE_MAPPING';
+      return {
+        team_id: teamId,
+        can_manage_members: canManageMembers,
+        items: page.map((row) => ({
+          user_id: row.user_id,
+          display_name: displayNames.get(row.user_id)!,
+          member_role: row.member_role,
+          joined_at: timestamp(row.joined_at),
+        })),
+        more,
+        ...(more && last ? { cursor: encodeKeysetCursor([last.user_id], last.user_id, filters) } : {}),
+      };
+    } catch (error) {
+      const isServerError = !(error instanceof AppError) || error.status === undefined || error.status >= 500;
+      if (isServerError) this.logger.error(`TEAM_MEMBERS_LIST_FAILED_AT_${stage}`);
+      throw error;
     }
-
-    const limit = dto.limit ?? 50;
-    const rows = await this.dataSource.query(
-      `SELECT tm.user_id,tm.member_role,
-              COALESCE((SELECT a.created_at FROM audit_log a
-                         WHERE a.entity_type='team_member' AND a.entity_id=($1::text || ':' || tm.user_id::text)
-                           AND a.action='TEAM_MEMBER_ADDED'
-                         ORDER BY a.created_at DESC,a.id DESC LIMIT 1),$3::timestamptz) AS joined_at
-         FROM team_member tm
-        WHERE tm.team_id=$1 AND tm.left_at IS NULL
-          AND ($2::uuid IS NULL OR tm.user_id>$2::uuid)
-        ORDER BY tm.user_id ASC LIMIT $4`,
-      [teamId, cursor?.sort[0] ?? null, team.created_at, limit + 1],
-    ) as TeamMemberListRow[];
-    const more = rows.length > limit;
-    const page = rows.slice(0, limit);
-    const profiles = await this.sessions.lookupUsers(page.map(({ user_id }) => user_id));
-    const displayNames = new Map(profiles.map(({ id, display_name }) => [id, display_name]));
-    const last = page.at(-1);
-
-    return {
-      team_id: teamId,
-      can_manage_members: canManageMembers,
-      items: page.map((row) => ({
-        user_id: row.user_id,
-        display_name: displayNames.get(row.user_id)!,
-        member_role: row.member_role,
-        joined_at: timestamp(row.joined_at),
-      })),
-      more,
-      ...(more && last ? { cursor: encodeKeysetCursor([last.user_id], last.user_id, filters) } : {}),
-    };
   }
 
   async listMemberCandidates(teamId: string, dto: TeamMemberCandidatesQueryDto, request: TeamCommandRequest) {

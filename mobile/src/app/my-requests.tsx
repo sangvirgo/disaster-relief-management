@@ -1,1 +1,3 @@
-export { MyRequestsScreen as default } from '../features/citizen/screens/MyRequestsScreen';
+import { MyRequestsScreen } from '../features/citizen/screens/MyRequestsScreen';
+
+export default MyRequestsScreen;

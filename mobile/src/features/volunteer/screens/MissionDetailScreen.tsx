@@ -45,6 +45,9 @@ import {
   Info,
 } from 'lucide-react-native';
 
+const isLoopbackDownloadUrl = (url: string) =>
+  /^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::|\/)/i.test(url);
+
 export const MissionDetailScreen: React.FC = () => {
   const router = useRouter();
   const { missionId: routeMissionId, teamRole: routeTeamRole } = useLocalSearchParams<{
@@ -75,6 +78,7 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Xem ảnh minh chứng phóng to
   const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
+  const [previewImageError, setPreviewImageError] = useState(false);
   const [loadingEvidence, setLoadingEvidence] = useState<boolean>(false);
 
   const handleViewEvidence = async (evidenceId: string, mimeType: string) => {
@@ -82,11 +86,21 @@ export const MissionDetailScreen: React.FC = () => {
     try {
       const res = await ResponseApi.getEvidenceDownloadUrl(evidenceId);
       if (res?.url) {
+        if (isLoopbackDownloadUrl(res.url)) {
+          Alert.alert(
+            'Không thể mở minh chứng',
+            'Đường dẫn tệp chưa truy cập được từ điện thoại. Vui lòng kiểm tra cấu hình kho lưu trữ hoặc liên hệ quản trị viên.'
+          );
+          return;
+        }
         if (mimeType === 'video/mp4') {
           await Linking.openURL(res.url);
         } else {
+          setPreviewImageError(false);
           setPreviewImageUri(res.url);
         }
+      } else {
+        Alert.alert('Không thể mở minh chứng', 'Chưa nhận được đường dẫn tệp. Vui lòng thử lại sau.');
       }
     } catch (e: any) {
       Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể mở tệp minh chứng.'));
@@ -201,7 +215,7 @@ export const MissionDetailScreen: React.FC = () => {
     setActionLoading(true);
     try {
       await ResponseApi.acceptMission(mission.id, mission.version);
-      Alert.alert('Đã tiếp nhận', 'Backend đã ghi nhận việc tiếp nhận nhiệm vụ.');
+      Alert.alert('Đã tiếp nhận', 'Việc tiếp nhận nhiệm vụ đã được ghi nhận.');
       fetchDetail();
     } catch (e: any) {
       Alert.alert('Lỗi tiếp nhận', getApiErrorMessage(e, 'Không thể tiếp nhận nhiệm vụ.'));
@@ -227,7 +241,7 @@ export const MissionDetailScreen: React.FC = () => {
     try {
       if (mission.status === 'OFFERED') {
         await ResponseApi.declineMission(mission.id, mission.version, reason);
-        Alert.alert('Đã từ chối', 'Backend đã ghi nhận lý do từ chối nhiệm vụ.');
+        Alert.alert('Đã từ chối', 'Lý do từ chối nhiệm vụ đã được ghi nhận.');
       } else {
         await ResponseApi.transitionMission(
           mission.id,
@@ -235,7 +249,7 @@ export const MissionDetailScreen: React.FC = () => {
           'FAILED',
           reason
         );
-        Alert.alert('Đã ghi nhận', 'Backend đã ghi nhận trạng thái nhiệm vụ không thể tiếp cận.');
+        Alert.alert('Đã ghi nhận', 'Trạng thái nhiệm vụ không thể tiếp cận đã được ghi nhận.');
       }
       setShowDeclineModal(false);
       goBackOrHome(router);
@@ -806,11 +820,16 @@ export const MissionDetailScreen: React.FC = () => {
             <X size={24} color="#FFFFFF" />
           </TouchableOpacity>
           {previewImageUri ? (
-            <Image
-              source={{ uri: previewImageUri }}
-              style={styles.previewFullImage}
-              resizeMode="contain"
-            />
+            previewImageError ? (
+              <Text style={styles.previewImageErrorText}>Không tải được ảnh minh chứng. Vui lòng kiểm tra kết nối rồi thử lại.</Text>
+            ) : (
+              <Image
+                source={{ uri: previewImageUri }}
+                style={styles.previewFullImage}
+                resizeMode="contain"
+                onError={() => setPreviewImageError(true)}
+              />
+            )
           ) : null}
         </View>
       </Modal>
@@ -1289,5 +1308,11 @@ const styles = StyleSheet.create({
   previewFullImage: {
     width: '100%',
     height: '80%',
+  },
+  previewImageErrorText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    textAlign: 'center',
+    marginHorizontal: 28,
   },
 });

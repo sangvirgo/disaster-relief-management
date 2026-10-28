@@ -2,7 +2,7 @@ import type { Mission } from '../../../types/api';
 
 export type TeamMembershipRole = 'LEADER' | 'MEMBER' | 'UNKNOWN';
 
-type MissionRoleView = Pick<Mission, 'reporter_contact_phone'>;
+type MissionRoleView = Pick<Mission, 'team' | 'reporter_contact_phone'>;
 
 /**
  * /missions/mine includes contact fields only for an active team leader.
@@ -12,11 +12,17 @@ type MissionRoleView = Pick<Mission, 'reporter_contact_phone'>;
 export const getTeamRoleFromMissionView = (mission: MissionRoleView): Exclude<TeamMembershipRole, 'UNKNOWN'> =>
   Object.prototype.hasOwnProperty.call(mission, 'reporter_contact_phone') ? 'LEADER' : 'MEMBER';
 
-export const getTeamRoleFromMissionList = (missions: MissionRoleView[]): TeamMembershipRole => {
-  if (missions.length === 0) return 'UNKNOWN';
+export const getTeamRoleFromMissionList = (
+  missions: MissionRoleView[],
+  teamId?: string,
+): TeamMembershipRole => {
+  const teamMissions = teamId
+    ? missions.filter((mission) => mission.team.id === teamId)
+    : missions;
+  if (teamMissions.length === 0) return 'UNKNOWN';
 
-  const firstRole = getTeamRoleFromMissionView(missions[0]);
-  return missions.every((mission) => getTeamRoleFromMissionView(mission) === firstRole)
+  const firstRole = getTeamRoleFromMissionView(teamMissions[0]);
+  return teamMissions.every((mission) => getTeamRoleFromMissionView(mission) === firstRole)
     ? firstRole
     : 'UNKNOWN';
 };

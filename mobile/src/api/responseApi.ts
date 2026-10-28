@@ -15,6 +15,7 @@ import {
   EvidenceDownload,
   CollectionPage,
   PublicCampaign,
+  NoticeItem,
   TeamMemberItem,
   TeamSkillOption,
   TeamMemberCandidate,
@@ -356,11 +357,11 @@ export const ResponseApi = {
     unread?: boolean,
     limit = 50,
     cursor?: string
-  ): Promise<{ items: any[]; more: boolean; cursor?: string }> {
+  ): Promise<{ items: NoticeItem[]; more: boolean; cursor?: string }> {
     const params: Record<string, any> = { limit };
     if (unread !== undefined) params.unread = unread ? 'true' : 'false';
     if (cursor) params.cursor = cursor;
-    const response = await apiClient.get<{ items: any[]; more: boolean; cursor?: string }>(
+    const response = await apiClient.get<{ items: NoticeItem[]; more: boolean; cursor?: string }>(
       '/response/notices',
       { params }
     );
