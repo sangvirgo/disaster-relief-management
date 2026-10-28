@@ -5,6 +5,7 @@ import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { AnalyticsRegionField, useAnalyticsRegion } from '../../components/AnalyticsRegion';
+import { HeatmapPanel } from './HeatmapPanel';
 
 type QueueItem = {
   id: string;
@@ -65,7 +66,7 @@ type Detail = QueueItem & {
     contactability?: string | null;
     household_reference_note?: string | null;
   };
-  contact_attempts: { items: { id: string; contact_target: string; outcome: string }[] };
+  contact_attempts: { items: { id: string; contact_target: string; outcome: string; attempted_at?: string }[] };
   timeline: { items: Event[] };
   proxy_activity_flags: unknown[];
   active_missions?: {
@@ -291,6 +292,7 @@ export function Coordinator({ page }: { page: string }) {
     return () => { live = false; };
   }, [revision]);
   const refreshReasonRef = useRef<'success' | 'stale' | null>(null);
+  const detailPanelRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     setQueueStatus(stateFilter[page] || '');
     setCursor('');
@@ -421,6 +423,14 @@ export function Coordinator({ page }: { page: string }) {
       />
     );
   }
+  function secondaryCommand(spec: CommandSpec) {
+    return (
+      <details className="secondary-command">
+        <summary>{spec.title}</summary>
+        {command(spec)}
+      </details>
+    );
+  }
   async function reviewAiAdvisory(decision: 'ACCEPTED' | 'ADJUSTED' | 'REJECTED') {
     if (!detail?.ai_advisory || detail.ai_priority_advisory?.status !== 'COMPLETED') return;
     if (decision === 'ADJUSTED' && !aiReviewNote.trim()) {
@@ -464,7 +474,7 @@ export function Coordinator({ page }: { page: string }) {
     <div className="coordinator-layout">
       <section className="card">
         <h2>{title[page] || title.queue}</h2>
-        <p>Yêu cầu được sắp theo thời điểm tiếp nhận. Chọn một yêu cầu để xem và xử lý.</p>
+        <p>Yêu cầu mới nhất ở trên cùng. Chọn một yêu cầu để xem và xử lý.</p>
         <div className="queue-filter-panel">
           <div className="queue-filter-heading">
             <div>
@@ -553,6 +563,10 @@ export function Coordinator({ page }: { page: string }) {
                     setDetail(null);
                     setDetailError('');
                     setUpdateMessage('');
+                    detailPanelRef.current?.scrollTo(0, 0);
+                    if (window.matchMedia('(max-width: 1050px)').matches) {
+                      detailPanelRef.current?.scrollIntoView({ block: 'start' });
+                    }
                   }}
                   key={item.id}
                 >
@@ -589,7 +603,7 @@ export function Coordinator({ page }: { page: string }) {
                     )}
                     {item.declared_danger && <small>Có khai báo nguy hiểm tính mạng</small>}
                   </span>
-                  <span className="chip">
+                  <span className="chip queue-status-chip" data-status={item.status}>
                     {requestStatusLabel(item.status)}
                     {item.priority ? ` · ${item.priority}` : ''}
                   </span>
@@ -604,7 +618,10 @@ export function Coordinator({ page }: { page: string }) {
           </>
         )}
       </section>
-      <section className="card">
+      <section
+        className={`card queue-detail-card${detail && ['SUBMITTED', 'VERIFYING'].includes(detail.status) ? ' verification-detail-card' : ''}`}
+        ref={detailPanelRef}
+      >
         <h2>Hồ sơ yêu cầu</h2>
         {updateMessage && (
           <p className="notice" role="status">
@@ -629,7 +646,56 @@ export function Coordinator({ page }: { page: string }) {
         {selected && !detail && !detailError && <p role="status">Đang tải hồ sơ…</p>}
         {detail && (
           <>
-            <div className="detail-grid">
+            {['SUBMITTED', 'VERIFYING'].includes(detail.status) && (
+              <div className="verification-summary">
+                <span className="eyebrow">{detail.status === 'SUBMITTED' ? 'BƯỚC 1 · MỞ XÁC MINH' : 'BƯỚC 2 · KIỂM TRA THÔNG TIN'}</span>
+                <h3>{detail.tracking_code} · {label(detail.category)}</h3>
+                <p>{detail.description || 'Chưa có mô tả tình huống.'}</p>
+                <div className="verification-facts">
+                  <span>{detail.subject.people_affected ?? 'Chưa rõ số'} người cần hỗ trợ</span>
+                  <span>{detail.needs_rescue ? 'Cần cứu hộ' : 'Không yêu cầu cứu hộ'}</span>
+                  <span>{detail.reporter.name || 'Người báo chưa ghi tên'} · {detail.reporter.contact_phone || 'Chưa có số liên hệ'}</span>
+                  <span>Vị trí: {detail.subject.location?.coordinates?.join(', ') || 'Chưa có tọa độ'}</span>
+                </div>
+                {detail.status === 'VERIFYING' && (
+                  <p className="verification-progress">
+                    {detail.contact_attempts.items.some((item) => item.outcome === 'REACHED')
+                      ? 'Đã có lần liên hệ thành công. Chọn lần đó để hoàn tất xác minh.'
+                      : 'Trước tiên hãy ghi nhận một lần liên hệ thành công. Sau đó mới xác nhận SOS.'}
+                  </p>
+                )}
+                <a href="#request-full-detail">Xem toàn bộ hồ sơ và lịch sử ↓</a>
+              </div>
+            )}
+            {page === 'triage' && (
+              <div className="triage-context">
+                <div className="triage-context-summary">
+                  <h3>Thông tin để quyết định ưu tiên</h3>
+                  <strong>{detail.tracking_code}</strong>
+                  <p>{detail.description || 'Người báo chưa cung cấp mô tả tình huống.'}</p>
+                  <p><b>{label(detail.category)}</b> · {detail.subject.people_affected ?? 'Chưa rõ số'} người cần hỗ trợ</p>
+                  <p>{detail.declared_danger ? 'Có khai báo nguy hiểm tính mạng' : 'Chưa khai báo nguy hiểm tính mạng'}</p>
+                  <p>{detail.needs_rescue ? 'Cần cứu hộ' : 'Không khai báo cần cứu hộ'}
+                    {detail.needs_relief_supplies ? ' · Cần hàng cứu trợ' : ''}</p>
+                  <small>Vị trí SOS lấy từ hồ sơ đã được cấp quyền; màu nền thể hiện số SOS trong từng ô.</small>
+                </div>
+                <div className="triage-context-map">
+                  <h3>Vị trí trên bản đồ nhiệt</h3>
+                  <HeatmapPanel
+                    region={detail.region_code || ''}
+                    showLayers={false}
+                    compact
+                    selected={detail.subject.location ? {
+                      id: detail.id,
+                      trackingCode: detail.tracking_code,
+                      longitude: detail.subject.location.coordinates[0],
+                      latitude: detail.subject.location.coordinates[1],
+                    } : null}
+                  />
+                </div>
+              </div>
+            )}
+            <div className="detail-grid" id="request-full-detail">
               <p>
                 <strong>Mã</strong>
                 <span className="detail-value">
@@ -638,7 +704,7 @@ export function Coordinator({ page }: { page: string }) {
               </p>
               <p>
                 <strong>Trạng thái</strong>
-                <span className="detail-value">
+                <span className="detail-value queue-detail-status" data-status={detail.status}>
                   {requestStatusLabel(detail.status)}
                 </span>
               </p>
@@ -1060,7 +1126,7 @@ export function Coordinator({ page }: { page: string }) {
             </div>
             <div className="action-grid">
               {!detail.campaign_id &&
-                command({
+                secondaryCommand({
                   title: 'Gắn vào chiến dịch cứu trợ',
                   service: 'response',
                   path: `/requests/${detail.id}/attach-campaign`,
@@ -1075,7 +1141,7 @@ export function Coordinator({ page }: { page: string }) {
                   warning: 'Xác nhận gắn yêu cầu này vào chiến dịch đã chọn?',
                 })}
               {detail.campaign_id &&
-                command({
+                secondaryCommand({
                   title: 'Gỡ khỏi chiến dịch',
                   service: 'response',
                   path: `/requests/${detail.id}/detach-campaign`,
@@ -1093,15 +1159,16 @@ export function Coordinator({ page }: { page: string }) {
               {detail.status === 'VERIFYING' && (
                 <>
                   {command({
-                    title: 'Ghi nhận lần liên hệ',
+                    title: 'Ghi nhận liên hệ',
                     service: 'response',
                     path: `/requests/${detail.id}/contact-attempts`,
                     fields: [
                       {
                         name: 'contact_target',
-                        label: 'Đối tượng liên hệ',
+                        label: 'Người đã liên hệ',
                         type: 'select',
                         required: true,
+                        initialValue: 'REPORTER',
                         options: [
                           ['REPORTER', 'Người báo'],
                           ['BENEFICIARY', 'Người cần hỗ trợ'],
@@ -1111,17 +1178,17 @@ export function Coordinator({ page }: { page: string }) {
                       },
                       {
                         name: 'outcome',
-                        label: 'Kết quả',
+                        label: 'Kết quả liên hệ',
                         type: 'select',
                         required: true,
                         options: [
-                          ['REACHED', 'Đã liên hệ'],
+                          ['REACHED', 'Đã trao đổi được'],
                           ['NO_ANSWER', 'Không trả lời'],
-                          ['WRONG_NUMBER', 'Sai số'],
+                          ['WRONG_NUMBER', 'Sai số điện thoại'],
                           ['OTHER', 'Khác'],
                         ].map(([value, label]) => ({ value, label })),
                       },
-                      { name: 'note', label: 'Ghi chú', type: 'textarea' },
+                      { name: 'note', label: 'Nội dung đã trao đổi', type: 'textarea', placeholder: 'Ví dụ: Người báo xác nhận vị trí và số người cần hỗ trợ.' },
                     ],
                   })}
                   {detail.report_mode === 'PROXY' &&
@@ -1141,9 +1208,9 @@ export function Coordinator({ page }: { page: string }) {
                         },
                       ],
                     })}
-                  {detail.report_mode !== 'PROXY' &&
+                  {detail.report_mode !== 'PROXY' && detail.contact_attempts.items.some((item) => item.outcome === 'REACHED') &&
                     command({
-                      title: 'Xác nhận đã xác minh',
+                      title: 'Hoàn tất xác minh SOS',
                       service: 'response',
                       path: `/requests/${detail.id}/verify`,
                       version: detail.version,
@@ -1152,21 +1219,24 @@ export function Coordinator({ page }: { page: string }) {
                       fields: [
                         {
                           name: 'contact_attempt_id',
-                          label: 'Mã lần liên hệ xác nhận',
+                          label: 'Lần liên hệ thành công',
                           type: 'select',
                           required: true,
+                          initialValue: detail.contact_attempts.items.filter((item) => item.outcome === 'REACHED').length === 1
+                            ? detail.contact_attempts.items.find((item) => item.outcome === 'REACHED')?.id : undefined,
                           options: detail.contact_attempts.items
                             .filter((item) => item.outcome === 'REACHED')
                             .map((item) => ({
                               value: item.id,
-                              label: `${label(item.contact_target)} · ${item.id.slice(0, 8)}`,
+                              label: `${label(item.contact_target)} · ${item.attempted_at ? timeLabel(item.attempted_at) : 'Đã liên hệ'}`,
                             })),
                         },
                         {
                           name: 'reason',
-                          label: 'Lý do xác minh',
+                          label: 'Thông tin đã kiểm chứng',
                           type: 'textarea',
                           required: true,
+                          placeholder: 'Ví dụ: Đã xác nhận vị trí, tình trạng và số người cần hỗ trợ.',
                         },
                       ],
                       build: (values) => ({
@@ -1216,8 +1286,8 @@ export function Coordinator({ page }: { page: string }) {
                     </p>
                   )}
                   {duplicates.length > 0 && (
-                    <section>
-                      <h3>Yêu cầu có thể trùng</h3>
+                    <details className="secondary-command">
+                      <summary>Kiểm tra {duplicates.length} yêu cầu có thể trùng</summary>
                       <p>
                         Hai yêu cầu ở gần nhau vẫn có thể thuộc hai hộ khác nhau. Hãy đối chiếu
                         trước khi đánh dấu trùng.
@@ -1250,9 +1320,9 @@ export function Coordinator({ page }: { page: string }) {
                           })}
                         </div>
                       ))}
-                    </section>
+                    </details>
                   )}
-                  {command({
+                  {secondaryCommand({
                     title: 'Từ chối yêu cầu',
                     service: 'response',
                     path: `/requests/${detail.id}/reject`,
@@ -1376,13 +1446,16 @@ export function Coordinator({ page }: { page: string }) {
                 'ASSIGNED',
                 'IN_PROGRESS',
               ].includes(detail.status) && (
-                <AsyncRequestForm
-                  key={`cancel-${detail.id}-${detail.version}`}
-                  requestId={detail.id}
-                  version={detail.version}
-                  kind="cancel"
-                  onCompleted={done}
-                />
+                <details className="secondary-command">
+                  <summary>Hủy yêu cầu</summary>
+                  <AsyncRequestForm
+                    key={`cancel-${detail.id}-${detail.version}`}
+                    requestId={detail.id}
+                    version={detail.version}
+                    kind="cancel"
+                    onCompleted={done}
+                  />
+                </details>
               )}
               {detail.status === 'RESOLVED' &&
                 command({
@@ -1408,14 +1481,17 @@ export function Coordinator({ page }: { page: string }) {
                   item.outcome === 'REACHED' &&
                   ['REPORTER', 'ALTERNATE'].includes(item.contact_target)
               ) && (
-                <RecoveryIssue
-                  key={`recovery-${detail.id}-${detail.version}`}
-                  service="response"
-                  path={`/requests/${detail.id}/recovery`}
-                  version={detail.version}
-                  kind="sos"
-                  contacts={detail.contact_attempts.items}
-                />
+                <details className="secondary-command">
+                  <summary>Cấp mã khôi phục</summary>
+                  <RecoveryIssue
+                    key={`recovery-${detail.id}-${detail.version}`}
+                    service="response"
+                    path={`/requests/${detail.id}/recovery`}
+                    version={detail.version}
+                    kind="sos"
+                    contacts={detail.contact_attempts.items}
+                  />
+                </details>
               )}
             </div>
           </>
@@ -1433,38 +1509,11 @@ export function CoordinatorMap() {
     loading: regionLoading,
     error: regionError,
   } = useAnalyticsRegion();
-  const [layer, setLayer] = useState<'confirmed' | 'unverified'>('confirmed');
-  const [data, setData] = useState<{
-    items: { center: { coordinates: [number, number] }; count: number }[];
-    generated_at: string;
-  } | null>(null);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    if (!region) return;
-    let active = true;
-    setData(null);
-    setError('');
-    const now = new Date().toISOString();
-    const from = new Date(Date.now() - 7 * 86_400_000).toISOString();
-    api<typeof data>(
-      'response',
-      `/map/heatmap?from=${encodeURIComponent(from)}&to=${encodeURIComponent(now)}&status_layer=${layer}&region_code=${encodeURIComponent(region)}`
-    )
-      .then((value) => {
-        if (active) setData(value);
-      })
-      .catch((cause) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'Không thể tải bản đồ.');
-      });
-    return () => {
-      active = false;
-    };
-  }, [layer, region]);
   return (
     <section className="card">
-      <h2>Bản đồ tổng hợp theo ô</h2>
+      <h2>Bản đồ nhiệt SOS</h2>
       <p>
-        Chỉ hiển thị số lượng theo ô, không hiển thị vị trí hoặc liên hệ chính xác của người báo.
+        Màu đậm hơn cho biết ô có nhiều yêu cầu SOS hơn. Kéo bản đồ hoặc dùng nút +/− để xem khu vực.
       </p>
       <AnalyticsRegionField region={region} onChange={setRegion} regions={regions} />
       {regionError && (
@@ -1473,43 +1522,7 @@ export function CoordinatorMap() {
         </p>
       )}
       {!region && !regionLoading && <p>Chọn hoặc nhập mã khu vực để tải bản đồ.</p>}
-      <div className="tabs">
-        <button
-          className={layer === 'confirmed' ? 'active' : ''}
-          onClick={() => setLayer('confirmed')}
-        >
-          Đã xác minh
-        </button>
-        <button
-          className={layer === 'unverified' ? 'active' : ''}
-          onClick={() => setLayer('unverified')}
-        >
-          Chưa xác minh
-        </button>
-      </div>
-      {error && (
-        <p className="notice error" role="alert">
-          {error}
-        </p>
-      )}
-      {!data && !error && <p role="status">Đang tải dữ liệu bản đồ…</p>}
-      {data && (
-        <>
-          <p className="muted">Tạo lúc {timeLabel(data.generated_at)}</p>
-          {data.items.length ? (
-            <div className="map-cells">
-              {data.items.map((cell, index) => (
-                <div className="map-cell" key={index}>
-                  <strong>{cell.count} yêu cầu</strong>
-                  <small>Ô gần {cell.center.coordinates.map((v) => v.toFixed(3)).join(', ')}</small>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="empty">Chưa có yêu cầu trong lớp dữ liệu này.</div>
-          )}
-        </>
-      )}
+      <HeatmapPanel region={region} />
     </section>
   );
 }

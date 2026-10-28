@@ -26,6 +26,7 @@ import { SosForm } from './features/citizen/SosForm';
 import { Donations } from './features/citizen/Donations';
 import { TrackingActions } from './features/citizen/TrackingActions';
 import { Coordinator, CoordinatorMap } from './features/coordinator/Coordinator';
+import { HeatmapPanel } from './features/coordinator/HeatmapPanel';
 import { Campaigns } from './features/coordinator/Campaigns';
 import { Notices, Volunteer } from './features/volunteer/Volunteer';
 import { Admin } from './features/admin/Admin';
@@ -1056,6 +1057,11 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
             )
           ) : 'status_counts' in data ? (
             <div className="report-content">
+              <div className="report-heatmap">
+                <h3>Bản đồ nhiệt SOS</h3>
+                <p>Mỗi ô cho biết số SOS trong khu vực. Kéo hoặc phóng to bản đồ để xem chi tiết.</p>
+                <HeatmapPanel region={region} />
+              </div>
               <div className="report-metrics">
                 <div className="metric-tile">
                   <span>Nhiệm vụ đang hoạt động</span>

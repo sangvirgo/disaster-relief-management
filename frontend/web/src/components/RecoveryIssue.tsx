@@ -13,10 +13,13 @@ export function RecoveryIssue({
   path: string;
   version: number;
   kind: 'sos' | 'donation';
-  contacts?: { id: string; outcome: string; contact_target: string }[];
+  contacts?: { id: string; outcome: string; contact_target: string; attempted_at?: string }[];
 }) {
   const [reason, setReason] = useState('');
-  const [basis, setBasis] = useState('');
+  const eligibleContacts = contacts?.filter(
+    (item) => item.outcome === 'REACHED' && ['REPORTER', 'ALTERNATE'].includes(item.contact_target)
+  ) ?? [];
+  const [basis, setBasis] = useState(eligibleContacts.length === 1 ? eligibleContacts[0].id : '');
   const [note, setNote] = useState('');
   const [result, setResult] = useState<{ recovery_code?: string; expires_at?: string } | null>(
     null
@@ -102,15 +105,9 @@ export function RecoveryIssue({
                 }}
               >
                 <option value="">Chọn lần liên hệ</option>
-                {contacts
-                  ?.filter(
-                    (item) =>
-                      item.outcome === 'REACHED' &&
-                      ['REPORTER', 'ALTERNATE'].includes(item.contact_target)
-                  )
-                  .map((item) => (
+                {eligibleContacts.map((item) => (
                     <option value={item.id} key={item.id}>
-                      {label(item.contact_target)} · {item.id.slice(0, 8)}
+                      {label(item.contact_target)} · {item.attempted_at ? timeLabel(item.attempted_at) : 'Đã liên hệ'}
                     </option>
                   ))}
               </select>

@@ -14,6 +14,7 @@ export type Field = {
   integer?: boolean;
   options?: { value: string; label: string }[];
   placeholder?: string;
+  initialValue?: string;
 };
 export interface CommandSpec {
   title: string;
@@ -42,7 +43,10 @@ export function CommandForm({
   onSuccess: () => void;
   onStale?: () => void;
 }) {
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries((spec.fields || []).filter((field) => field.initialValue)
+      .map((field) => [field.name, field.initialValue!]))
+  );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
