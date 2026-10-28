@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { maplibreGL } from '@maplibre/maplibre-gl-leaflet';
@@ -35,35 +35,43 @@ function validPoint(point: SelectedSos | null): point is SelectedSos {
   );
 }
 
-function cellColor(count: number): string {
-  if (count >= 7) return '#b42318';
-  if (count >= 4) return '#ea580c';
-  if (count >= 2) return '#f59e0b';
-  return '#facc15';
+function resolutionForZoom(zoom: number): 250 | 500 | 1000 | 5000 {
+  if (zoom >= 13) return 250;
+  if (zoom >= 11) return 500;
+  if (zoom >= 9) return 1000;
+  return 5000;
+}
+
+function centerOf(cell: HeatmapCell): L.LatLngTuple | null {
+  const [longitude, latitude] = cell.center.coordinates;
+  return Number.isFinite(longitude) && Number.isFinite(latitude)
+    ? [latitude, longitude]
+    : null;
 }
 
 function HeatmapCanvas({
   cells,
   selected,
+  onResolutionChange,
 }: {
   cells: HeatmapCell[];
   selected: SelectedSos | null;
+  onResolutionChange: (resolution: 250 | 500 | 1000 | 5000) => void;
 }) {
   const elementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const cellLayerRef = useRef<L.LayerGroup | null>(null);
+  const dotLayerRef = useRef<L.LayerGroup | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
-  const framedRef = useRef(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [tileError, setTileError] = useState(false);
 
   useEffect(() => {
     if (!elementRef.current) return;
     const map = L.map(elementRef.current, {
-      center: [16.1, 107.7], zoom: 6, zoomControl: true, scrollWheelZoom: true,
+      center: [16.1, 107.7], zoom: 5, minZoom: 4, maxZoom: 18,
+      zoomControl: true, scrollWheelZoom: true,
     });
     mapRef.current = map;
-    cellLayerRef.current = L.layerGroup().addTo(map);
-    markerLayerRef.current = L.layerGroup().addTo(map);
     if (tileUrl) {
       L.tileLayer(tileUrl, { attribution: tileAttribution, maxZoom: 19 })
         .on('tileerror', () => setTileError(true))
@@ -74,49 +82,102 @@ function HeatmapCanvas({
       vectorLayer.getMaplibreMap().on('error', () => setTileError(true));
       vectorLayer.getMaplibreMap().on('load', () => setTileError(false));
     }
+    dotLayerRef.current = L.layerGroup().addTo(map);
+    markerLayerRef.current = L.layerGroup().addTo(map);
+    const canvas = document.createElement('canvas');
+    canvas.className = 'heatmap-soft-layer';
+    elementRef.current.appendChild(canvas);
+    canvasRef.current = canvas;
+    map.fitBounds([[8.2, 102.1], [23.5, 110.4]], { padding: [12, 12], animate: false });
+    onResolutionChange(resolutionForZoom(map.getZoom()));
     const sizeTimer = window.setTimeout(() => map.invalidateSize(), 150);
     return () => {
       window.clearTimeout(sizeTimer);
       map.remove();
+      canvas.remove();
       mapRef.current = null;
-      cellLayerRef.current = null;
+      dotLayerRef.current = null;
       markerLayerRef.current = null;
-      framedRef.current = false;
+      canvasRef.current = null;
     };
   }, []);
 
   useEffect(() => {
     const map = mapRef.current;
-    const cellLayer = cellLayerRef.current;
-    if (!map || !cellLayer) return;
-    cellLayer.clearLayers();
-    const bounds = L.latLngBounds([]);
-    const selectedLatLng = validPoint(selected)
-      ? L.latLng(selected.latitude, selected.longitude)
-      : null;
-    for (const cell of cells) {
-      const ring = cell.cell.coordinates[0];
-      if (!ring || ring.length < 4) continue;
-      const polygon = L.polygon(
-        ring.map(([longitude, latitude]) => [latitude, longitude] as L.LatLngTuple),
-        {
-          color: '#fff', weight: 1.5, fillColor: cellColor(cell.count),
-          fillOpacity: 0.62, className: 'heatmap-cell-polygon',
+    const dots = dotLayerRef.current;
+    const canvas = canvasRef.current;
+    if (!map || !dots || !canvas) return;
+    function redraw() {
+      if (!map || !dots || !canvas) return;
+      const zoom = map.getZoom();
+      onResolutionChange(resolutionForZoom(zoom));
+      dots.clearLayers();
+      const size = map.getSize();
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, Math.round(size.x * ratio));
+      canvas.height = Math.max(1, Math.round(size.y * ratio));
+      canvas.style.width = `${size.x}px`;
+      canvas.style.height = `${size.y}px`;
+      const context = canvas.getContext('2d');
+      if (!context) return;
+      context.scale(ratio, ratio);
+      if (zoom <= 8) {
+        const clusters: { latitude: number; longitude: number; x: number; y: number; count: number }[] = [];
+        for (const cell of cells) {
+          const position = centerOf(cell);
+          if (!position) continue;
+          const pixel = map.latLngToContainerPoint(position);
+          const nearby = clusters.find((cluster) => Math.hypot(cluster.x - pixel.x, cluster.y - pixel.y) < 46);
+          if (nearby) {
+            const total = nearby.count + cell.count;
+            nearby.latitude = (nearby.latitude * nearby.count + position[0] * cell.count) / total;
+            nearby.longitude = (nearby.longitude * nearby.count + position[1] * cell.count) / total;
+            nearby.x = (nearby.x * nearby.count + pixel.x * cell.count) / total;
+            nearby.y = (nearby.y * nearby.count + pixel.y * cell.count) / total;
+            nearby.count = total;
+          } else {
+            clusters.push({ latitude: position[0], longitude: position[1], x: pixel.x, y: pixel.y, count: cell.count });
+          }
         }
-      );
-      if (selectedLatLng && polygon.getBounds().contains(selectedLatLng)) {
-        polygon.setStyle({ color: '#9f1239', weight: 3, fillOpacity: 0.75 });
+        for (const cluster of clusters) {
+          const radius = Math.min(24, 10 + Math.sqrt(cluster.count) * 3);
+          const dot = L.circleMarker([cluster.latitude, cluster.longitude], {
+            radius, color: '#fff', weight: 2.5,
+            fillColor: cluster.count >= 5 ? '#bf2a22' : '#eb6b24', fillOpacity: 0.92,
+            className: 'heatmap-overview-dot',
+          }).addTo(dots);
+          dot.bindTooltip(`${cluster.count} SOS gần khu vực này · nhấn để xem gần hơn`);
+          dot.on('click', () => map.setView([cluster.latitude, cluster.longitude], 10, { animate: true }));
+          L.marker([cluster.latitude, cluster.longitude], {
+            interactive: false,
+            icon: L.divIcon({
+              className: 'heatmap-dot-count', html: String(cluster.count),
+              iconSize: [radius * 2, radius * 2], iconAnchor: [radius, radius],
+            }),
+          }).addTo(dots);
+        }
+        return;
       }
-      polygon.bindTooltip(`${cell.count} yêu cầu SOS trong ô này`);
-      polygon.addTo(cellLayer);
-      bounds.extend(polygon.getBounds());
+      for (const cell of cells) {
+        const position = centerOf(cell);
+        if (!position) continue;
+        const pixel = map.latLngToContainerPoint(position);
+        const radius = zoom >= 14 ? 58 : zoom >= 11 ? 70 : 84;
+        if (pixel.x < -radius || pixel.x > size.x + radius || pixel.y < -radius || pixel.y > size.y + radius) continue;
+        const intensity = Math.min(1, 0.4 + Math.log2(cell.count + 1) * 0.18);
+        const gradient = context.createRadialGradient(pixel.x, pixel.y, 2, pixel.x, pixel.y, radius);
+        gradient.addColorStop(0, cell.count >= 4 ? `rgba(185, 28, 28, ${intensity})` : cell.count >= 2 ? `rgba(234, 88, 12, ${intensity})` : `rgba(245, 158, 11, ${intensity})`);
+        gradient.addColorStop(0.38, `rgba(250, 174, 27, ${intensity * 0.55})`);
+        gradient.addColorStop(0.75, `rgba(250, 204, 21, ${intensity * 0.22})`);
+        gradient.addColorStop(1, 'rgba(250, 204, 21, 0)');
+        context.fillStyle = gradient;
+        context.fillRect(pixel.x - radius, pixel.y - radius, radius * 2, radius * 2);
+      }
     }
-    if (!framedRef.current && !selectedLatLng && bounds.isValid()) {
-      map.fitBounds(bounds.pad(0.28), { maxZoom: 13, animate: false });
-      framedRef.current = true;
-    }
-    map.invalidateSize();
-  }, [cells, selected?.id, selected?.latitude, selected?.longitude]);
+    map.on('zoomend moveend resize', redraw);
+    redraw();
+    return () => { map.off('zoomend moveend resize', redraw); };
+  }, [cells, onResolutionChange]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -139,9 +200,9 @@ function HeatmapCanvas({
   return (
     <>
       <div ref={elementRef} className="heatmap-canvas" role="region"
-        aria-label="Bản đồ nhiệt SOS; dùng nút cộng trừ để phóng to hoặc thu nhỏ" />
+        aria-label="Bản đồ nhiệt SOS; cuộn chuột hoặc dùng nút cộng trừ để phóng to và thu nhỏ" />
       {tileError && <p className="notice warning" role="status">
-        Nền bản đồ chưa tải được. Dữ liệu các ô SOS vẫn được hiển thị.
+        Nền bản đồ chưa tải được. Dữ liệu SOS vẫn được hiển thị.
       </p>}
     </>
   );
@@ -149,41 +210,62 @@ function HeatmapCanvas({
 
 export function HeatmapPanel({
   region,
+  overviewRegions,
   selected = null,
   compact = false,
   showLayers = true,
 }: {
   region: string;
+  overviewRegions?: string[];
   selected?: SelectedSos | null;
   compact?: boolean;
   showLayers?: boolean;
 }) {
-  const [layer, setLayer] = useState<'confirmed' | 'unverified'>('confirmed');
-  const [data, setData] = useState<HeatmapResult | null>(null);
+  const [layer, setLayer] = useState<'confirmed' | 'unverified'>('unverified');
+  const [resolution, setResolution] = useState<250 | 500 | 1000 | 5000>(5000);
+  const [data, setData] = useState<{ items: HeatmapCell[]; generated_at: string } | null>(null);
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
   const [loading, setLoading] = useState(false);
+  const targetRegions = overviewRegions?.length ? [...new Set(overviewRegions)] : region ? [region] : [];
+  const regionKey = targetRegions.join('|');
+  const onResolutionChange = useCallback((next: typeof resolution) => {
+    setResolution((current) => current === next ? current : next);
+  }, []);
   useEffect(() => {
-    if (!region) {
+    if (!regionKey) {
       setData(null);
       return;
     }
     let active = true;
     setLoading(true);
-    setData(null);
     setError('');
+    setWarning('');
     const now = new Date().toISOString();
     const from = new Date(Date.now() - 7 * 86_400_000).toISOString();
-    const params = new URLSearchParams({
-      from, to: now, status_layer: layer, region_code: region, cell_m: '1000',
-    });
-    void api<HeatmapResult>('response', `/map/heatmap?${params}`)
-      .then((value) => { if (active) setData(value); })
-      .catch((cause) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'Không thể tải bản đồ nhiệt.');
-      })
-      .finally(() => { if (active) setLoading(false); });
+    void Promise.allSettled(targetRegions.map((code) => {
+      const params = new URLSearchParams({
+        from, to: now, status_layer: layer, region_code: code, cell_m: String(resolution),
+      });
+      return api<HeatmapResult>('response', `/map/heatmap?${params}`);
+    })).then((results) => {
+      if (!active) return;
+      const values = results.filter((result): result is PromiseFulfilledResult<HeatmapResult> => result.status === 'fulfilled');
+      if (!values.length) {
+        const first = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+        setError(first?.reason instanceof Error ? first.reason.message : 'Không thể tải bản đồ nhiệt.');
+        setData(null);
+        return;
+      }
+      if (values.length < targetRegions.length)
+        setWarning(`Chỉ tải được ${values.length}/${targetRegions.length} khu vực. Số SOS trên bản đồ chưa đầy đủ.`);
+      setData({ items: values.flatMap((result) => result.value.items), generated_at: now });
+    }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [region, layer]);
+  }, [regionKey, layer, resolution]);
+
+  const count = data?.items.reduce((sum, cell) => sum + cell.count, 0) ?? 0;
+  const showMap = Boolean(regionKey || validPoint(selected));
 
   return (
     <div className={`heatmap-panel${compact ? ' heatmap-panel-compact' : ''}`}>
@@ -193,22 +275,22 @@ export function HeatmapPanel({
         <button type="button" className={layer === 'unverified' ? 'active' : ''}
           onClick={() => setLayer('unverified')}>Chưa xác minh</button>
       </div>}
-      {!region && <p>Chọn khu vực để xem bản đồ nhiệt.</p>}
-      {!region && validPoint(selected) && <HeatmapCanvas cells={[]} selected={selected} />}
-      {region && <>
+      {!showMap && <p>Chọn khu vực để xem bản đồ nhiệt.</p>}
+      {showMap && <>
         {loading && <p role="status">Đang cập nhật bản đồ nhiệt…</p>}
         {error && <p className="notice error" role="alert">{error}</p>}
+        {warning && <p className="notice warning" role="status">{warning}</p>}
+        <HeatmapCanvas key={regionKey} cells={data?.items ?? []} selected={selected} onResolutionChange={onResolutionChange} />
         {data && <>
-          <HeatmapCanvas key={region} cells={data.items} selected={selected} />
           <div className="heatmap-caption">
-            <span>Ít SOS</span><span className="heatmap-gradient" aria-hidden="true" /><span>Nhiều SOS</span>
-            <small>{data.items.reduce((sum, cell) => sum + cell.count, 0)} yêu cầu · 7 ngày gần đây · ô 1 km</small>
+            <span>{resolution === 5000 ? 'Chấm SOS' : 'Vùng nhiệt'}</span>
+            <span className="heatmap-gradient" aria-hidden="true" /><span>Ít → Nhiều</span>
+            <small>{count} SOS · 7 ngày gần đây · độ chi tiết {resolution >= 1000 ? `${resolution / 1000} km` : `${resolution} m`}</small>
           </div>
           {compact && validPoint(selected) && <p className="muted">
-            Ghim đỏ là SOS đang chọn. Nền màu chỉ tính yêu cầu trong 7 ngày gần đây;
-            SOS cũ vẫn hiện ghim nhưng có thể không nằm trong ô màu.
+            Ghim đỏ là SOS đang chọn. Nền nhiệt chỉ gồm SOS trong 7 ngày gần đây.
           </p>}
-          {data.items.length === 0 && <p className="muted">
+          {count === 0 && <p className="muted">
             Chưa có SOS thuộc lớp dữ liệu này trong khu vực và thời gian đã chọn.
           </p>}
           <p className="muted">Cập nhật: {timeLabel(data.generated_at)}</p>

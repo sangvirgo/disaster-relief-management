@@ -1131,7 +1131,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
             <div className="report-content">
               <div className="report-heatmap">
                 <h3>Bản đồ nhiệt SOS</h3>
-                <p>Mỗi ô cho biết số SOS trong khu vực. Kéo hoặc phóng to bản đồ để xem chi tiết.</p>
+                <p>Chấm tròn cho biết nơi có SOS; phóng gần để xem vùng nhiệt theo mật độ.</p>
                 <HeatmapPanel region={region} />
               </div>
               <div className="report-metrics">
@@ -1393,8 +1393,13 @@ function App() {
           </div>
         </header>
         <div className="emergency-bar" role="note">
-          <strong>Nguy hiểm tính mạng?</strong>
-          <span>Gọi ngay <a href="tel:113">113 Công an</a> · <a href="tel:114">114 Cứu hỏa</a> · <a href="tel:115">115 Cấp cứu</a></span>
+          <span className="emergency-icon" aria-hidden="true">!</span>
+          <strong>Khẩn cấp? Gọi ngay</strong>
+          <div className="emergency-links">
+            <a href="tel:113">113 <span>Công an</span></a>
+            <a href="tel:114">114 <span>Cứu hỏa</span></a>
+            <a href="tel:115">115 <span>Cấp cứu</span></a>
+          </div>
         </div>
 
         <main className="content">

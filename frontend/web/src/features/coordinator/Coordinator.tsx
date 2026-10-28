@@ -675,7 +675,7 @@ export function Coordinator({ page }: { page: string }) {
                   <p>{detail.declared_danger ? 'Có khai báo nguy hiểm tính mạng' : 'Chưa khai báo nguy hiểm tính mạng'}</p>
                   <p>{detail.needs_rescue ? 'Cần cứu hộ' : 'Không khai báo cần cứu hộ'}
                     {detail.needs_relief_supplies ? ' · Cần hàng cứu trợ' : ''}</p>
-                  <small>Vị trí SOS lấy từ hồ sơ đã được cấp quyền; màu nền thể hiện số SOS trong từng ô.</small>
+                  <small>Ghim đỏ là SOS đang chọn; vùng nhiệt cho biết mật độ SOS gần đó.</small>
                 </div>
                 <div className="triage-context-map">
                   <h3>Vị trí trên bản đồ nhiệt</h3>
@@ -1457,6 +1457,7 @@ export function Coordinator({ page }: { page: string }) {
 }
 
 export function CoordinatorMap() {
+  const [national, setNational] = useState(true);
   const {
     region,
     setRegion,
@@ -1468,16 +1469,26 @@ export function CoordinatorMap() {
     <section className="card">
       <h2>Bản đồ nhiệt SOS</h2>
       <p>
-        Màu đậm hơn cho biết ô có nhiều yêu cầu SOS hơn. Kéo bản đồ hoặc dùng nút +/− để xem khu vực.
+        Bản đồ mở ở tầm nhìn Việt Nam. Chấm tròn cho biết khu vực có SOS; phóng gần bằng chuột hoặc nút + để xem vùng nhiệt.
       </p>
-      <AnalyticsRegionField region={region} onChange={setRegion} regions={regions} />
+      <div className="tabs map-scope-switch" role="group" aria-label="Phạm vi bản đồ">
+        <button type="button" className={national ? 'active' : ''} onClick={() => setNational(true)}>
+          Các khu vực của tôi
+        </button>
+        <button type="button" className={!national ? 'active' : ''} onClick={() => setNational(false)}>
+          Một khu vực
+        </button>
+      </div>
+      {!national && <AnalyticsRegionField region={region} onChange={setRegion} regions={regions} />}
+      {national && <p className="muted">Tổng hợp các khu vực có chiến dịch mà tài khoản được cấp quyền xem.</p>}
       {regionError && (
         <p role="alert" className="notice error">
           {regionError}
         </p>
       )}
-      {!region && !regionLoading && <p>Chọn hoặc nhập mã khu vực để tải bản đồ.</p>}
-      <HeatmapPanel region={region} />
+      {national && !regions.length && !regionLoading && <p>Chưa có khu vực nào để tổng hợp. Hãy chọn “Một khu vực” và nhập mã.</p>}
+      {!national && !region && !regionLoading && <p>Chọn hoặc nhập mã khu vực để tải bản đồ.</p>}
+      <HeatmapPanel region={national ? '' : region} overviewRegions={national ? regions : undefined} />
     </section>
   );
 }
