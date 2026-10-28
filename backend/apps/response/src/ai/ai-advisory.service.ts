@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
+import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
 import { buildAiAssessmentInput } from './ai-risk';
 import { isAiAdvisoryFresh } from './ai-advisory-input';
@@ -8,6 +9,8 @@ interface AdvisoryJob {
   id: string;
   request_id: string;
   input_hash: string;
+  attempts: number;
+  claim_token: string;
   request_version: number;
   workCycle: number;
   latest_id: string;
@@ -44,6 +47,17 @@ const responseSchema = {
   },
   required: ['summary', 'indicators', 'facts', 'priority_score', 'priority_reasons', 'confidence'],
 };
+
+function maxRetries(): number {
+  const value = process.env.GEMINI_MAX_RETRIES;
+  if (value === undefined) return 3;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 3;
+}
+
+function retryDelaySeconds(attempt: number): number {
+  return Math.min(900, 30 * 4 ** Math.max(0, attempt - 1));
+}
 
 const indicatorLabels: Readonly<Record<string, string>> = {
   FIRE: 'Cháy',
@@ -92,7 +106,6 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   onModuleInit(): void {
-    if (process.env.GEMINI_ADVISORY_WORKER_ENABLED !== 'true') return;
     this.timer = setInterval(() => void this.processOne(), 2_000);
     this.timer.unref();
     void this.processOne();
@@ -114,15 +127,26 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
         extracted = await this.extract(job, JSON.stringify(buildAiAssessmentInput(job)));
       } catch (error) {
         const code = error instanceof Error && error.message === 'AI_INVALID_OUTPUT' ? 'AI_INVALID_OUTPUT' : 'AI_PROVIDER_ERROR';
-        this.logger.warn(code, `job:${job.id}`);
+        const providerStatus = error instanceof Error
+          ? /^AI_PROVIDER_(?:RETRYABLE|ERROR):(\d{3}|NETWORK)$/u.exec(error.message)?.[1]
+          : undefined;
+        if (error instanceof Error && error.message.startsWith('AI_PROVIDER_RETRYABLE:') && job.attempts <= maxRetries()) {
+          const delaySeconds = retryDelaySeconds(job.attempts);
+          this.logger.warn('AI_PROVIDER_RETRY_SCHEDULED', `job:${job.id} attempt:${job.attempts} delay_seconds:${delaySeconds} provider_status:${providerStatus ?? 'UNKNOWN'}`);
+          await this.persistResult(job.id,
+            `UPDATE ai_advisory SET status='QUEUED',error_code=NULL,completed_at=NULL,lease_until=now()+($2 * interval '1 second'),claim_token=NULL
+              WHERE id=$1 AND status='PROCESSING' AND claim_token=$3 AND lease_until>now()`, [job.id, delaySeconds, job.claim_token]);
+          return;
+        }
+        this.logger.warn(code, providerStatus ? `job:${job.id} provider_status:${providerStatus}` : `job:${job.id}`);
         await this.persistResult(job.id,
-          `UPDATE ai_advisory SET status='FAILED',error_code=$2,completed_at=now(),lease_until=NULL
-            WHERE id=$1 AND status='PROCESSING' AND lease_until>now()`, [job.id, code]);
+          `UPDATE ai_advisory SET status='FAILED',error_code=$2,completed_at=now(),lease_until=NULL,claim_token=NULL
+            WHERE id=$1 AND status='PROCESSING' AND claim_token=$3 AND lease_until>now()`, [job.id, code, job.claim_token]);
         return;
       }
       await this.persistResult(job.id,
-        `UPDATE ai_advisory SET status='COMPLETED',extracted_json=$2::jsonb,error_code=NULL,completed_at=now(),lease_until=NULL
-          WHERE id=$1 AND status='PROCESSING' AND lease_until>now()`, [job.id, JSON.stringify(extracted)]);
+        `UPDATE ai_advisory SET status='COMPLETED',extracted_json=$2::jsonb,error_code=NULL,completed_at=now(),lease_until=NULL,claim_token=NULL
+          WHERE id=$1 AND status='PROCESSING' AND claim_token=$3 AND lease_until>now()`, [job.id, JSON.stringify(extracted), job.claim_token]);
     } catch {
       this.logger.warn('AI_ADVISORY_CLAIM_FAILED');
     } finally {
@@ -131,8 +155,8 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async persistResult(jobId: string, sql: string, parameters: unknown[]): Promise<void> {
-    // The provider is called once. If writes remain unavailable, the durable lease expires
-    // and claimJob marks the abandoned attempt failed without calling the provider again.
+    // Provider retries are explicit queued attempts. If result persistence keeps failing,
+    // the lease expires and claimJob marks the abandoned attempt failed without replaying it.
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         await this.dataSource.query(sql, parameters);
@@ -145,9 +169,19 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
 
   private async claimJob(): Promise<AdvisoryJob | undefined> {
     return this.dataSource.transaction(async (manager) => {
-      await manager.query("UPDATE ai_advisory SET status='FAILED',error_code='AI_PROVIDER_ERROR',completed_at=now(),lease_until=NULL WHERE status='PROCESSING' AND lease_until<now()");
+      await manager.query(
+        `UPDATE ai_advisory
+            SET status=CASE WHEN attempts<=$1 THEN 'QUEUED' ELSE 'FAILED' END,
+                error_code=CASE WHEN attempts<=$1 THEN NULL ELSE 'AI_PROVIDER_ERROR' END,
+                completed_at=CASE WHEN attempts<=$1 THEN NULL ELSE now() END,
+                lease_until=CASE WHEN attempts<=$1
+                  THEN now()+(LEAST(900,30*POWER(4,GREATEST(0,attempts-1)))*interval '1 second')
+                  ELSE NULL END,
+                claim_token=NULL
+          WHERE status='PROCESSING' AND lease_until<now()`, [maxRetries()],
+      );
       const rows = await manager.query(
-        `SELECT a.id,a.request_id,a.input_hash,a.model,a.request_version,r.work_cycle AS "workCycle",
+        `SELECT a.id,a.request_id,a.input_hash,a.attempts,a.model,a.request_version,r.work_cycle AS "workCycle",
                   (SELECT id FROM ai_advisory WHERE request_id=a.request_id ORDER BY created_at DESC,id DESC LIMIT 1) AS latest_id,
                   r.incident_category_code AS "incidentCategoryCode",r.description,
                   s.people_affected AS "peopleAffected",s.children_count AS "childrenCount",
@@ -155,7 +189,8 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
                   r.needs_rescue AS "needsRescue",r.needs_relief_supplies AS "needsReliefSupplies"
            FROM ai_advisory a JOIN assistance_request r ON r.id=a.request_id
            JOIN request_subject s ON s.request_id=r.id
-          WHERE a.status='QUEUED' AND a.attempts=0 ORDER BY a.created_at,a.id FOR UPDATE OF a SKIP LOCKED LIMIT 1`,
+          WHERE a.status='QUEUED' AND (a.lease_until IS NULL OR a.lease_until<=now())
+          ORDER BY a.created_at,a.id FOR UPDATE OF a SKIP LOCKED LIMIT 1`,
       ) as AdvisoryJob[];
       const job = rows[0];
       if (!job) return undefined;
@@ -175,10 +210,20 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
          WHERE ai_daily_usage.calls<500 RETURNING calls`,
       ) as Array<{ calls: number }>;
       if (!usage[0]) {
-        await manager.query("UPDATE ai_advisory SET status='SKIPPED',error_code='AI_DAILY_LIMIT',completed_at=now() WHERE id=$1", [job.id]);
+        await manager.query(
+          `UPDATE ai_advisory SET lease_until=(date_trunc('day',timezone('America/Los_Angeles',now()))+interval '1 day') AT TIME ZONE 'America/Los_Angeles'
+            WHERE id=$1 AND status='QUEUED'`, [job.id],
+        );
+        this.logger.warn('AI_DAILY_LIMIT_RETRY_SCHEDULED', `job:${job.id}`);
         return undefined;
       }
-      await manager.query("UPDATE ai_advisory SET status='PROCESSING',attempts=1,lease_until=now()+interval '45 seconds' WHERE id=$1", [job.id]);
+      const claimToken = randomUUID();
+      await manager.query(
+        "UPDATE ai_advisory SET status='PROCESSING',attempts=attempts+1,lease_until=now()+interval '45 seconds',claim_token=$2 WHERE id=$1 AND status='QUEUED'",
+        [job.id, claimToken],
+      );
+      job.attempts = Number(job.attempts) + 1;
+      job.claim_token = claimToken;
       return job;
     });
   }
@@ -194,14 +239,21 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
         }),
         signal: AbortSignal.timeout(15_000),
       });
-      if (!response.ok) throw new Error('AI_PROVIDER_ERROR');
+      if (!response.ok) {
+        const code = response.status === 408 || response.status === 429 || response.status >= 500
+          ? 'AI_PROVIDER_RETRYABLE'
+          : 'AI_PROVIDER_ERROR';
+        throw new Error(`${code}:${response.status}`);
+      }
       const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
       const value = normalizeExtraction(JSON.parse(body.candidates?.[0]?.content?.parts?.[0]?.text ?? '') as unknown);
       if (!this.validExtraction(value)) throw new Error('AI_INVALID_OUTPUT');
       return value;
     } catch (error) {
       if (error instanceof Error && error.message === 'AI_INVALID_OUTPUT') throw error;
-      throw new Error('AI_PROVIDER_ERROR');
+      if (error instanceof SyntaxError) throw new Error('AI_INVALID_OUTPUT');
+      if (error instanceof Error && /^AI_PROVIDER_(?:RETRYABLE|ERROR):\d{3}$/u.test(error.message)) throw error;
+      throw new Error('AI_PROVIDER_RETRYABLE:NETWORK');
     }
   }
 

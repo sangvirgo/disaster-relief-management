@@ -1,8 +1,6 @@
 import { buildAiAssessmentInput, serializeAiAssessmentInput, sanitizeAiDescription, scoreRequestRisk } from '../src/ai/ai-risk';
 
 describe('Gemini assessment input', () => {
-  beforeEach(() => { delete process.env.GEMINI_ADVISORY_INCLUDE_REDACTED_TEXT; });
-  afterEach(() => { delete process.env.GEMINI_ADVISORY_INCLUDE_REDACTED_TEXT; });
   it('includes safe structured SOS facts even when the description is empty', () => {
     const input = buildAiAssessmentInput({
       incidentCategoryCode: 'FLOOD',
@@ -27,11 +25,11 @@ describe('Gemini assessment input', () => {
     });
   });
 
-  it('omits narrative by default even when personal information is present', () => {
+  it('excludes narrative by default and masks direct identifiers only when explicitly enabled', () => {
     const facts = {
-      incidentCategoryCode: 'MEDICAL',
-      description: 'Tôi tên là Nguyễn Văn An, cần cấp cứu. Email an@example.com.',
-      peopleAffected: 1,
+      incidentCategoryCode: 'FLOOD',
+      description: 'Nước lũ dâng nhanh, 4 người mắc kẹt. Tôi tên là Nguyễn Văn An, email an@example.com.',
+      peopleAffected: 4,
       childrenCount: null,
       elderlyCount: null,
       reporterDeclaredDanger: false,
@@ -39,22 +37,46 @@ describe('Gemini assessment input', () => {
       needsReliefSupplies: false,
     };
 
-    const serialized = serializeAiAssessmentInput(facts);
+    const serialized = serializeAiAssessmentInput(facts, true);
 
-    expect(serialized).toBe(serializeAiAssessmentInput(facts));
+    expect(buildAiAssessmentInput(facts).description).toBe('');
+    expect(serializeAiAssessmentInput(facts)).not.toContain(facts.description);
+    expect(serialized).toBe(serializeAiAssessmentInput(facts, true));
     expect(serialized).not.toContain('Nguyễn Văn An');
     expect(serialized).not.toContain('an@example.com');
     expect(JSON.parse(serialized)).toMatchObject({
-      incident_category_code: 'MEDICAL',
-      description: '',
-      people_affected: 1,
+      incident_category_code: 'FLOOD',
+      description: 'Nước lũ dâng nhanh, 4 người mắc kẹt. [đã ẩn tên], email [đã ẩn email].',
+      people_affected: 4,
     });
   });
 
-  it('preserves title-case emergency facts when redaction is explicitly enabled', () => {
+  it('preserves title-case emergency facts only in explicitly enabled synthetic narratives', () => {
     expect(sanitizeAiDescription('Nước Đang Dâng; Cần Cấp Cứu')).toBe('Nước Đang Dâng; Cần Cấp Cứu');
-    process.env.GEMINI_ADVISORY_INCLUDE_REDACTED_TEXT = 'true';
-    expect(buildAiAssessmentInput({ incidentCategoryCode: 'FLOOD', description: 'Nước Đang Dâng' }).description).toBe('Nước Đang Dâng');
+    expect(buildAiAssessmentInput({ incidentCategoryCode: 'FLOOD', description: 'Nước Đang Dâng' }).description).toBe('');
+    expect(buildAiAssessmentInput({ incidentCategoryCode: 'FLOOD', description: 'Nước Đang Dâng' }, true).description).toBe('Nước Đang Dâng');
+  });
+
+  it('masks exact coordinates, signed URLs, and credential assignments', () => {
+    const sanitized = sanitizeAiDescription(
+      'Nước lũ dâng nhanh. Link https://a.vn/p?token=abc_1234567890; vị trí 10.7769 106.7009; secret=secret_1234567890; "access_token":"json_credential_1234567890"',
+    );
+    expect(sanitized).toContain('Nước lũ dâng nhanh.');
+    expect(sanitized).not.toMatch(/https?:\/\/|abc_1234567890|10\.7769|106\.7009|secret_1234567890/u);
+    expect(sanitized).not.toContain('json_credential_');
+  });
+
+  it('masks only the name and preserves symptoms that follow it', () => {
+    const sanitized = sanitizeAiDescription('Tôi tên An đang khó thở; tôi tên Bình đau ngực, 2 người cần cứu.');
+    expect(sanitized).toContain('[đã ẩn tên]');
+    expect(sanitized).toContain('đang khó thở');
+    expect(sanitized).toContain('đau ngực');
+    expect(sanitized).toContain('2 người cần cứu.');
+  });
+
+  it('does not truncate the incident narrative before sending it to Gemini', () => {
+    const narrative = `${'x'.repeat(2_000)}; cần cứu.`;
+    expect(sanitizeAiDescription(narrative)).toBe(narrative);
   });
 
   it('abstains when counts and the incident narrative are unknown', () => {

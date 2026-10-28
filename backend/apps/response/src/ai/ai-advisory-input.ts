@@ -1,17 +1,17 @@
 import type { EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { aiInputHash, buildAiAssessmentInput, scoreRequestRisk, type AiAssessmentFacts } from './ai-risk';
+import { aiInputHash, buildAiAssessmentInput, includeSyntheticDemoNarrative, scoreRequestRisk, type AiAssessmentFacts } from './ai-risk';
 
 export interface StoredAssessmentFacts extends AiAssessmentFacts {
   version: number;
   workCycle: number;
 }
 
-export function aiAssessmentHash(facts: AiAssessmentFacts, requestVersion: number, workCycle: number): string {
+export function aiAssessmentHash(facts: AiAssessmentFacts, requestVersion: number, workCycle: number, includeNarrative = includeSyntheticDemoNarrative()): string {
   return aiInputHash(JSON.stringify({
-    schema_version: 'v3', request_version: Number(requestVersion), work_cycle: Number(workCycle),
-    include_redacted_text: process.env.GEMINI_ADVISORY_INCLUDE_REDACTED_TEXT === 'true',
-    input: buildAiAssessmentInput(facts, true),
+    schema_version: 'v4', request_version: Number(requestVersion), work_cycle: Number(workCycle),
+    input_mode: includeNarrative ? 'SYNTHETIC_DEMO_NARRATIVE' : 'STRUCTURED_ONLY',
+    input: buildAiAssessmentInput(facts, includeNarrative),
   }));
 }
 
@@ -40,8 +40,8 @@ export async function enqueueAiAdvisory(manager: Pick<EntityManager, 'query'>, r
   const risk = scoreRequestRisk(facts);
   await manager.query(
     `INSERT INTO ai_advisory (request_id,request_version,input_hash,model,prompt_version,schema_version,risk_score,reason_codes)
-     VALUES ($1,$2,$3,$4,'v3','v3',$5,$6) ON CONFLICT (request_id,input_hash) DO NOTHING`,
+     VALUES ($1,$2,$3,$4,'v3','v4',$5,$6) ON CONFLICT (request_id,input_hash) DO NOTHING`,
     [requestId, Number(facts.version), aiAssessmentHash(facts, facts.version, facts.workCycle),
-      process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite', risk.score, risk.reasonCodes],
+      process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite', risk.score, risk.reasonCodes],
   );
 }

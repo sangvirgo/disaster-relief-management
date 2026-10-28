@@ -136,6 +136,17 @@ const responseDetails = {
     request: request(object({ expected_version: { type: 'integer', minimum: 1 }, decision: { type: 'string', enum: ['ACCEPTED', 'ADJUSTED', 'REJECTED'] }, note: { type: 'string', maxLength: 1000 } }, ['expected_version', 'decision'])),
     response: response(object({ request_id: id, advisory_id: id, decision: { type: 'string', enum: ['ACCEPTED', 'ADJUSTED', 'REJECTED'] } }, ['request_id', 'advisory_id', 'decision'])),
   },
+  responseRequestOperationsRetryAiAdvisory: {
+    summary: 'Queue a coordinator-requested retry for a failed AI advisory.',
+    description: 'Requires REQUEST_VERIFY scope, the current request expected_version, an idempotency key, a configured Gemini API key, and the latest advisory to be FAILED and fresh for current SOS facts. Resets that advisory retry budget, appends a staff timeline event, and returns 202. A stale or superseded advisory is not retried. This does not change request facts, official priority, or team assignment.',
+    parameters: [
+      { $ref: '#/components/parameters/RequestId' },
+      { name: 'advisoryId', in: 'path', required: true, schema: id },
+      { $ref: '#/components/parameters/IdempotencyKey' },
+    ],
+    request: request(versionBody()),
+    response: response(object({ request_id: id, advisory_id: id, status: { type: 'string', const: 'QUEUED' } }, ['request_id', 'advisory_id', 'status']), 'AI advisory queued for a coordinator-requested retry.', undefined, idempotentCommandResponseHeaders),
+  },
   responseTrackingUpdateReport: {
     summary: 'Update editable facts on an SOS report before verification.',
     description: 'Uses expected_version for concurrency control. Omitted facts retain their current values. The request must be owned by the signed-in reporter or accompanied by valid tracking credentials.',
@@ -783,6 +794,7 @@ const routeErrorCodes = {
   supplementSelfRequest: ['STATE_TRANSITION_INVALID', 'VERSION_CONFLICT'],
   responseTrackingUpdateReport: ['NOT_FOUND', 'VALIDATION_FAILED', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
   responseRequestOperationsReviewAiAdvisory: ['NOT_FOUND', 'VALIDATION_FAILED', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
+  responseRequestOperationsRetryAiAdvisory: ['NOT_FOUND', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
   claimSelfRequest: ['ALREADY_CLAIMED', 'SESSION_EXPIRED'],
   issueRequestRecoveryCode: ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   redeemRequestRecoveryCode: ['NOT_FOUND', 'SESSION_EXPIRED'],
