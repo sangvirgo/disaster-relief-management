@@ -914,7 +914,7 @@ test('documented route errors include verification, mission, donation, and quant
     }
   };
 
-  expectErrors('response', 'verifyRequest', ['VERIFICATION_BASIS_REQUIRED', 'SECOND_COORDINATOR_REQUIRED', 'NO_CONTACT_ATTEMPT', 'PENDING_SUPPLEMENT_REVIEW']);
+  expectErrors('response', 'verifyRequest', ['VERIFICATION_BASIS_REQUIRED', 'SECOND_COORDINATOR_REQUIRED', 'PENDING_SUPPLEMENT_REVIEW']);
   expectErrors('response', 'rejectRequest', ['REJECT_THRESHOLD_NOT_MET']);
   expectErrors('response', 'markRequestDuplicate', ['CANONICAL_INVALID', 'CANONICAL_HAS_DUPLICATES']);
   expectErrors('response', 'createMissionOffer', ['REGION_REQUIRED', 'TEAM_BUSY', 'TEAM_NOT_ELIGIBLE', 'CAMPAIGN_PAUSED', 'TEAM_HAS_ACTIVE_MISSION', 'OVERRIDE_REASON_REQUIRED', 'CAMPAIGN_NOT_ACTIVE']);

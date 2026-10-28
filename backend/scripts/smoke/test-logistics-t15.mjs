@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { activateEmailRegistration, withEmail } from './lib/email-registration.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -121,11 +122,13 @@ async function registerAndLogin(label, roles = []) {
       username: account.username,
       display_name: `Người dùng kiểm thử T15 ${label} ${accountSuffix}`,
       password: account.password,
+      email: `${account.username}@example.test`,
     },
     idempotencyKey: key(),
     headers: { 'X-Forwarded-For': account.sourceIp },
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.value));
+  await activateEmailRegistration(identityDb, registered);
   account.id = registered.value.user.id;
   for (const role of roles) {
     await identityDb.query(
@@ -185,12 +188,8 @@ async function createRequest(reporter) {
 async function verifyRequest(request, coordinator) {
   const started = await command(responseUrl, `requests/${request.id}/start-verification`, coordinator, { expected_version: 1 });
   assert.equal(started.status, 200, JSON.stringify(started.value));
-  const contact = await command(responseUrl, `requests/${request.id}/contact-attempts`, coordinator, {
-    contact_target: 'REPORTER', outcome: 'REACHED', note: 'Đã xác nhận thông tin và vị trí.',
-  });
-  assert.equal(contact.status, 201, JSON.stringify(contact.value));
   const verified = await command(responseUrl, `requests/${request.id}/verify`, coordinator, {
-    expected_version: 3, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [contact.value.id] },
+    expected_version: 2, basis: 'EVIDENCE_REVIEWED', reason: 'Đã đối chiếu vị trí, thông tin và hình ảnh được gắn cờ.',
   });
   assert.equal(verified.status, 200, JSON.stringify(verified.value));
 }

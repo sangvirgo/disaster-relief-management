@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { runTeamCandidatesSmoke } from './test-response-t8-team-candidates.mjs';
 import { runMissionSmoke } from './test-response-t9-missions.mjs';
+import { activateEmailRegistration, withEmail } from './lib/email-registration.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -78,9 +79,10 @@ async function registerAndLogin(label, regionCode) {
   };
   const sourceIp = identityIp();
   const registered = await call(identityUrl, 'auth/register', {
-    method: 'POST', body: credentials, headers: { 'Idempotency-Key': key(), 'X-Forwarded-For': sourceIp },
+    method: 'POST', body: withEmail(credentials), headers: { 'Idempotency-Key': key(), 'X-Forwarded-For': sourceIp },
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.value));
+  await activateEmailRegistration(identityDb, registered);
   const userId = registered.value.user.id;
   if (regionCode !== undefined) {
     await identityDb.query(

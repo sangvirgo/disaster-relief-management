@@ -1,17 +1,17 @@
 import type { EntityManager } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { aiInputHash, buildAiAssessmentInput, includeSyntheticDemoNarrative, scoreRequestRisk, type AiAssessmentFacts } from './ai-risk';
+import { aiInputHash, buildAiAssessmentInput, scoreRequestRisk, type AiAssessmentFacts } from './ai-risk';
 
 export interface StoredAssessmentFacts extends AiAssessmentFacts {
   version: number;
   workCycle: number;
 }
 
-export function aiAssessmentHash(facts: AiAssessmentFacts, requestVersion: number, workCycle: number, includeNarrative = includeSyntheticDemoNarrative()): string {
+export function aiAssessmentHash(facts: AiAssessmentFacts, requestVersion: number, workCycle: number): string {
   return aiInputHash(JSON.stringify({
-    schema_version: 'v4', request_version: Number(requestVersion), work_cycle: Number(workCycle),
-    input_mode: includeNarrative ? 'SYNTHETIC_DEMO_NARRATIVE' : 'STRUCTURED_ONLY',
-    input: buildAiAssessmentInput(facts, includeNarrative),
+    schema_version: 'v5', request_version: Number(requestVersion), work_cycle: Number(workCycle),
+    input_mode: 'SANITIZED_NARRATIVE',
+    input: buildAiAssessmentInput(facts),
   }));
 }
 

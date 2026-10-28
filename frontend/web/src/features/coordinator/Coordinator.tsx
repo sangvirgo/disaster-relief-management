@@ -1092,38 +1092,6 @@ export function Coordinator({ page }: { page: string }) {
                 })}
               {detail.status === 'VERIFYING' && (
                 <>
-                  {command({
-                    title: 'Ghi nhận lần liên hệ',
-                    service: 'response',
-                    path: `/requests/${detail.id}/contact-attempts`,
-                    fields: [
-                      {
-                        name: 'contact_target',
-                        label: 'Đối tượng liên hệ',
-                        type: 'select',
-                        required: true,
-                        options: [
-                          ['REPORTER', 'Người báo'],
-                          ['BENEFICIARY', 'Người cần hỗ trợ'],
-                          ['ALTERNATE', 'Liên hệ thay thế'],
-                          ['AUTHORITY', 'Cơ quan chức năng'],
-                        ].map(([value, label]) => ({ value, label })),
-                      },
-                      {
-                        name: 'outcome',
-                        label: 'Kết quả',
-                        type: 'select',
-                        required: true,
-                        options: [
-                          ['REACHED', 'Đã liên hệ'],
-                          ['NO_ANSWER', 'Không trả lời'],
-                          ['WRONG_NUMBER', 'Sai số'],
-                          ['OTHER', 'Khác'],
-                        ].map(([value, label]) => ({ value, label })),
-                      },
-                      { name: 'note', label: 'Ghi chú', type: 'textarea' },
-                    ],
-                  })}
                   {detail.report_mode === 'PROXY' &&
                     command({
                       title: 'Điều phối viên thứ hai xác nhận',
@@ -1148,31 +1116,23 @@ export function Coordinator({ page }: { page: string }) {
                       path: `/requests/${detail.id}/verify`,
                       version: detail.version,
                       warning:
-                        'Xác nhận kết quả xác minh dựa trên bằng chứng đã chọn? Quyết định này do điều phối viên thực hiện.',
+                        'Bạn đã đối chiếu vị trí, thông tin và hình ảnh được gắn cờ và thấy phù hợp? Quyết định này do điều phối viên thực hiện.',
                       fields: [
                         {
-                          name: 'contact_attempt_id',
-                          label: 'Mã lần liên hệ xác nhận',
-                          type: 'select',
-                          required: true,
-                          options: detail.contact_attempts.items
-                            .filter((item) => item.outcome === 'REACHED')
-                            .map((item) => ({
-                              value: item.id,
-                              label: `${label(item.contact_target)} · ${item.id.slice(0, 8)}`,
-                            })),
-                        },
-                        {
                           name: 'reason',
-                          label: 'Lý do xác minh',
+                          label: 'Nội dung đã đối chiếu (vị trí, thông tin, hình ảnh)',
                           type: 'textarea',
                           required: true,
                         },
                       ],
                       build: (values) => ({
-                        basis: 'CONTACT_CONFIRMED',
+                        basis: 'EVIDENCE_REVIEWED',
                         reason: values.reason,
-                        source_refs: { contact_attempt_ids: [values.contact_attempt_id] },
+                        source_refs: {
+                          evidence_ids: (detail.evidence?.items ?? [])
+                            .filter((item) => item.state === 'READY')
+                            .map((item) => item.id),
+                        },
                       }),
                     })}
                   {detail.report_mode === 'PROXY' &&

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { activateEmailRegistration, withEmail } from './lib/email-registration.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -64,10 +65,11 @@ async function registerAndLogin(label) {
   };
   const sourceIp = `198.18.${randomBytes(2).join('.')}`;
   const registered = await call(identityUrl, 'auth/register', {
-    method: 'POST', body: credentials,
+    method: 'POST', body: withEmail(credentials),
     headers: { 'Idempotency-Key': key(), 'X-Forwarded-For': sourceIp },
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.value));
+  await activateEmailRegistration(identityDb, registered);
   const userId = registered.value.user.id;
   users.push(userId);
 
@@ -346,7 +348,7 @@ try {
   )).rows;
   await responseDb.query(
     `INSERT INTO verification_decision (request_id,outcome,basis,reviewer_user_id,decided_at)
-     VALUES ($1,'VERIFIED','CONTACT_CONFIRMED',$2,$3)`,
+     VALUES ($1,'VERIFIED','EVIDENCE_REVIEWED',$2,$3)`,
     [requestId, coordinator.id, verifiedAt],
   );
   await responseDb.query('UPDATE assistance_request SET verification_revision=$2 WHERE id=$1', [requestId, verificationEvent.id]);
@@ -393,7 +395,7 @@ try {
   )).rows;
   await responseDb.query(
     `INSERT INTO verification_decision (request_id,outcome,basis,reviewer_user_id,decided_at)
-     VALUES ($1,'VERIFIED','CONTACT_CONFIRMED',$2,$3)`,
+     VALUES ($1,'VERIFIED','EVIDENCE_REVIEWED',$2,$3)`,
     [outOfScopeRequestId, coordinator.id, verifiedAt],
   );
   await responseDb.query('UPDATE assistance_request SET verification_revision=$2 WHERE id=$1', [outOfScopeRequestId, foreignVerificationEvent.id]);
@@ -615,29 +617,23 @@ try {
   expectSuccess(closeRequestVerification);
   assert.equal(closeRequestVerification.value.status, 'VERIFYING');
 
-  const closeRequestContact = await call(responseUrl, `requests/${closeRequestId}/contact-attempts`, {
-    method: 'POST', body: { contact_target: 'REPORTER', outcome: 'REACHED', note: 'Đã xác nhận thông tin.' },
-    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
-  });
-  expectSuccess(closeRequestContact, 201);
-
   const closeRequestVerified = await call(responseUrl, `requests/${closeRequestId}/verify`, {
     method: 'POST',
-    body: { expected_version: 4, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [closeRequestContact.value.id] } },
+    body: { expected_version: 3, basis: 'EVIDENCE_REVIEWED', reason: 'Đã đối chiếu vị trí, thông tin và hình ảnh được gắn cờ.' },
     headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
   });
   expectSuccess(closeRequestVerified);
   assert.equal(closeRequestVerified.value.status, 'VERIFIED');
 
   const closeRequestTriaged = await call(responseUrl, `requests/${closeRequestId}/triage`, {
-    method: 'POST', body: { expected_version: 5, priority: 'P3', priority_basis: 'COMPLETE' },
+    method: 'POST', body: { expected_version: 4, priority: 'P3', priority_basis: 'COMPLETE' },
     headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
   });
   expectSuccess(closeRequestTriaged);
   assert.equal(closeRequestTriaged.value.status, 'TRIAGED');
 
   const closeRequestResolved = await call(responseUrl, `requests/${closeRequestId}/resolve`, {
-    method: 'POST', body: { expected_version: 6, resolution_reason: 'Đã rà soát, không cần hỗ trợ thêm.', outcome_basis: 'NO_ACTION_REQUIRED' },
+    method: 'POST', body: { expected_version: 5, resolution_reason: 'Đã rà soát, không cần hỗ trợ thêm.', outcome_basis: 'NO_ACTION_REQUIRED' },
     headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
   });
   expectSuccess(closeRequestResolved, 202);
@@ -646,9 +642,9 @@ try {
   assert.equal(closeOperation.value.state, 'COMPLETED');
 
   const closeRequestState = await responseDb.query('SELECT status,version FROM assistance_request WHERE id=$1', [closeRequestId]);
-  assert.deepEqual(closeRequestState.rows, [{ status: 'RESOLVED', version: 8 }]);
+  assert.deepEqual(closeRequestState.rows, [{ status: 'RESOLVED', version: 7 }]);
   const closedRequest = await call(responseUrl, `requests/${closeRequestId}/close`, {
-    method: 'POST', body: { expected_version: 8 },
+    method: 'POST', body: { expected_version: 7 },
     headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
   });
   expectSuccess(closedRequest);

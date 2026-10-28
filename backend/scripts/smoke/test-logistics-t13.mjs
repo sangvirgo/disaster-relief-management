@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { activateEmailRegistration, withEmail } from './lib/email-registration.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -59,9 +60,10 @@ async function registerAndLogin(label, roles) {
   };
   const sourceIp = `198.51.100.${identityIp++}`;
   const registered = await call(identityUrl, 'auth/register', {
-    method: 'POST', body: credentials, idempotencyKey: key(), headers: { 'X-Forwarded-For': sourceIp },
+    method: 'POST', body: withEmail(credentials), idempotencyKey: key(), headers: { 'X-Forwarded-For': sourceIp },
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.value));
+  await activateEmailRegistration(identityDb, registered);
   for (const role of roles) {
     await identityDb.query(
       `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)

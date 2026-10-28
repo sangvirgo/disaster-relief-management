@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { activateEmailRegistration, withEmail } from './lib/email-registration.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -75,9 +76,10 @@ async function registerAndLogin(label, roles = []) {
   };
   const sourceIp = `${identityNetwork}.${identityIp++}`;
   const registered = await call(identityUrl, 'auth/register', {
-    method: 'POST', body: credentials, idempotencyKey: key(), headers: { 'X-Forwarded-For': sourceIp },
+    method: 'POST', body: withEmail(credentials), idempotencyKey: key(), headers: { 'X-Forwarded-For': sourceIp },
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.value));
+  await activateEmailRegistration(identityDb, registered);
   for (const role of roles) {
     await identityDb.query(
       `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
@@ -123,12 +125,8 @@ async function verifyRequest(request, coordinator) {
   const started = await command(responseUrl, `requests/${request.id}/start-verification`, coordinator, { expected_version: 1 });
   expectSuccess(started);
   assert.equal(started.value.status, 'VERIFYING');
-  const contact = await command(responseUrl, `requests/${request.id}/contact-attempts`, coordinator, {
-    contact_target: 'REPORTER', outcome: 'REACHED', note: 'Đã xác nhận vị trí.',
-  });
-  expectSuccess(contact, 201);
   const verified = await command(responseUrl, `requests/${request.id}/verify`, coordinator, {
-    expected_version: 3, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [contact.value.id] },
+    expected_version: 2, basis: 'EVIDENCE_REVIEWED', reason: 'Đã đối chiếu vị trí, thông tin và hình ảnh được gắn cờ.',
   });
   expectSuccess(verified);
   assert.equal(verified.value.status, 'VERIFIED');

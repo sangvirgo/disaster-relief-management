@@ -150,8 +150,8 @@
 <text x="1555.0" y="254.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Xác minh yêu cầu và</text>
 <text x="1555.0" y="274.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">ghi nhận kết quả</text>
 <ellipse cx="1555.0" cy="385.0" rx="215.0" ry="39.0" fill="#f8dedd" stroke="#c76761" stroke-width="1.8"/>
-<text x="1555.0" y="380.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Ghi nhận liên hệ, bằng chứng</text>
-<text x="1555.0" y="400.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">và kết quả xác minh</text>
+<text x="1555.0" y="380.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Đối chiếu vị trí, thông tin, hình ảnh</text>
+<text x="1555.0" y="400.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">và ghi nhận kết quả xác minh</text>
 <ellipse cx="1555.0" cy="511.0" rx="215.0" ry="39.0" fill="#f8dedd" stroke="#c76761" stroke-width="1.8"/>
 <text x="1555.0" y="506.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">Từ chối yêu cầu hoặc</text>
 <text x="1555.0" y="526.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#1f2937">liên kết yêu cầu trùng</text>

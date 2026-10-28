@@ -8,16 +8,13 @@ const facts = { version: 4, workCycle: 1, incidentCategoryCode: 'FLOOD', descrip
 
 describe('advisory input identity and review', () => {
   afterEach(() => {
-    delete process.env.GEMINI_INCLUDE_SYNTHETIC_DEMO_NARRATIVE;
     delete process.env.GEMINI_API_KEY;
   });
 
-  it('keeps narrative out of the default provider input and changes identity for explicit demo narrative', () => {
-    const defaultHash = aiAssessmentHash(facts, 4, 1);
-    expect(buildAiAssessmentInput(facts).description).toBe('');
-    process.env.GEMINI_INCLUDE_SYNTHETIC_DEMO_NARRATIVE = 'true';
+  it('includes the sanitized narrative in the default provider input and assessment identity', () => {
+    const narrativeHash = aiAssessmentHash(facts, 4, 1);
     expect(buildAiAssessmentInput(facts).description).toBe('Nước đang dâng.');
-    expect(aiAssessmentHash(facts, 4, 1)).not.toBe(defaultHash);
+    expect(aiAssessmentHash({ ...facts, description: 'Có người bất tỉnh.' }, 4, 1)).not.toBe(narrativeHash);
   });
 
   it('distinguishes A → B → A and reopened work cycles while tolerating unrelated request-version bumps', () => {
@@ -27,11 +24,9 @@ describe('advisory input identity and review', () => {
     expect(new Set([a, b, aiAssessmentHash(facts, 6, 1)]).size).toBe(3);
     expect(isAiAdvisoryFresh({ input_hash: a, request_version: 4 }, laterVersion, 1)).toBe(true);
     expect(isAiAdvisoryFresh({ input_hash: a, request_version: 4 }, facts, 2)).toBe(false);
-    expect(isAiAdvisoryFresh({ input_hash: a, request_version: 4 }, { ...facts, description: 'Có người bất tỉnh.' }, 1)).toBe(true);
   });
 
-  it('invalidates a narrative-enabled advisory when the synthetic description changes', () => {
-    process.env.GEMINI_INCLUDE_SYNTHETIC_DEMO_NARRATIVE = 'true';
+  it('invalidates an advisory when its sanitized description changes', () => {
     const inputHash = aiAssessmentHash(facts, 4, 1);
     expect(isAiAdvisoryFresh({ input_hash: inputHash, request_version: 4 }, { ...facts, description: 'Có người bất tỉnh.' }, 1)).toBe(false);
   });
