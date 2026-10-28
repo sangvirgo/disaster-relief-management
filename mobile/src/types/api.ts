@@ -260,6 +260,26 @@ export interface RescueTeam {
   position: TeamPositionSummary | null;
 }
 
+export type TeamMemberRole = 'LEADER' | 'MEMBER';
+
+export interface TeamMember {
+  user_id: string;
+  display_name: string;
+  member_role: TeamMemberRole;
+  joined_at: string;
+}
+
+export interface TeamMembersPage extends CollectionPage<TeamMember> {
+  team_id: string;
+  can_manage_members: boolean;
+}
+
+export interface TeamMemberCandidate {
+  user_id: string;
+  username: string;
+  display_name: string;
+}
+
 // ==================== NOTICES & CAMPAIGNS ====================
 
 export interface NoticeItem {

@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
 import { postgresOptions } from '../../../../packages/technical/src/persistence/postgres-options';
 import { IDENTITY_SERVICE_TOKEN_CONFIG, issueServiceToken, ServiceName, ServiceTokenConfig } from '../auth/service-tokens';
 
@@ -24,6 +25,9 @@ type TeamLeaderEligibilityReason = 'USER_NOT_FOUND' | 'USER_INACTIVE' | 'MEMBERS
 
 type TeamLeaderEligibility = { eligible: true } | { eligible: false; reason: TeamLeaderEligibilityReason };
 type ActiveUserCheck = { active: true } | { active: false; reason: 'USER_NOT_FOUND' | 'USER_INACTIVE' };
+type ActiveUserSearchRow = { id: string; username: string; display_name: string; created_at: Date | string };
+
+const userIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 @Injectable()
 export class InternalService implements OnModuleInit, OnModuleDestroy {
@@ -97,6 +101,46 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
       [ids],
     ) as Array<{ id: string; display_name: string }>;
     return { items };
+  }
+
+  async searchActiveUsers(query: string, pageCursor?: string, requestedLimit = 50): Promise<{
+    items: Array<{ id: string; username: string; display_name: string }>;
+    more: boolean;
+    cursor?: string;
+  }> {
+    const normalizedQuery = query.trim().toLowerCase();
+    const filters = { query: normalizedQuery, status: 'ACTIVE' };
+    const cursor = pageCursor ? decodeKeysetCursor(pageCursor, filters) : undefined;
+    if (cursor && (cursor.sort.length !== 1 || typeof cursor.sort[0] !== 'string' ||
+        !Number.isFinite(new Date(cursor.sort[0]).getTime()) || !userIdPattern.test(cursor.id))) {
+      throw new AppError('CURSOR_INVALID', { status: 400 });
+    }
+
+    const values: unknown[] = [];
+    const where = ["status = 'ACTIVE'"];
+    const escaped = normalizedQuery.replace(/[\\%_]/g, '\\$&') + '%';
+    values.push(escaped);
+    where.push(`(lower(username::text) LIKE $1 ESCAPE E'\\\\' OR lower(display_name) LIKE $1 ESCAPE E'\\\\')`);
+    if (cursor) {
+      values.push(cursor.sort[0], cursor.id);
+      where.push(`(created_at,id)<($${values.length - 1}::timestamptz,$${values.length}::uuid)`);
+    }
+    const limit = Math.min(requestedLimit, 100);
+    values.push(limit + 1);
+    const rows = await this.introspectionDataSource.query(
+      `SELECT id,username::text AS username,display_name,created_at
+         FROM app_user WHERE ${where.join(' AND ')}
+        ORDER BY created_at DESC,id DESC LIMIT $${values.length}`,
+      values,
+    ) as ActiveUserSearchRow[];
+    const more = rows.length > limit;
+    const items = rows.slice(0, limit);
+    const last = items.at(-1);
+    return {
+      items: items.map(({ id, username, display_name }) => ({ id, username, display_name })),
+      more,
+      ...(more && last ? { cursor: encodeKeysetCursor([new Date(last.created_at).toISOString()], last.id, filters) } : {}),
+    };
   }
 
   async activeUserCheck(userId: string): Promise<ActiveUserCheck> {

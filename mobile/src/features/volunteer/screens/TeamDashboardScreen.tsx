@@ -17,13 +17,13 @@ import { FormFieldError } from '../../../components/common/FormFieldError';
 import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
 import { LocationPickerModal } from '../../../components/common/LocationPickerModal';
+import { TeamMembersSection } from '../components/TeamMembersSection';
 import { useAuthStore } from '../../../store/authStore';
 import { useLocation } from '../../../hooks/useLocation';
 import { ResponseApi } from '../../../api/responseApi';
 import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { GeoLocation, RescueTeamDetail, Mission, TeamSkillOption } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
-import { isValidUuid } from '../../../utils/formValidation';
 import { reverseGeocodeCoordinates } from '../../../utils/locationGeocoding';
 import { RESCUE_TEAM_KIND_LABELS, RESCUE_SKILL_LABELS } from '../../../constants/labels';
 import { getTeamRoleFromMissionList } from '../utils/teamMembershipRole';
@@ -46,12 +46,8 @@ import {
   PackageCheck,
   Flag,
   Bell,
-  UserPlus,
-  UserMinus,
   X,
 } from 'lucide-react-native';
-
-type TeamMemberAction = 'ADD' | 'REMOVE';
 
 export const TeamDashboardScreen: React.FC = () => {
   const router = useRouter();
@@ -71,11 +67,6 @@ export const TeamDashboardScreen: React.FC = () => {
   const [isUpdatingPosition, setIsUpdatingPosition] = useState<boolean>(false);
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
   const [showUserIdModal, setShowUserIdModal] = useState<boolean>(false);
-  const [showAddMemberModal, setShowAddMemberModal] = useState<boolean>(false);
-  const [memberAction, setMemberAction] = useState<TeamMemberAction>('ADD');
-  const [newMemberUserId, setNewMemberUserId] = useState<string>('');
-  const [memberIdError, setMemberIdError] = useState<string | undefined>();
-  const [isAddingMember, setIsAddingMember] = useState<boolean>(false);
   const [teamSkills, setTeamSkills] = useState<TeamSkillOption[]>([]);
   const [showTeamProfileModal, setShowTeamProfileModal] = useState(false);
   const [teamNameDraft, setTeamNameDraft] = useState('');
@@ -319,82 +310,6 @@ export const TeamDashboardScreen: React.FC = () => {
     if (!user?.id) return;
     setShowUserIdModal(true);
   };
-
-  const executeMemberAction = async (userId: string) => {
-    if (!team || !isTeamLeader) return;
-    setIsAddingMember(true);
-    try {
-      if (memberAction === 'ADD') {
-        await ResponseApi.addTeamMember(team.id, userId);
-        Alert.alert('Thành công', 'Đã thêm thành viên mới vào đội cứu hộ.');
-      } else {
-        await ResponseApi.removeTeamMember(team.id, userId);
-        Alert.alert('Đã gỡ thành viên', 'Tài khoản đã được gỡ khỏi đội cứu hộ.');
-      }
-      setNewMemberUserId('');
-      setMemberIdError(undefined);
-      setShowAddMemberModal(false);
-      await loadTeamData();
-    } catch (err: unknown) {
-      if (isApiErrorCode(err, 'USER_IN_OTHER_TEAM')) {
-        Alert.alert('Không thể thêm', 'Tài khoản này hiện đang thuộc một đội cứu hộ khác.');
-      } else if (isApiErrorCode(err, 'NOT_FOUND')) {
-        Alert.alert('Không tìm thấy', 'Không tìm thấy tài khoản phù hợp. Hãy kiểm tra mã ID và vai trò thành viên.');
-      } else if (isApiErrorCode(err, 'FORBIDDEN', 'MISSION_NOT_LEADER')) {
-        Alert.alert('Chưa có quyền', 'Chỉ đội trưởng đang hoạt động mới có quyền quản lý thành viên của đội.');
-      } else if (isApiErrorCode(err, 'LEADER_REQUIRED')) {
-        Alert.alert('Không thể gỡ thành viên', 'Đội phải luôn có đội trưởng. Không thể gỡ đội trưởng hiện tại.');
-      } else if (isApiErrorCode(err, 'VERSION_CONFLICT')) {
-        Alert.alert('Dữ liệu đã thay đổi', 'Hãy tải lại thông tin đội trước khi tiếp tục.');
-        await loadTeamData();
-      } else {
-        Alert.alert('Không thể cập nhật thành viên', getApiErrorMessage(err, 'Vui lòng thử lại.'));
-      }
-    } finally {
-      setIsAddingMember(false);
-    }
-  };
-
-  const handleMemberActionSubmit = () => {
-    const trimmedId = newMemberUserId.trim();
-    if (!team || !isTeamLeader) return;
-    if (!trimmedId) {
-      setMemberIdError('Vui lòng nhập mã ID tài khoản tình nguyện viên.');
-      return;
-    }
-    if (!isValidUuid(trimmedId)) {
-      setMemberIdError('Mã ID phải đúng định dạng UUID, ví dụ 123e4567-e89b-12d3-a456-426614174000.');
-      return;
-    }
-    setMemberIdError(undefined);
-    const copy = {
-      ADD: { title: 'Xác nhận thêm thành viên', message: 'Thêm tài khoản này vào đội cứu hộ?', action: 'Thêm thành viên' },
-      REMOVE: { title: 'Xác nhận gỡ thành viên', message: 'Gỡ tài khoản này khỏi đội cứu hộ?', action: 'Gỡ thành viên' },
-    }[memberAction];
-    if (memberAction === 'ADD') {
-      void executeMemberAction(trimmedId);
-      return;
-    }
-    Alert.alert(copy.title, copy.message, [
-      { text: 'Hủy', style: 'cancel' },
-      { text: copy.action, style: memberAction === 'REMOVE' ? 'destructive' : 'default', onPress: () => void executeMemberAction(trimmedId) },
-    ]);
-  };
-
-  const memberActionCopy = {
-    ADD: { title: 'Thêm thành viên vào đội', help: 'Nhập mã ID do tình nguyện viên cung cấp để ghi danh vào đội.', button: 'Ghi danh vào đội', placeholder: 'Mã ID tình nguyện viên (UUID)' },
-    REMOVE: { title: 'Gỡ thành viên khỏi đội', help: 'Nhập mã ID của thành viên cần gỡ. Đội trưởng hiện tại không thể tự gỡ.', button: 'Gỡ khỏi đội', placeholder: 'Mã ID thành viên (UUID)' },
-  }[memberAction];
-
-  const openMemberAction = (action: TeamMemberAction) => {
-    if (!isTeamLeader) return;
-    setMemberAction(action);
-    setNewMemberUserId('');
-    setMemberIdError(undefined);
-    setShowAddMemberModal(true);
-  };
-
-  const memberActionDisabled = isAddingMember || newMemberUserId.length > 36 || !isValidUuid(newMemberUserId);
 
   const handleLogout = async () => {
     Alert.alert('Xác nhận đăng xuất', 'Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?', [
@@ -697,6 +612,7 @@ export const TeamDashboardScreen: React.FC = () => {
             </Text>
           </View>
         ) : null}
+        <TeamMembersSection key={team.id} teamId={team.id} />
 
         {/* 2. TỌA ĐỘ VỊ TRÍ DI QUÂN CỦA ĐỘI */}
         <View style={styles.card}>
@@ -827,90 +743,8 @@ export const TeamDashboardScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* 4. QUẢN LÝ THÀNH VIÊN ĐỘI CỨU HỘ */}
-        {isTeamLeader && <View style={styles.card}>
-          <View style={styles.cardHeaderRow}>
-            <UserCheck size={20} color={THEME.colors.primary.main} />
-            <Text style={styles.cardTitle}>QUẢN LÝ THÀNH VIÊN ĐỘI</Text>
-          </View>
-          <Text style={styles.cardDesc}>
-            Đội trưởng đang hoạt động có thể thêm hoặc gỡ thành viên bằng mã ID tài khoản. Máy chủ kiểm tra quyền và tư cách thành viên trước khi lưu.
-          </Text>
-          <View style={styles.memberActionsRow}>
-            <TouchableOpacity style={styles.memberActionButton} onPress={() => openMemberAction('ADD')} activeOpacity={0.85}>
-              <UserPlus size={16} color="#FFFFFF" />
-              <Text style={styles.memberActionButtonText}>Thêm</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.memberActionButton, styles.memberActionSecondary]} onPress={() => openMemberAction('REMOVE')} activeOpacity={0.85}>
-              <UserMinus size={16} color={THEME.colors.emergency.main} />
-              <Text style={styles.memberActionSecondaryText}>Gỡ</Text>
-            </TouchableOpacity>
-          </View>
-        </View>}
       </ScrollView>
 
-      {/* MODAL THÊM THÀNH VIÊN VÀO ĐỘI */}
-      <Modal visible={showAddMemberModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalTitle}>{memberActionCopy.title}</Text>
-              <TouchableOpacity onPress={() => setShowAddMemberModal(false)} disabled={isAddingMember}>
-                <X size={20} color={THEME.colors.text.muted} />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.modalSubtitle}>
-              {memberActionCopy.help}
-            </Text>
-            <Text style={styles.modalSubtitle}>Mã tài khoản (UUID) <RequiredAsterisk /></Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder={memberActionCopy.placeholder}
-              placeholderTextColor={THEME.colors.text.muted}
-              value={newMemberUserId}
-              onChangeText={(value) => {
-                setNewMemberUserId(value);
-                setMemberIdError(value.length > 36
-                  ? 'Mã tài khoản không được vượt quá 36 ký tự.'
-                  : value && !isValidUuid(value)
-                    ? 'Mã ID phải đúng định dạng UUID, ví dụ 123e4567-e89b-12d3-a456-426614174000.'
-                    : undefined);
-              }}
-              onBlur={() => {
-                if (!newMemberUserId.trim()) setMemberIdError('Mã tài khoản là bắt buộc.');
-                else if (newMemberUserId.length > 36) setMemberIdError('Mã tài khoản không được vượt quá 36 ký tự.');
-                else if (!isValidUuid(newMemberUserId)) setMemberIdError('Mã ID phải đúng định dạng UUID, ví dụ 123e4567-e89b-12d3-a456-426614174000.');
-                else setMemberIdError(undefined);
-              }}
-              autoCapitalize="none"
-              autoCorrect={false}
-              maxLength={37}
-              editable={!isAddingMember}
-            />
-            <FormFieldError message={memberIdError} />
-            <View style={styles.modalButtonRow}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setShowAddMemberModal(false)}
-                disabled={isAddingMember}
-              >
-                <Text style={styles.modalCancelText}>Hủy bỏ</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSubmitBtn, memberActionDisabled && { opacity: 0.5 }]}
-                onPress={handleMemberActionSubmit}
-                disabled={memberActionDisabled}
-              >
-                {isAddingMember ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.modalSubmitText}>{memberActionCopy.button}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
       <Modal visible={showTeamProfileModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.profileModalBox}>
@@ -1484,38 +1318,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: THEME.colors.primary.main,
     marginRight: 4,
-  },
-  memberActionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
-  },
-  memberActionButton: {
-    flex: 1,
-    minHeight: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-    borderRadius: 9,
-    backgroundColor: THEME.colors.primary.main,
-  },
-  memberActionSecondary: {
-    backgroundColor: THEME.colors.surface.background,
-    borderWidth: 1,
-    borderColor: THEME.colors.surface.border,
-  },
-  memberActionButtonText: {
-    marginLeft: 5,
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  memberActionSecondaryText: {
-    marginLeft: 5,
-    fontSize: 11,
-    fontWeight: '700',
-    color: THEME.colors.text.primary,
   },
   modalOverlay: {
     flex: 1,

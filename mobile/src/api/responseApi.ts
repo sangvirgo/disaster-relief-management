@@ -17,6 +17,8 @@ import {
   PublicCampaign,
   TeamMemberItem,
   TeamSkillOption,
+  TeamMemberCandidate,
+  TeamMembersPage,
 } from '../types/api';
 import { generateUUID } from '../utils/secureStore';
 
@@ -434,7 +436,27 @@ export const ResponseApi = {
     return response.data;
   },
 
-  // Đội trưởng thêm thành viên mới vào đội bằng mã User ID (POST /response/teams/:id/members)
+  async getTeamMembers(teamId: string, limit = 50, cursor?: string): Promise<TeamMembersPage> {
+    const response = await apiClient.get<TeamMembersPage>(`/response/teams/${teamId}/members`, {
+      params: { limit, ...(cursor ? { cursor } : {}) },
+    });
+    return response.data;
+  },
+
+  async searchTeamMemberCandidates(
+    teamId: string,
+    query: string,
+    limit = 50,
+    cursor?: string
+  ): Promise<CollectionPage<TeamMemberCandidate>> {
+    const response = await apiClient.get<CollectionPage<TeamMemberCandidate>>(
+      `/response/teams/${teamId}/member-candidates`,
+      { params: { query, limit, ...(cursor ? { cursor } : {}) } }
+    );
+    return response.data;
+  },
+
+  // Đội trưởng thêm thành viên bằng tài khoản đã tìm thấy (POST /response/teams/:id/members).
   async addTeamMember(
     teamId: string,
     userId: string,

@@ -42,6 +42,17 @@ export type ActiveUserCheck =
   | { active: true }
   | { active: false; reason: 'USER_NOT_FOUND' | 'USER_INACTIVE' };
 
+export interface IdentityUserProfile {
+  id: string;
+  display_name: string;
+}
+
+export interface ActiveUserSearchResult {
+  items: Array<{ id: string; username: string; display_name: string }>;
+  more: boolean;
+  cursor?: string;
+}
+
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function unavailable(): AppError {
@@ -197,6 +208,70 @@ export class ReporterSessionService implements OnModuleDestroy {
       return { active: false, reason: value.reason as 'USER_NOT_FOUND' | 'USER_INACTIVE' };
     }
     throw unavailable();
+  }
+
+  async lookupUsers(ids: string[]): Promise<IdentityUserProfile[]> {
+    const requested = [...new Set(ids)];
+    if (!requested.length) return [];
+    if (requested.length > 100) throw new AppError('INTERNAL_ERROR', { status: 500 });
+
+    const token = await this.serviceTokens.get();
+    let result;
+    try {
+      result = await this.client.post<unknown>('/api/v1/identity/internal/users:lookup', { ids: requested }, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw unavailable();
+    }
+    if (result.status !== 200 || !result.body || typeof result.body !== 'object') throw unavailable();
+    const items = (result.body as Record<string, unknown>).items;
+    if (!Array.isArray(items)) throw unavailable();
+    const expected = new Set(requested);
+    const seen = new Set<string>();
+    const profiles = items.map((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) throw unavailable();
+      const value = item as Record<string, unknown>;
+      if (Object.keys(value).sort().join(',') !== 'display_name,id' ||
+          typeof value.id !== 'string' || !uuidPattern.test(value.id) || !expected.has(value.id) || seen.has(value.id) ||
+          typeof value.display_name !== 'string' || !value.display_name.trim()) throw unavailable();
+      seen.add(value.id);
+      return { id: value.id, display_name: value.display_name };
+    });
+    if (seen.size !== expected.size) throw unavailable();
+    return profiles;
+  }
+
+  async searchActiveUsers(query: string, cursor?: string, limit = 50): Promise<ActiveUserSearchResult> {
+    const token = await this.serviceTokens.get();
+    let result;
+    try {
+      result = await this.client.post<unknown>('/api/v1/identity/internal/users:search', {
+        query: query.trim(), ...(cursor ? { cursor } : {}), limit,
+      }, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw unavailable();
+    }
+    if (result.status !== 200 || !result.body || typeof result.body !== 'object') throw unavailable();
+    const value = result.body as Record<string, unknown>;
+    if (!Array.isArray(value.items) || typeof value.more !== 'boolean' ||
+        (value.cursor !== undefined && typeof value.cursor !== 'string') || value.more !== (typeof value.cursor === 'string')) {
+      throw unavailable();
+    }
+    const items = value.items.map((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) throw unavailable();
+      const user = item as Record<string, unknown>;
+      if (Object.keys(user).sort().join(',') !== 'display_name,id,username' ||
+          typeof user.id !== 'string' || !uuidPattern.test(user.id) ||
+          typeof user.username !== 'string' || !user.username.trim() ||
+          typeof user.display_name !== 'string' || !user.display_name.trim()) throw unavailable();
+      return { id: user.id, username: user.username, display_name: user.display_name };
+    });
+    return { items, more: value.more, ...(typeof value.cursor === 'string' ? { cursor: value.cursor } : {}) };
   }
 
   onModuleDestroy(): void {

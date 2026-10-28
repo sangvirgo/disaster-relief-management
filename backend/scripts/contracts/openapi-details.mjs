@@ -102,6 +102,21 @@ const identityDetails = {
       object({ active: { type: 'boolean', const: false }, reason: { type: 'string', enum: ['USER_NOT_FOUND', 'USER_INACTIVE'] } }, ['active', 'reason']),
     ] }),
   },
+  identityInternalSearchActiveUsers: {
+    summary: 'Search active accounts for Response team membership.',
+    description: 'Restricted to the Response service token. Searches active accounts by username or display-name prefix and returns only the fields needed by the team member picker. Results use a filter-bound keyset cursor and are not cached.',
+    request: request(object({
+      query: { type: 'string', minLength: 2, maxLength: 64 },
+      cursor: { type: 'string', maxLength: 2048 },
+      limit: { type: 'integer', minimum: 1, maximum: 100, default: 50 },
+    }, ['query'])),
+    response: response(object({
+      items: item({ id, username: text, display_name: text }, ['id', 'username', 'display_name']),
+      more: boolean(), cursor: text,
+    }, ['items', 'more']), 'Active account search results.', undefined, {
+      'Cache-Control': { $ref: '#/components/headers/CacheControlNoStore' },
+    }),
+  },
   identityInternalTeamLeaderEligibility: {
     request: request(object({ user_id: id, organization_id: id }, ['user_id', 'organization_id'])),
     response: response({ oneOf: [object({ eligible: { type: 'boolean', const: true } }, ['eligible']), object({ eligible: { type: 'boolean', const: false }, reason: { type: 'string', enum: ['USER_NOT_FOUND', 'USER_INACTIVE', 'MEMBERSHIP_REQUIRED', 'VOLUNTEER_GRANT_REQUIRED'] } }, ['eligible', 'reason'])] }),
@@ -255,6 +270,29 @@ const responseDetails = {
     request: request(object({ expected_version: version, name: text, skill_codes: array(text), availability: text }, ['expected_version'])),
     response: response(teamViewSchema),
   },
+  responseTeamsListMembers: {
+    summary: 'List active members of a rescue team.',
+    description: 'Accessible to active team members, scoped TEAM_READ callers, and team managers. Returns display names resolved through Identity and a keyset page ordered by user ID.',
+    response: response(object({
+      team_id: id,
+      can_manage_members: boolean(),
+      items: item({ user_id: id, display_name: text, member_role: { type: 'string', enum: ['LEADER', 'MEMBER'] }, joined_at: dateTime }, ['user_id', 'display_name', 'member_role', 'joined_at']),
+      more: boolean(), cursor: text,
+    }, ['team_id', 'can_manage_members', 'items', 'more']), 'Active team member page.', undefined, {
+      'Cache-Control': { $ref: '#/components/headers/CacheControlNoStore' },
+    }),
+  },
+  responseTeamsListMemberCandidates: {
+    summary: 'Search accounts that can be added to a rescue team.',
+    description: 'Available only to the active team leader or a scoped TEAM_MANAGE_ANY caller. Searches ACTIVE Identity accounts by username or display-name prefix and excludes accounts already assigned to any active team. Any ACTIVE account remains eligible; the add command rechecks status and the one-active-team invariant.',
+    query: [{ name: 'query', in: 'query', required: true, schema: { type: 'string', minLength: 2, maxLength: 64 } }],
+    response: response(object({
+      items: item({ user_id: id, username: text, display_name: text }, ['user_id', 'username', 'display_name']),
+      more: boolean(), cursor: text,
+    }, ['items', 'more']), 'Search results eligible for a team membership attempt.', undefined, {
+      'Cache-Control': { $ref: '#/components/headers/CacheControlNoStore' },
+    }),
+  },
   responseTeamsAddMember: {
     parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }],
     request: request(object({ user_id: id }, ['user_id'])),
@@ -284,6 +322,8 @@ const responsePaginationQueries = {
   listOverdueMissionOffers: ['cursor', 'limit'],
   listNotices: ['cursor', 'limit'],
   responseTeamsList: ['cursor', 'limit'],
+  responseTeamsListMembers: ['cursor', 'limit'],
+  responseTeamsListMemberCandidates: ['cursor', 'limit'],
   listCampaigns: ['cursor', 'limit'],
   listPublicCampaigns: ['cursor', 'limit'],
 };
@@ -769,6 +809,7 @@ const errorCatalog = new Map([...fs.readFileSync(errorCatalogPath, 'utf8').match
 
 const routeErrorCodes = {
   identityInternalActiveUserCheck: ['FORBIDDEN'],
+  identityInternalSearchActiveUsers: ['FORBIDDEN', 'CURSOR_INVALID', 'VALIDATION_FAILED'],
   identityInternalTeamLeaderEligibility: ['FORBIDDEN'],
   registerCitizen: ['USERNAME_TAKEN', 'EMAIL_TAKEN', 'PASSWORD_WEAK', 'EMAIL_OTP_UNAVAILABLE', 'REGISTRATION_EXPIRED', 'RATE_LIMITED', 'CSRF_INVALID'],
   login: ['INVALID_CREDENTIALS', 'RATE_LIMITED', 'CSRF_INVALID'],
@@ -816,6 +857,8 @@ const routeErrorCodes = {
   responseRequestResolutionResolve: ['RESOLUTION_BLOCKED', 'RESOLUTION_BASIS_INVALID', 'PENDING_SUPPLEMENT_REVIEW', 'LOGISTICS_UNAVAILABLE'],
   responseRequestResolutionClose: ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   responseRequestResolutionReopen: ['CAMPAIGN_NOT_ACTIVE', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
+  responseTeamsListMembers: ['NOT_FOUND', 'CURSOR_INVALID', 'IDENTITY_UNAVAILABLE', 'VALIDATION_FAILED'],
+  responseTeamsListMemberCandidates: ['NOT_FOUND', 'CURSOR_INVALID', 'IDENTITY_UNAVAILABLE', 'VALIDATION_FAILED'],
   responseTeamsAddMember: ['NOT_FOUND', 'IDENTITY_UNAVAILABLE', 'USER_IN_OTHER_TEAM', 'STATE_TRANSITION_INVALID'],
   responseTeamsRemoveMember: ['NOT_FOUND', 'LEADER_REQUIRED'],
   responseTeamsTransferLeader: ['NOT_FOUND', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'IDENTITY_UNAVAILABLE'],
@@ -1281,7 +1324,11 @@ export function applyOpenApiDetails(document, service) {
         ...(logisticsQueries[operation.operationId] ?? []),
       ]);
       const configuredQueries = [
-        ...(detail.query ?? []).map((parameter) => ({ ...parameter, required: false, schema: { type: 'string' } })),
+        ...(detail.query ?? []).map((parameter) => ({
+          ...parameter,
+          required: parameter.required ?? false,
+          schema: parameter.schema ?? { type: 'string' },
+        })),
         ...paginationQueries.map((name) => ({
           name,
           in: 'query',

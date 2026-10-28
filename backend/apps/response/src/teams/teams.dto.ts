@@ -1,6 +1,6 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
-  ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsDateString, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested,
+  ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsDateString, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateNested,
 } from 'class-validator';
 
 const skillCodePattern = /^[A-Z0-9_]{2,40}$/u;
@@ -21,6 +21,20 @@ export class TeamPageQueryDto {
 
   @IsOptional() @IsIn(['ACTIVE', 'INACTIVE'])
   declare status?: 'ACTIVE' | 'INACTIVE';
+}
+
+export class TeamMembersPageQueryDto {
+  @IsOptional() @IsString() @MaxLength(2_048)
+  declare cursor?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  declare limit?: number;
+}
+
+export class TeamMemberCandidatesQueryDto extends TeamMembersPageQueryDto {
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @IsString() @MinLength(2) @MaxLength(64) @Matches(/\S/u)
+  query!: string;
 }
 
 export class CreateTeamDto {
