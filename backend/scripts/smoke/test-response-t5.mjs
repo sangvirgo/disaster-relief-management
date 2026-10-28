@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { activateEmailRegistration, withEmail } from './lib/email-registration.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -13,7 +14,7 @@ const responseDb = new Client({ connectionString: process.env.C48_RESPONSE_DATAB
 const identityDb = new Client({ connectionString: process.env.C48_IDENTITY_DATABASE_URL });
 const backendRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const composeArgs = ['compose', '--profile', 'storage', '-p', 'c48', '--env-file', resolve(backendRoot, '.env'), '-f', resolve(backendRoot, 'infra/compose.yaml')];
-const intakeOrganizationId = '40000000-0000-4000-8000-000000000004';
+const intakeOrganizationId = process.env.DEMO_INTAKE_ORGANIZATION_ID ?? '40000000-0000-4000-8000-000000000004';
 let ipSequence = 40;
 
 function requiredEnv(name) {
@@ -70,10 +71,11 @@ async function registerAndLogin(label, clientKind = 'NATIVE') {
     password: `Fields remain private ${suffix}!`,
   };
   const registered = await call(identityUrl, 'auth/register', {
-    method: 'POST', body: credentials,
+    method: 'POST', body: withEmail(credentials),
     headers: { 'Idempotency-Key': key(), 'X-Forwarded-For': ip() },
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.value));
+  await activateEmailRegistration(identityDb, registered);
   const origin = process.env.C48_SMOKE_ORIGIN ?? 'http://localhost:8080';
   const csrf = clientKind === 'WEB' ? await call(identityUrl, 'auth/csrf', { headers: { Origin: origin } }) : undefined;
   const csrfCookies = csrf?.headers.getSetCookie() ?? [];

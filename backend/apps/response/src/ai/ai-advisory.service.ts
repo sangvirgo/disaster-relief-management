@@ -126,13 +126,18 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
       try {
         extracted = await this.extract(job, JSON.stringify(buildAiAssessmentInput(job)));
       } catch (error) {
-        const code = error instanceof Error && error.message === 'AI_INVALID_OUTPUT' ? 'AI_INVALID_OUTPUT' : 'AI_PROVIDER_ERROR';
+        const invalidOutput = error instanceof Error && error.message === 'AI_INVALID_OUTPUT';
+        const code = invalidOutput ? 'AI_INVALID_OUTPUT' : 'AI_PROVIDER_ERROR';
         const providerStatus = error instanceof Error
           ? /^AI_PROVIDER_(?:RETRYABLE|ERROR):(\d{3}|NETWORK)$/u.exec(error.message)?.[1]
           : undefined;
-        if (error instanceof Error && error.message.startsWith('AI_PROVIDER_RETRYABLE:') && job.attempts <= maxRetries()) {
+        const retryableProviderError = error instanceof Error && error.message.startsWith('AI_PROVIDER_RETRYABLE:');
+        if ((retryableProviderError || invalidOutput) && job.attempts <= maxRetries()) {
           const delaySeconds = retryDelaySeconds(job.attempts);
-          this.logger.warn('AI_PROVIDER_RETRY_SCHEDULED', `job:${job.id} attempt:${job.attempts} delay_seconds:${delaySeconds} provider_status:${providerStatus ?? 'UNKNOWN'}`);
+          this.logger.warn(
+            invalidOutput ? 'AI_INVALID_OUTPUT_RETRY_SCHEDULED' : 'AI_PROVIDER_RETRY_SCHEDULED',
+            `job:${job.id} attempt:${job.attempts} delay_seconds:${delaySeconds}${invalidOutput ? '' : ` provider_status:${providerStatus ?? 'UNKNOWN'}`}`,
+          );
           await this.persistResult(job.id,
             `UPDATE ai_advisory SET status='QUEUED',error_code=NULL,completed_at=NULL,lease_until=now()+($2 * interval '1 second'),claim_token=NULL
               WHERE id=$1 AND status='PROCESSING' AND claim_token=$3 AND lease_until>now()`, [job.id, delaySeconds, job.claim_token]);

@@ -28,9 +28,13 @@ type Notice = ResponseComponents['schemas']['Notice'];
 
 const noticeNames: Record<string, string> = {
   MISSION_OFFERED: 'Có nhiệm vụ mới',
+  MISSION_OFFER_PENDING: 'Nhiệm vụ đang chờ đội tiếp nhận',
+  MISSION_OFFER_OVERDUE: 'Nhiệm vụ chờ nhận quá lâu',
   MISSION_OVERDUE: 'Nhiệm vụ cần chú ý',
   MISSION_ACCEPTED: 'Nhiệm vụ đã được nhận',
   REQUEST_UPDATED: 'Yêu cầu đã cập nhật',
+  REQUEST_STATUS_CHANGED: 'Trạng thái SOS đã thay đổi',
+  REQUEST_OVERDUE: 'SOS cần được xử lý sớm',
   DONATION_COUNTED: 'Vật phẩm đã kiểm đếm',
   DONATION_REVIEWED: 'Đóng góp đã được duyệt',
 };
@@ -537,33 +541,39 @@ export function Volunteer({ page }: { page: string }) {
                 <div className="detail-grid mission-facts">
                   <p>
                     <strong>Tên đội</strong>
-                    <br />
-                    {selectedTeam.name}
+                    <span className="detail-value">
+                      {selectedTeam.name}
+                    </span>
                   </p>
                   <p>
                     <strong>Loại đội</strong>
-                    <br />
-                    {label(selectedTeam.kind)}
+                    <span className="detail-value">
+                      {label(selectedTeam.kind)}
+                    </span>
                   </p>
                   <p>
                     <strong>Tính khả dụng</strong>
-                    <br />
-                    {label(selectedTeam.availability)}
+                    <span className="detail-value">
+                      {label(selectedTeam.availability)}
+                    </span>
                   </p>
                   <p>
                     <strong>Chế độ báo cáo</strong>
-                    <br />
-                    {label(selectedTeam.reporting_mode)}
+                    <span className="detail-value">
+                      {label(selectedTeam.reporting_mode)}
+                    </span>
                   </p>
                   <p>
                     <strong>Trạng thái</strong>
-                    <br />
-                    {label(selectedTeam.status)}
+                    <span className="detail-value">
+                      {label(selectedTeam.status)}
+                    </span>
                   </p>
                   <p>
                     <strong>Phiên bản</strong>
-                    <br />
-                    {selectedTeam.version}
+                    <span className="detail-value">
+                      {selectedTeam.version}
+                    </span>
                   </p>
                 </div>
 
@@ -639,33 +649,39 @@ export function Volunteer({ page }: { page: string }) {
                 <div className="detail-grid mission-facts">
                   <p>
                     <strong>Đội thực hiện</strong>
-                    <br />
-                    {activeMission.team.name}
+                    <span className="detail-value">
+                      {activeMission.team.name}
+                    </span>
                   </p>
                   <p>
                     <strong>Trạng thái</strong>
-                    <br />
-                    <span className="chip">{label(activeMission.status)}</span>
+                    <span className="detail-value">
+                      <span className="chip">{label(activeMission.status)}</span>
+                    </span>
                   </p>
                   <p>
                     <strong>Loại sự cố</strong>
-                    <br />
-                    {label(activeMission.category)}
+                    <span className="detail-value">
+                      {label(activeMission.category)}
+                    </span>
                   </p>
                   <p>
                     <strong>Số người cần cứu</strong>
-                    <br />
-                    {activeMission.people_affected ?? 'Chưa rõ'}
+                    <span className="detail-value">
+                      {activeMission.people_affected ?? 'Chưa rõ'}
+                    </span>
                   </p>
                   <p>
                     <strong>Thời điểm giao</strong>
-                    <br />
-                    {timeLabel(activeMission.created_at)}
+                    <span className="detail-value">
+                      {timeLabel(activeMission.created_at)}
+                    </span>
                   </p>
                   <p>
                     <strong>Phiên bản</strong>
-                    <br />
-                    {activeMission.version}
+                    <span className="detail-value">
+                      {activeMission.version}
+                    </span>
                   </p>
                 </div>
 
@@ -944,13 +960,18 @@ export function Volunteer({ page }: { page: string }) {
                       {(
                         missionDetail.timeline.items as Array<{
                           id?: string;
-                          event_type: string;
+                          to_status: string;
+                          outcome_note?: string | null;
+                          reason?: string | null;
                           occurred_at: string;
                         }>
                       ).map((entry, idx) => (
                         <p className="timeline-item" key={entry.id || idx}>
-                          <strong>{label(entry.event_type)}</strong> ·{' '}
+                          <strong>{label(entry.to_status)}</strong> ·{' '}
                           {timeLabel(entry.occurred_at)}
+                          {(entry.outcome_note || entry.reason) && (
+                            <> · {entry.outcome_note || entry.reason}</>
+                          )}
                         </p>
                       ))}
                     </div>

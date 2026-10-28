@@ -1956,14 +1956,6 @@
                                    "correlation_id": "00000000-0000-4000-8000-000000000000"
                                  }
                                },
-                               "NO_CONTACT_ATTEMPT": {
-                                 "summary": "NO_CONTACT_ATTEMPT",
-                                 "value": {
-                                   "code": "NO_CONTACT_ATTEMPT",
-                                   "message": "Cần ghi nhận ít nhất một lần liên hệ hoặc nêu lý do không thể liên hệ.",
-                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
-                                 }
-                               },
                                "PENDING_SUPPLEMENT_REVIEW": {
                                  "summary": "PENDING_SUPPLEMENT_REVIEW",
                                  "value": {

@@ -38,7 +38,7 @@ export async function runMissionSmoke({
   )).rows;
   await responseDb.query(
     `INSERT INTO verification_decision (request_id,outcome,basis,reviewer_user_id)
-     VALUES ($1,'VERIFIED','CONTACT_CONFIRMED',$2)`, [request.value.id, coordinator.id],
+     VALUES ($1,'VERIFIED','EVIDENCE_REVIEWED',$2)`, [request.value.id, coordinator.id],
   );
   await responseDb.query(
     `INSERT INTO request_event (request_id,actor_user_id,event_type,visibility,from_status,to_status,payload)
@@ -830,7 +830,7 @@ async function createTriagedRequest({ responseDb, responseUrl, reporter, coordin
   );
   await responseDb.query(
     `INSERT INTO verification_decision (request_id,outcome,basis,reviewer_user_id)
-     VALUES ($1,'VERIFIED','CONTACT_CONFIRMED',$2)`, [created.value.id, coordinator.id],
+     VALUES ($1,'VERIFIED','EVIDENCE_REVIEWED',$2)`, [created.value.id, coordinator.id],
   );
   await responseDb.query(
     `INSERT INTO request_event (request_id,actor_user_id,event_type,visibility,from_status,to_status,payload)

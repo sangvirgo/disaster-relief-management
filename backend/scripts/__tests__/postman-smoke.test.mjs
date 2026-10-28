@@ -179,11 +179,19 @@ function sandbox(initial = {}) {
   return output;
 }
 
+test('main verification is a location/information/image review with no phone-contact step', () => {
+  const verify = op(main, 'verifyRequest');
+  const body = JSON.parse(verify.request.body.raw.replace('{{requestVersion}}', '1'));
+  assert.equal(body.basis, 'EVIDENCE_REVIEWED');
+  assert.ok(body.reason);
+  assert.equal(main.some((item) => meta(item).operationId === 'recordRequestContactAttempt'), false);
+});
+
 test('main scenario explicitly changes actors and finishes the rescue before resolving', () => {
   const operations = main.map((item) => meta(item).operationId);
   assert.deepEqual(operations, [
     'login', 'listIdentityOrganizations', 'createIdentityUser', 'createIdentityUserGrant', 'login', 'createSelfRequest', 'trackSelfRequest', 'supplementSelfRequest',
-    'login', 'getStaffRequestDetail', 'startRequestVerification', 'recordRequestContactAttempt', 'verifyRequest', 'triageRequest',
+    'login', 'getStaffRequestDetail', 'startRequestVerification', 'verifyRequest', 'triageRequest',
     'responseTeamsCreate', 'createMissionOffer', 'login', 'acceptMission', 'transitionMission', 'transitionMission', 'transitionMission',
     'login', 'getStaffRequestDetail', 'responseRequestResolutionResolve', 'responseRequestResolutionOperation', 'login', 'trackSelfRequest',
   ]);
@@ -220,9 +228,9 @@ test('SOS creation commits its generated capability only on success; detail neve
   assert.equal(runner.next, null);
 });
 
-test('contact response captures contact ID without replacing SOS ID and preserves its current version', () => {
+test('recovery contact response captures contact ID without replacing SOS ID and preserves its current version', () => {
   const runner = sandbox({ activeAccessToken: 'coord', requestId: 'sos-a' });
-  runner.send(op(main, 'recordRequestContactAttempt'), { id: 'contact-a', version: 6 });
+  runner.send(op(folder('Khôi phục'), 'recordRequestContactAttempt'), { id: 'contact-a', version: 6 });
   assert.equal(runner.values.get('requestId'), 'sos-a');
   assert.equal(runner.values.get('contactAttemptId'), 'contact-a');
   assert.equal(runner.values.get('requestVersion'), '6');
@@ -316,7 +324,6 @@ test('complete main script chain carries actor tokens, IDs and versions without 
     supplementSelfRequest: () => ({ id: 'sos-a', version: ++version }),
     getStaffRequestDetail: () => ({ id: 'sos-a', version: ++detailCalls === 1 ? version : (version = 9), region_code: 'DEMO_A' }),
     startRequestVerification: () => ({ id: 'sos-a', version: ++version }),
-    recordRequestContactAttempt: () => ({ id: 'contact-a', version: ++version }),
     verifyRequest: () => ({ id: 'sos-a', version: ++version }), triageRequest: () => ({ id: 'sos-a', version: ++version }),
     responseTeamsCreate: () => ({ id: 'team-a' }),
     createMissionOffer: () => ({ id: 'mission-a', request_id: 'sos-a', version: missionVersion }),

@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { cleanupT17TestUsers, registerAndLoginT17User } from './t17-test-users.mjs';
 import { assertFulfillmentReportPage, selectReportWarehouse } from './t17-fulfillment-report.mjs';
+import { activateEmailRegistration, withEmail } from './lib/email-registration.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -63,11 +64,11 @@ async function loginSmokeActor(organizationId, cleanupUserIds, roleCode) {
   const sourceIp = `198.51.100.${50 + Number.parseInt(suffix.slice(0, 2), 16) % 150}`;
   return registerAndLoginT17User({
     cleanupUserIds,
-    register: () => call(identityUrl, 'auth/register', {
+    register: async () => activateEmailRegistration(identityDb, await call(identityUrl, 'auth/register', {
       method: 'POST',
-      body: { username, display_name: `Người dùng báo cáo T17 ${suffix}`, password },
+      body: withEmail({ username, display_name: `Người dùng báo cáo T17 ${suffix}`, password }),
       headers: { 'Idempotency-Key': randomUUID(), 'X-Forwarded-For': sourceIp },
-    }),
+    })),
     grant: async (userId) => {
       if (!roleCode) return;
       await identityDb.query(

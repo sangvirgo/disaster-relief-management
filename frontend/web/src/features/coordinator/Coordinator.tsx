@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
-import { label, timeLabel } from '../../i18n/labels';
+import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { AnalyticsRegionField, useAnalyticsRegion } from '../../components/AnalyticsRegion';
@@ -139,6 +139,51 @@ type DuplicateCandidate = {
   received_at: string;
   distance_m: number;
 };
+
+function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onStale }: {
+  missionId: string; teamId: string; revision: number; onSuccess: () => void; onStale: () => void;
+}) {
+  const [mission, setMission] = useState<{ status: string; version: number } | null>(null);
+  const [reportingMode, setReportingMode] = useState('');
+  const [loadError, setLoadError] = useState('');
+  useEffect(() => {
+    let live = true;
+    Promise.all([
+      api<{ status: string; version: number }>('response', `/missions/${missionId}`),
+      api<{ reporting_mode: string }>('response', `/teams/${teamId}`),
+    ]).then(([missionValue, teamValue]) => {
+      if (live) { setMission(missionValue); setReportingMode(teamValue.reporting_mode); }
+    }).catch((cause) => {
+      if (live) setLoadError(cause instanceof Error ? cause.message : 'Không thể tải nhiệm vụ.');
+    });
+    return () => { live = false; };
+  }, [missionId, teamId, revision]);
+  if (loadError) return <p className="notice error">{loadError}</p>;
+  if (!mission || !reportingMode) return <p>Đang tải nhiệm vụ…</p>;
+  if (reportingMode !== 'COORDINATOR') return null;
+  const next = { OFFERED: 'ACCEPTED', ACCEPTED: 'EN_ROUTE', EN_ROUTE: 'ON_SCENE', ON_SCENE: 'COMPLETED' }[mission.status];
+  if (!next) return null;
+  const nextLabel = { ACCEPTED: 'Đội đã nhận', EN_ROUTE: 'Đội đang di chuyển', ON_SCENE: 'Đội đã đến nơi', COMPLETED: 'Đội đã hoàn thành' }[next];
+  return <CommandForm
+    key={`${missionId}-${mission.version}`}
+    spec={{
+      title: `Ghi nhận qua liên lạc: ${nextLabel}`,
+      service: 'response', path: `/missions/${missionId}/record-on-behalf`, version: mission.version,
+      fields: [
+        { name: 'recorded_basis', label: 'Cách nhận thông tin', type: 'select', required: true,
+          options: [{ value: 'RADIO', label: 'Bộ đàm' }, { value: 'PHONE', label: 'Điện thoại' },
+            { value: 'IN_PERSON', label: 'Trao đổi trực tiếp' }, { value: 'OTHER', label: 'Cách khác' }] },
+        { name: 'reported_by', label: 'Người báo từ đội', required: true },
+        { name: 'reason', label: 'Nội dung xác nhận', required: true, type: 'textarea' },
+        ...(next === 'COMPLETED' ? [{ name: 'outcome_note', label: 'Kết quả nhiệm vụ', required: true, type: 'textarea' as const }] : []),
+      ],
+      build: (values) => ({ to: next, recorded_basis: values.recorded_basis, reported_by: values.reported_by,
+        reason: values.reason, occurred_at: new Date().toISOString(),
+        ...(next === 'COMPLETED' ? { result: { outcome_note: values.outcome_note } } : {}) }),
+    }}
+    onSuccess={onSuccess} onStale={onStale}
+  />;
+}
 const priorities = ['P1', 'P2', 'P3', 'P4'].map((value) => ({ value, label: value }));
 const stateFilter: Record<string, string> = {
   verify: 'SUBMITTED',
@@ -197,17 +242,17 @@ const advisoryReviewLabels: Record<string, string> = {
   REJECTED: 'Không sử dụng',
 };
 const advisoryStatusLabels: Record<string, string> = {
-  QUEUED: 'Đang chờ Gemini đánh giá',
-  PROCESSING: 'Gemini đang đánh giá',
-  COMPLETED: 'Đã có gợi ý',
-  STALE: 'Gợi ý đã cũ do dữ kiện thay đổi',
-  SKIPPED: 'AI không khả dụng hoặc đã bỏ qua đánh giá',
-  FAILED: 'Gemini chưa trả được kết quả',
+  QUEUED: 'Đang chờ AI đánh giá',
+  PROCESSING: 'AI đang đánh giá',
+  COMPLETED: 'Đã có kết quả AI',
+  STALE: 'Thông tin SOS đã đổi; kết quả AI cần cập nhật',
+  SKIPPED: 'Chưa thực hiện đánh giá AI',
+  FAILED: 'Chưa có kết quả AI dùng được',
   UNKNOWN: 'Chưa rõ trạng thái đánh giá AI',
 };
 
 function advisoryScoreLabel(score: number | null, level: string | null): string {
-  if (score === null || !level || !advisoryLevelLabels[level]) return 'Chưa đủ dữ kiện để đánh giá';
+  if (score === null || !level || !advisoryLevelLabels[level]) return 'Chưa đủ thông tin để đánh giá';
   return `${advisoryLevelLabels[level]} · ${score}/100`;
 }
 
@@ -230,6 +275,21 @@ export function Coordinator({ page }: { page: string }) {
   const [aiReviewBusy, setAiReviewBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [campaignOptions, setCampaignOptions] = useState<{
+    value: string; label: string; regionCode: string | null
+  }[]>([]);
+  useEffect(() => {
+    let live = true;
+    void api<{ items: { id: string; name: string; status: string; region_code: string | null }[] }>('response', '/campaigns')
+      .then((value) => {
+        if (live) setCampaignOptions(value.items
+          .filter((campaign) => campaign.status === 'ACTIVE')
+          .map((campaign) => ({ value: campaign.id, label: campaign.name,
+            regionCode: campaign.region_code })));
+      })
+      .catch(() => { /* Vẫn có thể nhập mã khi không tải được danh sách. */ });
+    return () => { live = false; };
+  }, [revision]);
   const refreshReasonRef = useRef<'success' | 'stale' | null>(null);
   useEffect(() => {
     setQueueStatus(stateFilter[page] || '');
@@ -285,8 +345,8 @@ export function Coordinator({ page }: { page: string }) {
             setCursor('');
             setUpdateMessage(
               reason === 'success'
-                ? `Đã cập nhật. Trạng thái hiện tại: ${label(value.status)}.`
-                : `Đã tải lại hồ sơ. Trạng thái hiện tại: ${label(value.status)}.`
+                ? `Đã cập nhật. Trạng thái hiện tại: ${requestStatusLabel(value.status)}.`
+                : `Đã tải lại hồ sơ. Trạng thái hiện tại: ${requestStatusLabel(value.status)}.`
             );
           }
         }
@@ -392,65 +452,85 @@ export function Coordinator({ page }: { page: string }) {
       setAiReviewBusy(false);
     }
   }
+  const aiFacts = detail?.ai_advisory?.extracted_json?.facts;
+  const aiNeedsMismatch = Boolean(
+    detail &&
+      ((typeof aiFacts?.needs_rescue === 'boolean' &&
+        aiFacts.needs_rescue !== detail.needs_rescue) ||
+        (typeof aiFacts?.needs_relief_supplies === 'boolean' &&
+          aiFacts.needs_relief_supplies !== detail.needs_relief_supplies))
+  );
   return (
     <div className="coordinator-layout">
       <section className="card">
         <h2>{title[page] || title.queue}</h2>
         <p>Yêu cầu được sắp theo thời điểm tiếp nhận. Chọn một yêu cầu để xem và xử lý.</p>
-        <button
-          type="button"
-          className="button secondary"
-          onClick={() => setRevision((value) => value + 1)}
-        >
-          Cập nhật danh sách
-        </button>
-        <label>
-          Trạng thái trong danh sách
-          <select
-            value={queueStatus}
-            onChange={(event) => {
-              setQueueStatus(event.target.value);
-              setCursor('');
-            }}
-          >
-            {queueStatuses.map(([status, name]) => (
-              <option key={status} value={status}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="tabs">
-          {[
-            ['NORMAL', 'Thông thường'],
-            ['RATE_LIMITED_REVIEW', 'Rà soát tần suất'],
-            ['PROXY_QUOTA_REVIEW', 'Rà soát báo hộ'],
-          ].map(([value, title]) => (
+        <div className="queue-filter-panel">
+          <div className="queue-filter-heading">
+            <div>
+              <span className="queue-filter-eyebrow">BỘ LỌC HÀNG ĐỢI</span>
+              <strong>Lọc danh sách</strong>
+            </div>
             <button
-              key={value}
-              className={reviewLane === value ? 'active' : ''}
-              onClick={() => {
-                setReviewLane(value);
+              type="button"
+              className="button secondary queue-refresh-button"
+              onClick={() => setRevision((value) => value + 1)}
+            >
+              <span aria-hidden="true">↻</span> Cập nhật
+            </button>
+          </div>
+          <label className="queue-status-field">
+            <span>Trạng thái yêu cầu</span>
+            <span className="queue-status-select-wrap">
+              <select
+                value={queueStatus}
+                onChange={(event) => {
+                  setQueueStatus(event.target.value);
+                  setCursor('');
+                  setSelected(null);
+                }}
+              >
+                {queueStatuses.map(([status, name]) => (
+                  <option key={status} value={status}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </span>
+          </label>
+          <div className="tabs queue-review-tabs" aria-label="Loại hàng đợi">
+            {[
+              ['NORMAL', 'Thông thường'],
+              ['RATE_LIMITED_REVIEW', 'Rà soát tần suất'],
+              ['PROXY_QUOTA_REVIEW', 'Rà soát báo hộ'],
+            ].map(([value, title]) => (
+              <button
+                key={value}
+                type="button"
+                className={reviewLane === value ? 'active' : ''}
+                onClick={() => {
+                  setReviewLane(value);
+                  setCursor('');
+                  setSelected(null);
+                }}
+              >
+                {title}
+              </button>
+            ))}
+          </div>
+          <label className="check queue-attention-filter">
+            <input
+              type="checkbox"
+              checked={overdue}
+              onChange={(event) => {
+                setOverdue(event.target.checked);
                 setCursor('');
                 setSelected(null);
               }}
-            >
-              {title}
-            </button>
-          ))}
+            />
+            Chỉ xem yêu cầu cần chú ý
+          </label>
         </div>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={overdue}
-            onChange={(event) => {
-              setOverdue(event.target.checked);
-              setCursor('');
-              setSelected(null);
-            }}
-          />{' '}
-          Chỉ xem yêu cầu cần chú ý
-        </label>
         {loading && <p role="status">Đang cập nhật danh sách…</p>}
         {error && (
           <p className="notice error" role="alert">
@@ -483,7 +563,7 @@ export function Coordinator({ page }: { page: string }) {
                     </small>
                     {item.priority_advisory && (
                       <small>
-                        Gợi ý theo quy tắc:{' '}
+                        Đánh giá ban đầu:{' '}
                         {advisoryScoreLabel(
                           item.priority_advisory.score,
                           item.priority_advisory.level
@@ -493,8 +573,8 @@ export function Coordinator({ page }: { page: string }) {
                     {item.ai_priority_advisory && (
                       <small>
                         {item.ai_priority_advisory.source === 'DEMO_FIXTURE'
-                          ? 'Gợi ý AI minh họa'
-                          : 'Gợi ý Gemini'}
+                          ? 'AI minh họa'
+                          : 'Kết quả AI'}
                         {' · '}
                         {item.ai_priority_advisory.review_status === 'REJECTED'
                           ? 'Đã bác bỏ, không sử dụng gợi ý'
@@ -510,7 +590,7 @@ export function Coordinator({ page }: { page: string }) {
                     {item.declared_danger && <small>Có khai báo nguy hiểm tính mạng</small>}
                   </span>
                   <span className="chip">
-                    {label(item.status)}
+                    {requestStatusLabel(item.status)}
                     {item.priority ? ` · ${item.priority}` : ''}
                   </span>
                 </button>
@@ -552,105 +632,125 @@ export function Coordinator({ page }: { page: string }) {
             <div className="detail-grid">
               <p>
                 <strong>Mã</strong>
-                <br />
-                {detail.tracking_code}
+                <span className="detail-value">
+                  {detail.tracking_code}
+                </span>
               </p>
               <p>
                 <strong>Trạng thái</strong>
-                <br />
-                {label(detail.status)}
+                <span className="detail-value">
+                  {requestStatusLabel(detail.status)}
+                </span>
               </p>
               <p>
                 <strong>Loại sự cố</strong>
-                <br />
-                {label(detail.category)}
+                <span className="detail-value">
+                  {label(detail.category)}
+                </span>
               </p>
               <p>
                 <strong>Ưu tiên</strong>
-                <br />
-                {detail.priority || 'Chưa quyết định'}
+                <span className="detail-value">
+                  {detail.priority || 'Chưa quyết định'}
+                </span>
               </p>
               <p>
                 <strong>Hình thức gửi</strong>
-                <br />
-                {detail.report_mode === 'PROXY'
-                  ? 'Báo hộ người ở nơi khác'
-                  : 'Báo cho bản thân hoặc gia đình'}
+                <span className="detail-value">
+                  {detail.report_mode === 'PROXY'
+                    ? 'Báo hộ người ở nơi khác'
+                    : 'Báo cho bản thân hoặc gia đình'}
+                </span>
               </p>
               <p>
                 <strong>Người cần hỗ trợ</strong>
-                <br />
-                {detail.subject.people_affected ?? 'Chưa rõ'} người
+                <span className="detail-value">
+                  {detail.subject.people_affected ?? 'Chưa rõ'} người
+                </span>
               </p>
               <p>
                 <strong>Trẻ em / người cao tuổi</strong>
-                <br />
-                {detail.subject.children_count ?? 0} trẻ em · {detail.subject.elderly_count ?? 0}{' '}
-                người cao tuổi
+                <span className="detail-value">
+                  {detail.subject.children_count ?? 0} trẻ em · {detail.subject.elderly_count ?? 0}{' '}
+                  người cao tuổi
+                </span>
               </p>
               <p>
                 <strong>Nhu cầu</strong>
-                <br />
-                {[
-                  ...(detail.needs_rescue ? ['Cứu hộ'] : []),
-                  ...(detail.needs_relief_supplies ? ['Hàng cứu trợ'] : []),
-                ].join(' · ') || 'Chưa khai báo'}
+                <span className="detail-value">
+                  {[
+                    ...(detail.needs_rescue ? ['Cứu hộ'] : []),
+                    ...(detail.needs_relief_supplies ? ['Hàng cứu trợ'] : []),
+                  ].join(' · ') || 'Chưa khai báo'}
+                </span>
               </p>
               <p>
                 <strong>Người báo</strong>
-                <br />
-                {detail.reporter.name || 'Chưa có tên'}
+                <span className="detail-value">
+                  {detail.reporter.name || 'Chưa có tên'}
+                </span>
               </p>
               <p>
                 <strong>Liên hệ</strong>
-                <br />
-                {detail.reporter.contact_phone || 'Chưa có số liên hệ'}
+                <span className="detail-value">
+                  {detail.reporter.contact_phone || 'Chưa có số liên hệ'}
+                </span>
               </p>
               <p>
                 <strong>Vị trí</strong>
-                <br />
-                {detail.subject.location?.coordinates?.join(', ') || 'Chưa có tọa độ'}
+                <span className="detail-value">
+                  {detail.subject.location?.coordinates?.join(', ') || 'Chưa có tọa độ'}
+                </span>
               </p>
               <p>
                 <strong>Quan hệ với người cần hỗ trợ</strong>
-                <br />
-                {detail.subject.reporter_relationship || 'Tự báo / chưa ghi rõ'}
+                <span className="detail-value">
+                  {detail.subject.reporter_relationship || 'Tự báo / chưa ghi rõ'}
+                </span>
               </p>
               <p>
                 <strong>Số liên hệ người cần hỗ trợ</strong>
-                <br />
-                {detail.subject.beneficiary_contact_phone || 'Chưa có'}
+                <span className="detail-value">
+                  {detail.subject.beneficiary_contact_phone || 'Chưa có'}
+                </span>
               </p>
               <p>
                 <strong>Liên hệ thay thế</strong>
-                <br />
-                {[detail.subject.alternate_contact?.name, detail.subject.alternate_contact?.phone]
-                  .filter(Boolean)
-                  .join(' · ') || 'Chưa có'}
+                <span className="detail-value">
+                  {[detail.subject.alternate_contact?.name, detail.subject.alternate_contact?.phone]
+                    .filter(Boolean)
+                    .join(' · ') || 'Chưa có'}
+                </span>
               </p>
               <p>
                 <strong>Nguồn thông tin / khả năng liên lạc</strong>
-                <br />
-                {[detail.subject.information_source, detail.subject.contactability]
-                  .filter(Boolean)
-                  .join(' · ') || 'Chưa ghi rõ'}
+                <span className="detail-value">
+                  {[detail.subject.information_source, detail.subject.contactability]
+                    .filter(Boolean)
+                    .join(' · ') || 'Chưa ghi rõ'}
+                </span>
               </p>
               {detail.subject.last_known_situation_at && (
                 <p>
                   <strong>Thời điểm biết tình hình gần nhất</strong>
-                  <br />
-                  {timeLabel(detail.subject.last_known_situation_at)}
+                  <span className="detail-value">
+                    {timeLabel(detail.subject.last_known_situation_at)}
+                  </span>
                 </p>
               )}
               <p>
                 <strong>Phiên bản</strong>
-                <br />
-                {detail.version}
+                <span className="detail-value">
+                  {detail.version}
+                </span>
               </p>
               <p>
                 <strong>Chiến dịch</strong>
-                <br />
-                {detail.campaign_id ? detail.campaign_id.slice(0, 8) : 'Chưa gắn'}
+                <span className="detail-value">
+                  {detail.campaign_id
+                    ? campaignOptions.find((campaign) => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn'
+                    : 'Chưa gắn'}
+                </span>
               </p>
             </div>
             {detail.description && <p>{detail.description}</p>}
@@ -671,7 +771,7 @@ export function Coordinator({ page }: { page: string }) {
             )}
             {detail.priority_advisory && (
               <section className="notice warning">
-                <h3>Gợi ý ưu tiên theo quy tắc backend</h3>
+                <h3>Đánh giá ban đầu từ thông tin SOS</h3>
                 <p>
                   <strong>
                     {advisoryScoreLabel(
@@ -683,24 +783,23 @@ export function Coordinator({ page }: { page: string }) {
                 <p>
                   <strong>Dấu hiệu:</strong>{' '}
                   {detail.priority_advisory.reason_codes
-                    .map((code) => advisoryReasonLabels[code] || 'Có dữ kiện cần rà soát')
-                    .join(' · ') || 'Chưa ghi nhận dấu hiệu theo bộ quy tắc.'}
+                    .map((code) => advisoryReasonLabels[code] || 'Có thông tin cần kiểm tra')
+                    .join(' · ') || 'Chưa ghi nhận dấu hiệu cần chú ý.'}
                 </p>
                 <p>
-                  Đây là gợi ý từ dữ liệu SOS đã cung cấp, cần điều phối viên xác minh. Gợi ý không
-                  thay đổi mức ưu tiên P1–P4 và không tự giao đội. Nếu Gemini quá tải hoặc hết hạn
-                  mức, gợi ý quy tắc này vẫn hoạt động.
+                  Hệ thống tự nhận diện các dấu hiệu cần chú ý từ thông tin đã khai. Điều phối viên
+                  vẫn phải xác minh, chọn mức ưu tiên P1–P4 và quyết định giao đội.
                 </p>
                 {detail.priority_advisory.outcome === 'INSUFFICIENT_DATA' && (
                   <p>
-                    Chưa đủ dữ kiện để kết luận mức nguy cơ. Thiếu thông tin không có nghĩa là tình
+                    Chưa đủ thông tin để kết luận mức nguy cơ. Thiếu thông tin không có nghĩa là tình
                     huống ít khẩn cấp; cần tiếp tục xác minh.
                   </p>
                 )}
                 {detail.declared_danger && (
                   <p>
-                    <strong>Cảnh báo riêng:</strong> người báo tin khai có nguy hiểm tính mạng; cần
-                    kiểm tra ngay. Cờ này không tự cộng điểm.
+                    <strong>Cần kiểm tra ngay:</strong> người báo cho biết có nguy hiểm tính mạng.
+                    Thông tin này không tự làm tăng điểm đánh giá.
                   </p>
                 )}
               </section>
@@ -709,8 +808,8 @@ export function Coordinator({ page }: { page: string }) {
               <section className="notice">
                 <h3>
                   {detail.ai_priority_advisory.source === 'DEMO_FIXTURE'
-                    ? 'Gợi ý AI minh họa'
-                    : 'Gợi ý đánh giá rủi ro từ Gemini'}
+                    ? 'Đánh giá AI minh họa'
+                    : 'Đánh giá hỗ trợ từ AI (Gemini)'}
                 </h3>
                 <p>
                   <strong>Trạng thái:</strong>{' '}
@@ -735,13 +834,13 @@ export function Coordinator({ page }: { page: string }) {
                         </strong>
                       </p>
                       <p>
-                        <strong>Lý do Gemini đưa ra:</strong>{' '}
+                        <strong>Lý do AI đưa ra:</strong>{' '}
                         {detail.ai_priority_advisory.reasons.join(' · ') ||
                           'Không có lý do kèm theo.'}
                       </p>
                       {detail.ai_priority_advisory.confidence !== null && (
                         <p>
-                          <strong>Độ tin cậy tự báo cáo:</strong>{' '}
+                        <strong>Độ tin cậy do AI ước tính:</strong>{' '}
                           {Math.round(detail.ai_priority_advisory.confidence * 100)}% (chỉ tham
                           khảo)
                         </p>
@@ -750,36 +849,39 @@ export function Coordinator({ page }: { page: string }) {
                   )}
                 {detail.ai_priority_advisory.status === 'STALE' && (
                   <p>
-                    Dữ kiện SOS đã thay đổi sau lần đánh giá. Gợi ý cũ không còn được dùng để rà
-                    soát; hãy đối chiếu dữ kiện hiện tại và tiếp tục xác minh thủ công.
+                    Thông tin SOS đã thay đổi sau lần đánh giá. Kết quả cũ không còn phù hợp;
+                    hãy kiểm tra thông tin mới và tiếp tục xác minh.
                   </p>
+                )}
+                {['FAILED', 'SKIPPED'].includes(detail.ai_priority_advisory.status) && (
+                  <p>Hãy tiếp tục xác minh với người báo và xử lý SOS theo quy trình thủ công.</p>
                 )}
                 {detail.ai_priority_advisory.status === 'COMPLETED' &&
                   detail.ai_priority_advisory.review_status !== 'REJECTED' &&
                   detail.ai_priority_advisory.score === null && (
                     <p>
-                      Gemini chưa đề xuất điểm nguy cơ; không coi đây là mức nguy cơ thấp.{' '}
+                      AI chưa đề xuất điểm nguy cơ; không coi đây là mức nguy cơ thấp.{' '}
                       {detail.ai_priority_advisory.reasons.join(' · ')} Hãy tiếp tục xác minh thủ công.
                     </p>
                   )}
                 <p>
                   {detail.ai_priority_advisory.source === 'DEMO_FIXTURE'
                     ? 'Đây là dữ liệu minh họa giao diện; không phải kết quả Gemini chạy thật.'
-                    : 'Đây là gợi ý để điều phối viên rà soát, không thay đổi mức P1–P4, thứ tự hàng đợi hoặc quyết định giao đội.'}
+                    : 'AI chỉ hỗ trợ xem xét. Điều phối viên vẫn quyết định mức ưu tiên và giao đội.'}
                 </p>
               </section>
             )}
-            {detail.ai_advisory && (
+            {detail.ai_advisory && detail.ai_advisory.status === 'COMPLETED' && (
               <section className="notice">
                 <h3>
                   {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
                     ? 'Thông tin AI minh họa'
-                    : 'Trích xuất thông tin bằng Gemini'}
+                    : 'Thông tin AI ghi nhận'}
                 </h3>
                 <p>
                   {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
                     ? 'Dữ liệu này dùng để minh họa và không phải phản hồi từ Gemini.'
-                    : 'Mặc định, Gemini chỉ nhận dữ kiện SOS có cấu trúc; mô tả tự do, thông tin liên hệ, vị trí chính xác và tệp bằng chứng không được gửi. Chỉ bật gửi mô tả đã khử một số định danh cho dữ liệu minh họa tổng hợp; biện pháp này có thể bỏ sót thông tin nhận dạng và không được dùng với SOS thật. Điều phối viên cần đối chiếu với người báo tin.'}
+                    : 'AI chỉ nhận các thông tin đã chọn trong biểu mẫu. Nội dung mô tả, liên hệ, vị trí chính xác và tệp đính kèm không được gửi. Hãy đối chiếu với người báo trước khi sử dụng.'}
                 </p>
                 <p>
                   <strong>Trạng thái:</strong>{' '}
@@ -789,6 +891,19 @@ export function Coordinator({ page }: { page: string }) {
                 </p>
                 {detail.ai_priority_advisory?.status === 'COMPLETED' && (
                   <>
+                    {detail.ai_advisory.risk_score !== null && (
+                      <p>
+                        <strong>Điểm rủi ro tham khảo:</strong> {detail.ai_advisory.risk_score}/100
+                      </p>
+                    )}
+                    {detail.ai_advisory.reason_codes.length > 0 && (
+                      <p>
+                        <strong>Dấu hiệu cần chú ý:</strong>{' '}
+                        {detail.ai_advisory.reason_codes
+                          .map((code) => advisoryReasonLabels[code] || 'Có dấu hiệu cần rà soát')
+                          .join(' · ')}
+                      </p>
+                    )}
                     {detail.ai_advisory.extracted_json?.summary && (
                       <p>
                         <strong>Tóm tắt:</strong> {detail.ai_advisory.extracted_json.summary}
@@ -797,7 +912,7 @@ export function Coordinator({ page }: { page: string }) {
                     {detail.ai_advisory.extracted_json?.indicators &&
                       detail.ai_advisory.extracted_json.indicators.length > 0 && (
                         <p>
-                          <strong>Dấu hiệu AI trích xuất:</strong>{' '}
+                          <strong>Dấu hiệu AI ghi nhận:</strong>{' '}
                           {detail.ai_advisory.extracted_json.indicators.join(' · ')}
                         </p>
                       )}
@@ -818,8 +933,14 @@ export function Coordinator({ page }: { page: string }) {
                           ))}
                       </div>
                     )}
+                    {aiNeedsMismatch && (
+                      <p role="status">
+                        <strong>Cần đối chiếu:</strong> AI ghi nhận nhu cầu cứu hộ hoặc hàng cứu trợ
+                        khác với phần người báo đã chọn. Giữ dữ liệu gốc và xác minh trước khi quyết định.
+                      </p>
+                    )}
                     <p>
-                      <strong>Độ tin cậy mô hình tự báo cáo:</strong>{' '}
+                      <strong>Độ tin cậy do AI ước tính:</strong>{' '}
                       {Math.round((detail.ai_advisory.extracted_json?.confidence ?? 0) * 100)}% (chỉ
                       tham khảo)
                     </p>
@@ -836,9 +957,10 @@ export function Coordinator({ page }: { page: string }) {
                       </p>
                     ) : (
                       <div>
-                        <label className="field">
+                        <label className="ai-review-note">
                           <span>Ghi chú khi điều chỉnh hoặc bác bỏ</span>
                           <textarea
+                            rows={4}
                             value={aiReviewNote}
                             onChange={(event) => setAiReviewNote(event.target.value)}
                             maxLength={1000}
@@ -871,12 +993,6 @@ export function Coordinator({ page }: { page: string }) {
                     )}
                   </>
                 )}
-                {['FAILED', 'SKIPPED'].includes(detail.ai_advisory.status) && (
-                  <p>
-                    Gemini chưa trả kết quả cho dữ kiện SOS này. Gợi ý theo quy tắc backend vẫn hiển
-                    thị ở mục trên; hãy tiếp tục xác minh thủ công.
-                  </p>
-                )}
               </section>
             )}
             {detail.active_missions && detail.active_missions.items.length > 0 && (
@@ -887,9 +1003,11 @@ export function Coordinator({ page }: { page: string }) {
                     <div className="candidate" key={m.id}>
                       <strong>Mã nhiệm vụ: {m.id.slice(0, 8)}</strong>
                       <p>
-                        Trạng thái: {label(m.status)} · Đội: {m.team_id.slice(0, 8)} ·{' '}
+                        Trạng thái: {label(m.status)} · Đội: {detail.mission_history?.items.find((mission) => mission.team_id === m.team_id)?.team_name ?? 'Đội cứu hộ'} ·{' '}
                         {timeLabel(m.created_at)}
                       </p>
+                      <CoordinatorMissionControl missionId={m.id} teamId={m.team_id}
+                        revision={revision} onSuccess={done} onStale={refreshAfterConflict} />
                     </div>
                   ))}
                 </div>
@@ -948,7 +1066,11 @@ export function Coordinator({ page }: { page: string }) {
                   path: `/requests/${detail.id}/attach-campaign`,
                   version: detail.version,
                   fields: [
-                    { name: 'campaign_id', label: 'Mã định danh chiến dịch', required: true },
+                    { name: 'campaign_id', label: 'Chiến dịch', type: 'reference', required: true,
+                      options: campaignOptions
+                        .filter((campaign) => campaign.regionCode === null || campaign.regionCode === detail.region_code)
+                        .map(({ value, label: name }) => ({ value, label: name })),
+                      placeholder: 'Dán mã chiến dịch' },
                   ],
                   warning: 'Xác nhận gắn yêu cầu này vào chiến dịch đã chọn?',
                 })}
@@ -970,38 +1092,6 @@ export function Coordinator({ page }: { page: string }) {
                 })}
               {detail.status === 'VERIFYING' && (
                 <>
-                  {command({
-                    title: 'Ghi nhận lần liên hệ',
-                    service: 'response',
-                    path: `/requests/${detail.id}/contact-attempts`,
-                    fields: [
-                      {
-                        name: 'contact_target',
-                        label: 'Đối tượng liên hệ',
-                        type: 'select',
-                        required: true,
-                        options: [
-                          ['REPORTER', 'Người báo'],
-                          ['BENEFICIARY', 'Người cần hỗ trợ'],
-                          ['ALTERNATE', 'Liên hệ thay thế'],
-                          ['AUTHORITY', 'Cơ quan chức năng'],
-                        ].map(([value, label]) => ({ value, label })),
-                      },
-                      {
-                        name: 'outcome',
-                        label: 'Kết quả',
-                        type: 'select',
-                        required: true,
-                        options: [
-                          ['REACHED', 'Đã liên hệ'],
-                          ['NO_ANSWER', 'Không trả lời'],
-                          ['WRONG_NUMBER', 'Sai số'],
-                          ['OTHER', 'Khác'],
-                        ].map(([value, label]) => ({ value, label })),
-                      },
-                      { name: 'note', label: 'Ghi chú', type: 'textarea' },
-                    ],
-                  })}
                   {detail.report_mode === 'PROXY' &&
                     command({
                       title: 'Điều phối viên thứ hai xác nhận',
@@ -1026,31 +1116,23 @@ export function Coordinator({ page }: { page: string }) {
                       path: `/requests/${detail.id}/verify`,
                       version: detail.version,
                       warning:
-                        'Xác nhận kết quả xác minh dựa trên bằng chứng đã chọn? Quyết định này do điều phối viên thực hiện.',
+                        'Bạn đã đối chiếu vị trí, thông tin và hình ảnh được gắn cờ và thấy phù hợp? Quyết định này do điều phối viên thực hiện.',
                       fields: [
                         {
-                          name: 'contact_attempt_id',
-                          label: 'Mã lần liên hệ xác nhận',
-                          type: 'select',
-                          required: true,
-                          options: detail.contact_attempts.items
-                            .filter((item) => item.outcome === 'REACHED')
-                            .map((item) => ({
-                              value: item.id,
-                              label: `${label(item.contact_target)} · ${item.id.slice(0, 8)}`,
-                            })),
-                        },
-                        {
                           name: 'reason',
-                          label: 'Lý do xác minh',
+                          label: 'Nội dung đã đối chiếu (vị trí, thông tin, hình ảnh)',
                           type: 'textarea',
                           required: true,
                         },
                       ],
                       build: (values) => ({
-                        basis: 'CONTACT_CONFIRMED',
+                        basis: 'EVIDENCE_REVIEWED',
                         reason: values.reason,
-                        source_refs: { contact_attempt_ids: [values.contact_attempt_id] },
+                        source_refs: {
+                          evidence_ids: (detail.evidence?.items ?? [])
+                            .filter((item) => item.state === 'READY')
+                            .map((item) => item.id),
+                        },
                       }),
                     })}
                   {detail.report_mode === 'PROXY' &&
@@ -1183,6 +1265,12 @@ export function Coordinator({ page }: { page: string }) {
                     </p>
                   )}
                   {!candidates && !candidateError && <p role="status">Đang tải đội phù hợp…</p>}
+                  {candidates?.items.length === 0 && (
+                    <p role="status">
+                      Chưa có đội phù hợp. Hãy kiểm tra đơn vị quản lý, khu vực hoạt động, kỹ năng,
+                      trạng thái và vị trí gần đây của các đội.
+                    </p>
+                  )}
                   {candidates?.items.map((candidate) => (
                     <div className="candidate" key={candidate.team.id}>
                       <strong>{candidate.team.name}</strong>

@@ -206,17 +206,17 @@ UPDATE request_subject AS s
   ) AS facts(request_suffix, children_count, elderly_count)
  WHERE s.request_id = pg_temp.u(facts.request_suffix);
 
--- These completed advisories contain single Gemini responses to synthetic SOS facts. Known machine-code indicators are localized by the worker before persistence.
--- Both start unreviewed: the coordinator's acceptance of the previous hand-authored af2 output does not apply to the new Gemini response.
+-- These completed advisories are saved demo fixtures for synthetic SOS facts, not live provider calls.
+-- Both start unreviewed; their source is surfaced as DEMO_FIXTURE rather than GEMINI.
 INSERT INTO ai_advisory (id, request_id, request_version, input_hash, model, prompt_version, schema_version,
                          status, attempts, extracted_json, risk_score, reason_codes, review_status,
                          review_by_user_id, review_at, review_note, created_at, completed_at) VALUES
-  -- input_hash covers the v4 structured-only assessment identity; risk_score/reason_codes remain backend-rule output.
-  (pg_temp.u('af1'), pg_temp.u('f9'), 1, 'e33d48e81d0c6237e84b4c5eb0e8b0030216ef400b8d64daea2eb7fd64f8efca', 'gemini-3.1-flash-lite', 'v3', 'v4',
+  -- input_hash covers the v5 sanitized-narrative assessment identity; schema_version v4 remains the provider-output contract.
+  (pg_temp.u('af1'), pg_temp.u('f9'), 1, '824598ae1da193ac5043427709ffc34476616cdbe073471ac03af8279020c622', 'demo-fixture:gemini-3.5-flash-lite', 'v3', 'v4',
    'COMPLETED', 1,
    '{"summary":"Một vụ hỏa hoạn đang xảy ra ảnh hưởng đến 6 người, trong đó có 2 trẻ em và 1 người cao tuổi, yêu cầu cứu hộ khẩn cấp.","indicators":["Cháy","Cần cứu hộ","Có trẻ em","Có người cao tuổi"],"facts":{"people_affected":6,"children_count":2,"elderly_count":1,"life_threat":true,"needs_rescue":true,"needs_relief_supplies":false},"priority_score":90,"priority_reasons":["Sự cố hỏa hoạn đe dọa trực tiếp đến tính mạng","Có sự hiện diện của trẻ em trong khu vực nguy hiểm","Có người cao tuổi cần hỗ trợ đặc biệt","Tổng số người bị ảnh hưởng là 6","Yêu cầu cứu hộ khẩn cấp đã được xác nhận"],"confidence":0.95}'::jsonb,
    NULL, ARRAY['DECLARED_LIFE_DANGER','CHILDREN_PRESENT','ELDERLY_PRESENT','RESCUE_REQUESTED'], NULL, NULL, NULL, NULL, now() - interval '42 minutes', now() - interval '41 minutes'),
-  (pg_temp.u('af2'), pg_temp.u('f6'), 5, 'bac706703a01f0759c5d16f495f7eae88526980769977cbce03dacbc690f6a46', 'gemini-3.1-flash-lite', 'v3', 'v4',
+  (pg_temp.u('af2'), pg_temp.u('f6'), 5, '3f39da9bcc687cf1a89dcaf28b3ba4108e65e1dec137e3769162c7a8d015a78a', 'demo-fixture:gemini-3.5-flash-lite', 'v3', 'v4',
    'COMPLETED', 1,
    '{"summary":"Nhóm 3 người bao gồm 1 trẻ em và 1 người cao tuổi đang bị mắc kẹt, cần cứu hộ và cứu trợ khẩn cấp.","indicators":["Có người mắc kẹt","Cần cứu hộ","Cần hàng cứu trợ","Có trẻ em","Có người cao tuổi"],"facts":{"people_affected":3,"children_count":1,"elderly_count":1,"life_threat":false,"needs_rescue":true,"needs_relief_supplies":true},"priority_score":85,"priority_reasons":["Đối tượng dễ bị tổn thương bao gồm trẻ em và người cao tuổi","Tình trạng mắc kẹt yêu cầu cứu hộ khẩn cấp","Số lượng người bị ảnh hưởng là 3","Yêu cầu cứu trợ khẩn cấp về nhu yếu phẩm"],"confidence":0.9}'::jsonb,
    55, ARRAY['DECLARED_LIFE_DANGER','FLOOD_OR_TRAPPED','CHILDREN_PRESENT','ELDERLY_PRESENT','RESCUE_REQUESTED'],
@@ -354,7 +354,7 @@ SELECT pg_temp.must('AI advisory review states are represented',
   AND (SELECT count(*) FROM ai_advisory WHERE review_status IS NOT NULL) = 0);
 SELECT pg_temp.must('AI seed fixtures have bounded priority output and backend risk scores match current rules',
   (SELECT count(*) = 2 FROM ai_advisory WHERE input_hash ~ '^[0-9a-f]{64}$')
-  AND (SELECT count(*) = 2 FROM ai_advisory WHERE model = 'gemini-3.1-flash-lite'
+  AND (SELECT count(*) = 2 FROM ai_advisory WHERE model = 'demo-fixture:gemini-3.5-flash-lite'
        AND (extracted_json->>'priority_score')::int BETWEEN 0 AND 100
        AND jsonb_typeof(extracted_json->'priority_reasons') = 'array')
   AND EXISTS (SELECT 1 FROM ai_advisory WHERE request_id = pg_temp.u('f9') AND risk_score IS NULL

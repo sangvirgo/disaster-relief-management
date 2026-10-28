@@ -4,10 +4,10 @@ INSERT INTO incident_category (code, display_name) VALUES
   ('TRAPPED', 'Người bị mắc kẹt'), ('OTHER', 'Khác')
 ON CONFLICT DO NOTHING;
 
--- Refresh only unreviewed Gemini AI samples; leave any staff-reviewed result untouched.
+-- Refresh only unreviewed demo fixtures; leave any staff-reviewed result untouched.
 UPDATE ai_advisory
-   SET model = 'gemini-3.1-flash-lite',
-       input_hash = 'e33d48e81d0c6237e84b4c5eb0e8b0030216ef400b8d64daea2eb7fd64f8efca',
+   SET model = 'demo-fixture:gemini-3.5-flash-lite',
+       input_hash = '824598ae1da193ac5043427709ffc34476616cdbe073471ac03af8279020c622',
        prompt_version = 'v3',
        schema_version = 'v4',
        risk_score = NULL,
@@ -18,8 +18,8 @@ UPDATE ai_advisory
    AND review_status IS NULL;
 
 UPDATE ai_advisory
-   SET model = 'gemini-3.1-flash-lite',
-       input_hash = 'bac706703a01f0759c5d16f495f7eae88526980769977cbce03dacbc690f6a46',
+   SET model = 'demo-fixture:gemini-3.5-flash-lite',
+       input_hash = '3f39da9bcc687cf1a89dcaf28b3ba4108e65e1dec137e3769162c7a8d015a78a',
        prompt_version = 'v3',
        schema_version = 'v4',
        risk_score = 55,
@@ -50,6 +50,12 @@ INSERT INTO rescue_team (id, organization_id, operating_region_code, name, team_
    now() - interval '2 days', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000ac', '00000000-0000-4000-8000-000000000001', 'DEMO_C',
    'Đội y tế cộng đồng Demo C', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập Demo C.', false,
+   now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
+  ('00000000-0000-4000-8000-0000000000ad', '00000000-0000-4000-8000-000000000001', 'DEMO_A',
+   'Đội xuồng cứu hộ Demo A', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội xuồng giả lập Demo A.', false,
+   now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
+  ('00000000-0000-4000-8000-0000000000ae', '00000000-0000-4000-8000-000000000001', 'DEMO_C',
+   'Đội cứu hộ Bắc Demo', 'VOLUNTEER', 'APP', NULL, false,
    now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE')
 ON CONFLICT DO NOTHING;
 
@@ -59,7 +65,8 @@ SELECT team.id, fixture.user_id, fixture.member_role
     ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Demo C', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000114'::uuid, 'LEADER'),
     ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Demo C', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000115'::uuid, 'MEMBER'),
     ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Demo A', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_A', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000116'::uuid, 'LEADER'),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Demo A', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_A', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000117'::uuid, 'MEMBER')
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Demo A', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_A', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000117'::uuid, 'MEMBER'),
+    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ Bắc Demo', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000119'::uuid, 'LEADER')
   ) AS fixture(team_id, team_name, organization_id, region_code, team_kind, reporting_mode, user_id, member_role)
   JOIN rescue_team team ON team.id = fixture.team_id AND team.name = fixture.team_name
                        AND team.organization_id = fixture.organization_id AND team.operating_region_code = fixture.region_code
@@ -77,7 +84,9 @@ SELECT team.id, fixture.skill_code
     ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Demo B', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_B', 'GOVERNMENT', 'COORDINATOR', 'RADIO'),
     ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Demo B', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_B', 'GOVERNMENT', 'COORDINATOR', 'TRUCK_DRIVER'),
     ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Demo C', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'GOVERNMENT', 'COORDINATOR', 'FIRST_AID'),
-    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Demo C', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'GOVERNMENT', 'COORDINATOR', 'CLIMBING')
+    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Demo C', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'GOVERNMENT', 'COORDINATOR', 'CLIMBING'),
+    ('00000000-0000-4000-8000-0000000000ad'::uuid, 'Đội xuồng cứu hộ Demo A', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_A', 'GOVERNMENT', 'COORDINATOR', 'BOAT'),
+    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ Bắc Demo', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', 'BOAT')
   ) AS fixture(team_id, team_name, organization_id, region_code, team_kind, reporting_mode, skill_code)
   JOIN rescue_team team ON team.id = fixture.team_id AND team.name = fixture.team_name
                        AND team.organization_id = fixture.organization_id AND team.operating_region_code = fixture.region_code
@@ -92,7 +101,9 @@ SELECT team.id, ST_SetSRID(ST_MakePoint(fixture.longitude, fixture.latitude), 43
     ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Demo C', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', 105.8500::float8, 21.0300::float8),
     ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Demo A', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_A', 'VOLUNTEER', 'APP', 106.7000::float8, 10.7800::float8),
     ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Demo B', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_B', 'GOVERNMENT', 'COORDINATOR', 107.6000::float8, 16.0700::float8),
-    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Demo C', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'GOVERNMENT', 'COORDINATOR', 105.8700::float8, 21.0500::float8)
+    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Demo C', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'GOVERNMENT', 'COORDINATOR', 105.8700::float8, 21.0500::float8),
+    ('00000000-0000-4000-8000-0000000000ad'::uuid, 'Đội xuồng cứu hộ Demo A', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_A', 'GOVERNMENT', 'COORDINATOR', 106.7000::float8, 10.7800::float8),
+    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ Bắc Demo', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', 105.8600::float8, 21.0400::float8)
   ) AS fixture(team_id, team_name, organization_id, region_code, team_kind, reporting_mode, longitude, latitude)
   JOIN rescue_team team ON team.id = fixture.team_id AND team.name = fixture.team_name
                        AND team.organization_id = fixture.organization_id AND team.operating_region_code = fixture.region_code

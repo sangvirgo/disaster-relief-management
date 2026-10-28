@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import type { Me } from '../../auth/session';
-import { label, timeLabel } from '../../i18n/labels';
+import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 
 type OwnedRequest = {
   id: string;
@@ -107,7 +107,7 @@ export function CitizenAccount({
                 <strong>{item.tracking_code}</strong>
                 <small>Tiếp nhận {timeLabel(item.received_at)}</small>
               </div>
-              <span className="chip">{label(item.status)}</span>
+              <span className="chip">{requestStatusLabel(item.status)}</span>
               <button className="button secondary" onClick={() => onTrack(item.tracking_code)}>
                 Theo dõi
               </button>

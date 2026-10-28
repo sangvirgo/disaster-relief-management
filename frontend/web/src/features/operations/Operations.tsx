@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { roles, type Me } from '../../auth/session';
-import { CommandForm, type CommandSpec } from '../../components/CommandForm';
-import { label, timeLabel } from '../../i18n/labels';
+import { CommandForm, type CommandSpec, type Field } from '../../components/CommandForm';
+import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
+import { formatQuantity } from '../../i18n/quantity';
 import { ReceiptCountForm } from './ReceiptCountForm';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { DetailCloseButton } from '../../components/DetailCloseButton';
@@ -49,7 +50,7 @@ const headings: Record<string, string> = {
 };
 const string = (value: unknown) => (typeof value === 'string' ? value : '');
 const number = (value: unknown) => (typeof value === 'number' ? value : undefined);
-const quantity = (value: unknown) => (value == null ? '—' : String(value));
+const quantity = formatQuantity;
 const distributionPages = new Set(['distribution', 'handoff']);
 function recordTitle(page: string, item: Row): string {
   if (distributionPages.has(page))
@@ -95,6 +96,58 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
+  const [references, setReferences] = useState<Record<string, { value: string; label: string }[]>>({});
+  useEffect(() => {
+    let live = true;
+    const sources = [
+      ['organizations', 'identity', '/organizations'],
+      ['warehouses', 'logistics', '/warehouses'],
+      ['items', 'logistics', '/items'],
+      ['campaigns', 'response', '/campaigns'],
+      ['reliefPoints', 'logistics', '/relief-points'],
+      ['vehicles', 'logistics', '/vehicles'],
+      ['requests', 'response', '/requests'],
+    ] as const;
+    void Promise.allSettled(sources.map(([, service, path]) => api<List>(service, path))).then((results) => {
+      if (!live) return;
+      const options: Record<string, { value: string; label: string }[]> = {};
+      results.forEach((result, index) => {
+        if (result.status !== 'fulfilled') return;
+        const key = sources[index][0];
+        options[key] = (result.value.items || [])
+          .filter((item) => item.id && (!['campaigns', 'organizations'].includes(key) || item.status === 'ACTIVE'))
+          .map((item) => ({
+            value: item.id!,
+            label: key === 'requests'
+              ? `SOS ${string(item.tracking_code) || item.id!.slice(0, 8)} · ${requestStatusLabel(string(item.status))}`
+              : string(item.name) || string(item.title) || string(item.identifier) ||
+                string(item.item_name) || `Mã …${item.id!.slice(-8)}`,
+          }));
+      });
+      setReferences(options);
+    });
+    return () => { live = false; };
+  }, [revision]);
+  const organizationOptions = references.organizations?.length
+    ? references.organizations
+    : [...new Set(user.grants.map((grant) => grant.organization_id).filter((id): id is string => Boolean(id)))]
+        .map((id) => ({ value: id, label: `Tổ chức trong quyền của tôi · …${id.slice(-8)}` }));
+  const warehouseName = (id: unknown) =>
+    references.warehouses?.find((warehouse) => warehouse.value === id)?.label ||
+    (typeof id === 'string' ? `Kho mã …${id.slice(-8)}` : 'Chưa rõ kho');
+  const referenceField = (
+    name: string,
+    title: string,
+    source: string,
+    required = false
+  ): Field => ({
+    name,
+    label: title,
+    type: 'reference',
+    required,
+    options: source === 'organizations' ? organizationOptions : references[source] || [],
+    placeholder: `Dán mã ${title.toLocaleLowerCase('vi-VN')}`,
+  });
   const route =
     page === 'assets'
       ? `/${asset}`
@@ -148,7 +201,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     };
   }, [path, ready, revision]);
   useEffect(() => {
-    if (!selected?.id) {
+    if (!selected) {
       setDetail(null);
       return;
     }
@@ -159,7 +212,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         ? selected.receipt_id
           ? `/donation-receipts/${selected.receipt_id}`
           : ''
-        : page === 'distribution' || page === 'handoff'
+        : (page === 'distribution' || page === 'handoff') && selected.id
           ? `/distributions/${selected.id}`
           : '';
     if (!detailPath) {
@@ -203,10 +256,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       ...fields([
         ['title', 'Tên đợt quyên góp', true],
         ['description', 'Mô tả', true],
-        ['intake_warehouse_id', 'Mã kho tiếp nhận', true],
-        ['campaign_id', 'Mã chiến dịch nếu có'],
-        ['item_id', 'Mã vật phẩm', true],
       ]),
+      referenceField('intake_warehouse_id', 'Kho tiếp nhận', 'warehouses', true),
+      referenceField('campaign_id', 'Chiến dịch (nếu có)', 'campaigns'),
+      referenceField('item_id', 'Vật phẩm', 'items', true),
       { name: 'target_quantity', label: 'Số lượng mục tiêu', type: 'number', required: true },
     ],
     build: (values) => ({
@@ -222,10 +275,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     service: 'logistics',
     path: '/needs',
     fields: [
-      ...fields([
-        ['request_id', 'Mã yêu cầu SOS', true],
-        ['item_id', 'Mã vật phẩm', true],
-      ]),
+      referenceField('request_id', 'Yêu cầu SOS', 'requests', true),
+      referenceField('item_id', 'Vật phẩm', 'items', true),
       { name: 'work_cycle', label: 'Chu kỳ xử lý', type: 'number', required: true },
       { name: 'quantity', label: 'Số lượng cần', type: 'number', required: true },
     ],
@@ -384,7 +435,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       </th>
                       <td>
                         {string(item.warehouse_name) ||
-                          (item.warehouse_id ? `Mã …${string(item.warehouse_id).slice(-8)}` : '—')}
+                          (item.warehouse_id ? warehouseName(item.warehouse_id) : '—')}
                       </td>
                       <td>
                         {string((item.unit as Row | undefined)?.display_name) ||
@@ -422,6 +473,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       {string(item.drive_title) || 'Đợt quyên góp'}
                       {item.public_code ? ` · Mã ${item.public_code}` : ''}
                     </small>
+                  )}
+                  {page === 'review' && reviewTab === 'disputes' && Boolean(item.reason) && (
+                    <small>{string(item.reason)}</small>
                   )}
                   <small>
                     {page !== 'intake' && item.donor_name
@@ -479,7 +533,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         )}
         <h2>
           {selected
-            ? 'Chi tiết và thao tác'
+            ? page === 'stock'
+              ? 'Chi tiết tồn kho'
+              : 'Chi tiết và thao tác'
             : ['drives', 'needs', 'assets', 'distribution'].includes(page)
               ? 'Tạo bản ghi'
               : 'Thông tin theo phạm vi'}
@@ -488,93 +544,163 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         {detail && (
           <>
             <div className="detail-grid">
+              {page === 'review' && reviewTab === 'disputes' && (
+                <>
+                  <p>
+                    <strong>Đợt quyên góp</strong>
+                    <span className="detail-value">{string(detail.drive_title) || 'Chưa rõ'}</span>
+                  </p>
+                  <p>
+                    <strong>Nội dung cần rà soát</strong>
+                    <span className="detail-value">{string(detail.reason) || 'Chưa có nội dung'}</span>
+                  </p>
+                  {Boolean(detail.resolution_note) && (
+                    <p>
+                      <strong>Kết quả xử lý</strong>
+                      <span className="detail-value">{string(detail.resolution_note)}</span>
+                    </p>
+                  )}
+                </>
+              )}
+              {page === 'stock' && (
+                <>
+                  <p>
+                    <strong>Vật phẩm</strong>
+                    <span className="detail-value">
+                      {string(detail.item_name) || 'Chưa có tên'}
+                    </span>
+                  </p>
+                  <p>
+                    <strong>Đơn vị</strong>
+                    <span className="detail-value">
+                      {string(detail.unit) || string(detail.unit_code) || 'Chưa có'}
+                    </span>
+                  </p>
+                </>
+              )}
               {page === 'assets' && asset === 'vehicles' && Boolean(detail.identifier) && (
                 <p>
                   <strong>Biển số hoặc mã xe</strong>
-                  <br />
-                  {string(detail.identifier)}
+                  <span className="detail-value">
+                    {string(detail.identifier)}
+                  </span>
                 </p>
               )}
               {distributionPages.has(page) && Boolean(detail.purpose) && (
                 <p>
                   <strong>Mục đích phân phối</strong>
-                  <br />
-                  {label(detail.purpose)}
+                  <span className="detail-value">
+                    {label(detail.purpose)}
+                  </span>
                 </p>
               )}
               <p>
                 <strong>
                   {distributionPages.has(page)
                     ? 'Mã phiếu phân phối'
+                    : page === 'stock'
+                      ? 'Mã dòng tồn kho'
                     : page === 'intake'
                       ? 'Mã tiếp nhận'
                       : 'Mã bản ghi'}
                 </strong>
-                <br />
-                {string(selected?.id || selected?.balance_id || selected?.warehouse_id) ||
-                  'Không có mã riêng'}
+                <span className="detail-value">
+                  {string(selected?.id || selected?.balance_id || selected?.warehouse_id) ||
+                    'Không có mã riêng'}
+                </span>
               </p>
               {status && (
                 <p>
                   <strong>Trạng thái</strong>
-                  <br />
-                  {label(status)}
+                  <span className="detail-value">
+                    {label(status)}
+                  </span>
                 </p>
               )}
               {version != null && (
                 <p>
                   <strong>Phiên bản</strong>
-                  <br />
-                  {version}
+                  <span className="detail-value">
+                    {version}
+                  </span>
                 </p>
               )}
               {Boolean(detail.intake_warehouse_id) && (
                 <p>
                   <strong>Kho tiếp nhận</strong>
-                  <br />
-                  {string(detail.intake_warehouse_id)}
+                  <span className="detail-value">
+                    {warehouseName(detail.intake_warehouse_id)}
+                  </span>
                 </p>
               )}
               {Boolean(detail.warehouse_id) && (
                 <p>
                   <strong>Kho</strong>
-                  <br />
-                  {string(detail.warehouse_id)}
+                  <span className="detail-value">
+                    {warehouseName(detail.warehouse_id)}
+                  </span>
                 </p>
               )}
               {Boolean(detail.public_code) && (
                 <p>
                   <strong>Mã công khai</strong>
-                  <br />
-                  {string(detail.public_code)}
+                  <span className="detail-value">
+                    {string(detail.public_code)}
+                  </span>
                 </p>
               )}
-              {detail.on_hand != null && (
+              {page === 'stock' && detail.on_hand != null && (
+                <>
+                  <p>
+                    <strong>Tồn thực tế</strong>
+                    <span className="detail-value">
+                      {quantity(detail.on_hand)}
+                    </span>
+                  </p>
+                  <p>
+                    <strong>Đã giữ</strong>
+                    <span className="detail-value">
+                      {quantity(detail.reserved)}
+                    </span>
+                  </p>
+                  <p>
+                    <strong>Khả dụng</strong>
+                    <span className="detail-value">
+                      {quantity(detail.available)}
+                    </span>
+                  </p>
+                </>
+              )}
+              {page !== 'stock' && detail.on_hand != null && (
                 <p>
                   <strong>Tồn khả dụng</strong>
-                  <br />
-                  {quantity(detail.available)} / {quantity(detail.on_hand)}
+                  <span className="detail-value">
+                    {quantity(detail.available)} / {quantity(detail.on_hand)}
+                  </span>
                 </p>
               )}
               {detail.held != null && (
                 <p>
                   <strong>Tạm giữ</strong>
-                  <br />
-                  {quantity(detail.held)}
+                  <span className="detail-value">
+                    {quantity(detail.held)}
+                  </span>
                 </p>
               )}
               {detail.in_transit != null && (
                 <p>
                   <strong>Đang vận chuyển</strong>
-                  <br />
-                  {quantity(detail.in_transit)}
+                  <span className="detail-value">
+                    {quantity(detail.in_transit)}
+                  </span>
                 </p>
               )}
               {detail.delivered != null && (
                 <p>
                   <strong>Đã giao</strong>
-                  <br />
-                  {quantity(detail.delivered)}
+                  <span className="detail-value">
+                    {quantity(detail.delivered)}
+                  </span>
                 </p>
               )}
             </div>
@@ -669,7 +795,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   title: 'Lập biên nhận',
                   service: 'logistics',
                   path: '/donation-receipts',
-                  fields: fields([['warehouse_id', 'Mã kho tiếp nhận', true]]),
+                  fields: [referenceField('warehouse_id', 'Kho tiếp nhận', 'warehouses', true)],
                   build: (values) => ({
                     delivery_id: selected.id,
                     warehouse_id: values.warehouse_id,
@@ -827,7 +953,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                         service: 'logistics',
                         path: `/needs/${id}/commitments`,
                         fields: [
-                          ...fields([['warehouse_id', 'Mã kho', true]]),
+                          referenceField('warehouse_id', 'Kho xuất hàng', 'warehouses', true),
                           { name: 'quantity', label: 'Số lượng', type: 'number', required: true },
                         ],
                         build: (values) => ({
@@ -863,13 +989,20 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     (rights.has('DISTRIBUTION_STAFF') ||
                       rights.has('INTAKE_STAFF') ||
                       rights.has('OPERATIONS_MANAGER')) &&
-                    command({
-                      title: 'Chuẩn bị từ cam kết',
-                      service: 'logistics',
-                      path: `/distributions/${id}/prepare-from-commitments`,
-                      version,
-                      warning: 'Thay thế các dòng phiếu bằng cam kết hiện có?',
-                    })}
+                    <>
+                      <p>
+                        Thao tác này lấy mọi cam kết còn hiệu lực trong cùng kho và tổ chức, kể cả
+                        cam kết của yêu cầu SOS khác. Kiểm tra các dòng hàng trước khi duyệt.
+                      </p>
+                      {command({
+                        title: 'Chuẩn bị từ cam kết',
+                        service: 'logistics',
+                        path: `/distributions/${id}/prepare-from-commitments`,
+                        version,
+                        warning:
+                          'Thay các dòng phiếu bằng mọi cam kết còn hiệu lực trong cùng kho và tổ chức, kể cả từ SOS khác?',
+                      })}
+                    </>}
                   {['DRAFT', 'APPROVED'].includes(status) &&
                     (detail.preparer_user_id === user.id || detail.approver_user_id === user.id) &&
                     command({
@@ -999,25 +1132,30 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             path: `/${asset}`,
             fields:
               asset === 'vehicles'
-                ? fields([
-                    ['organization_id', 'Mã tổ chức', true],
+                ? [
+                    referenceField('organization_id', 'Tổ chức', 'organizations', true),
+                    ...fields([
                     ['region_code', 'Mã khu vực', true],
                     ['identifier', 'Biển số hoặc mã xe', true],
                     ['vehicle_type', 'Loại phương tiện', true],
-                  ])
+                    ]),
+                  ]
                 : asset === 'warehouses'
-                  ? fields([
-                      ['organization_id', 'Mã tổ chức', true],
+                  ? [
+                      referenceField('organization_id', 'Tổ chức', 'organizations', true),
+                      ...fields([
                       ['region_code', 'Mã khu vực', true],
                       ['name', 'Tên kho', true],
-                    ])
-                  : fields([
-                      ['organization_id', 'Mã tổ chức', true],
-                      ['region_code', 'Mã khu vực', true],
-                      ['name', 'Tên điểm', true],
-                      ['longitude', 'Kinh độ', true],
-                      ['latitude', 'Vĩ độ', true],
-                    ]),
+                      ]),
+                    ]
+                  : [
+                      referenceField('organization_id', 'Tổ chức', 'organizations', true),
+                      ...fields([
+                        ['region_code', 'Mã khu vực', true],
+                        ['name', 'Tên điểm cứu trợ', true],
+                      ]),
+                      { name: 'location', label: 'Địa chỉ hoặc vị trí trên bản đồ', type: 'location', required: true },
+                    ],
             build:
               asset === 'relief-points'
                 ? (values) => ({
@@ -1026,7 +1164,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     name: values.name,
                     location: {
                       type: 'Point',
-                      coordinates: [Number(values.longitude), Number(values.latitude)],
+                      coordinates: values.location.split(',').map(Number),
                     },
                   })
                 : undefined,
@@ -1041,10 +1179,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             service: 'logistics',
             path: '/distributions',
             fields: [
-              ...fields([
-                ['warehouse_id', 'Mã kho', true],
-                ['item_id', 'Mã vật phẩm', true],
-              ]),
+              referenceField('warehouse_id', 'Kho xuất hàng', 'warehouses', true),
+              referenceField('item_id', 'Vật phẩm', 'items', true),
               {
                 name: 'purpose',
                 label: 'Mục đích',
@@ -1057,12 +1193,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 ].map(([value, title]) => ({ value, label: title })),
               },
               { name: 'quantity', label: 'Số lượng', type: 'number', required: true },
-              ...fields([
-                ['commitment_id', 'Mã cam kết khi hỗ trợ yêu cầu SOS'],
-                ['campaign_id', 'Mã chiến dịch khi phân phối theo chiến dịch'],
-                ['relief_point_id', 'Mã điểm cứu trợ khi bổ sung tại điểm'],
-                ['vehicle_id', 'Mã phương tiện nếu có'],
-              ]),
+              ...fields([['commitment_id', 'Mã cam kết khi hỗ trợ yêu cầu SOS']]),
+              referenceField('campaign_id', 'Chiến dịch (khi phân phối theo chiến dịch)', 'campaigns'),
+              referenceField('relief_point_id', 'Điểm cứu trợ (khi bổ sung tại điểm)', 'reliefPoints'),
+              referenceField('vehicle_id', 'Phương tiện (nếu có)', 'vehicles'),
             ],
             build: (values) => ({
               warehouse_id: values.warehouse_id,
