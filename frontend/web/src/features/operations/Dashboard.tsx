@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { label, timeLabel } from '../../i18n/labels';
+import { formatQuantity } from '../../i18n/quantity';
 import { AnalyticsRegionField, useAnalyticsRegion } from '../../components/AnalyticsRegion';
 
 type ResponseSummary = {
@@ -180,10 +181,10 @@ export function OperationsDashboard() {
                         <th scope="row">{item.item.name}</th>
                         <td title={item.warehouse_id}>Mã …{item.warehouse_id.slice(-8)}</td>
                         <td>{item.unit.display_name}</td>
-                        <td className="numeric">{item.on_hand}</td>
-                        <td className="numeric">{item.reserved}</td>
+                        <td className="numeric">{formatQuantity(item.on_hand)}</td>
+                        <td className="numeric">{formatQuantity(item.reserved)}</td>
                         <td className="numeric">
-                          <strong className="available-value">{item.available}</strong>
+                          <strong className="available-value">{formatQuantity(item.available)}</strong>
                         </td>
                       </tr>
                     ))}

@@ -368,12 +368,12 @@ export function LocationPicker({
       } else {
         setSuggestions([]);
         setError(
-          'Không tìm thấy địa điểm phù hợp. Hãy thử tên khác hoặc kéo bản đồ đến nơi cần hỗ trợ.'
+          'Không tìm thấy địa điểm phù hợp. Hãy thử tên khác hoặc kéo bản đồ đến vị trí cần chọn.'
         );
       }
     } catch {
       if (!controller.signal.aborted)
-        setError('Không thể tìm địa điểm lúc này. Bạn có thể kéo bản đồ đến nơi cần hỗ trợ.');
+        setError('Không thể tìm địa điểm lúc này. Bạn có thể kéo bản đồ đến vị trí cần chọn.');
     } finally {
       if (searchAbortRef.current === controller) {
         setSearching(false);
@@ -474,7 +474,7 @@ export function LocationPicker({
                 {mapEngine === 'google' ? 'Google Maps' : 'Bản đồ OpenStreetMap · OpenFreeMap'}
               </p>
               <small style={{ color: 'var(--color-text-secondary)' }}>
-                Kéo bản đồ để đặt ghim đỏ đúng nơi cần hỗ trợ, rồi xác nhận địa chỉ
+                Tìm địa chỉ hoặc kéo bản đồ để đặt ghim đỏ vào đúng vị trí, rồi xác nhận.
               </small>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -505,7 +505,7 @@ export function LocationPicker({
               <input
                 type="search"
                 placeholder="Nhập địa chỉ hoặc tên địa điểm"
-                aria-label="Tìm địa chỉ hoặc địa điểm cần hỗ trợ"
+                aria-label="Tìm địa chỉ hoặc địa điểm"
                 aria-autocomplete="list"
                 aria-expanded={suggestions.length > 0}
                 value={searchQuery}
@@ -576,7 +576,7 @@ export function LocationPicker({
                 ref={leafletContainerRef}
                 className="location-map"
                 role="application"
-                aria-label="Bản đồ OpenStreetMap chọn vị trí cần hỗ trợ"
+                aria-label="Bản đồ OpenStreetMap chọn vị trí"
                 style={{ width: '100%', height: '100%', zIndex: 1 }}
               />
             )}
@@ -585,7 +585,7 @@ export function LocationPicker({
                 ref={googleContainerRef}
                 className="location-map"
                 role="application"
-                aria-label="Bản đồ Google chọn vị trí cần hỗ trợ"
+                aria-label="Bản đồ Google chọn vị trí"
                 style={{ width: '100%', height: '100%' }}
               />
             )}
@@ -605,7 +605,7 @@ export function LocationPicker({
               onClick={() => void confirmCenter()}
               disabled={!draftPoint}
             >
-              Xác nhận địa chỉ
+              Xác nhận vị trí
             </button>
           </div>
 

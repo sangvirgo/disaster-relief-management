@@ -100,7 +100,7 @@ const messages: Record<string, string> = {
   STATE_TRANSITION_INVALID: 'Trạng thái hiện tại không cho phép thao tác này.',
   IDENTITY_UNAVAILABLE: 'Dịch vụ tài khoản tạm thời không khả dụng. Vui lòng thử lại.',
   PASSWORD_WEAK:
-    'Mật khẩu mới chưa đủ mạnh. Mật khẩu phải từ 10 ký tự, khác tên tài khoản, khác mật khẩu hiện tại và không dùng mật khẩu phổ biến (như password123, 1234567890...).',
+    'Mật khẩu chưa đủ mạnh. Mật khẩu phải từ 10 ký tự, khác tên tài khoản và không dùng mật khẩu phổ biến (như password123, 1234567890...).',
   INVALID_CREDENTIALS: 'Tên đăng nhập hoặc mật khẩu không đúng. Vui lòng kiểm tra lại.',
 };
 let csrfToken: string | null = null;

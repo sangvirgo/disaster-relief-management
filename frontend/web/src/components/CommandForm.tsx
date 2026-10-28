@@ -1,10 +1,11 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, type Service, type HttpMethod } from '../api/client';
+import { LocationPicker } from '../maps/LocationPicker';
 
 export type Field = {
   name: string;
   label: string;
-  type?: 'text' | 'number' | 'password' | 'textarea' | 'select' | 'datetime-local';
+  type?: 'text' | 'number' | 'password' | 'textarea' | 'select' | 'datetime-local' | 'location' | 'reference';
   required?: boolean;
   min?: number;
   max?: number;
@@ -26,6 +27,12 @@ export interface CommandSpec {
 }
 const sentenceLabel = (value: string) =>
   value.charAt(0).toLocaleLowerCase('vi-VN') + value.slice(1);
+function pointValue(value: string) {
+  const [longitude, latitude] = value.split(',').map(Number);
+  return Number.isFinite(longitude) && Number.isFinite(latitude) && value.includes(',')
+    ? { longitude, latitude }
+    : null;
+}
 export function CommandForm({
   spec,
   onSuccess,
@@ -39,6 +46,7 @@ export function CommandForm({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [manualFields, setManualFields] = useState<Record<string, boolean>>({});
   const key = useRef<string | null>(null);
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -47,7 +55,7 @@ export function CommandForm({
       const value = (values[field.name] || '').trim();
       if (field.required && !value)
         invalid[field.name] =
-          `Vui lòng ${field.type === 'select' ? 'chọn' : 'nhập'} ${sentenceLabel(field.label)}.`;
+          `Vui lòng ${field.type === 'select' || field.type === 'reference' ? 'chọn' : 'nhập'} ${sentenceLabel(field.label)}.`;
       else if (value && field.minLength && value.length < field.minLength)
         invalid[field.name] = `${field.label} cần ít nhất ${field.minLength} ký tự.`;
       else if (value && field.maxLength && value.length > field.maxLength)
@@ -114,7 +122,91 @@ export function CommandForm({
   return (
     <form className="form-stack command-form" onSubmit={submit} noValidate>
       <h3>{spec.title}</h3>
-      {spec.fields?.map((field) => (
+      {spec.fields?.map((field) =>
+        field.type === 'reference' ? (
+          <div key={field.name} className="form-stack">
+            <label htmlFor={`reference-${field.name}`}>{field.label}</label>
+            {field.options?.length && !manualFields[field.name] &&
+            (!values[field.name] || field.options.some((option) => option.value === values[field.name])) ? (
+              <select
+                id={`reference-${field.name}`}
+                required={field.required}
+                aria-invalid={Boolean(fieldErrors[field.name])}
+                value={values[field.name] || ''}
+                onChange={(event) => {
+                  if (event.target.value === '__manual__') {
+                    setManualFields((current) => ({ ...current, [field.name]: true }));
+                    setValues((current) => ({ ...current, [field.name]: '' }));
+                  } else {
+                    setValues((current) => ({ ...current, [field.name]: event.target.value }));
+                  }
+                  setFieldErrors((current) => ({ ...current, [field.name]: '' }));
+                  setMessage('');
+                  key.current = null;
+                }}
+              >
+                <option value="">Chọn {sentenceLabel(field.label)}</option>
+                {field.options.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+                <option value="__manual__">Không thấy trong danh sách? Nhập mã</option>
+              </select>
+            ) : (
+              <>
+                <input
+                  id={`reference-${field.name}`}
+                  required={field.required}
+                  aria-invalid={Boolean(fieldErrors[field.name])}
+                  placeholder={field.placeholder || 'Dán mã bản ghi'}
+                  value={values[field.name] || ''}
+                  onChange={(event) => {
+                    setValues((current) => ({ ...current, [field.name]: event.target.value }));
+                    setFieldErrors((current) => ({ ...current, [field.name]: '' }));
+                    setMessage('');
+                    key.current = null;
+                  }}
+                />
+                {Boolean(field.options?.length) && (
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={() => {
+                      setManualFields((current) => ({ ...current, [field.name]: false }));
+                      setValues((current) => ({ ...current, [field.name]: '' }));
+                    }}
+                  >
+                    Chọn từ danh sách
+                  </button>
+                )}
+              </>
+            )}
+            {fieldErrors[field.name] && (
+              <small className="field-error" role="alert">{fieldErrors[field.name]}</small>
+            )}
+          </div>
+        ) : field.type === 'location' ? (
+          <div key={field.name} className="form-stack">
+            <strong>{field.label}</strong>
+            <LocationPicker
+              value={pointValue(values[field.name] || '')}
+              onSelect={(point) => {
+                setValues((current) => ({
+                  ...current,
+                  [field.name]: point ? `${point.longitude},${point.latitude}` : '',
+                }));
+                setFieldErrors((current) => ({ ...current, [field.name]: '' }));
+                setMessage('');
+                key.current = null;
+              }}
+            />
+            {pointValue(values[field.name] || '') && (
+              <small>Vị trí đã chọn: {pointValue(values[field.name] || '')?.latitude.toFixed(6)}, {pointValue(values[field.name] || '')?.longitude.toFixed(6)}</small>
+            )}
+            {fieldErrors[field.name] && (
+              <small className="field-error" role="alert">{fieldErrors[field.name]}</small>
+            )}
+          </div>
+        ) : (
         <label key={field.name}>
           {field.label}
           {field.type === 'textarea' ? (
@@ -181,7 +273,8 @@ export function CommandForm({
             <small className="field-error">{fieldErrors[field.name]}</small>
           )}
         </label>
-      ))}
+        )
+      )}
       {message && (
         <p
           role={message.startsWith('Thao tác đã') ? 'status' : 'alert'}

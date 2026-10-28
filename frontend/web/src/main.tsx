@@ -214,7 +214,13 @@ function AuthModal({
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Không thể hoàn tất yêu cầu.');
-      if (error instanceof ApiError && Object.keys(error.fieldErrors).length) {
+      if (mode === 'register' && error instanceof ApiError && error.code === 'PASSWORD_WEAK') {
+        setAuthErrors({ password: 'Mật khẩu cần từ 10 ký tự, khác tên đăng nhập và không phổ biến.' });
+      } else if (mode === 'register' && error instanceof ApiError && error.code === 'USERNAME_TAKEN') {
+        setAuthErrors({ username: 'Tên đăng nhập đã được sử dụng.' });
+      } else if (mode === 'register' && error instanceof ApiError && error.code === 'EMAIL_TAKEN') {
+        setAuthErrors({ email: 'Địa chỉ email đã được sử dụng.' });
+      } else if (error instanceof ApiError && Object.keys(error.fieldErrors).length) {
         setAuthErrors(
           Object.fromEntries(
             Object.keys(error.fieldErrors).map((name) => [name, 'Thông tin này chưa hợp lệ.'])
