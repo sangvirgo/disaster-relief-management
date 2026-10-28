@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { roles, type Me } from '../../auth/session';
-import { CommandForm, type CommandSpec } from '../../components/CommandForm';
+import { CommandForm, type CommandSpec, type Field } from '../../components/CommandForm';
 import { label, timeLabel } from '../../i18n/labels';
 import { formatQuantity } from '../../i18n/quantity';
 import { ReceiptCountForm } from './ReceiptCountForm';
@@ -96,6 +96,55 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
+  const [references, setReferences] = useState<Record<string, { value: string; label: string }[]>>({});
+  useEffect(() => {
+    let live = true;
+    const sources = [
+      ['organizations', 'identity', '/organizations'],
+      ['warehouses', 'logistics', '/warehouses'],
+      ['items', 'logistics', '/items'],
+      ['campaigns', 'response', '/campaigns'],
+      ['reliefPoints', 'logistics', '/relief-points'],
+      ['vehicles', 'logistics', '/vehicles'],
+      ['requests', 'response', '/requests'],
+    ] as const;
+    void Promise.allSettled(sources.map(([, service, path]) => api<List>(service, path))).then((results) => {
+      if (!live) return;
+      const options: Record<string, { value: string; label: string }[]> = {};
+      results.forEach((result, index) => {
+        if (result.status !== 'fulfilled') return;
+        const key = sources[index][0];
+        options[key] = (result.value.items || [])
+          .filter((item) => item.id && (!['campaigns', 'organizations'].includes(key) || item.status === 'ACTIVE'))
+          .map((item) => ({
+            value: item.id!,
+            label: key === 'requests'
+              ? `SOS ${string(item.tracking_code) || item.id!.slice(0, 8)} · ${label(item.status)}`
+              : string(item.name) || string(item.title) || string(item.identifier) ||
+                string(item.item_name) || `Mã …${item.id!.slice(-8)}`,
+          }));
+      });
+      setReferences(options);
+    });
+    return () => { live = false; };
+  }, [revision]);
+  const organizationOptions = references.organizations?.length
+    ? references.organizations
+    : [...new Set(user.grants.map((grant) => grant.organization_id).filter((id): id is string => Boolean(id)))]
+        .map((id) => ({ value: id, label: `Tổ chức trong quyền của tôi · …${id.slice(-8)}` }));
+  const referenceField = (
+    name: string,
+    title: string,
+    source: string,
+    required = false
+  ): Field => ({
+    name,
+    label: title,
+    type: 'reference',
+    required,
+    options: source === 'organizations' ? organizationOptions : references[source] || [],
+    placeholder: `Dán mã ${title.toLocaleLowerCase('vi-VN')}`,
+  });
   const route =
     page === 'assets'
       ? `/${asset}`
@@ -204,10 +253,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       ...fields([
         ['title', 'Tên đợt quyên góp', true],
         ['description', 'Mô tả', true],
-        ['intake_warehouse_id', 'Mã kho tiếp nhận', true],
-        ['campaign_id', 'Mã chiến dịch nếu có'],
-        ['item_id', 'Mã vật phẩm', true],
       ]),
+      referenceField('intake_warehouse_id', 'Kho tiếp nhận', 'warehouses', true),
+      referenceField('campaign_id', 'Chiến dịch (nếu có)', 'campaigns'),
+      referenceField('item_id', 'Vật phẩm', 'items', true),
       { name: 'target_quantity', label: 'Số lượng mục tiêu', type: 'number', required: true },
     ],
     build: (values) => ({
@@ -223,10 +272,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     service: 'logistics',
     path: '/needs',
     fields: [
-      ...fields([
-        ['request_id', 'Mã yêu cầu SOS', true],
-        ['item_id', 'Mã vật phẩm', true],
-      ]),
+      referenceField('request_id', 'Yêu cầu SOS', 'requests', true),
+      referenceField('item_id', 'Vật phẩm', 'items', true),
       { name: 'work_cycle', label: 'Chu kỳ xử lý', type: 'number', required: true },
       { name: 'quantity', label: 'Số lượng cần', type: 'number', required: true },
     ],
@@ -724,7 +771,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   title: 'Lập biên nhận',
                   service: 'logistics',
                   path: '/donation-receipts',
-                  fields: fields([['warehouse_id', 'Mã kho tiếp nhận', true]]),
+                  fields: [referenceField('warehouse_id', 'Kho tiếp nhận', 'warehouses', true)],
                   build: (values) => ({
                     delivery_id: selected.id,
                     warehouse_id: values.warehouse_id,
@@ -882,7 +929,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                         service: 'logistics',
                         path: `/needs/${id}/commitments`,
                         fields: [
-                          ...fields([['warehouse_id', 'Mã kho', true]]),
+                          referenceField('warehouse_id', 'Kho xuất hàng', 'warehouses', true),
                           { name: 'quantity', label: 'Số lượng', type: 'number', required: true },
                         ],
                         build: (values) => ({
@@ -1061,25 +1108,30 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             path: `/${asset}`,
             fields:
               asset === 'vehicles'
-                ? fields([
-                    ['organization_id', 'Mã tổ chức', true],
+                ? [
+                    referenceField('organization_id', 'Tổ chức', 'organizations', true),
+                    ...fields([
                     ['region_code', 'Mã khu vực', true],
                     ['identifier', 'Biển số hoặc mã xe', true],
                     ['vehicle_type', 'Loại phương tiện', true],
-                  ])
+                    ]),
+                  ]
                 : asset === 'warehouses'
-                  ? fields([
-                      ['organization_id', 'Mã tổ chức', true],
+                  ? [
+                      referenceField('organization_id', 'Tổ chức', 'organizations', true),
+                      ...fields([
                       ['region_code', 'Mã khu vực', true],
                       ['name', 'Tên kho', true],
-                    ])
-                  : fields([
-                      ['organization_id', 'Mã tổ chức', true],
-                      ['region_code', 'Mã khu vực', true],
-                      ['name', 'Tên điểm', true],
-                      ['longitude', 'Kinh độ', true],
-                      ['latitude', 'Vĩ độ', true],
-                    ]),
+                      ]),
+                    ]
+                  : [
+                      referenceField('organization_id', 'Tổ chức', 'organizations', true),
+                      ...fields([
+                        ['region_code', 'Mã khu vực', true],
+                        ['name', 'Tên điểm cứu trợ', true],
+                      ]),
+                      { name: 'location', label: 'Địa chỉ hoặc vị trí trên bản đồ', type: 'location', required: true },
+                    ],
             build:
               asset === 'relief-points'
                 ? (values) => ({
@@ -1088,7 +1140,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     name: values.name,
                     location: {
                       type: 'Point',
-                      coordinates: [Number(values.longitude), Number(values.latitude)],
+                      coordinates: values.location.split(',').map(Number),
                     },
                   })
                 : undefined,
@@ -1103,10 +1155,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             service: 'logistics',
             path: '/distributions',
             fields: [
-              ...fields([
-                ['warehouse_id', 'Mã kho', true],
-                ['item_id', 'Mã vật phẩm', true],
-              ]),
+              referenceField('warehouse_id', 'Kho xuất hàng', 'warehouses', true),
+              referenceField('item_id', 'Vật phẩm', 'items', true),
               {
                 name: 'purpose',
                 label: 'Mục đích',
@@ -1119,12 +1169,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 ].map(([value, title]) => ({ value, label: title })),
               },
               { name: 'quantity', label: 'Số lượng', type: 'number', required: true },
-              ...fields([
-                ['commitment_id', 'Mã cam kết khi hỗ trợ yêu cầu SOS'],
-                ['campaign_id', 'Mã chiến dịch khi phân phối theo chiến dịch'],
-                ['relief_point_id', 'Mã điểm cứu trợ khi bổ sung tại điểm'],
-                ['vehicle_id', 'Mã phương tiện nếu có'],
-              ]),
+              ...fields([['commitment_id', 'Mã cam kết khi hỗ trợ yêu cầu SOS']]),
+              referenceField('campaign_id', 'Chiến dịch (khi phân phối theo chiến dịch)', 'campaigns'),
+              referenceField('relief_point_id', 'Điểm cứu trợ (khi bổ sung tại điểm)', 'reliefPoints'),
+              referenceField('vehicle_id', 'Phương tiện (nếu có)', 'vehicles'),
             ],
             build: (values) => ({
               warehouse_id: values.warehouse_id,

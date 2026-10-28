@@ -197,17 +197,17 @@ const advisoryReviewLabels: Record<string, string> = {
   REJECTED: 'Không sử dụng',
 };
 const advisoryStatusLabels: Record<string, string> = {
-  QUEUED: 'Đang chờ Gemini đánh giá',
-  PROCESSING: 'Gemini đang đánh giá',
-  COMPLETED: 'Đã có gợi ý',
-  STALE: 'Gợi ý đã cũ do dữ kiện thay đổi',
-  SKIPPED: 'AI không khả dụng hoặc đã bỏ qua đánh giá',
-  FAILED: 'Gemini chưa trả được kết quả',
+  QUEUED: 'Đang chờ AI đánh giá',
+  PROCESSING: 'AI đang đánh giá',
+  COMPLETED: 'Đã có kết quả AI',
+  STALE: 'Thông tin SOS đã đổi; kết quả AI cần cập nhật',
+  SKIPPED: 'Chưa thực hiện đánh giá AI',
+  FAILED: 'Chưa có kết quả AI dùng được',
   UNKNOWN: 'Chưa rõ trạng thái đánh giá AI',
 };
 
 function advisoryScoreLabel(score: number | null, level: string | null): string {
-  if (score === null || !level || !advisoryLevelLabels[level]) return 'Chưa đủ dữ kiện để đánh giá';
+  if (score === null || !level || !advisoryLevelLabels[level]) return 'Chưa đủ thông tin để đánh giá';
   return `${advisoryLevelLabels[level]} · ${score}/100`;
 }
 
@@ -230,6 +230,18 @@ export function Coordinator({ page }: { page: string }) {
   const [aiReviewBusy, setAiReviewBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [campaignOptions, setCampaignOptions] = useState<{ value: string; label: string }[]>([]);
+  useEffect(() => {
+    let live = true;
+    void api<{ items: { id: string; name: string; status: string }[] }>('response', '/campaigns')
+      .then((value) => {
+        if (live) setCampaignOptions(value.items
+          .filter((campaign) => campaign.status === 'ACTIVE')
+          .map((campaign) => ({ value: campaign.id, label: campaign.name })));
+      })
+      .catch(() => { /* Vẫn có thể nhập mã khi không tải được danh sách. */ });
+    return () => { live = false; };
+  }, [revision]);
   const refreshReasonRef = useRef<'success' | 'stale' | null>(null);
   useEffect(() => {
     setQueueStatus(stateFilter[page] || '');
@@ -491,7 +503,7 @@ export function Coordinator({ page }: { page: string }) {
                     </small>
                     {item.priority_advisory && (
                       <small>
-                        Gợi ý theo quy tắc:{' '}
+                        Đánh giá ban đầu:{' '}
                         {advisoryScoreLabel(
                           item.priority_advisory.score,
                           item.priority_advisory.level
@@ -501,8 +513,8 @@ export function Coordinator({ page }: { page: string }) {
                     {item.ai_priority_advisory && (
                       <small>
                         {item.ai_priority_advisory.source === 'DEMO_FIXTURE'
-                          ? 'Gợi ý AI minh họa'
-                          : 'Gợi ý Gemini'}
+                          ? 'AI minh họa'
+                          : 'Kết quả AI'}
                         {' · '}
                         {item.ai_priority_advisory.review_status === 'REJECTED'
                           ? 'Đã bác bỏ, không sử dụng gợi ý'
@@ -697,7 +709,7 @@ export function Coordinator({ page }: { page: string }) {
             )}
             {detail.priority_advisory && (
               <section className="notice warning">
-                <h3>Gợi ý ưu tiên theo quy tắc backend</h3>
+                <h3>Đánh giá ban đầu từ thông tin SOS</h3>
                 <p>
                   <strong>
                     {advisoryScoreLabel(
@@ -709,24 +721,23 @@ export function Coordinator({ page }: { page: string }) {
                 <p>
                   <strong>Dấu hiệu:</strong>{' '}
                   {detail.priority_advisory.reason_codes
-                    .map((code) => advisoryReasonLabels[code] || 'Có dữ kiện cần rà soát')
-                    .join(' · ') || 'Chưa ghi nhận dấu hiệu theo bộ quy tắc.'}
+                    .map((code) => advisoryReasonLabels[code] || 'Có thông tin cần kiểm tra')
+                    .join(' · ') || 'Chưa ghi nhận dấu hiệu cần chú ý.'}
                 </p>
                 <p>
-                  Đây là gợi ý từ dữ liệu SOS đã cung cấp, cần điều phối viên xác minh. Gợi ý không
-                  thay đổi mức ưu tiên P1–P4 và không tự giao đội. Nếu Gemini quá tải hoặc hết hạn
-                  mức, gợi ý quy tắc này vẫn hoạt động.
+                  Hệ thống tự nhận diện các dấu hiệu cần chú ý từ thông tin đã khai. Điều phối viên
+                  vẫn phải xác minh, chọn mức ưu tiên P1–P4 và quyết định giao đội.
                 </p>
                 {detail.priority_advisory.outcome === 'INSUFFICIENT_DATA' && (
                   <p>
-                    Chưa đủ dữ kiện để kết luận mức nguy cơ. Thiếu thông tin không có nghĩa là tình
+                    Chưa đủ thông tin để kết luận mức nguy cơ. Thiếu thông tin không có nghĩa là tình
                     huống ít khẩn cấp; cần tiếp tục xác minh.
                   </p>
                 )}
                 {detail.declared_danger && (
                   <p>
-                    <strong>Cảnh báo riêng:</strong> người báo tin khai có nguy hiểm tính mạng; cần
-                    kiểm tra ngay. Cờ này không tự cộng điểm.
+                    <strong>Cần kiểm tra ngay:</strong> người báo cho biết có nguy hiểm tính mạng.
+                    Thông tin này không tự làm tăng điểm đánh giá.
                   </p>
                 )}
               </section>
@@ -735,8 +746,8 @@ export function Coordinator({ page }: { page: string }) {
               <section className="notice">
                 <h3>
                   {detail.ai_priority_advisory.source === 'DEMO_FIXTURE'
-                    ? 'Gợi ý AI minh họa'
-                    : 'Gợi ý đánh giá rủi ro từ Gemini'}
+                    ? 'Đánh giá AI minh họa'
+                    : 'Đánh giá hỗ trợ từ AI (Gemini)'}
                 </h3>
                 <p>
                   <strong>Trạng thái:</strong>{' '}
@@ -761,13 +772,13 @@ export function Coordinator({ page }: { page: string }) {
                         </strong>
                       </p>
                       <p>
-                        <strong>Lý do Gemini đưa ra:</strong>{' '}
+                        <strong>Lý do AI đưa ra:</strong>{' '}
                         {detail.ai_priority_advisory.reasons.join(' · ') ||
                           'Không có lý do kèm theo.'}
                       </p>
                       {detail.ai_priority_advisory.confidence !== null && (
                         <p>
-                          <strong>Độ tin cậy tự báo cáo:</strong>{' '}
+                        <strong>Độ tin cậy do AI ước tính:</strong>{' '}
                           {Math.round(detail.ai_priority_advisory.confidence * 100)}% (chỉ tham
                           khảo)
                         </p>
@@ -776,36 +787,39 @@ export function Coordinator({ page }: { page: string }) {
                   )}
                 {detail.ai_priority_advisory.status === 'STALE' && (
                   <p>
-                    Dữ kiện SOS đã thay đổi sau lần đánh giá. Gợi ý cũ không còn được dùng để rà
-                    soát; hãy đối chiếu dữ kiện hiện tại và tiếp tục xác minh thủ công.
+                    Thông tin SOS đã thay đổi sau lần đánh giá. Kết quả cũ không còn phù hợp;
+                    hãy kiểm tra thông tin mới và tiếp tục xác minh.
                   </p>
+                )}
+                {['FAILED', 'SKIPPED'].includes(detail.ai_priority_advisory.status) && (
+                  <p>Hãy tiếp tục xác minh với người báo và xử lý SOS theo quy trình thủ công.</p>
                 )}
                 {detail.ai_priority_advisory.status === 'COMPLETED' &&
                   detail.ai_priority_advisory.review_status !== 'REJECTED' &&
                   detail.ai_priority_advisory.score === null && (
                     <p>
-                      Gemini chưa đề xuất điểm nguy cơ; không coi đây là mức nguy cơ thấp.{' '}
+                      AI chưa đề xuất điểm nguy cơ; không coi đây là mức nguy cơ thấp.{' '}
                       {detail.ai_priority_advisory.reasons.join(' · ')} Hãy tiếp tục xác minh thủ công.
                     </p>
                   )}
                 <p>
                   {detail.ai_priority_advisory.source === 'DEMO_FIXTURE'
                     ? 'Đây là dữ liệu minh họa giao diện; không phải kết quả Gemini chạy thật.'
-                    : 'Đây là gợi ý để điều phối viên rà soát, không thay đổi mức P1–P4, thứ tự hàng đợi hoặc quyết định giao đội.'}
+                    : 'AI chỉ hỗ trợ xem xét. Điều phối viên vẫn quyết định mức ưu tiên và giao đội.'}
                 </p>
               </section>
             )}
-            {detail.ai_advisory && (
+            {detail.ai_advisory && detail.ai_advisory.status === 'COMPLETED' && (
               <section className="notice">
                 <h3>
                   {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
                     ? 'Thông tin AI minh họa'
-                    : 'Trích xuất thông tin bằng Gemini'}
+                    : 'Thông tin AI ghi nhận'}
                 </h3>
                 <p>
                   {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
                     ? 'Dữ liệu này dùng để minh họa và không phải phản hồi từ Gemini.'
-                    : 'Mặc định, Gemini chỉ nhận dữ kiện SOS có cấu trúc; mô tả tự do, thông tin liên hệ, vị trí chính xác và tệp bằng chứng không được gửi. Chỉ bật gửi mô tả đã khử một số định danh cho dữ liệu minh họa tổng hợp; biện pháp này có thể bỏ sót thông tin nhận dạng và không được dùng với SOS thật. Điều phối viên cần đối chiếu với người báo tin.'}
+                    : 'AI chỉ nhận các thông tin đã chọn trong biểu mẫu. Nội dung mô tả, liên hệ, vị trí chính xác và tệp đính kèm không được gửi. Hãy đối chiếu với người báo trước khi sử dụng.'}
                 </p>
                 <p>
                   <strong>Trạng thái:</strong>{' '}
@@ -822,7 +836,7 @@ export function Coordinator({ page }: { page: string }) {
                     )}
                     {detail.ai_advisory.reason_codes.length > 0 && (
                       <p>
-                        <strong>Dấu hiệu theo quy tắc:</strong>{' '}
+                        <strong>Dấu hiệu cần chú ý:</strong>{' '}
                         {detail.ai_advisory.reason_codes
                           .map((code) => advisoryReasonLabels[code] || 'Có dấu hiệu cần rà soát')
                           .join(' · ')}
@@ -836,7 +850,7 @@ export function Coordinator({ page }: { page: string }) {
                     {detail.ai_advisory.extracted_json?.indicators &&
                       detail.ai_advisory.extracted_json.indicators.length > 0 && (
                         <p>
-                          <strong>Dấu hiệu AI trích xuất:</strong>{' '}
+                          <strong>Dấu hiệu AI ghi nhận:</strong>{' '}
                           {detail.ai_advisory.extracted_json.indicators.join(' · ')}
                         </p>
                       )}
@@ -864,7 +878,7 @@ export function Coordinator({ page }: { page: string }) {
                       </p>
                     )}
                     <p>
-                      <strong>Độ tin cậy mô hình tự báo cáo:</strong>{' '}
+                      <strong>Độ tin cậy do AI ước tính:</strong>{' '}
                       {Math.round((detail.ai_advisory.extracted_json?.confidence ?? 0) * 100)}% (chỉ
                       tham khảo)
                     </p>
@@ -916,12 +930,6 @@ export function Coordinator({ page }: { page: string }) {
                       </div>
                     )}
                   </>
-                )}
-                {['FAILED', 'SKIPPED'].includes(detail.ai_advisory.status) && (
-                  <p>
-                    Gemini chưa trả kết quả cho dữ kiện SOS này. Gợi ý theo quy tắc backend vẫn hiển
-                    thị ở mục trên; hãy tiếp tục xác minh thủ công.
-                  </p>
                 )}
               </section>
             )}
@@ -994,7 +1002,8 @@ export function Coordinator({ page }: { page: string }) {
                   path: `/requests/${detail.id}/attach-campaign`,
                   version: detail.version,
                   fields: [
-                    { name: 'campaign_id', label: 'Mã định danh chiến dịch', required: true },
+                    { name: 'campaign_id', label: 'Chiến dịch', type: 'reference', required: true,
+                      options: campaignOptions, placeholder: 'Dán mã chiến dịch' },
                   ],
                   warning: 'Xác nhận gắn yêu cầu này vào chiến dịch đã chọn?',
                 })}
@@ -1231,8 +1240,8 @@ export function Coordinator({ page }: { page: string }) {
                   {!candidates && !candidateError && <p role="status">Đang tải đội phù hợp…</p>}
                   {candidates?.items.length === 0 && (
                     <p role="status">
-                      Hiện chưa có đội đủ điều kiện để giao yêu cầu này. Kiểm tra trạng thái và thời
-                      điểm cập nhật vị trí của đội.
+                      Chưa có đội phù hợp. Hãy kiểm tra đơn vị quản lý, khu vực hoạt động, kỹ năng,
+                      trạng thái và vị trí gần đây của các đội.
                     </p>
                   )}
                   {candidates?.items.map((candidate) => (

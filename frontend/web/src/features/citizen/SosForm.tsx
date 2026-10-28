@@ -340,8 +340,9 @@ export function SosForm({
         />
       </label>
       <div className="notice warning">
-        Mô tả ngắn được gửi đến Gemini để trích xuất dữ kiện thành JSON. Không nhập tên, số điện
-        thoại, số giấy tờ hoặc địa chỉ cụ thể. Điều phối viên sẽ xem xét mọi gợi ý AI.
+        Mô tả này giúp điều phối viên hiểu tình huống. Mặc định, AI chỉ nhận thông tin bạn chọn
+        trong biểu mẫu; nội dung mô tả, số điện thoại và vị trí chính xác không được gửi cho AI.
+        Không nhập thông tin cá nhân không cần thiết.
       </div>
       <fieldset className="sos-needs">
         <legend>Nhu cầu cần hỗ trợ</legend>
