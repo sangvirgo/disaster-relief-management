@@ -1123,7 +1123,7 @@ Phiếu phân phối chỉ được xuất kho khi đúng phiên bản đã duy�
 \end{diagram}
 
 \section{Kiến trúc hệ thống}
-Backend gồm ba dịch vụ Identity, Response và Logistics, được triển khai bằng NestJS với TypeScript; mỗi dịch vụ quản lý dữ liệu thuộc phạm vi của mình. Nginx định tuyến API theo dịch vụ, các dịch vụ trao đổi với nhau qua giao diện REST (Representational State Transfer). Tệp bằng chứng được lưu riêng tư trên MinIO AIStor Free thông qua giao thức lưu trữ đối tượng S3 (Simple Storage Service). Web/Mobile là các giao diện dành cho người dân, đội ứng cứu và nhân viên vận hành.
+Backend gồm ba dịch vụ Identity, Response và Logistics, được triển khai bằng NestJS với TypeScript; mỗi dịch vụ quản lý dữ liệu thuộc phạm vi của mình. Nginx định tuyến API theo dịch vụ, các dịch vụ trao đổi với nhau qua giao diện REST (Representational State Transfer). Tệp bằng chứng được lưu riêng tư trên MinIO Community thông qua giao thức lưu trữ đối tượng S3 (Simple Storage Service). Web/Mobile là các giao diện dành cho người dân, đội ứng cứu và nhân viên vận hành.
 
 \begin{diagram}[p]
   \centering
@@ -1142,7 +1142,7 @@ Backend gồm ba dịch vụ Identity, Response và Logistics, được triển 
     \node[database] (dbidentity) at (-5.0,-10.3) {CSDL Identity\\(PostgreSQL)};
     \node[database] (dbresponse) at (-0.6,-10.3) {CSDL Response\\(PostgreSQL/\\PostGIS)};
     \node[database] (dblogistics) at (5.4,-10.3) {CSDL Logistics\\(PostgreSQL)};
-    \node[database,minimum width=3.6cm] (minio) at (2.5,-13.4) {MinIO AIStor Free\\tệp riêng tư};
+    \node[database,minimum width=3.6cm] (minio) at (2.5,-13.4) {MinIO Community\\tệp riêng tư};
 
     \draw[flowarrow] (actors) -- (client);
     \draw[flowarrow] (client) -- (nginx);
@@ -1176,14 +1176,14 @@ Backend gồm ba dịch vụ Identity, Response và Logistics, được triển 
     \hline
     Web/Mobile & Hiển thị/nhập liệu theo vai trò; không phải ranh giới bảo mật. & React/Vite/TypeScript và \mbox{React Native}, Expo, TypeScript. \\
     \hline
-    Lưu tệp & Tệp bằng chứng riêng tư và thông tin kiểm soát tải xuống. & MinIO AIStor Free, triển khai một nút cho môi trường demo; quyền riêng tư và khôi phục cần được kiểm tra. \\
+    Lưu tệp & Tệp bằng chứng riêng tư và thông tin kiểm soát tải xuống. & MinIO Community, triển khai một nút cho môi trường demo; quyền riêng tư và khôi phục cần được kiểm tra. \\
     \hline
     Triển khai demo & Các API và thành phần phục vụ trình diễn. & Docker Compose trên một máy; cấu hình này chưa chứng minh khả năng sẵn sàng cao hay cam kết thời gian phục vụ. \\
     \hline
   \end{tabularx}
 \end{table}
 
-NestJS với TypeScript được lựa chọn sau khi nhóm so sánh định tính với Spring Boot, Django/DRF (Django REST Framework), FastAPI và Flask. Cách chọn này phù hợp với định hướng dùng TypeScript cho backend và các ứng dụng khách, đồng thời cung cấp cấu trúc mô-đun, kiểm tra dữ liệu đầu vào và hỗ trợ mô tả API. PostgreSQL/PostGIS phù hợp với các dữ liệu có quan hệ, giao dịch tồn kho và truy vấn vị trí. Đây là đánh giá theo nhu cầu của đề tài, không phải kết quả so sánh hiệu năng. MinIO AIStor Free được chọn cho lưu trữ tệp trong môi trường demo một nút; việc xác nhận quyền truy cập riêng tư và quy trình sao lưu, khôi phục vẫn còn phải thực hiện.
+NestJS với TypeScript được lựa chọn sau khi nhóm so sánh định tính với Spring Boot, Django/DRF (Django REST Framework), FastAPI và Flask. Cách chọn này phù hợp với định hướng dùng TypeScript cho backend và các ứng dụng khách, đồng thời cung cấp cấu trúc mô-đun, kiểm tra dữ liệu đầu vào và hỗ trợ mô tả API. PostgreSQL/PostGIS phù hợp với các dữ liệu có quan hệ, giao dịch tồn kho và truy vấn vị trí. Đây là đánh giá theo nhu cầu của đề tài, không phải kết quả so sánh hiệu năng. MinIO Community được chọn cho lưu trữ tệp trong môi trường demo một nút; việc xác nhận quyền truy cập riêng tư và quy trình sao lưu, khôi phục vẫn còn phải thực hiện.
 
 \section{Kết quả xây dựng backend}
 Backend được chia thành ba dịch vụ theo trách nhiệm dữ liệu. Identity quản lý tài khoản, phiên đăng nhập, tổ chức, thành viên, quyền truy cập và nhật ký thao tác. Response tiếp nhận SOS, theo dõi và bổ sung yêu cầu, hỗ trợ xác minh, xem xét báo trùng, đặt ưu tiên, giao nhiệm vụ cho đội và cập nhật kết quả ứng cứu. Logistics quản lý chiến dịch, hàng cứu trợ, kiểm đếm và duyệt độc lập, tồn kho, nhu cầu, cam kết, phân phối, bàn giao và báo cáo.
@@ -1454,7 +1454,7 @@ Hệ thống hiện được xây dựng và minh họa trong môi trường dem
   \bibitem{docker-compose} Docker, \textit{Docker Compose}: \url{https://docs.docker.com/compose/}
   \bibitem{expo-location} Expo, \textit{Location}: \url{https://docs.expo.dev/versions/latest/sdk/location/}
   \bibitem{wfp-warehouse} Logistics Cluster, \textit{Warehousing Documentation}: \url{https://log.logcluster.org/en/warehousing-documentation}
-  \bibitem{minio} MinIO, \textit{AIStor Subscriptions \& Pricing}: \url{https://www.min.io/pricing}
+  \bibitem{minio} MinIO, \textit{MinIO Community source repository}: \url{https://github.com/minio/minio}
   \bibitem{nestjs} NestJS, \textit{First steps}: \url{https://docs.nestjs.com/first-steps}
   \bibitem{ocha-data} OCHA Centre for Humanitarian Data, \textit{OCHA Data Responsibility Guidelines 2025}: \url{https://centre.humdata.org/data-responsibility-guidelines-2025/}
   \bibitem{sahana} OSGeo, \textit{Sahana Eden Overview}: \url{https://live-archive.osgeo.org/7.9/en/overview/sahana_overview.html}

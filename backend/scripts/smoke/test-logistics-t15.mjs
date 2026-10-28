@@ -398,7 +398,7 @@ try {
     { file: png, actor: fieldRecorder },
   );
   if (uploadedEvidence.status === 503 && uploadedEvidence.value?.code === 'STORAGE_UNAVAILABLE') {
-    throw new Error('Logistics T15 handoff evidence upload returned STORAGE_UNAVAILABLE; start/configure the primary AIStor service before running this smoke');
+    throw new Error('Logistics T15 handoff evidence upload returned STORAGE_UNAVAILABLE; start/configure the primary MinIO service before running this smoke');
   }
   expectSuccess(uploadedEvidence, 201);
   assert.equal(uploadedEvidence.value.state, 'READY');
@@ -415,7 +415,7 @@ try {
 
   const evidenceDownload = await call(logisticsUrl, `evidence/${uploadedEvidence.value.id}/download`, { actor: fieldRecorder });
   if (evidenceDownload.status === 503 && evidenceDownload.value?.code === 'STORAGE_UNAVAILABLE') {
-    throw new Error('Logistics T15 handoff evidence download returned STORAGE_UNAVAILABLE; verify the primary AIStor service before running this smoke');
+    throw new Error('Logistics T15 handoff evidence download returned STORAGE_UNAVAILABLE; verify the primary MinIO service before running this smoke');
   }
   expectSuccess(evidenceDownload);
   assert.equal(evidenceDownload.value.expires_in, 60);

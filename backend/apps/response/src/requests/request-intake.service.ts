@@ -4,7 +4,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { canonicalRequestHash, IdempotencyService } from '../../../../packages/technical/src/idempotency/idempotency';
 import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { aiInputHash, sanitizeAiDescription, scoreRequestRisk } from '../ai/ai-risk';
+import { enqueueAiAdvisory } from '../ai/ai-advisory-input';
 import { hashPurposeBoundSecret, PepperSet } from '../../../../packages/technical/src/security/secret-hash';
 import { CreateProxyRequestDto, CreateSelfRequestDto } from './request-intake.dto';
 import { loadReporterTokenConfig, ReporterTokenConfig } from './reporter-token';
@@ -329,16 +329,7 @@ export class RequestIntakeService {
            VALUES ($1,$2,'REQUEST_SUBMITTED','REPORTER',NULL,'SUBMITTED',$3::jsonb)`,
           [request.id, reporterUserId, JSON.stringify({ public_text_code: 'RECEIVED', review_lane: request.review_lane })],
         );
-        const safeDescription = sanitizeAiDescription(dto.description ?? '');
-        if (safeDescription) {
-          const risk = scoreRequestRisk({ description: safeDescription, reporterDeclaredDanger: dto.reporter_declared_danger ?? false,
-            peopleAffected: dto.people_affected ?? null, childrenCount, elderlyCount, needsRescue, needsReliefSupplies });
-          await manager.query(
-            `INSERT INTO ai_advisory (request_id,request_version,input_hash,model,prompt_version,schema_version,risk_score,reason_codes)
-             VALUES ($1,$2,$3,$4,'v1','v1',$5,$6) ON CONFLICT (request_id,input_hash) DO NOTHING`,
-            [request.id, Number(request.version), aiInputHash(safeDescription), process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite', risk.score, risk.reasonCodes],
-          );
-        }
+        await enqueueAiAdvisory(manager, request.id);
         if (proxy) await this.recordProxyActivityFlag(manager, request.id, reporterUserId!, phone, throttle.received_at);
         const value = createdResponse(request);
         return { status: 201, value, resource: { type: 'assistance_request', id: request.id } };

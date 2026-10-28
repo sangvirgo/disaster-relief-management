@@ -3,6 +3,32 @@ INSERT INTO incident_category (code, display_name) VALUES
   ('FLOOD', 'Ngập lụt'), ('LANDSLIDE', 'Sạt lở đất'), ('STORM', 'Bão, gió lốc'), ('MEDICAL', 'Cấp cứu y tế'),
   ('TRAPPED', 'Người bị mắc kẹt'), ('OTHER', 'Khác')
 ON CONFLICT DO NOTHING;
+
+-- Refresh only unreviewed Gemini AI samples; leave any staff-reviewed result untouched.
+UPDATE ai_advisory
+   SET model = 'gemini-3.1-flash-lite',
+       input_hash = 'e33d48e81d0c6237e84b4c5eb0e8b0030216ef400b8d64daea2eb7fd64f8efca',
+       prompt_version = 'v3',
+       schema_version = 'v4',
+       risk_score = NULL,
+       reason_codes = ARRAY['DECLARED_LIFE_DANGER','CHILDREN_PRESENT','ELDERLY_PRESENT','RESCUE_REQUESTED'],
+       extracted_json = '{"summary":"Một vụ hỏa hoạn đang xảy ra ảnh hưởng đến 6 người, trong đó có 2 trẻ em và 1 người cao tuổi, yêu cầu cứu hộ khẩn cấp.","indicators":["Cháy","Cần cứu hộ","Có trẻ em","Có người cao tuổi"],"facts":{"people_affected":6,"children_count":2,"elderly_count":1,"life_threat":true,"needs_rescue":true,"needs_relief_supplies":false},"priority_score":90,"priority_reasons":["Sự cố hỏa hoạn đe dọa trực tiếp đến tính mạng","Có sự hiện diện của trẻ em trong khu vực nguy hiểm","Có người cao tuổi cần hỗ trợ đặc biệt","Tổng số người bị ảnh hưởng là 6","Yêu cầu cứu hộ khẩn cấp đã được xác nhận"],"confidence":0.95}'::jsonb
+ WHERE id = '00000000-0000-4000-8000-000000000af1'::uuid
+   AND status = 'COMPLETED'
+   AND review_status IS NULL;
+
+UPDATE ai_advisory
+   SET model = 'gemini-3.1-flash-lite',
+       input_hash = 'bac706703a01f0759c5d16f495f7eae88526980769977cbce03dacbc690f6a46',
+       prompt_version = 'v3',
+       schema_version = 'v4',
+       risk_score = 55,
+       reason_codes = ARRAY['DECLARED_LIFE_DANGER','FLOOD_OR_TRAPPED','CHILDREN_PRESENT','ELDERLY_PRESENT','RESCUE_REQUESTED'],
+       extracted_json = '{"summary":"Nhóm 3 người bao gồm 1 trẻ em và 1 người cao tuổi đang bị mắc kẹt, cần cứu hộ và cứu trợ khẩn cấp.","indicators":["Có người mắc kẹt","Cần cứu hộ","Cần hàng cứu trợ","Có trẻ em","Có người cao tuổi"],"facts":{"people_affected":3,"children_count":1,"elderly_count":1,"life_threat":false,"needs_rescue":true,"needs_relief_supplies":true},"priority_score":85,"priority_reasons":["Đối tượng dễ bị tổn thương bao gồm trẻ em và người cao tuổi","Tình trạng mắc kẹt yêu cầu cứu hộ khẩn cấp","Số lượng người bị ảnh hưởng là 3","Yêu cầu cứu trợ khẩn cấp về nhu yếu phẩm"],"confidence":0.9}'::jsonb
+ WHERE id = '00000000-0000-4000-8000-000000000af2'::uuid
+   AND status = 'COMPLETED'
+   AND review_status IS NULL;
+
 INSERT INTO skill (code, display_name) VALUES
   ('BOAT', 'Điều khiển xuồng, thuyền'), ('FIRST_AID', 'Sơ cấp cứu'), ('CLIMBING', 'Leo trèo, cứu hộ địa hình'),
   ('TRUCK_DRIVER', 'Lái xe tải'), ('RADIO', 'Liên lạc vô tuyến')

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, newCommandKey } from '../../api/client';
+import { api, ApiError, newCommandKey } from '../../api/client';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { label, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
@@ -17,6 +17,25 @@ type QueueItem = {
   declared_danger: boolean;
   people_affected?: number | null;
   region_code?: string | null;
+  priority_advisory?: {
+    score: number | null;
+    level: 'CRITICAL' | 'HIGH' | 'ELEVATED' | 'STANDARD' | null;
+    outcome: 'SUGGESTION' | 'INSUFFICIENT_DATA';
+    reason_codes: string[];
+    source: 'BACKEND_RULES';
+    rules_version: string;
+  };
+  ai_priority_advisory?: AiPriorityAdvisory | null;
+};
+type AiPriorityAdvisory = {
+  status: string;
+  score: number | null;
+  level: 'CRITICAL' | 'HIGH' | 'ELEVATED' | 'STANDARD' | null;
+  reasons: string[];
+  confidence: number | null;
+  source: 'GEMINI' | 'DEMO_FIXTURE';
+  human_review_required: true;
+  review_status: string | null;
 };
 type Queue = { items: QueueItem[]; cursor?: string; more: boolean; generated_at: string };
 type Event = {
@@ -72,13 +91,15 @@ type Detail = QueueItem & {
     id: string;
     model: string;
     status: string;
-    risk_score: number;
+    risk_score: number | null;
     reason_codes: string[];
     extracted_json?: {
       summary?: string;
       indicators?: string[];
       facts?: Record<string, unknown>;
       confidence?: number;
+      priority_score?: number;
+      priority_reasons?: string[];
     } | null;
     review_status?: string | null;
     review_note?: string | null;
@@ -158,15 +179,37 @@ const advisoryReasonLabels: Record<string, string> = {
   FLOOD_OR_TRAPPED: 'Có dấu hiệu ngập lụt hoặc mắc kẹt',
   CHILDREN_PRESENT: 'Có trẻ em',
   ELDERLY_PRESENT: 'Có người cao tuổi',
+  LARGE_GROUP_AFFECTED: 'Có nhiều người cần hỗ trợ',
   INJURY_OR_MEDICAL: 'Có dấu hiệu chấn thương hoặc cần cấp cứu',
+  URGENT_MEDICAL_REVIEW_REQUIRED: 'Có dấu hiệu cấp cứu cần điều phối viên rà soát ngay',
   RESCUE_REQUESTED: 'Có yêu cầu cứu hộ',
   RELIEF_SUPPLIES_ONLY: 'Chỉ yêu cầu hàng cứu trợ',
+};
+const advisoryLevelLabels: Record<string, string> = {
+  CRITICAL: 'Rất khẩn cấp',
+  HIGH: 'Nguy cơ cao',
+  ELEVATED: 'Cần ưu tiên rà soát',
+  STANDARD: 'Theo dõi thông thường',
 };
 const advisoryReviewLabels: Record<string, string> = {
   ACCEPTED: 'Ghi nhận',
   ADJUSTED: 'Điều chỉnh',
   REJECTED: 'Không sử dụng',
 };
+const advisoryStatusLabels: Record<string, string> = {
+  QUEUED: 'Đang chờ Gemini đánh giá',
+  PROCESSING: 'Gemini đang đánh giá',
+  COMPLETED: 'Đã có gợi ý',
+  STALE: 'Gợi ý đã cũ do dữ kiện thay đổi',
+  SKIPPED: 'AI không khả dụng hoặc đã bỏ qua đánh giá',
+  FAILED: 'Gemini chưa trả được kết quả',
+  UNKNOWN: 'Chưa rõ trạng thái đánh giá AI',
+};
+
+function advisoryScoreLabel(score: number | null, level: string | null): string {
+  if (score === null || !level || !advisoryLevelLabels[level]) return 'Chưa đủ dữ kiện để đánh giá';
+  return `${advisoryLevelLabels[level]} · ${score}/100`;
+}
 
 export function Coordinator({ page }: { page: string }) {
   const [queue, setQueue] = useState<Queue | null>(null);
@@ -319,7 +362,7 @@ export function Coordinator({ page }: { page: string }) {
     );
   }
   async function reviewAiAdvisory(decision: 'ACCEPTED' | 'ADJUSTED' | 'REJECTED') {
-    if (!detail?.ai_advisory) return;
+    if (!detail?.ai_advisory || detail.ai_priority_advisory?.status !== 'COMPLETED') return;
     if (decision === 'ADJUSTED' && !aiReviewNote.trim()) {
       setError('Vui lòng ghi nội dung điều chỉnh trước khi lưu quyết định.');
       return;
@@ -332,7 +375,11 @@ export function Coordinator({ page }: { page: string }) {
         `/requests/${detail.id}/ai-advisories/${detail.ai_advisory.id}/review`,
         {
           method: 'POST',
-          body: { decision, ...(aiReviewNote.trim() ? { note: aiReviewNote.trim() } : {}) },
+          body: {
+            decision,
+            expected_version: detail.version,
+            ...(aiReviewNote.trim() ? { note: aiReviewNote.trim() } : {}),
+          },
           idempotencyKey: newCommandKey(),
         }
       );
@@ -340,6 +387,7 @@ export function Coordinator({ page }: { page: string }) {
       done();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Không thể lưu quyết định rà soát AI.');
+      if (cause instanceof ApiError && cause.status === 409) refreshAfterConflict();
     } finally {
       setAiReviewBusy(false);
     }
@@ -441,6 +489,33 @@ export function Coordinator({ page }: { page: string }) {
                     <small>
                       {label(item.category)} · {timeLabel(item.received_at)}
                     </small>
+                    {item.priority_advisory && (
+                      <small>
+                        Gợi ý theo quy tắc:{' '}
+                        {advisoryScoreLabel(
+                          item.priority_advisory.score,
+                          item.priority_advisory.level
+                        )}
+                      </small>
+                    )}
+                    {item.ai_priority_advisory && (
+                      <small>
+                        {item.ai_priority_advisory.source === 'DEMO_FIXTURE'
+                          ? 'Gợi ý AI minh họa'
+                          : 'Gợi ý Gemini'}
+                        {' · '}
+                        {item.ai_priority_advisory.review_status === 'REJECTED'
+                          ? 'Đã bác bỏ, không sử dụng gợi ý'
+                          : item.ai_priority_advisory.status !== 'COMPLETED'
+                            ? advisoryStatusLabels[item.ai_priority_advisory.status] ||
+                              'Chưa rõ trạng thái đánh giá AI'
+                            : advisoryScoreLabel(
+                                item.ai_priority_advisory.score,
+                                item.ai_priority_advisory.level
+                              )}
+                      </small>
+                    )}
+                    {item.declared_danger && <small>Có khai báo nguy hiểm tính mạng</small>}
                   </span>
                   <span className="chip">
                     {label(item.status)}
@@ -620,27 +695,139 @@ export function Coordinator({ page }: { page: string }) {
                 Có tín hiệu hoạt động báo hộ cần rà soát. Đây không phải kết luận gian lận.
               </p>
             )}
+            {detail.priority_advisory && (
+              <section className="notice warning">
+                <h3>Gợi ý ưu tiên theo quy tắc backend</h3>
+                <p>
+                  <strong>
+                    {advisoryScoreLabel(
+                      detail.priority_advisory.score,
+                      detail.priority_advisory.level
+                    )}
+                  </strong>
+                </p>
+                <p>
+                  <strong>Dấu hiệu:</strong>{' '}
+                  {detail.priority_advisory.reason_codes
+                    .map((code) => advisoryReasonLabels[code] || 'Có dữ kiện cần rà soát')
+                    .join(' · ') || 'Chưa ghi nhận dấu hiệu theo bộ quy tắc.'}
+                </p>
+                <p>
+                  Đây là gợi ý từ dữ liệu SOS đã cung cấp, cần điều phối viên xác minh. Gợi ý không
+                  thay đổi mức ưu tiên P1–P4 và không tự giao đội. Nếu Gemini quá tải hoặc hết hạn
+                  mức, gợi ý quy tắc này vẫn hoạt động.
+                </p>
+                {detail.priority_advisory.outcome === 'INSUFFICIENT_DATA' && (
+                  <p>
+                    Chưa đủ dữ kiện để kết luận mức nguy cơ. Thiếu thông tin không có nghĩa là tình
+                    huống ít khẩn cấp; cần tiếp tục xác minh.
+                  </p>
+                )}
+                {detail.declared_danger && (
+                  <p>
+                    <strong>Cảnh báo riêng:</strong> người báo tin khai có nguy hiểm tính mạng; cần
+                    kiểm tra ngay. Cờ này không tự cộng điểm.
+                  </p>
+                )}
+              </section>
+            )}
+            {detail.ai_priority_advisory && (
+              <section className="notice">
+                <h3>
+                  {detail.ai_priority_advisory.source === 'DEMO_FIXTURE'
+                    ? 'Gợi ý AI minh họa'
+                    : 'Gợi ý đánh giá rủi ro từ Gemini'}
+                </h3>
+                <p>
+                  <strong>Trạng thái:</strong>{' '}
+                  {advisoryStatusLabels[detail.ai_priority_advisory.status] || 'Chưa rõ trạng thái'}
+                </p>
+                {detail.ai_priority_advisory.review_status === 'REJECTED' && (
+                  <p>
+                    <strong>Điều phối viên đã bác bỏ gợi ý này.</strong> Nội dung chỉ được giữ trong
+                    lịch sử để đối chiếu, không phải gợi ý đang sử dụng.
+                  </p>
+                )}
+                {detail.ai_priority_advisory.status === 'COMPLETED' &&
+                  detail.ai_priority_advisory.review_status !== 'REJECTED' &&
+                  detail.ai_priority_advisory.score !== null && (
+                    <>
+                      <p>
+                        <strong>
+                          {advisoryScoreLabel(
+                            detail.ai_priority_advisory.score,
+                            detail.ai_priority_advisory.level
+                          )}
+                        </strong>
+                      </p>
+                      <p>
+                        <strong>Lý do Gemini đưa ra:</strong>{' '}
+                        {detail.ai_priority_advisory.reasons.join(' · ') ||
+                          'Không có lý do kèm theo.'}
+                      </p>
+                      {detail.ai_priority_advisory.confidence !== null && (
+                        <p>
+                          <strong>Độ tin cậy tự báo cáo:</strong>{' '}
+                          {Math.round(detail.ai_priority_advisory.confidence * 100)}% (chỉ tham
+                          khảo)
+                        </p>
+                      )}
+                    </>
+                  )}
+                {detail.ai_priority_advisory.status === 'STALE' && (
+                  <p>
+                    Dữ kiện SOS đã thay đổi sau lần đánh giá. Gợi ý cũ không còn được dùng để rà
+                    soát; hãy đối chiếu dữ kiện hiện tại và tiếp tục xác minh thủ công.
+                  </p>
+                )}
+                {detail.ai_priority_advisory.status === 'COMPLETED' &&
+                  detail.ai_priority_advisory.review_status !== 'REJECTED' &&
+                  detail.ai_priority_advisory.score === null && (
+                    <p>
+                      Gemini chưa đề xuất điểm nguy cơ; không coi đây là mức nguy cơ thấp.{' '}
+                      {detail.ai_priority_advisory.reasons.join(' · ')} Hãy tiếp tục xác minh thủ công.
+                    </p>
+                  )}
+                <p>
+                  {detail.ai_priority_advisory.source === 'DEMO_FIXTURE'
+                    ? 'Đây là dữ liệu minh họa giao diện; không phải kết quả Gemini chạy thật.'
+                    : 'Đây là gợi ý để điều phối viên rà soát, không thay đổi mức P1–P4, thứ tự hàng đợi hoặc quyết định giao đội.'}
+                </p>
+              </section>
+            )}
             {detail.ai_advisory && (
               <section className="notice">
-                <h3>Gợi ý trích xuất và rủi ro từ AI</h3>
+                <h3>
+                  {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
+                    ? 'Thông tin AI minh họa'
+                    : 'Trích xuất thông tin bằng Gemini'}
+                </h3>
                 <p>
-                  AI chỉ hỗ trợ tổng hợp thông tin. Điều phối viên phải tự xác minh; điểm này không
-                  thay thế mức ưu tiên P1–P4 và không tự giao đội.
+                  {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
+                    ? 'Dữ liệu này dùng để minh họa và không phải phản hồi từ Gemini.'
+                    : 'Mặc định, Gemini chỉ nhận dữ kiện SOS có cấu trúc; mô tả tự do, thông tin liên hệ, vị trí chính xác và tệp bằng chứng không được gửi. Chỉ bật gửi mô tả đã khử một số định danh cho dữ liệu minh họa tổng hợp; biện pháp này có thể bỏ sót thông tin nhận dạng và không được dùng với SOS thật. Điều phối viên cần đối chiếu với người báo tin.'}
                 </p>
                 <p>
-                  <strong>Trạng thái:</strong> {label(detail.ai_advisory.status)}
+                  <strong>Trạng thái:</strong>{' '}
+                  {advisoryStatusLabels[
+                    detail.ai_priority_advisory?.status || detail.ai_advisory.status
+                  ] || 'Chưa rõ trạng thái đánh giá AI'}
                 </p>
-                {detail.ai_advisory.status === 'COMPLETED' && (
+                {detail.ai_priority_advisory?.status === 'COMPLETED' && (
                   <>
-                    <p>
-                      <strong>Điểm rủi ro tham khảo:</strong> {detail.ai_advisory.risk_score}/100
-                    </p>
-                    <p>
-                      <strong>Dấu hiệu theo quy tắc:</strong>{' '}
-                      {detail.ai_advisory.reason_codes
-                        .map((code) => advisoryReasonLabels[code] || 'Có dấu hiệu cần rà soát')
-                        .join(' · ') || 'Không có'}
-                    </p>
+                    {detail.ai_advisory.risk_score !== null && (
+                      <p>
+                        <strong>Điểm rủi ro tham khảo:</strong> {detail.ai_advisory.risk_score}/100
+                      </p>
+                    )}
+                    {detail.ai_advisory.reason_codes.length > 0 && (
+                      <p>
+                        <strong>Dấu hiệu theo quy tắc:</strong>{' '}
+                        {detail.ai_advisory.reason_codes
+                          .map((code) => advisoryReasonLabels[code] || 'Có dấu hiệu cần rà soát')
+                          .join(' · ')}
+                      </p>
+                    )}
                     {detail.ai_advisory.extracted_json?.summary && (
                       <p>
                         <strong>Tóm tắt:</strong> {detail.ai_advisory.extracted_json.summary}
@@ -685,6 +872,9 @@ export function Coordinator({ page }: { page: string }) {
                       <p>
                         <strong>Quyết định của điều phối viên:</strong>{' '}
                         {advisoryReviewLabels[detail.ai_advisory.review_status] || 'Đã rà soát'}
+                        {detail.ai_advisory.review_status === 'REJECTED'
+                          ? ' · Chỉ lưu lịch sử, không sử dụng.'
+                          : ''}
                         {detail.ai_advisory.review_note
                           ? ` · ${detail.ai_advisory.review_note}`
                           : ''}
@@ -729,7 +919,8 @@ export function Coordinator({ page }: { page: string }) {
                 )}
                 {['FAILED', 'SKIPPED'].includes(detail.ai_advisory.status) && (
                   <p>
-                    Không có kết quả AI cho mô tả này. Hãy tiếp tục quy trình xác minh thủ công.
+                    Gemini chưa trả kết quả cho dữ kiện SOS này. Gợi ý theo quy tắc backend vẫn hiển
+                    thị ở mục trên; hãy tiếp tục xác minh thủ công.
                   </p>
                 )}
               </section>

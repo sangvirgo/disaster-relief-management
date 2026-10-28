@@ -118,8 +118,8 @@ const identityPaginationQueries = {
 
 const responseDetails = {
   getStaffRequestDetail: {
-    summary: 'Get complete scoped SOS details, coordinator timeline, mission history and any AI advisory.',
-    description: 'Returns exact contacts and coordinates only to staff authorized for this request. The AI advisory is an untrusted, human-reviewed aid and never sets official priority or dispatches a team.',
+    summary: 'Get scoped SOS details, coordinator timeline, mission history and separate rules and Gemini advisories.',
+    description: 'Returns exact contacts and coordinates only to staff authorized for this request. Backend and Gemini risk advisories are untrusted human-reviewed aids; neither sets official priority, reorders the queue, or dispatches a team. Seeder examples are labeled DEMO_FIXTURE.',
   },
   listTeamCandidates: {
     summary: 'Suggest eligible teams using distance bands and recent workload.',
@@ -127,14 +127,25 @@ const responseDetails = {
   },
   responseRequestOperationsReviewAiAdvisory: {
     summary: 'Record a human decision on an AI advisory.',
-    description: 'Accepts, adjusts or rejects a completed advisory and appends a staff timeline event. It does not modify SOS facts, official priority, or team assignment. An ADJUSTED decision requires a note.',
+    description: 'Accepts, adjusts or rejects a completed advisory and appends a staff timeline event. The advisory must still match the current SOS facts and expected_version; stale decisions return VERSION_CONFLICT. It does not modify SOS facts, official priority, or team assignment. An ADJUSTED decision requires a note.',
     parameters: [
       { $ref: '#/components/parameters/RequestId' },
       { name: 'advisoryId', in: 'path', required: true, schema: id },
       { $ref: '#/components/parameters/IdempotencyKey' },
     ],
-    request: request(object({ decision: { type: 'string', enum: ['ACCEPTED', 'ADJUSTED', 'REJECTED'] }, note: { type: 'string', maxLength: 1000 } }, ['decision'])),
+    request: request(object({ expected_version: { type: 'integer', minimum: 1 }, decision: { type: 'string', enum: ['ACCEPTED', 'ADJUSTED', 'REJECTED'] }, note: { type: 'string', maxLength: 1000 } }, ['expected_version', 'decision'])),
     response: response(object({ request_id: id, advisory_id: id, decision: { type: 'string', enum: ['ACCEPTED', 'ADJUSTED', 'REJECTED'] } }, ['request_id', 'advisory_id', 'decision'])),
+  },
+  responseRequestOperationsRetryAiAdvisory: {
+    summary: 'Queue a coordinator-requested retry for a failed AI advisory.',
+    description: 'Requires REQUEST_VERIFY scope, the current request expected_version, an idempotency key, a configured Gemini API key, and the latest advisory to be FAILED and fresh for current SOS facts. Resets that advisory retry budget, appends a staff timeline event, and returns 202. A stale or superseded advisory is not retried. This does not change request facts, official priority, or team assignment.',
+    parameters: [
+      { $ref: '#/components/parameters/RequestId' },
+      { name: 'advisoryId', in: 'path', required: true, schema: id },
+      { $ref: '#/components/parameters/IdempotencyKey' },
+    ],
+    request: request(versionBody()),
+    response: response(object({ request_id: id, advisory_id: id, status: { type: 'string', const: 'QUEUED' } }, ['request_id', 'advisory_id', 'status']), 'AI advisory queued for a coordinator-requested retry.', undefined, idempotentCommandResponseHeaders),
   },
   responseTrackingUpdateReport: {
     summary: 'Update editable facts on an SOS report before verification.',
@@ -782,7 +793,8 @@ const routeErrorCodes = {
   listReporterEvents: ['NOT_FOUND'],
   supplementSelfRequest: ['STATE_TRANSITION_INVALID', 'VERSION_CONFLICT'],
   responseTrackingUpdateReport: ['NOT_FOUND', 'VALIDATION_FAILED', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
-  responseRequestOperationsReviewAiAdvisory: ['NOT_FOUND', 'VALIDATION_FAILED', 'STATE_TRANSITION_INVALID', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
+  responseRequestOperationsReviewAiAdvisory: ['NOT_FOUND', 'VALIDATION_FAILED', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
+  responseRequestOperationsRetryAiAdvisory: ['NOT_FOUND', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
   claimSelfRequest: ['ALREADY_CLAIMED', 'SESSION_EXPIRED'],
   issueRequestRecoveryCode: ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   redeemRequestRecoveryCode: ['NOT_FOUND', 'SESSION_EXPIRED'],
@@ -1134,8 +1146,37 @@ export function applyOpenApiDetails(document, service) {
       const schema = document.components.schemas[name];
       if (schema) schema.properties = { ...schema.properties, ...countFields, ...needsFields };
     }
+    const nullableAdvisory = (schema) => ({ anyOf: [schema, { type: 'null' }] });
+    const priorityAdvisory = object({
+      outcome: { type: 'string', enum: ['SUGGESTION', 'INSUFFICIENT_DATA'] },
+      score: nullableAdvisory({ type: 'integer', minimum: 0, maximum: 100 }),
+      level: nullableAdvisory({ type: 'string', enum: ['CRITICAL', 'HIGH', 'ELEVATED', 'STANDARD'] }),
+      reason_codes: array(text),
+      source: { type: 'string', const: 'BACKEND_RULES' },
+      rules_version: text,
+    }, ['outcome', 'score', 'level', 'reason_codes', 'source', 'rules_version']);
+    const aiPriorityAdvisory = object({
+      status: { type: 'string', enum: ['QUEUED', 'PROCESSING', 'COMPLETED', 'SKIPPED', 'FAILED', 'STALE', 'UNKNOWN'] },
+      score: { anyOf: [{ type: 'integer', minimum: 0, maximum: 100 }, { type: 'null' }] },
+      level: { anyOf: [{ type: 'string', enum: ['CRITICAL', 'HIGH', 'ELEVATED', 'STANDARD'] }, { type: 'null' }] },
+      reasons: array(text),
+      confidence: { anyOf: [{ type: 'number', minimum: 0, maximum: 1 }, { type: 'null' }] },
+      source: { type: 'string', enum: ['GEMINI', 'DEMO_FIXTURE'] },
+      human_review_required: { type: 'boolean', const: true },
+      review_status: { anyOf: [{ type: 'string', enum: ['ACCEPTED', 'ADJUSTED', 'REJECTED'] }, { type: 'null' }] },
+    }, ['status', 'score', 'level', 'reasons', 'confidence', 'source', 'human_review_required', 'review_status']);
+    const queueItem = document.components.schemas.RequestQueueItem;
+    if (queueItem) {
+      queueItem.required = [...new Set([...(queueItem.required ?? []), 'priority_advisory', 'ai_priority_advisory'])];
+      queueItem.properties = {
+        ...queueItem.properties,
+        priority_advisory: priorityAdvisory,
+        ai_priority_advisory: nullableAdvisory(aiPriorityAdvisory),
+      };
+    }
     const staffDetail = document.components.schemas.StaffRequestDetail;
     if (staffDetail) {
+      staffDetail.required = [...new Set([...(staffDetail.required ?? []), 'priority_advisory', 'ai_priority_advisory'])];
       staffDetail.properties = {
         ...staffDetail.properties,
         report_mode: text,
@@ -1145,6 +1186,8 @@ export function applyOpenApiDetails(document, service) {
         declared_danger: boolean(),
         needs_rescue: boolean(),
         needs_relief_supplies: boolean(),
+        priority_advisory: priorityAdvisory,
+        ai_priority_advisory: nullableAdvisory(aiPriorityAdvisory),
         mission_history: object({
           items: array(object({
             id, status: text, mission_kind: { type: 'string', enum: ['RESCUE', 'DELIVERY', 'COMBINED'] },
@@ -1160,7 +1203,7 @@ export function applyOpenApiDetails(document, service) {
         ai_advisory: { anyOf: [
           { type: 'null' },
           object({
-            id, model: text, status: { type: 'string', enum: ['QUEUED', 'PROCESSING', 'COMPLETED', 'FAILED', 'SKIPPED'] },
+            id, model: text, status: { type: 'string', enum: ['QUEUED', 'PROCESSING', 'COMPLETED', 'FAILED', 'SKIPPED', 'STALE'] },
             risk_score: { anyOf: [integer(), { type: 'null' }] }, reason_codes: array(text),
             extracted_json: { anyOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }] },
             review_status: { anyOf: [{ type: 'string', enum: ['ACCEPTED', 'ADJUSTED', 'REJECTED'] }, { type: 'null' }] },

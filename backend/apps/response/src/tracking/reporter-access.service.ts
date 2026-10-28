@@ -19,6 +19,7 @@ export interface ReporterRequestRow {
   organization_id: string;
   region_code: string | null;
   campaign_id: string | null;
+  incident_category_code: string;
   description: string | null;
   reporter_declared_danger: boolean;
   needs_rescue: boolean;
@@ -75,7 +76,8 @@ export class ReporterAccessService {
     const hash = lookupHash(trackingSecret, this.config);
     const rows = await queryable.query(
       `SELECT id, tracking_code, tracking_secret_hash, reporter_user_id, status, version, review_lane, received_at,
-              organization_id, region_code, campaign_id, description, reporter_declared_danger,needs_rescue,needs_relief_supplies
+              organization_id, region_code, campaign_id, incident_category_code, description,
+              reporter_declared_danger,needs_rescue,needs_relief_supplies
          FROM assistance_request WHERE tracking_secret_hash = $1`,
       [hash],
     ) as ReporterRequestRow[];

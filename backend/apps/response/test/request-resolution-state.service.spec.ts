@@ -51,6 +51,11 @@ describe('RequestResolutionStateService', () => {
         id: requestId, status: 'TRIAGED', version: 21, work_cycle: 5, organization_id: organizationId,
         region_code: 'DEMO_A', campaign_id: null, reporter_user_id: userId,
       }], 1];
+      if (sql.includes('SELECT r.version,r.work_cycle AS "workCycle"')) return [{
+        version: 21, workCycle: 5, incidentCategoryCode: 'FLOOD', description: null,
+        reporterDeclaredDanger: false, needsRescue: true, needsReliefSupplies: false,
+        peopleAffected: 3, childrenCount: 0, elderlyCount: 0,
+      }];
       return [];
     }) };
     const dataSource = {

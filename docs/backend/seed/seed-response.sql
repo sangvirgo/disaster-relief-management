@@ -13,7 +13,7 @@
 --   f2 R2  PROXY by citizen1, VERIFYING, alternate contact, 2 NO_ANSWER attempts (aged: overdue)
 --   f3 R3  VERIFIED (CONTACT_CONFIRMED), campaign-linked          f4 R4  DUPLICATE of R3
 --   f5 R5  IN_PROGRESS P2, Logistics-admitted, ACCEPTED mission team 1 (+ earlier FAILED team B mission with EN_ROUTE history)
---   f6 R6  P1 flood report: declared danger, children + elderly, rescue + supplies, AI suggestion reviewed by a coordinator
+--   f6 R6  P1 trapped-person report: declared danger, children + elderly, rescue + supplies, Gemini suggestion pending review
 --   f7 R7  unassigned: region NULL, point lon 105.0 lat 21.0 (deliberately outside DEMO_A and DEMO_B boundaries)
 --   f8 R8  RATE_LIMITED_REVIEW lane        f9 R9  declared danger, SUBMITTED, 45 min old (overdue)
 --   fa R10 REJECTED with reason            fb R11 PROXY in PROXY_QUOTA_REVIEW lane
@@ -206,20 +206,21 @@ UPDATE request_subject AS s
   ) AS facts(request_suffix, children_count, elderly_count)
  WHERE s.request_id = pg_temp.u(facts.request_suffix);
 
--- These completed advisories are synthetic UI examples; they never dispatch or set official priority.
+-- These completed advisories contain single Gemini responses to synthetic SOS facts. Known machine-code indicators are localized by the worker before persistence.
+-- Both start unreviewed: the coordinator's acceptance of the previous hand-authored af2 output does not apply to the new Gemini response.
 INSERT INTO ai_advisory (id, request_id, request_version, input_hash, model, prompt_version, schema_version,
                          status, attempts, extracted_json, risk_score, reason_codes, review_status,
                          review_by_user_id, review_at, review_note, created_at, completed_at) VALUES
-  -- input_hash is aiInputHash(sanitizeAiDescription(description)); risk_score/reason_codes use scoreRequestRisk.
-  (pg_temp.u('af1'), pg_temp.u('f9'), 1, 'd587df93f479c960f4ebf481e3074525f1f5c1caeda983f1517388738d6da421', 'gemini-3.1-flash-lite', 'v1', 'v1',
+  -- input_hash covers the v4 structured-only assessment identity; risk_score/reason_codes remain backend-rule output.
+  (pg_temp.u('af1'), pg_temp.u('f9'), 1, 'e33d48e81d0c6237e84b4c5eb0e8b0030216ef400b8d64daea2eb7fd64f8efca', 'gemini-3.1-flash-lite', 'v3', 'v4',
    'COMPLETED', 1,
-   '{"summary":"Cháy lan gần khu dân cư; người báo cho biết có nguy hiểm tính mạng.","indicators":["Có nguy cơ cháy lan","Cần xác minh tình trạng người trong khu vực"],"facts":{"people_affected":6,"children_count":2,"elderly_count":1,"life_threat":true,"needs_rescue":true,"needs_relief_supplies":false},"confidence":0.86}'::jsonb,
-   67, ARRAY['DECLARED_LIFE_DANGER','CHILDREN_PRESENT','ELDERLY_PRESENT','RESCUE_REQUESTED'], NULL, NULL, NULL, NULL, now() - interval '42 minutes', now() - interval '41 minutes'),
-  (pg_temp.u('af2'), pg_temp.u('f6'), 5, 'dbf91b1cbba2206f58f5a46bd8db92c6e169f42af28f12c62d65ac6408db0efe', 'gemini-3.1-flash-lite', 'v1', 'v1',
+   '{"summary":"Một vụ hỏa hoạn đang xảy ra ảnh hưởng đến 6 người, trong đó có 2 trẻ em và 1 người cao tuổi, yêu cầu cứu hộ khẩn cấp.","indicators":["Cháy","Cần cứu hộ","Có trẻ em","Có người cao tuổi"],"facts":{"people_affected":6,"children_count":2,"elderly_count":1,"life_threat":true,"needs_rescue":true,"needs_relief_supplies":false},"priority_score":90,"priority_reasons":["Sự cố hỏa hoạn đe dọa trực tiếp đến tính mạng","Có sự hiện diện của trẻ em trong khu vực nguy hiểm","Có người cao tuổi cần hỗ trợ đặc biệt","Tổng số người bị ảnh hưởng là 6","Yêu cầu cứu hộ khẩn cấp đã được xác nhận"],"confidence":0.95}'::jsonb,
+   NULL, ARRAY['DECLARED_LIFE_DANGER','CHILDREN_PRESENT','ELDERLY_PRESENT','RESCUE_REQUESTED'], NULL, NULL, NULL, NULL, now() - interval '42 minutes', now() - interval '41 minutes'),
+  (pg_temp.u('af2'), pg_temp.u('f6'), 5, 'bac706703a01f0759c5d16f495f7eae88526980769977cbce03dacbc690f6a46', 'gemini-3.1-flash-lite', 'v3', 'v4',
    'COMPLETED', 1,
-   '{"summary":"Có người cao tuổi và trẻ nhỏ mắc kẹt; nước đang lên nhanh.","indicators":["Ngập lụt","Có người dễ bị tổn thương","Cần cứu hộ và hàng cứu trợ"],"facts":{"people_affected":3,"children_count":1,"elderly_count":1,"life_threat":true,"needs_rescue":true,"needs_relief_supplies":true},"confidence":0.93}'::jsonb,
-   90, ARRAY['DECLARED_LIFE_DANGER','FLOOD_OR_TRAPPED','CHILDREN_PRESENT','ELDERLY_PRESENT','RESCUE_REQUESTED'],
-   'ACCEPTED', pg_temp.u('102'), now() - interval '44 minutes', NULL, now() - interval '52 minutes', now() - interval '51 minutes');
+   '{"summary":"Nhóm 3 người bao gồm 1 trẻ em và 1 người cao tuổi đang bị mắc kẹt, cần cứu hộ và cứu trợ khẩn cấp.","indicators":["Có người mắc kẹt","Cần cứu hộ","Cần hàng cứu trợ","Có trẻ em","Có người cao tuổi"],"facts":{"people_affected":3,"children_count":1,"elderly_count":1,"life_threat":false,"needs_rescue":true,"needs_relief_supplies":true},"priority_score":85,"priority_reasons":["Đối tượng dễ bị tổn thương bao gồm trẻ em và người cao tuổi","Tình trạng mắc kẹt yêu cầu cứu hộ khẩn cấp","Số lượng người bị ảnh hưởng là 3","Yêu cầu cứu trợ khẩn cấp về nhu yếu phẩm"],"confidence":0.9}'::jsonb,
+   55, ARRAY['DECLARED_LIFE_DANGER','FLOOD_OR_TRAPPED','CHILDREN_PRESENT','ELDERLY_PRESENT','RESCUE_REQUESTED'],
+   NULL, NULL, NULL, NULL, now() - interval '52 minutes', now() - interval '51 minutes');
 
 -- ---------- timeline events (REPORTER-visible submission + staff events) ----------
 -- event id scheme: 'e' + request suffix (1-2 hex) + 2-digit sequence, e.g. request f5 -> e5xx, request fc -> ecxx
@@ -247,7 +248,6 @@ INSERT INTO request_event (id, request_id, actor_user_id, event_type, visibility
      '{"public_text_code":"VERIFIED","snapshot":{"incident_category_code":"TRAPPED","people_affected":3,"region_code":"DEMO_A"}}', now() - interval '100 minutes'),
   (pg_temp.u('e603'), pg_temp.u('f6'), pg_temp.u('102'),   'TRIAGED', 'STAFF', 'VERIFIED', 'TRIAGED', 'Ưu tiên P1: nguy hiểm đến tính mạng.', '{"priority":"P1"}', now() - interval '60 minutes'),
   (pg_temp.u('e604'), pg_temp.u('f6'), pg_temp.u('102'),   'MISSION_OFFERED', 'STAFF', 'TRIAGED', 'DISPATCHED', NULL, '{"mission_id":"00000000-0000-4000-8000-0000000000b3","team_id":"00000000-0000-4000-8000-0000000000a3"}', now() - interval '50 minutes'),
-  (pg_temp.u('e605'), pg_temp.u('f6'), pg_temp.u('102'),   'AI_ADVISORY_REVIEW', 'STAFF', NULL, NULL, NULL, '{"advisory_id":"00000000-0000-4000-8000-0000000000af2","decision":"ACCEPTED","note":null}', now() - interval '44 minutes'),
   (pg_temp.u('e701'), pg_temp.u('f7'), NULL,               'REQUEST_SUBMITTED', 'REPORTER', NULL, 'SUBMITTED', NULL, '{"public_text_code":"RECEIVED"}', now() - interval '8 minutes'),
   (pg_temp.u('e801'), pg_temp.u('f8'), NULL,               'REQUEST_SUBMITTED', 'REPORTER', NULL, 'SUBMITTED', NULL, '{"public_text_code":"RECEIVED"}', now() - interval '12 minutes'),
   (pg_temp.u('e901'), pg_temp.u('f9'), NULL,               'REQUEST_SUBMITTED', 'REPORTER', NULL, 'SUBMITTED', NULL, '{"public_text_code":"RECEIVED"}', now() - interval '45 minutes'),
@@ -350,13 +350,16 @@ SELECT pg_temp.must('combined and rescue-only missions are represented',
   AND (SELECT count(*) FROM mission WHERE mission_kind = 'RESCUE') > 0);
 SELECT pg_temp.must('AI advisory review states are represented',
   (SELECT count(*) FROM ai_advisory) = 2
-  AND (SELECT count(*) FROM ai_advisory WHERE review_status IS NULL) = 1
-  AND (SELECT count(*) FROM ai_advisory WHERE review_status = 'ACCEPTED') = 1);
-SELECT pg_temp.must('AI seed hashes are SHA-256 and risk scores match current rules',
+  AND (SELECT count(*) FROM ai_advisory WHERE review_status IS NULL) = 2
+  AND (SELECT count(*) FROM ai_advisory WHERE review_status IS NOT NULL) = 0);
+SELECT pg_temp.must('AI seed fixtures have bounded priority output and backend risk scores match current rules',
   (SELECT count(*) = 2 FROM ai_advisory WHERE input_hash ~ '^[0-9a-f]{64}$')
-  AND EXISTS (SELECT 1 FROM ai_advisory WHERE request_id = pg_temp.u('f9') AND risk_score = 67
+  AND (SELECT count(*) = 2 FROM ai_advisory WHERE model = 'gemini-3.1-flash-lite'
+       AND (extracted_json->>'priority_score')::int BETWEEN 0 AND 100
+       AND jsonb_typeof(extracted_json->'priority_reasons') = 'array')
+  AND EXISTS (SELECT 1 FROM ai_advisory WHERE request_id = pg_temp.u('f9') AND risk_score IS NULL
               AND reason_codes = ARRAY['DECLARED_LIFE_DANGER','CHILDREN_PRESENT','ELDERLY_PRESENT','RESCUE_REQUESTED'])
-  AND EXISTS (SELECT 1 FROM ai_advisory WHERE request_id = pg_temp.u('f6') AND risk_score = 90
+  AND EXISTS (SELECT 1 FROM ai_advisory WHERE request_id = pg_temp.u('f6') AND risk_score = 55
               AND reason_codes = ARRAY['DECLARED_LIFE_DANGER','FLOOD_OR_TRAPPED','CHILDREN_PRESENT','ELDERLY_PRESENT','RESCUE_REQUESTED']));
 SELECT pg_temp.must('statuses covered: SUBMITTED VERIFYING VERIFIED DUPLICATE REJECTED TRIAGED DISPATCHED IN_PROGRESS RESOLVED',
   (SELECT count(DISTINCT status) FROM assistance_request WHERE status IN ('SUBMITTED','VERIFYING','VERIFIED','DUPLICATE','REJECTED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVED')) = 9);

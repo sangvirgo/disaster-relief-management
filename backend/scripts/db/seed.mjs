@@ -1,3 +1,4 @@
+import { createHash, createHmac } from 'node:crypto';
 import argon2 from 'argon2';
 import pg from 'pg';
 import { readFileSync } from 'node:fs';
@@ -18,6 +19,16 @@ const integer = (name, fallback) => {
 };
 
 let passwordHash;
+const demoDonationSecret = createHash('sha256').update('c48-demo-donation-GD7K2N01-v1').digest('base64url');
+
+function demoDonationCapabilityHash(pepper) {
+  if (pepper.length < 32 || pepper.length > 256) {
+    throw new Error('Set SECRET_HASH_PEPPER_DONATION before seeding the demo donation fixture.');
+  }
+  const digest = createHmac('sha256', pepper)
+    .update('donation-delivery').update('\0').update(demoDonationSecret).digest('hex');
+  return 'v1:' + digest;
+}
 
 async function createPasswordHash() {
   const seedPassword = process.env.SEED_PASSWORD;
@@ -50,6 +61,9 @@ function prepareSql(
     ['-- @include demo expansion', 'seed-expansion-' + service + '.sql'],
   ]) {
     if (source.includes(marker)) source = source.replace(marker, readFileSync(resolve('seed', include), 'utf8'));
+  }
+  if (source.includes('{{donation_capability_hash}}')) {
+    source = source.replaceAll('{{donation_capability_hash}}', demoDonationCapabilityHash(process.env.SECRET_HASH_PEPPER_DONATION ?? ''));
   }
   if (source.includes('{{campaign_creator_id}}')) {
     if (!/^[0-9a-f-]{36}$/iu.test(campaignCreatorId)) throw new Error('Invalid campaign seed creator id.');

@@ -45,7 +45,7 @@
 <text x="952.5" y="815.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Logistics database</text>
 <text x="952.5" y="835.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Own credentials / migrations</text>
 <rect x="425" y="965" width="520" height="80" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
-<text x="685.0" y="1000.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Private MinIO AIStor Free</text>
+<text x="685.0" y="1000.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Private MinIO Community</text>
 <text x="685.0" y="1020.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#0f172a">Separate Response / Logistics access</text>
 <text x="600" y="1090" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#334155" stroke="white" stroke-width="5" paint-order="stroke">One demo host; separate service databases. No cross-service SQL or foreign keys.</text>
 <text x="422" y="532" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#334155" stroke="white" stroke-width="5" paint-order="stroke">grants</text>

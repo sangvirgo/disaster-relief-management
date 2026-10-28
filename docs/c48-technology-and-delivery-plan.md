@@ -40,6 +40,8 @@ The product emphasizes public donation opportunities and receipt/progress transp
 
 ## 2. Recommendation summary
 
+**Delivery-focus update — 2026-10-27, user-authorized:** SOS intake, human verification/priority, coordinator decision support, rescue-team progress, and guarded resolution are the main demonstration. Donations and Logistics remain supporting capabilities. A short optional declaration → count → independent review → stock-posting scenario is sufficient for the default API demo; advanced donation, dispute, held-stock, distribution, and warehouse scenarios need not be included in Postman. This update governs demonstration emphasis over the older schedules and scenes below. Existing APIs, traceability identifiers, authorization, accounting, and resolution invariants are preserved. Postman scenarios may repeat login, detail/track reads, and state-transition requests when the workflow requires them; full OpenAPI coverage and route uniqueness are not demo acceptance criteria.
+
 ### 2.1 Product priorities
 
 | Priority | Planned outcome | Completion gate |
@@ -62,7 +64,7 @@ Section 16 turns these priorities into integrated weekly slices. Section 7 suppl
 | Service communication | REST/JSON for user-facing and cross-service commands; local database transactions | Workflows are human-paced and need immediate responses. Broker-based messaging is deferred until a measured use case needs fan-out, replay, or independent consumers. |
 | Web | React + TypeScript + Vite | Suitable for operational dashboards; authenticated screens do not require SSR/SEO. [Vite guide](https://vite.dev/guide/) |
 | Mobile | React Native + Expo + TypeScript | Shares TypeScript skills and supports GPS, photos, and notifications. Request location permission when needed; no default background tracking. [React Native TypeScript](https://reactnative.dev/docs/typescript), [Expo Location](https://docs.expo.dev/versions/latest/sdk/location/) |
-| Files | MinIO AIStor Free, single-node lab deployment, through the AWS SDK for JavaScript S3 client | Final capstone choice for synthetic demo data. Obtain/use it under current license terms; do not redistribute software. Free tier has no HA/SLA and excludes at-rest encryption; retain private access and tested backup. |
+| Files | MinIO Community built from the upstream source tag, single-node lab deployment, through the AWS SDK for JavaScript S3 client | Final capstone choice for synthetic demo data (revised 2026-10-27 from AIStor Free, which needs a license the team does not have). AGPLv3, no license file; the image is built locally and not redistributed. No HA/SLA or at-rest encryption; retain private access and tested backup. |
 | Deployment | Docker Compose on one demo host; Nginx reverse proxy | Multiple containers do not require multiple physical machines. [Docker Compose production](https://docs.docker.com/compose/how-tos/production/) |
 | AI | Advisor with explanations; coordinator makes the decision | An optional research direction, with no automatic priority changes or rescue dispatch. |
 
@@ -218,7 +220,7 @@ flowchart TB
   IDB[(Identity database)]
   RDB[(Response database + PostGIS)]
   LDB[(Logistics database)]
-  Files[(Private MinIO AIStor Free)]
+  Files[(Private MinIO Community)]
   Web --> Proxy
   Mobile --> Proxy
   Proxy --> Identity
@@ -873,18 +875,18 @@ Model review checklist: distinguish reporter/beneficiary/donor; show optional ca
 - Store files in object storage. The database holds object key, owner type/ID, validated MIME, size, checksum, uploader, time, and visibility. Keep buckets private; use short-lived signed URLs if direct access is used.
 - Validate actual MIME, extension, and size; do not trust client-provided names/MIME. Uploads require authorization on the owning business object.
 - Demo data must be synthetic; do not use real victims' images or personal information.
-- Use the AWS SDK for JavaScript v3 S3 client from the owning NestJS service. Configure separate service credentials and private buckets for Response and Logistics. Unit tests may mock S3; provider integration and restore checks must use the selected MinIO AIStor Free lab instance.
+- Use the AWS SDK for JavaScript v3 S3 client from the owning NestJS service. Configure separate service credentials and private buckets for Response and Logistics. Unit tests may mock S3; provider integration and restore checks must use the selected MinIO Community lab instance.
 
-#### Selected object storage: MinIO AIStor Free
+#### Selected object storage: MinIO Community (built from source)
 
-**Final choice for this capstone: MinIO AIStor Free, single-node lab deployment, using synthetic data.** MinIO Community is not selected: its repository is archived and marked unmaintained. AIStor Free is a separate proprietary product; its agreement allows standalone educational/research use, and its operations documentation sets edition-specific limits. This is a lab choice, not a production recommendation. No MinIO artifact/license, application integration, or restore test has been installed or verified as part of this plan. [Community repository](https://github.com/minio/minio), [AIStor Free agreement](https://www.min.io/legal/aistor-free-agreement), [AIStor license operations](https://docs.min.io/aistor/operations/licenses/)
+**Revised choice (2026-10-27): MinIO Community, single-node lab deployment, using synthetic data.** The earlier AIStor Free choice was dropped because AIStor requires a license file that the team does not have. MinIO Community is AGPLv3 and needs no license, but its upstream repository is archived and unmaintained, and no official image is pullable (Docker Hub removed; quay.io returns unauthorized). Reliva therefore builds the server and `mc` from the upstream source tags in `backend/infra/minio/Dockerfile`. This is a lab choice, not a production recommendation. [Community repository](https://github.com/minio/minio)
 
 | Decision | Reliva baseline |
 |---|---|
-| Product/edition | MinIO AIStor Free; do not substitute a Community image or third-party rebuild |
+| Product/edition | MinIO Community, server tag `RELEASE.2025-10-15T17-29-55Z`, `mc` tag `RELEASE.2025-08-13T08-35-41Z`, built locally with Go; no AIStor image or license |
 | Topology/data | One node for the lab; synthetic demo data only; no HA or production availability claim |
-| License/package | Operators must obtain and use the product under the current agreement and active license. Do not modify or redistribute the AIStor binary/image or license in the repository/submission unless the applicable terms expressly allow it. Record the exact release and license validity before the demo. |
-| Free-tier limits | Do not rely on distributed deployment, replication, lifecycle transitions, version-specific deletion, encryption at rest, or an SLA/SLO. The current docs state AIStor Free support begins with `minio.RELEASE.2025-12-20T04-58-37Z`; recheck the requirement against the release chosen for setup. |
+| License/package | AGPLv3 upstream source, unmodified; the image is built locally and not redistributed. No license file is mounted or stored in the repository. |
+| Limits | Archived upstream: no security fixes; the admin web console is absent in the Community edition (use `mc`). Do not rely on replication, encryption at rest, or an SLA/SLO. Keep ports on loopback and buckets private. |
 | Application integration | Private S3 API; AWS SDK for JavaScript v3; separate least-privilege Response and Logistics credentials/buckets; no blanket access for other services |
 
 Use backend-mediated uploads through the owning NestJS service for the first implementation. Authorize the business object, persist attachment state as PENDING in a short database transaction, validate and stream bounded content to a generated immutable key outside the transaction, then record READY in a second short transaction. On failure, preserve the SOS and expose a retryable FAILED/PENDING attachment; reconcile crashes between object upload and metadata commit. Enforce extension/type/size rules using detected content, not client MIME or filename. Do not hold database locks during S3 calls or claim a cross-database/object-store atomic transaction. [AWS SDK for JavaScript S3 client](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/), [OWASP file upload guidance](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
@@ -1541,6 +1543,8 @@ Data quality and verification need are separate from urgency: improved GPS accur
 | GET /response/requests/{id}/recommendations | Scoped coordinator reads results with age, input revision, reasons, missing facts, and eligibility; no public/guest access |
 | POST /response/recommendations/{id}/review | Scoped coordinator supplies ACCEPT/OVERRIDE/DISMISS, reason, chosen priority when overriding, expected request version, and idempotency key |
 
+The current Response API exposes `POST /response/requests/{id}/ai-advisories/{advisoryId}/retry` for a coordinator with `REQUEST_VERIFY` scope. It requires `expected_version`, an idempotency key, a configured Gemini key, and the latest fresh advisory in `FAILED` state. It resets that job's retry budget, returns `202`, and appends a staff timeline event. The command does not alter reported facts, official priority, or team assignment.
+
 Automatic job creation after intake is allowed only when the AI feature is enabled; submission remains successful if AI is disabled or unavailable. An early suggestion may be displayed as unverified information. **Accept/override can affect priority only after request verification and only in a state permitting human priority changes.** Use the same domain command as manual triage; do not add a backdoor around normal guards. For VERIFIED requests it may perform the normal human-authorized transition to TRIAGED; for later eligible states it changes priority without rewinding progress. Reject terminal/ineligible states and stale input with a conflict.
 
 In one review transaction, check role/scope, request version, current input revision/work cycle, recommendation/context freshness, advisor review eligibility, and permitted state; then write review, human-authorized priority change where applicable, and audit. Research-only weighted outputs cannot be accepted or overridden through this command; a coordinator may always use eligible manual triage separately. DISMISS records feedback without changing priority. An override requires the selected priority and a reason. A repeated identical idempotent command returns the original result; a conflicting second review fails.
@@ -1551,12 +1555,12 @@ Coordinator UI must render explanations and summaries in Vietnamese, mapping sta
 
 ### 12.6 Reliability, privacy, and deployment
 
-- **Retry budget:** propose at most three attempts with bounded backoff and a provider deadline; choose actual timeouts after measurement. Permanent validation/schema errors do not retry indefinitely. Rate limits respect provider guidance and a project cost budget.
+- **Retry budget:** allow at most three automatic retries after the initial provider call (four calls total per job), configured by `GEMINI_MAX_RETRIES` (default `3`), with bounded backoff and a provider deadline. `0` disables automatic retries. Permanent validation/schema errors do not retry. A coordinator may explicitly retry the latest fresh failed advisory through the idempotent, audited Response endpoint; it starts a new retry budget. Rate limits respect provider guidance and a project cost budget.
 - **Lease recovery:** assign a fresh claim token per attempt. After a lease expires, another worker may retry; only the current token may commit a result. This prevents a late worker overwriting a newer attempt. Maintain one committed recommendation per job.
 - **External calls:** a crash after a provider response may incur a second call/cost. Use provider idempotency if supported, otherwise document this residual behavior; database deduplication cannot guarantee one billable call.
 - **Failure isolation:** worker/model/provider outage leaves jobs pending/failed. Human intake, verification, priority changes, dispatch, and stock operations continue.
 - **Resource limits:** begin with one worker and CPU inference; cap concurrency and memory so analysis cannot starve Response. Benchmark before adding local LLM/GPU infrastructure. A separate model server is a runtime dependency, not automatically a new domain service.
-- **Data minimization:** use structured fields first; redact approved text before any external call. Redaction may be incomplete, so real sensitive-data egress still needs a provider/retention decision. Do not log full prompts, outputs, exact locations, credentials, or signed URLs by default.
+- **Data minimization:** send structured SOS fields only by default; exclude narrative, contacts, exact coordinates, and evidence. `GEMINI_INCLUDE_SYNTHETIC_DEMO_NARRATIVE=true` is an explicit synthetic-demonstration-only option. Its masking may miss identifiers and must remain off for real SOS data. Real sensitive-data egress still requires a provider, storage, and retention decision. Do not log full prompts, outputs, exact locations, credentials, or signed URLs by default.
 - **Untrusted text:** treat citizen narratives, OCR, and retrieved content as data. Give an LLM no tools, database mutation permissions, network actions, or storage credentials. Instructions embedded in a report must not change workflow or output policy. Prompt instructions and JSON validation alone do not eliminate injection risk. [OWASP prompt injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/)
 - **Model artifacts:** store trusted, versioned artifacts with checksums and training/environment metadata; load only approved artifacts. Do not accept uploaded model files from users.
 - **Storage relationship:** MinIO may hold private authorized research datasets or trusted model artifacts; inference runs in the NestJS worker or an approved provider endpoint. No vector database is required to store photos, JSON, or model files. Keep research/model buckets separate from evidence and restrict access.
@@ -1661,7 +1665,7 @@ flowchart TD
 - **Keep decisions human-owned:** extraction proposes facts; rules propose priority or verification need. Neither changes verified facts, official P1–P4, mission state or assignment. Manual processing remains available with AI disabled or unavailable.
 - **Use only supported context:** preserve unknown totals, overlapping groups, negation and contradictory updates as Section 12.4 specifies. Compute optional hazard features locally; version and expire time/hazard-dependent results. The PDF's unsupported `peopleCount=4` and uncalibrated `semanticUrgency=0.95` are counterexamples, not contract defaults.
 - **Separate operational advisor and experiment:** rules are the baseline advisor; optional rule+LLM supports extraction and summarization. Weighted scoring is a research comparator with documented dilution limits, separate confidence and independently reviewed labels. A future hybrid requires evaluation and an explicit policy revision before it becomes review-eligible.
-- **Keep adjacent extensions deferred:** live/background tracking, route replay, forecast feeds, ETA/hazard-aware routing, Redis/WebSocket and additional service boundaries are not adopted by this AI integration. Team scope, mandatory skills and availability remain hard constraints in ordinary Response queries. The selected stack remains three NestJS services with TypeORM, PostgreSQL/PostGIS, and MinIO AIStor Free; no Python runtime or broker is introduced.
+- **Keep adjacent extensions deferred:** live/background tracking, route replay, forecast feeds, ETA/hazard-aware routing, Redis/WebSocket and additional service boundaries are not adopted by this AI integration. Team scope, mandatory skills and availability remain hard constraints in ordinary Response queries. The selected stack remains three NestJS services with TypeORM, PostgreSQL/PostGIS, and MinIO Community; no Python runtime or broker is introduced.
 
 Before enabling this extension, finalize extraction provenance schemas, rule taxonomy/precedence, bounded fields, expiry/context version checks, Vietnamese reason mappings, provider/data-egress decisions when applicable and the tests in Section 12.8. The PDF's example weights and urgency rules are unvalidated research proposals, not rescue-authority policy. Core delivery proceeds independently of this optional integration.
 
@@ -1803,7 +1807,7 @@ Browser / Mobile
     -> Nginx (one demo host)
     -> Identity, Response, Logistics (3 application services)
     -> PostgreSQL/PostGIS (separate database/user per service)
-    -> MinIO AIStor Free S3 API (single-node lab)
+    -> MinIO Community S3 API (single-node lab)
     -> Prometheus/Grafana (optional profile)
 ```
 
@@ -1814,7 +1818,7 @@ Browser / Mobile
 
 ## 16. Revised implementation and delivery sequence
 
-**Scope revision: 2026-10-06.** Rescue coordination and guest in-kind donations are the main flows. Warehouse work is supporting intake/stock/issue rather than a full logistics product. The earlier two-to-three-week backend estimate is not a fresh estimate for this revision: re-estimate at the compatibility spike. The ten-week outline remains the project reference, not a claim about elapsed calendar weeks.
+**Scope revision: 2026-10-06; delivery focus updated 2026-10-27.** Rescue coordination is the main flow. Guest in-kind donation intake is a short optional supporting demonstration. Warehouse work supports intake/stock/issue rather than a full logistics product. The earlier two-to-three-week backend estimate is not a fresh estimate for this revision: re-estimate at the compatibility spike. The ten-week outline remains the project reference, not a claim about elapsed calendar weeks.
 
 | Order | End-to-end slice | Required exit evidence (planned) |
 |---|---|---|
@@ -1854,8 +1858,8 @@ Cut optional AI, push, full offline queue and CSV before any core correctness/se
 3. Coordinator records contact attempts/corroboration and human priority; two reports about the same household are reviewed manually, while nearby different households stay separate.
 4. Compare nearby volunteer/military/government teams. Reject busy/incapable/stale-position teams; show a slightly farther team with lighter recent workload and human selection.
 5. Leader accepts and records mission progress/evidence. Display confirmed-request heatmap with source time; unverified reports do not inflate confirmed counts.
-6. Campaign manager publishes an in-kind appeal. Guest leaves name/phone and hands over 60 units; staff count 58 and approve 55/reject 3 through a distinct reviewer. Private receipt shows differences; no money or mandatory donor login.
-7. Deliver 12 of 20 requested kits, then 8; warehouse stock changes once per issue. A point receipt is not household handout. Coordinator resolves only through current-cycle guards/seal.
+6. Coordinator resolves the rescue request after completed mission outcomes and current-cycle guards. The rescue-only scene does not require creating donation or Logistics needs.
+7. Optional supporting scene: a donor declares a handover; intake staff record conserved counts; a distinct reviewer approves the current revisions and posts accepted stock once. Advanced partial distribution, held-stock, loss/dispute and warehouse permutations are outside the default demonstration. If shown separately, a point receipt remains distinct from household handout and the current-cycle seal remains mandatory for request-linked needs.
 8. Show denied cross-scope/self-review, retry/notification audit, timestamped reports and executed recovery/load/device evidence. Optional AI can be shown only if its evaluation is complete; manual flow remains usable.
 
 These are planned scenes, not evidence that a working product or tests already exist.
@@ -1894,14 +1898,14 @@ These are planned scenes, not evidence that a working product or tests already e
 | File types/sizes/retention? | Section 23.5 fixes demo media limits and signed-link TTL; real-data retention remains separate | Limits settled for demo; retention before pilot |
 | Location/photo/audit/backup retention? | No invented official policy; confirm before a pilot | Before real deployment |
 | Load targets/demo hardware? | Section 23.6 adopts the workload and numeric demo thresholds; record actual host details and measured results | Hardware at setup; results before performance acceptance |
-| Storage edition/provider and license? | MinIO AIStor Free single-node lab selected; team members obtain it under current terms; validate private access and restore before demo | Before storage integration |
+| Storage edition/provider and license? | MinIO Community single-node lab selected (built from source, no license); private access verified 2026-10-27; validate restore before demo | Before storage integration |
 | Labeled AI data? | Do not assume availability; explainable rules suffice for PoC; AI disabled by default | Before optional evaluation |
 | Partial-fulfillment policy | Demo uses coordinator-created needs and confirmed delivery; validate real workflow with domain reviewer | Before claiming operational policy |
 | Kafka/event broker? | Not in baseline; revisit only if the criteria in Section 4.4 are demonstrated | Only after measured need |
 
 ## 20. Design conclusion
 
-The proposed baseline is **NestJS/TypeScript + TypeORM + PostgreSQL/PostGIS + React/Vite + React Native/Expo**, with three services: Identity, Response, and Logistics. REST handles immediate operations; each service owns its database and reports; Logistics links partial aid commitments to opaque request IDs. Compose runs the demo on one host. Kafka, standalone Notification/Reporting services, and distributed stock-reservation sagas are deferred. MinIO AIStor Free is the selected single-node lab object store. AI is optional and provides coordinator-reviewed suggestions only.
+The proposed baseline is **NestJS/TypeScript + TypeORM + PostgreSQL/PostGIS + React/Vite + React Native/Expo**, with three services: Identity, Response, and Logistics. REST handles immediate operations; each service owns its database and reports; Logistics links partial aid commitments to opaque request IDs. Compose runs the demo on one host. Kafka, standalone Notification/Reporting services, and distributed stock-reservation sagas are deferred. MinIO Community is the selected single-node lab object store. AI is optional and provides coordinator-reviewed suggestions only.
 
 This baseline and Section 22 support incremental backend implementation. The workflow additions are proposals inspired by humanitarian platforms and peer-project patterns; they are not official emergency-response policy. Each slice still requires reviewed API/data contracts and executed acceptance evidence before it is called complete.
 
@@ -1949,8 +1953,6 @@ This baseline and Section 22 support incremental backend implementation. The wor
 - [Ushahidi incoming-data review and moderation](https://docs.ushahidi.com/platform-user-manual/6.-managing-data-in-your-deployment)
 - [Ushahidi saved searches](https://docs.ushahidi.com/platform-user-manual/7.-analysing-data-on-your-deployment/7.1-saved-searches)
 - [MinIO Community repository status](https://github.com/minio/minio)
-- [MinIO AIStor Free agreement](https://www.min.io/legal/aistor-free-agreement)
-- [MinIO AIStor license operations and feature limits](https://docs.min.io/aistor/operations/licenses/)
 - [AWS SDK for JavaScript v3 S3 client](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/)
 - [Amazon S3 presigned URL behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
 - [OWASP file upload guidance](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
@@ -1964,9 +1966,9 @@ This baseline and Section 22 support incremental backend implementation. The wor
 
 ### Research notes
 
-- Initial research was conducted on 2026-09-29; the NestJS framework comparison and MinIO AIStor Free decision were checked against linked primary sources on 2026-09-30. Versions, support schedules, APIs, license terms, and project status can change. Recheck release compatibility and current AIStor terms before implementation.
+- Initial research was conducted on 2026-09-29; the NestJS framework comparison and MinIO decision were first checked against linked primary sources on 2026-09-30. Versions, support schedules, APIs, license terms, and project status can change. Recheck release compatibility before implementation; the storage choice was revised to MinIO Community on 2026-10-27.
 - NestJS/TypeScript was selected after a qualitative comparison with Spring Boot, Django/DRF, FastAPI, and Flask. This was not a performance benchmark; team familiarity should be confirmed during setup.
-- MinIO AIStor Free single-node is the one selected capstone storage option. MinIO Community is not selected. Current terms, artifact/license validity, S3 compatibility, private policy behavior, and restoration still need to be checked during setup; none have been tested by this research.
+- MinIO Community single-node (built from upstream source) is the one selected capstone storage option; AIStor Free was dropped for lack of a license. S3 compatibility and private policy behavior were checked on 2026-10-27; restoration still needs to be checked.
 - The workflow adaptation report reviews Ushahidi, Sahana Eden, and KoboToolbox; the separate CNTT workbook scan is summarized in that note and should be read as project descriptions, not implementation verification.
 - Section 22 records the current three-service and partial-fulfillment decisions, including guest-capable SOS intake. Quantitative NFRs, official priority rules, retention, external providers, and operational AI use still need the relevant confirmation.
 
@@ -2074,7 +2076,7 @@ These planned cases extend existing IDs without renumbering them. They are not e
 
 Historical baseline (2026-10-01): when this section was written, the repository contained documentation only and had no NestJS workspace, migrations, OpenAPI artifacts, running services, or executed product tests. This no longer describes the current repository: backend implementation T0–T19 and its contracts/tests are recorded in [the backend implementation pack](backend/README.md). Current verification and open acceptance gates are recorded in [the backend handoff](backend/HANDOFF.md). Section 22 remains the design baseline; it is not evidence of runtime behavior.
 
-At the time this baseline was written, runtime/provider verification and conversion of these decisions into OpenAPI and migrations were prerequisites to implementation. Backend contracts and migrations are now present; current verification and remaining acceptance evidence are tracked in [the backend handoff](backend/HANDOFF.md). The selected AIStor artifact/license and restore evidence remain open, as do hardware-recorded performance checks. External map/push/email/LLM providers remain unselected. Official priority/SLA, retention, real-data privacy and disaster-authority policies need separate confirmation before real deployment. These limitations do not block independent synthetic-demo slices.
+At the time this baseline was written, runtime/provider verification and conversion of these decisions into OpenAPI and migrations were prerequisites to implementation. Backend contracts and migrations are now present; current verification and remaining acceptance evidence are tracked in [the backend handoff](backend/HANDOFF.md). Restore evidence for the MinIO Community store remains open, as do hardware-recorded performance checks. External map/push/email/LLM providers remain unselected. Official priority/SLA, retention, real-data privacy and disaster-authority policies need separate confirmation before real deployment. These limitations do not block independent synthetic-demo slices.
 
 ## 23. Architecture review decisions — 2026-10-01
 
@@ -2133,7 +2135,7 @@ Performance dataset: 10,000 synthetic stored requests across seeded regions, sta
 
 Node 24 LTS is the setup baseline; pin the exact supported patch, compatible Nest/TypeORM versions and PostgreSQL/PostGIS image digest after a migration/spatial-query/locking/OpenAPI compatibility spike. Choose CommonJS and Jest for the existing documented testing approach; verify against the selected Nest major. Current Nest documentation distinguishes application and CLI runtime floors. [Node releases](https://nodejs.org/en/about/previous-releases), [Nest migration guide](https://docs.nestjs.com/migration-guide).
 
-Keep MinIO AIStor Free as selected. Verify the actual Free license, S3 read/write, private policies and isolated restore before acceptance; current Free licenses report no expiry, which must not be confused with a trial. Free still lacks MinIO encryption at rest/HA/SLA. [AIStor license info](https://docs.min.io/aistor/reference/cli/mc-license/mc-license-info/), [AIStor license limits](https://docs.min.io/aistor/operations/licenses/). Map/provider procurement and real-data policy remain separate gates; optional push/email/LLM are unnecessary for the core demo. AI stays disabled until its own contract/evaluation gates pass.
+Keep MinIO Community as selected (revised 2026-10-27). Its S3 read/write, per-service private policies and cross-bucket denial were verified on the main stack on 2026-10-27; isolated restore is still to be checked before acceptance. It lacks MinIO encryption at rest/HA/SLA and upstream is archived. Map/provider procurement and real-data policy remain separate gates; optional push/email/LLM are unnecessary for the core demo. AI stays disabled until its own contract/evaluation gates pass.
 
 ### 23.7 Additional planned acceptance cases
 
@@ -2174,7 +2176,7 @@ Slice gates in Section 22.5 additionally require TC-BE-20 for Identity, TC-BE-17
 | R-02 | SRS/SDD/test-case/user-guide deliverables are not yet separate documents | High / High | Derive SRS and SDD from this plan; keep identifiers; plan Sections 7, 9, 13 map directly to SRS, Section 5, 6, 10, 22, 23 to SDD | Whole team |
 | R-03 | Three-service design and the seal/intent protocol (Section 23.2) are the most complex parts; defects here are likely | Medium / High | Implement and test TC-BE-17/18 early with real PostgreSQL. The seal is protected scope: a check-then-write (read open needs, then write RESOLVED) is **not** equivalent because Logistics can create a need between the read and the write, so it is not an accepted fallback. If time runs out, cut other scope first in the order of Section 16; only if the seal still cannot be finished, disable the RESOLVE command for requests that have linked Logistics needs (feature cut, documented as a limitation), and amend FR-REQ-09, TC-BE-17/18, the demo script and defense claims together. Never claim distributed atomicity | Backend owner |
 | R-04 | TypeORM + PostGIS + row-lock behavior unverified | Medium / High | One-day compatibility spike before Slice 1 (geometry migration, ST_DWithin, SELECT FOR UPDATE, concurrency test); switch ORM only if the spike fails | Backend owner |
-| R-05 | MinIO AIStor Free license, artifact, S3 behavior and restore are unverified | Medium / Medium | Verify current terms from the primary source before use; code against the S3 client so the store is replaceable; keep local fallback for development; do not redistribute the binary | Backend owner |
+| R-05 | MinIO Community is archived upstream (no fixes), has no official image, and restore is unverified | Medium / Medium | Build from the pinned upstream source tag; code against the S3 client so the store is replaceable; keep to synthetic data on loopback-only ports; do not redistribute the image | Backend owner |
 | R-06 | Map/tile provider not selected | Medium / Medium | Select before the coordinator map slice; adapter keeps the choice swappable | Web owner |
 | R-07 | Priority taxonomy, verification and closure policy are team proposals, not rescue-authority policy | High / Medium | State this openly; interview or survey a domain contact if possible; keep all labels configurable and "draft" | Whole team |
 | R-08 | Guest SOS invites spam or malicious reports | Medium / Medium | Rate limits, strict validation, verification gate, hashed client-generated tracking secret; add captcha if abuse is seen; keep guest uploads on a lower quota | Backend owner |
@@ -2212,6 +2214,8 @@ Slice gates in Section 22.5 additionally require TC-BE-20 for Identity, TC-BE-17
 ## 25. Reduced in-kind donations and accountable delivery
 
 **Revised 2026-10-06 under user instructions.** Replaces the expanded 2026-10-04 warehouse extension. In-kind only, no money or payments. Preserve independent count/review, discrepancy history, exactly-once stock posting and delivery accountability; defer warehouse ERP depth. Existing [research](research/in-kind-donation-reconciliation-patterns.md) is historical evidence for patterns, not current scope authority or proof against corruption.
+
+**2026-10-27 delivery clarification:** this is supporting scope. Keep the default demonstration to a short optional intake/review/posting flow and spend implementation/review effort on SOS coordination first. The detailed rules below still govern existing capabilities when used; reducing demo breadth does not waive independent review, stock conservation, or service ownership.
 
 ### 25.1 Scope and ownership
 
@@ -2595,7 +2599,7 @@ Decided by the owner or by best practice under the owner's delegation; they repl
 
 The current technical baseline is NestJS/TypeScript, three services (Identity, Response, Logistics), REST/JSON, TypeORM, PostgreSQL/PostGIS, React/Vite, and React Native/Expo. Section 4 records the selection rationale and alternatives. The project brief defines scope; technology choices are design decisions, not requirements imposed by the brief.
 
-Nginx and three NestJS service boundaries are the working baseline. MinIO AIStor Free is the selected single-node lab object store; each operator must obtain/use it under current terms, and the team must verify the artifact, private access, and restore path. AI remains optional. Draft business rules, numeric targets, and provider/retention policies remain open where marked.
+Nginx and three NestJS service boundaries are the working baseline. MinIO Community, built from the upstream source tag, is the selected single-node lab object store; the team must verify the restore path. AI remains optional. Draft business rules, numeric targets, and provider/retention policies remain open where marked.
 
 Use the recorded baseline for implementation. Revisit it when new evidence materially changes the tradeoffs, rather than repeatedly reopening settled choices. Record new decisions and ask only for information or authorization actually missing for the affected work. Routine reversible implementation choices may proceed with documented assumptions.
 

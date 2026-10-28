@@ -12,7 +12,7 @@ import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from '../requests/request-
 import { ReporterAccessService, ReporterRequestRow, trackingCodeMatches } from './reporter-access.service';
 import { RecoveryIssueDto, RequestEventsQueryDto, SupplementRequestDto } from './tracking.dto';
 import { RequestOperationsService } from '../operations/request-operations.service';
-import { aiInputHash, sanitizeAiDescription, scoreRequestRisk } from '../ai/ai-risk';
+import { assessmentFields, enqueueAiAdvisory } from '../ai/ai-advisory-input';
 
 const terminalStatuses = new Set(['REJECTED', 'DUPLICATE', 'RESOLVED', 'CLOSED', 'CANCELLED']);
 const preVerificationStatuses = new Set(['SUBMITTED', 'VERIFYING']);
@@ -330,22 +330,7 @@ export class TrackingService {
             add('location_captured_at', location.captured_at ?? null, '::timestamptz');
           }
           if (sets.length) await manager.query(`UPDATE request_subject SET ${sets.join(', ')} WHERE request_id = $1`, values);
-          const nextDescription = Object.hasOwn(dto, 'description') ? dto.description ?? null : row.description;
-          const risk = scoreRequestRisk({ description: nextDescription, reporterDeclaredDanger: dto.reporter_declared_danger ?? row.reporter_declared_danger,
-            peopleAffected: nextPeople, childrenCount: nextChildren, elderlyCount: nextElderly,
-            needsRescue: nextNeedsRescue, needsReliefSupplies: nextNeedsRelief });
-          await manager.query(
-            `UPDATE ai_advisory SET risk_score=$2,reason_codes=$3 WHERE id=(SELECT id FROM ai_advisory WHERE request_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1)`,
-            [row.id, risk.score, risk.reasonCodes],
-          );
-          const safeDescription = sanitizeAiDescription(nextDescription ?? '');
-          if (safeDescription && Object.hasOwn(dto, 'description')) {
-            await manager.query(
-              `INSERT INTO ai_advisory (request_id,request_version,input_hash,model,prompt_version,schema_version,risk_score,reason_codes)
-               VALUES ($1,$2,$3,$4,'v1','v1',$5,$6) ON CONFLICT (request_id,input_hash) DO NOTHING`,
-              [row.id, Number(updated.version), aiInputHash(safeDescription), process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite', risk.score, risk.reasonCodes],
-            );
-          }
+          if (assessmentFields.some((field) => Object.hasOwn(dto, field))) await enqueueAiAdvisory(manager, row.id);
         }
         const value = { id: row.id, tracking_code: updated.tracking_code, status: updated.status, version: Number(updated.version) };
         payload.result = value;

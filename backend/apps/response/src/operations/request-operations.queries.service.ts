@@ -7,6 +7,7 @@ import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/tec
 import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { riskAttentionLevel, scoreRequestRisk } from '../ai/ai-risk';
 import type { RiskFacts } from '../ai/ai-risk';
+import { aiPriorityAdvisory, currentAiAdvisory } from '../ai/ai-priority-advisory';
 import { ReporterSessionService } from '../requests/reporter-session';
 import type { ReporterSession } from '../requests/reporter-session';
 import type { RequestOperationPageDto, RequestQueueQueryDto } from './request-operations.dto';
@@ -22,16 +23,24 @@ type ScoredQueueRow = QueueRow & {
   elderly_count: number | null;
   needs_rescue: boolean;
   needs_relief_supplies: boolean;
+  work_cycle: number;
+  ai_input_hash: string | null;
+  ai_request_version: number | null;
+  ai_model: string | null;
+  ai_status: string | null;
+  ai_extracted_json: unknown;
+  ai_review_status: string | null;
 };
 
 function priorityAdvisory(facts: RiskFacts): Record<string, unknown> {
   const risk = scoreRequestRisk(facts);
   return {
+    outcome: risk.score === null ? 'INSUFFICIENT_DATA' : 'SUGGESTION',
     score: risk.score,
     level: riskAttentionLevel(risk.score),
     reason_codes: risk.reasonCodes,
     source: 'BACKEND_RULES',
-    rules_version: 'v1',
+    rules_version: 'v3',
   };
 }
 
@@ -79,26 +88,30 @@ export class RequestOperationsQueriesService {
     values.push(limit + 1);
     const rows = await this.dataSource.query(
       `SELECT r.id,r.tracking_code,r.status,r.priority,r.review_lane,r.incident_category_code AS category,
-              r.description,r.needs_rescue,r.needs_relief_supplies,
+              r.description,r.needs_rescue,r.needs_relief_supplies,r.work_cycle,
               s.people_affected,s.children_count,s.elderly_count,r.region_code,r.received_at,
               to_char(r.received_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_received_at,
               r.reporter_declared_danger AS declared_danger,${overdue} AS overdue,
               CASE WHEN r.reporter_contact_phone IS NULL THEN NULL ELSE '******'||right(r.reporter_contact_phone,4) END AS reporter_contact_phone,
               round(ST_X(s.location::geometry)::numeric,3)::float8 AS longitude,
               round(ST_Y(s.location::geometry)::numeric,3)::float8 AS latitude,
+              ai.model AS ai_model,ai.status AS ai_status,ai.extracted_json AS ai_extracted_json,
+              ai.review_status AS ai_review_status,ai.input_hash AS ai_input_hash,ai.request_version AS ai_request_version,
               coalesce((SELECT e.payload->'flags' FROM request_event e WHERE e.request_id=r.id AND e.event_type='PROXY_ACTIVITY_FLAG' ORDER BY e.occurred_at DESC,e.id DESC LIMIT 1),'[]'::jsonb) AS proxy_activity_flags
          FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
+         LEFT JOIN LATERAL (
+           SELECT model,status,extracted_json,review_status,input_hash,request_version FROM ai_advisory
+            WHERE request_id=r.id ORDER BY created_at DESC,id DESC LIMIT 1
+         ) ai ON true
         WHERE ${conditions.join(' AND ')}
         ORDER BY r.received_at ASC,r.id ASC LIMIT $${values.length}`,
       values,
     ) as ScoredQueueRow[];
     const more = rows.length > limit;
     const page = rows.slice(0, limit);
-    const items = page.map((row) => ({
-      id: row.id, tracking_code: row.tracking_code, status: row.status, priority: row.priority,
-      review_lane: row.review_lane, category: row.category, people_affected: row.people_affected,
-      region_code: row.region_code, received_at: toIso(row.received_at), declared_danger: row.declared_danger,
-      priority_advisory: priorityAdvisory({
+    const items = page.map((row) => {
+      const facts = {
+        incidentCategoryCode: row.category,
         description: row.description,
         reporterDeclaredDanger: row.declared_danger,
         peopleAffected: countOrNull(row.people_affected),
@@ -106,11 +119,23 @@ export class RequestOperationsQueriesService {
         elderlyCount: countOrNull(row.elderly_count),
         needsRescue: row.needs_rescue,
         needsReliefSupplies: row.needs_relief_supplies,
-      }),
-      overdue: row.overdue, reporter_contact_phone: row.reporter_contact_phone,
-      approx_location: { longitude: Number(row.longitude), latitude: Number(row.latitude) },
-      staff_flags: row.proxy_activity_flags ?? [],
-    }));
+      };
+      return {
+        id: row.id, tracking_code: row.tracking_code, status: row.status, priority: row.priority,
+        review_lane: row.review_lane, category: row.category, people_affected: row.people_affected,
+        region_code: row.region_code, received_at: toIso(row.received_at), declared_danger: row.declared_danger,
+        priority_advisory: priorityAdvisory(facts),
+        ai_priority_advisory: aiPriorityAdvisory(currentAiAdvisory(row.ai_status ? {
+          model: row.ai_model, input_hash: row.ai_input_hash, request_version: row.ai_request_version,
+          status: row.ai_status,
+          extracted_json: row.ai_extracted_json,
+          review_status: row.ai_review_status,
+        } : undefined, facts, Number(row.work_cycle))),
+        overdue: row.overdue, reporter_contact_phone: row.reporter_contact_phone,
+        approx_location: { longitude: Number(row.longitude), latitude: Number(row.latitude) },
+        staff_flags: row.proxy_activity_flags ?? [],
+      };
+    });
     const next = more && page.length ? page[page.length - 1]! : undefined;
     return {
       items, more,
@@ -178,13 +203,14 @@ export class RequestOperationsQueriesService {
       row.canonical_request_id ? this.scopedRequestSummary(row.canonical_request_id, session) : Promise.resolve([]),
       this.duplicatesPage(this.dataSource, row.id, undefined, 20, session),
       this.dataSource.query(
-        `SELECT id,model,status,risk_score,reason_codes,extracted_json,review_status,review_by_user_id,review_at,review_note,error_code,created_at
+        `SELECT id,model,status,request_version,input_hash,risk_score,reason_codes,extracted_json,review_status,review_by_user_id,review_at,review_note,error_code,created_at
            FROM ai_advisory WHERE request_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1`, [row.id],
       ) as Promise<Array<Record<string, unknown>>>,
     ]);
     const subject = subjectRows[0];
     if (!subject) throw new AppError('INTERNAL_ERROR', { status: 500 });
-    const requestPriorityAdvisory = priorityAdvisory({
+    const assessmentFacts = {
+      incidentCategoryCode: row.incident_category_code,
       description: row.description,
       reporterDeclaredDanger: row.reporter_declared_danger,
       peopleAffected: countOrNull(subject.people_affected),
@@ -192,7 +218,9 @@ export class RequestOperationsQueriesService {
       elderlyCount: countOrNull(subject.elderly_count),
       needsRescue: row.needs_rescue,
       needsReliefSupplies: row.needs_relief_supplies,
-    });
+    };
+    const requestPriorityAdvisory = priorityAdvisory(assessmentFacts);
+    const advisory = currentAiAdvisory(advisoryRows[0], assessmentFacts, Number(row.work_cycle));
     const safeEvents = await this.restrictEvents(eventPage.items, session);
     const flagViews = safeEvents.filter((event) => event.event_type === 'PROXY_ACTIVITY_FLAG').map((event) => ({
       event_id: event.id, occurred_at: event.occurred_at,
@@ -211,6 +239,7 @@ export class RequestOperationsQueriesService {
       declared_danger: row.reporter_declared_danger,
       needs_rescue: row.needs_rescue, needs_relief_supplies: row.needs_relief_supplies,
       priority_advisory: requestPriorityAdvisory,
+      ai_priority_advisory: aiPriorityAdvisory(advisory),
       reporter: { user_id: row.reporter_user_id, name: row.reporter_name, contact_phone: row.reporter_contact_phone },
       subject: {
         people_affected: subject.people_affected,
@@ -228,9 +257,9 @@ export class RequestOperationsQueriesService {
       verification_decision: decisionRows[0] ? decisionView(decisionRows[0]) : null,
       active_missions: { items: missionRows.slice(0, 5).map((mission) => ({ ...mission, created_at: toIso(mission.created_at as Date | string) })), more: missionRows.length > 5 },
       mission_history: { items: missionHistory.slice(0, 20).map((mission) => ({ ...mission, created_at: toIso(mission.created_at as Date | string), last_occurred_at: mission.last_occurred_at == null ? null : toIso(mission.last_occurred_at as Date | string) })), more: missionHistory.length > 20 },
-      ai_advisory: advisoryRows[0] ? {
-        ...advisoryRows[0], created_at: toIso(advisoryRows[0].created_at as Date | string),
-        review_at: advisoryRows[0].review_at == null ? null : toIso(advisoryRows[0].review_at as Date | string),
+      ai_advisory: advisory ? {
+        ...advisory, created_at: toIso(advisory.created_at as Date | string),
+        review_at: advisory.review_at == null ? null : toIso(advisory.review_at as Date | string),
         human_review_required: true,
       } : null,
       evidence: { items: evidenceRows.slice(0, 5).map((evidence) => ({ ...evidence, created_at: toIso(evidence.created_at as Date | string) })), more: evidenceRows.length > 5 },

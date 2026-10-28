@@ -1,307 +1,377 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import vm from 'node:vm';
 
 const collection = JSON.parse(readFileSync(new URL('../../postman/C48-backend-demo.postman_collection.json', import.meta.url), 'utf8'));
-const seedSql = readFileSync(new URL('../../../docs/backend/seed/seed-identity.sql', import.meta.url), 'utf8');
-const expansionIdentitySql = readFileSync(new URL('../../../docs/backend/seed/seed-expansion-identity.sql', import.meta.url), 'utf8');
-const items = [];
-
-function collect(children) {
-  for (const item of children) {
-    if (item.item) collect(item.item);
-    else items.push(item);
-  }
+const flatten = (folder) => folder.item.flatMap((entry) => entry.request ? [entry] : flatten(entry));
+const all = flatten(collection);
+const main = flatten(collection.item[0]);
+const script = (item, kind) => item.event?.filter((event) => event.listen === kind).flatMap((event) => event.script.exec).join('\n') || '';
+function meta(item) {
+  const match = script(item, 'prerequest').match(/pm.variables.set\('_c48', (".*")\);/u);
+  return match ? JSON.parse(JSON.parse(match[1])) : {};
 }
-
-collect(collection.item);
-
-function itemNamed(name) {
-  const item = items.find((entry) => entry.name.includes(name));
-  assert.ok(item, `Postman request containing "${name}" exists`);
-  return item;
-}
-
-function operation(operationId) {
-  const item = items.find((entry) => entry.event?.some((event) =>
-    event.listen === 'prerequest' && event.script.exec.some((line) => line.includes(`\\"operationId\\":\\"${operationId}\\"`))));
-  assert.ok(item, `Postman request for ${operationId} exists`);
-  return item;
-}
-
-function metadata(item) {
-  const line = item.event?.find((event) => event.listen === 'prerequest')?.script.exec.find((entry) =>
-    entry.includes("pm.variables.set('_c48'"));
-  const encoded = line?.match(/pm\.variables\.set\('_c48', (".*")\);/u)?.[1];
-  assert.ok(encoded, `Postman metadata exists for ${item.name}`);
-  return JSON.parse(JSON.parse(encoded));
-}
-
-test('public donation smoke uses a quantity valid for every unit precision', () => {
-  const body = JSON.parse(operation('logisticsDonationsCreateDelivery').request.body.raw);
-  assert.equal(body.lines[0].declared_quantity, '1');
+const op = (items, operation, occurrence = 0) => {
+  const result = items.filter((item) => meta(item).operationId === operation)[occurrence];
+  assert.ok(result, operation);
+  return result;
+};
+const folder = (fragment) => {
+  const result = collection.item.find((item) => item.name.includes(fragment));
+  assert.ok(result, fragment);
+  return flatten(result);
+};
+test('collection and main folder explain the optional-run boundary consistently', () => {
+  assert.match(collection.info.description, /Chạy ở cấp collection cũng dừng sau folder 00/u);
+  assert.match(collection.item[0].description, /Chạy ở cấp collection cũng dừng sau folder 00/u);
+  assert.match(collection.item[0].description, /folder tùy chọn 10–60 chỉ chạy khi chọn riêng/u);
 });
-
-test('donation declaration revision uses a precision-safe sample quantity', () => {
-  const raw = operation('logisticsDonationsReviseDeclaration').request.body.raw.replace('{{donationVersion}}', '1');
-  const body = JSON.parse(raw);
-  assert.equal(body.lines[0].declared_quantity, '1');
+test('guest recovery SOS request disables ambient Postman cookies', () => {
+  const guestRequest = all.find((item) => item.id === 'recovery-01');
+  assert.ok(guestRequest, 'guest recovery request');
+  assert.equal(guestRequest.protocolProfileBehavior?.disableCookies, true);
 });
-
-test('donation claim and recovery requests use the donor flow login token', () => {
-  for (const operationId of ['logisticsDonationsClaim', 'logisticsDonationsRecover']) {
-    const authorization = operation(operationId).request.header.find((header) => header.key === 'Authorization');
-    assert.equal(authorization?.value, 'Bearer {{donorAccessToken}}', operationId);
-  }
-});
-
-test('donation capability secret is retained only after a successful declaration', () => {
-  const prerequest = collection.event.find((event) => event.listen === 'prerequest').script.exec.join('\n');
-  const testScript = collection.event.find((event) => event.listen === 'test').script.exec.join('\n');
-  const createRequests = items.filter((item) => {
-    try { return metadata(item).operationId === 'logisticsDonationsCreateDelivery'; } catch { return false; }
-  });
-
-  assert.equal(createRequests.length, 2, 'both existing donation create forms remain in use');
-  for (const item of createRequests) {
-    const header = item.request.header.find((entry) => entry.key === 'X-Donation-Secret');
-    assert.equal(header?.value, '{{pendingDonationSecret}}', item.name);
-  }
-  assert.match(prerequest, /pm\.variables\.set\('pendingDonationSecret', makeSecret\(\)\)/u);
-  assert.doesNotMatch(prerequest, /pm\.collectionVariables\.set\('donationSecret', makeSecret\(\)\)/u);
-  assert.match(testScript, /if \(pm\.response\.code >= 200 && pm\.response\.code < 300[\s\S]*meta\.operationId === 'logisticsDonationsCreateDelivery'[\s\S]*const pendingSecret = pm\.variables\.get\('pendingDonationSecret'\)[\s\S]*pm\.collectionVariables\.set\('donationSecret', pendingSecret\)/u);
-});
-
-test('donation recovery reuses the created public code and saves the issued recovery code', () => {
-  const recovery = operation('logisticsDonationsRecover');
-  const body = JSON.parse(recovery.request.body.raw);
-  const recoveryHeader = recovery.request.header.find((entry) => entry.key === 'X-Recovery-Code');
-  const testScript = collection.event.find((event) => event.listen === 'test').script.exec.join('\n');
-
-  assert.equal(body.public_code, '{{donationPublicCode}}');
-  assert.equal(recoveryHeader?.value, '{{recoveryCode}}');
-  assert.match(testScript, /meta\.operationId === 'logisticsDonationsIssueRecovery' && body\.recovery_code[\s\S]*pm\.collectionVariables\.set\('recoveryCode', body\.recovery_code\)/u);
-});
-
-test('request supplement includes at least one reported fact', () => {
-  const body = JSON.parse(operation('supplementSelfRequest').request.body.raw.replace('{{requestVersion}}', '1'));
-  assert.ok(Object.keys(body).some((field) => field !== 'expected_version'));
-});
-
-test('proxy request forms include GPS accuracy and capture timestamp', () => {
-  const proxyRequests = items.filter((item) => {
-    const url = typeof item.request.url === 'string' ? item.request.url : item.request.url?.raw;
-    return url?.endsWith('/requests/proxy');
-  });
-  assert.ok(proxyRequests.length > 0);
-  for (const item of proxyRequests) {
-    const body = JSON.parse(item.request.body.raw);
-    assert.equal(body.location.source, 'GPS', item.name);
-    assert.ok(Number.isFinite(body.location.accuracy_m), item.name);
-    assert.equal(body.location.captured_at, '{{$isoTimestamp}}', item.name);
-  }
-});
-
-test('catalog item uses the type and unit created by earlier requests', () => {
-  const body = JSON.parse(operation('logisticsCatalogCreateItem').request.body.raw);
-  assert.equal(body.item_type_code, '{{itemTypeCode}}');
-  assert.equal(body.unit_code, '{{unitCode}}');
-  assert.ok(items.indexOf(operation('logisticsCatalogCreateUnit')) < items.indexOf(operation('logisticsCatalogCreateItem')));
-});
-
-test('stock adjustment review uses the ID returned by adjustment creation', () => {
-  const script = collection.event.find((event) => event.listen === 'test').script.exec.join('\n');
-  const requestUrl = operation('logisticsStockReviewAdjustment').request.url;
-  const reviewUrl = typeof requestUrl === 'string' ? requestUrl : requestUrl.raw;
-
-  assert.match(script, /logisticsStockCreateAdjustment[\s\S]*pm\.collectionVariables\.set\('adjustmentId', body\.id\)/);
-  assert.match(reviewUrl, /\/stock\/adjustments\/\{\{adjustmentId\}\}\/review$/);
-  assert.ok(collection.variable.some((variable) => variable.key === 'adjustmentId'));
-});
-
-test('quick queue smoke uses a coordinator session', () => {
-  const header = itemNamed('Queue điều phối theo quyền cán bộ').request.header.find((entry) => entry.key === 'Authorization');
-  assert.equal(header?.value, 'Bearer {{coordinatorAccessToken}}');
-});
-
-test('coordinator queue saves a request ID for the existing detail request', () => {
-  const testScript = collection.event.find((event) => event.listen === 'test').script.exec.join('\n');
-  const detail = operation('getStaffRequestDetail');
-  const url = typeof detail.request.url === 'string' ? detail.request.url : detail.request.url.raw;
-
-  assert.match(testScript, /meta\.operationId === 'listRequestQueue'[\s\S]*pm\.collectionVariables\.set\('requestId', firstRequest\.id\)/u);
-  assert.match(url, /\/requests\/\{\{requestId\}\}$/u);
-});
-
-test('AI advisory review uses the advisory ID returned by detail and clears stale IDs', () => {
-  const testScript = collection.event.find((event) => event.listen === 'test').script.exec.join('\n');
-  const detail = operation('getStaffRequestDetail');
-  const review = operation('responseRequestOperationsReviewAiAdvisory');
-  const reviewUrl = typeof review.request.url === 'string' ? review.request.url : review.request.url.raw;
-
-  assert.match(testScript, /meta\.operationId === 'getStaffRequestDetail'[\s\S]*body\.ai_advisory\.id[\s\S]*pm\.collectionVariables\.set\('advisoryId', body\.ai_advisory\.id\)[\s\S]*pm\.collectionVariables\.unset\('advisoryId'\)/u);
-  assert.match(reviewUrl, /\/requests\/\{\{requestId\}\}\/ai-advisories\/\{\{advisoryId\}\}\/review$/u);
-  assert.ok(review.request.description.includes('`/requests/{id}`'));
-  assert.ok(review.request.description.includes('COMPLETED'));
-  assert.ok(review.request.description.includes('chưa có bản ghi để rà soát'));
-});
-
-test('queue and detail save backend priority advisory values into Postman variables', () => {
-  const testScript = collection.event.find((event) => event.listen === 'test').script.exec.join('\n');
-  const variableKeys = [
-    'priorityAdvisoryScore',
-    'priorityAdvisoryLevel',
-    'priorityAdvisoryReasonCodes',
-    'priorityAdvisorySource',
-    'priorityAdvisoryRulesVersion',
-  ];
-
-  for (const key of variableKeys) {
-    assert.ok(collection.variable.some((variable) => variable.key === key), `${key} is declared`);
-  }
-  assert.match(testScript, /meta\.operationId === 'listRequestQueue'[\s\S]*setPriorityAdvisoryVariables\(firstRequest\.priority_advisory\)/u);
-  assert.match(testScript, /meta\.operationId === 'getStaffRequestDetail'[\s\S]*setPriorityAdvisoryVariables\(body\.priority_advisory\)/u);
-  for (const field of ['score', 'level', 'reason_codes', 'source', 'rules_version']) {
-    assert.ok(testScript.includes(`advisory.${field}`), `priority_advisory.${field} is captured`);
-  }
-});
-
-test('heatmap requests include a seeded region filter', () => {
-  const heatmapRequests = items.filter((item) => {
-    const url = typeof item.request.url === 'string' ? item.request.url : item.request.url.raw;
-    return url.includes('/map/heatmap');
-  });
-  assert.ok(heatmapRequests.length > 0);
-  for (const item of heatmapRequests) {
-    const url = typeof item.request.url === 'string' ? item.request.url : item.request.url.raw;
-    assert.match(url, /[?&]region_code=\{\{regionCode\}\}/u, item.name);
-  }
-  assert.equal(collection.variable.find((variable) => variable.key === 'regionCode')?.value, 'DEMO_A');
-});
-
-test('native CSRF probe clears cookies before other local API requests', () => {
-  const script = collection.event.find((event) => event.listen === 'test').script.exec.join('\n');
-  assert.match(script, /getAuthCsrf[\s\S]*cookies\.jar\(\)\.clear/);
-});
-
-test('Native login clears stale Web cookies and Origin before sending', () => {
-  const script = collection.event.find((event) => event.listen === 'prerequest').script.exec.join('\n');
-  const cleanup = script.match(/if \(nativeLoginBody\.client_kind === 'NATIVE'\) \{([\s\S]*?)\n\}/u)?.[1];
-  assert.ok(cleanup, 'Native login has a dedicated cookie cleanup block');
-  assert.match(cleanup, /cookies\.toObject\(\)/);
-  assert.match(cleanup, /cookies\.jar\(\)\.clear/);
-  assert.match(cleanup, /console\.warn/);
-  assert.doesNotMatch(cleanup, /pm\.execution\.skipRequest\(\)/, 'a Cookie Jar allowlist error must not silently skip login');
-  assert.match(script, /headers\.remove\('Origin'\)/);
-});
-
-test('WEB refresh probe skips when no browser refresh cookie exists', () => {
-  const refresh = itemNamed('session WEB không body');
-  const script = refresh.event.find((event) => event.listen === 'prerequest').script.exec.join('\n');
-  assert.match(script, /c48_refresh/);
-  assert.match(script, /pm\.execution\.skipRequest\(\)/);
-});
-
-test('Postman collection contains public routes only', () => {
-  const urls = items.map((item) => typeof item.request.url === 'string' ? item.request.url : item.request.url.raw);
-  assert.ok(urls.every((url) => !/\/internal(?:\/|$)/u.test(url)));
-});
-
-test('citizen registration fails the Postman check when OTP email is not sent', () => {
-  const script = collection.event.find((event) => event.listen === 'test').script.exec.join('\n');
-  assert.ok(script.includes('meta.operationId === "registerCitizen"') || script.includes("meta.operationId === 'registerCitizen'"));
-  assert.ok(script.includes('pm.expect(body.email_sent).to.eql(true)'));
-  assert.ok(script.includes('body.verification.challenge_id'));
-  assert.ok(script.includes("pm.collectionVariables.set('challengeId'"));
-});
-
-test('Postman exposes every seeded account and gives each login its own token pair', () => {
-  const userRows = seedSql.match(/INSERT INTO app_user[\s\S]*?FROM \(VALUES([\s\S]*?)\) AS v/u)?.[1];
-  assert.ok(userRows, 'identity seed includes the demo user list');
-  const seedPassword = collection.variable.find((variable) => variable.key === 'seedPassword')?.value;
-  assert.equal(typeof seedPassword, 'string');
-  assert.ok(seedPassword.trim(), 'the flow collection can run without a separate environment file');
-  const seededUsernames = [...userRows.matchAll(/\(\s*'[a-f0-9]+'\s*,\s*'([^']+)'/giu)].map((match) => match[1]);
-  const usernameVariables = collection.variable.filter((variable) => variable.key.endsWith('SeedUsername'));
-
-  assert.deepEqual(
-    usernameVariables.map((variable) => variable.value).sort(),
-    seededUsernames.sort(),
-    'Postman usernames match the identity seed exactly',
-  );
-
-  const usernameVariableByValue = new Map(usernameVariables.map((variable) => [variable.value, variable.key]));
-  const loginRequests = items.filter((item) => {
-    try { return metadata(item).operationId === 'login'; } catch { return false; }
-  });
-  const seededLoginRequests = loginRequests.filter((item) => {
-    const usernameVariable = item.request.body?.raw?.match(/"username"\s*:\s*"\{\{([^}]+)\}\}"/u)?.[1];
-    return usernameVariableByValue.has(usernameVariables.find((variable) => variable.key === usernameVariable)?.value);
-  });
-  const seededLoginUsernames = seededLoginRequests.map((item) => {
-    const usernameVariable = item.request.body.raw.match(/"username"\s*:\s*"\{\{([^}]+)\}\}"/u)?.[1];
-    return usernameVariables.find((variable) => variable.key === usernameVariable)?.value;
-  });
-
-  const primaryFlowAccounts = ['admin', 'campaign_mgr', 'citizen1', 'citizen2', 'coord1', 'coord_regional', 'dist1', 'intake1', 'ops_mgr', 'reviewer1', 'vol_leader1'];
-  assert.deepEqual([...new Set(seededLoginUsernames)].sort(), primaryFlowAccounts.sort(), 'each authenticated seed flow uses its primary seeded account');
-
-  const authenticatedFlows = new Map([
-    ['01 · Công dân · tự gửi SOS (SELF)', 'citizenSeedUsername'],
-    ['02 · Công dân · gửi thay người thân (PROXY)', 'proxyCitizenSeedUsername'],
-    ['03 · Người quyên góp · khai báo và theo dõi', 'citizenSeedUsername'],
-    ['04 · Điều phối viên (COORDINATOR)', 'coordinatorSeedUsername'],
-    ['05 · Quản lý chiến dịch (CAMPAIGN_MANAGER)', 'campaignManagerSeedUsername'],
-    ['06 · Quản lý vận hành (OPERATIONS_MANAGER)', 'operationsManagerSeedUsername'],
-    ['07 · Nhân viên tiếp nhận (INTAKE_STAFF)', 'intakeSeedUsername'],
-    ['08 · Người duyệt độc lập (REVIEWER)', 'reviewerSeedUsername'],
-    ['09 · Nhân viên phân phối (DISTRIBUTION_STAFF)', 'distributionSeedUsername'],
-    ['10 · Tình nguyện viên (VOLUNTEER)', 'volunteerSeedUsername'],
-    ['11 · Quản trị hệ thống (ADMIN)', 'adminSeedUsername'],
+test('guest evidence folder uploads the fixture with tracking capability and downloads its signed URL', () => {
+  const evidence = folder('Ảnh chứng cứ SOS khách');
+  assert.deepEqual(evidence.map((item) => meta(item).operationId), [
+    'createSelfRequest', 'uploadRequestEvidence', 'getRequestEvidenceDownloadUrl', 'downloadSignedEvidenceObject',
   ]);
-  for (const [flowName, usernameVariable] of authenticatedFlows) {
-    const flow = collection.item.find((entry) => entry.name === flowName);
-    assert.ok(flow, `authenticated flow ${flowName} exists`);
-    const guide = flow.item?.find((entry) => entry.name.startsWith('00 · Luồng gợi ý'));
-    assert.ok(guide, `${flowName} has a login guide`);
-    const flowLogins = guide.item?.filter((entry) => {
-      try { return metadata(entry).operationId === 'login' && JSON.parse(entry.request.body.raw).client_kind === 'NATIVE'; } catch { return false; }
-    }) || [];
-    assert.equal(flowLogins.length, 1, `${flowName} has exactly one Native login`);
-    assert.equal(guide.item[0], flowLogins[0], `${flowName} starts with its login`);
-    assert.match(flowLogins[0].request.body.raw, new RegExp(`"username"\\s*:\\s*"\\{\\{${usernameVariable}\\}\\}"`, 'u'));
-    assert.ok(metadata(flowLogins[0]).tokenTarget, `${flowName} stores its own access token`);
-    assert.ok(metadata(flowLogins[0]).refreshTokenTarget, `${flowName} stores its own refresh token`);
+  const [create, upload, signedUrl, fetchImage] = evidence;
+  assert.equal(create.protocolProfileBehavior?.disableCookies, true);
+  assert.ok(script(create, 'test').includes("collectionVariables.set('trackingSecret'"));
+  assert.equal(upload.request.body.mode, 'formdata');
+  const file = upload.request.body.formdata.find((field) => field.key === 'file');
+  assert.equal(file?.type, 'file');
+  assert.equal(file?.src, 'postman/fixtures/c48-evidence-demo.png');
+  assert.equal(file?.contentType, 'image/png');
+  const uploadHeaders = Object.fromEntries(upload.request.header.map(({ key, value }) => [key, value]));
+  assert.equal(uploadHeaders['X-Tracking-Code'], '{{trackingCode}}');
+  assert.equal(uploadHeaders['X-Tracking-Secret'], '{{trackingSecret}}');
+  assert.ok(uploadHeaders['Idempotency-Key']);
+  assert.ok(!upload.request.header.some(({ key }) => ['Authorization', 'Cookie', 'Origin', 'X-CSRF-Token'].includes(key)));
+  assert.equal(upload.protocolProfileBehavior?.disableCookies, true);
+  assert.ok(script(upload, 'test').includes("collectionVariables.set('evidenceId'"));
+  assert.ok(script(signedUrl, 'test').includes("collectionVariables.set('signedEvidenceUrl'"));
+  assert.equal(fetchImage.request.url, '{{signedEvidenceUrl}}');
+  assert.ok(!fetchImage.request.header.some(({ key }) => ['Authorization', 'Cookie', 'Origin'].includes(key)));
+  assert.ok(script(fetchImage, 'test').includes('image/png'));
+  assert.equal(collection.variable.find((variable) => variable.key === 'evidenceId')?.value, '');
+  assert.equal(collection.variable.find((variable) => variable.key === 'signedEvidenceUrl')?.value, '');
+  const fixture = readFileSync(new URL('../../postman/fixtures/c48-evidence-demo.png', import.meta.url));
+  assert.deepEqual([...fixture.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+
+  const runner = sandbox();
+  runner.send(create, { id: 'sos-a', tracking_code: 'ABC1234567', review_lane: 'NORMAL' }, 201);
+  assert.equal(runner.values.get('requestId'), 'sos-a');
+  assert.equal(runner.values.get('trackingSecret'), 'q'.repeat(43));
+  runner.send(upload, { id: 'evidence-a', state: 'READY', detected_mime: 'image/png', size_bytes: 68, checksum: 'a'.repeat(64) }, 201);
+  assert.equal(runner.values.get('evidenceId'), 'evidence-a');
+  runner.send(signedUrl, { url: 'http://localhost:8080/c48-response-evidence/evidence-a?X-Amz-Signature=demo', expires_in: 60 }, 200);
+  assert.equal(runner.values.get('signedEvidenceUrl'), 'http://localhost:8080/c48-response-evidence/evidence-a?X-Amz-Signature=demo');
+  runner.send(fetchImage, {}, 200, { 'Content-Type': 'image/png', 'Content-Length': '68' });
+  assert.equal(runner.failures.length, 0);
+  assert.equal(runner.next, null);
+});
+test('path ID variables are discovered earlier in every runnable folder', () => {
+  for (const section of collection.item) {
+    const available = new Set();
+    for (const item of flatten(section)) {
+      for (const [, key] of JSON.stringify(item.request).matchAll(/\{\{([^}]+Id)\}\}/gu)) {
+        const declared = collection.variable.find((variable) => variable.key === key);
+        assert.ok(declared, `${section.name}: undeclared ${key}`);
+        assert.ok(String(declared.value ?? '').trim() || available.has(key), `${section.name}: ${key} needs an earlier request`);
+      }
+      for (const [, key] of script(item, 'test').matchAll(/pm\.collectionVariables\.set\(['"]([^'"]+)['"]/gu)) available.add(key);
+    }
   }
-
-  const nativeLoginRequests = loginRequests.filter((item) => JSON.parse(item.request.body.raw).client_kind === 'NATIVE');
-  const targets = nativeLoginRequests.map(metadata);
-  assert.equal(new Set(targets.map((entry) => entry.tokenTarget)).size, targets.length, 'access tokens are isolated per login flow');
-  assert.equal(new Set(targets.map((entry) => entry.refreshTokenTarget)).size, targets.length, 'refresh tokens are isolated per login flow');
-  for (const target of targets) {
-    assert.ok(collection.variable.some((variable) => variable.key === target.tokenTarget), `${target.tokenTarget} exists`);
-    assert.ok(collection.variable.some((variable) => variable.key === target.refreshTokenTarget), `${target.refreshTokenTarget} exists`);
+});
+test('seed IDs come from GET requests and login requests have credentials', () => {
+  const discover = (operationId, variable) => {
+    const item = all.find((request) => meta(request).operationId === operationId && request.request.method === 'GET' &&
+      script(request, 'test').includes(`collectionVariables.set('${variable}'`));
+    assert.ok(item, `GET ${operationId} must populate ${variable}`);
+  };
+  discover('listIdentityOrganizations', 'intakeOrganizationId');
+  discover('listRequestQueue', 'requestId');
+  discover('logisticsDrivesPublicList', 'donationDriveId');
+  discover('logisticsDrivesPublicList', 'donationItemId');
+  discover('logisticsDrivesList', 'donationWarehouseId');
+  for (const key of ['intakeOrganizationId', 'donationDriveId', 'donationItemId', 'donationWarehouseId']) {
+    assert.equal(collection.variable.find((variable) => variable.key === key)?.value, '', `${key} must not be hardcoded`);
   }
+  assert.ok(String(collection.variable.find((variable) => variable.key === 'seedPassword')?.value).length >= 10);
+  const logins = all.filter((item) => meta(item).operationId === 'login');
+  assert.ok(logins.length > 0);
+  for (const item of logins) {
+    const body = JSON.parse(item.request.body.raw);
+    assert.ok(String(body.username ?? '').trim(), `${item.name}: missing username`);
+    assert.ok(String(body.password ?? '').trim(), `${item.name}: missing password`);
+    assert.equal(body.client_kind, 'NATIVE');
+  }
+});
+test('GET setup requests populate organization, AI SOS and donation IDs from API results', () => {
+  const cases = [
+    ['listIdentityOrganizations', 'intakeOrganizationId',
+      { items: [{ id: 'org-id', name: 'Trung tâm điều phối C48 (demo)', status: 'ACTIVE' }] }, 'org-id'],
+    ['listRequestQueue', 'requestId',
+      { items: [{ id: 'request-id', tracking_code: 'C48DEM0009', status: 'SUBMITTED' }] }, 'request-id'],
+    ['logisticsDrivesPublicList', 'donationDriveId',
+      { items: [{ id: 'drive-id', title: 'Quyên góp nhu yếu phẩm cho vùng ngập Demo A', status: 'OPEN',
+        items: [{ item_id: 'item-id', item_name: 'Gạo' }] }] }, 'drive-id'],
+    ['logisticsDrivesPublicList', 'donationItemId',
+      { items: [{ id: 'drive-id', title: 'Quyên góp nhu yếu phẩm cho vùng ngập Demo A', status: 'OPEN',
+        items: [{ item_id: 'item-id', item_name: 'Gạo' }] }] }, 'item-id'],
+    ['logisticsDrivesList', 'donationWarehouseId',
+      { items: [{ intake_warehouse_id: 'warehouse-id', title: 'Quyên góp nhu yếu phẩm cho vùng ngập Demo A', status: 'OPEN' }] }, 'warehouse-id'],
+  ];
+  for (const [operationId, variable, response, expected] of cases) {
+    const request = all.find((item) => meta(item).operationId === operationId &&
+      script(item, 'test').includes(`collectionVariables.set('${variable}'`));
+    assert.ok(request, `GET ${operationId} populates ${variable}`);
+    const result = sandbox({ activeAccessToken: 'test-token', seedPassword: 'test-password' });
+    result.send(request, response, 200);
+    assert.equal(result.skipped, false, `${variable} lookup must be runnable`);
+    assert.deepEqual(result.failures, []);
+    assert.equal(result.values.get(variable), expected);
+  }
+});
+function sandbox(initial = {}) {
+  const values = new Map(collection.variable.map(({ key, value }) => [key, value]));
+  Object.entries(initial).forEach(([key, value]) => values.set(key, value));
+  const local = new Map();
+  const output = { next: undefined, skipped: false, failures: [], values };
+  const variables = {
+    get: (key) => local.has(key) ? local.get(key) : values.get(key),
+    set: (key, value) => local.set(key, value),
+    unset: (key) => local.delete(key),
+    replaceIn: (value) => value.replace(/\{\{([^}]+)\}\}/gu, (_, key) => key === '$guid' ? '12345678-1234-4234-8234-123456789abc' : key === '$isoTimestamp' ? new Date().toISOString() : String(variables.get(key) ?? '')),
+  };
+  const pm = {
+    variables, collectionVariables: { get: (key) => values.get(key), set: (key, value) => values.set(key, value), unset: (key) => values.delete(key) },
+    execution: { setNextRequest: (value) => { output.next = value; }, skipRequest: () => { output.skipped = true; } },
+    cookies: { toObject: () => ({}), jar: () => ({ clear: (_url, callback) => callback(null) }) },
+    expect: (value) => ({ to: { eql: (expected) => assert.deepEqual(value, expected) } }),
+    test: (name, callback) => { try { callback(); } catch (error) { output.failures.push({ name, error }); } },
+    info: {},
+  };
+  const cryptoJs = { lib: { WordArray: { random: () => ({}) } }, enc: { Base64: { stringify: () => 'q'.repeat(43) } } };
+  const context = vm.createContext({ pm, console: { warn() {}, log() {} }, setTimeout: (callback) => callback(), require: (name) => { assert.equal(name, 'crypto-js'); return cryptoJs; } });
+  output.send = (item, body = {}, code = meta(item).expectedStatus, responseHeaders = {}) => {
+    output.next = undefined; output.skipped = false; local.clear();
+    const headers = new Map(item.request.header.map(({ key, value }) => [key, value]));
+    pm.info.requestId = item.id; pm.info.requestName = item.name;
+    pm.request = { ...item.request, url: { toString: () => item.request.url }, headers: { get: (key) => headers.get(key), remove: (key) => headers.delete(key) } };
+    for (const owner of [collection, item]) vm.runInContext(script(owner, 'prerequest'), context);
+    output.body = item.request.body?.raw ? JSON.parse(variables.replaceIn(item.request.body.raw)) : undefined;
+    if (!output.skipped) {
+      pm.response = {
+        code,
+        json: () => body,
+        text: () => JSON.stringify(body),
+        headers: { get: (name) => responseHeaders[Object.keys(responseHeaders).find((key) => key.toLowerCase() === name.toLowerCase())] ?? null },
+        to: { have: { status: (expected) => assert.equal(code, expected) } },
+      };
+      for (const owner of [collection, item]) vm.runInContext(script(owner, 'test'), context);
+    }
+    return output;
+  };
+  return output;
+}
 
-  const googleLogin = metadata(operation('identityAuthGoogleLogin'));
-  assert.equal(googleLogin.tokenTarget, 'googleCitizenAccessToken');
-  assert.equal(googleLogin.refreshTokenTarget, 'googleCitizenRefreshToken');
-
-  const webFlow = collection.item[0].item.find((item) => item.name.startsWith('05 · Phiên WEB · cookie và CSRF'));
-  assert.ok(webFlow, 'WEB cookie flow exists');
-  const webCsrfIndex = webFlow.item.findIndex((item) => item.name.includes('bắt đầu phiên WEB'));
-  const webLoginIndex = webFlow.item.findIndex((item) => item.name === 'POST /auth/login · phiên WEB');
-  const webRefreshIndex = webFlow.item.findIndex((item) => item.name.includes('session WEB'));
-  assert.ok(webCsrfIndex >= 0 && webCsrfIndex < webLoginIndex && webLoginIndex < webRefreshIndex, 'WEB flow runs CSRF, login, then refresh');
-  assert.equal(JSON.parse(webFlow.item[webLoginIndex].request.body.raw).client_kind, 'WEB');
-  assert.equal(webFlow.variable.find((variable) => variable.key === 'clientKind')?.value, 'WEB');
+test('main scenario explicitly changes actors and finishes the rescue before resolving', () => {
+  const operations = main.map((item) => meta(item).operationId);
+  assert.deepEqual(operations, [
+    'login', 'listIdentityOrganizations', 'createIdentityUser', 'createIdentityUserGrant', 'login', 'createSelfRequest', 'trackSelfRequest', 'supplementSelfRequest',
+    'login', 'getStaffRequestDetail', 'startRequestVerification', 'recordRequestContactAttempt', 'verifyRequest', 'triageRequest',
+    'responseTeamsCreate', 'createMissionOffer', 'login', 'acceptMission', 'transitionMission', 'transitionMission', 'transitionMission',
+    'login', 'getStaffRequestDetail', 'responseRequestResolutionResolve', 'responseRequestResolutionOperation', 'login', 'trackSelfRequest',
+  ]);
+  assert.deepEqual(main.filter((item) => meta(item).operationId === 'transitionMission').map((item) => JSON.parse(item.request.body.raw.replace('{{missionVersion}}', '1')).to), ['EN_ROUTE', 'ON_SCENE', 'COMPLETED']);
+  assert.ok(op(main, 'transitionMission', 2).request.body.raw.includes('outcome_note'));
 });
 
-test('Identity demo seeds assign unique verified emails and active account flags', () => {
-  assert.match(seedSql, /INSERT INTO app_user \(id, username, display_name, email, email_verified_at, password_hash, status, must_change_password\)/u);
-  assert.match(seedSql, /v\.username \|\| '\+' \|\| substr\(md5\(pg_temp\.u\(v\.suffix\)::text\), 1, 10\) \|\| '@example\.test'/u);
-  assert.match(seedSql, /now\(\), :'seed_password_hash', 'ACTIVE', true/u);
-  assert.match(expansionIdentitySql, /UPDATE app_user AS account[\s\S]*email_verified_at = COALESCE\([\s\S]*status = 'ACTIVE'[\s\S]*must_change_password = true/u);
-  assert.match(expansionIdentitySql, /INSERT INTO app_user \(id, username, display_name, email, email_verified_at, password_hash, status, must_change_password\)/u);
-  assert.match(expansionIdentitySql, /'@example\.test'/u);
+test('login boundaries use explicit credentials and clear a failed actor switch', () => {
+  const runner = sandbox({ activeAccessToken: 'previous' });
+  runner.send(op(main, 'login'), { access_token: 'admin-token', refresh_token: 'refresh' });
+  assert.equal(runner.values.get('activeAccessToken'), 'admin-token');
+  assert.equal(runner.body.username, 'admin');
+  runner.send(op(main, 'login', 1), { code: 'INVALID_CREDENTIALS' }, 401);
+  assert.equal(runner.values.get('activeAccessToken'), undefined);
+  assert.equal(runner.next, null);
+  assert.equal(runner.failures.length, 1);
+});
+
+test('SOS creation commits its generated capability only on success; detail never selects another ID', () => {
+  const runner = sandbox({ activeAccessToken: 'citizen', requestId: 'old', trackingSecret: 'old-secret' });
+  const create = op(main, 'createSelfRequest');
+  runner.send(create, { code: 'VALIDATION_FAILED' }, 400);
+  assert.equal(runner.values.get('requestId'), 'old');
+  assert.equal(runner.values.get('trackingSecret'), 'old-secret');
+  runner.send(create, { id: 'sos-a', tracking_code: 'ABC1234567', review_lane: 'NORMAL' });
+  assert.equal(runner.values.get('requestId'), 'sos-a');
+  assert.equal(runner.values.get('trackingSecret'), 'q'.repeat(43));
+  runner.send(op(main, 'getStaffRequestDetail'), { id: 'sos-a', version: 4, organization_id: 'org', region_code: 'DEMO_A' });
+  assert.equal(runner.values.get('requestVersion'), '4');
+  assert.equal(runner.values.get('requestId'), 'sos-a');
+  runner.send(op(main, 'getStaffRequestDetail'), { id: 'unrelated', version: 99 });
+  assert.equal(runner.values.get('requestId'), 'sos-a');
+  assert.equal(runner.values.get('requestVersion'), '4');
+  assert.equal(runner.next, null);
+});
+
+test('contact response captures contact ID without replacing SOS ID and preserves its current version', () => {
+  const runner = sandbox({ activeAccessToken: 'coord', requestId: 'sos-a' });
+  runner.send(op(main, 'recordRequestContactAttempt'), { id: 'contact-a', version: 6 });
+  assert.equal(runner.values.get('requestId'), 'sos-a');
+  assert.equal(runner.values.get('contactAttemptId'), 'contact-a');
+  assert.equal(runner.values.get('requestVersion'), '6');
+});
+
+test('resolution polling is bounded, checks success, and final tracking stops before optional folders', () => {
+  const poll = op(main, 'responseRequestResolutionOperation');
+  const runner = sandbox({ activeAccessToken: 'coord', requestId: 'sos-a', operationId: 'operation-a', operationPollCount: '0', pollLimit: '3' });
+  runner.send(poll, { state: 'PENDING', request_id: 'sos-a' });
+  assert.equal(runner.next, poll.id);
+  runner.send(poll, { state: 'PENDING', request_id: 'sos-a' });
+  assert.equal(runner.next, poll.id);
+  runner.send(poll, { state: 'PENDING', request_id: 'sos-a' });
+  assert.equal(runner.next, null);
+  assert.equal(runner.failures.length, 1);
+  const success = sandbox({ activeAccessToken: 'coord', requestId: 'sos-a', operationId: 'operation-a' });
+  success.send(poll, { state: 'COMPLETED', request_id: 'sos-a', request_status: 'RESOLVED' });
+  assert.equal(success.failures.length, 0);
+  success.send(main.at(-1), { id: 'sos-a', version: 10, status: 'RESOLVED' });
+  assert.equal(success.next, null);
+});
+
+test('donation optional scenario conserves counts and reviews current revisions before posting', () => {
+  const donation = folder('Quyên góp');
+  const operations = donation.map((item) => meta(item).operationId);
+  assert.ok(operations.indexOf('logisticsDonationReceiptsReview') < operations.indexOf('logisticsDonationReceiptsPost'));
+  const runner = sandbox({ activeAccessToken: 'intake', donationReceiptId: 'receipt-a', donationItemId: 'rice', receiptVersion: '2' });
+  runner.send(op(donation, 'logisticsDonationReceiptsCount'), { id: 'receipt-a', version: 3, count: { revision: 4, declaration_revision: 5 } });
+  const line = runner.body.lines[0];
+  assert.equal(Number(line.counted_quantity), Number(line.accepted_quantity) + Number(line.held_quantity) + Number(line.rejected_quantity));
+  runner.send(op(donation, 'logisticsDonationReceiptsReview'), { id: 'receipt-a', version: 4 });
+  assert.equal(runner.body.count_revision, 4);
+  assert.equal(runner.body.declaration_revision, 5);
+  assert.ok(!all.some((item) => /distributions|stock\/adjustments|review-loss/u.test(item.request.url)));
+});
+
+test('AI optional polling terminates on unavailable output without changing manual priority', () => {
+  const ai = folder('AI'); const detail = op(ai, 'getStaffRequestDetail');
+  for (const status of ['FAILED', 'SKIPPED', 'STALE', 'UNKNOWN']) {
+    const runner = sandbox({ activeAccessToken: 'coord', requestId: 'sos-a', pollLimit: '2' });
+    runner.send(detail, { id: 'sos-a', version: 8, priority: 'P2', ai_advisory: { id: 'advisory-a', status } });
+    assert.equal(runner.next, null, `${status} is terminal and must not be polled again`);
+    assert.equal(runner.values.get('requestId'), 'sos-a');
+    assert.equal(runner.values.get('requestVersion'), '8');
+  }
+  const pending = sandbox({ activeAccessToken: 'coord', requestId: 'sos-a', pollLimit: '2' });
+  pending.send(detail, { id: 'sos-a', version: 8, ai_advisory: { id: 'advisory-a', status: 'QUEUED' } });
+  assert.equal(pending.next, detail.id);
+  pending.send(detail, { id: 'sos-a', version: 8, ai_advisory: { id: 'advisory-a', status: 'QUEUED' } });
+  assert.equal(pending.next, null);
+  assert.equal(pending.failures.length, 0);
+  assert.ok(op(ai, 'responseRequestOperationsReviewAiAdvisory').request.body.raw.includes('{{requestVersion}}'));
+});
+
+test('duplicate and guest recovery use distinct source IDs and purpose-specific recovery data', () => {
+  const duplicates = folder('Trùng');
+  const runner = sandbox({ activeAccessToken: 'citizen' });
+  runner.send(op(duplicates, 'createSelfRequest'), { id: 'canonical-a', tracking_code: 'CAN1234567', review_lane: 'NORMAL' });
+  runner.send(op(duplicates, 'createSelfRequest', 1), { id: 'source-b', tracking_code: 'SRC1234567', review_lane: 'NORMAL' });
+  assert.equal(runner.values.get('canonicalRequestId'), 'canonical-a');
+  assert.equal(runner.values.get('duplicateRequestId'), 'source-b');
+  const recovery = folder('Khôi phục');
+  const guestCreation = op(recovery, 'createSelfRequest');
+  assert.equal(guestCreation.protocolProfileBehavior?.disableCookies, true);
+  assert.ok(!guestCreation.request.header.some(({ key }) => ['Authorization', 'Cookie', 'Origin', 'X-CSRF-Token'].includes(key)));
+  runner.values.set('requestId', 'guest-a'); runner.values.set('requestVersion', '3'); runner.values.set('contactAttemptId', 'contact-a');
+  runner.send(op(recovery, 'issueRequestRecoveryCode'), { recovery_code: 'recovery-a' });
+  assert.equal(runner.body.contact_attempt_id, 'contact-a');
+  assert.equal(runner.values.get('requestRecoveryCode'), 'recovery-a');
+  assert.equal(runner.values.get('requestId'), 'guest-a');
+});
+
+test('all scenarios contain public ingress routes and stop at their own end', () => {
+  assert.ok(all.length < 100);
+  for (const item of all) {
+    const requestUrl = typeof item.request.url === 'string' ? item.request.url : item.request.url.raw;
+    if (requestUrl !== '{{signedEvidenceUrl}}') assert.match(requestUrl, /^\{\{(?:identity|response|logistics)BaseUrl\}\}/u);
+    assert.doesNotMatch(requestUrl, /\/internal|\/health/u);
+    assert.ok(meta(item).operationId);
+  }
+  for (const scenario of collection.item) assert.ok(script(flatten(scenario).at(-1), 'test').includes('setNextRequest(null)'));
+});
+
+test('complete main script chain carries actor tokens, IDs and versions without missing inputs', () => {
+  const runner = sandbox(); let version = 1; let missionVersion = 1; let detailCalls = 0;
+  const responses = {
+    listIdentityOrganizations: () => ({ items: [{ id: 'intake-org-a', name: 'Trung tâm điều phối C48 (demo)', status: 'ACTIVE' }] }),
+    createIdentityUser: () => ({ id: 'leader-a' }), createIdentityUserGrant: () => ({ id: 'grant-a' }),
+    createSelfRequest: () => ({ id: 'sos-a', tracking_code: 'ABC1234567', review_lane: 'NORMAL' }),
+    trackSelfRequest: () => ({ id: 'sos-a', version, status: version === 10 ? 'RESOLVED' : 'SUBMITTED' }),
+    supplementSelfRequest: () => ({ id: 'sos-a', version: ++version }),
+    getStaffRequestDetail: () => ({ id: 'sos-a', version: ++detailCalls === 1 ? version : (version = 9), region_code: 'DEMO_A' }),
+    startRequestVerification: () => ({ id: 'sos-a', version: ++version }),
+    recordRequestContactAttempt: () => ({ id: 'contact-a', version: ++version }),
+    verifyRequest: () => ({ id: 'sos-a', version: ++version }), triageRequest: () => ({ id: 'sos-a', version: ++version }),
+    responseTeamsCreate: () => ({ id: 'team-a' }),
+    createMissionOffer: () => ({ id: 'mission-a', request_id: 'sos-a', version: missionVersion }),
+    acceptMission: () => ({ id: 'mission-a', version: ++missionVersion }), transitionMission: () => ({ id: 'mission-a', version: ++missionVersion }),
+    responseRequestResolutionResolve: () => ({ operation_id: 'operation-a' }),
+    responseRequestResolutionOperation: () => { version = 10; return { state: 'COMPLETED', request_id: 'sos-a', request_status: 'RESOLVED' }; },
+  };
+  const actors = []; let actor = '';
+  for (const item of main) {
+    const operation = meta(item).operationId;
+    const response = operation === 'login' ? { access_token: `token-${actors.length}`, refresh_token: 'refresh' } : responses[operation]();
+    runner.send(item, response);
+    assert.equal(runner.skipped, false, item.name);
+    assert.equal(runner.failures.length, 0, item.name + ': ' + runner.failures.map(({ error }) => error.message).join(', '));
+    if (operation === 'login') { actor = runner.body.username; actors.push(actor); }
+    if (operation === 'createIdentityUser') assert.equal(runner.body.organization_id, runner.values.get('intakeOrganizationId'));
+    if (operation === 'responseTeamsCreate') {
+      assert.equal(runner.body.leader_user_id, 'leader-a');
+      assert.equal(runner.body.organization_id, runner.values.get('intakeOrganizationId'));
+    }
+    if (operation === 'responseRequestResolutionResolve') assert.equal(runner.body.expected_version, 9);
+    if (operation === 'transitionMission') assert.equal(actor, runner.values.get('demoLeaderUsername'));
+    if (item !== main.at(-1)) assert.notEqual(runner.next, null, item.name);
+  }
+  assert.deepEqual(actors, ['admin', 'citizen1', 'coord1', runner.values.get('demoLeaderUsername'), 'coord1', 'citizen1']);
+  assert.equal(runner.next, null);
+});
+
+test('PROXY captures the actual event_id contract for independent concurrence', () => {
+  assert.equal(JSON.parse(op(folder('PROXY'), 'login').request.body.raw).username, 'citizen3');
+  const runner = sandbox({ activeAccessToken: 'coord2', requestId: 'proxy-a', requestVersion: '4' });
+  runner.send(op(folder('PROXY'), 'concurRequestVerification'), { id: 'proxy-a', version: 5, event_id: 'concurrence-a' });
+  assert.equal(runner.failures.length, 0);
+  assert.equal(runner.values.get('concurrenceEventId'), 'concurrence-a');
+  assert.equal(runner.values.get('requestVersion'), '5');
+});
+
+test('AI review needs a deliberately supplied human decision', () => {
+  assert.equal(collection.variable.find(({ key }) => key === 'aiReviewDecision').value, '');
+  const ai = folder('AI');
+  const detail = op(ai, 'getStaffRequestDetail');
+  const review = op(ai, 'responseRequestOperationsReviewAiAdvisory');
+  const noDecision = sandbox({ activeAccessToken: 'coord', requestId: 'sos-a' });
+  noDecision.send(detail, { id: 'sos-a', version: 8, ai_advisory: { id: 'advisory-a', status: 'COMPLETED' } });
+  assert.equal(noDecision.next, null);
+
+  const runner = sandbox({ activeAccessToken: 'coord', requestId: 'sos-a', aiReviewDecision: 'ACCEPTED' });
+  runner.send(detail, { id: 'sos-a', version: 8, ai_advisory: { id: 'advisory-a', status: 'COMPLETED' } });
+  assert.equal(runner.next, review.id);
+  assert.equal(runner.values.get('requestVersion'), '8');
+  assert.equal(runner.values.get('advisoryId'), 'advisory-a');
+  runner.send(review, { request_id: 'sos-a', advisory_id: 'advisory-a', decision: 'ACCEPTED' });
+  assert.equal(runner.skipped, false);
+  assert.equal(runner.body.expected_version, 8);
+  assert.equal(runner.body.decision, 'ACCEPTED');
+  assert.equal(runner.next, null);
+  assert.equal(runner.failures.length, 0);
 });

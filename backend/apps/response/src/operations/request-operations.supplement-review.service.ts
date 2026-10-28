@@ -1,3 +1,4 @@
+import { assessmentFields, enqueueAiAdvisory } from '../ai/ai-advisory-input';
 import { Injectable } from '@nestjs/common';
 import type { Request } from 'express';
 import type { EntityManager } from 'typeorm';
@@ -85,6 +86,9 @@ export class RequestOperationsSupplementReviewService {
             dto.decision === 'ACCEPT' && Object.hasOwn(reported, 'needs_relief_supplies'), reported.needs_relief_supplies ?? false],
         ) as [Array<{ status: string; version: number; verification_revision: string | null }>, number];
         if (!updated[0]) checkVersion(Number(row.version), dto.expected_version);
+        if (dto.decision === 'ACCEPT' && assessmentFields.some((field) => Object.hasOwn(reported, field))) {
+          await enqueueAiAdvisory(manager, row.id);
+        }
         await this.persistence.notifyReporter(manager, row.reporter_user_id, row.id, Number(updated[0]!.version), 'SUPPLEMENT_REVIEWED', `SUPPLEMENT_${dto.decision}`);
         return { status: 200, value: { id: row.id, status: updated[0]!.status, version: Number(updated[0]!.version), decision: dto.decision, event_id: reviewId, verification_revision: updated[0]!.verification_revision }, resource: { type: 'request_event', id: reviewId } };
       },

@@ -1,0 +1,47 @@
+{
+  "fixture_id": "af2",
+  "model": "gemini-3.1-flash-lite",
+  "prompt_version": "v3",
+  "schema_version": "v3",
+  "input": {
+    "incident_category_code": "TRAPPED",
+    "description": "",
+    "people_affected": 3,
+    "children_count": 1,
+    "elderly_count": 1,
+    "reporter_declared_danger": true,
+    "needs_rescue": true,
+    "needs_relief_supplies": true
+  },
+  "extracted_json": {
+    "summary": "Nhóm 3 người bao gồm 1 trẻ em và 1 người cao tuổi đang bị mắc kẹt, cần cứu hộ và cứu trợ khẩn cấp.",
+    "indicators": [
+      "TRAPPED",
+      "needs_rescue",
+      "needs_relief_supplies",
+      "children_count",
+      "elderly_count"
+    ],
+    "facts": {
+      "children_count": 1,
+      "elderly_count": 1,
+      "life_threat": false,
+      "needs_relief_supplies": true,
+      "needs_rescue": true,
+      "people_affected": 3
+    },
+    "priority_score": 85,
+    "priority_reasons": [
+      "Đối tượng dễ bị tổn thương bao gồm trẻ em và người cao tuổi",
+      "Tình trạng mắc kẹt yêu cầu cứu hộ khẩn cấp",
+      "Số lượng người bị ảnh hưởng là 3",
+      "Yêu cầu cứu trợ khẩn cấp về nhu yếu phẩm"
+    ],
+    "confidence": 0.9
+  },
+  "provenance": {
+    "source": "single Gemini generateContent response",
+    "requested_at": "2026-10-27T13:10:30.064Z",
+    "data_classification": "synthetic"
+  }
+}
