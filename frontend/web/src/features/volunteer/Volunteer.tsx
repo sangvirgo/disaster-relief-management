@@ -960,13 +960,18 @@ export function Volunteer({ page }: { page: string }) {
                       {(
                         missionDetail.timeline.items as Array<{
                           id?: string;
-                          event_type: string;
+                          to_status: string;
+                          outcome_note?: string | null;
+                          reason?: string | null;
                           occurred_at: string;
                         }>
                       ).map((entry, idx) => (
                         <p className="timeline-item" key={entry.id || idx}>
-                          <strong>{label(entry.event_type)}</strong> ·{' '}
+                          <strong>{label(entry.to_status)}</strong> ·{' '}
                           {timeLabel(entry.occurred_at)}
+                          {(entry.outcome_note || entry.reason) && (
+                            <> · {entry.outcome_note || entry.reason}</>
+                          )}
                         </p>
                       ))}
                     </div>
