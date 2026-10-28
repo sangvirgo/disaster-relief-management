@@ -1304,44 +1304,45 @@ function App() {
   return (
     <div className="shell">
       <aside className={`sidebar ${menuOpen ? 'open' : ''}`} aria-label="Điều hướng chính">
-        <div className="brand">
-          <span className="brand-mark">
-            <img src="/reliva-logo.png" alt="" aria-hidden="true" />
-          </span>
-          <div>
-            <strong>Reliva</strong>
-            <small>CHUNG TAY CỨU TRỢ</small>
+        <div className="sidebar-content">
+          <div className="brand">
+            <span className="brand-mark">
+              <img src="/reliva-logo.png" alt="" aria-hidden="true" />
+            </span>
+            <div>
+              <strong>Reliva</strong>
+              <small>CHUNG TAY CỨU TRỢ</small>
+            </div>
           </div>
+
+          <p className="nav-label">Xem theo vai trò</p>
+          <div className="workspace-switch" role="group" aria-label="Chọn vai trò">
+            {workspaces.map((item) => (
+              <button
+                key={item}
+                className={workspace === item ? 'active' : ''}
+                onClick={() => changeWorkspace(item)}
+              >
+                {workspaceLabels[item]}
+              </button>
+            ))}
+          </div>
+
+          <p className="nav-label">Chức năng</p>
+          <nav>
+            {navigation.map((page) => (
+              <button
+                key={page.id}
+                className={`nav-item ${page.id === selected.id ? 'active' : ''}`}
+                onClick={() => changePage(page.id)}
+                aria-current={page.id === selected.id ? 'page' : undefined}
+              >
+                {icon(page.icon)}
+                <span>{page.title}</span>
+              </button>
+            ))}
+          </nav>
         </div>
-
-        <p className="nav-label">Xem theo vai trò</p>
-        <div className="workspace-switch" role="group" aria-label="Chọn vai trò">
-          {workspaces.map((item) => (
-            <button
-              key={item}
-              className={workspace === item ? 'active' : ''}
-              onClick={() => changeWorkspace(item)}
-            >
-              {workspaceLabels[item]}
-            </button>
-          ))}
-        </div>
-
-        <p className="nav-label">Chức năng</p>
-        <nav>
-          {navigation.map((page) => (
-            <button
-              key={page.id}
-              className={`nav-item ${page.id === selected.id ? 'active' : ''}`}
-              onClick={() => changePage(page.id)}
-              aria-current={page.id === selected.id ? 'page' : undefined}
-            >
-              {icon(page.icon)}
-              <span>{page.title}</span>
-            </button>
-          ))}
-        </nav>
-
       </aside>
 
       <div className="main">
