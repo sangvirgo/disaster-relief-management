@@ -6,6 +6,7 @@ import {
   RequestTrackingDetail,
   MyRequestItem,
   Mission,
+  MissionDetail,
   MissionStatus,
   RescueTeam,
   RescueTeamDetail,
@@ -14,6 +15,11 @@ import {
   EvidenceDownload,
   CollectionPage,
   PublicCampaign,
+  NoticeItem,
+  TeamMemberItem,
+  TeamSkillOption,
+  TeamMemberCandidate,
+  TeamMembersPage,
 } from '../types/api';
 import { generateUUID } from '../utils/secureStore';
 
@@ -176,7 +182,7 @@ export const ResponseApi = {
 
     const response = await apiClient.post(`/response/requests/${requestId}/evidence`, formData, {
       headers,
-      timeout: 60000,
+      timeout: 120000,
     });
     return response.data;
   },
@@ -192,8 +198,8 @@ export const ResponseApi = {
   },
 
   // Chi tiết nhiệm vụ cứu nạn
-  async getMissionDetail(missionId: string): Promise<Mission> {
-    const response = await apiClient.get<Mission>(`/response/missions/${missionId}`);
+  async getMissionDetail(missionId: string): Promise<MissionDetail> {
+    const response = await apiClient.get<MissionDetail>(`/response/missions/${missionId}`);
     return response.data;
   },
 
@@ -274,6 +280,7 @@ export const ResponseApi = {
 
     const response = await apiClient.post(`/response/missions/${missionId}/evidence`, formData, {
       headers,
+      timeout: 120000,
     });
     return response.data;
   },
@@ -285,6 +292,11 @@ export const ResponseApi = {
     const response = await apiClient.get<CollectionPage<RescueTeam>>('/response/teams', {
       params: { limit, ...(cursor ? { cursor } : {}) },
     });
+    return response.data;
+  },
+
+  async getTeamSkills(): Promise<{ items: TeamSkillOption[] }> {
+    const response = await apiClient.get<{ items: TeamSkillOption[] }>('/response/skills');
     return response.data;
   },
 
@@ -308,8 +320,8 @@ export const ResponseApi = {
     expectedVersion: number,
     availability: 'AVAILABLE' | 'UNAVAILABLE',
     idempotencyKey?: string
-  ): Promise<void> {
-    await apiClient.patch(
+  ): Promise<RescueTeamDetail> {
+    const response = await apiClient.patch<RescueTeamDetail>(
       `/response/teams/${teamId}`,
       {
         expected_version: expectedVersion,
@@ -321,21 +333,21 @@ export const ResponseApi = {
         },
       }
     );
+    return response.data;
   },
 
-  async confirmTeamReadiness(
+  async updateTeamProfile(
     teamId: string,
     expectedVersion: number,
-    confirmationBasis: 'RADIO' | 'PHONE' | 'IN_PERSON' | 'OTHER',
-    reportedBy?: string,
-    idempotencyKey = generateUUID()
-  ): Promise<void> {
-    await apiClient.post(`/response/teams/${teamId}/ready`, {
-      expected_version: expectedVersion,
-      confirmation_basis: confirmationBasis,
-      ...(reportedBy?.trim() ? { reported_by: reportedBy.trim() } : {}),
-      occurred_at: new Date().toISOString(),
-    }, { headers: { 'Idempotency-Key': idempotencyKey } });
+    patch: { name?: string; skill_codes?: string[] },
+    idempotencyKey?: string,
+  ): Promise<RescueTeamDetail> {
+    const response = await apiClient.patch<RescueTeamDetail>(
+      `/response/teams/${teamId}`,
+      { expected_version: expectedVersion, ...patch },
+      { headers: { 'Idempotency-Key': idempotencyKey || generateUUID() } },
+    );
+    return response.data;
   },
 
   // === THÔNG BÁO ĐIỀU PHỐI (NOTICES) & CHIẾN DỊCH (CAMPAIGNS) ===
@@ -345,11 +357,11 @@ export const ResponseApi = {
     unread?: boolean,
     limit = 50,
     cursor?: string
-  ): Promise<{ items: any[]; more: boolean; cursor?: string }> {
+  ): Promise<{ items: NoticeItem[]; more: boolean; cursor?: string }> {
     const params: Record<string, any> = { limit };
     if (unread !== undefined) params.unread = unread ? 'true' : 'false';
     if (cursor) params.cursor = cursor;
-    const response = await apiClient.get<{ items: any[]; more: boolean; cursor?: string }>(
+    const response = await apiClient.get<{ items: NoticeItem[]; more: boolean; cursor?: string }>(
       '/response/notices',
       { params }
     );
@@ -423,5 +435,60 @@ export const ResponseApi = {
   async getTeamDetail(teamId: string): Promise<RescueTeamDetail> {
     const response = await apiClient.get<RescueTeamDetail>(`/response/teams/${teamId}`);
     return response.data;
+  },
+
+  async getTeamMembers(teamId: string, limit = 50, cursor?: string): Promise<TeamMembersPage> {
+    const response = await apiClient.get<TeamMembersPage>(`/response/teams/${teamId}/members`, {
+      params: { limit, ...(cursor ? { cursor } : {}) },
+    });
+    return response.data;
+  },
+
+  async searchTeamMemberCandidates(
+    teamId: string,
+    query: string,
+    limit = 50,
+    cursor?: string
+  ): Promise<CollectionPage<TeamMemberCandidate>> {
+    const response = await apiClient.get<CollectionPage<TeamMemberCandidate>>(
+      `/response/teams/${teamId}/member-candidates`,
+      { params: { query, limit, ...(cursor ? { cursor } : {}) } }
+    );
+    return response.data;
+  },
+
+  // Đội trưởng thêm thành viên bằng tài khoản đã tìm thấy (POST /response/teams/:id/members).
+  async addTeamMember(
+    teamId: string,
+    userId: string,
+    idempotencyKey?: string
+  ): Promise<TeamMemberItem> {
+    const response = await apiClient.post<TeamMemberItem>(
+      `/response/teams/${teamId}/members`,
+      { user_id: userId.trim() },
+      {
+        headers: {
+          'Idempotency-Key': idempotencyKey || generateUUID(),
+        },
+      }
+    );
+    return response.data;
+  },
+
+  // Đội trưởng xóa thành viên khỏi đội (POST /response/teams/:id/members/:user_id/remove)
+  async removeTeamMember(
+    teamId: string,
+    userId: string,
+    idempotencyKey?: string
+  ): Promise<void> {
+    await apiClient.post(
+      `/response/teams/${teamId}/members/${userId.trim()}/remove`,
+      {},
+      {
+        headers: {
+          'Idempotency-Key': idempotencyKey || generateUUID(),
+        },
+      }
+    );
   },
 };

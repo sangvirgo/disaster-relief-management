@@ -96,13 +96,12 @@ export class RequestOperationsVerificationService {
         if (row.status !== 'VERIFYING') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         if (await hasPendingSupplement(manager, row.id)) throw new AppError('PENDING_SUPPLEMENT_REVIEW', { status: 409 });
         const attemptRows = await manager.query('SELECT id,outcome FROM contact_attempt WHERE request_id=$1', [row.id]) as Array<{ id: string; outcome: string }>;
-        if (!attemptRows.length && !reason) throw new AppError('NO_CONTACT_ATTEMPT', { status: 409 });
         const refs = await validateSourceRefs(manager, row, dto.source_refs, session);
         if (dto.basis === 'CONTACT_CONFIRMED' && !refs.attempts.some((attempt) => attempt.outcome === 'REACHED') && !attemptRows.some((attempt) => attempt.outcome === 'REACHED')) {
           throw new AppError('VERIFICATION_BASIS_REQUIRED', { status: 400 });
         }
         if (dto.basis === 'CORROBORATED' && !refs.requests.length && !sourceNote) throw new AppError('VERIFICATION_BASIS_REQUIRED', { status: 400 });
-        if (dto.basis === 'EVIDENCE_REVIEWED' && !refs.evidence.length) throw new AppError('VERIFICATION_BASIS_REQUIRED', { status: 400 });
+        if (dto.basis === 'EVIDENCE_REVIEWED' && !refs.evidence.length && !reason) throw new AppError('VERIFICATION_BASIS_REQUIRED', { status: 400 });
         let concurringUserId: string | null = null;
         if (dto.basis === 'TWO_COORDINATOR_JUDGMENT') {
           if (!reason || !dto.concurrence_event_id) throw new AppError('SECOND_COORDINATOR_REQUIRED', { status: 409 });

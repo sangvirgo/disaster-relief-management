@@ -80,6 +80,12 @@ const codeMessages: Record<string, string> = {
   STORAGE_UNAVAILABLE: 'Dịch vụ lưu trữ tạm thời không khả dụng. Hồ sơ vẫn được giữ nguyên.',
   CURSOR_INVALID: 'Danh sách đã thay đổi. Vui lòng tải lại từ đầu.',
   NOT_FOUND: 'Không tìm thấy dữ liệu hoặc thông tin tra cứu chưa chính xác.',
+  USER_IN_OTHER_TEAM: 'Người dùng này hiện đã tham gia một đội cứu hộ khác.',
+  LEADER_REQUIRED: 'Đội cứu hộ bắt buộc phải có đội trưởng.',
+  TEAM_BUSY: 'Đội cứu hộ đang bận xử lý một nhiệm vụ khác.',
+  TEAM_NOT_ELIGIBLE: 'Đội cứu hộ chưa đủ điều kiện hoặc thiếu kỹ năng cần thiết cho nhiệm vụ này.',
+  MISSION_NOT_LEADER: 'Chỉ đội trưởng đang hoạt động mới có quyền thực hiện thao tác này.',
+  RECOVERY_CODE_INVALID: 'Mã khôi phục không chính xác hoặc đã hết hạn.',
 };
 
 const statusMessages: Record<number, string> = {
@@ -200,7 +206,6 @@ apiClient.interceptors.response.use(
     try {
       const refreshResponse = await axios.post(`${API_BASE_URL}/identity/auth/refresh`, {
         refresh_token: refreshToken,
-        client_kind: 'NATIVE',
       }, { timeout: 15000, headers: { Accept: 'application/json' } });
 
       const { access_token, refresh_token: newRefreshToken } = refreshResponse.data;

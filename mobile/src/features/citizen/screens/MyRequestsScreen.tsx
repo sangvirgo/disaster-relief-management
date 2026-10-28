@@ -14,11 +14,14 @@ import {
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { FormFieldError } from '../../../components/common/FormFieldError';
+import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { ResponseApi } from '../../../api/responseApi';
 import { getApiErrorMessage } from '../../../api/client';
 import { MyRequestItem } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
+import { getTrackingCodeError, getTrackingSecretError, isValidTrackingCode, isValidTrackingSecret } from '../../../utils/formValidation';
 import {
   ClipboardList,
   ChevronRight,
@@ -34,23 +37,37 @@ export const MyRequestsScreen: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<string | undefined>();
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Modal gắn yêu cầu ẩn danh vào tài khoản
   const [showClaimModal, setShowClaimModal] = useState<boolean>(false);
   const [claimTrackingCode, setClaimTrackingCode] = useState<string>('');
   const [claimSecret, setClaimSecret] = useState<string>('');
+  const [claimErrors, setClaimErrors] = useState<Record<string, string | undefined>>({});
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
 
-  const fetchMyRequests = useCallback(async () => {
+  const fetchMyRequests = useCallback(async (nextCursor?: string, append = false, retainContent = false) => {
     setErrorMsg(null);
+    if (append) setLoadingMore(true);
+    else if (!retainContent) setLoading(true);
     try {
-      const result = await ResponseApi.getMyRequests();
-      setItems(result.items || []);
+      const result = await ResponseApi.getMyRequests(50, nextCursor);
+      setItems((current) => append
+        ? [...current, ...result.items.filter((item) => !current.some((existing) => existing.id === item.id))]
+        : result.items || []);
+      setCursor(result.cursor);
+      setHasMore(result.more);
     } catch (err: any) {
-      setErrorMsg(getApiErrorMessage(err, 'Không thể tải danh sách yêu cầu. Vui lòng thử lại.'));
+      const message = getApiErrorMessage(err, 'Không thể tải danh sách yêu cầu. Vui lòng thử lại.');
+      if (append) Alert.alert('Không thể tải thêm yêu cầu', message);
+      else if (retainContent) Alert.alert('Không thể cập nhật danh sách', message);
+      else setErrorMsg(message);
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
   }, []);
 
@@ -62,15 +79,26 @@ export const MyRequestsScreen: React.FC = () => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchMyRequests();
+    fetchMyRequests(undefined, false, true);
+  };
+
+  const loadMoreRequests = () => {
+    if (!loadingMore && hasMore && cursor) {
+      void fetchMyRequests(cursor, true);
+    }
   };
 
   const handleClaim = async () => {
     const code = claimTrackingCode.trim().toUpperCase();
     const secret = claimSecret.trim();
 
-    if (!code || !secret) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập cả mã tra cứu và chuỗi bí mật.');
+    const errors: Record<string, string> = {};
+    if (!code) errors.trackingCode = 'Vui lòng nhập mã tra cứu.';
+    else if (!isValidTrackingCode(code)) errors.trackingCode = 'Mã tra cứu phải gồm đúng 10 ký tự hợp lệ.';
+    if (!secret) errors.secret = 'Vui lòng nhập chuỗi bí mật.';
+    else if (!isValidTrackingSecret(secret)) errors.secret = 'Chuỗi bí mật phải gồm đúng 43 ký tự hợp lệ.';
+    setClaimErrors(errors);
+    if (Object.keys(errors).length > 0) {
       return;
     }
 
@@ -83,14 +111,18 @@ export const MyRequestsScreen: React.FC = () => {
       );
       setClaimTrackingCode('');
       setClaimSecret('');
+      setClaimErrors({});
       setShowClaimModal(false);
-      fetchMyRequests();
+      fetchMyRequests(undefined, false, true);
     } catch (err: any) {
       Alert.alert('Lỗi', getApiErrorMessage(err, 'Không thể gắn yêu cầu. Vui lòng kiểm tra lại mã và bí mật.'));
     } finally {
       setIsClaiming(false);
     }
   };
+
+  const claimDisabled = isClaiming || claimTrackingCode.length > 10 || claimSecret.length > 43 ||
+    !isValidTrackingCode(claimTrackingCode) || !isValidTrackingSecret(claimSecret);
 
   const renderItem = ({ item }: { item: MyRequestItem }) => {
     const formattedDate = new Date(item.received_at).toLocaleString('vi-VN', {
@@ -143,7 +175,10 @@ export const MyRequestsScreen: React.FC = () => {
       {/* Nút gắn yêu cầu ẩn danh vào tài khoản */}
       <TouchableOpacity
         style={styles.claimButton}
-        onPress={() => setShowClaimModal(true)}
+        onPress={() => {
+          setClaimErrors({});
+          setShowClaimModal(true);
+        }}
         activeOpacity={0.8}
       >
         <Link2 size={18} color={THEME.colors.primary.main} style={{ marginRight: 8 }} />
@@ -159,7 +194,7 @@ export const MyRequestsScreen: React.FC = () => {
         <View style={styles.centerContainer}>
           <AlertCircle size={44} color={THEME.colors.emergency.main} />
           <Text style={styles.errorText}>{errorMsg}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchMyRequests}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => void fetchMyRequests()}>
             <Text style={styles.retryText}>Thử lại</Text>
           </TouchableOpacity>
         </View>
@@ -192,6 +227,13 @@ export const MyRequestsScreen: React.FC = () => {
           }
           contentContainerStyle={{ paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
+          ListFooterComponent={hasMore ? (
+            <TouchableOpacity style={styles.loadMoreButton} onPress={loadMoreRequests} disabled={loadingMore || !cursor}>
+              {loadingMore
+                ? <ActivityIndicator size="small" color={THEME.colors.primary.main} />
+                : <Text style={styles.loadMoreText}>Tải thêm yêu cầu</Text>}
+            </TouchableOpacity>
+          ) : undefined}
         />
       )}
 
@@ -205,27 +247,61 @@ export const MyRequestsScreen: React.FC = () => {
             </Text>
 
             <View style={styles.modalInputGroup}>
-              <Text style={styles.modalInputLabel}>Mã tra cứu (Tracking Code):</Text>
+              <Text style={styles.modalInputLabel}>Mã tra cứu <RequiredAsterisk /></Text>
               <TextInput
                 style={styles.modalTextInput}
                 placeholder="Ví dụ: 9K8J7H6G5F"
                 placeholderTextColor={THEME.colors.text.muted}
                 value={claimTrackingCode}
-                onChangeText={setClaimTrackingCode}
+                onChangeText={(value) => {
+                  setClaimTrackingCode(value.toUpperCase());
+                  setClaimErrors((current) => ({
+                    ...current,
+                    trackingCode: getTrackingCodeError(value),
+                  }));
+                }}
+                onBlur={() => {
+                  setClaimErrors((current) => ({
+                    ...current,
+                    trackingCode: !claimTrackingCode.trim()
+                      ? 'Mã tra cứu là bắt buộc.'
+                      : getTrackingCodeError(claimTrackingCode),
+                  }));
+                }}
                 autoCapitalize="characters"
+                maxLength={11}
               />
+              <FormFieldError message={claimErrors.trackingCode} />
             </View>
 
             <View style={styles.modalInputGroup}>
-              <Text style={styles.modalInputLabel}>Chuỗi bí mật (Tracking Secret):</Text>
+              <Text style={styles.modalInputLabel}>Chuỗi bí mật <RequiredAsterisk /></Text>
               <TextInput
                 style={styles.modalTextInput}
                 placeholder="Nhập chuỗi bí mật gồm 43 ký tự..."
                 placeholderTextColor={THEME.colors.text.muted}
                 value={claimSecret}
-                onChangeText={setClaimSecret}
+                onChangeText={(value) => {
+                  setClaimSecret(value);
+                  setClaimErrors((current) => ({
+                    ...current,
+                    secret: getTrackingSecretError(value, 'Chuỗi bí mật'),
+                  }));
+                }}
+                onBlur={() => {
+                  setClaimErrors((current) => ({
+                    ...current,
+                    secret: !claimSecret.trim()
+                      ? 'Chuỗi bí mật là bắt buộc.'
+                      : getTrackingSecretError(claimSecret, 'Chuỗi bí mật'),
+                  }));
+                }}
                 autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={44}
+                secureTextEntry
               />
+              <FormFieldError message={claimErrors.secret} />
             </View>
 
             <View style={styles.modalButtonRow}>
@@ -237,9 +313,9 @@ export const MyRequestsScreen: React.FC = () => {
                 <Text style={styles.modalCancelText}>HỦY BỎ</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSubmitButton, isClaiming && { opacity: 0.6 }]}
+                style={[styles.modalSubmitButton, claimDisabled && { opacity: 0.6 }]}
                 onPress={handleClaim}
-                disabled={isClaiming}
+                disabled={claimDisabled}
               >
                 {isClaiming ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
@@ -271,6 +347,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: THEME.colors.primary.main,
+  },
+  loadMoreButton: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  loadMoreText: {
+    color: THEME.colors.primary.main,
+    fontSize: 13,
+    fontWeight: '700',
   },
   card: {
     backgroundColor: THEME.colors.surface.card,

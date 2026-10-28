@@ -14,6 +14,8 @@ import { useIdTokenAuthRequest } from 'expo-auth-session/providers/google';
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { FormFieldError } from '../../../components/common/FormFieldError';
+import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { useAuthStore } from '../../../store/authStore';
 import { getApiErrorMessage } from '../../../api/client';
 import { THEME } from '../../../constants/theme';
@@ -21,10 +23,11 @@ import { User, Lock, ArrowRight, Eye, EyeOff, UserPlus } from 'lucide-react-nati
 
 export const LoginScreen: React.FC = () => {
   const router = useRouter();
-  const { login, loginWithGoogle, isLoading, isVolunteerOrLeader } = useAuthStore();
+  const { login, loginWithGoogle, logout, isLoading, isVolunteerOrLeader } = useAuthStore();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [formErrors, setFormErrors] = useState<Record<string, string | undefined>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const googleClients = {
@@ -46,13 +49,36 @@ export const LoginScreen: React.FC = () => {
 
   const handleLogin = async () => {
     const trimmedUsername = username.trim();
-    if (!trimmedUsername || !password.trim()) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.');
+    const errors: Record<string, string> = {};
+    if (!trimmedUsername) errors.username = 'Vui lòng nhập tên đăng nhập.';
+    else if (trimmedUsername.length > 64) errors.username = 'Tên đăng nhập không được vượt quá 64 ký tự.';
+    if (!password) errors.password = 'Vui lòng nhập mật khẩu.';
+    else if (password.length > 256) errors.password = 'Mật khẩu không được vượt quá 256 ký tự.';
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
       return;
     }
 
     try {
       await login(trimmedUsername, password);
+      const authState = useAuthStore.getState();
+      if (authState.user?.must_change_password) {
+        router.replace('/change-password');
+        return;
+      }
+      if (!authState.isVolunteerOrLeader() && !authState.isCitizen()) {
+        try {
+          await logout();
+        } catch {
+          // The local session is cleared even when the server logout request fails.
+        }
+        Alert.alert(
+          'Vai trò chưa được hỗ trợ trên ứng dụng',
+          'Ứng dụng di động dành cho Công dân và Tình nguyện viên. Vui lòng sử dụng cổng điều phối trên Web cho vai trò này.'
+        );
+        router.replace('/login');
+        return;
+      }
       const isVolunteer = isVolunteerOrLeader();
       const currentUser = useAuthStore.getState().user;
       const displayName = currentUser?.display_name || trimmedUsername;
@@ -100,14 +126,31 @@ export const LoginScreen: React.FC = () => {
       const idToken = result.params.id_token;
       if (!idToken) throw new Error('Google chưa trả về mã định danh an toàn.');
       await loginWithGoogle(idToken);
-      if (isVolunteerOrLeader()) router.replace('/team');
-      else goBackOrHome(router);
+      const authState = useAuthStore.getState();
+      if (authState.user?.must_change_password) {
+        router.replace('/change-password');
+      } else if (authState.isVolunteerOrLeader()) router.replace('/team');
+      else if (authState.isCitizen()) goBackOrHome(router);
+      else {
+        try {
+          await logout();
+        } catch {
+          // The local session is cleared even when the server logout request fails.
+        }
+        Alert.alert(
+          'Vai trò chưa được hỗ trợ trên ứng dụng',
+          'Ứng dụng di động dành cho Công dân và Tình nguyện viên. Vui lòng sử dụng cổng điều phối trên Web cho vai trò này.'
+        );
+        router.replace('/login');
+      }
     } catch (err: unknown) {
       Alert.alert('Đăng nhập Google thất bại', getApiErrorMessage(err, 'Không thể đăng nhập bằng Google. Vui lòng thử lại.'));
     } finally {
       setGoogleBusy(false);
     }
   };
+
+  const loginDisabled = isLoading || !username.trim() || !password || username.length > 64 || password.length > 256;
 
   return (
     <ScreenContainer title="Đăng Nhập Hệ Thống" onBack={() => goBackOrHome(router)} scrollable={true}>
@@ -130,23 +173,34 @@ export const LoginScreen: React.FC = () => {
         <View style={styles.inputGroup}>
           <View style={styles.labelRow}>
             <User size={16} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Tên đăng nhập:</Text>
+            <Text style={styles.inputLabel}>Tên đăng nhập <RequiredAsterisk /></Text>
           </View>
           <TextInput
             style={styles.textInput}
             placeholder="Nhập tên đăng nhập..."
             placeholderTextColor={THEME.colors.text.muted}
             value={username}
-            onChangeText={setUsername}
+            onChangeText={(value) => {
+              setUsername(value);
+              setFormErrors((current) => ({
+                ...current,
+                username: value.length > 64 ? 'Tên đăng nhập không được vượt quá 64 ký tự.' : undefined,
+              }));
+            }}
+            onBlur={() => {
+              if (!username.trim()) setFormErrors((current) => ({ ...current, username: 'Tên đăng nhập là bắt buộc.' }));
+            }}
             autoCapitalize="none"
             autoCorrect={false}
+            maxLength={65}
           />
+          <FormFieldError message={formErrors.username} />
         </View>
 
         <View style={styles.inputGroup}>
           <View style={styles.labelRow}>
             <Lock size={16} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Mật khẩu:</Text>
+            <Text style={styles.inputLabel}>Mật khẩu <RequiredAsterisk /></Text>
           </View>
           <View style={styles.passwordContainer}>
             <TextInput
@@ -154,9 +208,19 @@ export const LoginScreen: React.FC = () => {
               placeholder="Nhập mật khẩu..."
               placeholderTextColor={THEME.colors.text.muted}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                setFormErrors((current) => ({
+                  ...current,
+                  password: value.length > 256 ? 'Mật khẩu không được vượt quá 256 ký tự.' : undefined,
+                }));
+              }}
+              onBlur={() => {
+                if (!password) setFormErrors((current) => ({ ...current, password: 'Mật khẩu là bắt buộc.' }));
+              }}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
+              maxLength={257}
             />
             <TouchableOpacity
               onPress={() => setShowPassword(!showPassword)}
@@ -170,12 +234,13 @@ export const LoginScreen: React.FC = () => {
               )}
             </TouchableOpacity>
           </View>
+          <FormFieldError message={formErrors.password} />
         </View>
 
         <TouchableOpacity
-          style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+          style={[styles.loginButton, loginDisabled && styles.loginButtonDisabled]}
           onPress={handleLogin}
-          disabled={isLoading}
+          disabled={loginDisabled}
           activeOpacity={0.85}
         >
           {isLoading ? (
@@ -213,7 +278,7 @@ export const LoginScreen: React.FC = () => {
       </View>
 
       <View style={styles.tipBox}>
-        <Text style={styles.tipHeader}>Gợi ý tài khoản kiểm thử (Backend thật):</Text>
+        <Text style={styles.tipHeader}>Gợi ý tài khoản kiểm thử (máy chủ thật):</Text>
         <Text style={styles.tipText}>
           • <Text style={{ fontWeight: '700' }}>Đội trưởng cứu hộ:</Text> <Text style={{ fontWeight: '700' }}>vol_leader1</Text> / Mật khẩu: <Text style={{ fontWeight: '700' }}>Password123!</Text>{'\n'}
           • <Text style={{ fontWeight: '700' }}>Thành viên cứu hộ:</Text> <Text style={{ fontWeight: '700' }}>vol_member1</Text> / Mật khẩu: <Text style={{ fontWeight: '700' }}>Password123!</Text>{'\n'}

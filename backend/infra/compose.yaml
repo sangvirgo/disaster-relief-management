@@ -207,7 +207,6 @@ services:
       GEMINI_API_KEY: '${GEMINI_API_KEY:-}'
       GEMINI_MODEL: '${GEMINI_MODEL:-gemini-3.5-flash-lite}'
       GEMINI_MAX_RETRIES: '${GEMINI_MAX_RETRIES:-3}'
-      GEMINI_INCLUDE_SYNTHETIC_DEMO_NARRATIVE: '${GEMINI_INCLUDE_SYNTHETIC_DEMO_NARRATIVE:-false}'
     ports:
       - '127.0.0.1:3002:3002'
     depends_on:
@@ -355,8 +354,9 @@ services:
         until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1 && mc ready local >/dev/null 2>&1; do sleep 2; done
         mc mb --ignore-existing local/c48-response-evidence
         mc mb --ignore-existing local/c48-logistics-evidence
-        mc admin user info local "$$S3_RESPONSE_ACCESS_KEY" >/dev/null 2>&1 || mc admin user add local "$$S3_RESPONSE_ACCESS_KEY" "$$S3_RESPONSE_SECRET_KEY"
-        mc admin user info local "$$S3_LOGISTICS_ACCESS_KEY" >/dev/null 2>&1 || mc admin user add local "$$S3_LOGISTICS_ACCESS_KEY" "$$S3_LOGISTICS_SECRET_KEY"
+        # Reapply credentials on every initialization so existing users stay in sync with backend/.env.
+        mc admin user add local "$$S3_RESPONSE_ACCESS_KEY" "$$S3_RESPONSE_SECRET_KEY"
+        mc admin user add local "$$S3_LOGISTICS_ACCESS_KEY" "$$S3_LOGISTICS_SECRET_KEY"
         mc admin policy info local c48-response-evidence >/dev/null 2>&1 || mc admin policy create local c48-response-evidence /policies/response-policy.json
         mc admin policy info local c48-logistics-evidence >/dev/null 2>&1 || mc admin policy create local c48-logistics-evidence /policies/logistics-policy.json
         mc admin policy attach local c48-response-evidence --user "$$S3_RESPONSE_ACCESS_KEY"

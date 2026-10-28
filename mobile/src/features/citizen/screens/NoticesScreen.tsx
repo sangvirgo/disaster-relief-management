@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { ResponseApi } from '../../../api/responseApi';
+import { getApiErrorMessage } from '../../../api/client';
 import { NoticeItem } from '../../../types/api';
 import { formatNoticeDisplay } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
@@ -26,28 +27,56 @@ export const NoticesScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [filterUnread, setFilterUnread] = useState<boolean>(false);
   const [selectedNotice, setSelectedNotice] = useState<NoticeItem | null>(null);
+  const [cursor, setCursor] = useState<string | undefined>();
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
-  const fetchNotices = useCallback(async () => {
+  const fetchNotices = useCallback(async (nextCursor?: string, append = false, retainContent = false) => {
+    setErrorMessage(null);
+    setLoadMoreError(null);
+    if (append) setLoadingMore(true);
+    else {
+      if (!retainContent) {
+        setCursor(undefined);
+        setLoading(true);
+        setNotices([]);
+      }
+    }
     try {
-      const res = await ResponseApi.getNotices(filterUnread ? true : undefined);
-      setNotices(res.items || []);
-    } catch (e) {
-      console.warn('Lỗi tải danh sách thông báo điều phối:', e);
+      const res = await ResponseApi.getNotices(filterUnread ? true : undefined, 50, nextCursor);
+      setNotices((current) => append
+        ? [...current, ...res.items.filter((item) => !current.some((existing) => existing.id === item.id))]
+        : res.items || []);
+      setCursor(res.cursor);
+      setHasMore(res.more);
+    } catch (error) {
+      const message = getApiErrorMessage(error, 'Không thể tải danh sách thông báo. Vui lòng thử lại.');
+      if (append) setLoadMoreError(message);
+      else setErrorMessage(message);
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
   }, [filterUnread]);
 
   useEffect(() => {
     // Initial loading is already true; this starts the initial request.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchNotices();
+    void fetchNotices();
   }, [fetchNotices]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchNotices();
+    void fetchNotices(undefined, false, true);
+  };
+
+  const loadMoreNotices = () => {
+    if (!loadingMore && hasMore && cursor) {
+      void fetchNotices(cursor, true);
+    }
   };
 
   const handleOpenNotice = async (notice: NoticeItem) => {
@@ -55,16 +84,34 @@ export const NoticesScreen: React.FC = () => {
     if (!notice.read_at) {
       try {
         await ResponseApi.markNoticeRead(notice.id);
-        setNotices((prev) =>
-          prev.map((n) => (n.id === notice.id ? { ...n, read_at: new Date().toISOString() } : n))
-        );
+        setNotices((prev) => filterUnread
+          ? prev.filter((item) => item.id !== notice.id)
+          : prev.map((item) => item.id === notice.id
+            ? { ...item, read_at: new Date().toISOString() }
+            : item));
       } catch (e) {
         console.warn('Lỗi đánh dấu đã đọc thông báo:', e);
       }
     }
   };
 
-  const unreadCount = notices.filter((n) => !n.read_at).length;
+  const loadMoreControl = hasMore || loadMoreError ? (
+    <View style={styles.loadMoreContainer}>
+      {loadMoreError ? <Text style={styles.loadMoreError}>{loadMoreError}</Text> : null}
+      {hasMore ? (
+        <TouchableOpacity
+          style={styles.loadMoreButton}
+          onPress={loadMoreNotices}
+          disabled={loadingMore || !cursor}
+          accessibilityRole="button"
+        >
+          {loadingMore
+            ? <ActivityIndicator size="small" color={THEME.colors.primary.main} />
+            : <Text style={styles.loadMoreText}>Tải thêm thông báo</Text>}
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  ) : null;
 
   return (
     <ScreenContainer
@@ -85,7 +132,7 @@ export const NoticesScreen: React.FC = () => {
           onPress={() => setFilterUnread(false)}
         >
           <Text style={[styles.filterText, !filterUnread && styles.filterTextActive]}>
-            Tất Cả ({notices.length})
+            Tất cả
           </Text>
         </TouchableOpacity>
 
@@ -94,7 +141,7 @@ export const NoticesScreen: React.FC = () => {
           onPress={() => setFilterUnread(true)}
         >
           <Text style={[styles.filterText, filterUnread && styles.filterTextActive]}>
-            Chưa Đọc {unreadCount > 0 ? `(${unreadCount})` : ''}
+            Chưa đọc
           </Text>
         </TouchableOpacity>
       </View>
@@ -105,6 +152,15 @@ export const NoticesScreen: React.FC = () => {
           <ActivityIndicator size="large" color={THEME.colors.primary.main} />
           <Text style={styles.loadingText}>Đang tải thông báo từ ban chỉ huy...</Text>
         </View>
+      ) : errorMessage && notices.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <AlertCircle size={48} color={THEME.colors.emergency.main} />
+          <Text style={styles.emptyTitle}>Không thể tải thông báo</Text>
+          <Text style={styles.emptySubtitle}>{errorMessage}</Text>
+          <TouchableOpacity style={styles.loadMoreButton} onPress={() => void fetchNotices()} accessibilityRole="button">
+            <Text style={styles.loadMoreText}>Thử tải lại</Text>
+          </TouchableOpacity>
+        </View>
       ) : notices.length === 0 ? (
         <View style={styles.emptyCard}>
           <Bell size={48} color={THEME.colors.text.muted} />
@@ -112,12 +168,14 @@ export const NoticesScreen: React.FC = () => {
           <Text style={styles.emptySubtitle}>
             Các lệnh điều động và cảnh báo thời tiết khẩn cấp sẽ hiển thị tại đây.
           </Text>
+          {loadMoreControl}
         </View>
       ) : (
         <ScrollView
           style={{ flex: 1 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
+          {errorMessage ? <Text style={styles.loadMoreError}>{errorMessage}</Text> : null}
           {notices.map((item) => {
             const isUnread = !item.read_at;
             const formatted = formatNoticeDisplay(item);
@@ -169,6 +227,7 @@ export const NoticesScreen: React.FC = () => {
               </TouchableOpacity>
             );
           })}
+          {loadMoreControl}
         </ScrollView>
       )}
 
@@ -224,6 +283,28 @@ export const NoticesScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  loadMoreContainer: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  loadMoreButton: {
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  loadMoreText: {
+    color: THEME.colors.primary.main,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  loadMoreError: {
+    color: THEME.colors.emergency.main,
+    fontSize: 13,
+    textAlign: 'center',
+    padding: 10,
+  },
   refreshBtn: {
     padding: 6,
   },

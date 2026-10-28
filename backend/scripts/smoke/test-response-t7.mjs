@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { activateEmailRegistration, withEmail } from './lib/email-registration.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -8,7 +9,7 @@ const responseUrl = process.env.C48_RESPONSE_BASE_URL;
 const identityUrl = process.env.C48_IDENTITY_BASE_URL;
 const responseDb = new Client({ connectionString: process.env.C48_RESPONSE_DATABASE_URL });
 const identityDb = new Client({ connectionString: process.env.C48_IDENTITY_DATABASE_URL });
-const organizationId = '40000000-0000-4000-8000-000000000004';
+const organizationId = process.env.DEMO_INTAKE_ORGANIZATION_ID ?? '40000000-0000-4000-8000-000000000004';
 const requestIds = [];
 let identityIpSequence = 1;
 
@@ -44,9 +45,10 @@ async function registerAndLogin(label, role = 'CITIZEN', scope = 'ORGANIZATION',
   };
   const sourceIp = identityIp();
   const registered = await call(identityUrl, 'auth/register', {
-    method: 'POST', body: credentials, headers: { 'Idempotency-Key': key(), 'X-Forwarded-For': sourceIp },
+    method: 'POST', body: withEmail(credentials), headers: { 'Idempotency-Key': key(), 'X-Forwarded-For': sourceIp },
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.value));
+  await activateEmailRegistration(identityDb, registered);
   const userId = registered.value.user.id;
   if (role === 'COORDINATOR') {
     await identityDb.query(
@@ -113,13 +115,17 @@ async function waitForRequestRowLockWaits(database, blockerPid, minimum) {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     const result = await database.query(
-      `SELECT count(*)::int AS count FROM pg_stat_activity
-        WHERE datname=current_database() AND pid<>$1 AND wait_event_type='Lock'
-          AND $1=ANY(pg_blocking_pids(pid))
-          AND query ILIKE '%FROM assistance_request WHERE id=$1 FOR UPDATE%'`,
+      // pg_locks is visible across roles; pg_stat_activity hides other roles' queries from the migrator login.
+      `SELECT count(DISTINCT pid)::int AS count FROM pg_locks
+        WHERE NOT granted AND pid<>$1 AND cardinality(pg_blocking_pids(pid))>0
+          AND database=(SELECT oid FROM pg_database WHERE datname=current_database())`,
       [blockerPid],
     );
-    if (result.rows[0].count >= minimum) return;
+    if (result.rows[0].count >= minimum) {
+      // The second command may queue behind the first rather than on the row lock, so give it time to arrive.
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      return;
+    }
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   assert.fail(`Timed out waiting for ${minimum} verification command(s) on the locked assistance_request row`);
@@ -193,18 +199,15 @@ try {
   assert.equal(started.value.status, 'VERIFYING');
   assert.equal(started.value.version, 2);
 
-  const noContact = await command(`requests/${self.id}/verify`, coordinator, { expected_version: 2, basis: 'CONTACT_CONFIRMED' });
-  assertVietnameseError(noContact, 409, 'NO_CONTACT_ATTEMPT');
-  const attempt = await command(`requests/${self.id}/contact-attempts`, coordinator, {
-    contact_target: 'REPORTER', outcome: 'REACHED', note: 'Đã xác nhận vị trí.',
-  });
-  assert.equal(attempt.status, 201, JSON.stringify(attempt.value));
-  assert.equal(attempt.value.outcome, 'REACHED');
+  const unreviewed = await command(`requests/${self.id}/verify`, coordinator, { expected_version: 2, basis: 'EVIDENCE_REVIEWED' });
+  assertVietnameseError(unreviewed, 400, 'VERIFICATION_BASIS_REQUIRED');
   const verified = await command(`requests/${self.id}/verify`, coordinator, {
-    expected_version: 3, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [attempt.value.id] },
+    expected_version: 2, basis: 'EVIDENCE_REVIEWED', reason: 'Đã đối chiếu vị trí, thông tin và hình ảnh được gắn cờ.',
   });
   assert.equal(verified.status, 200, JSON.stringify(verified.value));
   assert.equal(verified.value.status, 'VERIFIED');
+  const noContactRows = await responseDb.query('SELECT 1 FROM contact_attempt WHERE request_id=$1', [self.id]);
+  assert.equal(noContactRows.rowCount, 0, 'verification no longer requires a contact attempt');
   const snapshot = await responseDb.query(
     `SELECT r.verification_revision,e.event_type,e.payload,d.basis
        FROM assistance_request r JOIN request_event e ON e.id=r.verification_revision AND e.request_id=r.id
@@ -213,16 +216,12 @@ try {
   );
   assert.equal(snapshot.rowCount, 1);
   assert.equal(snapshot.rows[0].event_type, 'REQUEST_VERIFIED');
-  assert.equal(snapshot.rows[0].basis, 'CONTACT_CONFIRMED');
+  assert.equal(snapshot.rows[0].basis, 'EVIDENCE_REVIEWED');
   assert.equal(snapshot.rows[0].payload.approved_facts.description, 'Nước đang dâng trong nhà.');
 
   const concurrentVerificationRequest = await createRequest(reporter, 'SELF', selfBody([105.16, 15.16]));
   const concurrentVerificationStart = await command(`requests/${concurrentVerificationRequest.id}/start-verification`, coordinator, { expected_version: 1 });
   assert.equal(concurrentVerificationStart.status, 200, JSON.stringify(concurrentVerificationStart.value));
-  const concurrentVerificationAttempt = await command(`requests/${concurrentVerificationRequest.id}/contact-attempts`, coordinator, {
-    contact_target: 'REPORTER', outcome: 'REACHED', note: 'Đã xác nhận thông tin.',
-  });
-  assert.equal(concurrentVerificationAttempt.status, 201, JSON.stringify(concurrentVerificationAttempt.value));
   const lockDb = new Client({ connectionString: process.env.C48_RESPONSE_DATABASE_URL });
   await lockDb.connect();
   let transactionOpen = false;
@@ -235,13 +234,13 @@ try {
     const blockerPid = (await lockDb.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
     pendingVerificationRace = Promise.all([
       command(`requests/${concurrentVerificationRequest.id}/verify`, coordinator, {
-        expected_version: 3, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [concurrentVerificationAttempt.value.id] },
+        expected_version: 2, basis: 'EVIDENCE_REVIEWED', reason: 'Đã đối chiếu vị trí, thông tin và hình ảnh.',
       }),
       command(`requests/${concurrentVerificationRequest.id}/verify`, secondCoordinator, {
-        expected_version: 3, basis: 'CONTACT_CONFIRMED', source_refs: { contact_attempt_ids: [concurrentVerificationAttempt.value.id] },
+        expected_version: 2, basis: 'EVIDENCE_REVIEWED', reason: 'Đã đối chiếu vị trí, thông tin và hình ảnh.',
       }),
     ]);
-    await waitForRequestRowLockWaits(responseDb, blockerPid, 2);
+    await waitForRequestRowLockWaits(responseDb, blockerPid, 1);
     await lockDb.query('COMMIT');
     transactionOpen = false;
     verificationRace = await pendingVerificationRace;
@@ -255,7 +254,7 @@ try {
   assert.equal(verificationWinners.length, 1, JSON.stringify(verificationRace.map((result) => result.value)));
   assert.equal(verificationLosers.length, 1, JSON.stringify(verificationRace.map((result) => result.value)));
   assert.equal(verificationWinners[0].value.status, 'VERIFIED');
-  assert.equal(verificationWinners[0].value.version, 4);
+  assert.equal(verificationWinners[0].value.version, 3);
   assertVietnameseError(verificationLosers[0], 409, 'VERSION_CONFLICT');
   const concurrentVerificationState = await responseDb.query(
     `SELECT r.status,r.version::int AS version,
@@ -264,7 +263,7 @@ try {
        FROM assistance_request r WHERE r.id=$1`, [concurrentVerificationRequest.id],
   );
   assert.deepEqual(concurrentVerificationState.rows[0], {
-    status: 'VERIFIED', version: 4, decisions: 1, verification_events: 1,
+    status: 'VERIFIED', version: 3, decisions: 1, verification_events: 1,
   }, 'concurrent verification commits one decision and one event');
 
   const supplementRequest = await createRequest(reporter, 'SELF', selfBody([105.12, 15.12]));
@@ -452,12 +451,12 @@ try {
   assertVietnameseError(staleConcurrence, 409, 'SECOND_COORDINATOR_REQUIRED');
 
   const triaged = await command(`requests/${self.id}/triage`, coordinator, {
-    expected_version: 4, priority: 'P2', priority_basis: 'INCOMPLETE_INFO', reason: 'Cần hỗ trợ sớm.',
+    expected_version: 3, priority: 'P2', priority_basis: 'INCOMPLETE_INFO', reason: 'Cần hỗ trợ sớm.',
   });
   assert.equal(triaged.status, 200, JSON.stringify(triaged.value));
   assert.equal(triaged.value.status, 'TRIAGED');
   const lowerPriorityWithoutReason = await command(`requests/${self.id}/triage`, coordinator, {
-    expected_version: 5, priority: 'P3', priority_basis: 'INCOMPLETE_INFO', reason: '',
+    expected_version: 4, priority: 'P3', priority_basis: 'INCOMPLETE_INFO', reason: '',
   });
   assertVietnameseError(lowerPriorityWithoutReason, 400, 'REASON_REQUIRED');
 
@@ -543,7 +542,7 @@ try {
   assert.ok(notices.rows.every((notice) => Object.keys(notice.payload).every((field) => ['text_code', 'request_id'].includes(field))));
 
   const repeated = await command(`requests/${self.id}/triage`, coordinator, {
-    expected_version: 4, priority: 'P2', priority_basis: 'INCOMPLETE_INFO', reason: 'Cần hỗ trợ sớm.',
+    expected_version: 3, priority: 'P2', priority_basis: 'INCOMPLETE_INFO', reason: 'Cần hỗ trợ sớm.',
   }, triaged.idempotencyKey);
   assert.equal(repeated.status, 200);
   assert.equal(repeated.headers.get('idempotent-replay'), 'true');

@@ -8,26 +8,29 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { ResponseApi } from '../../../api/responseApi';
 import { getApiErrorMessage } from '../../../api/client';
 import { Mission } from '../../../types/api';
-import { INCIDENT_CATEGORIES } from '../../../constants/labels';
+import { INCIDENT_CATEGORIES, MISSION_KIND_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
-import { AlertTriangle, Users, MapPin, ChevronRight, Inbox } from 'lucide-react-native';
+import { getTeamRoleFromMissionView } from '../utils/teamMembershipRole';
+import { AlertTriangle, Users, ChevronRight, Inbox } from 'lucide-react-native';
 
 export const MissionListScreen: React.FC = () => {
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const initialTab = params.tab === 'ACTIVE' || params.tab === 'COMPLETED' ? params.tab : 'OFFERED';
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [hasMore, setHasMore] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'OFFERED' | 'ACTIVE' | 'COMPLETED'>('OFFERED');
+  const [activeTab, setActiveTab] = useState<'OFFERED' | 'ACTIVE' | 'COMPLETED'>(initialTab);
 
   const fetchMissions = async (nextCursor?: string, append = false) => {
     setErrorMessage(null);
@@ -59,17 +62,28 @@ export const MissionListScreen: React.FC = () => {
   });
 
   const renderMissionItem = ({ item }: { item: Mission }) => {
-    const categoryInfo = INCIDENT_CATEGORIES[item.category] || { label: 'Sự cố cứu hộ' };
+    const categoryInfo = INCIDENT_CATEGORIES[item.category ?? 'UNKNOWN'] || { label: 'Sự cố cứu hộ' };
+    const kindInfo = item.mission_kind ? MISSION_KIND_LABELS[item.mission_kind] : null;
 
     return (
       <TouchableOpacity
         style={styles.missionCard}
-        onPress={() => router.push({ pathname: '/mission-detail', params: { missionId: item.id } })}
+        onPress={() => router.push({
+          pathname: '/mission-detail',
+          params: { missionId: item.id, teamRole: getTeamRoleFromMissionView(item) },
+        })}
         activeOpacity={0.85}
       >
         <View style={styles.cardTopRow}>
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryText}>{categoryInfo.label}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, flex: 1, marginRight: 8 }}>
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>{categoryInfo.label}</Text>
+            </View>
+            {kindInfo && (
+              <View style={[styles.kindBadge, { backgroundColor: kindInfo.bg }]}>
+                <Text style={[styles.kindBadgeText, { color: kindInfo.color }]}>{kindInfo.label}</Text>
+              </View>
+            )}
           </View>
           <StatusBadge missionStatus={item.status} />
         </View>
@@ -90,15 +104,6 @@ export const MissionListScreen: React.FC = () => {
             <Users size={16} color={THEME.colors.text.secondary} />
             <Text style={styles.metaText}>
               {item.people_affected == null ? 'Chưa rõ số người' : `${item.people_affected} người`}
-            </Text>
-          </View>
-
-          <View style={styles.metaItem}>
-            <MapPin size={16} color={THEME.colors.primary.main} />
-            <Text style={styles.metaText}>
-              {item.distance_m != null && Number.isFinite(item.distance_m)
-                ? `${(item.distance_m / 1000).toFixed(1)} km`
-                : 'Chưa có khoảng cách'}
             </Text>
           </View>
 
@@ -248,6 +253,15 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: THEME.colors.surface.border,
+  },
+  kindBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  kindBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   categoryText: {
     fontSize: 11,

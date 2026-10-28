@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { activateEmailRegistration, withEmail } from './lib/email-registration.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -41,10 +42,11 @@ async function registerAndLogin(label) {
     password: `Proxy test password ${suffix}!`,
   };
   const registered = await call(identityUrl, 'auth/register', {
-    method: 'POST', body: credentials,
+    method: 'POST', body: withEmail(credentials),
     headers: { 'Idempotency-Key': key(), 'X-Forwarded-For': ip() },
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.value));
+  await activateEmailRegistration(identityDb, registered);
   const login = await call(identityUrl, 'auth/login', {
     method: 'POST', body: { username: credentials.username, password: credentials.password, client_kind: 'NATIVE' },
     headers: { 'X-Forwarded-For': ip() },

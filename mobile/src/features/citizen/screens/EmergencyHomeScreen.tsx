@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Modal, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { FormFieldError } from '../../../components/common/FormFieldError';
 import { SOSButton } from '../../../components/common/SOSButton';
 import { THEME } from '../../../constants/theme';
+import { getTrackingCodeError, isValidTrackingCode } from '../../../utils/formValidation';
 import { useAuthStore } from '../../../store/authStore';
 import { ResponseApi } from '../../../api/responseApi';
 import { NoticeItem } from '../../../types/api';
@@ -31,12 +33,20 @@ import {
 export const EmergencyHomeScreen: React.FC = () => {
   const router = useRouter();
   const [trackingCode, setTrackingCode] = useState('');
+  const [trackingCodeError, setTrackingCodeError] = useState<string | undefined>();
   const [notices, setNotices] = useState<NoticeItem[]>([]);
   const [selectedNotice, setSelectedNotice] = useState<NoticeItem | null>(null);
-  const { user, isAuthenticated, logout, getUserRoleName, isVolunteerOrLeader } = useAuthStore();
+  const {
+    user,
+    isAuthenticated,
+    logout,
+    getUserRoleName,
+    isCitizen,
+    isVolunteerOrLeader,
+  } = useAuthStore();
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !user?.must_change_password && (isCitizen() || isVolunteerOrLeader())) {
       ResponseApi.getNotices()
         .then((res) => {
           if (res?.items) {
@@ -45,7 +55,13 @@ export const EmergencyHomeScreen: React.FC = () => {
         })
         .catch(() => {});
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isCitizen, isVolunteerOrLeader, user?.must_change_password]);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.must_change_password) {
+      router.replace('/change-password');
+    }
+  }, [isAuthenticated, router, user?.must_change_password]);
 
   const handleOpenNotice = async (notice: NoticeItem) => {
     setSelectedNotice(notice);
@@ -62,11 +78,17 @@ export const EmergencyHomeScreen: React.FC = () => {
   };
 
   const handleTrackSubmit = () => {
-    if (!trackingCode.trim()) {
-      Alert.alert('Thông báo', 'Vui lòng nhập mã tra cứu cứu trợ.');
+    const code = trackingCode.trim().toUpperCase();
+    if (!code) {
+      setTrackingCodeError('Vui lòng nhập mã tra cứu cứu trợ.');
       return;
     }
-    router.push({ pathname: '/tracking', params: { trackingCode: trackingCode.trim().toUpperCase() } });
+    if (!isValidTrackingCode(code)) {
+      setTrackingCodeError('Mã tra cứu phải gồm đúng 10 ký tự hợp lệ.');
+      return;
+    }
+    setTrackingCodeError(undefined);
+    router.push({ pathname: '/tracking', params: { trackingCode: code } });
   };
 
   const handleLogout = () => {
@@ -86,6 +108,48 @@ export const EmergencyHomeScreen: React.FC = () => {
       ]
     );
   };
+
+  if (isAuthenticated && user?.must_change_password) {
+    return (
+      <ScreenContainer title="Đổi mật khẩu bắt buộc">
+        <View style={styles.accessNoticeCard}>
+          <KeyRound size={32} color={THEME.colors.warning.main} />
+          <Text style={styles.accessNoticeTitle}>Cần đổi mật khẩu trước khi tiếp tục</Text>
+          <Text style={styles.accessNoticeBody}>
+            Tài khoản này phải cập nhật mật khẩu để tiếp tục sử dụng các chức năng cứu trợ.
+          </Text>
+          <TouchableOpacity
+            style={styles.accessNoticeButton}
+            onPress={() => router.replace('/change-password')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.accessNoticeButtonText}>Đổi mật khẩu</Text>
+          </TouchableOpacity>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  if (isAuthenticated && !isCitizen() && !isVolunteerOrLeader()) {
+    return (
+      <ScreenContainer title="Ứng dụng di động Reliva">
+        <View style={styles.accessNoticeCard}>
+          <ShieldAlert size={32} color={THEME.colors.warning.main} />
+          <Text style={styles.accessNoticeTitle}>Vai trò này chưa được hỗ trợ trên ứng dụng</Text>
+          <Text style={styles.accessNoticeBody}>
+            Ứng dụng di động dành cho Công dân và Tình nguyện viên. {getUserRoleName()} vui lòng sử dụng cổng điều phối trên Web.
+          </Text>
+          <TouchableOpacity
+            style={styles.accessNoticeButton}
+            onPress={handleLogout}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.accessNoticeButtonText}>Đăng xuất</Text>
+          </TouchableOpacity>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer scrollable={true}>
@@ -186,7 +250,7 @@ export const EmergencyHomeScreen: React.FC = () => {
             >
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <KeyRound size={15} color={THEME.colors.text.secondary} style={{ marginRight: 6 }} />
-                <Text style={styles.changePassBarText}>Đổi mật khẩu</Text>
+                <Text style={styles.changePassBarText}>Đổi mật khẩu & Bảo mật</Text>
               </View>
               <ChevronRight size={15} color={THEME.colors.text.muted} />
             </TouchableOpacity>
@@ -317,24 +381,40 @@ export const EmergencyHomeScreen: React.FC = () => {
       {/* Tra cứu tiến độ cứu hộ nhanh bằng mã */}
       <View style={styles.trackingCard}>
         <Text style={styles.trackingTitle}>TRA CỨU TIẾN ĐỘ CỨU TRỢ</Text>
-        <Text style={styles.trackingDesc}>Nhập mã tra cứu (VD: SOS-7890) được cấp khi gửi yêu cầu:</Text>
+        <Text style={styles.trackingDesc}>
+          {isAuthenticated
+            ? 'Nhập mã tra cứu 10 ký tự được cấp khi gửi yêu cầu.'
+            : 'Khách vãng lai cần mã tra cứu và khóa bí mật. Trên thiết bị đã gửi SOS, ứng dụng sẽ tự dùng khóa đã lưu.'}
+        </Text>
         <View style={styles.searchRow}>
           <TextInput
             style={styles.searchInput}
-            placeholder="Nhập mã tra cứu cứu trợ..."
+            placeholder="Ví dụ: AB12CD34EF"
             placeholderTextColor={THEME.colors.text.muted}
             value={trackingCode}
-            onChangeText={setTrackingCode}
+            onChangeText={(value) => {
+              const normalized = value.toUpperCase();
+              setTrackingCode(normalized);
+              setTrackingCodeError(getTrackingCodeError(normalized));
+            }}
+            onBlur={() => {
+              setTrackingCodeError(!trackingCode.trim()
+                ? 'Mã tra cứu là bắt buộc.'
+                : getTrackingCodeError(trackingCode));
+            }}
             autoCapitalize="characters"
+            maxLength={11}
           />
           <TouchableOpacity
-            style={styles.searchButton}
+            style={[styles.searchButton, (trackingCode.length > 10 || !isValidTrackingCode(trackingCode)) && { opacity: 0.5 }]}
             onPress={handleTrackSubmit}
+            disabled={trackingCode.length > 10 || !isValidTrackingCode(trackingCode)}
             activeOpacity={0.8}
           >
             <Search size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
+        <FormFieldError message={trackingCodeError} />
       </View>
 
       {/* Truy cập nhanh các tính năng khác */}
@@ -359,10 +439,10 @@ export const EmergencyHomeScreen: React.FC = () => {
           <Text style={styles.quickAccessDesc}>Tiếp tế các điểm lũ</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
+        {(isVolunteerOrLeader() || !isAuthenticated) ? <TouchableOpacity
           style={styles.quickAccessCard}
           onPress={() => {
-            if (isAuthenticated && isVolunteerOrLeader()) {
+            if (isVolunteerOrLeader()) {
               router.push('/team');
             } else {
               router.push('/login');
@@ -372,12 +452,12 @@ export const EmergencyHomeScreen: React.FC = () => {
         >
           <ShieldAlert size={26} color={THEME.colors.warning.main} />
           <Text style={styles.quickAccessTitle}>
-            {isAuthenticated && isVolunteerOrLeader() ? 'Cứu Hộ & TNV' : 'Đội cứu hộ'}
+            {isAuthenticated ? 'Đội cứu hộ của tôi' : 'Đội cứu hộ'}
           </Text>
           <Text style={styles.quickAccessDesc}>
-            {isAuthenticated && isVolunteerOrLeader() ? 'Tác chiến & Hậu cần' : 'Đăng nhập tác chiến'}
+            {isAuthenticated ? 'Nhiệm vụ và hoạt động đội' : 'Đăng nhập để xem nhiệm vụ'}
           </Text>
-        </TouchableOpacity>
+        </TouchableOpacity> : null}
       </View>
 
       {/* Modal chi tiết thông báo điều phối */}
@@ -419,6 +499,43 @@ export const EmergencyHomeScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  accessNoticeCard: {
+    alignItems: 'center',
+    backgroundColor: THEME.colors.surface.card,
+    borderColor: THEME.colors.surface.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 28,
+    padding: 22,
+    ...THEME.shadows.sm,
+  },
+  accessNoticeTitle: {
+    color: THEME.colors.text.primary,
+    fontSize: THEME.typography.fontSizes.lg,
+    fontWeight: '800',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  accessNoticeBody: {
+    color: THEME.colors.text.secondary,
+    fontSize: THEME.typography.fontSizes.sm,
+    lineHeight: 20,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  accessNoticeButton: {
+    alignItems: 'center',
+    backgroundColor: THEME.colors.primary.main,
+    borderRadius: 10,
+    marginTop: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  accessNoticeButtonText: {
+    color: '#FFFFFF',
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '800',
+  },
   brandHeader: {
     flexDirection: 'row',
     alignItems: 'center',

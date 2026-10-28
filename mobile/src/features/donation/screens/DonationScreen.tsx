@@ -9,12 +9,15 @@ import {
   ActivityIndicator,
   Modal,
   Image,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { FormFieldError } from '../../../components/common/FormFieldError';
+import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
 import { LogisticsApi } from '../../../api/logisticsApi';
 import {
@@ -26,6 +29,7 @@ import { PendingDonationCommand, StorageService, generateUUID } from '../../../u
 import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { useAuthStore } from '../../../store/authStore';
 import { THEME } from '../../../constants/theme';
+import { getTrackingSecretError, isValidPhone, isValidTrackingSecret, normalizePhone } from '../../../utils/formValidation';
 import {
   HeartHandshake,
   Package,
@@ -45,6 +49,38 @@ import {
   MessageSquareWarning,
   BarChart3,
 } from 'lucide-react-native';
+
+const quantityError = (value: string): string | undefined => {
+  const quantity = value.trim();
+  if (value.length > 19) return 'Số lượng không được vượt quá 19 ký tự.';
+  if (!quantity) return undefined;
+  const match = /^(?:0|[1-9]\d*)(?:\.(\d+))?$/.exec(quantity);
+  if (!match || (match[1]?.length ?? 0) > 3 || quantity.split('.')[0]!.length > 15) {
+    return 'Nhập số lượng không âm, tối đa 15 chữ số nguyên và 3 chữ số thập phân.';
+  }
+  return undefined;
+};
+
+const isPositiveQuantity = (value: string): boolean => {
+  const quantity = value.trim();
+  return !quantityError(quantity) && /[1-9]/.test(quantity.replace('.', ''));
+};
+
+const isDonationUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim());
+const isPublicDonationCode = (value: string) => /^[0-9A-HJKMNP-TV-Z]{8,16}$/i.test(value.trim());
+const isValidDonationQuery = (value: string) => isDonationUuid(value) || isPublicDonationCode(value);
+const donationQueryError = (value: string) => {
+  const query = value.trim();
+  if (value.length > 36) return 'Mã tra cứu không được vượt quá 36 ký tự.';
+  if (!query) return undefined;
+  if (isDonationUuid(query)) return undefined;
+  if (value.length > 16) return 'Mã biên nhận không được vượt quá 16 ký tự, hoặc hãy nhập mã UUID đầy đủ.';
+  if (isPublicDonationCode(query)) return undefined;
+  if (query.length < 8) return 'Mã biên nhận phải có ít nhất 8 ký tự, hoặc hãy nhập mã UUID đầy đủ.';
+  return 'Mã biên nhận chứa ký tự không hợp lệ, hoặc hãy nhập mã UUID đầy đủ.';
+};
+const quantityFieldError = (value: string) => quantityError(value) ||
+  (value.trim() && !isPositiveQuantity(value) ? 'Số lượng phải lớn hơn 0.' : undefined);
 
 export const DonationScreen: React.FC = () => {
   const router = useRouter();
@@ -66,6 +102,7 @@ export const DonationScreen: React.FC = () => {
   const [donorName, setDonorName] = useState<string>('');
   const [donorPhone, setDonorPhone] = useState<string>('');
   const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [donationFormErrors, setDonationFormErrors] = useState<Record<string, string | undefined>>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [donationPhoto, setDonationPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [pendingDonationCommand, setPendingDonationCommand] = useState<PendingDonationCommand | null>(null);
@@ -84,6 +121,9 @@ export const DonationScreen: React.FC = () => {
   const [trackingLoading, setTrackingLoading] = useState<boolean>(false);
   const [trackingResult, setTrackingResult] = useState<DonationTrackingDetail | null>(null);
   const [trackingError, setTrackingError] = useState<string | null>(null);
+  const [trackingCodeError, setTrackingCodeError] = useState<string | undefined>();
+  const [trackingSecretError, setTrackingSecretError] = useState<string | undefined>();
+  const [donationRecoveryError, setDonationRecoveryError] = useState<string | undefined>();
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
   const [trackingCapabilityAvailable, setTrackingCapabilityAvailable] = useState<boolean>(false);
   const [claimedDonationIds, setClaimedDonationIds] = useState<string[]>([]);
@@ -91,11 +131,14 @@ export const DonationScreen: React.FC = () => {
   // Khiếu nại kiểm đếm
   const [showDisputeModal, setShowDisputeModal] = useState<boolean>(false);
   const [disputeReason, setDisputeReason] = useState<string>('');
+  const [disputeError, setDisputeError] = useState<string | undefined>();
   const [isSubmittingDispute, setIsSubmittingDispute] = useState<boolean>(false);
 
   // Báo cáo minh bạch quyên góp
   const [selectedReportDrive, setSelectedReportDrive] = useState<DonationDrive | null>(null);
   const [reportLoading, setReportLoading] = useState<boolean>(false);
+  const [reportLoadingMore, setReportLoadingMore] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
   const [reportData, setReportData] = useState<PublicDonationReportSummary | null>(null);
 
   // Xem ảnh phóng to
@@ -164,6 +207,7 @@ export const DonationScreen: React.FC = () => {
     }
     setSelectedDrive(drive);
     setQuantities({});
+    setDonationFormErrors({});
     setDonationPhoto(null);
   };
 
@@ -202,9 +246,15 @@ export const DonationScreen: React.FC = () => {
   };
 
   const handleQuantityChange = (itemId: string, text: string) => {
+    const nextQuantities = { ...quantities, [itemId]: text };
     setQuantities((prev) => ({
       ...prev,
       [itemId]: text,
+    }));
+    setDonationFormErrors((current) => ({
+      ...current,
+      [itemId]: quantityFieldError(text),
+      quantities: Object.values(nextQuantities).some(isPositiveQuantity) ? undefined : current.quantities,
     }));
   };
 
@@ -214,23 +264,20 @@ export const DonationScreen: React.FC = () => {
       Alert.alert('Đợt tiếp nhận đã dừng', 'Đợt quyên góp này hiện không nhận khai báo bàn giao mới.');
       return;
     }
-    const normalizedPhone = donorPhone.trim().replace(/[\s()-]/g, '');
-    if (!pendingDonationCommand && (!donorName.trim() || !normalizedPhone)) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập họ tên và số điện thoại người bàn giao.');
-      return;
-    }
-    if (!pendingDonationCommand && (donorName.trim().length > 200 || !/^\+?[0-9]{8,15}$/.test(normalizedPhone))) {
-      Alert.alert('Thông tin chưa hợp lệ', 'Họ tên tối đa 200 ký tự; số điện thoại cần có 8–15 chữ số và có thể bắt đầu bằng dấu +.');
-      return;
-    }
+    const normalizedPhone = normalizePhone(donorPhone);
+    const errors: Record<string, string> = {};
+    if (!pendingDonationCommand && !donorName.trim()) errors.donorName = 'Vui lòng nhập họ tên người bàn giao.';
+    else if (!pendingDonationCommand && donorName.trim().length > 200) errors.donorName = 'Họ tên không được vượt quá 200 ký tự.';
+    if (!pendingDonationCommand && !normalizedPhone) errors.donorPhone = 'Vui lòng nhập số điện thoại người bàn giao.';
+    else if (!pendingDonationCommand && !isValidPhone(donorPhone)) errors.donorPhone = 'Số điện thoại cần có 8–15 chữ số; có thể bắt đầu bằng dấu +.';
 
-    const hasInvalidQuantity = Object.values(quantities).some((value) => {
-      const quantity = value.trim();
-      return quantity !== '' && !/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(quantity);
-    });
-    if (!pendingDonationCommand && hasInvalidQuantity) {
-      Alert.alert('Số lượng chưa hợp lệ', 'Nhập số thập phân không âm, không dùng dấu phân cách hàng nghìn hoặc số mũ.');
-      return;
+    if (!pendingDonationCommand) {
+      Object.entries(quantities).forEach(([itemId, value]) => {
+        const quantity = value.trim();
+        if (!quantity) return;
+        const error = quantityFieldError(quantity);
+        if (error) errors[itemId] = error;
+      });
     }
 
     const lines = Object.entries(quantities).flatMap(([itemId, value]) => {
@@ -240,7 +287,10 @@ export const DonationScreen: React.FC = () => {
     });
 
     if (!pendingDonationCommand && lines.length === 0) {
-      Alert.alert('Chưa chọn hiện vật', 'Vui lòng nhập số lượng cho ít nhất 1 loại hàng cứu trợ.');
+      errors.quantities = 'Nhập số lượng lớn hơn 0 cho ít nhất một loại hiện vật.';
+    }
+    setDonationFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
       return;
     }
 
@@ -345,10 +395,17 @@ export const DonationScreen: React.FC = () => {
 
   // Gửi khiếu nại kiểm đếm
   const handleOpenDisputeSubmit = async () => {
-    if (!trackingResult || !disputeReason.trim()) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập rõ lý do khiếu nại kiểm đếm.');
+    const reason = disputeReason.trim();
+    if (!trackingResult) return;
+    if (!reason) {
+      setDisputeError('Vui lòng nhập rõ lý do khiếu nại kiểm đếm.');
       return;
     }
+    if (reason.length > 2000) {
+      setDisputeError('Lý do khiếu nại không được vượt quá 2.000 ký tự.');
+      return;
+    }
+    setDisputeError(undefined);
     setIsSubmittingDispute(true);
     try {
       let secret: string | undefined;
@@ -358,7 +415,7 @@ export const DonationScreen: React.FC = () => {
       if (saved) secret = await getReceiptSecret(saved.id, saved.public_code);
       if (!secret) secret = await getReceiptSecret(trackingResult.id, trackingResult.public_code);
 
-      await LogisticsApi.openDonationDispute(trackingResult.id, disputeReason.trim(), secret);
+      await LogisticsApi.openDonationDispute(trackingResult.id, reason, secret);
       Alert.alert('Đã gửi khiếu nại', 'Khiếu nại kiểm đếm đã gửi đến quản lý kho để đối soát lại.');
       setShowDisputeModal(false);
       setDisputeReason('');
@@ -373,9 +430,25 @@ export const DonationScreen: React.FC = () => {
   const handleTrackDonation = async (targetIdOrCode?: string, targetSecret?: string) => {
     const query = (targetIdOrCode || searchCode).trim();
     if (!query) {
-      Alert.alert('Chưa nhập mã', 'Vui lòng nhập mã biên nhận hoặc mã nhận diện quyên góp.');
+      setTrackingError('Vui lòng nhập mã biên nhận hoặc mã nhận diện quyên góp.');
       return;
     }
+    if (!isValidDonationQuery(query)) {
+      setTrackingCodeError(donationQueryError(query) || 'Mã biên nhận chưa hợp lệ.');
+      return;
+    }
+    setTrackingCodeError(undefined);
+
+    const providedSecret = targetSecret || (
+      query.toUpperCase() === searchCode.trim().toUpperCase()
+        ? donationTrackingSecret.trim()
+        : ''
+    );
+    if (providedSecret && !isValidTrackingSecret(providedSecret)) {
+      setTrackingSecretError('Khóa bí mật phải gồm đúng 43 ký tự hợp lệ.');
+      return;
+    }
+    setTrackingSecretError(undefined);
 
     setTrackingLoading(true);
     setTrackingError(null);
@@ -383,11 +456,7 @@ export const DonationScreen: React.FC = () => {
     setTrackingCapabilityAvailable(false);
     try {
       let resolvedId = query;
-      let secret = targetSecret || (
-        query.toUpperCase() === searchCode.trim().toUpperCase()
-          ? donationTrackingSecret.trim() || undefined
-          : undefined
-      );
+      let secret = providedSecret || undefined;
 
       // Tìm trong danh sách đã lưu nếu là public_code
       const saved = recentReceipts.find(
@@ -403,6 +472,10 @@ export const DonationScreen: React.FC = () => {
 
       if (!secret) {
         secret = await getReceiptSecret(resolvedId, query);
+      }
+      if (secret && !isValidTrackingSecret(secret)) {
+        setTrackingError('Khóa bí mật phải gồm đúng 43 ký tự hợp lệ.');
+        return;
       }
 
       const res = await LogisticsApi.trackDonation(resolvedId, secret);
@@ -430,17 +503,29 @@ export const DonationScreen: React.FC = () => {
 
   const handleRecoverDonation = async () => {
     const publicCode = searchCode.trim().toUpperCase();
-    if (!publicCode || !donationRecoveryCode.trim()) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập mã biên nhận và mã khôi phục do kho tiếp nhận cấp.');
+    if (!isPublicDonationCode(publicCode) || searchCode.length > 16) {
+      setTrackingCodeError(searchCode.length > 16
+        ? 'Mã biên nhận không được vượt quá 16 ký tự.'
+        : 'Mã biên nhận phải gồm 8–16 ký tự hợp lệ.');
       return;
     }
+    if (!donationRecoveryCode.trim()) {
+      setDonationRecoveryError('Mã khôi phục là bắt buộc.');
+      return;
+    }
+    if (!isValidTrackingSecret(donationRecoveryCode.trim())) {
+      setDonationRecoveryError('Mã khôi phục phải gồm đúng 43 ký tự hợp lệ.');
+      return;
+    }
+    setTrackingCodeError(undefined);
+    setDonationRecoveryError(undefined);
     setTrackingLoading(true);
-    setTrackingError(null);
     setTrackingResult(null);
     setTrackingCapabilityAvailable(false);
     try {
       const recovered = await LogisticsApi.recoverDonation(publicCode, donationRecoveryCode.trim(), recoveryIdempotencyKey);
       const detail = await LogisticsApi.trackDonation(recovered.id);
+      setTrackingError(null);
       setTrackingResult(detail);
       setTrackingCapabilityAvailable(false);
       setClaimedDonationIds((current) => current.includes(detail.id) ? current : [...current, detail.id]);
@@ -459,13 +544,39 @@ export const DonationScreen: React.FC = () => {
     setSelectedReportDrive(drive);
     setReportLoading(true);
     setReportData(null);
+    setReportError(null);
     try {
-      const rep = await LogisticsApi.getPublicDonationReportSummary({ drive_id: drive.id });
+      const rep = await LogisticsApi.getPublicDonationReportSummary({ drive_id: drive.id, limit: 50 });
       setReportData(rep);
-    } catch {
+    } catch (error) {
+      setReportError(getApiErrorMessage(error, 'Không thể tải báo cáo minh bạch. Vui lòng thử lại.'));
       Alert.alert('Báo cáo minh bạch', 'Chưa có dữ liệu báo cáo tổng hợp cho đợt quyên góp này.');
     } finally {
       setReportLoading(false);
+    }
+  };
+
+  const handleLoadMoreReport = async () => {
+    if (!selectedReportDrive || !reportData?.cursor || !reportData.more || reportLoadingMore) return;
+    setReportLoadingMore(true);
+    setReportError(null);
+    try {
+      const page = await LogisticsApi.getPublicDonationReportSummary({
+        drive_id: selectedReportDrive.id,
+        limit: 50,
+        cursor: reportData.cursor,
+      });
+      setReportData((current) => current ? {
+        ...current,
+        items: [...current.items, ...page.items],
+        more: page.more,
+        cursor: page.cursor,
+        generated_at: page.generated_at,
+      } : page);
+    } catch (error) {
+      setReportError(getApiErrorMessage(error, 'Không thể tải thêm số liệu báo cáo. Vui lòng thử lại.'));
+    } finally {
+      setReportLoadingMore(false);
     }
   };
 
@@ -531,8 +642,19 @@ export const DonationScreen: React.FC = () => {
     isAuthenticated &&
     trackingError &&
     searchCode.trim() &&
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(searchCode.trim())
+    !isDonationUuid(searchCode)
   );
+  const hasPositiveQuantity = Object.values(quantities).some(isPositiveQuantity);
+  const hasInvalidQuantity = Object.values(quantities).some((value) => Boolean(quantityFieldError(value)));
+  const declarationSubmitDisabled = isSubmitting || (!pendingDonationCommand && (
+    !donorName.trim() || donorName.length > 200 || !normalizePhone(donorPhone) || !isValidPhone(donorPhone) || donorPhone.length > 32 ||
+    !hasPositiveQuantity || hasInvalidQuantity
+  ));
+  const trackingLookupDisabled = trackingLoading || Boolean(donationQueryError(searchCode)) || !isValidDonationQuery(searchCode) ||
+    donationTrackingSecret.length > 43 || (donationTrackingSecret.length > 0 && !isValidTrackingSecret(donationTrackingSecret));
+  const recoverySubmitDisabled = trackingLoading || searchCode.length > 16 || donationRecoveryCode.length > 43 ||
+    !isPublicDonationCode(searchCode) || !isValidTrackingSecret(donationRecoveryCode);
+  const disputeSubmitDisabled = isSubmittingDispute || !disputeReason.trim() || disputeReason.length > 2000;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -765,25 +887,35 @@ export const DonationScreen: React.FC = () => {
             <Text style={styles.searchSubtitle}>
               Nhập mã định danh tra cứu; mã biên nhận đã lưu trên thiết bị cũng được chấp nhận:
             </Text>
+            <Text style={styles.inputLabel}>Mã biên nhận hoặc mã định danh tra cứu <RequiredAsterisk /></Text>
             <View style={styles.searchRow}>
               <TextInput
                 style={styles.searchInput}
                 placeholder="Mã biên nhận hoặc mã định danh tra cứu"
                 placeholderTextColor={THEME.colors.text.muted}
                 value={searchCode}
+                maxLength={37}
                 onChangeText={(value) => {
                   setSearchCode(value);
                   setDonationTrackingSecret('');
+                  setTrackingCodeError(donationQueryError(value));
+                  setTrackingSecretError(undefined);
+                  setDonationRecoveryError(undefined);
                   setTrackingResult(null);
                   setTrackingCapabilityAvailable(false);
                   setTrackingError(null);
                 }}
+                onBlur={() => {
+                  setTrackingCodeError(!searchCode.trim()
+                    ? 'Mã biên nhận hoặc mã định danh tra cứu là bắt buộc.'
+                    : donationQueryError(searchCode));
+                }}
                 autoCapitalize="characters"
               />
               <TouchableOpacity
-                style={styles.searchButton}
+                style={[styles.searchButton, trackingLookupDisabled && { opacity: 0.5 }]}
                 onPress={() => handleTrackDonation()}
-                disabled={trackingLoading}
+                disabled={trackingLookupDisabled}
                 activeOpacity={0.85}
               >
                 {trackingLoading ? (
@@ -796,38 +928,59 @@ export const DonationScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
             </View>
+            <FormFieldError message={trackingCodeError} />
             <TextInput
               style={[styles.searchInput, styles.secretInput]}
               placeholder="Khóa bí mật (nếu bạn đã lưu)"
               placeholderTextColor={THEME.colors.text.muted}
               value={donationTrackingSecret}
-              onChangeText={setDonationTrackingSecret}
+              onChangeText={(value) => {
+                setDonationTrackingSecret(value);
+                setTrackingSecretError(getTrackingSecretError(value));
+              }}
+              onBlur={() => {
+                setTrackingSecretError(getTrackingSecretError(donationTrackingSecret));
+              }}
               autoCapitalize="none"
               autoCorrect={false}
               secureTextEntry
+              maxLength={44}
             />
+            <FormFieldError message={trackingSecretError} />
             {canRecoverDonation ? (
               <View style={styles.recoveryBox}>
                 <Text style={styles.recoveryHint}>Để liên kết mã biên nhận công khai, cần mã khôi phục do kho tiếp nhận cấp.</Text>
+                  <Text style={styles.inputLabel}>Mã khôi phục <RequiredAsterisk /></Text>
                 <TextInput
                   style={styles.searchInput}
                   placeholder="Mã khôi phục"
                   placeholderTextColor={THEME.colors.text.muted}
                   value={donationRecoveryCode}
-                  onChangeText={setDonationRecoveryCode}
+                  onChangeText={(value) => {
+                    setDonationRecoveryCode(value);
+                    setDonationRecoveryError(getTrackingSecretError(value, 'Mã khôi phục'));
+                  }}
+                  onBlur={() => {
+                    setDonationRecoveryError(!donationRecoveryCode.trim()
+                      ? 'Mã khôi phục là bắt buộc.'
+                      : getTrackingSecretError(donationRecoveryCode, 'Mã khôi phục'));
+                  }}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  maxLength={44}
                   secureTextEntry
                 />
+                <FormFieldError message={donationRecoveryError} />
                 <TouchableOpacity
-                  style={[styles.searchButton, { marginLeft: 0, marginTop: 8, alignSelf: 'flex-start' }]}
+                  style={[styles.searchButton, { marginLeft: 0, marginTop: 8, alignSelf: 'flex-start' }, recoverySubmitDisabled && { opacity: 0.5 }]}
                   onPress={handleRecoverDonation}
-                  disabled={trackingLoading}
+                  disabled={recoverySubmitDisabled}
                 >
                   {trackingLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.searchButtonText}>Khôi phục biên nhận</Text>}
                 </TouchableOpacity>
               </View>
             ) : null}
+            <FormFieldError message={trackingError ?? undefined} />
           </View>
 
           {/* DANH SÁCH BIÊN NHẬN GẦN ĐÂY ĐÃ LƯU TRÊN THIẾT BỊ */}
@@ -858,14 +1011,6 @@ export const DonationScreen: React.FC = () => {
               ))}
             </View>
           )}
-
-          {/* LỖI TRA CỨU */}
-          {trackingError ? (
-            <View style={styles.errorBox}>
-              <AlertCircle size={32} color={THEME.colors.emergency.main} />
-              <Text style={styles.errorText}>{trackingError}</Text>
-            </View>
-          ) : null}
 
           {/* KẾT QUẢ TRA CỨU BIÊN NHẬN */}
           {trackingResult ? (
@@ -1052,7 +1197,10 @@ export const DonationScreen: React.FC = () => {
 
                 <TouchableOpacity
                   style={styles.disputeBtn}
-                  onPress={() => setShowDisputeModal(true)}
+                onPress={() => {
+                  setDisputeError(undefined);
+                  setShowDisputeModal(true);
+                }}
                   activeOpacity={0.8}
                 >
                   <MessageSquareWarning size={18} color={THEME.colors.warning.main} />
@@ -1083,29 +1231,67 @@ export const DonationScreen: React.FC = () => {
             </Text>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Họ và tên người quyên góp:</Text>
+              <Text style={styles.inputLabel}>Họ và tên người quyên góp <RequiredAsterisk /></Text>
               <TextInput
                 style={styles.textInput}
                 placeholder="Nguyễn Văn A"
                 placeholderTextColor={THEME.colors.text.muted}
                 value={donorName}
-                onChangeText={setDonorName}
+                onChangeText={(value) => {
+                  setDonorName(value);
+                  setDonationFormErrors((current) => ({
+                    ...current,
+                    donorName: value.length > 200 ? 'Họ tên không được vượt quá 200 ký tự.' : undefined,
+                  }));
+                }}
+                onBlur={() => {
+                  setDonationFormErrors((current) => ({
+                    ...current,
+                    donorName: !donorName.trim()
+                      ? 'Họ tên người quyên góp là bắt buộc.'
+                      : donorName.length > 200
+                        ? 'Họ tên không được vượt quá 200 ký tự.'
+                        : undefined,
+                  }));
+                }}
+                maxLength={201}
               />
+              <FormFieldError message={donationFormErrors.donorName} />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Số điện thoại:</Text>
+              <Text style={styles.inputLabel}>Số điện thoại <RequiredAsterisk /></Text>
               <TextInput
                 style={styles.textInput}
                 placeholder="0912 345 678"
                 placeholderTextColor={THEME.colors.text.muted}
                 value={donorPhone}
-                onChangeText={setDonorPhone}
+                onChangeText={(value) => {
+                  setDonorPhone(value);
+                  setDonationFormErrors((current) => ({
+                    ...current,
+                    donorPhone: value.length > 32
+                      ? 'Số điện thoại không được vượt quá 32 ký tự.'
+                      : !normalizePhone(value)
+                        ? undefined
+                        : !isValidPhone(value)
+                          ? 'Số điện thoại cần có 8–15 chữ số; có thể bắt đầu bằng dấu +.'
+                          : undefined,
+                  }));
+                }}
+                onBlur={() => {
+                  if (donorPhone.length > 32) setDonationFormErrors((current) => ({ ...current, donorPhone: 'Số điện thoại không được vượt quá 32 ký tự.' }));
+                  else if (!normalizePhone(donorPhone)) setDonationFormErrors((current) => ({ ...current, donorPhone: 'Số điện thoại là bắt buộc.' }));
+                  else if (!isValidPhone(donorPhone)) setDonationFormErrors((current) => ({ ...current, donorPhone: 'Số điện thoại cần có 8–15 chữ số; có thể bắt đầu bằng dấu +.' }));
+                  else setDonationFormErrors((current) => ({ ...current, donorPhone: undefined }));
+                }}
                 keyboardType="phone-pad"
+                maxLength={33}
               />
+              <FormFieldError message={donationFormErrors.donorPhone} />
             </View>
 
-            <Text style={[styles.inputLabel, { marginTop: 12 }]}>Số lượng từng loại hiện vật:</Text>
+            <Text style={[styles.inputLabel, { marginTop: 12 }]}>Số lượng từng loại hiện vật (nhập ít nhất một mục) <RequiredAsterisk /></Text>
             {selectedDrive?.items &&
               selectedDrive.items.map((it) => {
                 const target = it.target_quantity || '0';
@@ -1114,28 +1300,43 @@ export const DonationScreen: React.FC = () => {
                 const unit = it.unit_name || 'đơn vị';
 
                 return (
-                  <View key={it.item_id} style={styles.modalItemRow}>
-                    <View style={{ flex: 1, marginRight: 10 }}>
-                      <Text style={styles.modalItemName}>
-                        {it.item_name || it.name} ({unit})
-                      </Text>
-                      <Text style={styles.modalItemRemaining}>
-                        {compareQuantities(remaining, '0') > 0
-                          ? `Đang cần thêm: ${formatNumberVN(remaining)} ${unit}`
-                          : `Đã đủ mục tiêu (${formatNumberVN(target)} ${unit})`}
-                      </Text>
+                  <View key={it.item_id}>
+                    <View style={styles.modalItemRow}>
+                      <View style={{ flex: 1, marginRight: 10 }}>
+                        <Text style={styles.modalItemName}>
+                          {it.item_name || it.name} ({unit})
+                        </Text>
+                        <Text style={styles.modalItemRemaining}>
+                          {compareQuantities(remaining, '0') > 0
+                            ? `Đang cần thêm: ${formatNumberVN(remaining)} ${unit}`
+                            : `Đã đủ mục tiêu (${formatNumberVN(target)} ${unit})`}
+                        </Text>
+                      </View>
+                      <TextInput
+                        style={styles.modalItemInput}
+                        placeholder="0"
+                        placeholderTextColor={THEME.colors.text.muted}
+                        keyboardType="numeric"
+                        value={quantities[it.item_id] || ''}
+                        onChangeText={(value) => handleQuantityChange(it.item_id, value)}
+                        onBlur={() => {
+                          const value = quantities[it.item_id] || '';
+                          const error = quantityError(value);
+                          const anyPositive = Object.values(quantities).some(isPositiveQuantity);
+                          setDonationFormErrors((current) => ({
+                            ...current,
+                            [it.item_id]: error,
+                            quantities: anyPositive ? undefined : 'Nhập số lượng lớn hơn 0 cho ít nhất một loại hiện vật.',
+                          }));
+                        }}
+                        maxLength={20}
+                      />
                     </View>
-                    <TextInput
-                      style={styles.modalItemInput}
-                      placeholder="0"
-                      placeholderTextColor={THEME.colors.text.muted}
-                      keyboardType="numeric"
-                      value={quantities[it.item_id] || ''}
-                      onChangeText={(t) => handleQuantityChange(it.item_id, t)}
-                    />
+                    <FormFieldError message={donationFormErrors[it.item_id]} />
                   </View>
                 );
               })}
+            <FormFieldError message={donationFormErrors.quantities} />
 
             {/* ĐÍNH KÈM ẢNH KIỆN HÀNG */}
             <View style={styles.donationPhotoSection}>
@@ -1176,9 +1377,9 @@ export const DonationScreen: React.FC = () => {
                 <Text style={styles.modalCancelText}>Hủy</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, isSubmitting && { opacity: 0.6 }]}
+                style={[styles.modalSubmitBtn, declarationSubmitDisabled && { opacity: 0.5 }]}
                 onPress={handleSubmitDeclaration}
-                disabled={isSubmitting}
+                disabled={declarationSubmitDisabled}
               >
                 {isSubmitting ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
@@ -1202,15 +1403,26 @@ export const DonationScreen: React.FC = () => {
               Nêu rõ chi tiết sai lệch số lượng kiểm đếm hoặc lý do từ chối để ban quản lý kho rà soát camera và hồ sơ:
             </Text>
 
+            <Text style={styles.inputLabel}>Lý do khiếu nại <RequiredAsterisk /></Text>
+
             <TextInput
               style={styles.disputeInput}
               placeholder="Ví dụ: Tôi đã giao 20 thùng mì Hảo Hảo nhưng biên nhận kiểm đếm ghi 15 thùng..."
               placeholderTextColor={THEME.colors.text.muted}
               value={disputeReason}
-              onChangeText={setDisputeReason}
+              onChangeText={(value) => {
+                setDisputeReason(value);
+                setDisputeError(value.length > 2000 ? 'Lý do khiếu nại không được vượt quá 2.000 ký tự.' : undefined);
+              }}
+              onBlur={() => {
+                if (!disputeReason.trim()) setDisputeError('Lý do khiếu nại là bắt buộc.');
+                else if (disputeReason.length > 2000) setDisputeError('Lý do khiếu nại không được vượt quá 2.000 ký tự.');
+              }}
               multiline={true}
               numberOfLines={4}
+              maxLength={2001}
             />
+            <FormFieldError message={disputeError} />
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -1218,14 +1430,15 @@ export const DonationScreen: React.FC = () => {
                 onPress={() => {
                   setShowDisputeModal(false);
                   setDisputeReason('');
+                  setDisputeError(undefined);
                 }}
               >
                 <Text style={styles.modalCancelText}>Đóng</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, { backgroundColor: THEME.colors.warning.main }]}
+                style={[styles.modalSubmitBtn, { backgroundColor: THEME.colors.warning.main }, disputeSubmitDisabled && { opacity: 0.5 }]}
                 onPress={handleOpenDisputeSubmit}
-                disabled={isSubmittingDispute}
+                disabled={disputeSubmitDisabled}
               >
                 {isSubmittingDispute ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
@@ -1257,6 +1470,7 @@ export const DonationScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
+            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 4 }}>
             {reportLoading ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <ActivityIndicator size="large" color={THEME.colors.primary.main} />
@@ -1302,6 +1516,30 @@ export const DonationScreen: React.FC = () => {
                 </Text>
               </View>
             )}
+
+            {reportError ? <Text style={[styles.reportGeneratedAt, { color: THEME.colors.emergency.main }]}>{reportError}</Text> : null}
+            {reportError && !reportData && selectedReportDrive ? (
+              <TouchableOpacity
+                style={[styles.modalSubmitBtn, { marginTop: 8 }]}
+                onPress={() => void handleOpenReportModal(selectedReportDrive)}
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalSubmitText}>Thử tải lại báo cáo</Text>
+              </TouchableOpacity>
+            ) : null}
+            {reportData?.more ? (
+              <TouchableOpacity
+                style={[styles.modalSubmitBtn, { marginTop: 8 }]}
+                onPress={() => void handleLoadMoreReport()}
+                disabled={reportLoadingMore}
+                accessibilityRole="button"
+              >
+                {reportLoadingMore
+                  ? <ActivityIndicator color="#FFFFFF" />
+                  : <Text style={styles.modalSubmitText}>Tải thêm số liệu</Text>}
+              </TouchableOpacity>
+            ) : null}
+            </ScrollView>
 
             <TouchableOpacity
               style={[styles.modalSubmitBtn, { marginTop: 12 }]}

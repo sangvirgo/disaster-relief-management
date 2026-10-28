@@ -1956,14 +1956,6 @@
                                    "correlation_id": "00000000-0000-4000-8000-000000000000"
                                  }
                                },
-                               "NO_CONTACT_ATTEMPT": {
-                                 "summary": "NO_CONTACT_ATTEMPT",
-                                 "value": {
-                                   "code": "NO_CONTACT_ATTEMPT",
-                                   "message": "Cần ghi nhận ít nhất một lần liên hệ hoặc nêu lý do không thể liên hệ.",
-                                   "correlation_id": "00000000-0000-4000-8000-000000000000"
-                                 }
-                               },
                                "PENDING_SUPPLEMENT_REVIEW": {
                                  "summary": "PENDING_SUPPLEMENT_REVIEW",
                                  "value": {
@@ -11612,6 +11604,236 @@
             }
           }
         }
+      },
+      "get": {
+        "operationId": "responseTeamsListMembers",
+        "summary": "List active members of a rescue team.",
+        "description": "Accessible to active team members, scoped TEAM_READ callers, and team managers. Returns display names resolved through Identity and a keyset page ordered by user ID.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active team member page.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "team_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "can_manage_members": {
+                      "type": "boolean"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "user_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "display_name": {
+                            "type": "string"
+                          },
+                          "member_role": {
+                            "type": "string",
+                            "enum": [
+                              "LEADER",
+                              "MEMBER"
+                            ]
+                          },
+                          "joined_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "user_id",
+                          "display_name",
+                          "member_role",
+                          "joined_at"
+                        ]
+                      }
+                    },
+                    "more": {
+                      "type": "boolean"
+                    },
+                    "cursor": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "team_id",
+                    "can_manage_members",
+                    "items",
+                    "more"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "CURSOR_INVALID": {
+                    "summary": "CURSOR_INVALID",
+                    "value": {
+                      "code": "CURSOR_INVALID",
+                      "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "VALIDATION_FAILED": {
+                    "summary": "VALIDATION_FAILED",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "NOT_FOUND": {
+                    "summary": "NOT_FOUND",
+                    "value": {
+                      "code": "NOT_FOUND",
+                      "message": "Không tìm thấy dữ liệu yêu cầu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "IDENTITY_UNAVAILABLE": {
+                    "summary": "IDENTITY_UNAVAILABLE",
+                    "value": {
+                      "code": "IDENTITY_UNAVAILABLE",
+                      "message": "Dịch vụ tài khoản tạm thời không khả dụng. Vui lòng thử lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/03-response-api.md",
+        "x-c48-controller-source": "backend/apps/response/src/teams/teams.controller.ts#TeamsController.listMembers",
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ]
       }
     },
     "/teams/{id}/members/{user_id}/remove": {
@@ -12998,6 +13220,230 @@
             }
           }
         }
+      }
+    },
+    "/teams/{id}/member-candidates": {
+      "get": {
+        "operationId": "responseTeamsListMemberCandidates",
+        "summary": "Search accounts that can be added to a rescue team.",
+        "description": "Available only to the active team leader or a scoped TEAM_MANAGE_ANY caller. Searches ACTIVE Identity accounts by username or display-name prefix and excludes accounts already assigned to any active team. Any ACTIVE account remains eligible; the add command rechecks status and the one-active-team invariant.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results eligible for a team membership attempt.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "user_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "display_name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "user_id",
+                          "username",
+                          "display_name"
+                        ]
+                      }
+                    },
+                    "more": {
+                      "type": "boolean"
+                    },
+                    "cursor": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "more"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "CURSOR_INVALID": {
+                    "summary": "CURSOR_INVALID",
+                    "value": {
+                      "code": "CURSOR_INVALID",
+                      "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "VALIDATION_FAILED": {
+                    "summary": "VALIDATION_FAILED",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "NOT_FOUND": {
+                    "summary": "NOT_FOUND",
+                    "value": {
+                      "code": "NOT_FOUND",
+                      "message": "Không tìm thấy dữ liệu yêu cầu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "IDENTITY_UNAVAILABLE": {
+                    "summary": "IDENTITY_UNAVAILABLE",
+                    "value": {
+                      "code": "IDENTITY_UNAVAILABLE",
+                      "message": "Dịch vụ tài khoản tạm thời không khả dụng. Vui lòng thử lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/03-response-api.md",
+        "x-c48-controller-source": "backend/apps/response/src/teams/teams.controller.ts#TeamsController.listMemberCandidates",
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ]
       }
     }
   },

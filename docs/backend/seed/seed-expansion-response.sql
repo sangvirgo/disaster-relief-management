@@ -4,10 +4,10 @@ INSERT INTO incident_category (code, display_name) VALUES
   ('TRAPPED', 'Người bị mắc kẹt'), ('OTHER', 'Khác')
 ON CONFLICT DO NOTHING;
 
--- Refresh only unreviewed Gemini AI samples; leave any staff-reviewed result untouched.
+-- Refresh only unreviewed demo fixtures; leave any staff-reviewed result untouched.
 UPDATE ai_advisory
-   SET model = 'gemini-3.1-flash-lite',
-       input_hash = 'e33d48e81d0c6237e84b4c5eb0e8b0030216ef400b8d64daea2eb7fd64f8efca',
+   SET model = 'demo-fixture:gemini-3.5-flash-lite',
+       input_hash = '824598ae1da193ac5043427709ffc34476616cdbe073471ac03af8279020c622',
        prompt_version = 'v3',
        schema_version = 'v4',
        risk_score = NULL,
@@ -18,8 +18,8 @@ UPDATE ai_advisory
    AND review_status IS NULL;
 
 UPDATE ai_advisory
-   SET model = 'gemini-3.1-flash-lite',
-       input_hash = 'bac706703a01f0759c5d16f495f7eae88526980769977cbce03dacbc690f6a46',
+   SET model = 'demo-fixture:gemini-3.5-flash-lite',
+       input_hash = '3f39da9bcc687cf1a89dcaf28b3ba4108e65e1dec137e3769162c7a8d015a78a',
        prompt_version = 'v3',
        schema_version = 'v4',
        risk_score = 55,

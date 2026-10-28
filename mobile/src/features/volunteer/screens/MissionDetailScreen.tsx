@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,14 +15,20 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { FormFieldError } from '../../../components/common/FormFieldError';
+import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { StatusBadge } from '../../../components/common/StatusBadge';
+import { TimelineStep } from '../../../components/common/TimelineStep';
 import { ResponseApi } from '../../../api/responseApi';
-import { getApiErrorMessage } from '../../../api/client';
-import { Mission, MissionStatus } from '../../../types/api';
-import { INCIDENT_CATEGORIES } from '../../../constants/labels';
+import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
+import { MissionDetail, MissionStatus } from '../../../types/api';
+import { INCIDENT_CATEGORIES, MISSION_KIND_LABELS, MISSION_STATUS_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
+import { generateUUID } from '../../../utils/secureStore';
+import { getEvidenceSizeLimitBytes, getSupportedEvidenceMimeType } from '../../../utils/evidence';
+import { getTeamRoleFromMissionView } from '../utils/teamMembershipRole';
+import type { TeamMembershipRole } from '../utils/teamMembershipRole';
 import {
-  MapPin,
   Users,
   Phone,
   Navigation,
@@ -34,39 +40,101 @@ import {
   FileCheck,
   Camera,
   ImageIcon,
+  Video,
   X,
+  Info,
 } from 'lucide-react-native';
+
+const isLoopbackDownloadUrl = (url: string) =>
+  /^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::|\/)/i.test(url);
 
 export const MissionDetailScreen: React.FC = () => {
   const router = useRouter();
-  const { missionId: routeMissionId } = useLocalSearchParams<{ missionId?: string }>();
+  const { missionId: routeMissionId, teamRole: routeTeamRole } = useLocalSearchParams<{
+    missionId?: string;
+    teamRole?: string;
+  }>();
   const missionId = Array.isArray(routeMissionId) ? routeMissionId[0] : routeMissionId;
+  const routeTeamRoleValue = Array.isArray(routeTeamRole) ? routeTeamRole[0] : routeTeamRole;
+  const teamRoleHint: TeamMembershipRole | undefined = routeTeamRoleValue === 'LEADER' || routeTeamRoleValue === 'MEMBER'
+    ? routeTeamRoleValue
+    : undefined;
 
-  const [mission, setMission] = useState<Mission | null>(null);
+  const [mission, setMission] = useState<MissionDetail | null>(null);
+  const [teamRole, setTeamRole] = useState<TeamMembershipRole>(teamRoleHint ?? 'UNKNOWN');
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
   // Modal hoàn thành nhiệm vụ & ảnh bằng chứng cứu nạn
   const [showCompleteModal, setShowCompleteModal] = useState<boolean>(false);
   const [outcomeNote, setOutcomeNote] = useState<string>('');
+  const [formErrors, setFormErrors] = useState<Record<string, string | undefined>>({});
   const [completionImage, setCompletionImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const evidenceUploadKey = useRef<{ uri: string; key: string } | null>(null);
 
   // Modal từ chối hoặc báo thất bại
   const [showDeclineModal, setShowDeclineModal] = useState<boolean>(false);
   const [declineReason, setDeclineReason] = useState<string>('');
 
-  const pickImage = async () => {
+  // Xem ảnh minh chứng phóng to
+  const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
+  const [previewImageError, setPreviewImageError] = useState(false);
+  const [loadingEvidence, setLoadingEvidence] = useState<boolean>(false);
+
+  const handleViewEvidence = async (evidenceId: string, mimeType: string) => {
+    setLoadingEvidence(true);
+    try {
+      const res = await ResponseApi.getEvidenceDownloadUrl(evidenceId);
+      if (res?.url) {
+        if (isLoopbackDownloadUrl(res.url)) {
+          Alert.alert(
+            'Không thể mở minh chứng',
+            'Đường dẫn tệp chưa truy cập được từ điện thoại. Vui lòng kiểm tra cấu hình kho lưu trữ hoặc liên hệ quản trị viên.'
+          );
+          return;
+        }
+        if (mimeType === 'video/mp4') {
+          await Linking.openURL(res.url);
+        } else {
+          setPreviewImageError(false);
+          setPreviewImageUri(res.url);
+        }
+      } else {
+        Alert.alert('Không thể mở minh chứng', 'Chưa nhận được đường dẫn tệp. Vui lòng thử lại sau.');
+      }
+    } catch (e: any) {
+      Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể mở tệp minh chứng.'));
+    } finally {
+      setLoadingEvidence(false);
+    }
+  };
+
+  const pickEvidence = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ['images', 'videos'],
         allowsEditing: true,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
         quality: 0.8,
       });
       if (!result.canceled && result.assets[0]) {
-        setCompletionImage(result.assets[0]);
+        const asset = result.assets[0];
+        const mimeType = getSupportedEvidenceMimeType(asset);
+        if (!mimeType) {
+          Alert.alert('Định dạng chưa hỗ trợ', 'Chỉ chọn ảnh JPEG, PNG hoặc video MP4.');
+          return;
+        }
+        if (asset.fileSize !== undefined && asset.fileSize > getEvidenceSizeLimitBytes(mimeType)) {
+          Alert.alert('Tệp quá lớn', mimeType === 'video/mp4'
+            ? 'Video MP4 phải có dung lượng không quá 50 MB.'
+            : 'Ảnh phải có dung lượng không quá 10 MB.');
+          return;
+        }
+        evidenceUploadKey.current = null;
+        setCompletionImage(asset);
       }
     } catch {
-      Alert.alert('Thông báo', 'Không thể mở thư viện ảnh.');
+      Alert.alert('Thông báo', 'Không thể mở thư viện ảnh và video.');
     }
   };
 
@@ -82,6 +150,7 @@ export const MissionDetailScreen: React.FC = () => {
         quality: 0.8,
       });
       if (!result.canceled && result.assets[0]) {
+        evidenceUploadKey.current = null;
         setCompletionImage(result.assets[0]);
       }
     } catch {
@@ -93,14 +162,26 @@ export const MissionDetailScreen: React.FC = () => {
     if (!missionId) return;
     setLoading(true);
     try {
-      const data = await ResponseApi.getMissionDetail(missionId);
+      const [data, missionsPage] = await Promise.all([
+        ResponseApi.getMissionDetail(missionId),
+        ResponseApi.getMyMissions(50).catch(() => null),
+      ]);
+      const missionFromMine = missionsPage?.items.find((item) => item.id === missionId);
+      const currentTeamRole = missionFromMine
+        ? getTeamRoleFromMissionView(missionFromMine)
+        : teamRoleHint ?? 'UNKNOWN';
+      setTeamRole(currentTeamRole);
+      if (currentTeamRole !== 'LEADER') {
+        setShowCompleteModal(false);
+        setShowDeclineModal(false);
+      }
       setMission(data);
     } catch (e: any) {
       Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể tải chi tiết nhiệm vụ.'));
     } finally {
       setLoading(false);
     }
-  }, [missionId]);
+  }, [missionId, teamRoleHint]);
 
   useEffect(() => {
     // Fetch the route's initial mission snapshot.
@@ -123,18 +204,18 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Gọi điện thoại trực tiếp cho nạn nhân
   const callVictimPhone = () => {
-    const phone = mission?.reporter_contact_phone;
+    const phone = teamRole === 'LEADER' ? mission?.reporter_contact_phone : undefined;
     if (!phone) return;
     Linking.openURL(`tel:${phone}`).catch(() => Alert.alert('Không thể gọi điện', 'Thiết bị không hỗ trợ cuộc gọi điện thoại.'));
   };
 
   // Xử lý Tiếp nhận
   const handleAccept = async () => {
-    if (!mission) return;
+    if (!mission || teamRole !== 'LEADER') return;
     setActionLoading(true);
     try {
       await ResponseApi.acceptMission(mission.id, mission.version);
-      Alert.alert('Đã tiếp nhận', 'Backend đã ghi nhận việc tiếp nhận nhiệm vụ.');
+      Alert.alert('Đã tiếp nhận', 'Việc tiếp nhận nhiệm vụ đã được ghi nhận.');
       fetchDetail();
     } catch (e: any) {
       Alert.alert('Lỗi tiếp nhận', getApiErrorMessage(e, 'Không thể tiếp nhận nhiệm vụ.'));
@@ -145,23 +226,30 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Xử lý Từ chối hoặc Báo thất bại
   const handleDeclineSubmit = async () => {
-    if (!mission || !declineReason.trim()) {
-      Alert.alert('Thiếu lý do', 'Vui lòng nêu rõ lý do không thể tiếp nhận ca cứu nạn này.');
+    if (!mission || teamRole !== 'LEADER') return;
+    const reason = declineReason.trim();
+    if (!reason) {
+      setFormErrors((current) => ({ ...current, declineReason: 'Vui lòng nêu rõ lý do từ chối hoặc trở ngại.' }));
       return;
     }
+    if (reason.length > 2000) {
+      setFormErrors((current) => ({ ...current, declineReason: 'Lý do không được vượt quá 2.000 ký tự.' }));
+      return;
+    }
+    setFormErrors((current) => ({ ...current, declineReason: undefined }));
     setActionLoading(true);
     try {
       if (mission.status === 'OFFERED') {
-        await ResponseApi.declineMission(mission.id, mission.version, declineReason.trim());
-        Alert.alert('Đã từ chối', 'Backend đã ghi nhận lý do từ chối nhiệm vụ.');
+        await ResponseApi.declineMission(mission.id, mission.version, reason);
+        Alert.alert('Đã từ chối', 'Lý do từ chối nhiệm vụ đã được ghi nhận.');
       } else {
         await ResponseApi.transitionMission(
           mission.id,
           mission.version,
           'FAILED',
-          declineReason.trim()
+          reason
         );
-        Alert.alert('Đã ghi nhận', 'Backend đã ghi nhận trạng thái nhiệm vụ không thể tiếp cận.');
+        Alert.alert('Đã ghi nhận', 'Trạng thái nhiệm vụ không thể tiếp cận đã được ghi nhận.');
       }
       setShowDeclineModal(false);
       goBackOrHome(router);
@@ -174,7 +262,7 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Xử lý Chuyển trạng thái tiến độ (EN_ROUTE, ON_SCENE)
   const handleTransition = async (toStatus: MissionStatus, promptTitle: string) => {
-    if (!mission) return;
+    if (!mission || teamRole !== 'LEADER') return;
     Alert.alert('Xác nhận cập nhật', `Đồng chí xác nhận chuyển trạng thái sang: "${promptTitle}"?`, [
       { text: 'Hủy' },
       {
@@ -196,49 +284,81 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Xử lý Hoàn thành cứu nạn thành công (kèm ảnh bằng chứng nếu có)
   const handleCompleteSubmit = async () => {
-    if (!mission || !outcomeNote.trim()) {
-      Alert.alert('Thiếu báo cáo kết quả', 'Vui lòng nhập báo cáo kết quả cứu hộ (số người đã giải cứu, bàn giao ở đâu...).');
+    if (!mission || teamRole !== 'LEADER') return;
+    const outcome = outcomeNote.trim();
+    if (!outcome) {
+      setFormErrors((current) => ({ ...current, outcomeNote: 'Vui lòng nhập báo cáo kết quả cứu hộ.' }));
       return;
     }
+    if (outcome.length > 2000) {
+      setFormErrors((current) => ({ ...current, outcomeNote: 'Báo cáo kết quả không được vượt quá 2.000 ký tự.' }));
+      return;
+    }
+    setFormErrors((current) => ({ ...current, outcomeNote: undefined }));
     setActionLoading(true);
-    let evidenceUploadFailed = false;
     try {
-      // 1. Tải lên ảnh bằng chứng hiện trường nếu có
+      // Upload selected media first so a storage failure does not lose the local file.
       if (completionImage) {
+        const mimeType = getSupportedEvidenceMimeType(completionImage);
+        if (!mimeType) {
+          Alert.alert('Định dạng chưa hỗ trợ', 'Chỉ chọn ảnh JPEG, PNG hoặc video MP4.');
+          return;
+        }
+        if (completionImage.fileSize !== undefined && completionImage.fileSize > getEvidenceSizeLimitBytes(mimeType)) {
+          Alert.alert('Tệp quá lớn', mimeType === 'video/mp4'
+            ? 'Video MP4 phải có dung lượng không quá 50 MB.'
+            : 'Ảnh phải có dung lượng không quá 10 MB.');
+          return;
+        }
         try {
+          if (!evidenceUploadKey.current || evidenceUploadKey.current.uri !== completionImage.uri) {
+            evidenceUploadKey.current = { uri: completionImage.uri, key: generateUUID() };
+          }
+          const uploadKey = evidenceUploadKey.current.key;
           await ResponseApi.uploadMissionEvidence(mission.id, {
             uri: completionImage.uri,
-            name: completionImage.fileName || `mission-${mission.id}-${Date.now()}.jpg`,
-            type: completionImage.mimeType || 'image/jpeg',
-          });
-        } catch {
-          evidenceUploadFailed = true;
+            name: completionImage.fileName || `mission-${mission.id}-${Date.now()}${mimeType === 'video/mp4' ? '.mp4' : mimeType === 'image/png' ? '.png' : '.jpg'}`,
+            type: mimeType,
+          }, uploadKey);
+        } catch (uploadError) {
+          if (isApiErrorCode(uploadError, 'STORAGE_UNAVAILABLE')) {
+            // The backend records this attachment as FAILED; retry it with a new key.
+            evidenceUploadKey.current = null;
+          }
+          Alert.alert(
+            'Chưa tải được bằng chứng',
+            `${getApiErrorMessage(uploadError, 'Không thể tải tệp minh chứng lên.')} Tệp vẫn được giữ. Hãy thử lại hoặc xóa tệp đã chọn để hoàn tất mà không đính kèm.`,
+          );
+          return;
         }
       }
 
-      // 2. Chuyển trạng thái sang COMPLETED
       await ResponseApi.transitionMission(
         mission.id,
         mission.version,
         'COMPLETED',
         undefined,
-        outcomeNote.trim()
+        outcome
       );
-      Alert.alert(
-        'Đã ghi nhận kết quả',
-        evidenceUploadFailed
-          ? 'Backend đã ghi nhận kết quả nhiệm vụ, nhưng ảnh bằng chứng chưa tải lên thành công.'
-          : 'Backend đã ghi nhận kết quả hoàn thành nhiệm vụ.'
-      );
+      Alert.alert('Đã ghi nhận kết quả', 'Đã ghi nhận kết quả hoàn thành nhiệm vụ.');
       setShowCompleteModal(false);
       setCompletionImage(null);
+      evidenceUploadKey.current = null;
       fetchDetail();
     } catch (e: any) {
-      Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể kết thúc nhiệm vụ.'));
+      if (isApiErrorCode(e, 'VERSION_CONFLICT')) {
+        await fetchDetail();
+        Alert.alert('Nhiệm vụ đã thay đổi', 'Thông tin mới nhất đã được tải. Hãy kiểm tra lại rồi xác nhận hoàn thành lần nữa.');
+      } else {
+        Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể kết thúc nhiệm vụ.'));
+      }
     } finally {
       setActionLoading(false);
     }
   };
+
+  const completeSubmitDisabled = actionLoading || !outcomeNote.trim() || outcomeNote.length > 2000;
+  const declineSubmitDisabled = actionLoading || !declineReason.trim() || declineReason.length > 2000;
 
   if (loading) {
     return (
@@ -259,7 +379,13 @@ export const MissionDetailScreen: React.FC = () => {
     );
   }
 
-  const categoryInfo = INCIDENT_CATEGORIES[mission.category] || { label: 'Sự cố cứu hộ' };
+  const categoryInfo = INCIDENT_CATEGORIES[mission.category ?? 'UNKNOWN'] || { label: 'Sự cố cứu hộ' };
+  const kindInfo = mission.mission_kind ? MISSION_KIND_LABELS[mission.mission_kind] : null;
+  const timeline = mission.timeline.items;
+  const evidence = mission.evidence.items;
+  const canManageMission = teamRole === 'LEADER';
+  const reporterContactPhone = canManageMission ? mission.reporter_contact_phone : undefined;
+  const alternateContact = canManageMission ? mission.alternate_contact : undefined;
 
   return (
     <ScreenContainer
@@ -270,8 +396,15 @@ export const MissionDetailScreen: React.FC = () => {
       {/* 1. THẺ TỔNG QUAN SỰ CỐ */}
       <View style={styles.card}>
         <View style={styles.headerRow}>
-          <View style={styles.categoryPill}>
-            <Text style={styles.categoryText}>{categoryInfo.label}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, flex: 1, marginRight: 8 }}>
+            <View style={styles.categoryPill}>
+              <Text style={styles.categoryText}>{categoryInfo.label}</Text>
+            </View>
+            {kindInfo && (
+              <View style={[styles.kindPill, { backgroundColor: kindInfo.bg }]}>
+                <Text style={[styles.kindText, { color: kindInfo.color }]}>{kindInfo.label}</Text>
+              </View>
+            )}
           </View>
           <StatusBadge missionStatus={mission.status} />
         </View>
@@ -294,15 +427,6 @@ export const MissionDetailScreen: React.FC = () => {
             <Text style={styles.metaLabel}>Cần cứu nạn</Text>
           </View>
 
-          <View style={styles.metaCol}>
-            <MapPin size={18} color={THEME.colors.primary.main} />
-            <Text style={styles.metaValue}>
-              {mission.distance_m != null && Number.isFinite(mission.distance_m)
-                ? `${(mission.distance_m / 1000).toFixed(1)} km`
-                : 'Chưa có dữ liệu'}
-            </Text>
-            <Text style={styles.metaLabel}>Khoảng cách</Text>
-          </View>
         </View>
       </View>
 
@@ -331,10 +455,10 @@ export const MissionDetailScreen: React.FC = () => {
       <View style={styles.card}>
         <Text style={styles.cardSectionTitle}>LIÊN HỆ NẠN NHÂN / NGƯỜI BÁO TIN</Text>
         <>
-            {mission.reporter_contact_phone ? (
+            {reporterContactPhone ? (
               <View style={styles.contactRow}>
                 <View>
-                  <Text style={styles.phoneText}>{mission.reporter_contact_phone}</Text>
+                  <Text style={styles.phoneText}>{reporterContactPhone}</Text>
                   <Text style={styles.phoneLabel}>Số điện thoại người báo cứu hộ</Text>
                 </View>
                 <TouchableOpacity style={styles.callBtn} onPress={callVictimPhone}>
@@ -344,16 +468,16 @@ export const MissionDetailScreen: React.FC = () => {
               </View>
             ) : null}
 
-            {mission.alternate_contact ? (
+            {alternateContact ? (
               <View style={[styles.contactRow, { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderColor: THEME.colors.surface.border }]}>
                 <View>
-                  <Text style={styles.phoneText}>{mission.alternate_contact.phone || 'Chưa cung cấp SĐT'}</Text>
-                  <Text style={styles.phoneLabel}>Người liên hệ phụ: {mission.alternate_contact.name}</Text>
+                  <Text style={styles.phoneText}>{alternateContact.phone || 'Chưa cung cấp SĐT'}</Text>
+                  <Text style={styles.phoneLabel}>Người liên hệ phụ: {alternateContact.name}</Text>
                 </View>
-                {mission.alternate_contact.phone ? (
+                {alternateContact.phone ? (
                   <TouchableOpacity
                     style={styles.callBtn}
-                    onPress={() => Linking.openURL(`tel:${mission.alternate_contact!.phone}`)}
+                    onPress={() => Linking.openURL(`tel:${alternateContact.phone}`)}
                   >
                     <Phone size={18} color="#FFFFFF" />
                     <Text style={styles.callBtnText}>Gọi điện</Text>
@@ -361,15 +485,85 @@ export const MissionDetailScreen: React.FC = () => {
                 ) : null}
               </View>
             ) : null}
-            {!mission.reporter_contact_phone && !mission.alternate_contact ? (
-              <Text style={styles.noContactText}>Hồ sơ hiện không có thông tin liên hệ được cung cấp.</Text>
+            {!reporterContactPhone && !alternateContact ? (
+              <Text style={styles.noContactText}>
+                {canManageMission
+                  ? 'Hồ sơ hiện không có thông tin liên hệ được cung cấp.'
+                  : 'Thông tin liên hệ hiện trường chỉ hiển thị với đội trưởng.'}
+              </Text>
             ) : null}
         </>
       </View>
 
+      {/* 4. KẾT QUẢ CỨU NẠN THỰC ĐỊA (KHI ĐÃ HOÀN THÀNH) */}
+      {/* 5. TIẾN TRÌNH NHIỆM VỤ (TIMELINE) */}
+      {timeline.length > 0 && (
+        <View style={styles.card}>
+          <Text style={styles.cardSectionTitle}>TIẾN TRÌNH NHIỆM VỤ CỨU HỘ</Text>
+          {timeline.map((evt, idx) => {
+            const info = MISSION_STATUS_LABELS[evt.to_status as MissionStatus] || { label: evt.to_status };
+            const isLast = idx === timeline.length - 1;
+            const dateObj = new Date(evt.occurred_at);
+            const timeStr = !isNaN(dateObj.getTime())
+              ? `${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')} · ${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`
+              : undefined;
+            const desc = evt.outcome_note
+              ? `Kết quả: ${evt.outcome_note}`
+              : evt.reason
+                ? `Lý do: ${evt.reason}`
+                : evt.recorded_basis
+                  ? `Điều phối viên ghi thay qua hình thức ${evt.recorded_basis}`
+                  : `Trạng thái: ${info.label}`;
+            return (
+              <TimelineStep
+                key={evt.id || idx}
+                title={info.label}
+                description={desc}
+                timestamp={timeStr}
+                isCompleted={true}
+                isCurrent={isLast}
+                isLast={isLast}
+              />
+            );
+          })}
+        </View>
+      )}
+
+      {/* 6. MINH CHỨNG HIỆN TRƯỜNG ĐÃ TẢI LÊN */}
+      {evidence.length > 0 && (
+        <View style={styles.card}>
+          <Text style={styles.cardSectionTitle}>ẢNH / VIDEO HIỆN TRƯỜNG ({evidence.length})</Text>
+          {loadingEvidence && (
+            <ActivityIndicator size="small" color={THEME.colors.primary.main} style={{ marginBottom: 8 }} />
+          )}
+          <View style={styles.evidenceGrid}>
+            {evidence.map((ev) => (
+              <TouchableOpacity
+                key={ev.id}
+                style={styles.evidenceThumbCard}
+                onPress={() => handleViewEvidence(ev.id, ev.detected_mime)}
+                activeOpacity={0.8}
+              >
+                {ev.detected_mime === 'video/mp4'
+                  ? <Video size={22} color={THEME.colors.primary.main} />
+                  : <ImageIcon size={22} color={THEME.colors.primary.main} />}
+                <Text style={styles.evidenceThumbText} numberOfLines={1}>
+                  {ev.detected_mime.includes('video') ? 'Video hiện trường' : 'Ảnh hiện trường'}
+                </Text>
+                <Text style={styles.evidenceSizeText}>
+                  {(ev.size_bytes / (1024 * 1024)).toFixed(1)} MB · Chạm để xem
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
       {/* Quyền thao tác được máy chủ kiểm tra theo trạng thái nhiệm vụ và thành viên hiện tại. */}
       <View style={styles.actionSection}>
-          <Text style={styles.memberActionSub}>Quyền thao tác được kiểm tra khi gửi yêu cầu.</Text>
+        {canManageMission ? (
+          <>
+          <Text style={styles.memberActionSub}>Bạn là đội trưởng của đội được giao. Hãy cập nhật nhiệm vụ theo tình hình thực tế.</Text>
           {actionLoading && <ActivityIndicator size="small" color={THEME.colors.primary.main} style={{ marginBottom: 10 }} />}
 
           {/* Khi mới nhận (OFFERED) */}
@@ -377,7 +571,10 @@ export const MissionDetailScreen: React.FC = () => {
             <View style={styles.buttonRow}>
               <TouchableOpacity
                 style={[styles.declineBtn, actionLoading && { opacity: 0.6 }]}
-                onPress={() => setShowDeclineModal(true)}
+                onPress={() => {
+                  setFormErrors((current) => ({ ...current, declineReason: undefined }));
+                  setShowDeclineModal(true);
+                }}
                 disabled={actionLoading}
               >
                 <XCircle size={18} color={THEME.colors.emergency.main} />
@@ -424,7 +621,10 @@ export const MissionDetailScreen: React.FC = () => {
             <View>
               <TouchableOpacity
                 style={[styles.primaryActionBtn, { backgroundColor: THEME.colors.success.main }]}
-                onPress={() => setShowCompleteModal(true)}
+                onPress={() => {
+                  setFormErrors((current) => ({ ...current, outcomeNote: undefined }));
+                  setShowCompleteModal(true);
+                }}
                 disabled={actionLoading}
               >
                 <FileCheck size={20} color="#FFFFFF" />
@@ -443,6 +643,22 @@ export const MissionDetailScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           )}
+          </>
+        ) : (
+          <View style={styles.roleNotice}>
+            <Info size={18} color={teamRole === 'MEMBER' ? THEME.colors.primary.main : THEME.colors.warning.dark} />
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={styles.roleNoticeTitle}>
+                {teamRole === 'MEMBER' ? 'Thành viên đội cứu hộ' : 'Chưa xác định vai trò đội'}
+              </Text>
+              <Text style={styles.roleNoticeText}>
+                {teamRole === 'MEMBER'
+                  ? 'Bạn có thể xem nhiệm vụ. Đội trưởng phụ trách tiếp nhận, từ chối và cập nhật tiến độ.'
+                  : 'Bạn vẫn có thể xem nhiệm vụ. Các thao tác cập nhật chỉ hiển thị khi hệ thống xác nhận bạn là đội trưởng.'}
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* MODAL HOÀN THÀNH NHIỆM VỤ */}
@@ -451,7 +667,7 @@ export const MissionDetailScreen: React.FC = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>BÁO CÁO KẾT QUẢ CỨU NẠN</Text>
             <Text style={styles.modalSubtitle}>
-              Ghi chú kết quả hoàn thành để trung tâm điều phối chốt hồ sơ:
+              Ghi chú kết quả hoàn thành để trung tâm điều phối chốt hồ sơ <RequiredAsterisk />:
             </Text>
 
             <TextInput
@@ -459,20 +675,43 @@ export const MissionDetailScreen: React.FC = () => {
               placeholder="Ví dụ: Đã đưa 2 người lên ca nô an toàn, sức khỏe bình thường, đã bàn giao cho trạm y tế xã..."
               placeholderTextColor={THEME.colors.text.muted}
               value={outcomeNote}
-              onChangeText={setOutcomeNote}
+              onChangeText={(value) => {
+                setOutcomeNote(value);
+                setFormErrors((current) => ({
+                  ...current,
+                  outcomeNote: value.length > 2000 ? 'Báo cáo kết quả không được vượt quá 2.000 ký tự.' : undefined,
+                }));
+              }}
+              onBlur={() => {
+                if (!outcomeNote.trim()) setFormErrors((current) => ({ ...current, outcomeNote: 'Báo cáo kết quả cứu hộ là bắt buộc.' }));
+              }}
               multiline={true}
               numberOfLines={4}
+              maxLength={2001}
             />
+            <FormFieldError message={formErrors.outcomeNote} />
 
-            {/* ĐÍNH KÈM ẢNH BẰNG CHỨNG CỨU NẠN */}
+            {/* ĐÍNH KÈM ẢNH HOẶC VIDEO BẰNG CHỨNG CỨU NẠN */}
             <View style={styles.imagePickerSection}>
-              <Text style={styles.imageSectionTitle}>ẢNH BẰNG CHỨNG HIỆN TRƯỜNG (KHUYẾN KHÍCH):</Text>
+              <Text style={styles.imageSectionTitle}>ẢNH HOẶC VIDEO MP4 BẰNG CHỨNG (KHUYẾN KHÍCH):</Text>
               {completionImage ? (
                 <View style={styles.imagePreviewContainer}>
-                  <Image source={{ uri: completionImage.uri }} style={styles.imagePreview} />
+                  {getSupportedEvidenceMimeType(completionImage) === 'video/mp4' ? (
+                    <View style={styles.videoPreview}>
+                      <Video size={24} color={THEME.colors.primary.main} />
+                      <Text style={styles.videoPreviewText} numberOfLines={2}>
+                        {completionImage.fileName || 'Video MP4 đã chọn'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Image source={{ uri: completionImage.uri }} style={styles.imagePreview} />
+                  )}
                   <TouchableOpacity
                     style={styles.removeImageBtn}
-                    onPress={() => setCompletionImage(null)}
+                    onPress={() => {
+                      setCompletionImage(null);
+                      evidenceUploadKey.current = null;
+                    }}
                     activeOpacity={0.8}
                   >
                     <X size={16} color="#FFFFFF" />
@@ -484,9 +723,9 @@ export const MissionDetailScreen: React.FC = () => {
                     <Camera size={16} color={THEME.colors.primary.main} />
                     <Text style={styles.imagePickerBtnText}>Chụp Ảnh</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage} activeOpacity={0.8}>
-                    <ImageIcon size={16} color={THEME.colors.primary.main} />
-                    <Text style={styles.imagePickerBtnText}>Chọn Từ Máy</Text>
+                  <TouchableOpacity style={styles.imagePickerBtn} onPress={pickEvidence} activeOpacity={0.8}>
+                    <Video size={16} color={THEME.colors.primary.main} />
+                    <Text style={styles.imagePickerBtnText}>Ảnh / Video</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -498,14 +737,15 @@ export const MissionDetailScreen: React.FC = () => {
                 onPress={() => {
                   setShowCompleteModal(false);
                   setCompletionImage(null);
+                  evidenceUploadKey.current = null;
                 }}
               >
                 <Text style={styles.modalCancelText}>Hủy</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, { backgroundColor: THEME.colors.success.main }]}
+                style={[styles.modalSubmitBtn, { backgroundColor: THEME.colors.success.main }, completeSubmitDisabled && { opacity: 0.5 }]}
                 onPress={handleCompleteSubmit}
-                disabled={actionLoading}
+                disabled={completeSubmitDisabled}
               >
                 {actionLoading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
@@ -528,16 +768,28 @@ export const MissionDetailScreen: React.FC = () => {
             <Text style={styles.modalSubtitle}>
               Nêu rõ lý do để điều phối viên cử đội cứu nạn khác chi viện:
             </Text>
+            <Text style={styles.modalSubtitle}>Lý do từ chối hoặc trở ngại <RequiredAsterisk /></Text>
 
             <TextInput
               style={styles.modalInput}
               placeholder="Ví dụ: Nước chảy quá xiết, sạt lở chia cắt đường không thể đưa ca nô vào..."
               placeholderTextColor={THEME.colors.text.muted}
               value={declineReason}
-              onChangeText={setDeclineReason}
+              onChangeText={(value) => {
+                setDeclineReason(value);
+                setFormErrors((current) => ({
+                  ...current,
+                  declineReason: value.length > 2000 ? 'Lý do không được vượt quá 2.000 ký tự.' : undefined,
+                }));
+              }}
+              onBlur={() => {
+                if (!declineReason.trim()) setFormErrors((current) => ({ ...current, declineReason: 'Lý do từ chối hoặc trở ngại là bắt buộc.' }));
+              }}
               multiline={true}
               numberOfLines={4}
+              maxLength={2001}
             />
+            <FormFieldError message={formErrors.declineReason} />
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -547,13 +799,38 @@ export const MissionDetailScreen: React.FC = () => {
                 <Text style={styles.modalCancelText}>Đóng</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, { backgroundColor: THEME.colors.emergency.main }]}
+                style={[styles.modalSubmitBtn, { backgroundColor: THEME.colors.emergency.main }, declineSubmitDisabled && { opacity: 0.5 }]}
                 onPress={handleDeclineSubmit}
+                disabled={declineSubmitDisabled}
               >
                 <Text style={styles.modalSubmitText}>Gửi Báo Cáo</Text>
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* MODAL XEM ẢNH MINH CHỨNG PHÓNG TO */}
+      <Modal visible={Boolean(previewImageUri)} transparent animationType="fade">
+        <View style={styles.previewModalOverlay}>
+          <TouchableOpacity
+            style={styles.previewModalClose}
+            onPress={() => setPreviewImageUri(null)}
+          >
+            <X size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          {previewImageUri ? (
+            previewImageError ? (
+              <Text style={styles.previewImageErrorText}>Không tải được ảnh minh chứng. Vui lòng kiểm tra kết nối rồi thử lại.</Text>
+            ) : (
+              <Image
+                source={{ uri: previewImageUri }}
+                style={styles.previewFullImage}
+                resizeMode="contain"
+                onError={() => setPreviewImageError(true)}
+              />
+            )
+          ) : null}
         </View>
       </Modal>
     </ScreenContainer>
@@ -583,6 +860,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: THEME.colors.surface.border,
+  },
+  kindPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  kindText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   categoryText: {
     fontSize: 11,
@@ -879,6 +1165,21 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 10,
   },
+  videoPreview: {
+    width: 160,
+    minHeight: 100,
+    borderRadius: 10,
+    padding: 12,
+    backgroundColor: THEME.colors.primary.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoPreviewText: {
+    marginTop: 6,
+    color: THEME.colors.text.secondary,
+    fontSize: THEME.typography.fontSizes.xs,
+    textAlign: 'center',
+  },
   removeImageBtn: {
     position: 'absolute',
     top: -6,
@@ -943,5 +1244,75 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#3B82F6',
     fontStyle: 'italic',
+  },
+  roleNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  roleNoticeTitle: {
+    fontSize: THEME.typography.fontSizes.xs + 1,
+    fontWeight: '800',
+    color: THEME.colors.text.primary,
+    marginBottom: 3,
+  },
+  roleNoticeText: {
+    fontSize: THEME.typography.fontSizes.xs,
+    color: THEME.colors.text.secondary,
+    lineHeight: 18,
+  },
+  evidenceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 6,
+  },
+  evidenceThumbCard: {
+    width: '48%',
+    backgroundColor: THEME.colors.surface.background,
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+    alignItems: 'center',
+  },
+  evidenceThumbText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.colors.text.primary,
+    marginTop: 6,
+  },
+  evidenceSizeText: {
+    fontSize: 10,
+    color: THEME.colors.text.muted,
+    marginTop: 2,
+  },
+  previewModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  previewModalClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    padding: 8,
+  },
+  previewFullImage: {
+    width: '100%',
+    height: '80%',
+  },
+  previewImageErrorText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    textAlign: 'center',
+    marginHorizontal: 28,
   },
 });

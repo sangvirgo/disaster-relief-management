@@ -12,13 +12,17 @@ import {
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { FormFieldError } from '../../../components/common/FormFieldError';
+import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { useLocation } from '../../../hooks/useLocation';
 import { INCIDENT_CATEGORIES } from '../../../constants/labels';
 import { IncidentCategoryCode, CreateSOSPayload } from '../../../types/api';
 import { ResponseApi } from '../../../api/responseApi';
-import { getApiErrorMessage } from '../../../api/client';
+import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { PendingSOSCommand, StorageService } from '../../../utils/secureStore';
 import { THEME } from '../../../constants/theme';
+import { isValidPhone, normalizePhone } from '../../../utils/formValidation';
+import { reverseGeocodeCoordinates } from '../../../utils/locationGeocoding';
 import { LocationPickerModal } from '../../../components/common/LocationPickerModal';
 import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
 import {
@@ -30,6 +34,7 @@ import {
   Send,
   RefreshCw,
   Map,
+  Compass,
   Trash2,
   AlertCircle,
 } from 'lucide-react-native';
@@ -55,15 +60,97 @@ export const CreateSOSScreen: React.FC = () => {
   const [reporterName, setReporterName] = useState<string>('');
   const [reporterPhone, setReporterPhone] = useState<string>('');
   const [description, setDescription] = useState<string>('');
+  const [formErrors, setFormErrors] = useState<Record<string, string | undefined>>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isMapModalVisible, setIsMapModalVisible] = useState<boolean>(false);
   const [locationNote, setLocationNote] = useState<string>('');
+  const [locationAreaResult, setLocationAreaResult] = useState<{
+    coordinatesKey: string;
+    address: string | null;
+  } | null>(null);
   const [pendingCommand, setPendingCommand] = useState<PendingSOSCommand | null>(null);
   const [restoringPending, setRestoringPending] = useState<boolean>(true);
   const [submissionSuccess, setSubmissionSuccess] = useState<{
     trackingCode: string;
     trackingSecret: string;
   } | null>(null);
+
+  const longitude = location?.coordinates[0] ?? null;
+  const latitude = location?.coordinates[1] ?? null;
+  const coordinatesKey = longitude === null || latitude === null
+    ? null
+    : `${longitude},${latitude}`;
+
+  const isManualPin = location?.source === 'MANUAL_PIN';
+
+  useEffect(() => {
+    if (
+      !isManualPin ||
+      coordinatesKey === null ||
+      longitude === null ||
+      latitude === null ||
+      locationAreaResult?.coordinatesKey === coordinatesKey
+    ) return;
+
+    let isCurrentLocation = true;
+    void reverseGeocodeCoordinates(longitude, latitude)
+      .then((address) => {
+        if (isCurrentLocation) setLocationAreaResult({ coordinatesKey, address });
+      })
+      .catch(() => {
+        if (isCurrentLocation) setLocationAreaResult({ coordinatesKey, address: null });
+      });
+
+    return () => {
+      isCurrentLocation = false;
+    };
+  }, [coordinatesKey, isManualPin, latitude, locationAreaResult?.coordinatesKey, longitude]);
+
+  const isResolvingLocationArea = Boolean(
+    isManualPin && coordinatesKey && locationAreaResult?.coordinatesKey !== coordinatesKey,
+  );
+  const locationArea = isManualPin && locationAreaResult?.coordinatesKey === coordinatesKey
+    ? locationAreaResult.address
+    : null;
+
+  const headcountError = (value: string) => {
+    if (value.length > 5) return 'Số người cần cứu nạn không được vượt quá 5 ký tự.';
+    const text = value.trim();
+    if (!text) return undefined;
+    const amount = Number(text);
+    if (!/^\d+$/.test(text) || !Number.isInteger(amount) || amount < 1 || amount > 10000) {
+      return 'Nhập số nguyên từ 1 đến 10.000; để trống nếu chưa rõ.';
+    }
+    return undefined;
+  };
+  const vulnerableCountsError = (childrenValue: string, elderlyValue: string, totalValue: string) => {
+    if (childrenValue.length > 5 || elderlyValue.length > 5) return 'Số trẻ em và người cao tuổi không được vượt quá 5 ký tự.';
+    const childrenText = childrenValue.trim();
+    const elderlyText = elderlyValue.trim();
+    const totalText = totalValue.trim();
+    const children = childrenText ? Number(childrenText) : null;
+    const elderly = elderlyText ? Number(elderlyText) : null;
+    if ((childrenText && (!/^\d+$/.test(childrenText) || !Number.isInteger(children) || (children as number) < 0 || (children as number) > 10000)) ||
+      (elderlyText && (!/^\d+$/.test(elderlyText) || !Number.isInteger(elderly) || (elderly as number) < 0 || (elderly as number) > 10000))) {
+      return 'Số trẻ em và người cao tuổi phải là số nguyên từ 0 đến 10.000.';
+    }
+    const total = totalText ? Number(totalText) : null;
+    if (total !== null && Number.isInteger(total) && total >= 1 && (children ?? 0) + (elderly ?? 0) > total) {
+      return 'Tổng số trẻ em và người cao tuổi không được lớn hơn tổng số người.';
+    }
+    return undefined;
+  };
+  const reporterPhoneError = (value: string) => {
+    if (value.length > 32) return 'Số điện thoại không được vượt quá 32 ký tự.';
+    if (!value.trim()) return undefined;
+    return isValidPhone(value) ? undefined : 'Số điện thoại cần có 8–15 chữ số; có thể bắt đầu bằng dấu +.';
+  };
+  const descriptionError = (value: string, note = locationNote) => {
+    const combined = [note ? `[Vị trí: ${note}]` : '', value.trim()].filter(Boolean).join(' ');
+    return value.length > 2000 || combined.length > 2000
+      ? 'Mô tả và ghi chú vị trí không được vượt quá 2.000 ký tự.'
+      : undefined;
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -90,12 +177,31 @@ export const CreateSOSScreen: React.FC = () => {
     return () => { mounted = false; };
   }, [setLocationSnapshot]);
 
-  const handleConfirmManualLocation = (coords: [number, number], note?: string) => {
+  const handleConfirmManualLocation = (
+    coords: [number, number],
+    note?: string,
+    detectedAddress?: string,
+  ) => {
     setManualLocation(coords[0], coords[1]);
+    if (detectedAddress) {
+      setLocationAreaResult({ coordinatesKey: `${coords[0]},${coords[1]}`, address: detectedAddress });
+    }
     if (note) {
       setLocationNote(note);
     }
+    setFormErrors((current) => ({
+      ...current,
+      location: undefined,
+      description: descriptionError(description, note ?? locationNote),
+    }));
   };
+
+  const combinedDescription = [locationNote ? `[Vị trí: ${locationNote}]` : '', description.trim()]
+    .filter(Boolean).join(' ');
+  const submitDisabled = isSubmitting || restoringPending || Boolean(descriptionError(description)) ||
+    Boolean(headcountError(peopleAffected)) || Boolean(vulnerableCountsError(childrenCount, elderlyCount, peopleAffected)) ||
+    Boolean(reporterPhoneError(reporterPhone)) ||
+    (!pendingCommand && (!location || (!needsRescue && !needsRelief)));
 
   const handleDiscardPending = () => {
     Alert.alert(
@@ -132,43 +238,32 @@ export const CreateSOSScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!pendingCommand && !location) {
-      Alert.alert(
-        'Chưa có vị trí',
-        'Vui lòng chọn hoặc ghim vị trí hiện trường trên bản đồ trước khi gửi yêu cầu cứu nạn.',
-        [
-          { text: 'Ghim trên bản đồ ngay', onPress: () => setIsMapModalVisible(true) },
-          { text: 'Đóng', style: 'cancel' },
-        ]
-      );
-      return;
-    }
-
+    const errors: Record<string, string> = {};
+    if (!pendingCommand && !location) errors.location = 'Hãy lấy GPS hoặc ghim và xác nhận vị trí hiện trường.';
     const headcountText = peopleAffected.trim();
     const headcount = headcountText ? Number(headcountText) : null;
-    if (!pendingCommand && headcountText && (!/^\d+$/.test(headcountText) || !Number.isInteger(headcount) || (headcount as number) < 1 || (headcount as number) > 10000)) {
-      Alert.alert('Thông tin chưa hợp lệ', 'Số người cần hỗ trợ phải là số nguyên từ 1 đến 10.000; để trống nếu chưa rõ.');
-      return;
-    }
-    const children = childrenCount === '' ? null : Number(childrenCount);
-    const elderly = elderlyCount === '' ? null : Number(elderlyCount);
-    if ([children, elderly].some((value) => value !== null && (!Number.isInteger(value) || value < 0 || value > 10000))) {
-      Alert.alert('Thông tin chưa hợp lệ', 'Số trẻ em và người cao tuổi phải là số nguyên từ 0 đến 10.000.');
-      return;
-    }
-    if (headcount !== null && (children ?? 0) + (elderly ?? 0) > headcount) {
-      Alert.alert('Thông tin chưa hợp lệ', 'Tổng số trẻ em và người cao tuổi không được lớn hơn tổng số người.');
-      return;
-    }
-    if (!needsRescue && !needsRelief) {
-      Alert.alert('Chưa chọn nhu cầu', 'Hãy chọn cần cứu hộ, cần hàng cứu trợ hoặc cả hai.');
+    const headcountValidationError = headcountError(headcountText);
+    if (!pendingCommand && headcountValidationError) errors.peopleAffected = headcountValidationError;
+    const childrenText = childrenCount.trim();
+    const elderlyText = elderlyCount.trim();
+    const children = childrenText === '' ? null : Number(childrenText);
+    const elderly = elderlyText === '' ? null : Number(elderlyText);
+    const vulnerableValidationError = vulnerableCountsError(childrenText, elderlyText, headcountText);
+    if (!pendingCommand && vulnerableValidationError) errors.vulnerableCounts = vulnerableValidationError;
+    if (!pendingCommand && !needsRescue && !needsRelief) errors.needs = 'Chọn cần cứu hộ, cần hàng cứu trợ hoặc cả hai.';
+    const normalizedPhone = normalizePhone(reporterPhone);
+    const phoneValidationError = reporterPhoneError(reporterPhone);
+    if (!pendingCommand && phoneValidationError) errors.reporterPhone = phoneValidationError;
+    const descriptionValidationError = descriptionError(description);
+    if (!pendingCommand && descriptionValidationError) errors.description = descriptionValidationError;
+
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const combinedDescription = [locationNote ? `[Vị trí: ${locationNote}]` : '', description.trim()]
-        .filter(Boolean).join(' ');
       const payload: CreateSOSPayload = pendingCommand?.payload || {
         incident_category_code: selectedCategory,
         description: combinedDescription || undefined,
@@ -176,7 +271,7 @@ export const CreateSOSScreen: React.FC = () => {
         ...(children === null ? {} : { children_count: children }),
         ...(elderly === null ? {} : { elderly_count: elderly }),
         reporter_name: reporterName.trim() || undefined,
-        reporter_contact_phone: reporterPhone.trim() || undefined,
+        reporter_contact_phone: normalizedPhone || undefined,
         reporter_declared_danger: declaredDanger,
         needs_rescue: needsRescue,
         needs_relief_supplies: needsRelief,
@@ -201,6 +296,17 @@ export const CreateSOSScreen: React.FC = () => {
         Alert.alert('Có yêu cầu đang chờ xác nhận', 'Ứng dụng giữ nguyên nội dung và khóa của lần gửi trước để tránh tạo SOS trùng. Hãy khôi phục nội dung cũ hoặc chờ kết nối rồi gửi lại.');
       } else if (error instanceof Error && error.message === 'PENDING_COMMAND_TOO_LARGE') {
         Alert.alert('Bản gửi quá dài', 'Không thể lưu an toàn để bảo đảm gửi lại đúng một lần. Hãy rút gọn mô tả rồi thử lại.');
+      } else if (isApiErrorCode(error, 'VALIDATION_FAILED')) {
+        try {
+          await StorageService.clearPendingSOS();
+          setPendingCommand(null);
+          Alert.alert(
+            'Yêu cầu chưa được gửi',
+            'Hệ thống từ chối dữ liệu của bản gửi trước. Nội dung vẫn còn trên biểu mẫu để bạn chỉnh sửa rồi gửi lại.',
+          );
+        } catch {
+          Alert.alert('Không thể gửi yêu cầu', getApiErrorMessage(error, 'Đã có lỗi xảy ra.'));
+        }
       } else {
         Alert.alert('Không thể gửi yêu cầu', getApiErrorMessage(error, 'Đã có lỗi xảy ra. Bản gửi được giữ lại để bạn thử lại an toàn.'));
       }
@@ -240,7 +346,7 @@ export const CreateSOSScreen: React.FC = () => {
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <MapPin size={20} color={THEME.colors.emergency.main} />
-          <Text style={styles.cardTitle}>VỊ TRÍ HIỆN TRƯỜNG CỦA BẠN</Text>
+          <Text style={styles.cardTitle}>VỊ TRÍ HIỆN TRƯỜNG CỦA BẠN <RequiredAsterisk /></Text>
           {location && (
             <View
               style={[
@@ -268,7 +374,10 @@ export const CreateSOSScreen: React.FC = () => {
             </View>
             <TouchableOpacity
               style={styles.pickMapFastBtn}
-              onPress={() => setIsMapModalVisible(true)}
+              onPress={() => {
+                if (!location) setFormErrors((current) => ({ ...current, location: 'Vị trí hiện trường là bắt buộc.' }));
+                setIsMapModalVisible(true);
+              }}
               activeOpacity={0.8}
             >
               <Map size={16} color={THEME.colors.emergency.main} />
@@ -287,6 +396,22 @@ export const CreateSOSScreen: React.FC = () => {
                 ? `Độ chính xác thiết bị báo: ±${location.accuracy_m}m (GPS)`
                 : 'Đã ghim thủ công chính xác trên bản đồ'}
             </Text>
+            {isManualPin ? (
+              <View style={styles.locationAreaRow}>
+                {isResolvingLocationArea ? (
+                  <ActivityIndicator size="small" color={THEME.colors.primary.main} />
+                ) : (
+                  <Compass size={15} color={THEME.colors.primary.main} />
+                )}
+                <Text style={styles.locationAreaText}>
+                  {isResolvingLocationArea
+                    ? 'Đang tra cứu tên địa bàn...'
+                    : locationArea
+                      ? `Địa bàn: ${locationArea}`
+                      : 'Chưa tra được tên địa bàn. Tọa độ vẫn có thể sử dụng bình thường.'}
+                </Text>
+              </View>
+            ) : null}
             {locationNote ? (
               <Text style={styles.locationNoteDisplay}>Ghi chú: {locationNote}</Text>
             ) : null}
@@ -295,7 +420,10 @@ export const CreateSOSScreen: React.FC = () => {
             <View style={styles.locationActionRow}>
               <TouchableOpacity
                 style={styles.actionBtnSecondary}
-                onPress={() => setIsMapModalVisible(true)}
+                onPress={() => {
+                  if (!location) setFormErrors((current) => ({ ...current, location: 'Vị trí hiện trường là bắt buộc.' }));
+                  setIsMapModalVisible(true);
+                }}
                 activeOpacity={0.8}
               >
                 <MapPin size={15} color={THEME.colors.primary.main} />
@@ -322,7 +450,10 @@ export const CreateSOSScreen: React.FC = () => {
             <View style={styles.errorActionRow}>
               <TouchableOpacity
                 style={styles.errorPinMapBtn}
-                onPress={() => setIsMapModalVisible(true)}
+                onPress={() => {
+                  if (!location) setFormErrors((current) => ({ ...current, location: 'Vị trí hiện trường là bắt buộc.' }));
+                  setIsMapModalVisible(true);
+                }}
                 activeOpacity={0.8}
               >
                 <MapPin size={16} color="#FFFFFF" />
@@ -339,6 +470,7 @@ export const CreateSOSScreen: React.FC = () => {
             </View>
           </View>
         )}
+        <FormFieldError message={!location ? formErrors.location : undefined} />
       </View>
 
       {/* Modal Ghim Vị Trí Trên Bản Đồ */}
@@ -384,11 +516,21 @@ export const CreateSOSScreen: React.FC = () => {
           <TextInput
             style={styles.numberInput}
             value={peopleAffected}
-            onChangeText={setPeopleAffected}
+            onChangeText={(value) => {
+              setPeopleAffected(value);
+              setFormErrors((current) => ({
+                ...current,
+                peopleAffected: headcountError(value),
+                vulnerableCounts: vulnerableCountsError(childrenCount, elderlyCount, value),
+              }));
+            }}
             keyboardType="number-pad"
-            maxLength={4}
+            maxLength={6}
+            placeholder="Chưa rõ"
+            placeholderTextColor={THEME.colors.text.muted}
           />
         </View>
+        <FormFieldError message={formErrors.peopleAffected} />
 
         <View style={styles.formRow}>
           <View style={styles.labelWithIcon}>
@@ -398,9 +540,15 @@ export const CreateSOSScreen: React.FC = () => {
           <TextInput
             style={styles.numberInput}
             value={childrenCount}
-            onChangeText={setChildrenCount}
+            onChangeText={(value) => {
+              setChildrenCount(value);
+              setFormErrors((current) => ({
+                ...current,
+                vulnerableCounts: vulnerableCountsError(value, elderlyCount, peopleAffected),
+              }));
+            }}
             keyboardType="number-pad"
-            maxLength={4}
+            maxLength={6}
             placeholder="Chưa rõ"
             placeholderTextColor={THEME.colors.text.muted}
           />
@@ -414,14 +562,22 @@ export const CreateSOSScreen: React.FC = () => {
           <TextInput
             style={styles.numberInput}
             value={elderlyCount}
-            onChangeText={setElderlyCount}
+            onChangeText={(value) => {
+              setElderlyCount(value);
+              setFormErrors((current) => ({
+                ...current,
+                vulnerableCounts: vulnerableCountsError(childrenCount, value, peopleAffected),
+              }));
+            }}
             keyboardType="number-pad"
-            maxLength={4}
+            maxLength={6}
             placeholder="Chưa rõ"
             placeholderTextColor={THEME.colors.text.muted}
           />
         </View>
+        <FormFieldError message={formErrors.vulnerableCounts} />
 
+        <Text style={styles.inputLabel}>Chọn ít nhất một nhu cầu hỗ trợ <RequiredAsterisk /></Text>
         <View style={styles.dangerToggleRow}>
           <View style={styles.dangerLabelBox}>
             <AlertTriangle size={20} color={THEME.colors.emergency.main} />
@@ -430,7 +586,13 @@ export const CreateSOSScreen: React.FC = () => {
               <Text style={styles.dangerSubtitle}>Đang được chọn mặc định</Text>
             </View>
           </View>
-          <Switch value={needsRescue} onValueChange={setNeedsRescue} />
+          <Switch value={needsRescue} onValueChange={(value) => {
+            setNeedsRescue(value);
+            setFormErrors((current) => ({
+              ...current,
+              needs: !value && !needsRelief ? 'Chọn ít nhất một nhu cầu hỗ trợ.' : undefined,
+            }));
+          }} />
         </View>
 
         <View style={styles.dangerToggleRow}>
@@ -441,8 +603,15 @@ export const CreateSOSScreen: React.FC = () => {
               <Text style={styles.dangerSubtitle}>Chọn thêm nếu cần thực phẩm, nước hoặc vật tư</Text>
             </View>
           </View>
-          <Switch value={needsRelief} onValueChange={setNeedsRelief} />
+          <Switch value={needsRelief} onValueChange={(value) => {
+            setNeedsRelief(value);
+            setFormErrors((current) => ({
+              ...current,
+              needs: !value && !needsRescue ? 'Chọn ít nhất một nhu cầu hỗ trợ.' : undefined,
+            }));
+          }} />
         </View>
+        <FormFieldError message={formErrors.needs} />
 
         {/* Nút bật cờ nguy hiểm tính mạng */}
         <View style={styles.dangerToggleRow}>
@@ -476,9 +645,14 @@ export const CreateSOSScreen: React.FC = () => {
             placeholder="0912 345 678"
             placeholderTextColor={THEME.colors.text.muted}
             value={reporterPhone}
-            onChangeText={setReporterPhone}
+            onChangeText={(value) => {
+              setReporterPhone(value);
+              setFormErrors((current) => ({ ...current, reporterPhone: reporterPhoneError(value) }));
+            }}
             keyboardType="phone-pad"
+            maxLength={33}
           />
+          <FormFieldError message={formErrors.reporterPhone} />
         </View>
 
         <View style={styles.inputGroup}>
@@ -491,18 +665,29 @@ export const CreateSOSScreen: React.FC = () => {
             placeholder="Ví dụ: Nước ngập ngang ngực, có 1 cụ già 80 tuổi và 1 trẻ nhỏ, đang ở trên gác xép..."
             placeholderTextColor={THEME.colors.text.muted}
             value={description}
-            onChangeText={setDescription}
+            onChangeText={(value) => {
+              setDescription(value);
+              setFormErrors((current) => ({
+                ...current,
+                description: descriptionError(value),
+              }));
+            }}
+            onBlur={() => {
+              setFormErrors((current) => ({ ...current, description: descriptionError(description) }));
+            }}
             multiline={true}
             numberOfLines={4}
+            maxLength={2001}
           />
+          <FormFieldError message={formErrors.description} />
         </View>
       </View>
 
       {/* NÚT BẤM GỬI CỨU NẠN */}
       <TouchableOpacity
-        style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+        style={[styles.submitButton, submitDisabled && styles.submitButtonDisabled]}
         onPress={handleSubmit}
-        disabled={isSubmitting || restoringPending}
+        disabled={submitDisabled}
         activeOpacity={0.85}
       >
         {isSubmitting ? (
@@ -588,6 +773,22 @@ const styles = StyleSheet.create({
     fontSize: THEME.typography.fontSizes.xs,
     color: THEME.colors.text.secondary,
     marginTop: 4,
+  },
+  locationAreaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: THEME.colors.primary.bg,
+  },
+  locationAreaText: {
+    flex: 1,
+    fontSize: THEME.typography.fontSizes.xs,
+    lineHeight: 18,
+    color: THEME.colors.primary.dark,
   },
   pendingBanner: {
     backgroundColor: '#FEF3C7',

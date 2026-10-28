@@ -15,6 +15,12 @@ import {
 import { WebView } from "react-native-webview";
 import * as Location from "expo-location";
 import { THEME } from "../../constants/theme";
+import { FormFieldError } from "./FormFieldError";
+import {
+  formatPhotonProperties,
+  reverseGeocodeCoordinates,
+} from "../../utils/locationGeocoding";
+import type { PhotonPlaceProperties } from "../../utils/locationGeocoding";
 import {
   MapPin,
   Navigation,
@@ -31,8 +37,13 @@ interface LocationPickerModalProps {
   initialAddressNote?: string;
   title?: string;
   confirmButtonText?: string;
+  disableExternalGeocoding?: boolean;
   onClose: () => void;
-  onConfirm: (coordinates: [number, number], addressNote?: string) => void;
+  onConfirm: (
+    coordinates: [number, number],
+    addressNote?: string,
+    detectedAddress?: string,
+  ) => void;
 }
 
 interface SearchPlaceItem {
@@ -46,27 +57,11 @@ interface SearchPlaceItem {
 const DEFAULT_LATITUDE = 10.9289;
 const DEFAULT_LONGITUDE = 106.8595;
 
-// Hàm định dạng địa chỉ tiếng Việt từ kết quả Photon/OSM
-function formatPhotonProperties(properties: any): {
-  name: string;
-  fullAddress: string;
-} {
-  const name = properties.name || properties.street || "Vị trí được chọn";
-  const parts = [
-    properties.name,
-    properties.street,
-    properties.locality,
-    properties.district,
-    properties.city,
-    properties.county,
-    properties.state,
-  ].filter((part, index, allParts) => part && allParts.indexOf(part) === index);
-  if (properties.country && parts.length === 0) parts.push(properties.country);
-
-  return {
-    name,
-    fullAddress: parts.join(", "),
-  };
+function parseCoordinate(value: string): number | null {
+  const normalized = value.trim();
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) return null;
+  const coordinate = Number(normalized);
+  return Number.isFinite(coordinate) ? coordinate : null;
 }
 
 export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
@@ -75,6 +70,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   initialAddressNote = "",
   title = "Ghim Vị Trí Cứu Nạn",
   confirmButtonText = "Xác nhận vị trí này",
+  disableExternalGeocoding = false,
   onClose,
   onConfirm,
 }) => {
@@ -97,6 +93,8 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       : DEFAULT_LATITUDE.toFixed(6),
   );
   const [isLocationSelected, setIsLocationSelected] = useState<boolean>(Boolean(initialCoordinates));
+  const [hasManualCoordinates, setHasManualCoordinates] = useState<boolean>(false);
+  const [coordinateError, setCoordinateError] = useState<string | undefined>();
   const [addressNote, setAddressNote] = useState<string>(initialAddressNote);
   const [detectedAddress, setDetectedAddress] = useState<string>("");
 
@@ -113,31 +111,18 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   const addressLookupRequestRef = useRef(0);
 
   const resolveSelectedAddress = useCallback(async (lat: number, lng: number) => {
+    if (disableExternalGeocoding) return;
     const requestId = ++addressLookupRequestRef.current;
     setDetectedAddress("");
     setAddressLookupError(false);
     setIsResolvingAddress(true);
 
     try {
-      const response = await fetch(
-        // The public Photon instance does not support `vi`; omitting `lang`
-        // lets it return the local name for Vietnamese locations.
-        `https://photon.komoot.io/reverse?lon=${encodeURIComponent(lng)}&lat=${encodeURIComponent(lat)}&limit=1`,
-      );
-      if (!response.ok) throw new Error("Address lookup failed");
-
-      const data = await response.json();
+      // The public Photon instance does not support `vi`; omitting `lang`
+      // lets it return the local name for Vietnamese locations.
+      const address = await reverseGeocodeCoordinates(lng, lat);
       if (requestId !== addressLookupRequestRef.current) return;
-
-      const properties = data?.features?.[0]?.properties;
-      if (!properties) {
-        setAddressLookupError(true);
-        return;
-      }
-
-      const { name, fullAddress } = formatPhotonProperties(properties);
-      const address = fullAddress || name;
-      if (!address || address === "Vị trí được chọn") {
+      if (!address) {
         setAddressLookupError(true);
         return;
       }
@@ -147,7 +132,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     } finally {
       if (requestId === addressLookupRequestRef.current) setIsResolvingAddress(false);
     }
-  }, []);
+  }, [disableExternalGeocoding]);
 
   // Cập nhật khi mở modal hoặc initialCoordinates thay đổi
   useEffect(() => {
@@ -165,23 +150,31 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       setLngInput(initialCoordinates ? initLng.toFixed(6) : "");
       setLatInput(initialCoordinates ? initLat.toFixed(6) : "");
       setIsLocationSelected(Boolean(initialCoordinates));
+      setHasManualCoordinates(false);
+      setCoordinateError(undefined);
       setAddressNote(initialAddressNote || "");
       setSearchQuery("");
       setSearchResults([]);
       setSearchError("");
 
-      if (initialCoordinates && isMapReady && webViewRef.current) {
-        webViewRef.current.injectJavaScript(`
-          if (typeof window.updateMapLocation === 'function') {
-            window.updateMapLocation(${initLat}, ${initLng}, 16);
-          }
-          true;
-        `);
-      }
     }
-  }, [visible, initialCoordinates, initialAddressNote, isMapReady]);
+  }, [visible, initialCoordinates, initialAddressNote]);
 
   useEffect(() => {
+    if (!visible || !initialCoordinates || !isMapReady || !webViewRef.current) return;
+    webViewRef.current.injectJavaScript(`
+      if (typeof window.updateMapLocation === 'function') {
+        window.updateMapLocation(${initialCoordinates[1]}, ${initialCoordinates[0]}, 16);
+      }
+      true;
+    `);
+  }, [visible, initialCoordinates, isMapReady]);
+
+  useEffect(() => {
+    if (disableExternalGeocoding) {
+      addressLookupRequestRef.current += 1;
+      return;
+    }
     if (!visible || !initialCoordinates) {
       addressLookupRequestRef.current += 1;
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -191,7 +184,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       return;
     }
     void resolveSelectedAddress(initialCoordinates[1], initialCoordinates[0]);
-  }, [visible, initialCoordinates, resolveSelectedAddress]);
+  }, [visible, initialCoordinates, resolveSelectedAddress, disableExternalGeocoding]);
 
   // Xử lý message từ Leaflet Map trong WebView
   const handleWebViewMessage = (event: any) => {
@@ -216,7 +209,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
           setIsLocationSelected(true);
           setLatInput(newLat.toFixed(6));
           setLngInput(newLng.toFixed(6));
-          void resolveSelectedAddress(newLat, newLng);
+          if (!disableExternalGeocoding) void resolveSelectedAddress(newLat, newLng);
         }
       }
     } catch {
@@ -226,6 +219,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
   // Xử lý tìm kiếm địa chỉ bằng Photon API
   const handleSearch = async () => {
+    if (disableExternalGeocoding) return;
     const q = searchQuery.trim();
     if (!q) return;
 
@@ -239,7 +233,9 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       if (data && data.features && data.features.length > 0) {
         const items: SearchPlaceItem[] = data.features.map(
           (f: any, idx: number) => {
-            const { name, fullAddress } = formatPhotonProperties(f.properties);
+            const { name, fullAddress } = formatPhotonProperties(
+              f.properties as PhotonPlaceProperties,
+            );
             return {
               id: `${idx}_${f.geometry.coordinates.join("_")}`,
               name,
@@ -320,7 +316,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       setIsLocationSelected(true);
       setLatInput(newLat.toFixed(6));
       setLngInput(newLng.toFixed(6));
-      void resolveSelectedAddress(newLat, newLng);
+      if (!disableExternalGeocoding) void resolveSelectedAddress(newLat, newLng);
 
       // Di chuyển bản đồ tới tọa độ GPS mới
       webViewRef.current?.injectJavaScript(`
@@ -341,19 +337,21 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
   // Áp dụng tọa độ nhập từ bàn phím
   const handleApplyManualInputs = () => {
-    const parsedLng = parseFloat(lngInput);
-    const parsedLat = parseFloat(latInput);
-    if (!Number.isFinite(parsedLng) || !Number.isFinite(parsedLat) || parsedLng < -180 || parsedLng > 180 || parsedLat < -90 || parsedLat > 90) {
-      Alert.alert(
-        "Tọa độ không hợp lệ",
-        "Vui lòng kiểm tra lại kinh độ và vĩ độ.",
-      );
+    if (!lngInput.trim() || !latInput.trim()) {
+      setCoordinateError(undefined);
       return;
     }
+    const parsedLng = parseCoordinate(lngInput);
+    const parsedLat = parseCoordinate(latInput);
+    if (parsedLng === null || parsedLat === null || parsedLng < -180 || parsedLng > 180 || parsedLat < -90 || parsedLat > 90) {
+      setCoordinateError("Kinh độ phải từ -180 đến 180 và vĩ độ từ -90 đến 90.");
+      return;
+    }
+    setCoordinateError(undefined);
     setLongitude(parsedLng);
     setLatitude(parsedLat);
     setIsLocationSelected(true);
-    void resolveSelectedAddress(parsedLat, parsedLng);
+    if (!disableExternalGeocoding) void resolveSelectedAddress(parsedLat, parsedLng);
     webViewRef.current?.injectJavaScript(`
       if (typeof window.updateMapLocation === 'function') {
         window.updateMapLocation(${parsedLat}, ${parsedLng}, 16);
@@ -371,13 +369,22 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
   // Xác nhận vị trí
   const handleConfirm = () => {
-    const parsedLng = parseFloat(lngInput);
-    const parsedLat = parseFloat(latInput);
-    if (!isLocationSelected || !Number.isFinite(parsedLng) || !Number.isFinite(parsedLat) || parsedLng < -180 || parsedLng > 180 || parsedLat < -90 || parsedLat > 90) {
-      Alert.alert("Tọa độ chưa đúng", "Vui lòng chọn hoặc nhập tọa độ hợp lệ.");
+    const parsedLng = parseCoordinate(lngInput);
+    const parsedLat = parseCoordinate(latInput);
+    if (parsedLng === null || parsedLat === null || parsedLng < -180 || parsedLng > 180 || parsedLat < -90 || parsedLat > 90) {
+      setCoordinateError("Nhập kinh độ từ -180 đến 180 và vĩ độ từ -90 đến 90.");
       return;
     }
-    onConfirm([parsedLng, parsedLat], addressNote.trim() || undefined);
+    if (!isLocationSelected && !hasManualCoordinates) {
+      setCoordinateError("Hãy chọn vị trí trên bản đồ hoặc nhập cả kinh độ và vĩ độ.");
+      return;
+    }
+    setCoordinateError(undefined);
+    onConfirm(
+      [parsedLng, parsedLat],
+      addressNote.trim() || undefined,
+      detectedAddress || undefined,
+    );
     onClose();
   };
 
@@ -512,7 +519,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
         </View>
 
         {/* Thanh Tìm Kiếm Địa Điểm Thông Minh (Search Bar) */}
-        <View style={styles.searchSection}>
+        {!disableExternalGeocoding ? <View style={styles.searchSection}>
           <View style={styles.searchBar}>
             <Search size={18} color={THEME.colors.text.muted} />
             <TextInput
@@ -589,7 +596,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
           {searchError ? (
             <Text style={styles.searchErrorText}>{searchError}</Text>
           ) : null}
-        </View>
+        </View> : null}
 
         {/* Khu vực Bản đồ Tương tác Leaflet / OpenStreetMap */}
         <View style={styles.mapContainer}>
@@ -637,12 +644,12 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
         </View>
 
         {/* Khung địa danh người dùng đã chọn từ tìm kiếm */}
-        <View style={styles.detectedAddressBox}>
+        {!disableExternalGeocoding ? <View style={styles.detectedAddressBox}>
           <View style={styles.detectedHeaderRow}>
             <Compass size={16} color={THEME.colors.primary.main} />
             <Text style={styles.detectedTitle}>ĐỊA BÀN CỦA VỊ TRÍ ĐANG GHIM:</Text>
           </View>
-          <Text style={styles.detectedContentText} numberOfLines={2}>
+          <Text style={styles.detectedContentText}>
             {isResolvingAddress
               ? "Đang tra cứu tên địa bàn..."
               : detectedAddress || (addressLookupError
@@ -659,7 +666,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               <ArrowRight size={13} color={THEME.colors.primary.main} />
             </TouchableOpacity>
           ) : null}
-        </View>
+        </View> : null}
 
         {/* Khu vực Nhập / Chỉnh sửa Chi tiết Tọa độ */}
         <ScrollView
@@ -672,7 +679,11 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               <TextInput
                 style={styles.input}
                 value={lngInput}
-                onChangeText={setLngInput}
+                onChangeText={(value) => {
+                  setLngInput(value);
+                  setHasManualCoordinates(true);
+                  setCoordinateError(undefined);
+                }}
                 onBlur={handleApplyManualInputs}
                 keyboardType="numeric"
                 placeholder="106.859509"
@@ -684,7 +695,11 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               <TextInput
                 style={styles.input}
                 value={latInput}
-                onChangeText={setLatInput}
+                onChangeText={(value) => {
+                  setLatInput(value);
+                  setHasManualCoordinates(true);
+                  setCoordinateError(undefined);
+                }}
                 onBlur={handleApplyManualInputs}
                 keyboardType="numeric"
                 placeholder="10.928944"
@@ -692,6 +707,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               />
             </View>
           </View>
+            <FormFieldError message={coordinateError} />
 
           <View style={styles.noteInputGroup}>
             <Text style={styles.fieldLabel}>

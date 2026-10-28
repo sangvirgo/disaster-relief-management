@@ -1,25 +1,33 @@
 @echo off
 chcp 65001 >nul
+cd /d "%~dp0"
 echo ========================================================
-echo  Khoi dong Backend C48: Postgres, APIs, Nginx, MinIO
+echo  Khởi động Backend C48: PostgreSQL, API, Nginx và MinIO Community
 echo ========================================================
 echo.
-docker compose -p c48 --env-file backend/.env -f backend/infra/compose.yaml --profile storage up -d
+echo Đang khởi động backend kèm profile storage (MinIO, không cần giấy phép).
+docker compose -p c48 --env-file backend/.env -f backend/infra/compose.yaml --profile storage up --build -d
+if errorlevel 1 goto startup_failed
+
+:startup_succeeded
+echo.
+echo Nạp lại Nginx để cập nhật địa chỉ các API.
+docker compose -p c48 --env-file backend/.env -f backend/infra/compose.yaml restart nginx
 if errorlevel 1 goto startup_failed
 echo.
-echo Trang thai cac dich vu Backend C48:
+echo Trạng thái các dịch vụ Backend C48:
 docker compose -p c48 --env-file backend/.env -f backend/infra/compose.yaml ps
 if errorlevel 1 goto startup_failed
 echo.
 echo ========================================================
-echo  Backend C48 da san sang phuc vu Mobile va Web!
+echo  Backend C48 đã sẵn sàng phục vụ Web và Mobile!
 echo ========================================================
 goto done
 
 :startup_failed
 echo.
-echo Khoi dong backend that bai. Hay xem log db-init va cac dich vu phu thuoc.
-echo Lenh xem log: docker compose -p c48 --env-file backend/.env -f backend/infra/compose.yaml logs --tail=100 db-init
+echo Khởi động backend thất bại. Hãy xem log các dịch vụ backend và MinIO.
+echo Lệnh xem log: docker compose -p c48 --env-file backend/.env -f backend/infra/compose.yaml --profile storage logs --tail=100 db-init identity-api response-api logistics-api minio minio-init nginx
 
 :done
 pause

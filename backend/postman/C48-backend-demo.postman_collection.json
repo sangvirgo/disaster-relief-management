@@ -920,71 +920,8 @@
               ]
             },
             {
-              "id": "main-11",
-              "name": "11 · Ghi nhận đã liên hệ người báo tin",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Accept",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Idempotency-Key",
-                    "value": "{{$guid}}"
-                  },
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{activeAccessToken}}"
-                  }
-                ],
-                "url": "{{responseBaseUrl}}/requests/{{requestId}}/contact-attempts",
-                "description": "Ghi nhận đã liên hệ người báo tin\n\nChạy theo thứ tự trong kịch bản. Lệnh ghi thay đổi dữ liệu demo chính; lỗi sẽ dừng Runner. Các lần đăng nhập, đọc chi tiết và chuyển trạng thái lặp có mục đích.",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"contact_target\": \"REPORTER\",\n  \"outcome\": \"REACHED\",\n  \"note\": \"Đã xác nhận người báo tin và tình huống qua cuộc gọi demo.\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "event": [
-                {
-                  "listen": "prerequest",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.variables.set('_c48', \"{\\\"service\\\": \\\"response\\\", \\\"operationId\\\": \\\"recordRequestContactAttempt\\\", \\\"expectedStatus\\\": 201}\");",
-                      "(function () {\n\nconst source = pm.request.url.toString() + ' ' + (pm.request.body?.raw || '') + ' ' + ['Authorization','X-Tracking-Code','X-Tracking-Secret','X-Donation-Secret','X-Recovery-Code'].map(k => pm.request.headers.get(k) || '').join(' ');\nconst missing = [...source.matchAll(/\\{\\{([A-Za-z][A-Za-z0-9_]*)\\}\\}/g)].map(match => match[1]).filter(key => !String(pm.variables.get(key) ?? '').trim());\nif (missing.length) { pm.test('Đã có dữ liệu cho bước này', function () { throw new Error('Thiếu biến: ' + [...new Set(missing)].join(', ')); }); pm.execution.setNextRequest(null); pm.execution.skipRequest(); }\n})();"
-                    ]
-                  }
-                },
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "(function () {",
-                      "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
-                      "const body = pm.response.json();",
-                      "try {",
-                      "if (!body.id) throw new Error('Thiếu mã lần liên hệ.'); pm.collectionVariables.set('contactAttemptId', body.id);if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version));",
-                      "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
-                      "})();"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
               "id": "main-12",
-              "name": "12 · Xác minh từ cuộc gọi đã ghi nhận",
+              "name": "11 · Xác minh vị trí, thông tin và hình ảnh được gắn cờ",
               "request": {
                 "method": "POST",
                 "header": [
@@ -1006,10 +943,10 @@
                   }
                 ],
                 "url": "{{responseBaseUrl}}/requests/{{requestId}}/verify",
-                "description": "Xác minh từ cuộc gọi đã ghi nhận\n\nChạy theo thứ tự trong kịch bản. Lệnh ghi thay đổi dữ liệu demo chính; lỗi sẽ dừng Runner. Các lần đăng nhập, đọc chi tiết và chuyển trạng thái lặp có mục đích.",
+                "description": "Xác minh vị trí, thông tin và hình ảnh được gắn cờ\n\nChạy theo thứ tự trong kịch bản. Lệnh ghi thay đổi dữ liệu demo chính; lỗi sẽ dừng Runner. Các lần đăng nhập, đọc chi tiết và chuyển trạng thái lặp có mục đích.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"expected_version\": {{requestVersion}},\n  \"basis\": \"CONTACT_CONFIRMED\"\n}",
+                  "raw": "{\n  \"expected_version\": {{requestVersion}},\n  \"basis\": \"EVIDENCE_REVIEWED\",\n  \"reason\": \"Đã đối chiếu vị trí, thông tin và hình ảnh được gắn cờ; phù hợp với báo cáo.\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -1047,7 +984,7 @@
             },
             {
               "id": "main-13",
-              "name": "13 · Điều phối viên quyết định mức ưu tiên",
+              "name": "12 · Điều phối viên quyết định mức ưu tiên",
               "request": {
                 "method": "POST",
                 "header": [
@@ -1110,7 +1047,7 @@
             },
             {
               "id": "main-14",
-              "name": "14 · Tạo đội APP riêng, có đội trưởng và kỹ năng xuồng",
+              "name": "13 · Tạo đội APP riêng, có đội trưởng và kỹ năng xuồng",
               "request": {
                 "method": "POST",
                 "header": [
@@ -1173,7 +1110,7 @@
             },
             {
               "id": "main-15",
-              "name": "15 · Giao nhiệm vụ cho đội vừa chuẩn bị",
+              "name": "14 · Giao nhiệm vụ cho đội vừa chuẩn bị",
               "request": {
                 "method": "POST",
                 "header": [
@@ -1236,7 +1173,7 @@
             },
             {
               "id": "main-16",
-              "name": "16 · Đội trưởng mới đăng nhập",
+              "name": "15 · Đội trưởng mới đăng nhập",
               "request": {
                 "method": "POST",
                 "header": [
@@ -1295,7 +1232,7 @@
             },
             {
               "id": "main-17",
-              "name": "17 · Đội trưởng nhận nhiệm vụ",
+              "name": "16 · Đội trưởng nhận nhiệm vụ",
               "request": {
                 "method": "POST",
                 "header": [
@@ -1358,7 +1295,7 @@
             },
             {
               "id": "main-18",
-              "name": "18 · Đội đang di chuyển",
+              "name": "17 · Đội đang di chuyển",
               "request": {
                 "method": "POST",
                 "header": [
@@ -1421,7 +1358,7 @@
             },
             {
               "id": "main-19",
-              "name": "19 · Đội đã đến hiện trường",
+              "name": "18 · Đội đã đến hiện trường",
               "request": {
                 "method": "POST",
                 "header": [
@@ -1484,7 +1421,7 @@
             },
             {
               "id": "main-20",
-              "name": "20 · Đội hoàn thành cứu hộ",
+              "name": "19 · Đội hoàn thành cứu hộ",
               "request": {
                 "method": "POST",
                 "header": [
@@ -1547,7 +1484,7 @@
             },
             {
               "id": "main-21",
-              "name": "21 · Điều phối viên đăng nhập để kết thúc",
+              "name": "20 · Điều phối viên đăng nhập để kết thúc",
               "request": {
                 "method": "POST",
                 "header": [
@@ -1606,7 +1543,7 @@
             },
             {
               "id": "main-22",
-              "name": "22 · Đọc lại version SOS sau tiến độ nhiệm vụ",
+              "name": "21 · Đọc lại version SOS sau tiến độ nhiệm vụ",
               "request": {
                 "method": "GET",
                 "header": [
@@ -1652,7 +1589,7 @@
             },
             {
               "id": "main-23",
-              "name": "23 · Kết thúc SOS sau khi cứu hộ hoàn tất",
+              "name": "22 · Kết thúc SOS sau khi cứu hộ hoàn tất",
               "request": {
                 "method": "POST",
                 "header": [
@@ -1715,7 +1652,7 @@
             },
             {
               "id": "main-24",
-              "name": "24 · Chờ kết thúc SOS với số lần giới hạn",
+              "name": "23 · Chờ kết thúc SOS với số lần giới hạn",
               "request": {
                 "method": "GET",
                 "header": [
@@ -1768,7 +1705,7 @@
             },
             {
               "id": "main-25",
-              "name": "25 · Công dân đăng nhập để xem kết quả",
+              "name": "24 · Công dân đăng nhập để xem kết quả",
               "request": {
                 "method": "POST",
                 "header": [
@@ -1827,7 +1764,7 @@
             },
             {
               "id": "main-26",
-              "name": "26 · Công dân xác nhận SOS đã kết thúc",
+              "name": "25 · Công dân xác nhận SOS đã kết thúc",
               "request": {
                 "method": "GET",
                 "header": [
@@ -2394,71 +2331,8 @@
           ]
         },
         {
-          "id": "proxy-06",
-          "name": "06 · Ghi nhận đã liên hệ người báo tin",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{activeAccessToken}}"
-              }
-            ],
-            "url": "{{responseBaseUrl}}/requests/{{requestId}}/contact-attempts",
-            "description": "Ghi nhận đã liên hệ người báo tin\n\nChạy theo thứ tự trong kịch bản. Lệnh ghi thay đổi dữ liệu demo chính; lỗi sẽ dừng Runner. Các lần đăng nhập, đọc chi tiết và chuyển trạng thái lặp có mục đích.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"contact_target\": \"REPORTER\",\n  \"outcome\": \"REACHED\",\n  \"note\": \"Đã xác nhận người báo tin và tình huống qua cuộc gọi demo.\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.variables.set('_c48', \"{\\\"service\\\": \\\"response\\\", \\\"operationId\\\": \\\"recordRequestContactAttempt\\\", \\\"expectedStatus\\\": 201}\");",
-                  "(function () {\n\nconst source = pm.request.url.toString() + ' ' + (pm.request.body?.raw || '') + ' ' + ['Authorization','X-Tracking-Code','X-Tracking-Secret','X-Donation-Secret','X-Recovery-Code'].map(k => pm.request.headers.get(k) || '').join(' ');\nconst missing = [...source.matchAll(/\\{\\{([A-Za-z][A-Za-z0-9_]*)\\}\\}/g)].map(match => match[1]).filter(key => !String(pm.variables.get(key) ?? '').trim());\nif (missing.length) { pm.test('Đã có dữ liệu cho bước này', function () { throw new Error('Thiếu biến: ' + [...new Set(missing)].join(', ')); }); pm.execution.setNextRequest(null); pm.execution.skipRequest(); }\n})();"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "(function () {",
-                  "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
-                  "const body = pm.response.json();",
-                  "try {",
-                  "if (!body.id) throw new Error('Thiếu mã lần liên hệ.'); pm.collectionVariables.set('contactAttemptId', body.id);if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version));",
-                  "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
-                  "})();"
-                ]
-              }
-            }
-          ]
-        },
-        {
           "id": "proxy-07",
-          "name": "07 · Điều phối viên thứ hai đăng nhập",
+          "name": "06 · Điều phối viên thứ hai đăng nhập",
           "request": {
             "method": "POST",
             "header": [
@@ -2517,7 +2391,7 @@
         },
         {
           "id": "proxy-08",
-          "name": "08 · Điều phối viên thứ hai đọc hồ sơ",
+          "name": "07 · Điều phối viên thứ hai đọc hồ sơ",
           "request": {
             "method": "GET",
             "header": [
@@ -2563,7 +2437,7 @@
         },
         {
           "id": "proxy-09",
-          "name": "09 · Ghi nhận đồng thuận độc lập",
+          "name": "08 · Ghi nhận đồng thuận độc lập",
           "request": {
             "method": "POST",
             "header": [
@@ -2626,7 +2500,7 @@
         },
         {
           "id": "proxy-10",
-          "name": "10 · Điều phối viên thứ nhất đăng nhập để xác minh",
+          "name": "09 · Điều phối viên thứ nhất đăng nhập để xác minh",
           "request": {
             "method": "POST",
             "header": [
@@ -2685,7 +2559,7 @@
         },
         {
           "id": "proxy-11",
-          "name": "11 · Xác minh với đồng thuận hai điều phối viên",
+          "name": "10 · Xác minh với đồng thuận hai điều phối viên",
           "request": {
             "method": "POST",
             "header": [

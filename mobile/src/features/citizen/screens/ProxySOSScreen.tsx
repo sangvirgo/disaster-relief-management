@@ -15,6 +15,8 @@ import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { FormFieldError } from '../../../components/common/FormFieldError';
+import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { useAuthStore } from '../../../store/authStore';
 import { INCIDENT_CATEGORIES, CONTACTABILITY_LABELS } from '../../../constants/labels';
 import { IncidentCategoryCode, CreateProxySOSPayload, GeoLocation } from '../../../types/api';
@@ -22,6 +24,7 @@ import { ResponseApi } from '../../../api/responseApi';
 import { getApiErrorMessage } from '../../../api/client';
 import { PendingProxySOSCommand, StorageService } from '../../../utils/secureStore';
 import { THEME } from '../../../constants/theme';
+import { isValidPhone, normalizePhone } from '../../../utils/formValidation';
 import { LocationPickerModal } from '../../../components/common/LocationPickerModal';
 import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
 import {
@@ -75,11 +78,66 @@ export const ProxySOSScreen: React.FC = () => {
   const [beneficiaryPhone, setBeneficiaryPhone] = useState<string>('');
   const [contactability, setContactability] = useState<'REACHABLE' | 'UNREACHABLE' | 'UNKNOWN'>('UNKNOWN');
   const [description, setDescription] = useState<string>('');
+  const [formErrors, setFormErrors] = useState<Record<string, string | undefined>>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isMapModalVisible, setIsMapModalVisible] = useState<boolean>(false);
   const [pendingCommand, setPendingCommand] = useState<PendingProxySOSCommand | null>(null);
   const [restoringPending, setRestoringPending] = useState<boolean>(true);
   const [submissionSuccessCode, setSubmissionSuccessCode] = useState<string | null>(null);
+
+  const relationshipError = (value: string) => value.length > 100
+    ? 'Mối quan hệ không được vượt quá 100 ký tự.'
+    : undefined;
+  const informationSourceError = (value: string) => value.length > 500
+    ? 'Nguồn thông tin không được vượt quá 500 ký tự.'
+    : undefined;
+  const headcountError = (value: string) => {
+    if (value.length > 5) return 'Số người dự kiến không được vượt quá 5 ký tự.';
+    const text = value.trim();
+    if (!text) return undefined;
+    const amount = Number(text);
+    if (!/^\d+$/.test(text) || !Number.isInteger(amount) || amount < 1 || amount > 10000) {
+      return 'Nhập số nguyên từ 1 đến 10.000; để trống nếu chưa rõ.';
+    }
+    return undefined;
+  };
+  const vulnerableCountsError = (childrenValue: string, elderlyValue: string, totalValue: string) => {
+    if (childrenValue.length > 5 || elderlyValue.length > 5) return 'Số trẻ em và người cao tuổi không được vượt quá 5 ký tự.';
+    const childrenText = childrenValue.trim();
+    const elderlyText = elderlyValue.trim();
+    const totalText = totalValue.trim();
+    const children = childrenText ? Number(childrenText) : null;
+    const elderly = elderlyText ? Number(elderlyText) : null;
+    if ((childrenText && (!/^\d+$/.test(childrenText) || !Number.isInteger(children) || (children as number) < 0 || (children as number) > 10000)) ||
+      (elderlyText && (!/^\d+$/.test(elderlyText) || !Number.isInteger(elderly) || (elderly as number) < 0 || (elderly as number) > 10000))) {
+      return 'Số trẻ em và người cao tuổi phải là số nguyên từ 0 đến 10.000.';
+    }
+    const total = totalText ? Number(totalText) : null;
+    if (total !== null && Number.isInteger(total) && total >= 1 && (children ?? 0) + (elderly ?? 0) > total) {
+      return 'Tổng số trẻ em và người cao tuổi không được lớn hơn tổng số người trong nhà.';
+    }
+    return undefined;
+  };
+  const beneficiaryPhoneError = (value: string) => {
+    if (value.length > 32) return 'Số điện thoại không được vượt quá 32 ký tự.';
+    if (!value.trim()) return undefined;
+    return isValidPhone(value) ? undefined : 'Số điện thoại cần có 8–15 chữ số; có thể bắt đầu bằng dấu +.';
+  };
+  const situationTimeError = (value: string) => {
+    if (!value.trim()) return undefined;
+    const date = new Date(value);
+    const isValid = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value) &&
+      !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value.slice(0, 19));
+    return isValid ? undefined : 'Thời điểm chưa hợp lệ. Hãy chọn lại ngày và giờ theo định dạng UTC.';
+  };
+  const descriptionError = (value: string, addressNote = householdAddressNote) => {
+    if (value.length > 2000) return 'Mô tả và ghi chú địa chỉ không được vượt quá 2.000 ký tự.';
+    const combined = [
+      addressNote.trim() ? `Địa chỉ tham chiếu do người báo cung cấp: ${addressNote.trim()}` : '',
+      value.trim(),
+    ].filter(Boolean).join('\n');
+    return combined.length > 2000 ? 'Mô tả và ghi chú địa chỉ không được vượt quá 2.000 ký tự.' : undefined;
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -117,10 +175,18 @@ export const ProxySOSScreen: React.FC = () => {
     if (note) {
       setHouseholdAddressNote(note);
     }
+    setFormErrors((current) => ({
+      ...current,
+      location: undefined,
+      description: descriptionError(description, note ?? householdAddressNote),
+    }));
   };
 
   const openSituationPicker = () => {
     const selectedDate = lastKnownSituationAt ? new Date(lastKnownSituationAt) : new Date();
+    if (!lastKnownSituationAt.trim()) {
+      setFormErrors((current) => ({ ...current, lastKnownSituationAt: 'Thời điểm gần nhất biết tình hình là bắt buộc.' }));
+    }
     setDraftSituationDate(Number.isNaN(selectedDate.getTime()) ? new Date() : selectedDate);
     setSituationPickerMode('date');
     setIsSituationPickerVisible(true);
@@ -128,8 +194,22 @@ export const ProxySOSScreen: React.FC = () => {
 
   const confirmSituationDate = () => {
     setLastKnownSituationAt(draftSituationDate.toISOString());
+    setFormErrors((current) => ({ ...current, lastKnownSituationAt: undefined }));
     setIsSituationPickerVisible(false);
   };
+
+  const combinedDescription = [
+    householdAddressNote.trim() ? `Địa chỉ tham chiếu do người báo cung cấp: ${householdAddressNote.trim()}` : '',
+    description.trim(),
+  ].filter(Boolean).join('\n');
+  const submitDisabled = isSubmitting || restoringPending || Boolean(descriptionError(description)) ||
+    Boolean(relationshipError(relationship)) || Boolean(informationSourceError(informationSource)) ||
+    Boolean(headcountError(peopleAffected)) || Boolean(vulnerableCountsError(childrenCount, elderlyCount, peopleAffected)) ||
+    Boolean(beneficiaryPhoneError(beneficiaryPhone)) || Boolean(situationTimeError(lastKnownSituationAt)) ||
+    (!pendingCommand && (
+      !householdLocation || !relationship.trim() || !informationSource.trim() || !lastKnownSituationAt.trim() ||
+      (!needsRescue && !needsRelief)
+    ));
 
   const handleDiscardPending = () => {
     Alert.alert(
@@ -194,42 +274,37 @@ export const ProxySOSScreen: React.FC = () => {
   }
 
   const handleSubmit = async () => {
-    if (!pendingCommand && !householdLocation) {
-      Alert.alert('Chưa chọn vị trí hộ gia đình', 'Vui lòng ghim và xác nhận vị trí thực tế của hộ gia đình đang cần hỗ trợ.');
-      return;
-    }
-
+    const errors: Record<string, string> = {};
+    if (!pendingCommand && !householdLocation) errors.location = 'Hãy ghim và xác nhận vị trí thực tế của hộ gia đình.';
     const headcountText = peopleAffected.trim();
     const headcount = headcountText ? Number(headcountText) : null;
-    if (!pendingCommand && headcountText && (!/^\d+$/.test(headcountText) || !Number.isInteger(headcount) || (headcount as number) < 1 || (headcount as number) > 10000)) {
-      Alert.alert('Số lượng chưa hợp lệ', 'Nhập số nguyên từ 1 đến 10.000; để trống nếu chưa rõ.');
-      return;
+    const headcountValidationError = headcountError(headcountText);
+    if (!pendingCommand && headcountValidationError) errors.peopleAffected = headcountValidationError;
+    const childrenText = childrenCount.trim();
+    const elderlyText = elderlyCount.trim();
+    const children = childrenText === '' ? null : Number(childrenText);
+    const elderly = elderlyText === '' ? null : Number(elderlyText);
+    const vulnerableValidationError = vulnerableCountsError(childrenText, elderlyText, headcountText);
+    if (!pendingCommand && vulnerableValidationError) errors.vulnerableCounts = vulnerableValidationError;
+    if (!pendingCommand && !needsRescue && !needsRelief) errors.needs = 'Chọn cần cứu hộ, cần hàng cứu trợ hoặc cả hai.';
+    const normalizedRelationship = relationship.trim();
+    if (!pendingCommand && !normalizedRelationship) errors.relationship = 'Vui lòng nhập mối quan hệ với nạn nhân.';
+    else if (!pendingCommand && relationshipError(relationship)) errors.relationship = relationshipError(relationship)!;
+    const normalizedInformationSource = informationSource.trim();
+    if (!pendingCommand && !normalizedInformationSource) errors.informationSource = 'Vui lòng ghi rõ nguồn nhận thông tin.';
+    else if (!pendingCommand && informationSourceError(informationSource)) errors.informationSource = informationSourceError(informationSource)!;
+    const lastKnownValue = lastKnownSituationAt.trim();
+    if (!pendingCommand && !lastKnownValue) {
+      errors.lastKnownSituationAt = 'Hãy chọn thời điểm gần nhất biết tình hình.';
     }
-    const children = childrenCount === '' ? null : Number(childrenCount);
-    const elderly = elderlyCount === '' ? null : Number(elderlyCount);
-    if ([children, elderly].some((value) => value !== null && (!Number.isInteger(value) || value < 0 || value > 10000))) {
-      Alert.alert('Số lượng chưa hợp lệ', 'Số trẻ em và người cao tuổi phải là số nguyên từ 0 đến 10.000.');
-      return;
-    }
-    if (headcount !== null && (children ?? 0) + (elderly ?? 0) > headcount) {
-      Alert.alert('Số lượng chưa hợp lệ', 'Tổng số trẻ em và người cao tuổi không được lớn hơn tổng số người trong nhà.');
-      return;
-    }
-    if (!pendingCommand && !needsRescue && !needsRelief) {
-      Alert.alert('Chưa chọn nhu cầu', 'Hãy chọn cần cứu hộ, cần hàng cứu trợ hoặc cả hai.');
-      return;
-    }
-    if (!pendingCommand && (!relationship.trim() || !informationSource.trim() || !lastKnownSituationAt.trim())) {
-      Alert.alert('Thiếu thông tin nguồn tin', 'Hãy nhập mối quan hệ, nguồn nhận tin và chọn thời điểm gần nhất biết tình hình.');
-      return;
-    }
-    if (!pendingCommand && !/Z$/.test(lastKnownSituationAt.trim())) {
-      Alert.alert('Thời điểm chưa hợp lệ', 'Vui lòng chọn lại ngày và giờ gần nhất biết tình hình.');
-      return;
-    }
-    const lastKnownDate = new Date(lastKnownSituationAt.trim());
-    if (!pendingCommand && Number.isNaN(lastKnownDate.getTime())) {
-      Alert.alert('Thời điểm chưa đúng', 'Không thể đọc thời điểm tình hình gần nhất.');
+    const lastKnownDate = new Date(lastKnownValue);
+    if (!pendingCommand && situationTimeError(lastKnownValue)) errors.lastKnownSituationAt = situationTimeError(lastKnownValue)!;
+    const normalizedPhone = normalizePhone(beneficiaryPhone);
+    if (!pendingCommand && beneficiaryPhoneError(beneficiaryPhone)) errors.beneficiaryPhone = beneficiaryPhoneError(beneficiaryPhone)!;
+    if (!pendingCommand && descriptionError(description)) errors.description = descriptionError(description)!;
+
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
       return;
     }
 
@@ -237,7 +312,7 @@ export const ProxySOSScreen: React.FC = () => {
     try {
       const payload: CreateProxySOSPayload = pendingCommand?.payload || {
         incident_category_code: selectedCategory,
-        description: [householdAddressNote.trim() ? `Địa chỉ tham chiếu do người báo cung cấp: ${householdAddressNote.trim()}` : '', description.trim()].filter(Boolean).join('\n') || undefined,
+        description: combinedDescription || undefined,
         people_affected: headcount,
         ...(children === null ? {} : { children_count: children }),
         ...(elderly === null ? {} : { elderly_count: elderly }),
@@ -245,11 +320,11 @@ export const ProxySOSScreen: React.FC = () => {
         needs_rescue: needsRescue,
         needs_relief_supplies: needsRelief,
         location: householdLocation!,
-        relationship: relationship.trim(),
-        information_source: informationSource.trim(),
+        relationship: normalizedRelationship,
+        information_source: normalizedInformationSource,
         last_known_situation_at: lastKnownDate.toISOString(),
         contactability,
-        beneficiary_contact_phone: beneficiaryPhone.trim() || undefined,
+        beneficiary_contact_phone: normalizedPhone || undefined,
       };
 
       const command = pendingCommand || await StorageService.getOrCreatePendingProxySOS(payload);
@@ -304,7 +379,7 @@ export const ProxySOSScreen: React.FC = () => {
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <MapPin size={20} color={THEME.colors.primary.main} />
-          <Text style={styles.cardTitle}>VỊ TRÍ HỘ GIA ĐÌNH NẠN NHÂN</Text>
+          <Text style={styles.cardTitle}>VỊ TRÍ HỘ GIA ĐÌNH NẠN NHÂN <RequiredAsterisk /></Text>
           <View style={styles.sourceBadge}>
             <Text style={styles.sourceBadgeText}>Ghim bản đồ</Text>
           </View>
@@ -313,7 +388,10 @@ export const ProxySOSScreen: React.FC = () => {
         {/* Nút mở bản đồ ghim vị trí */}
         <TouchableOpacity
           style={styles.openMapBtn}
-          onPress={() => setIsMapModalVisible(true)}
+          onPress={() => {
+            if (!householdLocation) setFormErrors((current) => ({ ...current, location: 'Vị trí hộ gia đình là bắt buộc.' }));
+            setIsMapModalVisible(true);
+          }}
           activeOpacity={0.85}
         >
           <Map size={18} color="#FFFFFF" />
@@ -335,7 +413,10 @@ export const ProxySOSScreen: React.FC = () => {
             placeholder="Ví dụ: Thôn 2, Xã Tân An, Gần trạm y tế cũ..."
             placeholderTextColor={THEME.colors.text.muted}
             value={householdAddressNote}
-            onChangeText={setHouseholdAddressNote}
+            onChangeText={(value) => {
+              setHouseholdAddressNote(value);
+              setFormErrors((current) => ({ ...current, description: descriptionError(description, value) }));
+            }}
           />
         </View>
 
@@ -359,6 +440,7 @@ export const ProxySOSScreen: React.FC = () => {
             />
           </View>
         </View>
+        <FormFieldError message={formErrors.location} />
       </View>
 
       {/* Modal Ghim Vị Trí Trên Bản Đồ */}
@@ -502,34 +584,69 @@ export const ProxySOSScreen: React.FC = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Mối quan hệ với nạn nhân:</Text>
+          <Text style={styles.inputLabel}>Mối quan hệ với nạn nhân <RequiredAsterisk /></Text>
           <TextInput
             style={styles.textInput}
             value={relationship}
-            onChangeText={setRelationship}
+            onChangeText={(value) => {
+              setRelationship(value);
+              setFormErrors((current) => ({ ...current, relationship: relationshipError(value) }));
+            }}
+            onBlur={() => {
+              setFormErrors((current) => ({
+                ...current,
+                relationship: !relationship.trim() ? 'Mối quan hệ với nạn nhân là bắt buộc.' : relationshipError(relationship),
+              }));
+            }}
+            maxLength={101}
             placeholder="Con cái, Cha mẹ, Hàng xóm..."
             placeholderTextColor={THEME.colors.text.muted}
           />
+          <FormFieldError message={formErrors.relationship} />
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Nguồn nhận thông tin (bắt buộc):</Text>
+          <Text style={styles.inputLabel}>Nguồn nhận thông tin <RequiredAsterisk /></Text>
           <TextInput
             style={styles.textInput}
             value={informationSource}
-            onChangeText={setInformationSource}
+            onChangeText={(value) => {
+              setInformationSource(value);
+              setFormErrors((current) => ({ ...current, informationSource: informationSourceError(value) }));
+            }}
+            onBlur={() => {
+              setFormErrors((current) => ({
+                ...current,
+                informationSource: !informationSource.trim()
+                  ? 'Nguồn nhận thông tin là bắt buộc.'
+                  : informationSourceError(informationSource),
+              }));
+            }}
+            maxLength={501}
             placeholder="Ví dụ: Gọi điện trực tiếp cho người thân lúc 14:30"
             placeholderTextColor={THEME.colors.text.muted}
           />
+          <FormFieldError message={formErrors.informationSource} />
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Thời điểm gần nhất biết tình hình:</Text>
+          <Text style={styles.inputLabel}>Thời điểm gần nhất biết tình hình <RequiredAsterisk /></Text>
           {Platform.OS === 'web' ? (
             <TextInput
               style={styles.textInput}
               value={lastKnownSituationAt}
-              onChangeText={setLastKnownSituationAt}
+              onChangeText={(value) => {
+                setLastKnownSituationAt(value);
+                setFormErrors((current) => ({ ...current, lastKnownSituationAt: situationTimeError(value) }));
+              }}
+              onBlur={() => {
+                setFormErrors((current) => ({
+                  ...current,
+                  lastKnownSituationAt: !lastKnownSituationAt.trim()
+                    ? 'Thời điểm gần nhất biết tình hình là bắt buộc.'
+                    : situationTimeError(lastKnownSituationAt),
+                }));
+              }}
               placeholder="2026-10-25T07:30:00Z"
               placeholderTextColor={THEME.colors.text.muted}
               autoCapitalize="none"
@@ -554,6 +671,7 @@ export const ProxySOSScreen: React.FC = () => {
               ? 'Nhập thời điểm theo định dạng UTC, kết thúc bằng Z.'
               : 'Ngày giờ hiển thị theo giờ trên điện thoại và sẽ được chuẩn hóa UTC khi gửi.'}
           </Text>
+          <FormFieldError message={formErrors.lastKnownSituationAt} />
         </View>
 
         <View style={styles.inputGroup}>
@@ -561,11 +679,20 @@ export const ProxySOSScreen: React.FC = () => {
           <TextInput
             style={styles.textInput}
             value={peopleAffected}
-            onChangeText={setPeopleAffected}
+            onChangeText={(value) => {
+              setPeopleAffected(value);
+              setFormErrors((current) => ({
+                ...current,
+                peopleAffected: headcountError(value),
+                vulnerableCounts: vulnerableCountsError(childrenCount, elderlyCount, value),
+              }));
+            }}
             placeholder="Để trống nếu chưa rõ"
             placeholderTextColor={THEME.colors.text.muted}
             keyboardType="number-pad"
+            maxLength={6}
           />
+          <FormFieldError message={formErrors.peopleAffected} />
         </View>
 
         <View style={styles.inputGroup}>
@@ -573,11 +700,17 @@ export const ProxySOSScreen: React.FC = () => {
           <TextInput
             style={styles.textInput}
             value={childrenCount}
-            onChangeText={setChildrenCount}
+            onChangeText={(value) => {
+              setChildrenCount(value);
+              setFormErrors((current) => ({
+                ...current,
+                vulnerableCounts: vulnerableCountsError(value, elderlyCount, peopleAffected),
+              }));
+            }}
             placeholder="Để trống nếu chưa rõ"
             placeholderTextColor={THEME.colors.text.muted}
             keyboardType="number-pad"
-            maxLength={4}
+            maxLength={6}
           />
         </View>
 
@@ -586,14 +719,22 @@ export const ProxySOSScreen: React.FC = () => {
           <TextInput
             style={styles.textInput}
             value={elderlyCount}
-            onChangeText={setElderlyCount}
+            onChangeText={(value) => {
+              setElderlyCount(value);
+              setFormErrors((current) => ({
+                ...current,
+                vulnerableCounts: vulnerableCountsError(childrenCount, value, peopleAffected),
+              }));
+            }}
             placeholder="Để trống nếu chưa rõ"
             placeholderTextColor={THEME.colors.text.muted}
             keyboardType="number-pad"
-            maxLength={4}
+            maxLength={6}
           />
+          <FormFieldError message={formErrors.vulnerableCounts} />
         </View>
 
+        <Text style={styles.inputLabel}>Chọn ít nhất một nhu cầu hỗ trợ <RequiredAsterisk /></Text>
         <View style={styles.switchRow}>
           <Text style={styles.inputLabel}>Có nguy cơ đe dọa tính mạng</Text>
           <Switch value={declaredDanger} onValueChange={setDeclaredDanger} />
@@ -603,15 +744,28 @@ export const ProxySOSScreen: React.FC = () => {
             <Text style={styles.inputLabel}>Cần đội cứu hộ</Text>
             <Text style={styles.fieldHint}>Mặc định đã chọn cho yêu cầu báo hộ.</Text>
           </View>
-          <Switch value={needsRescue} onValueChange={setNeedsRescue} />
+          <Switch value={needsRescue} onValueChange={(value) => {
+            setNeedsRescue(value);
+            setFormErrors((current) => ({
+              ...current,
+              needs: !value && !needsRelief ? 'Chọn ít nhất một nhu cầu hỗ trợ.' : undefined,
+            }));
+          }} />
         </View>
         <View style={styles.switchRow}>
           <View style={{ flex: 1, paddingRight: 12 }}>
             <Text style={styles.inputLabel}>Cần hàng cứu trợ</Text>
             <Text style={styles.fieldHint}>Chọn thêm nếu hộ gia đình cần thực phẩm, nước hoặc vật tư.</Text>
           </View>
-          <Switch value={needsRelief} onValueChange={setNeedsRelief} />
+          <Switch value={needsRelief} onValueChange={(value) => {
+            setNeedsRelief(value);
+            setFormErrors((current) => ({
+              ...current,
+              needs: !value && !needsRescue ? 'Chọn ít nhất một nhu cầu hỗ trợ.' : undefined,
+            }));
+          }} />
         </View>
+        <FormFieldError message={formErrors.needs} />
 
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Số điện thoại của người thân (nếu có):</Text>
@@ -620,9 +774,14 @@ export const ProxySOSScreen: React.FC = () => {
             placeholder="09xx xxx xxx"
             placeholderTextColor={THEME.colors.text.muted}
             value={beneficiaryPhone}
-            onChangeText={setBeneficiaryPhone}
+            onChangeText={(value) => {
+              setBeneficiaryPhone(value);
+              setFormErrors((current) => ({ ...current, beneficiaryPhone: beneficiaryPhoneError(value) }));
+            }}
             keyboardType="phone-pad"
+            maxLength={33}
           />
+          <FormFieldError message={formErrors.beneficiaryPhone} />
         </View>
 
         <View style={styles.inputGroup}>
@@ -651,17 +810,25 @@ export const ProxySOSScreen: React.FC = () => {
           placeholder="Mô tả đặc điểm ngôi nhà, dấu hiệu nhận biết, lương thực còn lại..."
           placeholderTextColor={THEME.colors.text.muted}
           value={description}
-          onChangeText={setDescription}
+          onChangeText={(value) => {
+            setDescription(value);
+            setFormErrors((current) => ({ ...current, description: descriptionError(value) }));
+          }}
+          onBlur={() => {
+            setFormErrors((current) => ({ ...current, description: descriptionError(description) }));
+          }}
           multiline={true}
           numberOfLines={4}
+          maxLength={2001}
         />
+        <FormFieldError message={formErrors.description} />
       </View>
 
       {/* NÚT BẤM GỬI */}
       <TouchableOpacity
-        style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+        style={[styles.submitButton, submitDisabled && styles.submitButtonDisabled]}
         onPress={handleSubmit}
-        disabled={isSubmitting || restoringPending}
+        disabled={submitDisabled}
         activeOpacity={0.85}
       >
         {isSubmitting ? (

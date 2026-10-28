@@ -23,7 +23,6 @@ describe('AI advisory worker lifecycle', () => {
     delete process.env.GEMINI_API_KEY;
     delete process.env.SCHEDULER_ENABLED;
     delete process.env.GEMINI_MAX_RETRIES;
-    delete process.env.GEMINI_INCLUDE_SYNTHETIC_DEMO_NARRATIVE;
   });
   it('claims AI jobs when other schedulers are disabled', () => {
     process.env.SCHEDULER_ENABLED = 'false';
@@ -71,9 +70,9 @@ describe('AI advisory worker lifecycle', () => {
       expect(saved.priority_score).toBe(fixture.value.priority_score);
     }
   });
-  it('claims an actually enqueued hash and sends structured facts without narrative by default', async () => {
+  it('claims an actually enqueued hash and sends sanitized narrative by default', async () => {
     process.env.GEMINI_API_KEY = 'unit-test';
-    const facts = { version: 2, workCycle: 1, incidentCategoryCode: 'FLOOD', description: 'Nước lũ dâng nhanh; 4 người mắc kẹt.',
+    const facts = { version: 2, workCycle: 1, incidentCategoryCode: 'FLOOD', description: 'Tôi tên Nguyễn Văn An, số điện thoại 0912345678; nước lũ dâng nhanh; 4 người mắc kẹt.',
       peopleAffected: 3, childrenCount: 1, elderlyCount: 0, reporterDeclaredDanger: true, needsRescue: true, needsReliefSupplies: false };
     let inputHash = '';
     const query = jest.fn(async (sql: string, parameters: unknown[] = []) => {
@@ -88,28 +87,11 @@ describe('AI advisory worker lifecycle', () => {
     const extract = jest.spyOn(worker as unknown as { extract(job: unknown, text: string): Promise<typeof extraction> }, 'extract').mockResolvedValue(extraction);
     await worker['processOne']();
     expect(extract).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(extract.mock.calls[0]![1])).toMatchObject({ incident_category_code: 'FLOOD', reporter_declared_danger: true, description: '' });
-    expect(extract.mock.calls[0]![1]).not.toContain(facts.description);
-    expect(inputHash).toBe(aiAssessmentHash(facts, 2, 1));
-  });
-  it('sends only sanitized narrative when the synthetic-demo flag is explicitly enabled', async () => {
-    process.env.GEMINI_API_KEY = 'unit-test';
-    process.env.GEMINI_INCLUDE_SYNTHETIC_DEMO_NARRATIVE = 'true';
-    const facts = { version: 2, workCycle: 1, incidentCategoryCode: 'FLOOD', description: 'Tôi tên Nguyễn Văn An, số điện thoại 0912345678; nước lũ dâng nhanh.',
-      peopleAffected: 3, childrenCount: 1, elderlyCount: 0, reporterDeclaredDanger: true, needsRescue: true, needsReliefSupplies: false };
-    let inputHash = '';
-    const query = jest.fn(async (sql: string, parameters: unknown[] = []) => {
-      if (sql.includes('SELECT r.version')) return [facts];
-      if (sql.includes('INSERT INTO ai_advisory')) { inputHash = String(parameters[2]); return []; }
-      if (sql.includes('SELECT a.id')) return [{ ...job, ...facts, request_version: 2, latest_id: job.id, input_hash: inputHash }];
-      if (sql.includes('INSERT INTO ai_daily_usage')) return [{ calls: 1 }];
-      return [];
+    expect(JSON.parse(extract.mock.calls[0]![1])).toMatchObject({
+      incident_category_code: 'FLOOD',
+      reporter_declared_danger: true,
+      description: '[đã ẩn tên], số điện thoại [đã ẩn số điện thoại]; nước lũ dâng nhanh; 4 người mắc kẹt.',
     });
-    await enqueueAiAdvisory({ query } as never, job.request_id);
-    const worker = new AiAdvisoryService({ query, transaction: async (work: (manager: unknown) => Promise<unknown>) => work({ query }) } as never);
-    const extract = jest.spyOn(worker as unknown as { extract(job: unknown, text: string): Promise<typeof extraction> }, 'extract').mockResolvedValue(extraction);
-    await worker['processOne']();
-    expect(JSON.parse(extract.mock.calls[0]![1]).description).toContain('[đã ẩn tên]');
     expect(extract.mock.calls[0]![1]).not.toContain('Nguyễn Văn An');
     expect(extract.mock.calls[0]![1]).not.toContain('0912345678');
     expect(inputHash).toBe(aiAssessmentHash(facts, 2, 1));
@@ -135,6 +117,24 @@ describe('AI advisory worker lifecycle', () => {
       `job:${job.id} attempt:1 delay_seconds:30 provider_status:NETWORK`,
     );
     expect(JSON.stringify(jest.mocked(Logger.prototype.warn).mock.calls)).not.toContain('secret');
+  });
+  it('requeues invalid Gemini output within the configured retry budget', async () => {
+    const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
+    const worker = new AiAdvisoryService({ query } as unknown as DataSource);
+    jest.spyOn(worker as unknown as { claimJob(): Promise<typeof job> }, 'claimJob').mockResolvedValue(job);
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: 'not JSON' }] } }] }),
+    } as Response);
+
+    await worker['processOne']();
+
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("status='QUEUED'"), [job.id, 30, job.claim_token]);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes("status='FAILED'"))).toBe(false);
+    expect(Logger.prototype.warn).toHaveBeenCalledWith(
+      'AI_INVALID_OUTPUT_RETRY_SCHEDULED',
+      `job:${job.id} attempt:1 delay_seconds:30`,
+    );
   });
   it.each([{ attempts: 1, delaySeconds: 30 }, { attempts: 2, delaySeconds: 120 }, { attempts: 3, delaySeconds: 480 }])(
     'requeues a transient Gemini failure after attempt $attempts with a $delaySeconds second delay', async ({ attempts, delaySeconds }) => {

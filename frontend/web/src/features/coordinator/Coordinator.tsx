@@ -659,9 +659,7 @@ export function Coordinator({ page }: { page: string }) {
                 </div>
                 {detail.status === 'VERIFYING' && (
                   <p className="verification-progress">
-                    {detail.contact_attempts.items.some((item) => item.outcome === 'REACHED')
-                      ? 'Đã có lần liên hệ thành công. Chọn lần đó để hoàn tất xác minh.'
-                      : 'Trước tiên hãy ghi nhận một lần liên hệ thành công. Sau đó mới xác nhận SOS.'}
+                    Đối chiếu vị trí, tình trạng và minh chứng nếu có. Ghi rõ điều đã kiểm tra trước khi xác nhận SOS.
                   </p>
                 )}
                 <a href="#request-full-detail">Xem toàn bộ hồ sơ và lịch sử ↓</a>
@@ -1158,39 +1156,6 @@ export function Coordinator({ page }: { page: string }) {
                 })}
               {detail.status === 'VERIFYING' && (
                 <>
-                  {command({
-                    title: 'Ghi nhận liên hệ',
-                    service: 'response',
-                    path: `/requests/${detail.id}/contact-attempts`,
-                    fields: [
-                      {
-                        name: 'contact_target',
-                        label: 'Người đã liên hệ',
-                        type: 'select',
-                        required: true,
-                        initialValue: 'REPORTER',
-                        options: [
-                          ['REPORTER', 'Người báo'],
-                          ['BENEFICIARY', 'Người cần hỗ trợ'],
-                          ['ALTERNATE', 'Liên hệ thay thế'],
-                          ['AUTHORITY', 'Cơ quan chức năng'],
-                        ].map(([value, label]) => ({ value, label })),
-                      },
-                      {
-                        name: 'outcome',
-                        label: 'Kết quả liên hệ',
-                        type: 'select',
-                        required: true,
-                        options: [
-                          ['REACHED', 'Đã trao đổi được'],
-                          ['NO_ANSWER', 'Không trả lời'],
-                          ['WRONG_NUMBER', 'Sai số điện thoại'],
-                          ['OTHER', 'Khác'],
-                        ].map(([value, label]) => ({ value, label })),
-                      },
-                      { name: 'note', label: 'Nội dung đã trao đổi', type: 'textarea', placeholder: 'Ví dụ: Người báo xác nhận vị trí và số người cần hỗ trợ.' },
-                    ],
-                  })}
                   {detail.report_mode === 'PROXY' &&
                     command({
                       title: 'Điều phối viên thứ hai xác nhận',
@@ -1208,41 +1173,31 @@ export function Coordinator({ page }: { page: string }) {
                         },
                       ],
                     })}
-                  {detail.report_mode !== 'PROXY' && detail.contact_attempts.items.some((item) => item.outcome === 'REACHED') &&
+                  {detail.report_mode !== 'PROXY' &&
                     command({
                       title: 'Hoàn tất xác minh SOS',
                       service: 'response',
                       path: `/requests/${detail.id}/verify`,
                       version: detail.version,
                       warning:
-                        'Xác nhận kết quả xác minh dựa trên bằng chứng đã chọn? Quyết định này do điều phối viên thực hiện.',
+                        'Bạn đã đối chiếu vị trí, thông tin và hình ảnh được gắn cờ và thấy phù hợp? Quyết định này do điều phối viên thực hiện.',
                       fields: [
                         {
-                          name: 'contact_attempt_id',
-                          label: 'Lần liên hệ thành công',
-                          type: 'select',
-                          required: true,
-                          initialValue: detail.contact_attempts.items.filter((item) => item.outcome === 'REACHED').length === 1
-                            ? detail.contact_attempts.items.find((item) => item.outcome === 'REACHED')?.id : undefined,
-                          options: detail.contact_attempts.items
-                            .filter((item) => item.outcome === 'REACHED')
-                            .map((item) => ({
-                              value: item.id,
-                              label: `${label(item.contact_target)} · ${item.attempted_at ? timeLabel(item.attempted_at) : 'Đã liên hệ'}`,
-                            })),
-                        },
-                        {
                           name: 'reason',
-                          label: 'Thông tin đã kiểm chứng',
+                          label: 'Nội dung đã đối chiếu (vị trí, thông tin, hình ảnh)',
                           type: 'textarea',
                           required: true,
                           placeholder: 'Ví dụ: Đã xác nhận vị trí, tình trạng và số người cần hỗ trợ.',
                         },
                       ],
                       build: (values) => ({
-                        basis: 'CONTACT_CONFIRMED',
+                        basis: 'EVIDENCE_REVIEWED',
                         reason: values.reason,
-                        source_refs: { contact_attempt_ids: [values.contact_attempt_id] },
+                        source_refs: {
+                          evidence_ids: (detail.evidence?.items ?? [])
+                            .filter((item) => item.state === 'READY')
+                            .map((item) => item.id),
+                        },
                       }),
                     })}
                   {detail.report_mode === 'PROXY' &&

@@ -64,7 +64,7 @@ Every error the API can return has one row here. The implementation loads this t
 | **Response — verification / priority** | | | |
 | `REASON_REQUIRED` | 400 | Response | Vui lòng nhập lý do. |
 | `VERIFICATION_BASIS_REQUIRED` | 400 | Response | Vui lòng chọn cơ sở xác minh. |
-| `NO_CONTACT_ATTEMPT` | 409 | Response | Cần ghi nhận ít nhất một lần liên hệ hoặc nêu lý do không thể liên hệ. |
+| `NO_CONTACT_ATTEMPT` | 409 | Response | Cần một lần liên hệ người báo tin thành công do điều phối viên khác ghi nhận để cấp lại mã tra cứu. |
 | `SECOND_COORDINATOR_REQUIRED` | 409 | Response | Cần một điều phối viên khác xác nhận đồng thuận. |
 | `REJECT_THRESHOLD_NOT_MET` | 409 | Response | Chưa đủ số lần liên hệ để từ chối vì không liên lạc được. |
 | `REQUEST_NOT_VERIFIED` | 409 | Response | Yêu cầu chưa được xác minh. |
