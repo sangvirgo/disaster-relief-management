@@ -465,60 +465,72 @@ export function Coordinator({ page }: { page: string }) {
       <section className="card">
         <h2>{title[page] || title.queue}</h2>
         <p>Yêu cầu được sắp theo thời điểm tiếp nhận. Chọn một yêu cầu để xem và xử lý.</p>
-        <button
-          type="button"
-          className="button secondary"
-          onClick={() => setRevision((value) => value + 1)}
-        >
-          Cập nhật danh sách
-        </button>
-        <label>
-          Trạng thái trong danh sách
-          <select
-            value={queueStatus}
-            onChange={(event) => {
-              setQueueStatus(event.target.value);
-              setCursor('');
-            }}
-          >
-            {queueStatuses.map(([status, name]) => (
-              <option key={status} value={status}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="tabs">
-          {[
-            ['NORMAL', 'Thông thường'],
-            ['RATE_LIMITED_REVIEW', 'Rà soát tần suất'],
-            ['PROXY_QUOTA_REVIEW', 'Rà soát báo hộ'],
-          ].map(([value, title]) => (
+        <div className="queue-filter-panel">
+          <div className="queue-filter-heading">
+            <div>
+              <span className="queue-filter-eyebrow">BỘ LỌC HÀNG ĐỢI</span>
+              <strong>Lọc danh sách</strong>
+            </div>
             <button
-              key={value}
-              className={reviewLane === value ? 'active' : ''}
-              onClick={() => {
-                setReviewLane(value);
+              type="button"
+              className="button secondary queue-refresh-button"
+              onClick={() => setRevision((value) => value + 1)}
+            >
+              <span aria-hidden="true">↻</span> Cập nhật
+            </button>
+          </div>
+          <label className="queue-status-field">
+            <span>Trạng thái yêu cầu</span>
+            <span className="queue-status-select-wrap">
+              <select
+                value={queueStatus}
+                onChange={(event) => {
+                  setQueueStatus(event.target.value);
+                  setCursor('');
+                  setSelected(null);
+                }}
+              >
+                {queueStatuses.map(([status, name]) => (
+                  <option key={status} value={status}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </span>
+          </label>
+          <div className="tabs queue-review-tabs" aria-label="Loại hàng đợi">
+            {[
+              ['NORMAL', 'Thông thường'],
+              ['RATE_LIMITED_REVIEW', 'Rà soát tần suất'],
+              ['PROXY_QUOTA_REVIEW', 'Rà soát báo hộ'],
+            ].map(([value, title]) => (
+              <button
+                key={value}
+                type="button"
+                className={reviewLane === value ? 'active' : ''}
+                onClick={() => {
+                  setReviewLane(value);
+                  setCursor('');
+                  setSelected(null);
+                }}
+              >
+                {title}
+              </button>
+            ))}
+          </div>
+          <label className="check queue-attention-filter">
+            <input
+              type="checkbox"
+              checked={overdue}
+              onChange={(event) => {
+                setOverdue(event.target.checked);
                 setCursor('');
                 setSelected(null);
               }}
-            >
-              {title}
-            </button>
-          ))}
+            />
+            Chỉ xem yêu cầu cần chú ý
+          </label>
         </div>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={overdue}
-            onChange={(event) => {
-              setOverdue(event.target.checked);
-              setCursor('');
-              setSelected(null);
-            }}
-          />{' '}
-          Chỉ xem yêu cầu cần chú ý
-        </label>
         {loading && <p role="status">Đang cập nhật danh sách…</p>}
         {error && (
           <p className="notice error" role="alert">

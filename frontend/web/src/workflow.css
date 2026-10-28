@@ -6,6 +6,173 @@
   align-items: start;
 }
 
+.queue-filter-panel {
+  container: queue-filters / inline-size;
+  display: grid;
+  gap: 16px;
+  margin: 22px 0 18px;
+  padding: 18px;
+  border: 1px solid var(--color-surface-border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(150deg, #f8fbff 0%, #f5f8fd 100%);
+}
+
+.queue-filter-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.queue-filter-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.queue-filter-eyebrow {
+  color: var(--color-primary-dark);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.queue-filter-heading strong {
+  color: var(--color-text-primary);
+  font-size: 16px;
+}
+
+.queue-refresh-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: none;
+  min-height: 38px;
+  padding: 7px 12px;
+  font-size: 12px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.queue-refresh-button:hover {
+  border-color: var(--color-primary-border);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.queue-refresh-button span {
+  font-size: 19px;
+  line-height: 1;
+}
+
+.queue-status-field {
+  display: grid;
+  gap: 8px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.queue-status-select-wrap {
+  position: relative;
+  display: block;
+}
+
+.queue-status-select-wrap::after {
+  content: '';
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--color-primary-dark);
+  border-bottom: 2px solid var(--color-primary-dark);
+  transform: translateY(-65%) rotate(45deg);
+  pointer-events: none;
+  transition: transform 0.18s ease;
+}
+
+.queue-status-select-wrap:focus-within::after {
+  transform: translateY(-35%) rotate(225deg);
+}
+
+.queue-status-field select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 11px 44px 11px 15px;
+  border: 1px solid #cbd9ed;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.queue-status-field select:hover {
+  border-color: var(--color-primary-light);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+  transform: translateY(-1px);
+}
+
+.queue-status-field select:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
+}
+
+.tabs.queue-review-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  gap: 7px;
+}
+
+.tabs.queue-review-tabs button {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 12px;
+  background: #fff;
+  transition: background-color 0.18s ease, border-color 0.18s ease,
+    box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.tabs.queue-review-tabs button:hover {
+  border-color: var(--color-primary-border);
+  transform: translateY(-1px);
+}
+
+.tabs.queue-review-tabs button.active {
+  box-shadow: 0 3px 9px rgba(37, 99, 235, 0.21);
+}
+
+.tabs.queue-review-tabs button:last-child {
+  grid-column: 1 / -1;
+}
+
+@container queue-filters (min-width: 420px) {
+  .tabs.queue-review-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .tabs.queue-review-tabs button:last-child {
+    grid-column: auto;
+  }
+}
+
+.queue-attention-filter {
+  gap: 9px;
+  padding-top: 13px;
+  border-top: 1px solid var(--color-surface-border);
+  color: var(--color-text-secondary);
+}
+
+.queue-attention-filter input {
+  margin: 0;
+}
+
 .queue-row {
   width: 100%;
   display: flex;
@@ -209,6 +376,12 @@
 }
 
 @media (max-width: 720px) {
+  .queue-filter-panel {
+    padding: 16px;
+  }
+  .tabs.queue-review-tabs button {
+    font-size: 12px;
+  }
   .queue-row {
     align-items: flex-start;
     flex-direction: column;
@@ -222,5 +395,13 @@
   }
   .mission-directions {
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .queue-filter-panel button,
+  .queue-status-field select,
+  .queue-status-select-wrap::after {
+    transition: none;
   }
 }
