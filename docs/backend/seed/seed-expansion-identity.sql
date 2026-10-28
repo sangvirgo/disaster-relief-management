@@ -1,20 +1,4 @@
--- Additive synthetic Identity fixtures. Safe to apply more than once.
-WITH demo_accounts(suffix, username) AS (VALUES
-  ('101', 'admin'), ('102', 'coord1'), ('103', 'coord2'), ('104', 'campaign_mgr'),
-  ('105', 'ops_mgr'), ('106', 'intake1'), ('107', 'intake2'), ('108', 'reviewer1'),
-  ('109', 'reviewer2'), ('10a', 'dist1'), ('10b', 'dist2'), ('10c', 'vol_leader1'),
-  ('10d', 'vol_leader2'), ('10e', 'vol_member1'), ('10f', 'citizen1'), ('110', 'citizen2'),
-  ('111', 'coord_regional'), ('112', 'ops_seed'), ('113', 'citizen3'), ('114', 'vol_leader3'),
-  ('115', 'vol_member3'), ('116', 'vol_leader4'), ('117', 'vol_member4'), ('118', 'coord_seed')
-)
-UPDATE app_user AS account
-   SET email = demo.username || '+' || substr(md5(account.id::text), 1, 10) || '@example.test',
-       email_verified_at = COALESCE(account.email_verified_at, now()),
-       status = 'ACTIVE',
-       must_change_password = true
-  FROM demo_accounts AS demo
- WHERE account.id = ('00000000-0000-4000-8000-' || lpad(demo.suffix, 12, '0'))::uuid
-   AND account.username::text = demo.username;
+-- Additive synthetic Identity fixtures. Existing account state is never reset by a repeat seed.
 
 INSERT INTO app_user (id, username, display_name, email, email_verified_at, password_hash, status, must_change_password) VALUES
   ('00000000-0000-4000-8000-000000000112', 'ops_seed', 'Quản lý vận hành 2 (demo)', 'ops_seed+' || substr(md5('00000000-0000-4000-8000-000000000112'), 1, 10) || '@example.test', now(), :'seed_password_hash', 'ACTIVE', true),

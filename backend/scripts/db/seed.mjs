@@ -178,7 +178,7 @@ try {
         (SELECT count(*)::int
            FROM fixture f
            JOIN app_user u ON u.id = f.user_id AND u.username::text = f.username
-                          AND u.status = 'ACTIVE' AND u.must_change_password
+                          AND u.status = 'ACTIVE'
            JOIN role_grant g ON g.user_id = f.user_id AND g.role_code = f.role_code AND g.scope_type = f.scope_type
                             AND g.organization_id IS NOT DISTINCT FROM f.organization_id
                             AND g.region_code IS NULL AND g.campaign_id IS NULL AND g.revoked_at IS NULL

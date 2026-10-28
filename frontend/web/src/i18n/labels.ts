@@ -127,12 +127,39 @@ export const statusLabels: Record<string, string> = {
   COORDINATOR_REPORTED: 'Điều phối viên cập nhật',
   AI_ADVISORY_REVIEW: 'Điều phối viên đã rà soát gợi ý AI',
   AI_ADVISORY_RETRY: 'Điều phối viên đã yêu cầu thử lại gợi ý AI',
+  REQUEST_SUBMITTED: 'Đã gửi yêu cầu hỗ trợ',
+  REQUEST_VERIFYING: 'Nhân viên đang xác minh thông tin',
+  REQUEST_VERIFIED: 'Thông tin đã được xác minh',
+  REQUEST_TRIAGED: 'Đã xác định mức ưu tiên',
+  REQUEST_REJECTED: 'Yêu cầu đã bị từ chối',
+  REQUEST_RESOLVED: 'Yêu cầu đã được xử lý',
+  REQUEST_CLOSED: 'Yêu cầu đã được đóng',
+  REQUEST_DUPLICATED: 'Yêu cầu trùng với một yêu cầu khác',
+  DUPLICATE_ORPHANED: 'Yêu cầu trùng đã được xử lý riêng',
+  SUPPLEMENT_RECEIVED: 'Đã nhận thông tin bổ sung',
+  REPORTER_SUPPLEMENT: 'Người báo đã bổ sung thông tin',
+  CONTACT_ATTEMPT_RECORDED: 'Đã ghi nhận lần liên hệ',
+  VERIFICATION_STARTED: 'Đã bắt đầu xác minh',
+  VERIFICATION_APPROVED: 'Đã xác minh thông tin',
+  CAMPAIGN_ATTACHED: 'Đã gắn yêu cầu vào chiến dịch',
+  CAMPAIGN_DETACHED: 'Đã gỡ yêu cầu khỏi chiến dịch',
+  MISSION_OFFERED: 'Đã giao nhiệm vụ cho đội cứu trợ',
+  MISSION_ACCEPTED: 'Đội cứu trợ đã nhận nhiệm vụ',
+  MISSION_EN_ROUTE: 'Đội cứu trợ đang đến hiện trường',
+  MISSION_PROGRESS_UPDATED: 'Đội cứu trợ đã cập nhật tiến độ',
+  MISSION_FAILED: 'Nhiệm vụ chưa hoàn thành',
+  MISSION_FAILURE_REVIEW: 'Đang xem xét nhiệm vụ chưa hoàn thành',
+  TEAM_ASSIGNED: 'Đã phân công đội cứu trợ',
+  TEAM_EN_ROUTE: 'Đội cứu trợ đang đến hiện trường',
+  RESOLUTION_INTENT_CREATED: 'Đang xác nhận kết quả xử lý',
 };
 export const label = (value: unknown): string =>
   value == null || value === ''
     ? 'Chưa có thông tin'
     : statusLabels[String(value)] ||
       (/^[A-Z][A-Z0-9_]+$/.test(String(value)) ? 'Có cập nhật mới' : String(value));
+export const requestStatusLabel = (status: string): string =>
+  status === 'DISPATCHED' ? 'Đã giao nhiệm vụ' : label(status);
 export const timeLabel = (value: unknown): string =>
   typeof value === 'string' && !Number.isNaN(Date.parse(value))
     ? new Date(value).toLocaleString('vi-VN')

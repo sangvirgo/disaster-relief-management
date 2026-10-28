@@ -28,9 +28,10 @@ type Tracking = {
   id: string;
   public_code: string;
   status: string;
-  declaration?: { lines: { item_name: string; unit_name: string; declared_quantity: string }[] };
+  declaration?: { lines: { item_id: string; item_name: string; unit_name: string; declared_quantity: string }[] };
   receipt?: {
     lines: {
+      item_id: string;
       declared_quantity: string | null;
       counted_quantity: string;
       accepted_quantity: string;
@@ -449,14 +450,17 @@ export function Donations({
             {tracking.receipt ? (
               <>
                 <h3>Kết quả kiểm đếm và duyệt</h3>
-                {tracking.receipt.lines.map((line, i) => (
-                  <p key={i}>
-                    Dòng {i + 1}: đã đếm {formatQuantity(line.counted_quantity)}, chấp nhận{' '}
-                    {formatQuantity(line.accepted_quantity)}, tạm giữ{' '}
-                    {formatQuantity(line.held_quantity)}, từ chối{' '}
-                    {formatQuantity(line.rejected_quantity)}
-                  </p>
-                ))}
+                {tracking.receipt.lines.map((line, i) => {
+                  const item = tracking.declaration?.lines.find((declared) => declared.item_id === line.item_id);
+                  return (
+                    <p key={`${line.item_id}-${i}`}>
+                      {item?.item_name || `Vật phẩm ${i + 1}`}: đã đếm {formatQuantity(line.counted_quantity)}, tiếp nhận{' '}
+                      {formatQuantity(line.accepted_quantity)}, tạm giữ{' '}
+                      {formatQuantity(line.held_quantity)}, từ chối{' '}
+                      {formatQuantity(line.rejected_quantity)}
+                    </p>
+                  );
+                })}
               </>
             ) : (
               <p>Chưa có biên nhận kiểm đếm. Bản khai chưa làm tăng tồn kho.</p>

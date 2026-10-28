@@ -28,9 +28,13 @@ type Notice = ResponseComponents['schemas']['Notice'];
 
 const noticeNames: Record<string, string> = {
   MISSION_OFFERED: 'Có nhiệm vụ mới',
+  MISSION_OFFER_PENDING: 'Nhiệm vụ đang chờ đội tiếp nhận',
+  MISSION_OFFER_OVERDUE: 'Nhiệm vụ chờ nhận quá lâu',
   MISSION_OVERDUE: 'Nhiệm vụ cần chú ý',
   MISSION_ACCEPTED: 'Nhiệm vụ đã được nhận',
   REQUEST_UPDATED: 'Yêu cầu đã cập nhật',
+  REQUEST_STATUS_CHANGED: 'Trạng thái SOS đã thay đổi',
+  REQUEST_OVERDUE: 'SOS cần được xử lý sớm',
   DONATION_COUNTED: 'Vật phẩm đã kiểm đếm',
   DONATION_REVIEWED: 'Đóng góp đã được duyệt',
 };

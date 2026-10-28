@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { roles, type Me } from '../../auth/session';
 import { CommandForm, type CommandSpec, type Field } from '../../components/CommandForm';
-import { label, timeLabel } from '../../i18n/labels';
+import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { formatQuantity } from '../../i18n/quantity';
 import { ReceiptCountForm } from './ReceiptCountForm';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
@@ -119,7 +119,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           .map((item) => ({
             value: item.id!,
             label: key === 'requests'
-              ? `SOS ${string(item.tracking_code) || item.id!.slice(0, 8)} · ${label(item.status)}`
+              ? `SOS ${string(item.tracking_code) || item.id!.slice(0, 8)} · ${requestStatusLabel(string(item.status))}`
               : string(item.name) || string(item.title) || string(item.identifier) ||
                 string(item.item_name) || `Mã …${item.id!.slice(-8)}`,
           }));
@@ -132,6 +132,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     ? references.organizations
     : [...new Set(user.grants.map((grant) => grant.organization_id).filter((id): id is string => Boolean(id)))]
         .map((id) => ({ value: id, label: `Tổ chức trong quyền của tôi · …${id.slice(-8)}` }));
+  const warehouseName = (id: unknown) =>
+    references.warehouses?.find((warehouse) => warehouse.value === id)?.label ||
+    (typeof id === 'string' ? `Kho mã …${id.slice(-8)}` : 'Chưa rõ kho');
   const referenceField = (
     name: string,
     title: string,
@@ -432,7 +435,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       </th>
                       <td>
                         {string(item.warehouse_name) ||
-                          (item.warehouse_id ? `Mã …${string(item.warehouse_id).slice(-8)}` : '—')}
+                          (item.warehouse_id ? warehouseName(item.warehouse_id) : '—')}
                       </td>
                       <td>
                         {string((item.unit as Row | undefined)?.display_name) ||
@@ -605,7 +608,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 <p>
                   <strong>Kho tiếp nhận</strong>
                   <span className="detail-value">
-                    {string(detail.intake_warehouse_id)}
+                    {warehouseName(detail.intake_warehouse_id)}
                   </span>
                 </p>
               )}
@@ -613,7 +616,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 <p>
                   <strong>Kho</strong>
                   <span className="detail-value">
-                    {string(detail.warehouse_id)}
+                    {warehouseName(detail.warehouse_id)}
                   </span>
                 </p>
               )}

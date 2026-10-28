@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
-import { label, timeLabel } from '../../i18n/labels';
+import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { AnalyticsRegionField, useAnalyticsRegion } from '../../components/AnalyticsRegion';
@@ -139,6 +139,51 @@ type DuplicateCandidate = {
   received_at: string;
   distance_m: number;
 };
+
+function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onStale }: {
+  missionId: string; teamId: string; revision: number; onSuccess: () => void; onStale: () => void;
+}) {
+  const [mission, setMission] = useState<{ status: string; version: number } | null>(null);
+  const [reportingMode, setReportingMode] = useState('');
+  const [loadError, setLoadError] = useState('');
+  useEffect(() => {
+    let live = true;
+    Promise.all([
+      api<{ status: string; version: number }>('response', `/missions/${missionId}`),
+      api<{ reporting_mode: string }>('response', `/teams/${teamId}`),
+    ]).then(([missionValue, teamValue]) => {
+      if (live) { setMission(missionValue); setReportingMode(teamValue.reporting_mode); }
+    }).catch((cause) => {
+      if (live) setLoadError(cause instanceof Error ? cause.message : 'Không thể tải nhiệm vụ.');
+    });
+    return () => { live = false; };
+  }, [missionId, teamId, revision]);
+  if (loadError) return <p className="notice error">{loadError}</p>;
+  if (!mission || !reportingMode) return <p>Đang tải nhiệm vụ…</p>;
+  if (reportingMode !== 'COORDINATOR') return null;
+  const next = { OFFERED: 'ACCEPTED', ACCEPTED: 'EN_ROUTE', EN_ROUTE: 'ON_SCENE', ON_SCENE: 'COMPLETED' }[mission.status];
+  if (!next) return null;
+  const nextLabel = { ACCEPTED: 'Đội đã nhận', EN_ROUTE: 'Đội đang di chuyển', ON_SCENE: 'Đội đã đến nơi', COMPLETED: 'Đội đã hoàn thành' }[next];
+  return <CommandForm
+    key={`${missionId}-${mission.version}`}
+    spec={{
+      title: `Ghi nhận qua liên lạc: ${nextLabel}`,
+      service: 'response', path: `/missions/${missionId}/record-on-behalf`, version: mission.version,
+      fields: [
+        { name: 'recorded_basis', label: 'Cách nhận thông tin', type: 'select', required: true,
+          options: [{ value: 'RADIO', label: 'Bộ đàm' }, { value: 'PHONE', label: 'Điện thoại' },
+            { value: 'IN_PERSON', label: 'Trao đổi trực tiếp' }, { value: 'OTHER', label: 'Cách khác' }] },
+        { name: 'reported_by', label: 'Người báo từ đội', required: true },
+        { name: 'reason', label: 'Nội dung xác nhận', required: true, type: 'textarea' },
+        ...(next === 'COMPLETED' ? [{ name: 'outcome_note', label: 'Kết quả nhiệm vụ', required: true, type: 'textarea' as const }] : []),
+      ],
+      build: (values) => ({ to: next, recorded_basis: values.recorded_basis, reported_by: values.reported_by,
+        reason: values.reason, occurred_at: new Date().toISOString(),
+        ...(next === 'COMPLETED' ? { result: { outcome_note: values.outcome_note } } : {}) }),
+    }}
+    onSuccess={onSuccess} onStale={onStale}
+  />;
+}
 const priorities = ['P1', 'P2', 'P3', 'P4'].map((value) => ({ value, label: value }));
 const stateFilter: Record<string, string> = {
   verify: 'SUBMITTED',
@@ -230,14 +275,17 @@ export function Coordinator({ page }: { page: string }) {
   const [aiReviewBusy, setAiReviewBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [campaignOptions, setCampaignOptions] = useState<{ value: string; label: string }[]>([]);
+  const [campaignOptions, setCampaignOptions] = useState<{
+    value: string; label: string; regionCode: string | null
+  }[]>([]);
   useEffect(() => {
     let live = true;
-    void api<{ items: { id: string; name: string; status: string }[] }>('response', '/campaigns')
+    void api<{ items: { id: string; name: string; status: string; region_code: string | null }[] }>('response', '/campaigns')
       .then((value) => {
         if (live) setCampaignOptions(value.items
           .filter((campaign) => campaign.status === 'ACTIVE')
-          .map((campaign) => ({ value: campaign.id, label: campaign.name })));
+          .map((campaign) => ({ value: campaign.id, label: campaign.name,
+            regionCode: campaign.region_code })));
       })
       .catch(() => { /* Vẫn có thể nhập mã khi không tải được danh sách. */ });
     return () => { live = false; };
@@ -297,8 +345,8 @@ export function Coordinator({ page }: { page: string }) {
             setCursor('');
             setUpdateMessage(
               reason === 'success'
-                ? `Đã cập nhật. Trạng thái hiện tại: ${label(value.status)}.`
-                : `Đã tải lại hồ sơ. Trạng thái hiện tại: ${label(value.status)}.`
+                ? `Đã cập nhật. Trạng thái hiện tại: ${requestStatusLabel(value.status)}.`
+                : `Đã tải lại hồ sơ. Trạng thái hiện tại: ${requestStatusLabel(value.status)}.`
             );
           }
         }
@@ -530,7 +578,7 @@ export function Coordinator({ page }: { page: string }) {
                     {item.declared_danger && <small>Có khai báo nguy hiểm tính mạng</small>}
                   </span>
                   <span className="chip">
-                    {label(item.status)}
+                    {requestStatusLabel(item.status)}
                     {item.priority ? ` · ${item.priority}` : ''}
                   </span>
                 </button>
@@ -579,7 +627,7 @@ export function Coordinator({ page }: { page: string }) {
               <p>
                 <strong>Trạng thái</strong>
                 <span className="detail-value">
-                  {label(detail.status)}
+                  {requestStatusLabel(detail.status)}
                 </span>
               </p>
               <p>
@@ -687,7 +735,9 @@ export function Coordinator({ page }: { page: string }) {
               <p>
                 <strong>Chiến dịch</strong>
                 <span className="detail-value">
-                  {detail.campaign_id ? detail.campaign_id.slice(0, 8) : 'Chưa gắn'}
+                  {detail.campaign_id
+                    ? campaignOptions.find((campaign) => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn'
+                    : 'Chưa gắn'}
                 </span>
               </p>
             </div>
@@ -941,9 +991,11 @@ export function Coordinator({ page }: { page: string }) {
                     <div className="candidate" key={m.id}>
                       <strong>Mã nhiệm vụ: {m.id.slice(0, 8)}</strong>
                       <p>
-                        Trạng thái: {label(m.status)} · Đội: {m.team_id.slice(0, 8)} ·{' '}
+                        Trạng thái: {label(m.status)} · Đội: {detail.mission_history?.items.find((mission) => mission.team_id === m.team_id)?.team_name ?? 'Đội cứu hộ'} ·{' '}
                         {timeLabel(m.created_at)}
                       </p>
+                      <CoordinatorMissionControl missionId={m.id} teamId={m.team_id}
+                        revision={revision} onSuccess={done} onStale={refreshAfterConflict} />
                     </div>
                   ))}
                 </div>
@@ -1003,7 +1055,10 @@ export function Coordinator({ page }: { page: string }) {
                   version: detail.version,
                   fields: [
                     { name: 'campaign_id', label: 'Chiến dịch', type: 'reference', required: true,
-                      options: campaignOptions, placeholder: 'Dán mã chiến dịch' },
+                      options: campaignOptions
+                        .filter((campaign) => campaign.regionCode === null || campaign.regionCode === detail.region_code)
+                        .map(({ value, label: name }) => ({ value, label: name })),
+                      placeholder: 'Dán mã chiến dịch' },
                   ],
                   warning: 'Xác nhận gắn yêu cầu này vào chiến dịch đã chọn?',
                 })}
