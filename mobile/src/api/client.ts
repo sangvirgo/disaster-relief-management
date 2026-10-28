@@ -206,7 +206,6 @@ apiClient.interceptors.response.use(
     try {
       const refreshResponse = await axios.post(`${API_BASE_URL}/identity/auth/refresh`, {
         refresh_token: refreshToken,
-        client_kind: 'NATIVE',
       }, { timeout: 15000, headers: { Accept: 'application/json' } });
 
       const { access_token, refresh_token: newRefreshToken } = refreshResponse.data;

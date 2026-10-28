@@ -36,10 +36,17 @@ export const EmergencyHomeScreen: React.FC = () => {
   const [trackingCodeError, setTrackingCodeError] = useState<string | undefined>();
   const [notices, setNotices] = useState<NoticeItem[]>([]);
   const [selectedNotice, setSelectedNotice] = useState<NoticeItem | null>(null);
-  const { user, isAuthenticated, logout, getUserRoleName } = useAuthStore();
+  const {
+    user,
+    isAuthenticated,
+    logout,
+    getUserRoleName,
+    isCitizen,
+    isVolunteerOrLeader,
+  } = useAuthStore();
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !user?.must_change_password && (isCitizen() || isVolunteerOrLeader())) {
       ResponseApi.getNotices()
         .then((res) => {
           if (res?.items) {
@@ -48,7 +55,13 @@ export const EmergencyHomeScreen: React.FC = () => {
         })
         .catch(() => {});
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isCitizen, isVolunteerOrLeader, user?.must_change_password]);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.must_change_password) {
+      router.replace('/change-password');
+    }
+  }, [isAuthenticated, router, user?.must_change_password]);
 
   const handleOpenNotice = async (notice: NoticeItem) => {
     setSelectedNotice(notice);
@@ -95,6 +108,48 @@ export const EmergencyHomeScreen: React.FC = () => {
       ]
     );
   };
+
+  if (isAuthenticated && user?.must_change_password) {
+    return (
+      <ScreenContainer title="Đổi mật khẩu bắt buộc">
+        <View style={styles.accessNoticeCard}>
+          <KeyRound size={32} color={THEME.colors.warning.main} />
+          <Text style={styles.accessNoticeTitle}>Cần đổi mật khẩu trước khi tiếp tục</Text>
+          <Text style={styles.accessNoticeBody}>
+            Tài khoản này phải cập nhật mật khẩu để tiếp tục sử dụng các chức năng cứu trợ.
+          </Text>
+          <TouchableOpacity
+            style={styles.accessNoticeButton}
+            onPress={() => router.replace('/change-password')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.accessNoticeButtonText}>Đổi mật khẩu</Text>
+          </TouchableOpacity>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  if (isAuthenticated && !isCitizen() && !isVolunteerOrLeader()) {
+    return (
+      <ScreenContainer title="Ứng dụng di động Reliva">
+        <View style={styles.accessNoticeCard}>
+          <ShieldAlert size={32} color={THEME.colors.warning.main} />
+          <Text style={styles.accessNoticeTitle}>Vai trò này chưa được hỗ trợ trên ứng dụng</Text>
+          <Text style={styles.accessNoticeBody}>
+            Ứng dụng di động dành cho Công dân và Tình nguyện viên. {getUserRoleName()} vui lòng sử dụng cổng điều phối trên Web.
+          </Text>
+          <TouchableOpacity
+            style={styles.accessNoticeButton}
+            onPress={handleLogout}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.accessNoticeButtonText}>Đăng xuất</Text>
+          </TouchableOpacity>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer scrollable={true}>
@@ -384,10 +439,10 @@ export const EmergencyHomeScreen: React.FC = () => {
           <Text style={styles.quickAccessDesc}>Tiếp tế các điểm lũ</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
+        {(isVolunteerOrLeader() || !isAuthenticated) ? <TouchableOpacity
           style={styles.quickAccessCard}
           onPress={() => {
-            if (isAuthenticated) {
+            if (isVolunteerOrLeader()) {
               router.push('/team');
             } else {
               router.push('/login');
@@ -402,7 +457,7 @@ export const EmergencyHomeScreen: React.FC = () => {
           <Text style={styles.quickAccessDesc}>
             {isAuthenticated ? 'Nhiệm vụ và hoạt động đội' : 'Đăng nhập để xem nhiệm vụ'}
           </Text>
-        </TouchableOpacity>
+        </TouchableOpacity> : null}
       </View>
 
       {/* Modal chi tiết thông báo điều phối */}
@@ -444,6 +499,43 @@ export const EmergencyHomeScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  accessNoticeCard: {
+    alignItems: 'center',
+    backgroundColor: THEME.colors.surface.card,
+    borderColor: THEME.colors.surface.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 28,
+    padding: 22,
+    ...THEME.shadows.sm,
+  },
+  accessNoticeTitle: {
+    color: THEME.colors.text.primary,
+    fontSize: THEME.typography.fontSizes.lg,
+    fontWeight: '800',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  accessNoticeBody: {
+    color: THEME.colors.text.secondary,
+    fontSize: THEME.typography.fontSizes.sm,
+    lineHeight: 20,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  accessNoticeButton: {
+    alignItems: 'center',
+    backgroundColor: THEME.colors.primary.main,
+    borderRadius: 10,
+    marginTop: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  accessNoticeButtonText: {
+    color: '#FFFFFF',
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '800',
+  },
   brandHeader: {
     flexDirection: 'row',
     alignItems: 'center',

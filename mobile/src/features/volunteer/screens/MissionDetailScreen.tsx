@@ -21,13 +21,14 @@ import { StatusBadge } from '../../../components/common/StatusBadge';
 import { TimelineStep } from '../../../components/common/TimelineStep';
 import { ResponseApi } from '../../../api/responseApi';
 import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
-import { Mission, MissionStatus } from '../../../types/api';
+import { MissionDetail, MissionStatus } from '../../../types/api';
 import { INCIDENT_CATEGORIES, MISSION_KIND_LABELS, MISSION_STATUS_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
 import { generateUUID } from '../../../utils/secureStore';
 import { getEvidenceSizeLimitBytes, getSupportedEvidenceMimeType } from '../../../utils/evidence';
+import { getTeamRoleFromMissionView } from '../utils/teamMembershipRole';
+import type { TeamMembershipRole } from '../utils/teamMembershipRole';
 import {
-  MapPin,
   Users,
   Phone,
   Navigation,
@@ -41,14 +42,23 @@ import {
   ImageIcon,
   Video,
   X,
+  Info,
 } from 'lucide-react-native';
 
 export const MissionDetailScreen: React.FC = () => {
   const router = useRouter();
-  const { missionId: routeMissionId } = useLocalSearchParams<{ missionId?: string }>();
+  const { missionId: routeMissionId, teamRole: routeTeamRole } = useLocalSearchParams<{
+    missionId?: string;
+    teamRole?: string;
+  }>();
   const missionId = Array.isArray(routeMissionId) ? routeMissionId[0] : routeMissionId;
+  const routeTeamRoleValue = Array.isArray(routeTeamRole) ? routeTeamRole[0] : routeTeamRole;
+  const teamRoleHint: TeamMembershipRole | undefined = routeTeamRoleValue === 'LEADER' || routeTeamRoleValue === 'MEMBER'
+    ? routeTeamRoleValue
+    : undefined;
 
-  const [mission, setMission] = useState<Mission | null>(null);
+  const [mission, setMission] = useState<MissionDetail | null>(null);
+  const [teamRole, setTeamRole] = useState<TeamMembershipRole>(teamRoleHint ?? 'UNKNOWN');
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
@@ -138,14 +148,26 @@ export const MissionDetailScreen: React.FC = () => {
     if (!missionId) return;
     setLoading(true);
     try {
-      const data = await ResponseApi.getMissionDetail(missionId);
+      const [data, missionsPage] = await Promise.all([
+        ResponseApi.getMissionDetail(missionId),
+        ResponseApi.getMyMissions(50).catch(() => null),
+      ]);
+      const missionFromMine = missionsPage?.items.find((item) => item.id === missionId);
+      const currentTeamRole = missionFromMine
+        ? getTeamRoleFromMissionView(missionFromMine)
+        : teamRoleHint ?? 'UNKNOWN';
+      setTeamRole(currentTeamRole);
+      if (currentTeamRole !== 'LEADER') {
+        setShowCompleteModal(false);
+        setShowDeclineModal(false);
+      }
       setMission(data);
     } catch (e: any) {
       Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể tải chi tiết nhiệm vụ.'));
     } finally {
       setLoading(false);
     }
-  }, [missionId]);
+  }, [missionId, teamRoleHint]);
 
   useEffect(() => {
     // Fetch the route's initial mission snapshot.
@@ -168,14 +190,14 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Gọi điện thoại trực tiếp cho nạn nhân
   const callVictimPhone = () => {
-    const phone = mission?.reporter_contact_phone;
+    const phone = teamRole === 'LEADER' ? mission?.reporter_contact_phone : undefined;
     if (!phone) return;
     Linking.openURL(`tel:${phone}`).catch(() => Alert.alert('Không thể gọi điện', 'Thiết bị không hỗ trợ cuộc gọi điện thoại.'));
   };
 
   // Xử lý Tiếp nhận
   const handleAccept = async () => {
-    if (!mission) return;
+    if (!mission || teamRole !== 'LEADER') return;
     setActionLoading(true);
     try {
       await ResponseApi.acceptMission(mission.id, mission.version);
@@ -190,7 +212,7 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Xử lý Từ chối hoặc Báo thất bại
   const handleDeclineSubmit = async () => {
-    if (!mission) return;
+    if (!mission || teamRole !== 'LEADER') return;
     const reason = declineReason.trim();
     if (!reason) {
       setFormErrors((current) => ({ ...current, declineReason: 'Vui lòng nêu rõ lý do từ chối hoặc trở ngại.' }));
@@ -226,7 +248,7 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Xử lý Chuyển trạng thái tiến độ (EN_ROUTE, ON_SCENE)
   const handleTransition = async (toStatus: MissionStatus, promptTitle: string) => {
-    if (!mission) return;
+    if (!mission || teamRole !== 'LEADER') return;
     Alert.alert('Xác nhận cập nhật', `Đồng chí xác nhận chuyển trạng thái sang: "${promptTitle}"?`, [
       { text: 'Hủy' },
       {
@@ -248,7 +270,7 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Xử lý Hoàn thành cứu nạn thành công (kèm ảnh bằng chứng nếu có)
   const handleCompleteSubmit = async () => {
-    if (!mission) return;
+    if (!mission || teamRole !== 'LEADER') return;
     const outcome = outcomeNote.trim();
     if (!outcome) {
       setFormErrors((current) => ({ ...current, outcomeNote: 'Vui lòng nhập báo cáo kết quả cứu hộ.' }));
@@ -343,8 +365,13 @@ export const MissionDetailScreen: React.FC = () => {
     );
   }
 
-  const categoryInfo = INCIDENT_CATEGORIES[mission.category] || { label: 'Sự cố cứu hộ' };
+  const categoryInfo = INCIDENT_CATEGORIES[mission.category ?? 'UNKNOWN'] || { label: 'Sự cố cứu hộ' };
   const kindInfo = mission.mission_kind ? MISSION_KIND_LABELS[mission.mission_kind] : null;
+  const timeline = mission.timeline.items;
+  const evidence = mission.evidence.items;
+  const canManageMission = teamRole === 'LEADER';
+  const reporterContactPhone = canManageMission ? mission.reporter_contact_phone : undefined;
+  const alternateContact = canManageMission ? mission.alternate_contact : undefined;
 
   return (
     <ScreenContainer
@@ -386,15 +413,6 @@ export const MissionDetailScreen: React.FC = () => {
             <Text style={styles.metaLabel}>Cần cứu nạn</Text>
           </View>
 
-          <View style={styles.metaCol}>
-            <MapPin size={18} color={THEME.colors.primary.main} />
-            <Text style={styles.metaValue}>
-              {mission.distance_m != null && Number.isFinite(mission.distance_m)
-                ? `${(mission.distance_m / 1000).toFixed(1)} km`
-                : 'Chưa có dữ liệu'}
-            </Text>
-            <Text style={styles.metaLabel}>Khoảng cách</Text>
-          </View>
         </View>
       </View>
 
@@ -423,10 +441,10 @@ export const MissionDetailScreen: React.FC = () => {
       <View style={styles.card}>
         <Text style={styles.cardSectionTitle}>LIÊN HỆ NẠN NHÂN / NGƯỜI BÁO TIN</Text>
         <>
-            {mission.reporter_contact_phone ? (
+            {reporterContactPhone ? (
               <View style={styles.contactRow}>
                 <View>
-                  <Text style={styles.phoneText}>{mission.reporter_contact_phone}</Text>
+                  <Text style={styles.phoneText}>{reporterContactPhone}</Text>
                   <Text style={styles.phoneLabel}>Số điện thoại người báo cứu hộ</Text>
                 </View>
                 <TouchableOpacity style={styles.callBtn} onPress={callVictimPhone}>
@@ -436,16 +454,16 @@ export const MissionDetailScreen: React.FC = () => {
               </View>
             ) : null}
 
-            {mission.alternate_contact ? (
+            {alternateContact ? (
               <View style={[styles.contactRow, { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderColor: THEME.colors.surface.border }]}>
                 <View>
-                  <Text style={styles.phoneText}>{mission.alternate_contact.phone || 'Chưa cung cấp SĐT'}</Text>
-                  <Text style={styles.phoneLabel}>Người liên hệ phụ: {mission.alternate_contact.name}</Text>
+                  <Text style={styles.phoneText}>{alternateContact.phone || 'Chưa cung cấp SĐT'}</Text>
+                  <Text style={styles.phoneLabel}>Người liên hệ phụ: {alternateContact.name}</Text>
                 </View>
-                {mission.alternate_contact.phone ? (
+                {alternateContact.phone ? (
                   <TouchableOpacity
                     style={styles.callBtn}
-                    onPress={() => Linking.openURL(`tel:${mission.alternate_contact!.phone}`)}
+                    onPress={() => Linking.openURL(`tel:${alternateContact.phone}`)}
                   >
                     <Phone size={18} color="#FFFFFF" />
                     <Text style={styles.callBtnText}>Gọi điện</Text>
@@ -453,34 +471,24 @@ export const MissionDetailScreen: React.FC = () => {
                 ) : null}
               </View>
             ) : null}
-            {!mission.reporter_contact_phone && !mission.alternate_contact ? (
-              <Text style={styles.noContactText}>Hồ sơ hiện không có thông tin liên hệ được cung cấp.</Text>
+            {!reporterContactPhone && !alternateContact ? (
+              <Text style={styles.noContactText}>
+                {canManageMission
+                  ? 'Hồ sơ hiện không có thông tin liên hệ được cung cấp.'
+                  : 'Thông tin liên hệ hiện trường chỉ hiển thị với đội trưởng.'}
+              </Text>
             ) : null}
         </>
       </View>
 
       {/* 4. KẾT QUẢ CỨU NẠN THỰC ĐỊA (KHI ĐÃ HOÀN THÀNH) */}
-      {mission.outcome_note ? (
-        <View style={[styles.card, { borderColor: THEME.colors.success.main, backgroundColor: '#F0FDF4' }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-            <CheckCircle2 size={18} color={THEME.colors.success.main} style={{ marginRight: 6 }} />
-            <Text style={[styles.cardSectionTitle, { color: THEME.colors.success.dark, marginBottom: 0 }]}>
-              BÁO CÁO KẾT QUẢ HOÀN THÀNH
-            </Text>
-          </View>
-          <Text style={{ fontSize: THEME.typography.fontSizes.sm, color: THEME.colors.text.primary, lineHeight: 20 }}>
-            {mission.outcome_note}
-          </Text>
-        </View>
-      ) : null}
-
       {/* 5. TIẾN TRÌNH NHIỆM VỤ (TIMELINE) */}
-      {mission.timeline && mission.timeline.length > 0 && (
+      {timeline.length > 0 && (
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>TIẾN TRÌNH NHIỆM VỤ CỨU HỘ</Text>
-          {mission.timeline.map((evt, idx) => {
+          {timeline.map((evt, idx) => {
             const info = MISSION_STATUS_LABELS[evt.to_status as MissionStatus] || { label: evt.to_status };
-            const isLast = idx === mission.timeline!.length - 1;
+            const isLast = idx === timeline.length - 1;
             const dateObj = new Date(evt.occurred_at);
             const timeStr = !isNaN(dateObj.getTime())
               ? `${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')} · ${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`
@@ -508,14 +516,14 @@ export const MissionDetailScreen: React.FC = () => {
       )}
 
       {/* 6. MINH CHỨNG HIỆN TRƯỜNG ĐÃ TẢI LÊN */}
-      {mission.evidence && mission.evidence.length > 0 && (
+      {evidence.length > 0 && (
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>ẢNH / VIDEO HIỆN TRƯỜNG ({mission.evidence.length})</Text>
+          <Text style={styles.cardSectionTitle}>ẢNH / VIDEO HIỆN TRƯỜNG ({evidence.length})</Text>
           {loadingEvidence && (
             <ActivityIndicator size="small" color={THEME.colors.primary.main} style={{ marginBottom: 8 }} />
           )}
           <View style={styles.evidenceGrid}>
-            {mission.evidence.map((ev) => (
+            {evidence.map((ev) => (
               <TouchableOpacity
                 key={ev.id}
                 style={styles.evidenceThumbCard}
@@ -539,7 +547,9 @@ export const MissionDetailScreen: React.FC = () => {
 
       {/* Quyền thao tác được máy chủ kiểm tra theo trạng thái nhiệm vụ và thành viên hiện tại. */}
       <View style={styles.actionSection}>
-          <Text style={styles.memberActionSub}>Quyền thao tác được kiểm tra khi gửi yêu cầu.</Text>
+        {canManageMission ? (
+          <>
+          <Text style={styles.memberActionSub}>Bạn là đội trưởng của đội được giao. Hãy cập nhật nhiệm vụ theo tình hình thực tế.</Text>
           {actionLoading && <ActivityIndicator size="small" color={THEME.colors.primary.main} style={{ marginBottom: 10 }} />}
 
           {/* Khi mới nhận (OFFERED) */}
@@ -619,6 +629,22 @@ export const MissionDetailScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           )}
+          </>
+        ) : (
+          <View style={styles.roleNotice}>
+            <Info size={18} color={teamRole === 'MEMBER' ? THEME.colors.primary.main : THEME.colors.warning.dark} />
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={styles.roleNoticeTitle}>
+                {teamRole === 'MEMBER' ? 'Thành viên đội cứu hộ' : 'Chưa xác định vai trò đội'}
+              </Text>
+              <Text style={styles.roleNoticeText}>
+                {teamRole === 'MEMBER'
+                  ? 'Bạn có thể xem nhiệm vụ. Đội trưởng phụ trách tiếp nhận, từ chối và cập nhật tiến độ.'
+                  : 'Bạn vẫn có thể xem nhiệm vụ. Các thao tác cập nhật chỉ hiển thị khi hệ thống xác nhận bạn là đội trưởng.'}
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* MODAL HOÀN THÀNH NHIỆM VỤ */}
@@ -1199,6 +1225,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#3B82F6',
     fontStyle: 'italic',
+  },
+  roleNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  roleNoticeTitle: {
+    fontSize: THEME.typography.fontSizes.xs + 1,
+    fontWeight: '800',
+    color: THEME.colors.text.primary,
+    marginBottom: 3,
+  },
+  roleNoticeText: {
+    fontSize: THEME.typography.fontSizes.xs,
+    color: THEME.colors.text.secondary,
+    lineHeight: 18,
   },
   evidenceGrid: {
     flexDirection: 'row',

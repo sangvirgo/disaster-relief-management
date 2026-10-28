@@ -17,6 +17,11 @@ import * as Location from "expo-location";
 import { THEME } from "../../constants/theme";
 import { FormFieldError } from "./FormFieldError";
 import {
+  formatPhotonProperties,
+  reverseGeocodeCoordinates,
+} from "../../utils/locationGeocoding";
+import type { PhotonPlaceProperties } from "../../utils/locationGeocoding";
+import {
   MapPin,
   Navigation,
   X,
@@ -34,7 +39,11 @@ interface LocationPickerModalProps {
   confirmButtonText?: string;
   disableExternalGeocoding?: boolean;
   onClose: () => void;
-  onConfirm: (coordinates: [number, number], addressNote?: string) => void;
+  onConfirm: (
+    coordinates: [number, number],
+    addressNote?: string,
+    detectedAddress?: string,
+  ) => void;
 }
 
 interface SearchPlaceItem {
@@ -53,29 +62,6 @@ function parseCoordinate(value: string): number | null {
   if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) return null;
   const coordinate = Number(normalized);
   return Number.isFinite(coordinate) ? coordinate : null;
-}
-
-// Hàm định dạng địa chỉ tiếng Việt từ kết quả Photon/OSM
-function formatPhotonProperties(properties: any): {
-  name: string;
-  fullAddress: string;
-} {
-  const name = properties.name || properties.street || "Vị trí được chọn";
-  const parts = [
-    properties.name,
-    properties.street,
-    properties.locality,
-    properties.district,
-    properties.city,
-    properties.county,
-    properties.state,
-  ].filter((part, index, allParts) => part && allParts.indexOf(part) === index);
-  if (properties.country && parts.length === 0) parts.push(properties.country);
-
-  return {
-    name,
-    fullAddress: parts.join(", "),
-  };
 }
 
 export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
@@ -132,25 +118,11 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     setIsResolvingAddress(true);
 
     try {
-      const response = await fetch(
-        // The public Photon instance does not support `vi`; omitting `lang`
-        // lets it return the local name for Vietnamese locations.
-        `https://photon.komoot.io/reverse?lon=${encodeURIComponent(lng)}&lat=${encodeURIComponent(lat)}&limit=1`,
-      );
-      if (!response.ok) throw new Error("Address lookup failed");
-
-      const data = await response.json();
+      // The public Photon instance does not support `vi`; omitting `lang`
+      // lets it return the local name for Vietnamese locations.
+      const address = await reverseGeocodeCoordinates(lng, lat);
       if (requestId !== addressLookupRequestRef.current) return;
-
-      const properties = data?.features?.[0]?.properties;
-      if (!properties) {
-        setAddressLookupError(true);
-        return;
-      }
-
-      const { name, fullAddress } = formatPhotonProperties(properties);
-      const address = fullAddress || name;
-      if (!address || address === "Vị trí được chọn") {
+      if (!address) {
         setAddressLookupError(true);
         return;
       }
@@ -261,7 +233,9 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       if (data && data.features && data.features.length > 0) {
         const items: SearchPlaceItem[] = data.features.map(
           (f: any, idx: number) => {
-            const { name, fullAddress } = formatPhotonProperties(f.properties);
+            const { name, fullAddress } = formatPhotonProperties(
+              f.properties as PhotonPlaceProperties,
+            );
             return {
               id: `${idx}_${f.geometry.coordinates.join("_")}`,
               name,
@@ -406,7 +380,11 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       return;
     }
     setCoordinateError(undefined);
-    onConfirm([parsedLng, parsedLat], addressNote.trim() || undefined);
+    onConfirm(
+      [parsedLng, parsedLat],
+      addressNote.trim() || undefined,
+      detectedAddress || undefined,
+    );
     onClose();
   };
 

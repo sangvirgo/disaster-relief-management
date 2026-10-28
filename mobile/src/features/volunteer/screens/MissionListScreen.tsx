@@ -17,7 +17,8 @@ import { getApiErrorMessage } from '../../../api/client';
 import { Mission } from '../../../types/api';
 import { INCIDENT_CATEGORIES, MISSION_KIND_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
-import { AlertTriangle, Users, MapPin, ChevronRight, Inbox } from 'lucide-react-native';
+import { getTeamRoleFromMissionView } from '../utils/teamMembershipRole';
+import { AlertTriangle, Users, ChevronRight, Inbox } from 'lucide-react-native';
 
 export const MissionListScreen: React.FC = () => {
   const router = useRouter();
@@ -61,13 +62,16 @@ export const MissionListScreen: React.FC = () => {
   });
 
   const renderMissionItem = ({ item }: { item: Mission }) => {
-    const categoryInfo = INCIDENT_CATEGORIES[item.category] || { label: 'Sự cố cứu hộ' };
+    const categoryInfo = INCIDENT_CATEGORIES[item.category ?? 'UNKNOWN'] || { label: 'Sự cố cứu hộ' };
     const kindInfo = item.mission_kind ? MISSION_KIND_LABELS[item.mission_kind] : null;
 
     return (
       <TouchableOpacity
         style={styles.missionCard}
-        onPress={() => router.push({ pathname: '/mission-detail', params: { missionId: item.id } })}
+        onPress={() => router.push({
+          pathname: '/mission-detail',
+          params: { missionId: item.id, teamRole: getTeamRoleFromMissionView(item) },
+        })}
         activeOpacity={0.85}
       >
         <View style={styles.cardTopRow}>
@@ -100,15 +104,6 @@ export const MissionListScreen: React.FC = () => {
             <Users size={16} color={THEME.colors.text.secondary} />
             <Text style={styles.metaText}>
               {item.people_affected == null ? 'Chưa rõ số người' : `${item.people_affected} người`}
-            </Text>
-          </View>
-
-          <View style={styles.metaItem}>
-            <MapPin size={16} color={THEME.colors.primary.main} />
-            <Text style={styles.metaText}>
-              {item.distance_m != null && Number.isFinite(item.distance_m)
-                ? `${(item.distance_m / 1000).toFixed(1)} km`
-                : 'Chưa có khoảng cách'}
             </Text>
           </View>
 

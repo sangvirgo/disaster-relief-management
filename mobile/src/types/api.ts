@@ -1,12 +1,20 @@
 // Types định nghĩa theo hợp đồng API Reliva (Identity, Response, Logistics).
 
-export type UserRole = 'CITIZEN' | 'VOLUNTEER' | 'COORDINATOR' | 'OPERATIONS_MANAGER' | 'ADMIN';
+export type UserRole =
+  | 'CITIZEN'
+  | 'VOLUNTEER'
+  | 'COORDINATOR'
+  | 'CAMPAIGN_MANAGER'
+  | 'OPERATIONS_MANAGER'
+  | 'INTAKE_STAFF'
+  | 'REVIEWER'
+  | 'DISTRIBUTION_STAFF'
+  | 'ADMIN';
 
 export interface User {
   id: string;
   username: string;
   display_name: string;
-  status: 'ACTIVE' | 'DISABLED';
   must_change_password?: boolean;
 }
 
@@ -14,17 +22,17 @@ export interface RoleGrant {
   id: string;
   role_code: UserRole;
   scope_type: 'SYSTEM' | 'ORGANIZATION' | 'REGION' | 'CAMPAIGN';
-  organization_id?: string;
-  region_code?: string;
-  campaign_id?: string;
+  organization_id?: string | null;
+  region_code?: string | null;
+  campaign_id?: string | null;
 }
 
 export interface NativeLoginResponse {
-  user: User;
+  user: Pick<User, 'id' | 'username' | 'display_name'>;
   access_token: string;
   refresh_token: string;
   expires_in: number;
-  must_change_password?: boolean;
+  must_change_password: boolean;
 }
 
 export interface ApiErrorEnvelope {
@@ -107,14 +115,13 @@ export interface CreateSOSResponse {
   tracking_code: string;
   status: RequestStatus;
   received_at: string;
-  review_lane?: string;
+  review_lane: 'NORMAL' | 'RATE_LIMITED_REVIEW' | 'PROXY_QUOTA_REVIEW';
 }
 
 export interface RequestTimelineEvent {
   event_type: string;
   occurred_at: string;
   public_text_code: string;
-  payload?: any;
 }
 
 export interface RequestTrackingDetail {
@@ -124,12 +131,12 @@ export interface RequestTrackingDetail {
   version: number;
   received_at: string;
   timeline: RequestTimelineEvent[];
+  more: boolean;
+  cursor?: string;
+  priority_visible: false;
   rejection_reason?: string;
   duplicate_of_code?: string;
   can_supplement: boolean;
-  people_affected?: number;
-  description?: string;
-  location?: GeoLocation;
 }
 
 export interface MyRequestItem {
@@ -163,7 +170,8 @@ export interface MissionTimelineEvent {
   reason?: string | null;
   outcome_note?: string | null;
   occurred_at: string;
-  recorded_at?: string;
+  recorded_at: string;
+  recorded_on_behalf: boolean;
 }
 
 export interface MissionEvidenceItem {
@@ -171,36 +179,43 @@ export interface MissionEvidenceItem {
   state: string;
   size_bytes: number;
   detected_mime: string;
-  checksum?: string;
+  checksum: string;
   created_at: string;
+}
+
+export interface MissionTimelinePage {
+  items: MissionTimelineEvent[];
+}
+
+export interface MissionEvidencePage {
+  items: MissionEvidenceItem[];
 }
 
 export interface Mission {
   id: string;
   request_id: string;
-  team_id?: string;
-  team?: { id: string; name: string };
+  team: { id: string; name: string };
   version: number;
-  work_cycle?: number;
+  work_cycle: number;
   status: MissionStatus;
   mission_kind?: MissionKind;
-  category: IncidentCategoryCode;
-  description?: string;
-  people_affected?: number | null;
+  category: IncidentCategoryCode | null;
+  description: string | null;
+  people_affected: number | null;
   declared_danger: boolean;
-  location: GeoLocation;
+  location: GeoLocation | null;
   reporter_contact_phone?: string | null; // Chỉ dành cho Đội trưởng
   beneficiary_contact_phone?: string | null;
-  alternate_contact_phone?: string;
   alternate_contact?: {
     name: string;
-    phone?: string;
+    phone?: string | null;
   } | null;
-  outcome_note?: string | null;
-  timeline?: MissionTimelineEvent[];
-  evidence?: MissionEvidenceItem[];
   created_at: string;
-  distance_m?: number | null;
+}
+
+export interface MissionDetail extends Mission {
+  timeline: MissionTimelinePage;
+  evidence: MissionEvidencePage;
 }
 
 export interface TeamMemberItem {
@@ -221,6 +236,18 @@ export interface RegionItem {
   status: string;
 }
 
+export interface TeamPositionLocation {
+  type: 'Point';
+  coordinates: [number, number];
+}
+
+export interface TeamPositionSummary {
+  location?: TeamPositionLocation;
+  age_s: number;
+  accuracy_m: number | null;
+  source: 'GPS' | 'MANUAL_PIN' | 'COORDINATOR_REPORTED';
+}
+
 export interface RescueTeam {
   id: string;
   name: string;
@@ -230,12 +257,7 @@ export interface RescueTeam {
   kind: 'VOLUNTEER' | 'MILITARY' | 'GOVERNMENT' | 'OTHER';
   reporting_mode: 'APP' | 'COORDINATOR';
   skills: string[];
-  position?: {
-    location?: GeoLocation;
-    age_s?: number;
-    accuracy_m?: number | null;
-    source?: string;
-  } | null;
+  position: TeamPositionSummary | null;
 }
 
 // ==================== NOTICES & CAMPAIGNS ====================
@@ -350,12 +372,9 @@ export interface EvidenceDownload {
 
 // Nhật ký sự kiện chi tiết của Yêu cầu cứu hộ
 export interface ReporterEvent {
-  event_id: string;
   event_type: string;
   public_text_code: string;
   occurred_at: string;
-  note?: string | null;
-  payload?: Record<string, any>;
 }
 
 export interface ReporterEventPage {

@@ -43,7 +43,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
       } catch {
         set({
-          user: response.user,
+          user: { ...response.user, must_change_password: response.must_change_password },
           grants: [],
           isAuthenticated: true,
           isLoading: false,
@@ -63,7 +63,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const me = await IdentityApi.getMe();
         set({ user: me.user, grants: me.grants, isAuthenticated: true, isLoading: false });
       } catch {
-        set({ user: response.user, grants: [], isAuthenticated: true, isLoading: false });
+        set({
+          user: { ...response.user, must_change_password: response.must_change_password },
+          grants: [],
+          isAuthenticated: true,
+          isLoading: false,
+        });
       }
     } catch (error) {
       set({ isLoading: false });
@@ -135,9 +140,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isCitizen: () => {
     const { grants, isAuthenticated } = get();
     if (!isAuthenticated) return false;
-    // Nếu có role CITIZEN hoặc không có role đặc biệt (cứu hộ/điều phối)
-    const hasSpecialRole = grants.some((g) => ['VOLUNTEER', 'COORDINATOR', 'ADMIN', 'DISPATCHER'].includes(g.role_code));
-    return grants.some((g) => g.role_code === 'CITIZEN') || !hasSpecialRole;
+    return grants.some((g) => g.role_code === 'CITIZEN');
   },
 
   getUserRoleName: () => {
@@ -145,7 +148,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!isAuthenticated) return 'Khách vãng lai';
     if (grants.some((g) => g.role_code === 'VOLUNTEER')) return 'Đội cứu hộ / Tình nguyện';
     if (grants.some((g) => g.role_code === 'COORDINATOR')) return 'Điều phối viên cứu trợ';
+    if (grants.some((g) => g.role_code === 'CAMPAIGN_MANAGER')) return 'Quản lý chiến dịch';
+    if (grants.some((g) => g.role_code === 'OPERATIONS_MANAGER')) return 'Quản lý hoạt động cứu trợ';
+    if (grants.some((g) => g.role_code === 'INTAKE_STAFF')) return 'Nhân viên tiếp nhận hàng cứu trợ';
+    if (grants.some((g) => g.role_code === 'REVIEWER')) return 'Nhân viên kiểm duyệt';
+    if (grants.some((g) => g.role_code === 'DISTRIBUTION_STAFF')) return 'Nhân viên phân phối cứu trợ';
     if (grants.some((g) => g.role_code === 'ADMIN')) return 'Quản trị viên hệ thống';
-    return 'Công dân';
+    if (grants.some((g) => g.role_code === 'CITIZEN')) return 'Công dân';
+    return 'Chưa xác định vai trò';
   },
 }));

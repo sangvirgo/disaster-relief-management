@@ -23,7 +23,7 @@ import { User, Lock, ArrowRight, Eye, EyeOff, UserPlus } from 'lucide-react-nati
 
 export const LoginScreen: React.FC = () => {
   const router = useRouter();
-  const { login, loginWithGoogle, isLoading, isVolunteerOrLeader } = useAuthStore();
+  const { login, loginWithGoogle, logout, isLoading, isVolunteerOrLeader } = useAuthStore();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -61,6 +61,24 @@ export const LoginScreen: React.FC = () => {
 
     try {
       await login(trimmedUsername, password);
+      const authState = useAuthStore.getState();
+      if (authState.user?.must_change_password) {
+        router.replace('/change-password');
+        return;
+      }
+      if (!authState.isVolunteerOrLeader() && !authState.isCitizen()) {
+        try {
+          await logout();
+        } catch {
+          // The local session is cleared even when the server logout request fails.
+        }
+        Alert.alert(
+          'Vai trò chưa được hỗ trợ trên ứng dụng',
+          'Ứng dụng di động dành cho Công dân và Tình nguyện viên. Vui lòng sử dụng cổng điều phối trên Web cho vai trò này.'
+        );
+        router.replace('/login');
+        return;
+      }
       const isVolunteer = isVolunteerOrLeader();
       const currentUser = useAuthStore.getState().user;
       const displayName = currentUser?.display_name || trimmedUsername;
@@ -108,8 +126,23 @@ export const LoginScreen: React.FC = () => {
       const idToken = result.params.id_token;
       if (!idToken) throw new Error('Google chưa trả về mã định danh an toàn.');
       await loginWithGoogle(idToken);
-      if (isVolunteerOrLeader()) router.replace('/team');
-      else goBackOrHome(router);
+      const authState = useAuthStore.getState();
+      if (authState.user?.must_change_password) {
+        router.replace('/change-password');
+      } else if (authState.isVolunteerOrLeader()) router.replace('/team');
+      else if (authState.isCitizen()) goBackOrHome(router);
+      else {
+        try {
+          await logout();
+        } catch {
+          // The local session is cleared even when the server logout request fails.
+        }
+        Alert.alert(
+          'Vai trò chưa được hỗ trợ trên ứng dụng',
+          'Ứng dụng di động dành cho Công dân và Tình nguyện viên. Vui lòng sử dụng cổng điều phối trên Web cho vai trò này.'
+        );
+        router.replace('/login');
+      }
     } catch (err: unknown) {
       Alert.alert('Đăng nhập Google thất bại', getApiErrorMessage(err, 'Không thể đăng nhập bằng Google. Vui lòng thử lại.'));
     } finally {

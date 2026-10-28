@@ -6,6 +6,7 @@ import {
   RequestTrackingDetail,
   MyRequestItem,
   Mission,
+  MissionDetail,
   MissionStatus,
   RescueTeam,
   RescueTeamDetail,
@@ -194,8 +195,8 @@ export const ResponseApi = {
   },
 
   // Chi tiết nhiệm vụ cứu nạn
-  async getMissionDetail(missionId: string): Promise<Mission> {
-    const response = await apiClient.get<Mission>(`/response/missions/${missionId}`);
+  async getMissionDetail(missionId: string): Promise<MissionDetail> {
+    const response = await apiClient.get<MissionDetail>(`/response/missions/${missionId}`);
     return response.data;
   },
 

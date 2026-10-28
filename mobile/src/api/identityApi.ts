@@ -76,7 +76,7 @@ export const IdentityApi = {
 
     const { id, username, display_name, must_change_password, grants } = response.data;
     return {
-      user: { id, username, display_name, status: 'ACTIVE', must_change_password },
+      user: { id, username, display_name, must_change_password },
       grants: grants || [],
     };
   },

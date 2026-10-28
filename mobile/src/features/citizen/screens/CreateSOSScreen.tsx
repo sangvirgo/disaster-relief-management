@@ -22,6 +22,7 @@ import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { PendingSOSCommand, StorageService } from '../../../utils/secureStore';
 import { THEME } from '../../../constants/theme';
 import { isValidPhone, normalizePhone } from '../../../utils/formValidation';
+import { reverseGeocodeCoordinates } from '../../../utils/locationGeocoding';
 import { LocationPickerModal } from '../../../components/common/LocationPickerModal';
 import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
 import {
@@ -33,6 +34,7 @@ import {
   Send,
   RefreshCw,
   Map,
+  Compass,
   Trash2,
   AlertCircle,
 } from 'lucide-react-native';
@@ -62,12 +64,54 @@ export const CreateSOSScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isMapModalVisible, setIsMapModalVisible] = useState<boolean>(false);
   const [locationNote, setLocationNote] = useState<string>('');
+  const [locationAreaResult, setLocationAreaResult] = useState<{
+    coordinatesKey: string;
+    address: string | null;
+  } | null>(null);
   const [pendingCommand, setPendingCommand] = useState<PendingSOSCommand | null>(null);
   const [restoringPending, setRestoringPending] = useState<boolean>(true);
   const [submissionSuccess, setSubmissionSuccess] = useState<{
     trackingCode: string;
     trackingSecret: string;
   } | null>(null);
+
+  const longitude = location?.coordinates[0] ?? null;
+  const latitude = location?.coordinates[1] ?? null;
+  const coordinatesKey = longitude === null || latitude === null
+    ? null
+    : `${longitude},${latitude}`;
+
+  const isManualPin = location?.source === 'MANUAL_PIN';
+
+  useEffect(() => {
+    if (
+      !isManualPin ||
+      coordinatesKey === null ||
+      longitude === null ||
+      latitude === null ||
+      locationAreaResult?.coordinatesKey === coordinatesKey
+    ) return;
+
+    let isCurrentLocation = true;
+    void reverseGeocodeCoordinates(longitude, latitude)
+      .then((address) => {
+        if (isCurrentLocation) setLocationAreaResult({ coordinatesKey, address });
+      })
+      .catch(() => {
+        if (isCurrentLocation) setLocationAreaResult({ coordinatesKey, address: null });
+      });
+
+    return () => {
+      isCurrentLocation = false;
+    };
+  }, [coordinatesKey, isManualPin, latitude, locationAreaResult?.coordinatesKey, longitude]);
+
+  const isResolvingLocationArea = Boolean(
+    isManualPin && coordinatesKey && locationAreaResult?.coordinatesKey !== coordinatesKey,
+  );
+  const locationArea = isManualPin && locationAreaResult?.coordinatesKey === coordinatesKey
+    ? locationAreaResult.address
+    : null;
 
   const headcountError = (value: string) => {
     if (value.length > 5) return 'Số người cần cứu nạn không được vượt quá 5 ký tự.';
@@ -133,8 +177,15 @@ export const CreateSOSScreen: React.FC = () => {
     return () => { mounted = false; };
   }, [setLocationSnapshot]);
 
-  const handleConfirmManualLocation = (coords: [number, number], note?: string) => {
+  const handleConfirmManualLocation = (
+    coords: [number, number],
+    note?: string,
+    detectedAddress?: string,
+  ) => {
     setManualLocation(coords[0], coords[1]);
+    if (detectedAddress) {
+      setLocationAreaResult({ coordinatesKey: `${coords[0]},${coords[1]}`, address: detectedAddress });
+    }
     if (note) {
       setLocationNote(note);
     }
@@ -345,6 +396,22 @@ export const CreateSOSScreen: React.FC = () => {
                 ? `Độ chính xác thiết bị báo: ±${location.accuracy_m}m (GPS)`
                 : 'Đã ghim thủ công chính xác trên bản đồ'}
             </Text>
+            {isManualPin ? (
+              <View style={styles.locationAreaRow}>
+                {isResolvingLocationArea ? (
+                  <ActivityIndicator size="small" color={THEME.colors.primary.main} />
+                ) : (
+                  <Compass size={15} color={THEME.colors.primary.main} />
+                )}
+                <Text style={styles.locationAreaText}>
+                  {isResolvingLocationArea
+                    ? 'Đang tra cứu tên địa bàn...'
+                    : locationArea
+                      ? `Địa bàn: ${locationArea}`
+                      : 'Chưa tra được tên địa bàn. Tọa độ vẫn có thể sử dụng bình thường.'}
+                </Text>
+              </View>
+            ) : null}
             {locationNote ? (
               <Text style={styles.locationNoteDisplay}>Ghi chú: {locationNote}</Text>
             ) : null}
@@ -706,6 +773,22 @@ const styles = StyleSheet.create({
     fontSize: THEME.typography.fontSizes.xs,
     color: THEME.colors.text.secondary,
     marginTop: 4,
+  },
+  locationAreaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: THEME.colors.primary.bg,
+  },
+  locationAreaText: {
+    flex: 1,
+    fontSize: THEME.typography.fontSizes.xs,
+    lineHeight: 18,
+    color: THEME.colors.primary.dark,
   },
   pendingBanner: {
     backgroundColor: '#FEF3C7',

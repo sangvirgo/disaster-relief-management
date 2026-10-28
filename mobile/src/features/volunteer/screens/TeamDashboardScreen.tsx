@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,9 @@ import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { GeoLocation, RescueTeamDetail, Mission, TeamSkillOption } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
 import { isValidUuid } from '../../../utils/formValidation';
+import { reverseGeocodeCoordinates } from '../../../utils/locationGeocoding';
 import { RESCUE_TEAM_KIND_LABELS, RESCUE_SKILL_LABELS } from '../../../constants/labels';
+import { getTeamRoleFromMissionList } from '../utils/teamMembershipRole';
 import {
   Shield,
   Radio,
@@ -35,6 +37,7 @@ import {
   Clock,
   AlertTriangle,
   ChevronRight,
+  Compass,
   Award,
   HeartHandshake,
   UserCheck,
@@ -52,7 +55,13 @@ type TeamMemberAction = 'ADD' | 'REMOVE';
 
 export const TeamDashboardScreen: React.FC = () => {
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const {
+    user,
+    logout,
+    isLoading: authLoading,
+    isAuthenticated,
+    isVolunteerOrLeader,
+  } = useAuthStore();
   const { location, refreshLocation } = useLocation();
 
   const [team, setTeam] = useState<RescueTeamDetail | null>(null);
@@ -75,8 +84,49 @@ export const TeamDashboardScreen: React.FC = () => {
   const [teamProfileError, setTeamProfileError] = useState<string | undefined>();
   const [isSavingTeamProfile, setIsSavingTeamProfile] = useState(false);
   const [showPositionPicker, setShowPositionPicker] = useState(false);
+  const [teamPositionAreaResult, setTeamPositionAreaResult] = useState<{
+    coordinatesKey: string;
+    address: string | null;
+  } | null>(null);
+  const teamRole = getTeamRoleFromMissionList(missions);
+  const isTeamLeader = teamRole === 'LEADER';
+  const teamCoordinates = team?.position?.location?.coordinates;
+  const teamLongitude = teamCoordinates?.[0] ?? null;
+  const teamLatitude = teamCoordinates?.[1] ?? null;
+  const teamCoordinatesKey = teamLongitude === null || teamLatitude === null
+    ? null
+    : `${teamLongitude},${teamLatitude}`;
+  const teamPositionArea = teamCoordinatesKey && teamPositionAreaResult?.coordinatesKey === teamCoordinatesKey
+    ? teamPositionAreaResult.address
+    : null;
+  const isResolvingTeamPositionArea = Boolean(
+    teamCoordinatesKey && teamPositionAreaResult?.coordinatesKey !== teamCoordinatesKey,
+  );
 
-  const loadTeamData = async () => {
+  useEffect(() => {
+    const coordinatesKey = teamCoordinatesKey;
+    if (
+      coordinatesKey === null ||
+      teamLongitude === null ||
+      teamLatitude === null ||
+      teamPositionAreaResult?.coordinatesKey === coordinatesKey
+    ) return;
+
+    let isCurrentPosition = true;
+    void reverseGeocodeCoordinates(teamLongitude, teamLatitude)
+      .then((address) => {
+        if (isCurrentPosition) setTeamPositionAreaResult({ coordinatesKey, address });
+      })
+      .catch(() => {
+        if (isCurrentPosition) setTeamPositionAreaResult({ coordinatesKey, address: null });
+      });
+
+    return () => {
+      isCurrentPosition = false;
+    };
+  }, [teamCoordinatesKey, teamLatitude, teamLongitude, teamPositionAreaResult?.coordinatesKey]);
+
+  const loadTeamData = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
@@ -112,17 +162,26 @@ export const TeamDashboardScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated || !isVolunteerOrLeader()) {
+      router.replace('/');
+      return;
+    }
+    if (user?.must_change_password) {
+      router.replace('/change-password');
+      return;
+    }
     // Initial loading is already true; this starts the initial request.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadTeamData();
-  }, []);
+    void loadTeamData();
+  }, [authLoading, isAuthenticated, isVolunteerOrLeader, loadTeamData, router, user?.must_change_password]);
 
   // Đội trưởng cập nhật trạng thái sẵn sàng của đội lên Backend
   const handleToggleAvailability = async (nextValue: boolean) => {
-    if (!team) return;
+    if (!team || !isTeamLeader) return;
     const prevValue = isAvailable;
     setIsAvailable(nextValue);
     try {
@@ -151,6 +210,7 @@ export const TeamDashboardScreen: React.FC = () => {
 
   // Đội trưởng phát tín hiệu vị trí GPS di quân hiện tại của Đội
   const handleBroadcastPosition = async () => {
+    if (!isTeamLeader) return;
     if (!team || !location) {
       Alert.alert('Chưa có vị trí GPS', 'Đang cập nhật GPS, vui lòng thử lại sau vài giây.');
       refreshLocation();
@@ -160,6 +220,8 @@ export const TeamDashboardScreen: React.FC = () => {
     setIsUpdatingPosition(true);
     try {
       await ResponseApi.updateTeamPosition(team.id, location);
+      const refreshedTeam = await ResponseApi.getTeamDetail(team.id).catch(() => null);
+      if (refreshedTeam) setTeam(refreshedTeam);
       Alert.alert('Thành công', 'Đã phát tín hiệu tọa độ hiện tại của đội cứu trợ lên bản đồ điều phối.');
     } catch (err: any) {
       if (isApiErrorCode(err, 'FORBIDDEN')) {
@@ -175,8 +237,11 @@ export const TeamDashboardScreen: React.FC = () => {
     }
   };
 
-  const handleManualPositionConfirm = async (coordinates: [number, number], addressNote?: string) => {
-    if (!team) return;
+  const handleManualPositionConfirm = async (
+    coordinates: [number, number],
+    addressNote?: string,
+  ) => {
+    if (!team || !isTeamLeader) return;
     setShowPositionPicker(false);
     setIsUpdatingPosition(true);
     const manualLocation: GeoLocation = {
@@ -187,8 +252,9 @@ export const TeamDashboardScreen: React.FC = () => {
     };
     try {
       await ResponseApi.updateTeamPosition(team.id, manualLocation, addressNote);
+      const refreshedTeam = await ResponseApi.getTeamDetail(team.id).catch(() => null);
+      if (refreshedTeam) setTeam(refreshedTeam);
       Alert.alert('Đã cập nhật vị trí', 'Vị trí ghim thủ công của đội đã được ghi nhận.');
-      await loadTeamData();
     } catch (err: any) {
       Alert.alert('Lỗi cập nhật', getApiErrorMessage(err, 'Không thể cập nhật vị trí đội.'));
     } finally {
@@ -197,7 +263,7 @@ export const TeamDashboardScreen: React.FC = () => {
   };
 
   const openTeamProfileEditor = () => {
-    if (!team) return;
+    if (!team || !isTeamLeader) return;
     setTeamNameDraft(team.name);
     setTeamSkillDraft([...team.skills]);
     setTeamSkillsChanged(false);
@@ -213,7 +279,7 @@ export const TeamDashboardScreen: React.FC = () => {
   };
 
   const handleSaveTeamProfile = async () => {
-    if (!team) return;
+    if (!team || !isTeamLeader) return;
     const name = teamNameDraft.trim();
     if (!name) {
       setTeamProfileError('Vui lòng nhập tên đội cứu hộ.');
@@ -255,7 +321,7 @@ export const TeamDashboardScreen: React.FC = () => {
   };
 
   const executeMemberAction = async (userId: string) => {
-    if (!team) return;
+    if (!team || !isTeamLeader) return;
     setIsAddingMember(true);
     try {
       if (memberAction === 'ADD') {
@@ -291,7 +357,7 @@ export const TeamDashboardScreen: React.FC = () => {
 
   const handleMemberActionSubmit = () => {
     const trimmedId = newMemberUserId.trim();
-    if (!team) return;
+    if (!team || !isTeamLeader) return;
     if (!trimmedId) {
       setMemberIdError('Vui lòng nhập mã ID tài khoản tình nguyện viên.');
       return;
@@ -321,6 +387,7 @@ export const TeamDashboardScreen: React.FC = () => {
   }[memberAction];
 
   const openMemberAction = (action: TeamMemberAction) => {
+    if (!isTeamLeader) return;
     setMemberAction(action);
     setNewMemberUserId('');
     setMemberIdError(undefined);
@@ -529,19 +596,23 @@ export const TeamDashboardScreen: React.FC = () => {
                 <Text style={styles.teamName} numberOfLines={1}>
                   {team.name}
                 </Text>
-                <View
-                  style={[
-                    styles.roleBadge,
-                    styles.roleBadgeMember,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.roleBadgeText,
-                      styles.roleBadgeTextMember,
-                    ]}
-                  >
-                    Đội cứu hộ
+                <View style={[
+                  styles.roleBadge,
+                  teamRole === 'LEADER'
+                    ? styles.roleBadgeLeader
+                    : teamRole === 'MEMBER'
+                      ? styles.roleBadgeMember
+                      : styles.roleBadgeUnknown,
+                ]}>
+                  <Text style={[
+                    styles.roleBadgeText,
+                    teamRole === 'LEADER'
+                      ? styles.roleBadgeTextLeader
+                      : teamRole === 'MEMBER'
+                        ? styles.roleBadgeTextMember
+                        : styles.roleBadgeTextUnknown,
+                  ]}>
+                    {teamRole === 'LEADER' ? 'Đội trưởng' : teamRole === 'MEMBER' ? 'Thành viên' : 'Chưa xác định'}
                   </Text>
                 </View>
               </View>
@@ -573,13 +644,15 @@ export const TeamDashboardScreen: React.FC = () => {
             </View>
           )}
 
-          <TouchableOpacity
-            style={styles.profileEditButton}
-            onPress={openTeamProfileEditor}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.profileEditButtonText}>Chỉnh sửa tên đội và kỹ năng</Text>
-          </TouchableOpacity>
+          {isTeamLeader && (
+            <TouchableOpacity
+              style={styles.profileEditButton}
+              onPress={openTeamProfileEditor}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.profileEditButtonText}>Chỉnh sửa tên đội và kỹ năng</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Trạng thái sẵn sàng nhận lệnh của đội */}
           <View style={styles.availabilityRow}>
@@ -590,18 +663,40 @@ export const TeamDashboardScreen: React.FC = () => {
               </Text>
             </View>
 
-            <Switch
-              value={isAvailable}
-              onValueChange={handleToggleAvailability}
-              trackColor={{ false: '#CBD5E1', true: THEME.colors.success.light }}
-              thumbColor={isAvailable ? THEME.colors.success.main : '#FFFFFF'}
-            />
+            {isTeamLeader ? (
+              <Switch
+                value={isAvailable}
+                onValueChange={handleToggleAvailability}
+                trackColor={{ false: '#CBD5E1', true: THEME.colors.success.light }}
+                thumbColor={isAvailable ? THEME.colors.success.main : '#FFFFFF'}
+              />
+            ) : (
+              <Text style={styles.availabilityValue}>{isAvailable ? 'Sẵn sàng' : 'Tạm dừng'}</Text>
+            )}
           </View>
 
           <Text style={styles.memberNote}>
-            Quyền thay đổi trạng thái được kiểm tra theo vai trò và trạng thái thành viên hiện tại.
+            {isTeamLeader
+              ? 'Đội trưởng có thể thay đổi trạng thái sẵn sàng của đội.'
+              : 'Chỉ đội trưởng mới có thể thay đổi trạng thái sẵn sàng của đội.'}
           </Text>
         </View>
+
+        {teamRole === 'MEMBER' ? (
+          <View style={styles.roleNotice}>
+            <Info size={18} color={THEME.colors.primary.main} />
+            <Text style={styles.roleNoticeText}>
+              Bạn là thành viên đội cứu hộ. Bạn có thể theo dõi nhiệm vụ; đội trưởng phụ trách cập nhật trạng thái, vị trí và thành viên của đội.
+            </Text>
+          </View>
+        ) : teamRole === 'UNKNOWN' ? (
+          <View style={styles.roleNotice}>
+            <Info size={18} color={THEME.colors.warning.dark} />
+            <Text style={styles.roleNoticeText}>
+              Chưa xác định được vai trò của bạn trong đội. Các thao tác quản lý chỉ hiển thị khi hệ thống xác nhận bạn là đội trưởng.
+            </Text>
+          </View>
+        ) : null}
 
         {/* 2. TỌA ĐỘ VỊ TRÍ DI QUÂN CỦA ĐỘI */}
         <View style={styles.card}>
@@ -610,34 +705,67 @@ export const TeamDashboardScreen: React.FC = () => {
             <Text style={styles.cardTitle}>TỌA ĐỘ VỊ TRÍ DI QUÂN CỦA ĐỘI</Text>
           </View>
           <Text style={styles.cardDesc}>
-            Cập nhật vị trí khi đội di chuyển. Bạn có thể gửi GPS hiện tại hoặc ghim vị trí thủ công; không bật theo dõi nền.
+            {isTeamLeader
+              ? 'Cập nhật vị trí khi đội di chuyển. Bạn có thể gửi GPS hiện tại hoặc ghim vị trí thủ công; không bật theo dõi nền.'
+              : 'Vị trí đội chỉ được hiển thị khi tài khoản có quyền xem thông tin vị trí.'}
           </Text>
 
-          <TouchableOpacity
-            style={[styles.beaconButton, isUpdatingPosition && { opacity: 0.7 }]}
-            onPress={handleBroadcastPosition}
-            disabled={isUpdatingPosition}
-            activeOpacity={0.85}
-          >
-            {isUpdatingPosition ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Radio size={20} color="#FFFFFF" />
-                <Text style={styles.beaconButtonText}>Phát tín hiệu GPS hiện tại</Text>
-              </>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.manualPositionButton, isUpdatingPosition && { opacity: 0.7 }]}
-            onPress={() => setShowPositionPicker(true)}
-            disabled={isUpdatingPosition}
-            activeOpacity={0.85}
-          >
-            <MapPin size={18} color={THEME.colors.primary.main} />
-            <Text style={styles.manualPositionButtonText}>Ghim vị trí đội trên bản đồ</Text>
-          </TouchableOpacity>
-          {team.position?.age_s != null ? (
+          {isTeamLeader && (
+            <>
+              <TouchableOpacity
+                style={[styles.beaconButton, isUpdatingPosition && { opacity: 0.7 }]}
+                onPress={handleBroadcastPosition}
+                disabled={isUpdatingPosition}
+                activeOpacity={0.85}
+              >
+                {isUpdatingPosition ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Radio size={20} color="#FFFFFF" />
+                    <Text style={styles.beaconButtonText}>Phát tín hiệu GPS hiện tại</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.manualPositionButton, isUpdatingPosition && { opacity: 0.7 }]}
+                onPress={() => setShowPositionPicker(true)}
+                disabled={isUpdatingPosition}
+                activeOpacity={0.85}
+              >
+                <MapPin size={18} color={THEME.colors.primary.main} />
+                <Text style={styles.manualPositionButtonText}>Ghim vị trí đội trên bản đồ</Text>
+              </TouchableOpacity>
+            </>
+          )}
+          {teamCoordinatesKey ? (
+            <View style={styles.teamPositionInfo}>
+              <Text style={styles.teamPositionCoordinates}>
+                Kinh độ: {teamLongitude?.toFixed(5) ?? ''}, Vĩ độ: {teamLatitude?.toFixed(5) ?? ''}
+              </Text>
+              <View style={styles.teamPositionAddressRow}>
+                {isResolvingTeamPositionArea ? (
+                  <ActivityIndicator size="small" color={THEME.colors.primary.main} />
+                ) : (
+                  <Compass size={15} color={THEME.colors.primary.main} />
+                )}
+                <Text style={styles.teamPositionAddressText}>
+                  {isResolvingTeamPositionArea
+                    ? 'Đang tra cứu tên địa bàn...'
+                    : teamPositionArea
+                      ? `Địa bàn: ${teamPositionArea}`
+                      : 'Chưa tra được tên địa bàn. Tọa độ đội vẫn được hiển thị.'}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.teamPositionUnavailable}>
+              {team.position
+                ? 'Tài khoản hiện không được cấp quyền xem vị trí đội.'
+                : 'Đội chưa có vị trí di chuyển được ghi nhận.'}
+            </Text>
+          )}
+          {teamCoordinatesKey && team.position?.age_s != null ? (
             <Text style={styles.memberNote}>
               Lần cập nhật gần nhất: {team.position.age_s} giây trước · {
                 team.position.source === 'MANUAL_PIN'
@@ -700,7 +828,7 @@ export const TeamDashboardScreen: React.FC = () => {
         </View>
 
         {/* 4. QUẢN LÝ THÀNH VIÊN ĐỘI CỨU HỘ */}
-        <View style={styles.card}>
+        {isTeamLeader && <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <UserCheck size={20} color={THEME.colors.primary.main} />
             <Text style={styles.cardTitle}>QUẢN LÝ THÀNH VIÊN ĐỘI</Text>
@@ -718,7 +846,7 @@ export const TeamDashboardScreen: React.FC = () => {
               <Text style={styles.memberActionSecondaryText}>Gỡ</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </View>}
       </ScrollView>
 
       {/* MODAL THÊM THÀNH VIÊN VÀO ĐỘI */}
@@ -856,7 +984,6 @@ export const TeamDashboardScreen: React.FC = () => {
       <LocationPickerModal
         visible={showPositionPicker}
         initialCoordinates={location?.coordinates}
-        disableExternalGeocoding
         title="Ghim vị trí đội cứu hộ"
         confirmButtonText="Cập nhật vị trí đội"
         onClose={() => setShowPositionPicker(false)}
@@ -1093,6 +1220,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#EFF6FF',
     borderColor: '#BFDBFE',
   },
+  roleBadgeUnknown: {
+    backgroundColor: THEME.colors.warning.bg,
+    borderColor: THEME.colors.warning.light,
+  },
   roleBadgeText: {
     fontSize: 10,
     fontWeight: '700',
@@ -1102,6 +1233,26 @@ const styles = StyleSheet.create({
   },
   roleBadgeTextMember: {
     color: '#1D4ED8',
+  },
+  roleBadgeTextUnknown: {
+    color: THEME.colors.warning.dark,
+  },
+  roleNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    padding: 12,
+    marginBottom: 14,
+  },
+  roleNoticeText: {
+    flex: 1,
+    marginLeft: 8,
+    color: THEME.colors.text.secondary,
+    fontSize: THEME.typography.fontSizes.xs,
+    lineHeight: 18,
   },
   skillsSection: {
     marginTop: 10,
@@ -1154,6 +1305,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: THEME.colors.text.secondary,
     marginTop: 2,
+  },
+  availabilityValue: {
+    color: THEME.colors.text.primary,
+    fontSize: THEME.typography.fontSizes.xs,
+    fontWeight: '700',
   },
   statusTagReadonly: {
     paddingHorizontal: 10,
@@ -1212,6 +1368,37 @@ const styles = StyleSheet.create({
     color: THEME.colors.text.secondary,
     lineHeight: 18,
     marginBottom: 12,
+  },
+  teamPositionInfo: {
+    backgroundColor: THEME.colors.primary.bg,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: THEME.colors.primary.border,
+    padding: 12,
+    marginBottom: 8,
+  },
+  teamPositionCoordinates: {
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '700',
+    color: THEME.colors.text.primary,
+  },
+  teamPositionAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 7,
+  },
+  teamPositionAddressText: {
+    flex: 1,
+    marginLeft: 7,
+    color: THEME.colors.primary.dark,
+    fontSize: THEME.typography.fontSizes.xs,
+    lineHeight: 18,
+  },
+  teamPositionUnavailable: {
+    fontSize: THEME.typography.fontSizes.xs,
+    color: THEME.colors.text.muted,
+    fontStyle: 'italic',
+    marginBottom: 8,
   },
   beaconButton: {
     flexDirection: 'row',
