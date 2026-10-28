@@ -131,7 +131,7 @@ export const pages: Record<Workspace, Page[]> = {
     },
     {
       id: 'reports',
-      title: 'Báo cáo',
+      title: 'Tổng quan',
       icon: 'report',
       service: 'response',
       path: '/reports/summary',

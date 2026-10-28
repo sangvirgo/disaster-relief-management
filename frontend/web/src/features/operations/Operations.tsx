@@ -102,6 +102,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     const sources = [
       ['organizations', 'identity', '/organizations'],
       ['warehouses', 'logistics', '/warehouses'],
+      ['drives', 'logistics', '/donation-drives'],
       ['items', 'logistics', '/items'],
       ['campaigns', 'response', '/campaigns'],
       ['reliefPoints', 'logistics', '/relief-points'],
@@ -124,6 +125,22 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 string(item.item_name) || `Mã …${item.id!.slice(-8)}`,
           }));
       });
+      if (!options.warehouses?.length) {
+        const driveResult = results[2];
+        if (driveResult.status === 'fulfilled') {
+          options.driveWarehouses = (driveResult.value.items || [])
+            .filter((drive) => drive.id && string(drive.intake_warehouse_id))
+            .map((drive) => ({ value: drive.id!, label: string(drive.intake_warehouse_id) }));
+          const byWarehouse = new Map<string, string>();
+          for (const drive of driveResult.value.items || []) {
+            const warehouseId = string(drive.intake_warehouse_id);
+            if (warehouseId && !byWarehouse.has(warehouseId)) {
+              byWarehouse.set(warehouseId, `Kho của đợt “${string(drive.title) || 'quyên góp'}”`);
+            }
+          }
+          options.warehouses = [...byWarehouse].map(([value, label]) => ({ value, label }));
+        }
+      }
       setReferences(options);
     });
     return () => { live = false; };
@@ -132,8 +149,14 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     ? references.organizations
     : [...new Set(user.grants.map((grant) => grant.organization_id).filter((id): id is string => Boolean(id)))]
         .map((id) => ({ value: id, label: `Tổ chức trong quyền của tôi · …${id.slice(-8)}` }));
+  const warehouseOptions = [...(references.warehouses || [])];
+  for (const item of items) {
+    const id = string(item.warehouse_id);
+    if (id && !warehouseOptions.some((option) => option.value === id))
+      warehouseOptions.push({ value: id, label: `Kho đang sử dụng · …${id.slice(-8)}` });
+  }
   const warehouseName = (id: unknown) =>
-    references.warehouses?.find((warehouse) => warehouse.value === id)?.label ||
+    warehouseOptions.find((warehouse) => warehouse.value === id)?.label ||
     (typeof id === 'string' ? `Kho mã …${id.slice(-8)}` : 'Chưa rõ kho');
   const referenceField = (
     name: string,
@@ -145,7 +168,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     label: title,
     type: 'reference',
     required,
-    options: source === 'organizations' ? organizationOptions : references[source] || [],
+    options: source === 'organizations' ? organizationOptions : source === 'warehouses' ? warehouseOptions : references[source] || [],
     placeholder: `Dán mã ${title.toLocaleLowerCase('vi-VN')}`,
   });
   const route =
@@ -795,7 +818,17 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   title: 'Lập biên nhận',
                   service: 'logistics',
                   path: '/donation-receipts',
-                  fields: [referenceField('warehouse_id', 'Kho tiếp nhận', 'warehouses', true)],
+                  fields: [(() => {
+                    const warehouseId = references.driveWarehouses?.find(
+                      (drive) => drive.value === selected.drive_id
+                    )?.label;
+                    const field = referenceField('warehouse_id', 'Kho tiếp nhận', 'warehouses', true);
+                    return warehouseId ? {
+                      ...field,
+                      initialValue: warehouseId,
+                      options: field.options?.filter((option) => option.value === warehouseId),
+                    } : field;
+                  })()],
                   build: (values) => ({
                     delivery_id: selected.id,
                     warehouse_id: values.warehouse_id,
@@ -840,9 +873,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 receiptId &&
                 count &&
                 version != null &&
+                ['PENDING_REVIEW', 'APPROVED'].includes(status) &&
                 rights.has('REVIEWER') && (
                   <>
-                    {command({
+                    {status === 'PENDING_REVIEW' && command({
                       title: 'Duyệt kiểm đếm',
                       service: 'logistics',
                       path: `/donation-receipts/${receiptId}/review`,
@@ -1085,6 +1119,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       label: 'Thời điểm thực tế',
                       type: 'datetime-local',
                       required: true,
+                      initialValue: new Date(Date.now() - new Date().getTimezoneOffset() * 60_000)
+                        .toISOString().slice(0, 16),
                     },
                   ],
                   build: (values) => ({

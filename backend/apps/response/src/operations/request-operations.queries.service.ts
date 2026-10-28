@@ -84,7 +84,7 @@ export class RequestOperationsQueriesService {
     if (query.overdue === 'true') conditions.push(overdue);
     if (query.overdue === 'false') conditions.push(`NOT ${overdue}`);
     values.push(cursor?.sort[0] ?? null, cursor?.id ?? null);
-    conditions.push(`($${values.length - 1}::timestamptz IS NULL OR (r.received_at,r.id)>($${values.length - 1}::timestamptz,$${values.length}::uuid))`);
+    conditions.push(`($${values.length - 1}::timestamptz IS NULL OR (r.received_at,r.id)<($${values.length - 1}::timestamptz,$${values.length}::uuid))`);
     values.push(limit + 1);
     const rows = await this.dataSource.query(
       `SELECT r.id,r.tracking_code,r.status,r.priority,r.review_lane,r.incident_category_code AS category,
@@ -104,7 +104,7 @@ export class RequestOperationsQueriesService {
             WHERE request_id=r.id ORDER BY created_at DESC,id DESC LIMIT 1
          ) ai ON true
         WHERE ${conditions.join(' AND ')}
-        ORDER BY r.received_at ASC,r.id ASC LIMIT $${values.length}`,
+        ORDER BY r.received_at DESC,r.id DESC LIMIT $${values.length}`,
       values,
     ) as ScoredQueueRow[];
     const more = rows.length > limit;
