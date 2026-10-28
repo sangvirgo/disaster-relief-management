@@ -32,7 +32,7 @@ export function TrackingActions({
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [gpsCapturedAt, setGpsCapturedAt] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [evidence, setEvidence] = useState<Evidence[] | null>(null);
+  const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [downloadUrls, setDownloadUrls] = useState<Record<string, string>>({});
   const [events, setEvents] = useState<Event[]>([]);
   const [cursor, setCursor] = useState<string | null>(tracking.cursor || null);
@@ -40,6 +40,7 @@ export function TrackingActions({
   const [busy, setBusy] = useState(false);
   const supplementKey = useRef<string | null>(null);
   const fileKey = useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   async function supplement(event: FormEvent) {
     event.preventDefault();
     setMessage('');
@@ -120,33 +121,14 @@ export function TrackingActions({
       );
       fileKey.current = null;
       setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       setMessage('Tệp minh chứng đã được máy chủ tiếp nhận.');
-      if (uploaded?.id) setEvidence((current) => [uploaded, ...(current || [])]);
+      if (uploaded?.id) setEvidence((current) => [uploaded, ...current]);
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === 'STORAGE_UNAVAILABLE') fileKey.current = null;
       setMessage(cause instanceof Error ? cause.message : 'Chưa xác nhận được tệp minh chứng.');
     } finally {
       setBusy(false);
-    }
-  }
-  async function loadEvidence() {
-    try {
-      const result = await api<{ items: Evidence[] }>(
-        'response',
-        `/requests/${tracking.id}/evidence`,
-        { headers: headers(code, secret) }
-      );
-      setEvidence(result.items);
-    } catch (cause) {
-      if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
-        if (!evidence || evidence.length === 0) {
-          setMessage(
-            'Tệp minh chứng gửi lên được bảo vệ riêng tư. Điều phối viên sẽ rà soát tệp khi xử lý yêu cầu.'
-          );
-        }
-        return;
-      }
-      setMessage(cause instanceof Error ? cause.message : 'Không thể tải danh sách minh chứng.');
     }
   }
   async function download(id: string) {
@@ -231,7 +213,7 @@ export function TrackingActions({
               }}
             />
           </label>
-          <label className="check">
+          <label className="tracking-danger-toggle">
             <input
               type="checkbox"
               checked={danger}
@@ -239,8 +221,8 @@ export function TrackingActions({
                 setDanger(event.target.checked);
                 supplementKey.current = null;
               }}
-            />{' '}
-            Có nguy hiểm tính mạng cần báo ngay
+            />
+            <span>Có nguy hiểm tính mạng cần báo ngay</span>
           </label>
           <div>
             <strong>Cập nhật vị trí cần hỗ trợ (nếu đã thay đổi)</strong>
@@ -274,33 +256,39 @@ export function TrackingActions({
       ) : (
         <p>Yêu cầu ở trạng thái hiện tại không nhận thông tin bổ sung.</p>
       )}
-      <form className="form-stack" onSubmit={attach}>
-        <label>
-          Minh chứng riêng tư (JPEG, PNG hoặc MP4)
-          <input
-            type="file"
-            required
-            accept="image/jpeg,image/png,video/mp4"
-            onChange={(event) => {
-              setFile(event.target.files?.[0] || null);
-              fileKey.current = null;
-            }}
-          />
-        </label>
-        <button className="button secondary" disabled={busy || !file}>
-          Tải minh chứng lên
-        </button>
-      </form>
-      <button className="button secondary" type="button" onClick={loadEvidence}>
-        Xem tệp minh chứng
-      </button>
+      <div className="tracking-evidence-section">
+        <h3>Ảnh và video hiện trường</h3>
+        <p>Chỉ điều phối viên và người có quyền theo dõi SOS được xem các tệp này.</p>
+        <form className="form-stack" onSubmit={attach}>
+          <label className="tracking-file-picker">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,video/mp4"
+              onChange={(event) => {
+                setFile(event.target.files?.[0] || null);
+                fileKey.current = null;
+              }}
+            />
+            <span className="tracking-file-icon" aria-hidden="true">↑</span>
+            <span>
+              <strong>{file ? file.name : 'Chọn ảnh hoặc video'}</strong>
+              <small>JPEG, PNG hoặc MP4</small>
+            </span>
+          </label>
+          <div className="tracking-evidence-actions">
+            <button className="button" disabled={busy || !file}>Tải minh chứng lên</button>
+          </div>
+        </form>
+      </div>
       {canClaim && secret && (
         <button className="button secondary" type="button" onClick={claim} disabled={busy}>
           Gắn yêu cầu với tài khoản
         </button>
       )}
-      {evidence &&
-        (evidence.length ? (
+      {evidence.length > 0 && (
+        <div className="tracking-recent-evidence">
+          <h3>Tệp vừa gửi trong phiên này</h3>
           <div className="record-list">
             {evidence.map((item) => (
               <div className="record" key={item.id}>
@@ -326,9 +314,8 @@ export function TrackingActions({
               </div>
             ))}
           </div>
-        ) : (
-          <p>Chưa có tệp minh chứng.</p>
-        ))}
+        </div>
+      )}
       {events.map((item, index) => (
         <p className="timeline-item" key={item.id || index}>
           {label(item.public_text_code || item.event_type)} · {timeLabel(item.occurred_at)}

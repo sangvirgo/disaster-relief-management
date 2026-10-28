@@ -89,6 +89,27 @@
   display: flex;
   justify-content: center;
   margin: 14px 0 2px;
+  width: 100%;
+  min-height: 44px;
+}
+.google-auth-wrap {
+  width: 100%;
+  margin-top: 20px;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: var(--color-surface-border);
 }
 .auth-modal-card .auth-field {
   gap: 8px;
@@ -247,6 +268,12 @@
   background: #f8fafc;
   border: 1px solid var(--color-surface-border);
   border-radius: 12px;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+.account-request:hover {
+  border-color: #a6c8f9;
+  box-shadow: 0 6px 18px rgba(28, 87, 161, 0.08);
+  transform: translateY(-1px);
 }
 .account-request > div {
   flex: 1;
@@ -256,6 +283,143 @@
 .account-request small {
   display: block;
 }
+.account-manual-lookup {
+  margin-top: 10px;
+}
+.request-status--pending {
+  background: #fff7e8;
+  border-color: #f8d497;
+  color: #8a5100;
+}
+.request-status--priority {
+  background: #edf0ff;
+  border-color: #c7ccfb;
+  color: #4338a7;
+}
+.request-status--progress {
+  background: #e9f7ff;
+  border-color: #a9ddf4;
+  color: #075b83;
+}
+.request-status--success {
+  background: #e9f8ef;
+  border-color: #b2e5c5;
+  color: #17683b;
+}
+.request-status--danger {
+  background: #fff0ef;
+  border-color: #f5c2bf;
+  color: #a12b24;
+}
+.tracking-layout {
+  display: grid;
+  gap: 20px;
+  max-width: 920px;
+  margin-inline: auto;
+}
+.tracking-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary-dark);
+  font: inherit;
+  font-weight: 700;
+}
+.tracking-back:hover { text-decoration: underline; }
+.tracking-progress-card .timeline { margin-top: 24px; }
+.tracking-progress-card > .request-status { margin-bottom: 10px; }
+.tracking-recovery { margin-top: 24px; border-top: 1px solid var(--color-surface-border); padding-top: 18px; }
+.tracking-recovery summary { color: var(--color-primary-dark); cursor: pointer; font-weight: 700; }
+.tracking-recovery form { margin-top: 16px; }
+.form-stack .tracking-danger-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  border: 1px solid #f4c8c4;
+  border-radius: 12px;
+  background: #fff8f7;
+  cursor: pointer;
+}
+.form-stack .tracking-danger-toggle input {
+  width: 19px;
+  height: 19px;
+  min-height: 19px;
+  margin: 0;
+  padding: 0;
+  flex: none;
+  accent-color: #d6362d;
+}
+.tracking-evidence-section {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-surface-border);
+}
+.tracking-evidence-section h3 { margin-bottom: 6px; }
+.tracking-evidence-section p { margin-top: 0; }
+.form-stack .tracking-file-picker {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 78px;
+  padding: 15px;
+  border: 1px dashed #86b3ee;
+  border-radius: 12px;
+  background: #f5f9ff;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.tracking-file-picker:hover,
+.tracking-file-picker:focus-within {
+  background: #ebf4ff;
+  border-color: #2874d7;
+}
+.tracking-file-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+.tracking-file-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 10px;
+  background: #dcecff;
+  color: #195eb7;
+  font-size: 23px;
+}
+.tracking-file-picker strong,
+.tracking-file-picker small { display: block; }
+.tracking-file-picker small { color: var(--color-text-secondary); font-weight: 400; margin-top: 3px; }
+.tracking-evidence-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+.tracking-recent-evidence { margin-top: 22px; }
+.tracking-recent-evidence h3 { margin-bottom: 12px; }
+.emergency-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 9px 16px;
+  border-bottom: 1px solid #f5c8c2;
+  background: #fff4f2;
+  color: #8e2a24;
+  font-size: 13px;
+}
+.emergency-bar a { color: #a2211b; font-weight: 800; text-decoration: none; }
+.emergency-bar a:hover { text-decoration: underline; }
 .account-request small {
   color: var(--color-text-secondary);
   margin-top: 3px;

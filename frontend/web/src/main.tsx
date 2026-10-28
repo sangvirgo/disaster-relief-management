@@ -33,7 +33,7 @@ import { Admin } from './features/admin/Admin';
 import { Operations } from './features/operations/Operations';
 import { OperationsDashboard } from './features/operations/Dashboard';
 import { AnalyticsRegionField, useAnalyticsRegion } from './components/AnalyticsRegion';
-import { CitizenAccount, CitizenRequests } from './features/citizen/CitizenAccount';
+import { CitizenAccount, CitizenRequests, requestStatusTone } from './features/citizen/CitizenAccount';
 import type { components as ResponseComponents } from './api/generated/response';
 import './style.css';
 
@@ -144,7 +144,7 @@ function AuthModal({
         size: 'large',
         text: 'signin_with',
         locale: 'vi',
-        width: 320,
+        width: Math.min(400, Math.floor(googleButton.current.getBoundingClientRect().width)),
       });
     };
     if (window.google) renderButton();
@@ -423,11 +423,14 @@ function AuthModal({
           </form>
         )}
         {mode === 'login' && googleClientId && (
-          <div
-            className="google-auth-button"
-            ref={googleButton}
-            aria-label="Đăng nhập bằng Google"
-          />
+          <div className="google-auth-wrap">
+            <span className="auth-divider">hoặc tiếp tục với</span>
+            <div
+              className="google-auth-button"
+              ref={googleButton}
+              aria-label="Đăng nhập bằng Google"
+            />
+          </div>
         )}
         <div className="modal-footer">
           {mode === 'login' && (
@@ -557,7 +560,19 @@ function PasswordChange({
   );
 }
 
-function Tracking({ user, initialCode = '' }: { user: Me | null; initialCode?: string }) {
+function Tracking({
+  user,
+  initialCode = '',
+  onSelectOwned,
+  onBack,
+  onNewSos,
+}: {
+  user: Me | null;
+  initialCode?: string;
+  onSelectOwned: (code: string) => void;
+  onBack: () => void;
+  onNewSos: () => void;
+}) {
   const [code, setCode] = useState(initialCode);
   const [secret, setSecret] = useState('');
   const [data, setData] = useState<ResponseComponents['schemas']['ReporterTracking'] | null>(null);
@@ -568,7 +583,7 @@ function Tracking({ user, initialCode = '' }: { user: Me | null; initialCode?: s
   const [recoveryCode, setRecoveryCode] = useState('');
   const [recoveryMessage, setRecoveryMessage] = useState('');
   const recoveryKey = useRef<string | null>(null);
-  const [showLookupForm, setShowLookupForm] = useState(!Boolean(user && initialCode));
+  const [manualMode, setManualMode] = useState(false);
   useEffect(() => {
     if (!user || !initialCode.trim()) return;
     let active = true;
@@ -586,7 +601,6 @@ function Tracking({ user, initialCode = '' }: { user: Me | null; initialCode?: s
       .catch((cause) => {
         if (!active || version !== lookupVersion.current) return;
         setError(cause instanceof Error ? cause.message : 'Không thể tải tiến độ yêu cầu.');
-        setShowLookupForm(true);
       })
       .finally(() => {
         if (active && version === lookupVersion.current) setBusy(false);
@@ -658,23 +672,28 @@ function Tracking({ user, initialCode = '' }: { user: Me | null; initialCode?: s
       setBusy(false);
     }
   }
+  if (user && !initialCode && !manualMode)
+    return (
+      <CitizenRequests
+        user={user}
+        onTrack={onSelectOwned}
+        onNewSos={onNewSos}
+        onManualLookup={() => setManualMode(true)}
+      />
+    );
+
   return (
-    <div className="grid-two">
-      <section className="card">
-        {user && initialCode && !showLookupForm ? (
-          <>
-            <h2>Yêu cầu {initialCode}</h2>
-            <p>Tiến độ của SOS gắn với tài khoản được mở tự động, không cần nhập mã.</p>
-            <button className="button secondary" type="button" onClick={() => setShowLookupForm(true)}>
-              Tra cứu yêu cầu khác
+    <div className="tracking-layout">
+      {(!user || manualMode) && (
+        <section className="card tracking-lookup-card">
+          {user && (
+            <button className="tracking-back" type="button" onClick={() => setManualMode(false)}>
+              <span aria-hidden="true">←</span> Quay lại danh sách
             </button>
-          </>
-        ) : (
-          <>
-          <h2>Tra cứu riêng tư</h2>
+          )}
+          <h2>Tra cứu SOS bằng mã</h2>
           <p>
-            SOS gắn với tài khoản có trong mục Yêu cầu của tôi. Nếu gửi khi chưa đăng nhập, bạn cần
-            mã theo dõi và mã bảo mật đã nhận để tra cứu riêng tư.
+            Nhập mã theo dõi đã nhận khi gửi SOS. Nếu gửi khi chưa đăng nhập, nhập thêm mã bảo mật.
           </p>
           <form onSubmit={lookup} className="form-stack">
           <label>
@@ -709,14 +728,14 @@ function Tracking({ user, initialCode = '' }: { user: Me | null; initialCode?: s
             {busy ? 'Đang tra cứu…' : 'Xem tiến độ'}
           </button>
           </form>
-          </>
-        )}
         {error && (
           <p role="alert" className="notice error">
             {error}
           </p>
         )}
-        {user && showLookupForm && (
+        {user && (
+          <details className="tracking-recovery">
+            <summary>Khôi phục SOS cũ vào tài khoản</summary>
           <form className="form-stack command-form" onSubmit={recover}>
             <h3>Khôi phục quyền theo dõi</h3>
             <p>
@@ -744,12 +763,29 @@ function Tracking({ user, initialCode = '' }: { user: Me | null; initialCode?: s
               </p>
             )}
           </form>
+          </details>
         )}
       </section>
+      )}
+      {user && initialCode && !data && (
+        <section className="card tracking-progress-card">
+          <button className="tracking-back" type="button" onClick={onBack}>
+            <span aria-hidden="true">←</span> Quay lại danh sách
+          </button>
+          {error ? <p role="alert" className="notice error">{error}</p> : <p role="status">Đang tải tiến độ SOS…</p>}
+        </section>
+      )}
       {data && (
-        <section className="card">
-          <h2>Tiến độ yêu cầu {text(data.tracking_code)}</h2>
-          <span className="chip">{label(data.status)}</span>
+        <section className="card tracking-progress-card">
+          {user && initialCode && (
+            <button className="tracking-back" type="button" onClick={onBack}>
+              <span aria-hidden="true">←</span> Quay lại danh sách
+            </button>
+          )}
+          <h2>Tiến độ SOS {text(data.tracking_code)}</h2>
+          <span className={`chip request-status request-status--${requestStatusTone(data.status)}`}>
+            {label(data.status)}
+          </span>
           <p>Máy chủ tiếp nhận: {timeLabel(data.received_at)}</p>
           <div className="timeline">
             {data.timeline.map((entry, index) => {
@@ -1278,8 +1314,8 @@ function App() {
           </div>
         </div>
 
-        <p className="nav-label">Không gian làm việc</p>
-        <div className="workspace-switch" role="group" aria-label="Chọn không gian làm việc">
+        <p className="nav-label">Xem theo vai trò</p>
+        <div className="workspace-switch" role="group" aria-label="Chọn vai trò">
           {workspaces.map((item) => (
             <button
               key={item}
@@ -1291,7 +1327,7 @@ function App() {
           ))}
         </div>
 
-        <p className="nav-label">Điều hướng</p>
+        <p className="nav-label">Chức năng</p>
         <nav>
           {navigation.map((page) => (
             <button
@@ -1306,13 +1342,6 @@ function App() {
           ))}
         </nav>
 
-        <div className="sidebar-bottom">
-          <strong>🚨 Hỗ trợ khẩn cấp 24/7</strong>
-          <span>Nguy hiểm tính mạng, gọi ngay:</span>
-          <span>
-            <strong className="hotlines">113 (Công an) · 114 (Cứu hỏa) · 115 (Cấp cứu)</strong>
-          </span>
-        </div>
       </aside>
 
       <div className="main">
@@ -1363,13 +1392,19 @@ function App() {
             )}
           </div>
         </header>
+        <div className="emergency-bar" role="note">
+          <strong>Nguy hiểm tính mạng?</strong>
+          <span>Gọi ngay <a href="tel:113">113 Công an</a> · <a href="tel:114">114 Cứu hỏa</a> · <a href="tel:115">115 Cấp cứu</a></span>
+        </div>
 
         <main className="content">
           <div className="heading">
             <div>
               <span className="eyebrow">HỆ THỐNG RELIVA</span>
               <h1>{selected.title}</h1>
-              {selected.note && <p>{selected.note}</p>}
+              {selected.id === 'track'
+                ? <p>{user ? 'Xem danh sách SOS đã gắn với tài khoản và tiến độ xử lý.' : 'Nhập mã theo dõi để xem tiến độ SOS đã gửi.'}</p>
+                : selected.note && <p>{selected.note}</p>}
             </div>
           </div>
 
@@ -1416,11 +1451,6 @@ function App() {
                       <button className="button secondary" onClick={() => changePage('track')}>
                         Theo dõi SOS
                       </button>
-                      {user && (
-                        <button className="button secondary" onClick={() => changePage('mine')}>
-                          Yêu cầu của tôi
-                        </button>
-                      )}
                       <button className="button secondary" onClick={() => changePage('drives')}>
                         Xem đợt quyên góp
                       </button>
@@ -1462,12 +1492,6 @@ function App() {
                     onChangePassword={() => setShowPasswordModal(true)}
                     onLogout={signOut}
                   />
-                ) : workspace === 'citizen' && selected.id === 'mine' && user ? (
-                  <CitizenRequests
-                    user={user}
-                    onTrack={trackOwnedRequest}
-                    onNewSos={() => changePage('sos')}
-                  />
                 ) : workspace === 'citizen' && selected.id === 'sos' ? (
                   <SosForm user={user} onConfirmed={setLatestReceipt} />
                 ) : selected.id === 'track' ? (
@@ -1475,6 +1499,9 @@ function App() {
                     key={selectedTrackingCode}
                     user={user}
                     initialCode={selectedTrackingCode}
+                    onSelectOwned={trackOwnedRequest}
+                    onBack={() => changePage('track')}
+                    onNewSos={() => changePage('sos')}
                   />
                 ) : workspace === 'citizen' &&
                   ['drives', 'declare', 'donation'].includes(selected.id) ? (

@@ -11,14 +11,24 @@ type OwnedRequest = {
 };
 type OwnedPage = { items: OwnedRequest[]; more: boolean; cursor?: string };
 
+export function requestStatusTone(status: string): string {
+  if (['REJECTED', 'CANCELLED', 'DUPLICATE'].includes(status)) return 'danger';
+  if (['RESOLVED', 'CLOSED'].includes(status)) return 'success';
+  if (['ASSIGNED', 'DISPATCHED', 'IN_PROGRESS'].includes(status)) return 'progress';
+  if (['TRIAGED', 'VERIFIED'].includes(status)) return 'priority';
+  return 'pending';
+}
+
 export function CitizenRequests({
   user,
   onTrack,
   onNewSos,
+  onManualLookup,
 }: {
   user: Me;
   onTrack: (code: string) => void;
   onNewSos?: () => void;
+  onManualLookup?: () => void;
 }) {
   const [items, setItems] = useState<OwnedRequest[]>([]);
   const [cursor, setCursor] = useState('');
@@ -62,13 +72,13 @@ export function CitizenRequests({
       <div className="section-header">
         <div>
           <span className="eyebrow">SOS cá nhân</span>
-          <h2>Yêu cầu của tôi</h2>
+          <h2>Danh sách yêu cầu</h2>
         </div>
         <button className="button secondary" type="button" onClick={refresh} disabled={loading}>
           Cập nhật danh sách
         </button>
       </div>
-      <p>Các SOS bạn gửi khi đăng nhập hoặc đã gắn với tài khoản sẽ hiện ở đây. Chọn một yêu cầu để xem tiến độ, không cần nhập mã.</p>
+      <p>Chọn một yêu cầu để xem tiến độ. Những SOS đã gắn với tài khoản không cần nhập mã.</p>
       {loading && <p role="status">Đang tải yêu cầu…</p>}
       {error && <p className="notice error" role="alert">{error}</p>}
       {!loading && !error && !items.length && (
@@ -84,7 +94,9 @@ export function CitizenRequests({
               <strong>{item.tracking_code}</strong>
               <small>Tiếp nhận {timeLabel(item.received_at)}</small>
             </div>
-            <span className="chip">{requestStatusLabel(item.status)}</span>
+            <span className={`chip request-status request-status--${requestStatusTone(item.status)}`}>
+              {requestStatusLabel(item.status)}
+            </span>
             <button className="button secondary" type="button" onClick={() => onTrack(item.tracking_code)}>
               Xem tiến độ
             </button>
@@ -94,6 +106,11 @@ export function CitizenRequests({
       {next && (
         <button className="button secondary" type="button" disabled={loading} onClick={() => setCursor(next)}>
           Xem thêm yêu cầu
+        </button>
+      )}
+      {onManualLookup && (
+        <button className="text-button account-manual-lookup" type="button" onClick={onManualLookup}>
+          Có SOS đã gửi khi chưa đăng nhập? Tra cứu bằng mã
         </button>
       )}
     </section>
