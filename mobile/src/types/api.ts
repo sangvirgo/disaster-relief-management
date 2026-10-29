@@ -203,6 +203,8 @@ export interface Mission {
   description: string | null;
   people_affected: number | null;
   declared_danger: boolean;
+  /** True only for an active leader of the mission's team; server-derived. */
+  can_manage_mission?: boolean;
   location: GeoLocation | null;
   reporter_contact_phone?: string | null; // Chỉ dành cho Đội trưởng
   beneficiary_contact_phone?: string | null;
@@ -234,6 +236,7 @@ export interface RegionItem {
   code: string;
   name: string;
   status: string;
+  version?: number;
 }
 
 export interface TeamPositionLocation {

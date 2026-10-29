@@ -16148,7 +16148,8 @@
           "description",
           "people_affected",
           "location",
-          "declared_danger"
+          "declared_danger",
+          "can_manage_mission"
         ],
         "properties": {
           "id": {
@@ -16216,6 +16217,10 @@
           },
           "declared_danger": {
             "type": "boolean"
+          },
+          "can_manage_mission": {
+            "type": "boolean",
+            "description": "True only for an active leader of the mission's team, who alone may accept, decline, and advance the mission. Clients may use it to show or hide those controls; the server remains the authority."
           },
           "reporter_contact_phone": {
             "type": [

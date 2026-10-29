@@ -31,13 +31,13 @@ export class RegionsService {
     const where = cursor ? (values.push(cursor.sort[0], cursor.id), 'WHERE (code, code) > ($1, $2)') : '';
     values.push(Math.min(dto.limit ?? 50, 100) + 1);
     const rows = await this.dataSource.query(
-      `SELECT code, name, status FROM region ${where} ORDER BY code ASC LIMIT $${values.length}`,
+      `SELECT code, name, status, version FROM region ${where} ORDER BY code ASC LIMIT $${values.length}`,
       values,
     ) as RegionRow[];
     const more = rows.length > (dto.limit ?? 50);
     const items = rows.slice(0, dto.limit ?? 50);
     const last = items.at(-1);
-    return { items, next_cursor: more && last ? encodeKeysetCursor([last.code], last.code, filters) : null };
+    return { items: items.map((item) => ({ ...item, version: Number(item.version) })), next_cursor: more && last ? encodeKeysetCursor([last.code], last.code, filters) : null };
   }
 
   async create(dto: CreateRegionDto, actor: AdminRequest) {

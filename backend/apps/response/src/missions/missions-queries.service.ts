@@ -28,7 +28,7 @@ interface MissionRow extends Record<string, unknown> {
   member_role?: 'LEADER' | 'MEMBER';
 }
 
-function missionView(row: MissionRow, includeContacts: boolean): Record<string, unknown> {
+function missionView(row: MissionRow, includeContacts: boolean, canManageMission: boolean): Record<string, unknown> {
   const facts = asObject(row.approved_facts);
   const view: Record<string, unknown> = {
     id: row.id,
@@ -44,6 +44,7 @@ function missionView(row: MissionRow, includeContacts: boolean): Record<string, 
     people_affected: facts.people_affected == null ? null : Number(facts.people_affected),
     location: facts.location ?? null,
     declared_danger: facts.reporter_declared_danger === true,
+    can_manage_mission: canManageMission,
   };
   if (includeContacts) {
     view.reporter_contact_phone = facts.reporter_contact_phone ?? null;
@@ -90,7 +91,10 @@ export class MissionsQueriesService {
     const page = rows.slice(0, limit);
     const next = more ? page.at(-1) : undefined;
     return {
-      items: page.map((row) => missionView(row, leaderTeams.has(row.team_id))),
+      items: page.map((row) => {
+        const isLeader = leaderTeams.has(row.team_id);
+        return missionView(row, isLeader, isLeader);
+      }),
       more,
       ...(next ? { cursor: encodeKeysetCursor([next.cursor_created_at], next.id, filters) } : {}),
     };
@@ -109,7 +113,8 @@ export class MissionsQueriesService {
       organizationId: row.organization_id, regionCode: row.region_code, campaignId: row.campaign_id,
     });
     if (!isMember && !staffAllowed) throw new AppError('FORBIDDEN', { status: 403 });
-    const includeContacts = staffAllowed || memberRows[0]?.member_role === 'LEADER';
+    const isLeader = memberRows[0]?.member_role === 'LEADER';
+    const includeContacts = staffAllowed || isLeader;
     const [events, evidence] = await Promise.all([
       this.dataSource.query(
         `SELECT id,actor_user_id,from_status,to_status,recorded_basis,reported_by,reason,outcome_note,occurred_at,recorded_at
@@ -121,7 +126,7 @@ export class MissionsQueriesService {
       ) as Promise<Array<Record<string, unknown>>>,
     ]);
     return {
-      ...missionView(row, includeContacts),
+      ...missionView(row, includeContacts, isLeader),
       timeline: { items: events.map((event) => ({
         id: event.id, actor_user_id: event.actor_user_id, from_status: event.from_status, to_status: event.to_status,
         recorded_basis: event.recorded_basis, reported_by: event.reported_by, reason: event.reason,
