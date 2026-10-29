@@ -56,12 +56,18 @@ export class MobileApiError extends Error {
 
 const codeMessages: Record<string, string> = {
   USERNAME_TAKEN: 'Tên đăng nhập này đã có người sử dụng. Vui lòng chọn tên khác.',
+  EMAIL_TAKEN: 'Email này đã được sử dụng. Vui lòng đăng nhập hoặc dùng địa chỉ email khác.',
   PASSWORD_WEAK: 'Mật khẩu chưa đủ mạnh. Vui lòng chọn mật khẩu khác theo yêu cầu.',
+  EMAIL_OTP_INVALID: 'Mã xác minh không đúng, đã hết hạn hoặc đã được sử dụng. Hãy kiểm tra mã mới nhất trong email.',
+  EMAIL_OTP_UNAVAILABLE: 'Chưa thể gửi email xác minh. Vui lòng thử gửi lại mã sau.',
+  REGISTRATION_EXPIRED: 'Yêu cầu đăng ký đã hết hạn. Vui lòng đăng ký lại để nhận mã mới.',
   INVALID_CREDENTIALS: 'Tên đăng nhập hoặc mật khẩu không chính xác.',
   RATE_LIMITED: 'Bạn thao tác quá nhanh. Vui lòng đợi một lát rồi thử lại.',
   SOS_RATE_CEILING: 'Thiết bị gửi quá nhiều yêu cầu. Nếu đang nguy hiểm, hãy gọi 112, 113, 114 hoặc 115.',
   UNAUTHENTICATED: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
   SESSION_EXPIRED: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+  REFRESH_RACE: 'Phiên đăng nhập vừa được làm mới. Vui lòng thử lại thao tác.',
+  REFRESH_REUSED: 'Phiên đăng nhập đã bị thu hồi để bảo vệ tài khoản. Vui lòng đăng nhập lại.',
   FORBIDDEN: 'Tài khoản không có quyền thực hiện thao tác này.',
   VALIDATION_FAILED: 'Thông tin gửi lên chưa hợp lệ. Vui lòng kiểm tra lại.',
   IDEMPOTENCY_KEY_INVALID: 'Không thể xác nhận yêu cầu an toàn. Vui lòng thử lại.',
@@ -86,6 +92,8 @@ const codeMessages: Record<string, string> = {
   TEAM_NOT_ELIGIBLE: 'Đội cứu hộ chưa đủ điều kiện hoặc thiếu kỹ năng cần thiết cho nhiệm vụ này.',
   MISSION_NOT_LEADER: 'Chỉ đội trưởng đang hoạt động mới có quyền thực hiện thao tác này.',
   RECOVERY_CODE_INVALID: 'Mã khôi phục không chính xác hoặc đã hết hạn.',
+  DRIVE_WINDOW_CLOSED: 'Đợt tiếp nhận hiện chưa mở hoặc đã kết thúc thời gian nhận hàng.',
+  DECLARATION_LOCKED: 'Bản khai đã được chuyển sang kiểm đếm và không thể chỉnh sửa.',
 };
 
 const statusMessages: Record<number, string> = {

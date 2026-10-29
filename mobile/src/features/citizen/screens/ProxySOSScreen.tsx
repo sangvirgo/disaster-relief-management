@@ -76,6 +76,8 @@ export const ProxySOSScreen: React.FC = () => {
   const [situationPickerMode, setSituationPickerMode] = useState<SituationPickerMode>('date');
   const [draftSituationDate, setDraftSituationDate] = useState<Date>(new Date());
   const [beneficiaryPhone, setBeneficiaryPhone] = useState<string>('');
+  const [alternateContactName, setAlternateContactName] = useState<string>('');
+  const [alternateContactPhone, setAlternateContactPhone] = useState<string>('');
   const [contactability, setContactability] = useState<'REACHABLE' | 'UNREACHABLE' | 'UNKNOWN'>('UNKNOWN');
   const [description, setDescription] = useState<string>('');
   const [formErrors, setFormErrors] = useState<Record<string, string | undefined>>({});
@@ -123,6 +125,9 @@ export const ProxySOSScreen: React.FC = () => {
     if (!value.trim()) return undefined;
     return isValidPhone(value) ? undefined : 'Số điện thoại cần có 8–15 chữ số; có thể bắt đầu bằng dấu +.';
   };
+  const alternateContactNameError = (value: string) => value.length > 200
+    ? 'Tên người liên hệ dự phòng không được vượt quá 200 ký tự.'
+    : undefined;
   const situationTimeError = (value: string) => {
     if (!value.trim()) return undefined;
     const date = new Date(value);
@@ -158,6 +163,8 @@ export const ProxySOSScreen: React.FC = () => {
         setHouseholdLng(String(payload.location.coordinates[0]));
         setHouseholdLat(String(payload.location.coordinates[1]));
         setBeneficiaryPhone(payload.beneficiary_contact_phone || '');
+        setAlternateContactName(payload.alternate_contact?.name || '');
+        setAlternateContactPhone(payload.alternate_contact?.phone || '');
         setContactability(payload.contactability);
         setDescription(payload.description || '');
         setInformationSource(payload.information_source);
@@ -205,9 +212,11 @@ export const ProxySOSScreen: React.FC = () => {
   const submitDisabled = isSubmitting || restoringPending || Boolean(descriptionError(description)) ||
     Boolean(relationshipError(relationship)) || Boolean(informationSourceError(informationSource)) ||
     Boolean(headcountError(peopleAffected)) || Boolean(vulnerableCountsError(childrenCount, elderlyCount, peopleAffected)) ||
-    Boolean(beneficiaryPhoneError(beneficiaryPhone)) || Boolean(situationTimeError(lastKnownSituationAt)) ||
+    Boolean(beneficiaryPhoneError(beneficiaryPhone)) || Boolean(alternateContactNameError(alternateContactName)) ||
+    Boolean(beneficiaryPhoneError(alternateContactPhone)) || Boolean(situationTimeError(lastKnownSituationAt)) ||
     (!pendingCommand && (
       !householdLocation || !relationship.trim() || !informationSource.trim() || !lastKnownSituationAt.trim() ||
+      (alternateContactPhone.trim() && !alternateContactName.trim()) ||
       (!needsRescue && !needsRelief)
     ));
 
@@ -239,6 +248,8 @@ export const ProxySOSScreen: React.FC = () => {
               setInformationSource('');
               setLastKnownSituationAt('');
               setBeneficiaryPhone('');
+              setAlternateContactName('');
+              setAlternateContactPhone('');
               setContactability('UNKNOWN');
               setDescription('');
             } catch {
@@ -287,10 +298,10 @@ export const ProxySOSScreen: React.FC = () => {
     const vulnerableValidationError = vulnerableCountsError(childrenText, elderlyText, headcountText);
     if (!pendingCommand && vulnerableValidationError) errors.vulnerableCounts = vulnerableValidationError;
     if (!pendingCommand && !needsRescue && !needsRelief) errors.needs = 'Chọn cần cứu hộ, cần hàng cứu trợ hoặc cả hai.';
-    const normalizedRelationship = relationship.trim();
+    const normalizedRelationship = relationship.trim().normalize('NFC');
     if (!pendingCommand && !normalizedRelationship) errors.relationship = 'Vui lòng nhập mối quan hệ với nạn nhân.';
     else if (!pendingCommand && relationshipError(relationship)) errors.relationship = relationshipError(relationship)!;
-    const normalizedInformationSource = informationSource.trim();
+    const normalizedInformationSource = informationSource.trim().normalize('NFC');
     if (!pendingCommand && !normalizedInformationSource) errors.informationSource = 'Vui lòng ghi rõ nguồn nhận thông tin.';
     else if (!pendingCommand && informationSourceError(informationSource)) errors.informationSource = informationSourceError(informationSource)!;
     const lastKnownValue = lastKnownSituationAt.trim();
@@ -301,6 +312,16 @@ export const ProxySOSScreen: React.FC = () => {
     if (!pendingCommand && situationTimeError(lastKnownValue)) errors.lastKnownSituationAt = situationTimeError(lastKnownValue)!;
     const normalizedPhone = normalizePhone(beneficiaryPhone);
     if (!pendingCommand && beneficiaryPhoneError(beneficiaryPhone)) errors.beneficiaryPhone = beneficiaryPhoneError(beneficiaryPhone)!;
+    const normalizedAlternateName = alternateContactName.trim().normalize('NFC');
+    const normalizedAlternatePhone = normalizePhone(alternateContactPhone);
+    if (!pendingCommand && alternateContactNameError(alternateContactName)) {
+      errors.alternateContactName = alternateContactNameError(alternateContactName)!;
+    } else if (!pendingCommand && alternateContactPhone.trim() && !normalizedAlternateName) {
+      errors.alternateContactName = 'Hãy nhập tên người liên hệ dự phòng khi có số điện thoại.';
+    }
+    if (!pendingCommand && beneficiaryPhoneError(alternateContactPhone)) {
+      errors.alternateContactPhone = beneficiaryPhoneError(alternateContactPhone)!;
+    }
     if (!pendingCommand && descriptionError(description)) errors.description = descriptionError(description)!;
 
     setFormErrors(errors);
@@ -325,6 +346,12 @@ export const ProxySOSScreen: React.FC = () => {
         last_known_situation_at: lastKnownDate.toISOString(),
         contactability,
         beneficiary_contact_phone: normalizedPhone || undefined,
+        ...(normalizedAlternateName ? {
+          alternate_contact: {
+            name: normalizedAlternateName,
+            phone: normalizedAlternatePhone || undefined,
+          },
+        } : {}),
       };
 
       const command = pendingCommand || await StorageService.getOrCreatePendingProxySOS(payload);
@@ -782,6 +809,47 @@ export const ProxySOSScreen: React.FC = () => {
             maxLength={33}
           />
           <FormFieldError message={formErrors.beneficiaryPhone} />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Người liên hệ dự phòng (nếu có):</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Họ tên người có thể cung cấp thêm thông tin"
+            placeholderTextColor={THEME.colors.text.muted}
+            value={alternateContactName}
+            onChangeText={(value) => {
+              setAlternateContactName(value);
+              setFormErrors((current) => ({
+                ...current,
+                alternateContactName: alternateContactNameError(value) ||
+                  (alternateContactPhone.trim() && !value.trim()
+                    ? 'Hãy nhập tên người liên hệ dự phòng khi có số điện thoại.'
+                    : undefined),
+              }));
+            }}
+            maxLength={201}
+          />
+          <FormFieldError message={formErrors.alternateContactName} />
+          <TextInput
+            style={[styles.textInput, { marginTop: 8 }]}
+            placeholder="Số điện thoại người liên hệ dự phòng"
+            placeholderTextColor={THEME.colors.text.muted}
+            value={alternateContactPhone}
+            onChangeText={(value) => {
+              setAlternateContactPhone(value);
+              setFormErrors((current) => ({
+                ...current,
+                alternateContactPhone: beneficiaryPhoneError(value),
+                alternateContactName: value.trim() && !alternateContactName.trim()
+                  ? 'Hãy nhập tên người liên hệ dự phòng khi có số điện thoại.'
+                  : alternateContactNameError(alternateContactName),
+              }));
+            }}
+            keyboardType="phone-pad"
+            maxLength={33}
+          />
+          <FormFieldError message={formErrors.alternateContactPhone} />
         </View>
 
         <View style={styles.inputGroup}>

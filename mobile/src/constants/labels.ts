@@ -109,7 +109,6 @@ export const PRIORITY_LABELS: Record<PriorityLevel, { label: string; color: stri
 
 export const CONTACTABILITY_LABELS = {
   REACHABLE: 'Có thể liên lạc được qua điện thoại',
-  INTERMITTENT: 'Sóng chập chờn, lúc được lúc mất',
   UNREACHABLE: 'Mất sóng hoàn toàn / Hết pin',
   UNKNOWN: 'Chưa rõ tình trạng liên lạc',
 };

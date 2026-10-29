@@ -8,7 +8,7 @@ interface AuthState {
   grants: RoleGrant[];
   isLoading: boolean;
   isAuthenticated: boolean;
-  register: (email: string, username: string, password: string, displayName: string) => Promise<{
+  register: (email: string, username: string, password: string, displayName: string, idempotencyKey?: string) => Promise<{
     verification: { challenge_id: string };
     email_sent: boolean;
   }>;
@@ -111,10 +111,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  register: async (email: string, username: string, password: string, displayName: string) => {
+  register: async (email: string, username: string, password: string, displayName: string, idempotencyKey?: string) => {
     set({ isLoading: true });
     try {
-      return await IdentityApi.register(email, username, password, displayName);
+      return await IdentityApi.register(email, username, password, displayName, idempotencyKey);
     } catch (error) {
       set({ isLoading: false });
       throw error;

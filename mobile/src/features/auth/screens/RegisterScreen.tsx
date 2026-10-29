@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -16,9 +16,10 @@ import { FormFieldError } from '../../../components/common/FormFieldError';
 import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { useAuthStore } from '../../../store/authStore';
 import { IdentityApi } from '../../../api/identityApi';
-import { getApiErrorMessage } from '../../../api/client';
+import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { THEME } from '../../../constants/theme';
 import { isCommonPassword, isValidEmail } from '../../../utils/formValidation';
+import { generateUUID } from '../../../utils/secureStore';
 import { User, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, UserCheck } from 'lucide-react-native';
 
 export const RegisterScreen: React.FC = () => {
@@ -37,6 +38,9 @@ export const RegisterScreen: React.FC = () => {
   const [emailSent, setEmailSent] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const registrationAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
+  const verificationAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
+  const resendAttempt = useRef<{ challengeId: string; key: string } | null>(null);
 
   const finishLogin = () => router.replace('/');
 
@@ -102,7 +106,26 @@ export const RegisterScreen: React.FC = () => {
     }
 
     try {
-      const result = await register(emailValue.toLowerCase(), trimmedUsername, cleanPassword, trimmedDisplayName);
+      const fingerprint = JSON.stringify([
+        emailValue.toLowerCase(),
+        trimmedUsername,
+        cleanPassword,
+        trimmedDisplayName,
+      ]);
+      if (!registrationAttempt.current || registrationAttempt.current.fingerprint !== fingerprint) {
+        registrationAttempt.current = { fingerprint, key: generateUUID() };
+      }
+      const result = await register(
+        emailValue.toLowerCase(),
+        trimmedUsername,
+        cleanPassword,
+        trimmedDisplayName,
+        registrationAttempt.current.key,
+      );
+      registrationAttempt.current = null;
+      verificationAttempt.current = null;
+      resendAttempt.current = null;
+      setVerificationCode('');
       setChallengeId(result.verification.challenge_id);
       setEmailSent(result.email_sent);
       Alert.alert('Đã tạo tài khoản chờ xác minh', result.email_sent
@@ -122,13 +145,35 @@ export const RegisterScreen: React.FC = () => {
     setFormErrors((current) => ({ ...current, verificationCode: undefined }));
     setIsVerifying(true);
     try {
-      await IdentityApi.verifyEmail(challengeId, verificationCode.trim());
-      await login(username.trim().toLowerCase(), password);
-      Alert.alert('Xác minh thành công', 'Email đã được xác minh và tài khoản đã kích hoạt.', [
-        { text: 'Tiếp tục', onPress: finishLogin },
-      ]);
+      const code = verificationCode.trim();
+      const fingerprint = `${challengeId}:${code}`;
+      if (!verificationAttempt.current || verificationAttempt.current.fingerprint !== fingerprint) {
+        verificationAttempt.current = { fingerprint, key: generateUUID() };
+      }
+      await IdentityApi.verifyEmail(challengeId, code, verificationAttempt.current.key);
+      verificationAttempt.current = null;
+      try {
+        await login(username.trim().toLowerCase(), password);
+        Alert.alert('Xác minh thành công', 'Email đã được xác minh và tài khoản đã kích hoạt.', [
+          { text: 'Tiếp tục', onPress: finishLogin },
+        ]);
+      } catch (loginError: unknown) {
+        setChallengeId('');
+        setVerificationCode('');
+        Alert.alert(
+          'Email đã được xác minh',
+          `Tài khoản đã được kích hoạt nhưng chưa đăng nhập được. ${getApiErrorMessage(loginError, 'Hãy đăng nhập bằng tên tài khoản và mật khẩu vừa đăng ký.')}`,
+          [{ text: 'Đăng nhập', onPress: () => router.replace('/login') }],
+        );
+      }
     } catch (err: unknown) {
       Alert.alert('Xác minh thất bại', getApiErrorMessage(err, 'Không thể xác minh email. Vui lòng thử lại.'));
+      if (isApiErrorCode(err, 'REGISTRATION_EXPIRED')) {
+        setChallengeId('');
+        setVerificationCode('');
+        verificationAttempt.current = null;
+        resendAttempt.current = null;
+      }
     } finally {
       setIsVerifying(false);
     }
@@ -137,13 +182,29 @@ export const RegisterScreen: React.FC = () => {
   const handleResend = async () => {
     setIsResending(true);
     try {
-      const result = await IdentityApi.resendEmailOtp(challengeId);
-      if (result.challenge_id) setChallengeId(result.challenge_id);
+      if (!resendAttempt.current || resendAttempt.current.challengeId !== challengeId) {
+        resendAttempt.current = { challengeId, key: generateUUID() };
+      }
+      const result = await IdentityApi.resendEmailOtp(challengeId, resendAttempt.current.key);
+      resendAttempt.current = null;
+      verificationAttempt.current = null;
+      setVerificationCode('');
       setEmailSent(result.email_sent);
-      Alert.alert('Gửi mã xác minh', result.email_sent
-        ? `Mã mới đã được gửi đến ${email.trim()}.`
-        : 'Chưa gửi được email. Vui lòng kiểm tra cấu hình email hoặc thử lại sau.');
+      if (result.challenge_id) {
+        setChallengeId(result.challenge_id);
+        Alert.alert('Gửi mã xác minh', result.email_sent
+          ? `Mã mới đã được gửi đến ${email.trim()}. Mã cũ không còn hiệu lực.`
+          : 'Yêu cầu xác minh vẫn còn hiệu lực nhưng email chưa gửi được. Vui lòng thử lại sau.');
+      } else {
+        setChallengeId('');
+        Alert.alert(
+          'Yêu cầu xác minh đã kết thúc',
+          'Yêu cầu đã hết hạn hoặc tài khoản đã được kích hoạt. Hãy đăng nhập nếu bạn vừa xác minh email, hoặc đăng ký lại để tạo yêu cầu mới.',
+          [{ text: 'Đăng nhập', onPress: () => router.replace('/login') }, { text: 'Đăng ký lại', style: 'cancel' }],
+        );
+      }
     } catch (err: unknown) {
+      if (isApiErrorCode(err, 'RATE_LIMITED')) resendAttempt.current = null;
       Alert.alert('Chưa gửi được mã', getApiErrorMessage(err, 'Chưa thể gửi lại mã xác minh.'));
     } finally {
       setIsResending(false);

@@ -270,7 +270,7 @@ export const CreateSOSScreen: React.FC = () => {
         people_affected: headcount,
         ...(children === null ? {} : { children_count: children }),
         ...(elderly === null ? {} : { elderly_count: elderly }),
-        reporter_name: reporterName.trim() || undefined,
+        reporter_name: reporterName.trim().normalize('NFC') || undefined,
         reporter_contact_phone: normalizedPhone || undefined,
         reporter_declared_danger: declaredDanger,
         needs_rescue: needsRescue,

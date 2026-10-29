@@ -1,10 +1,16 @@
 import { apiClient } from './client';
 import { NativeLoginResponse, User, RoleGrant, RegionItem } from '../types/api';
-import { StorageService } from '../utils/secureStore';
+import { generateUUID, StorageService } from '../utils/secureStore';
 
 export const IdentityApi = {
   // Đăng ký tài khoản công dân mới (POST /identity/auth/register)
-  async register(email: string, username: string, password: string, displayName: string): Promise<{
+  async register(
+    email: string,
+    username: string,
+    password: string,
+    displayName: string,
+    idempotencyKey = generateUUID(),
+  ): Promise<{
     user: { id: string; username: string; display_name: string };
     verification: { challenge_id: string };
     email_sent: boolean;
@@ -18,22 +24,23 @@ export const IdentityApi = {
       password,
       display_name: displayName.trim().normalize('NFC'),
       email: email.trim().toLowerCase(),
-    });
+    }, { headers: { 'Idempotency-Key': idempotencyKey } });
     return response.data;
   },
 
-  async verifyEmail(challengeId: string, code: string): Promise<{ verified: true }> {
+  async verifyEmail(challengeId: string, code: string, idempotencyKey = generateUUID()): Promise<{ verified: true }> {
     const response = await apiClient.post<{ verified: true }>('/identity/auth/email/verify', {
       challenge_id: challengeId,
       code: code.trim(),
-    });
+    }, { headers: { 'Idempotency-Key': idempotencyKey } });
     return response.data;
   },
 
-  async resendEmailOtp(challengeId: string): Promise<{ challenge_id: string | null; email_sent: boolean }> {
+  async resendEmailOtp(challengeId: string, idempotencyKey = generateUUID()): Promise<{ challenge_id: string | null; email_sent: boolean }> {
     const response = await apiClient.post<{ challenge_id: string | null; email_sent: boolean }>(
       '/identity/auth/email/resend',
       { challenge_id: challengeId },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
     );
     return response.data;
   },

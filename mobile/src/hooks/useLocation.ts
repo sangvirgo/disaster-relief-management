@@ -25,10 +25,13 @@ export function useLocation() {
       // Thử lấy nhanh vị trí đã biết gần nhất trong bộ nhớ đệm
       try {
         const lastKnown = await Location.getLastKnownPositionAsync();
-        if (lastKnown?.coords) {
-          const acc = typeof lastKnown.coords.accuracy === 'number' && Number.isFinite(lastKnown.coords.accuracy)
-            ? lastKnown.coords.accuracy
-            : 50;
+        const acc = lastKnown?.coords.accuracy;
+        if (
+          lastKnown?.coords &&
+          typeof acc === 'number' && Number.isFinite(acc) && acc >= 0 &&
+          Number.isFinite(lastKnown.timestamp) && Number.isFinite(lastKnown.coords.longitude) &&
+          Number.isFinite(lastKnown.coords.latitude)
+        ) {
           setLocation({
             type: 'Point',
             coordinates: [lastKnown.coords.longitude, lastKnown.coords.latitude],
@@ -54,7 +57,11 @@ export function useLocation() {
 
       if (currentLocation && currentLocation.coords) {
         const accuracy = currentLocation.coords.accuracy;
-        if (typeof accuracy === 'number' && Number.isFinite(accuracy) && accuracy >= 0) {
+        if (
+          typeof accuracy === 'number' && Number.isFinite(accuracy) && accuracy >= 0 &&
+          Number.isFinite(currentLocation.timestamp) && Number.isFinite(currentLocation.coords.longitude) &&
+          Number.isFinite(currentLocation.coords.latitude)
+        ) {
           setLocation({
             type: 'Point',
             coordinates: [currentLocation.coords.longitude, currentLocation.coords.latitude],

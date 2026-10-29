@@ -56,7 +56,6 @@ export const TeamDashboardScreen: React.FC = () => {
     logout,
     isLoading: authLoading,
     isAuthenticated,
-    isVolunteerOrLeader,
   } = useAuthStore();
   const { location, refreshLocation } = useLocation();
 
@@ -177,7 +176,7 @@ export const TeamDashboardScreen: React.FC = () => {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!isAuthenticated || !isVolunteerOrLeader()) {
+    if (!isAuthenticated) {
       router.replace('/');
       return;
     }
@@ -188,7 +187,7 @@ export const TeamDashboardScreen: React.FC = () => {
     // Initial loading is already true; this starts the initial request.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadTeamData();
-  }, [authLoading, isAuthenticated, isVolunteerOrLeader, loadTeamData, router, user?.must_change_password]);
+  }, [authLoading, isAuthenticated, loadTeamData, router, user?.must_change_password]);
 
   // Đội trưởng cập nhật trạng thái sẵn sàng của đội
   const handleToggleAvailability = async (nextValue: boolean) => {

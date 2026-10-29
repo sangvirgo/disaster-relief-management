@@ -36,6 +36,7 @@ export const EmergencyHomeScreen: React.FC = () => {
   const [trackingCodeError, setTrackingCodeError] = useState<string | undefined>();
   const [notices, setNotices] = useState<NoticeItem[]>([]);
   const [selectedNotice, setSelectedNotice] = useState<NoticeItem | null>(null);
+  const [teamMembershipUserId, setTeamMembershipUserId] = useState<string | null>(null);
   const {
     user,
     isAuthenticated,
@@ -56,6 +57,19 @@ export const EmergencyHomeScreen: React.FC = () => {
         .catch(() => {});
     }
   }, [isAuthenticated, isCitizen, isVolunteerOrLeader, user?.must_change_password]);
+
+  useEffect(() => {
+    if (!isAuthenticated || isVolunteerOrLeader() || !user?.id) return;
+    let isCurrentUser = true;
+    void ResponseApi.getMyTeams(1)
+      .then((page) => {
+        if (isCurrentUser) setTeamMembershipUserId(page.items.length > 0 ? user.id : null);
+      })
+      .catch(() => {
+        if (isCurrentUser) setTeamMembershipUserId(null);
+      });
+    return () => { isCurrentUser = false; };
+  }, [isAuthenticated, isVolunteerOrLeader, user?.id]);
 
   useEffect(() => {
     if (isAuthenticated && user?.must_change_password) {
@@ -439,10 +453,10 @@ export const EmergencyHomeScreen: React.FC = () => {
           <Text style={styles.quickAccessDesc}>Tiếp tế các điểm lũ</Text>
         </TouchableOpacity>
 
-        {(isVolunteerOrLeader() || !isAuthenticated) ? <TouchableOpacity
+        {(isVolunteerOrLeader() || (isAuthenticated && teamMembershipUserId === user?.id) || !isAuthenticated) ? <TouchableOpacity
           style={styles.quickAccessCard}
           onPress={() => {
-            if (isVolunteerOrLeader()) {
+            if (isAuthenticated) {
               router.push('/team');
             } else {
               router.push('/login');
