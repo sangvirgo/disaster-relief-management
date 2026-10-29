@@ -15,6 +15,8 @@ interface MissionRow extends Record<string, unknown> {
   request_id: string;
   team_id: string;
   team_name: string;
+  team_status: string;
+  team_reporting_mode: 'APP' | 'COORDINATOR';
   work_cycle: number;
   status: string;
   mission_kind: string;
@@ -74,7 +76,7 @@ export class MissionsQueriesService {
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
     const limit = query.limit ?? 50;
     const rows = await this.dataSource.query(
-      `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,m.work_cycle,m.status,m.mission_kind,m.version,m.created_at,
+      `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,t.status AS team_status,t.reporting_mode AS team_reporting_mode,m.work_cycle,m.status,m.mission_kind,m.version,m.created_at,
               to_char(m.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
               r.organization_id,r.region_code,r.campaign_id,e.payload->'approved_facts' AS approved_facts,
               tm.member_role
@@ -93,7 +95,7 @@ export class MissionsQueriesService {
     return {
       items: page.map((row) => {
         const isLeader = leaderTeams.has(row.team_id);
-        return missionView(row, isLeader, isLeader);
+        return missionView(row, isLeader, isLeader && row.team_status === 'ACTIVE' && row.team_reporting_mode === 'APP');
       }),
       more,
       ...(next ? { cursor: encodeKeysetCursor([next.cursor_created_at], next.id, filters) } : {}),
@@ -124,7 +126,7 @@ export class MissionsQueriesService {
       ) as Promise<Array<Record<string, unknown>>>,
     ]);
     return {
-      ...missionView(row, includeContacts, isLeader),
+      ...missionView(row, includeContacts, isLeader && row.team_status === 'ACTIVE' && row.team_reporting_mode === 'APP'),
       timeline: { items: events.map((event) => ({
         id: event.id, actor_user_id: event.actor_user_id, from_status: event.from_status, to_status: event.to_status,
         recorded_basis: event.recorded_basis, reported_by: event.reported_by, reason: event.reason,
@@ -175,7 +177,7 @@ export class MissionsQueriesService {
 
   async findMission(queryable: Pick<DataSource, 'query'>, missionId: string): Promise<MissionRow | undefined> {
     const rows = await queryable.query(
-      `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,m.work_cycle,m.status,m.mission_kind,m.version,m.created_at,
+      `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,t.status AS team_status,t.reporting_mode AS team_reporting_mode,m.work_cycle,m.status,m.mission_kind,m.version,m.created_at,
               to_char(m.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
               r.organization_id,r.region_code,r.campaign_id,e.payload->'approved_facts' AS approved_facts
          FROM mission m JOIN rescue_team t ON t.id=m.team_id

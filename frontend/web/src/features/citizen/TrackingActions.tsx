@@ -3,6 +3,7 @@ import { api, ApiError, newCommandKey, upload } from '../../api/client';
 import { label, timeLabel } from '../../i18n/labels';
 import type { components as ResponseComponents } from '../../api/generated/response';
 import { LocationPicker, type Point } from '../../maps/LocationPicker';
+import { confirmAction } from '../../components/confirmAction';
 
 type Tracking = ResponseComponents['schemas']['ReporterTracking'];
 type Evidence = { id: string; state: string; size_bytes: number; created_at: string };
@@ -143,9 +144,9 @@ export function TrackingActions({
   }
   async function claim() {
     if (
-      !window.confirm(
+      !(await confirmAction(
         'Gắn yêu cầu này với tài khoản đang đăng nhập? Mã bảo mật cũ sẽ hết hiệu lực.'
-      )
+      ))
     )
       return;
     setBusy(true);
@@ -258,8 +259,10 @@ export function TrackingActions({
       )}
       <div className="tracking-evidence-section">
         <h3>Ảnh và video hiện trường</h3>
-        <p>Chỉ điều phối viên và người có quyền theo dõi SOS được xem các tệp này.</p>
-        <form className="form-stack" onSubmit={attach}>
+        <p>{tracking.can_supplement
+          ? 'Chỉ điều phối viên và người có quyền theo dõi SOS được xem các tệp này.'
+          : 'Yêu cầu đã kết thúc nên không thể gửi thêm tệp minh chứng.'}</p>
+        {tracking.can_supplement && <form className="form-stack" onSubmit={attach}>
           <label className="tracking-file-picker">
             <input
               ref={fileInputRef}
@@ -279,7 +282,7 @@ export function TrackingActions({
           <div className="tracking-evidence-actions">
             <button className="button" disabled={busy || !file}>Tải minh chứng lên</button>
           </div>
-        </form>
+        </form>}
       </div>
       {canClaim && secret && (
         <button className="button secondary" type="button" onClick={claim} disabled={busy}>

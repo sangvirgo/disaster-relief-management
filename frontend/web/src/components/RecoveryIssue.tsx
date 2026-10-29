@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { api, newCommandKey, type Service } from '../api/client';
 import { label, timeLabel } from '../i18n/labels';
+import { confirmAction } from './confirmAction';
 
 export function RecoveryIssue({
   service,
@@ -29,7 +30,7 @@ export function RecoveryIssue({
   const key = useRef<string | null>(null);
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!window.confirm('Bạn đã xác minh độc lập người yêu cầu khôi phục và muốn cấp mã một lần?'))
+    if (!(await confirmAction('Bạn đã xác minh độc lập người yêu cầu khôi phục và muốn cấp mã một lần?')))
       return;
     setBusy(true);
     setError('');

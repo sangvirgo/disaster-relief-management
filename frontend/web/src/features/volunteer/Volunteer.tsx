@@ -4,6 +4,7 @@ import { label, timeLabel } from '../../i18n/labels';
 import type { components as ResponseComponents } from '../../api/generated/response';
 import { googleMapsDirectionsUrl } from '../../maps/googleMaps';
 import { LocationPicker, type Point } from '../../maps/LocationPicker';
+import { confirmAction } from '../../components/confirmAction';
 
 type Mission = ResponseComponents['schemas']['MissionView'];
 type MissionDetail = ResponseComponents['schemas']['MissionDetail'];
@@ -319,7 +320,7 @@ export function Volunteer({ page, initialMissionId }: { page: string; initialMis
 
   // --- Mission Actions ---
   async function acceptMission(mission: Mission | MissionDetail) {
-    if (!window.confirm('Xác nhận tiếp nhận nhiệm vụ cứu hộ này?')) return;
+    if (!(await confirmAction('Xác nhận tiếp nhận nhiệm vụ cứu hộ này?'))) return;
     setBusy(true);
     setActionMessage('');
     try {
@@ -456,9 +457,9 @@ export function Volunteer({ page, initialMissionId }: { page: string; initialMis
     const nextAvailability = team.availability === 'AVAILABLE' ? 'UNAVAILABLE' : 'AVAILABLE';
     const confirmText =
       nextAvailability === 'AVAILABLE'
-        ? `Chuyển trạng thái đội ${team.name} sang SẴN SÀNG HOẠT ĐỘNG?`
-        : `Tạm ngưng hoạt động đội ${team.name}?`;
-    if (!window.confirm(confirmText)) return;
+        ? `Chuyển ${team.name} sang trạng thái sẵn sàng hoạt động?`
+        : `Tạm ngưng hoạt động ${team.name}?`;
+    if (!(await confirmAction(confirmText))) return;
     setBusy(true);
     setTeamMessage('');
     try {
@@ -467,7 +468,7 @@ export function Volunteer({ page, initialMissionId }: { page: string; initialMis
         body: { expected_version: team.version, availability: nextAvailability },
         idempotencyKey: newCommandKey(),
       });
-      setTeamMessage(`Đội ${team.name} đã chuyển sang ${label(nextAvailability)}.`);
+      setTeamMessage(`${team.name} đã chuyển sang ${label(nextAvailability)}.`);
       refreshAll();
     } catch (cause) {
       setTeamMessage(cause instanceof Error ? cause.message : 'Không thể cập nhật trạng thái đội.');
@@ -512,7 +513,7 @@ export function Volunteer({ page, initialMissionId }: { page: string; initialMis
           accuracy_m: teamAccuracy,
         },
       });
-      setTeamMessage(`Đã cập nhật vị trí mới cho đội ${team.name}.`);
+      setTeamMessage(`Đã cập nhật vị trí mới cho ${team.name}.`);
       setTeamPoint(null);
       setTeamAccuracy(null);
       refreshAll();
@@ -524,8 +525,7 @@ export function Volunteer({ page, initialMissionId }: { page: string; initialMis
   }
 
   const activeMission = missionDetail || selectedMission;
-  const canManageMission = Boolean(selectedMission &&
-    Object.prototype.hasOwnProperty.call(selectedMission, 'reporter_contact_phone'));
+  const canManageMission = activeMission?.can_manage_mission === true;
   const directionsUrl = activeMission && googleMapsDirectionsUrl(activeMission.location);
 
   return (
@@ -647,6 +647,7 @@ export function Volunteer({ page, initialMissionId }: { page: string; initialMis
                       {label(selectedTeam.availability)}
                     </span>
                   </p>
+                  <p className="muted">Sẵn sàng hoạt động nghĩa là đội đang bật nhận việc. Đội vẫn không được giao thêm khi có nhiệm vụ đang thực hiện.</p>
                   <p>
                     <strong>Chế độ báo cáo</strong>
                     <span className="detail-value">

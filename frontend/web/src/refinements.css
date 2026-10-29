@@ -1049,3 +1049,71 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.action-confirm-dialog {
+  width: min(430px, calc(100vw - 32px));
+  max-width: none;
+  padding: 0;
+  border: 1px solid #dce5f0;
+  border-radius: 22px;
+  background: #fff;
+  color: #14233b;
+  box-shadow: 0 28px 70px #0b254455;
+}
+.action-confirm-dialog::backdrop {
+  background: #10243a99;
+  backdrop-filter: blur(3px);
+}
+.action-confirm-content { padding: clamp(20px, 5vw, 30px); }
+.action-confirm-logo {
+  display: block;
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+  border-radius: 18px;
+  background: #f2f7fc;
+  padding: 7px;
+}
+.action-confirm-content h2 { margin: 18px 0 8px; font-size: 1.3rem; }
+.action-confirm-content p { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }
+.action-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 26px; flex-wrap: wrap; }
+.action-confirm-actions .button { min-width: 104px; }
+.team-position-refresh {
+  padding: 16px;
+  margin: 12px 0;
+  border: 1px solid #d5e2ef;
+  border-radius: 16px;
+  background: #f7fbff;
+}
+.team-position-refresh > p:first-child { margin-top: 0; line-height: 1.5; }
+.team-position-refresh > .button { margin-top: 10px; }
+@media (max-width: 1180px) {
+  .grid-two,
+  .coordinator-layout { grid-template-columns: 1fr; }
+  .queue-detail-card { position: static; max-height: none; overflow: visible; }
+}
+.heatmap-context {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 7px 11px;
+  margin: 5px 0 10px;
+  border: 1px solid #cfe1f2;
+  border-radius: 999px;
+  background: #f2f8fe;
+  color: #254669;
+  font-size: .83rem;
+}
+.heatmap-context strong { color: #183a60; }
+.heatmap-context-dot { width: 8px; height: 8px; border-radius: 50%; background: #e25a38; flex: none; }
+.sos-form [aria-invalid="true"] { border-color: #c53939; box-shadow: 0 0 0 3px #c5393922; }
+.sos-field-error { display: block; color: #a62626; font-size: .84rem; line-height: 1.4; margin-top: 5px; font-weight: 600; }
+.sos-coordinate-details { border: 1px solid #d7e3ee; border-radius: 12px; padding: 11px 14px; background: #f7fafc; }
+.sos-coordinate-details summary { cursor: pointer; color: #194b79; font-weight: 700; }
+.sos-coordinate-details[open] summary { margin-bottom: 12px; }
+.sos-coordinate-details .muted { margin: 0 0 12px; font-size: .87rem; }
+.sos-location-jump { width: fit-content; }
+#sos-location { scroll-margin-top: 125px; }

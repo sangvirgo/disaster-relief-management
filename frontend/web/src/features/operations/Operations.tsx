@@ -38,11 +38,11 @@ const routes: Record<string, string> = {
 };
 const headings: Record<string, string> = {
   overview: 'Tình hình vật tư',
-  drives: 'Đợt quyên góp',
+  drives: 'Danh sách đợt quyên góp',
   intake: 'Tiếp nhận đóng góp',
   review: 'Duyệt biên nhận',
-  stock: 'Tồn kho',
-  assets: 'Điểm và phương tiện',
+  stock: 'Tồn kho theo kho',
+  assets: 'Danh sách điểm và phương tiện',
   needs: 'Nhu cầu cứu trợ',
   distribution: 'Phân phối vật tư',
   handoff: 'Bàn giao vật tư',

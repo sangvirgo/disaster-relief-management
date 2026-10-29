@@ -390,7 +390,7 @@ export interface paths {
         };
         /**
          * List reporter or scoped staff request events
-         * @description A valid tracking capability receives only reporter-visible events without Identity; an authenticated staff caller with REQUEST_DETAIL_READ receives the paginated staff timeline. Related request IDs are scope-filtered.
+         * @description A valid tracking capability receives reporter-visible request events and public mission status milestones without Identity; an authenticated staff caller with REQUEST_DETAIL_READ receives the paginated staff timeline. Related request IDs are scope-filtered.
          */
         get: operations["listReporterEvents"];
         put?: never;
@@ -577,7 +577,7 @@ export interface paths {
         get?: never;
         /**
          * Set a team's reported position
-         * @description APP team leaders may report GPS or manual-pin positions for their own team. Scoped coordinators with TEAM_POSITION_SET_ANY may report COORDINATOR_REPORTED positions. Updates within 15 seconds or moving less than 25 meters are suppressed; writes return no content and are not idempotency-keyed.
+         * @description APP team leaders may report GPS or manual-pin positions for their own team. Scoped coordinators with TEAM_POSITION_SET_ANY may report COORDINATOR_REPORTED positions. Updates within 15 seconds are suppressed. After that window, a move under 25 meters keeps the stored coordinates and metadata but refreshes captured_at when newer. Writes return no content and are not idempotency-keyed.
          */
         put: operations["setTeamPosition"];
         post?: never;

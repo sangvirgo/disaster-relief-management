@@ -72,7 +72,7 @@ export class TeamsPositionService {
       const currentRows = await manager.query(
         `SELECT ST_X(location::geometry)::float8 AS longitude,ST_Y(location::geometry)::float8 AS latitude,
                 accuracy_m,captured_at,source,set_by_user_id,
-                captured_at >= clock_timestamp() - interval '15 seconds' AS within_window,
+                captured_at BETWEEN clock_timestamp() - interval '15 seconds' AND clock_timestamp() AS within_window,
                 ST_Distance(location,ST_SetSRID(ST_MakePoint($2,$3),4326)::geography) AS distance_m
            FROM team_position WHERE team_id=$1 FOR UPDATE`, [teamId, longitude, latitude],
       ) as TeamPositionRow[];

@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, type Service, type HttpMethod } from '../api/client';
 import { LocationPicker } from '../maps/LocationPicker';
+import { confirmAction } from './confirmAction';
 
 export type Field = {
   name: string;
@@ -81,7 +82,7 @@ export function CommandForm({
       setMessage('Hãy kiểm tra các trường được đánh dấu.');
       return;
     }
-    if (spec.warning && !window.confirm(spec.warning)) return;
+    if (spec.warning && !(await confirmAction(spec.warning))) return;
     setBusy(true);
     setMessage('');
     setFieldErrors({});

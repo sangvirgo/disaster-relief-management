@@ -6,6 +6,7 @@ import { AsyncRequestForm } from './AsyncRequestForm';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { AnalyticsRegionField, useAnalyticsRegion } from '../../components/AnalyticsRegion';
 import { HeatmapPanel } from './HeatmapPanel';
+import { LocationPicker, type Point } from '../../maps/LocationPicker';
 
 type QueueItem = {
   id: string;
@@ -110,7 +111,7 @@ type Detail = QueueItem & {
   evidence?: { items: { id: string; state: string; size_bytes: number; created_at: string }[] };
 };
 type Candidate = {
-  team: { id: string; name: string };
+  team: { id: string; name: string; reporting_mode: 'APP' | 'COORDINATOR' };
   distance_m: number | null;
   position_age_s: number | null;
   recent_missions_24h: number;
@@ -132,6 +133,73 @@ type Candidate = {
   suggested: boolean;
 };
 type Candidates = { items: Candidate[]; unknown_position: Candidate[] };
+
+const addressCache = new Map<string, string>();
+function NearbyAddress({ coordinates }: { coordinates?: [number, number] }) {
+  const longitude = coordinates?.[0];
+  const latitude = coordinates?.[1];
+  const key = longitude === undefined || latitude === undefined ? '' : `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+  const [address, setAddress] = useState(key ? addressCache.get(key) || '' : '');
+  useEffect(() => {
+    if (!key || latitude === undefined || longitude === undefined) return;
+    const cached = addressCache.get(key);
+    if (cached) { setAddress(cached); return; }
+    setAddress('Đang tìm địa chỉ gần vị trí SOS…');
+    const controller = new AbortController();
+    void fetch(`https://photon.komoot.io/reverse?lat=${latitude}&lon=${longitude}&limit=1`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('REVERSE_FAILED')))
+      .then((data: { features?: { properties?: Record<string, string> }[] }) => {
+        const properties = data.features?.[0]?.properties;
+        const parts = [properties?.name, properties?.street, properties?.district, properties?.city].filter(Boolean);
+        const label = parts.length ? [...new Set(parts)].join(', ') : 'Chưa tìm được địa chỉ gần vị trí SOS';
+        addressCache.set(key, label);
+        setAddress(label);
+      })
+      .catch(() => { if (!controller.signal.aborted) setAddress('Chưa tìm được địa chỉ gần vị trí SOS'); });
+    return () => controller.abort();
+  }, [key]);
+  if (!key) return <>Chưa có tọa độ</>;
+  return <>{address && !address.startsWith('Chưa tìm') && !address.startsWith('Đang tìm') ? `Địa chỉ gần đúng: ${address}` : address || 'Đang tìm địa chỉ gần vị trí SOS…'} <small>({key})</small></>;
+}
+
+function TeamPositionRefresh({ team, onUpdated }: {
+  team: Candidate['team']; onUpdated: () => void;
+}) {
+  const [point, setPoint] = useState<Point | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  async function save() {
+    if (!point) return;
+    setBusy(true);
+    setMessage('');
+    try {
+      await api('response', `/teams/${team.id}/position`, {
+        method: 'PUT',
+        body: {
+          location: { type: 'Point', coordinates: [point.longitude, point.latitude], source: 'COORDINATOR_REPORTED' },
+          captured_at: new Date().toISOString(),
+          note: 'Vị trí đội do điều phối viên xác nhận',
+        },
+      });
+      setMessage('Đã cập nhật vị trí đội. Đang tải lại danh sách phù hợp…');
+      onUpdated();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'Không thể cập nhật vị trí đội.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="team-position-refresh">
+      <p><strong>{team.name}</strong> · Vị trí đã cũ hoặc chưa có. Xác nhận vị trí thực tế của đội để đưa vào danh sách xét giao nhiệm vụ.</p>
+      <LocationPicker value={point} onSelect={setPoint} />
+      <button type="button" className="button secondary" disabled={!point || busy} onClick={() => void save()}>
+        {busy ? 'Đang cập nhật…' : 'Cập nhật vị trí đội'}
+      </button>
+      {message && <p role="status">{message}</p>}
+    </div>
+  );
+}
 type DuplicateCandidate = {
   id: string;
   tracking_code?: string;
@@ -187,7 +255,7 @@ function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onS
 }
 const priorities = ['P1', 'P2', 'P3', 'P4'].map((value) => ({ value, label: value }));
 const stateFilter: Record<string, string> = {
-  verify: 'SUBMITTED',
+  verify: '',
   triage: 'VERIFIED',
   assign: 'TRIAGED',
 };
@@ -197,7 +265,7 @@ const queueStatuses = [
   ['VERIFYING', 'Đang xác minh'],
   ['VERIFIED', 'Đã xác minh'],
   ['TRIAGED', 'Đã quyết định ưu tiên'],
-  ['ASSIGNED', 'Đã giao đội'],
+  ['DISPATCHED', 'Đã giao đội'],
   ['IN_PROGRESS', 'Đang thực hiện'],
   ['RESOLVING', 'Đang kết thúc'],
   ['RESOLVED', 'Đã giải quyết'],
@@ -207,7 +275,7 @@ const queueStatuses = [
   ['CANCELLED', 'Đã hủy'],
 ] as const;
 const title: Record<string, string> = {
-  queue: 'Hàng đợi SOS',
+  queue: 'Danh sách yêu cầu',
   verify: 'Xác minh yêu cầu',
   triage: 'Quyết định ưu tiên',
   assign: 'Chọn đội cứu hộ',
@@ -347,7 +415,6 @@ export function Coordinator({ page }: { page: string }) {
     if (!selected) return;
     let live = true;
     setDetailError('');
-    setCandidates(null);
     setCandidateError('');
     api<Detail>('response', `/requests/${selected}`)
       .then((value) => {
@@ -378,6 +445,7 @@ export function Coordinator({ page }: { page: string }) {
       live = false;
     };
   }, [selected, revision]);
+  useEffect(() => { setCandidates(null); }, [selected]);
   useEffect(() => {
     if (!selected || !detail || detail.status !== 'TRIAGED') return;
     let live = true;
@@ -668,7 +736,7 @@ export function Coordinator({ page }: { page: string }) {
                   <span>{detail.subject.people_affected ?? 'Chưa rõ số'} người cần hỗ trợ</span>
                   <span>{detail.needs_rescue ? 'Cần cứu hộ' : 'Không yêu cầu cứu hộ'}</span>
                   <span>{detail.reporter.name || 'Người báo chưa ghi tên'} · {detail.reporter.contact_phone || 'Chưa có số liên hệ'}</span>
-                  <span>Vị trí: {detail.subject.location?.coordinates?.join(', ') || 'Chưa có tọa độ'}</span>
+                  <span>Vị trí: <NearbyAddress coordinates={detail.subject.location?.coordinates} /></span>
                 </div>
                 {detail.status === 'VERIFYING' && (
                   <p className="verification-progress">
@@ -688,6 +756,7 @@ export function Coordinator({ page }: { page: string }) {
                   selected={{
                     id: detail.id,
                     trackingCode: detail.tracking_code,
+                    status: detail.status,
                     longitude: detail.subject.location.coordinates[0],
                     latitude: detail.subject.location.coordinates[1],
                   }}
@@ -715,6 +784,7 @@ export function Coordinator({ page }: { page: string }) {
                     selected={detail.subject.location ? {
                       id: detail.id,
                       trackingCode: detail.tracking_code,
+                    status: detail.status,
                       longitude: detail.subject.location.coordinates[0],
                       latitude: detail.subject.location.coordinates[1],
                     } : null}
@@ -792,7 +862,7 @@ export function Coordinator({ page }: { page: string }) {
               <p>
                 <strong>Vị trí</strong>
                 <span className="detail-value">
-                  {detail.subject.location?.coordinates?.join(', ') || 'Chưa có tọa độ'}
+                  <NearbyAddress coordinates={detail.subject.location?.coordinates} />
                 </span>
               </p>
               <p>
@@ -974,7 +1044,7 @@ export function Coordinator({ page }: { page: string }) {
                 <p>
                   {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
                     ? 'Dữ liệu này dùng để minh họa và không phải phản hồi từ Gemini.'
-                    : 'AI chỉ nhận các thông tin đã chọn trong biểu mẫu. Nội dung mô tả, liên hệ, vị trí chính xác và tệp đính kèm không được gửi. Hãy đối chiếu với hồ sơ SOS trước khi sử dụng.'}
+                    : 'AI có thể nhận bản mô tả đã được rút gọn cùng các thông tin tình huống. Số điện thoại, tọa độ chính xác và tệp đính kèm không được đưa vào phần đánh giá. Hãy đối chiếu với hồ sơ SOS trước khi sử dụng.'}
                 </p>
                 <p>
                   <strong>Trạng thái:</strong>{' '}
@@ -1347,6 +1417,9 @@ export function Coordinator({ page }: { page: string }) {
               {detail.status === 'TRIAGED' && (
                 <section>
                   <h3>Đội có thể giao nhiệm vụ</h3>
+                  {detail.mission_history?.items.some((mission) => mission.status === 'COMPLETED') && (
+                    <p className="notice">Đã có nhiệm vụ hoàn thành. Chỉ giao thêm đội nếu yêu cầu còn việc cần xử lý; nếu đã hoàn tất, hãy kết thúc yêu cầu bên dưới.</p>
+                  )}
                   <p>Xem khoảng cách, vị trí cập nhật và số nhiệm vụ gần đây trước khi chọn đội.</p>
                   <p>
                     Gợi ý cân bằng dựa trên nhiệm vụ 24 giờ và 7 ngày của các đội gần nhất. Đội đang
@@ -1359,9 +1432,10 @@ export function Coordinator({ page }: { page: string }) {
                   )}
                   {!candidates && !candidateError && <p role="status">Đang tải đội phù hợp…</p>}
                   {candidates?.items.length === 0 && (
-                    <p role="status">
-                      Chưa có đội phù hợp. Hãy kiểm tra đơn vị quản lý, khu vực hoạt động, kỹ năng,
-                      trạng thái và vị trí gần đây của các đội.
+                    <p role="status" className="notice warning">
+                      Chưa có đội đủ điều kiện. Vị trí đội phải được cập nhật trong 30 phút gần nhất.
+                      Với đội do điều phối viên báo cáo, hãy cập nhật vị trí bên dưới; với đội dùng ứng dụng,
+                      nhờ đội trưởng cập nhật. Đội đang bận, sai khu vực hoặc thiếu kỹ năng cũng không xuất hiện.
                     </p>
                   )}
                   {candidates?.items.map((candidate) => (
@@ -1396,23 +1470,25 @@ export function Coordinator({ page }: { page: string }) {
                         </details>
                       )}
                       {command({
-                        title: `Giao đội ${candidate.team.name}`,
+                        title: `Giao nhiệm vụ cho ${candidate.team.name}`,
                         service: 'response',
                         path: `/requests/${detail.id}/missions`,
                         version: detail.version,
-                        warning: `Xác nhận giao yêu cầu ${detail.tracking_code} cho đội ${candidate.team.name}?`,
+                        warning: `Xác nhận giao yêu cầu ${detail.tracking_code} cho ${candidate.team.name}?`,
                         build: () => ({ team_id: candidate.team.id }),
                       })}
                     </div>
                   ))}
-                  {candidates?.unknown_position.map((candidate) => (
+                  {candidates?.unknown_position.map((candidate) => candidate.team.reporting_mode === 'COORDINATOR' ? (
+                    <TeamPositionRefresh key={candidate.team.id} team={candidate.team} onUpdated={done} />
+                  ) : (
                     <p className="notice warning" key={candidate.team.id}>
-                      {candidate.team.name}: chưa có vị trí đủ mới; cần kiểm tra trước khi giao.
+                      {candidate.team.name}: vị trí đã cũ hoặc chưa có. Nhờ đội trưởng cập nhật trên tài khoản đội.
                     </p>
                   ))}
                 </section>
               )}
-              {['VERIFIED', 'TRIAGED', 'ASSIGNED', 'IN_PROGRESS'].includes(detail.status) && (
+              {['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(detail.status) && (
                 <AsyncRequestForm
                   key={`resolve-${detail.id}-${detail.version}`}
                   requestId={detail.id}
@@ -1426,7 +1502,7 @@ export function Coordinator({ page }: { page: string }) {
                 'VERIFYING',
                 'VERIFIED',
                 'TRIAGED',
-                'ASSIGNED',
+                'DISPATCHED',
                 'IN_PROGRESS',
               ].includes(detail.status) && (
                 <details className="secondary-command">

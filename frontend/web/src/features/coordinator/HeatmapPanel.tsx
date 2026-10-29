@@ -16,6 +16,7 @@ type HeatmapCell = components['schemas']['HeatmapCell'];
 export type SelectedSos = {
   id: string;
   trackingCode: string;
+  status?: string;
   longitude: number;
   latitude: number;
 };
@@ -182,22 +183,18 @@ function HeatmapCanvas({
         }
         for (const cluster of clusters) {
           const radius = Math.min(24, 10 + Math.sqrt(cluster.count) * 3);
-          const dot = L.circleMarker([cluster.latitude, cluster.longitude], {
-            radius, color: '#fff', weight: 3,
-            fillColor: '#c2410c', fillOpacity: 0.98,
-            className: 'heatmap-overview-dot',
+          const dot = L.marker([cluster.latitude, cluster.longitude], {
+            icon: L.divIcon({
+              className: 'heatmap-overview-cluster',
+              html: `<span>${cluster.count}</span>`,
+              iconSize: [radius * 2, radius * 2],
+              iconAnchor: [radius, radius],
+            }),
           }).addTo(dots);
           dot.bindTooltip(`${cluster.count} SOS trong cụm hiển thị · nhấn để xem mật độ`);
           dot.on('click', () => map.setView(
             [cluster.latitude, cluster.longitude], map.getZoom() < 8 ? 8 : 12, { animate: true }
           ));
-          L.marker([cluster.latitude, cluster.longitude], {
-            interactive: false,
-            icon: L.divIcon({
-              className: 'heatmap-dot-count', html: String(cluster.count),
-              iconSize: [radius * 2, radius * 2], iconAnchor: [radius, radius],
-            }),
-          }).addTo(dots);
         }
         return;
       }
@@ -344,6 +341,10 @@ export function HeatmapPanel({
   showLayers?: boolean;
 }) {
   const [layer, setLayer] = useState<'confirmed' | 'unverified'>('unverified');
+  useEffect(() => {
+    if (compact && selected?.status)
+      setLayer(['SUBMITTED', 'VERIFYING'].includes(selected.status) ? 'unverified' : 'confirmed');
+  }, [compact, selected?.id, selected?.status]);
   const [resolution, setResolution] = useState<250 | 500 | 1000 | 5000>(5000);
   const [zoom, setZoom] = useState(5);
   const [heatOpacity, setHeatOpacity] = useState(55);
@@ -409,6 +410,11 @@ export function HeatmapPanel({
         <button type="button" className={layer === 'unverified' ? 'active' : ''}
           onClick={() => setLayer('unverified')}>Chưa xác minh</button>
       </div>}
+      <div className="heatmap-context" role="status">
+        <span className="heatmap-context-dot" aria-hidden="true" />
+        <strong>{layer === 'unverified' ? 'SOS chưa xác minh' : 'SOS đã xác minh'}</strong>
+        <span>trong 7 ngày gần đây</span>
+      </div>
       {showMap && <button type="button" className="button secondary heatmap-refresh" disabled={loading}
         onClick={() => setRefresh((value) => value + 1)}>Cập nhật SOS trên bản đồ</button>}
       {!showMap && <p>Chọn khu vực để xem bản đồ nhiệt.</p>}
@@ -433,7 +439,7 @@ export function HeatmapPanel({
           </div>
           {zoom > 10 && <p className="muted">Vùng không có SOS giữ nguyên nền bản đồ. Ghim đỏ đại diện cho ô có SOS; nhấn ghim để xem số yêu cầu. Mật độ được tính trong phạm vi 1 km quanh ô.</p>}
           {compact && validPoint(selected) && <p className="muted">
-            Ghim đỏ đang nhảy là SOS đang chọn, đặt theo tọa độ trong hồ sơ. Nền nhiệt chỉ gồm SOS trong 7 ngày gần đây.
+            Ghim đỏ đang nhảy là SOS đang chọn, đặt theo tọa độ trong hồ sơ. Ghim có thể xuất hiện ngay cả khi SOS chưa thuộc lớp dữ liệu đang xem.
           </p>}
           {count === 0 && <p className="muted">
             Chưa có SOS thuộc lớp dữ liệu này trong khu vực và thời gian đã chọn.

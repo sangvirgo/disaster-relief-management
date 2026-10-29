@@ -310,30 +310,35 @@ try {
   await responseDb.query(
     `UPDATE team_position SET captured_at=clock_timestamp() - interval '16 seconds' WHERE team_id=$1`, [appTeam.value.id],
   );
-  const beforeDistanceSuppression = await responseDb.query(
+  const beforeStationaryRefresh = await responseDb.query(
     `SELECT ST_X(location::geometry) AS longitude,ST_Y(location::geometry) AS latitude,
             accuracy_m,source,captured_at,set_by_user_id
        FROM team_position WHERE team_id=$1`, [appTeam.value.id],
   );
-  const distanceSuppressedPosition = await setPosition(appTeam.value.id, reporter.token, {
-    location: { type: 'Point', coordinates: [104.5001, 14.5], source: 'MANUAL_PIN' },
-    captured_at: new Date().toISOString(), note: 'Không ghi lần cập nhật dưới 25 m',
+  const stationaryRefresh = await setPosition(appTeam.value.id, reporter.token, {
+    location: { type: 'Point', coordinates: [104.5, 14.5], source: 'GPS' },
+    accuracy_m: 6.5,
+    captured_at: new Date().toISOString(), note: 'Làm mới vị trí đội đứng yên',
   });
-  assert.equal(distanceSuppressedPosition.status, 204, JSON.stringify(distanceSuppressedPosition.value));
-  const afterDistanceSuppression = await responseDb.query(
+  assert.equal(stationaryRefresh.status, 204, JSON.stringify(stationaryRefresh.value));
+  const afterStationaryRefresh = await responseDb.query(
     `SELECT ST_X(location::geometry) AS longitude,ST_Y(location::geometry) AS latitude,
             accuracy_m,source,captured_at,set_by_user_id
        FROM team_position WHERE team_id=$1`, [appTeam.value.id],
   );
-  const { captured_at: capturedBeforeStay, ...stayBefore } = beforeDistanceSuppression.rows[0];
-  const { captured_at: capturedAfterStay, ...stayAfter } = afterDistanceSuppression.rows[0];
+  const { captured_at: capturedBeforeStay, ...stayBefore } = beforeStationaryRefresh.rows[0];
+  const { captured_at: capturedAfterStay, ...stayAfter } = afterStationaryRefresh.rows[0];
   assert.deepEqual(stayAfter, stayBefore, 'a move under 25 m must not change the stored location, accuracy, source or owner');
   assert.ok(capturedAfterStay > capturedBeforeStay, 'a move under 25 m must refresh captured_at so the fix does not go stale');
-  const auditAfterDistanceSuppression = await responseDb.query(
+  const auditAfterStationaryRefresh = await responseDb.query(
     `SELECT count(*)::int AS count FROM audit_log
       WHERE entity_type='rescue_team' AND entity_id=$1 AND action='TEAM_POSITION_SET'`, [appTeam.value.id],
   );
-  assert.equal(auditAfterDistanceSuppression.rows[0].count, 1, 'a move under 25 m must not audit');
+  assert.equal(auditAfterStationaryRefresh.rows[0].count, 1, 'a same-source position refresh need not audit');
+
+  await responseDb.query(
+    `UPDATE team_position SET captured_at=clock_timestamp() - interval '16 seconds' WHERE team_id=$1`, [appTeam.value.id],
+  );
 
   const movedPosition = await setPosition(appTeam.value.id, reporter.token, {
     location: { type: 'Point', coordinates: [104.51, 14.5], source: 'MANUAL_PIN' },

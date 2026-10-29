@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import { label } from '../../i18n/labels';
+import { confirmAction } from '../../components/confirmAction';
 
 type Kind = 'cancel' | 'resolve';
 export function AsyncRequestForm({
@@ -54,11 +55,11 @@ export function AsyncRequestForm({
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (
-      !window.confirm(
+      !(await confirmAction(
         kind === 'cancel'
           ? 'Xác nhận hủy yêu cầu này?'
           : 'Xác nhận đề nghị kết thúc xử lý yêu cầu này?'
-      )
+      ))
     )
       return;
     setBusy(true);

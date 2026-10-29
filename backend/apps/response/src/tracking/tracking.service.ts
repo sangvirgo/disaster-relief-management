@@ -444,11 +444,21 @@ export class TrackingService {
     const filters = cursorFilters(requestId);
     const cursor = rawCursor ? decodeKeysetCursor(rawCursor, filters) : undefined;
     const rows = await queryable.query(
-      `SELECT id,event_type,occurred_at,
+      `WITH public_events AS (
+         SELECT id,event_type,occurred_at,
+                coalesce(payload->>'public_text_code',event_type) AS public_text_code
+           FROM request_event WHERE request_id=$1 AND visibility='REPORTER'
+         UNION ALL
+         SELECT me.id,('MISSION_' || me.to_status)::text AS event_type,me.occurred_at,
+                ('MISSION_' || me.to_status)::text AS public_text_code
+           FROM mission_event me JOIN mission m ON m.id=me.mission_id
+          WHERE m.request_id=$1
+       )
+       SELECT id,event_type,occurred_at,
               to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_occurred_at,
-              coalesce(payload->>'public_text_code',event_type) AS public_text_code
-         FROM request_event WHERE request_id=$1 AND visibility='REPORTER'
-           AND ($2::timestamptz IS NULL OR (occurred_at,id)<($2::timestamptz,$3::uuid))
+              public_text_code
+         FROM public_events
+        WHERE ($2::timestamptz IS NULL OR (occurred_at,id)<($2::timestamptz,$3::uuid))
         ORDER BY occurred_at DESC,id DESC LIMIT $4`,
       [requestId, cursor?.sort[0] ?? null, cursor?.id ?? null, limit + 1],
     ) as Array<{ id: string; event_type: string; occurred_at: Date | string; cursor_occurred_at: string; public_text_code: string }>;

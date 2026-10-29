@@ -14,7 +14,7 @@ type OwnedPage = { items: OwnedRequest[]; more: boolean; cursor?: string };
 export function requestStatusTone(status: string): string {
   if (['REJECTED', 'CANCELLED', 'DUPLICATE'].includes(status)) return 'danger';
   if (['RESOLVED', 'CLOSED'].includes(status)) return 'success';
-  if (['ASSIGNED', 'DISPATCHED', 'IN_PROGRESS'].includes(status)) return 'progress';
+  if (['DISPATCHED', 'IN_PROGRESS'].includes(status)) return 'progress';
   if (['TRIAGED', 'VERIFIED'].includes(status)) return 'priority';
   return 'pending';
 }

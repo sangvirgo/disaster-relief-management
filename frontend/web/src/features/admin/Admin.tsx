@@ -90,7 +90,7 @@ export function Admin({ page }: { page: string }) {
   useEffect(() => {
     if (!selected) return;
     if (!['users', 'grants', 'overview'].includes(page)) {
-      setDetail(items.find((item) => item.id === selected) || null);
+      setDetail(items.find((item) => (page === 'regions' ? item.code : item.id) === selected) || null);
       return;
     }
     let live = true;
@@ -105,7 +105,7 @@ export function Admin({ page }: { page: string }) {
     return () => {
       live = false;
     };
-  }, [selected, revision, page]);
+  }, [selected, revision, page, items]);
   function success() {
     setSelected(null);
     setDetail(null);
@@ -154,12 +154,12 @@ export function Admin({ page }: { page: string }) {
       <section className="card">
         <h2>
           {page === 'audit'
-            ? 'Nhật ký kiểm toán'
+            ? 'Bản ghi kiểm toán'
             : page === 'regions'
-              ? 'Khu vực'
+              ? 'Danh sách khu vực'
               : page === 'organizations'
-                ? 'Tổ chức'
-                : 'Người dùng'}
+                ? 'Danh sách tổ chức'
+                : 'Danh sách người dùng'}
         </h2>
         {page === 'audit' && (
           <label className="filter">
@@ -220,8 +220,8 @@ export function Admin({ page }: { page: string }) {
                 {item.status && <span className="chip">{label(item.status)}</span>}
                 {Boolean(item.created_at) && <small>{timeLabel(item.created_at)}</small>}
               </div>
-              {['users', 'grants', 'overview', 'organizations'].includes(page) && item.id && (
-                <button className="button secondary" onClick={() => setSelected(item.id!)}>
+              {['users', 'grants', 'overview', 'organizations', 'regions'].includes(page) && (item.id || item.code) && (
+                <button className="button secondary" onClick={() => setSelected(item.id || item.code || null)}>
                   Xem chi tiết
                 </button>
               )}
@@ -260,7 +260,7 @@ export function Admin({ page }: { page: string }) {
             <p>
               Trạng thái: {label(detail.status)} · phiên bản {detail.version}
             </p>
-            {page !== 'organizations' && (
+            {!['organizations', 'regions'].includes(page) && (
               <>
                 <h3>Quyền hiện có</h3>
                 {detail.grants?.length ? (
@@ -353,6 +353,19 @@ export function Admin({ page }: { page: string }) {
                     version: detail.version,
                     warning: `Ngừng hoạt động tổ chức ${detail.name}?`,
                     fields: [{ name: 'reason', label: 'Lý do', type: 'textarea', required: true }],
+                  }}
+                  onSuccess={success}
+                />
+              )}
+              {page === 'regions' && detail.code && detail.status === 'ACTIVE' && detail.version != null && (
+                <CommandForm
+                  spec={{
+                    title: 'Ngừng hoạt động khu vực',
+                    service: 'identity',
+                    path: `/regions/${encodeURIComponent(detail.code)}/deactivate`,
+                    version: detail.version,
+                    warning: `Ngừng hoạt động khu vực ${detail.name || detail.code}?`,
+                    fields: [{ name: 'reason', label: 'Lý do', type: 'textarea', required: true, maxLength: 500 }],
                   }}
                   onSuccess={success}
                 />

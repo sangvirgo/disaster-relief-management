@@ -211,7 +211,7 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Xử lý Tiếp nhận
   const handleAccept = async () => {
-    if (!mission || teamRole !== 'LEADER') return;
+    if (!mission?.can_manage_mission) return;
     setActionLoading(true);
     try {
       await ResponseApi.acceptMission(mission.id, mission.version);
@@ -226,7 +226,7 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Xử lý Từ chối hoặc Báo thất bại
   const handleDeclineSubmit = async () => {
-    if (!mission || teamRole !== 'LEADER') return;
+    if (!mission?.can_manage_mission) return;
     const reason = declineReason.trim();
     if (!reason) {
       setFormErrors((current) => ({ ...current, declineReason: 'Vui lòng nêu rõ lý do từ chối hoặc trở ngại.' }));
@@ -262,7 +262,7 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Xử lý Chuyển trạng thái tiến độ (EN_ROUTE, ON_SCENE)
   const handleTransition = async (toStatus: MissionStatus, promptTitle: string) => {
-    if (!mission || teamRole !== 'LEADER') return;
+    if (!mission?.can_manage_mission) return;
     Alert.alert('Xác nhận cập nhật', `Đồng chí xác nhận chuyển trạng thái sang: "${promptTitle}"?`, [
       { text: 'Hủy' },
       {
@@ -284,7 +284,7 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Xử lý Hoàn thành cứu nạn thành công (kèm ảnh bằng chứng nếu có)
   const handleCompleteSubmit = async () => {
-    if (!mission || teamRole !== 'LEADER') return;
+    if (!mission?.can_manage_mission) return;
     const outcome = outcomeNote.trim();
     if (!outcome) {
       setFormErrors((current) => ({ ...current, outcomeNote: 'Vui lòng nhập báo cáo kết quả cứu hộ.' }));
@@ -383,9 +383,9 @@ export const MissionDetailScreen: React.FC = () => {
   const kindInfo = mission.mission_kind ? MISSION_KIND_LABELS[mission.mission_kind] : null;
   const timeline = mission.timeline.items;
   const evidence = mission.evidence.items;
-  const canManageMission = teamRole === 'LEADER';
-  const reporterContactPhone = canManageMission ? mission.reporter_contact_phone : undefined;
-  const alternateContact = canManageMission ? mission.alternate_contact : undefined;
+  const canManageMission = mission.can_manage_mission === true;
+  const reporterContactPhone = teamRole === 'LEADER' ? mission.reporter_contact_phone : undefined;
+  const alternateContact = teamRole === 'LEADER' ? mission.alternate_contact : undefined;
 
   return (
     <ScreenContainer
@@ -649,12 +649,14 @@ export const MissionDetailScreen: React.FC = () => {
             <Info size={18} color={teamRole === 'MEMBER' ? THEME.colors.primary.main : THEME.colors.warning.dark} />
             <View style={{ flex: 1, marginLeft: 8 }}>
               <Text style={styles.roleNoticeTitle}>
-                {teamRole === 'MEMBER' ? 'Thành viên đội cứu hộ' : 'Chưa xác định vai trò đội'}
+                {teamRole === 'MEMBER' ? 'Thành viên đội cứu hộ' : teamRole === 'LEADER' ? 'Chưa thể cập nhật nhiệm vụ' : 'Chưa xác định vai trò đội'}
               </Text>
               <Text style={styles.roleNoticeText}>
                 {teamRole === 'MEMBER'
                   ? 'Bạn có thể xem nhiệm vụ. Đội trưởng phụ trách tiếp nhận, từ chối và cập nhật tiến độ.'
-                  : 'Bạn vẫn có thể xem nhiệm vụ. Các thao tác cập nhật chỉ hiển thị khi hệ thống xác nhận bạn là đội trưởng.'}
+                  : teamRole === 'LEADER'
+                    ? 'Đội hiện không đủ điều kiện cập nhật nhiệm vụ qua ứng dụng. Vui lòng liên hệ điều phối viên.'
+                    : 'Bạn vẫn có thể xem nhiệm vụ. Các thao tác cập nhật chỉ hiển thị khi hệ thống xác nhận quyền của bạn.'}
               </Text>
             </View>
           </View>

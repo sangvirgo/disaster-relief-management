@@ -108,6 +108,7 @@ export function LocationPicker({
   const chosenSearchRef = useRef<{ point: Point; label: string } | null>(null);
   const confirmedPointRef = useRef<Point | null>(value);
   const reverseAbortRef = useRef<AbortController | null>(null);
+  const reverseTimerRef = useRef<number | null>(null);
   const suppressMoveRef = useRef(false);
 
   // Google Maps refs
@@ -130,6 +131,43 @@ export function LocationPicker({
   const [pinDropKey, setPinDropKey] = useState(0);
   const [tileError, setTileError] = useState(false);
   const [error, setError] = useState('');
+
+  function lookupAddress(point: Point, confirmed = false) {
+    if (reverseTimerRef.current !== null) window.clearTimeout(reverseTimerRef.current);
+    reverseAbortRef.current?.abort();
+    searchOnTypingRef.current = false;
+    const original = chosenSearchRef.current;
+    if (original && samePoint(original.point, point)) {
+      setSearchQuery(original.label);
+      setSelectedAddress(`${confirmed ? 'Đã xác nhận' : 'Địa chỉ gần ghim'}: ${original.label}`);
+      return;
+    }
+    setSearchQuery('Đang tìm địa chỉ gần ghim…');
+    setSelectedAddress(confirmed ? 'Đã xác nhận vị trí · đang tìm địa chỉ gần ghim…' : 'Đang tìm địa chỉ gần ghim…');
+    reverseTimerRef.current = window.setTimeout(async () => {
+      reverseTimerRef.current = null;
+      const controller = new AbortController();
+      reverseAbortRef.current = controller;
+      try {
+        const result = await fetch(
+          `https://photon.komoot.io/reverse?lat=${point.latitude}&lon=${point.longitude}&limit=1`,
+          { signal: controller.signal }
+        );
+        if (!result.ok) throw new Error('REVERSE_SEARCH_FAILED');
+        const [nearest] = photonPlaces(await result.json());
+        if (controller.signal.aborted) return;
+        const label = nearest ? [nearest.name, nearest.address].filter(Boolean).join(' · ') : `Tọa độ ${pointLabel(point)}`;
+        chosenSearchRef.current = { point, label };
+        setSearchQuery(label);
+        setSelectedAddress(`${confirmedPointRef.current && samePoint(confirmedPointRef.current, point) ? 'Đã xác nhận' : 'Địa chỉ gần ghim'}: ${label}`);
+      } catch {
+        if (controller.signal.aborted) return;
+        const label = `Tọa độ ${pointLabel(point)}`;
+        setSearchQuery(label);
+        setSelectedAddress(`Chưa tìm được địa chỉ gần ghim · ${label}`);
+      }
+    }, confirmed ? 0 : 250);
+  }
 
   // The pin is fixed over the map center. Moving the map changes the draft point.
   useEffect(() => {
@@ -169,6 +207,7 @@ export function LocationPicker({
     }
 
     let frame = 0;
+    let userMovedMap = false;
     const updateCenter = () => {
       if (suppressMoveRef.current || frame) return;
       frame = requestAnimationFrame(() => {
@@ -176,7 +215,7 @@ export function LocationPicker({
         const center = map.getCenter();
         const point = { latitude: center.lat, longitude: center.lng };
         setDraftPoint(point);
-        setSelectedAddress('Đã chỉnh vị trí. Hãy xác nhận địa chỉ.');
+        setSelectedAddress('Đang cập nhật vị trí ghim…');
         if (confirmedPointRef.current && !samePoint(point, confirmedPointRef.current)) {
           confirmedPointRef.current = null;
           selectRef.current(null);
@@ -184,13 +223,19 @@ export function LocationPicker({
         reverseAbortRef.current?.abort();
       });
     };
-    map.on('movestart', () => setMoving(true));
+    map.on('dragstart', () => { userMovedMap = true; setMoving(true); });
     map.on('move', updateCenter);
     map.on('moveend', () => {
       setMoving(false);
       updateCenter();
+      if (!suppressMoveRef.current && userMovedMap) {
+        userMovedMap = false;
+        const center = map.getCenter();
+        lookupAddress({ latitude: center.lat, longitude: center.lng });
+      }
     });
     map.on('click', (event: L.LeafletMouseEvent) => {
+      userMovedMap = true;
       map.setView(event.latlng, map.getZoom(), { animate: false });
     });
 
@@ -201,6 +246,8 @@ export function LocationPicker({
 
     return () => {
       cancelAnimationFrame(frame);
+      if (reverseTimerRef.current !== null) window.clearTimeout(reverseTimerRef.current);
+      reverseAbortRef.current?.abort();
       map.remove();
       leafletMapRef.current = null;
     };
@@ -254,23 +301,31 @@ export function LocationPicker({
         });
         googleMapRef.current = map;
 
-        moveStartListener = map.addListener('dragstart', () => setMoving(true));
+        let userMovedMap = false;
+        moveStartListener = map.addListener('dragstart', () => { userMovedMap = true; setMoving(true); });
         moveListener = map.addListener('center_changed', () => {
-          if (suppressMoveRef.current) return;
+          if (suppressMoveRef.current || !userMovedMap) return;
+          userMovedMap = false;
           const center = map.getCenter();
           if (!center) return;
           const point = { latitude: center.lat(), longitude: center.lng() };
           setDraftPoint(point);
-          setSelectedAddress('Đã chỉnh vị trí. Hãy xác nhận địa chỉ.');
+          setSelectedAddress('Đang cập nhật vị trí ghim…');
           if (confirmedPointRef.current && !samePoint(point, confirmedPointRef.current)) {
             confirmedPointRef.current = null;
             selectRef.current(null);
           }
           reverseAbortRef.current?.abort();
         });
-        moveEndListener = map.addListener('idle', () => setMoving(false));
+        moveEndListener = map.addListener('idle', () => {
+          setMoving(false);
+          if (suppressMoveRef.current) return;
+          const center = map.getCenter();
+          if (center) lookupAddress({ latitude: center.lat(), longitude: center.lng() });
+        });
         clickListener = map.addListener('click', (event: google.maps.MapMouseEvent) => {
           if (!event.latLng) return;
+          userMovedMap = true;
           map.panTo(event.latLng);
         });
 
@@ -326,6 +381,8 @@ export function LocationPicker({
 
     return () => {
       active = false;
+      if (reverseTimerRef.current !== null) window.clearTimeout(reverseTimerRef.current);
+      reverseAbortRef.current?.abort();
       clickListener?.remove();
       moveListener?.remove();
       moveStartListener?.remove();
@@ -393,6 +450,7 @@ export function LocationPicker({
     }
     const label = [item.name, item.address].filter(Boolean).join(' · ');
     chosenSearchRef.current = { point: item.point, label };
+    setSearchQuery(label);
     setSelectedAddress(label);
     setDraftPoint(item.point);
     setSuggestions([]);
@@ -424,35 +482,7 @@ export function LocationPicker({
       return;
     }
 
-    // One reverse lookup on confirmation, never for every map movement.
-    reverseAbortRef.current?.abort();
-    const controller = new AbortController();
-    reverseAbortRef.current = controller;
-    const fallback = 'Vị trí đã chọn trên bản đồ';
-    setSearchQuery(fallback);
-    setSelectedAddress(`Đã xác nhận: ${fallback}`);
-    if (mapEngine !== 'osm') return;
-    try {
-      const result = await fetch(
-        `https://photon.komoot.io/reverse?lat=${point.latitude}&lon=${point.longitude}&limit=1`,
-        { signal: controller.signal }
-      );
-      if (!result.ok) return;
-      const [nearest] = photonPlaces(await result.json());
-      if (
-        !nearest ||
-        controller.signal.aborted ||
-        !confirmedPointRef.current ||
-        !samePoint(confirmedPointRef.current, point)
-      )
-        return;
-      const label = [nearest.name, nearest.address].filter(Boolean).join(' · ');
-      setSearchQuery(label);
-      setSelectedAddress(`Đã xác nhận · Địa chỉ gần đúng: ${label}`);
-      chosenSearchRef.current = { point, label };
-    } catch {
-      // Exact coordinates remain confirmed even when the address service is unavailable.
-    }
+    lookupAddress(point, true);
   }
 
   return (
@@ -516,6 +546,7 @@ export function LocationPicker({
                   setSearching(false);
                   setSuggestions([]);
                   reverseAbortRef.current?.abort();
+                  if (reverseTimerRef.current !== null) window.clearTimeout(reverseTimerRef.current);
                   chosenSearchRef.current = null;
                   confirmedPointRef.current = null;
                   setSearchQuery(e.target.value);

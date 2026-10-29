@@ -21,17 +21,7 @@ import {
   type Page,
   type Workspace,
 } from './app/catalog';
-import { label, timeLabel } from './i18n/labels';
-import { SosForm } from './features/citizen/SosForm';
-import { Donations } from './features/citizen/Donations';
-import { TrackingActions } from './features/citizen/TrackingActions';
-import { Coordinator, CoordinatorMap } from './features/coordinator/Coordinator';
-import { HeatmapPanel } from './features/coordinator/HeatmapPanel';
-import { Campaigns } from './features/coordinator/Campaigns';
-import { Notices, Volunteer } from './features/volunteer/Volunteer';
-import { Admin } from './features/admin/Admin';
-import { Operations } from './features/operations/Operations';
-import { OperationsDashboard } from './features/operations/Dashboard';
+import { label, requestStatusLabel, timeLabel } from './i18n/labels';
 import { AnalyticsRegionField, useAnalyticsRegion } from './components/AnalyticsRegion';
 import { CitizenAccount, CitizenRequests, requestStatusTone } from './features/citizen/CitizenAccount';
 import type { components as ResponseComponents } from './api/generated/response';
@@ -55,6 +45,45 @@ declare global {
 import './sos.css';
 import './workflow.css';
 import './refinements.css';
+
+const commonPasswords = new Set([
+  'password123', 'password1', '1234567890', 'qwerty1234', 'qwertyuiop', 'letmein123', 'iloveyou', 'welcome123',
+  'admin12345', 'abc1234567', '1111111111', '0000000000', 'changeme123', 'monkey12345', 'dragon12345',
+  'football1', 'sunshine123', 'princess123', 'trustno123', 'password!', 'passw0rd123', 'p@ssword123',
+]);
+
+const SosForm = React.lazy(() => import('./features/citizen/SosForm').then((module) => ({ default: module.SosForm })));
+const Donations = React.lazy(() => import('./features/citizen/Donations').then((module) => ({ default: module.Donations })));
+const TrackingActions = React.lazy(() => import('./features/citizen/TrackingActions').then((module) => ({ default: module.TrackingActions })));
+const Coordinator = React.lazy(() => import('./features/coordinator/Coordinator').then((module) => ({ default: module.Coordinator })));
+const CoordinatorMap = React.lazy(() => import('./features/coordinator/Coordinator').then((module) => ({ default: module.CoordinatorMap })));
+const HeatmapPanel = React.lazy(() => import('./features/coordinator/HeatmapPanel').then((module) => ({ default: module.HeatmapPanel })));
+const Campaigns = React.lazy(() => import('./features/coordinator/Campaigns').then((module) => ({ default: module.Campaigns })));
+const Notices = React.lazy(() => import('./features/volunteer/Volunteer').then((module) => ({ default: module.Notices })));
+const Volunteer = React.lazy(() => import('./features/volunteer/Volunteer').then((module) => ({ default: module.Volunteer })));
+const Admin = React.lazy(() => import('./features/admin/Admin').then((module) => ({ default: module.Admin })));
+const Operations = React.lazy(() => import('./features/operations/Operations').then((module) => ({ default: module.Operations })));
+const OperationsDashboard = React.lazy(() => import('./features/operations/Dashboard').then((module) => ({ default: module.OperationsDashboard })));
+
+class ContentErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() { return { failed: true }; }
+
+  render() {
+    if (this.state.failed) return (
+      <div className="card notice warning" role="alert">
+        <h2>Chưa tải được nội dung</h2>
+        <p>Trang có thể vừa được cập nhật. Hãy tải lại để dùng phiên bản mới nhất.</p>
+        <button type="button" className="button" onClick={() => window.location.reload()}>Tải lại trang</button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 type DataPage = {
   items?: Record<string, unknown>[];
@@ -88,7 +117,13 @@ function AuthModal({
   const [challengeId, setChallengeId] = useState('');
   const [otp, setOtp] = useState('');
   const googleButton = useRef<HTMLDivElement>(null);
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const authCallbacks = useRef({ onReady, onClose });
+  authCallbacks.current = { onReady, onClose };
+  // The local HTTP demo uses password/email login; its Google OAuth origin is
+  // not registered. Keep the unavailable button out of that flow.
+  const googleClientId = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    ? ''
+    : import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -128,8 +163,8 @@ function AuthModal({
           setMessage('');
           void googleLogin(credential.credential)
             .then((loggedUser) => {
-              onReady(loggedUser);
-              onClose();
+              authCallbacks.current.onReady(loggedUser);
+              authCallbacks.current.onClose();
             })
             .catch((error) =>
               setMessage(
@@ -163,7 +198,7 @@ function AuthModal({
     return () => {
       cancelled = true;
     };
-  }, [googleClientId, isOpen, mode, onClose, onReady]);
+  }, [googleClientId, isOpen, mode]);
 
   if (!isOpen) return null;
 
@@ -185,6 +220,10 @@ function AuthModal({
       if (!password) invalid.password = 'Vui lòng nhập mật khẩu.';
       else if (mode === 'register' && password.length < 10)
         invalid.password = 'Mật khẩu đăng ký cần ít nhất 10 ký tự.';
+      else if (mode === 'register' && password.toLocaleLowerCase('vi-VN') === username.trim().toLocaleLowerCase('vi-VN'))
+        invalid.password = 'Mật khẩu phải khác tên đăng nhập.';
+      else if (mode === 'register' && commonPasswords.has(password.toLowerCase()))
+        invalid.password = 'Mật khẩu quá phổ biến. Hãy chọn mật khẩu riêng khó đoán.';
     }
     setAuthErrors(invalid);
     if (Object.keys(invalid).length) {
@@ -784,7 +823,7 @@ function Tracking({
           )}
           <h2>Tiến độ SOS {text(data.tracking_code)}</h2>
           <span className={`chip request-status request-status--${requestStatusTone(data.status)}`}>
-            {label(data.status)}
+            {requestStatusLabel(data.status)}
           </span>
           <p>Máy chủ tiếp nhận: {timeLabel(data.received_at)}</p>
           <div className="timeline">
@@ -1077,7 +1116,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
       <div className="section-header">
         <div>
           <span className="eyebrow">Số liệu trực tiếp</span>
-          <h2>{page.path === '/reports/summary' ? 'Tổng quan ứng cứu' : page.title}</h2>
+          <h2>{page.path === '/reports/summary' ? 'Tổng quan ứng cứu' : page.id === 'campaigns' ? 'Danh sách chiến dịch' : page.title}</h2>
         </div>
         <span className="report-period">
           {page.path === '/reports/summary' ? '7 ngày gần đây' : 'Dữ liệu từ hệ thống'}
@@ -1406,6 +1445,8 @@ function App() {
         </div>
 
         <main className="content">
+          <ContentErrorBoundary key={`${workspace}:${selected.id}`}>
+          <React.Suspense fallback={<div className="card" role="status">Đang tải nội dung…</div>}>
           <div className="heading">
             <div>
               <h1>{selected.title}</h1>
@@ -1543,6 +1584,8 @@ function App() {
               </>
             )
           )}
+          </React.Suspense>
+          </ContentErrorBoundary>
         </main>
       </div>
 
@@ -1588,8 +1631,16 @@ function App() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// Secure session cookies work on localhost in the local HTTP demo. Some browsers
+// reject those cookies on the numeric loopback host, which breaks login/registration.
+if (window.location.protocol === 'http:' && window.location.hostname === '127.0.0.1') {
+  const demoUrl = new URL(window.location.href);
+  demoUrl.hostname = 'localhost';
+  window.location.replace(demoUrl.href);
+} else {
+  createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}

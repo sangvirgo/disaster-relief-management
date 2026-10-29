@@ -3,6 +3,7 @@ import { api, ApiError, newCommandKey, upload } from '../../api/client';
 import { label } from '../../i18n/labels';
 import { formatQuantity } from '../../i18n/quantity';
 import type { Me } from '../../auth/session';
+import { confirmAction } from '../../components/confirmAction';
 
 type DriveItem = {
   item_id: string;
@@ -311,9 +312,9 @@ export function Donations({
       !tracking ||
       !user ||
       !verifiedSecret ||
-      !window.confirm(
+      !(await confirmAction(
         'Gắn bản khai này với tài khoản đang đăng nhập? Mã bảo mật cũ sẽ hết hiệu lực.'
-      )
+      ))
     )
       return;
     setLoading(true);

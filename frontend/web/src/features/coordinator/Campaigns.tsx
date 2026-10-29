@@ -130,7 +130,7 @@ export function Campaigns() {
         <div className="section-header">
           <div>
             <span className="eyebrow">Điều phối cứu trợ</span>
-            <h2>Chiến dịch cứu trợ</h2>
+            <h2>Danh sách chiến dịch</h2>
           </div>
           <span className="chip">{items.length} chiến dịch trên trang</span>
         </div>
