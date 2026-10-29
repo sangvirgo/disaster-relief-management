@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { IdempotencyService } from '../../../../packages/technical/src/idempotency/idempotency';
+import { IdempotencyService } from '@c48/technical/idempotency/idempotency';
 import { LogisticsAuthModule } from '../auth/logistics-auth.module';
 import { StockController } from './stock.controller';
 import { StockQueriesService } from './stock-queries.service';

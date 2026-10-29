@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import {
   canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef,
-} from '../../../../packages/technical/src/idempotency/idempotency';
+} from '@c48/technical/idempotency/idempotency';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { decimalFromUnits, quantityUnits, validateQuantity } from '../common/quantity';
 import { requireWarehousePermission } from '../stock/stock.scope';

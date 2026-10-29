@@ -2,9 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { riskAttentionLevel, scoreRequestRisk } from '../ai/ai-risk';
 import type { RiskFacts } from '../ai/ai-risk';
 import { aiPriorityAdvisory, currentAiAdvisory } from '../ai/ai-priority-advisory';
@@ -16,6 +15,7 @@ import { asObject, filtersHash, openDangerStatuses, parseBbox, relatedRequestIds
 import type { OperationRequestRow, QueueRow, RequestEventRow, RequestOperationsConfig } from './request-operations.types';
 import { decisionView, eventView } from './request-operations.mapper';
 import { RequestOperationsPersistenceService } from './request-operations.persistence.service';
+import { canAccessRequest } from '../requests/request-scope';
 
 type ScoredQueueRow = QueueRow & {
   description: string | null;
@@ -374,7 +374,7 @@ export class RequestOperationsQueriesService {
     ) as Array<Record<string, unknown> & { organization_id: string; region_code: string | null; campaign_id: string | null }>;
     const row = rows[0];
     if (!row) return [];
-    if (!hasPermission(session.grants, 'REQUEST_DETAIL_READ', { organizationId: row.organization_id, regionCode: row.region_code, campaignId: row.campaign_id })) return [];
+    if (!canAccessRequest(session, 'REQUEST_DETAIL_READ', row)) return [];
     return [{ id: row.id, tracking_code: row.tracking_code, status: row.status, region_code: row.region_code, campaign_id: row.campaign_id }];
   }
 

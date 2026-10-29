@@ -1,23 +1,14 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, Res, UseGuards, UseInterceptors } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { LogisticsServiceTokenGuard } from './logistics-service-token.guard';
 import { ReopenRequestDto, RequestVersionDto, RequestVersionReasonDto, ResolveRequestDto } from './request-resolution.dto';
 import { RequestResolutionLifecycleService } from './request-resolution-lifecycle.service';
 import { RequestResolutionStateService } from './request-resolution-state.service';
 import { RequestResolutionService } from './request-resolution.service';
+import { noStore, requireIdempotencyKey as idempotencyKey } from '@c48/technical/http/response-headers';
 
 type OperationRequest = Request & { idempotencyKey?: string };
-
-function idempotencyKey(request: OperationRequest): string {
-  if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
-  return request.idempotencyKey;
-}
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
-}
 
 @Controller()
 export class RequestResolutionController {

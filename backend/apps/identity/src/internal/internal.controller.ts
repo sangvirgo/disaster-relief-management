@@ -1,13 +1,10 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import { InternalService } from './internal.service';
 import { ActiveUserCheckDto, IntrospectDto, LookupUsersDto, RegionLookupDto, RequestCoordinatorQueryDto, SearchActiveUsersDto, ServiceTokenDto, TeamLeaderEligibilityDto } from './internal.dto';
 import { AdminRequest, IdentityServiceGuard } from '../admin/admin-security';
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
-}
+import { noStore } from '@c48/technical/http/response-headers';
 
 @Controller('internal')
 export class InternalController {

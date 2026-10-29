@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import type { Request } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import type { IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import type { IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { ReporterSessionService } from '../requests/reporter-session';
 import { AuthorityReferralDto, CorrectRegionDto, DuplicateRequestDto } from './request-operations.dto';
 import { RequestOperationsCommandRunner } from './request-operations.command-runner.service';
 import { RequestOperationsPersistenceService } from './request-operations.persistence.service';
 import { blockedCanonicalStatuses, checkVersion, cleanText, hasOrganizationPermission, terminalStatuses, unverifiedStatuses } from './request-operations.helpers';
 import type { OperationRequestRow } from './request-operations.types';
+import { assertRequestPermission, canAccessRequest } from '../requests/request-scope';
 
 @Injectable()
 export class RequestOperationsDedupReferralService {
@@ -37,9 +37,9 @@ export class RequestOperationsDedupReferralService {
         const source = locked.get(requestId);
         const canonical = locked.get(dto.canonical_request_id);
         if (!source) throw new AppError('NOT_FOUND', { status: 404 });
-        if (!hasPermission(session.grants, 'REQUEST_VERIFY', { organizationId: source.organization_id, regionCode: source.region_code, campaignId: source.campaign_id })) throw new AppError('FORBIDDEN', { status: 403 });
+        assertRequestPermission(session, 'REQUEST_VERIFY', source);
         if (!canonical || canonical.id === source.id || blockedCanonicalStatuses.has(canonical.status) ||
-            !hasPermission(session.grants, 'REQUEST_VERIFY', { organizationId: canonical.organization_id, regionCode: canonical.region_code, campaignId: canonical.campaign_id })) {
+            !canAccessRequest(session, 'REQUEST_VERIFY', canonical)) {
           throw new AppError('CANONICAL_INVALID', { status: 409 });
         }
         checkVersion(Number(source.version), dto.expected_version);

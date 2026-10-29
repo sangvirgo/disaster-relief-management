@@ -1,7 +1,7 @@
 import { generateKeyPairSync } from 'node:crypto';
-import { AppError } from '../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import { CampaignScopeService } from '../src/grants/campaign-scope.service';
-import { CircuitBreakerClient } from '../../../packages/technical/src/http/service-client';
+import { CircuitBreakerClient } from '@c48/technical/http/service-client';
 
 describe('CampaignScopeService', () => {
   it('maps malformed Response data to the unavailable dependency error', async () => {

@@ -3,17 +3,17 @@ import { Logger, OnModuleDestroy, OnModuleInit, Inject, Injectable } from '@nest
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
-import { JobRunner } from '../../../../packages/technical/src/persistence/jobs';
-import { hashPurposeBoundSecret } from '../../../../packages/technical/src/security/secret-hash';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '@c48/technical/idempotency/idempotency';
+import { JobRunner } from '@c48/technical/persistence/jobs';
+import { hashPurposeBoundSecret } from '@c48/technical/security/secret-hash';
 import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from '../requests/request-intake.service';
 import { ReporterAccessService, ReporterRequestRow } from '../tracking/reporter-access.service';
-import { EvidenceMime } from '../../../../packages/technical/src/media/evidence-media';
-import { stageEvidenceMultipart } from '../../../../packages/technical/src/uploads/evidence-upload';
+import { EvidenceMime } from '@c48/technical/media/evidence-media';
+import { stageEvidenceMultipart } from '@c48/technical/uploads/evidence-upload';
 import { EvidenceObjectStorage, EvidenceStorageConfig, RESPONSE_EVIDENCE_STORAGE } from './evidence-storage';
+import { canAccessRequest } from '../requests/request-scope';
 
 const requestAttachmentCountLimit = 5;
 const ownerAttachmentByteLimit = 100 * 1024 * 1024;
@@ -251,9 +251,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
     const evidence = rows[0];
     if (!evidence) throw new AppError('NOT_FOUND', { status: 404 });
     const session = await this.sessions.optional(request, this.access.validTrackingSecret(trackingSecret));
-    const staffAllowed = session && hasPermission(session.grants, 'REQUEST_DETAIL_READ', {
-      organizationId: evidence.organization_id, regionCode: evidence.region_code, campaignId: evidence.campaign_id,
-    });
+    const staffAllowed = session && canAccessRequest(session, 'REQUEST_DETAIL_READ', evidence);
     if (evidence.mission_id) {
       if (!session) throw new AppError('UNAUTHENTICATED', { status: 401 });
       const memberRows = evidence.team_id
@@ -262,9 +260,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
           [evidence.team_id, session.userId],
         ) as unknown[]
         : [];
-      const coordinatorAllowed = hasPermission(session.grants, 'MISSION_RECORD_ON_BEHALF', {
-        organizationId: evidence.organization_id, regionCode: evidence.region_code, campaignId: evidence.campaign_id,
-      });
+      const coordinatorAllowed = canAccessRequest(session, 'MISSION_RECORD_ON_BEHALF', evidence);
       if (!memberRows.length && !staffAllowed && !coordinatorAllowed) throw new AppError('FORBIDDEN', { status: 403 });
     } else {
       if (!evidence.request_id) throw new AppError('INTERNAL_ERROR', { status: 500 });
@@ -387,9 +383,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
       [owner.team_id, session.userId],
     ) as Array<{ member_role: 'LEADER' | 'MEMBER' }>;
     const isLeader = owner.team_reporting_mode === 'APP' && memberRows[0]?.member_role === 'LEADER';
-    const isScopedCoordinator = hasPermission(session.grants, 'MISSION_RECORD_ON_BEHALF', {
-      organizationId: owner.organization_id, regionCode: owner.region_code, campaignId: owner.campaign_id,
-    });
+    const isScopedCoordinator = canAccessRequest(session, 'MISSION_RECORD_ON_BEHALF', owner);
     if (!isLeader && !isScopedCoordinator) throw new AppError('FORBIDDEN', { status: 403 });
     return owner;
   }

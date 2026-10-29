@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService } from '../../../../packages/technical/src/idempotency/idempotency';
-import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotencyService } from '@c48/technical/idempotency/idempotency';
+import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { AdminRequest, IdentityAdminSupport } from '../admin/admin-security';
 import { CreateRegionDto, DeactivateRegionDto, RegionListQueryDto } from './regions.dto';
 

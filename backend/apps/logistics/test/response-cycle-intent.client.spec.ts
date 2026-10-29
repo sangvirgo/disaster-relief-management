@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import type { CircuitBreakerClient, ServiceResponse } from '../../../packages/technical/src/http/service-client';
+import type { CircuitBreakerClient, ServiceResponse } from '@c48/technical/http/service-client';
 import type { LogisticsIdentityService } from '../src/auth/logistics-identity.service';
 import { ResponseCycleIntentClient } from '../src/integrations/response/response-cycle-intent.client';
 

@@ -1,6 +1,6 @@
-import { CircuitBreakerClient } from '../../../../packages/technical/src/http/service-client';
+import { CircuitBreakerClient } from '@c48/technical/http/service-client';
 import { Module } from '@nestjs/common';
-import { IdempotencyService } from '../../../../packages/technical/src/idempotency/idempotency';
+import { IdempotencyService } from '@c48/technical/idempotency/idempotency';
 import { loadReporterSessionConfig, REPORTER_SESSION_CONFIG, REPORTER_SESSION_CLIENT, ReporterSessionConfig, ReporterSessionService } from './reporter-session';
 import { RequestIntakeController } from './request-intake.controller';
 import { loadRequestIntakeConfig, REQUEST_INTAKE_CONFIG, RequestIntakeService } from './request-intake.service';

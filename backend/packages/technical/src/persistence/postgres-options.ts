@@ -4,6 +4,7 @@ import { BackendService, validateEnvironment } from '../config/environment';
 
 dotenv.config({ quiet: true });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type -- TypeORM migration classes
 export function postgresOptions(migrations: Function[], service: BackendService): DataSourceOptions {
   const config = validateEnvironment(process.env, service);
   return {

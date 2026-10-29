@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import { Test } from '@nestjs/testing';
 import { jest } from '@jest/globals';
 import request from 'supertest';
-import { ApiExceptionFilter, loadErrorCatalog } from '../../../packages/technical/src';
+import { ApiExceptionFilter, loadErrorCatalog } from '@c48/technical';
 import { LOGISTICS_IDENTITY_CLIENT, LOGISTICS_IDENTITY_CONFIG, LogisticsIdentityService } from '../src/auth/logistics-identity.service';
 import { LOGISTICS_AUTH_CONFIG, LogisticsSessionService } from '../src/auth/logistics-session.service';
 import { LogisticsServiceTokenGuard } from '../src/auth/logistics-service-token.guard';

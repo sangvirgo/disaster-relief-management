@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import type { Request } from 'express';
 import { jest } from '@jest/globals';
 import { DataSource } from 'typeorm';
-import { decodeKeysetCursor, encodeKeysetCursor } from '../../../packages/technical/src/pagination/keyset';
+import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { LogisticsSessionService } from '../src/auth/logistics-session.service';
 import { AuditListQueryDto } from '../src/audit/audit.dto';
 import { AuditService } from '../src/audit/audit.service';

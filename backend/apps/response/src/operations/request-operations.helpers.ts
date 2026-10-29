@@ -1,5 +1,5 @@
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { Grant, Permission, ROLE_PERMISSIONS } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import { Grant, Permission, ROLE_PERMISSIONS } from '@c48/identity-contracts/permissions';
 import type { ReporterSession, RequestCoordinatorGrant } from '../requests/reporter-session';
 import type { OperationRequestRow, RequestEventRow, RequestOperationsConfig } from './request-operations.types';
 

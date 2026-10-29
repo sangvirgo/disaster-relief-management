@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import { DataSource } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import { LogisticsSessionService, AuthenticatedLogisticsSession } from '../auth/logistics-session.service';
 import { DONATION_SECRET_CONFIG, DonationSecretConfig, verifyDonationCapability } from './donations.helpers';
 import { readReceiptLines } from '../receipts/donation-receipts.read';

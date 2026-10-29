@@ -1,5 +1,5 @@
 import type { EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import { decimalFromUnits, quantityUnits, validateQuantity } from '../common/quantity';
 import type { DistributionLineDto } from './distributions.dto';
 import { commitmentRemaining } from './distribution-commands.helpers';

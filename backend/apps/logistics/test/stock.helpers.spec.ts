@@ -1,4 +1,4 @@
-import { mapPostgresError } from '../../../packages/technical/src/persistence/postgres-errors';
+import { mapPostgresError } from '@c48/technical/persistence/postgres-errors';
 import { assertIndependentAdjustmentReviewer, STOCK_ADJUSTMENT_ERROR_MAPPINGS, validateQuantity } from '../src/stock/stock.helpers';
 
 describe('Logistics stock rules', () => {

@@ -3,7 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { jest } from '@jest/globals';
 import request from 'supertest';
-import { ApiExceptionFilter, loadErrorCatalog } from '../../../packages/technical/src';
+import { ApiExceptionFilter, loadErrorCatalog } from '@c48/technical';
 import { LogisticsServiceTokenGuard } from '../src/resolution/logistics-service-token.guard';
 import { RequestResolutionController } from '../src/resolution/request-resolution.controller';
 import { RequestResolutionLifecycleService } from '../src/resolution/request-resolution-lifecycle.service';

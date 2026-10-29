@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { decimalFromUnits, quantityUnits, validateQuantity } from '../common/quantity';
 import { hasWarehouseScope, requireWarehousePermission } from '../stock/stock.scope';
@@ -17,6 +17,7 @@ import { DistributionHandoffKind, HandoffSourceStage, nextCustodyBalance } from 
 import { readHandoffView } from './handoffs.read';
 import { DistributionContext, loadDistribution, readDistributionView } from './distributions.read';
 import { requireHandoffPermission } from './handoff-permissions.helpers';
+import { requireIdempotencyKey as idempotencyKey } from '@c48/technical/http/response-headers';
 
 type HandoffRequest = Request & { idempotencyKey?: string };
 
@@ -30,11 +31,6 @@ interface HandoffRecordRow {
 
 interface HandoffLineRow extends DistributionHandoffLineContext {
   handoff_line_id: string;
-}
-
-function idempotencyKey(request: HandoffRequest): string {
-  if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
-  return request.idempotencyKey;
 }
 
 function requireScope(

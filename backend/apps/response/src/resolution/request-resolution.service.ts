@@ -2,15 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService, type IdempotentOutcome, type IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotencyService, type IdempotentOutcome, type IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { LogisticsCycleClient, type FulfillmentNeedEvidence, type ResolutionOutcomeBasis } from '../integrations/logistics/logistics-cycle.client';
 import { ReporterSessionService, type ReporterSession } from '../requests/reporter-session';
 import { cleanText } from '../operations/request-operations.helpers';
 import { assertResolutionReady, type ResolutionMissionEvidence, type ResolutionNeedEvidence } from './request-resolution.rules';
 import type { ResolveRequestDto } from './request-resolution.dto';
 import { RequestResolutionFinalizer } from './request-resolution-finalizer.service';
+import { assertRequestPermission } from '../requests/request-scope';
 
 type OperationRequest = Request & { idempotencyKey?: string };
 interface RequestRow {
@@ -44,13 +44,6 @@ interface InternalOperation {
 }
 
 const resolvableStatuses = ['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'];
-const requestUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
-
-function assertCanResolve(session: ReporterSession, row: RequestRow): void {
-  if (!hasPermission(session.grants, 'REQUEST_RESOLVE', {
-    organizationId: row.organization_id, regionCode: row.region_code, campaignId: row.campaign_id,
-  })) throw new AppError('FORBIDDEN', { status: 403 });
-}
 
 function normalizeNeeds(needs: readonly FulfillmentNeedEvidence[]): ResolutionNeedEvidence[] {
   return needs.map(({ status, delivered, reserved, unsettledIssued }) => ({ status, delivered, reserved, unsettledIssued }));
@@ -82,7 +75,7 @@ export class RequestResolutionService {
     ) as RequestRow[];
     const preflight = preflightRows[0];
     if (!preflight) throw new AppError('NOT_FOUND', { status: 404 });
-    assertCanResolve(session, preflight);
+    assertRequestPermission(session, 'REQUEST_RESOLVE', preflight);
     const scopeKey = `response.request-resolve:${requestId}:${session.userId}`;
     const command = 'response.requests.resolve';
     const requestHash = canonicalRequestHash({ request_id: requestId, actor_user_id: session.userId, dto });
@@ -123,9 +116,7 @@ export class RequestResolutionService {
     const row = rows[0];
     if (!row) throw new AppError('NOT_FOUND', { status: 404 });
     const permission = row.kind === 'CANCELLATION' ? 'REQUEST_CANCEL' : 'REQUEST_RESOLVE';
-    if (!hasPermission(session.grants, permission, {
-      organizationId: row.organization_id, regionCode: row.region_code, campaignId: row.campaign_id,
-    })) throw new AppError('FORBIDDEN', { status: 403 });
+    assertRequestPermission(session, permission, row);
     return this.publicOperation(row);
   }
 
@@ -169,7 +160,7 @@ export class RequestResolutionService {
     ) as RequestRow[];
     const row = rows[0];
     if (!row) throw new AppError('NOT_FOUND', { status: 404 });
-    assertCanResolve(session, row);
+    assertRequestPermission(session, 'REQUEST_RESOLVE', row);
     if (!resolvableStatuses.includes(row.status)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
     if (Number(row.version) !== expectedVersion) throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
 

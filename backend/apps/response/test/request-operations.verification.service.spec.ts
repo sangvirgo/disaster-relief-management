@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import type { IdempotentCommand } from '../../../packages/technical/src/idempotency/idempotency';
+import type { IdempotentCommand } from '@c48/technical/idempotency/idempotency';
 import { RequestOperationsCommandRunner } from '../src/operations/request-operations.command-runner.service';
 import { RequestOperationsPersistenceService } from '../src/operations/request-operations.persistence.service';
 import { RequestOperationsVerificationService } from '../src/operations/request-operations.verification.service';

@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { hashPurposeBoundSecret } from '../../../packages/technical/src/security/secret-hash';
+import { hashPurposeBoundSecret } from '@c48/technical/security/secret-hash';
 import { DonationsQueriesService } from '../src/drives/donations-queries.service';
 
 const deliveryId = '44444444-4444-4444-8444-444444444444';

@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { DataSource } from 'typeorm';
-import { canonicalRequestHash, IdempotencyService } from '../../../packages/technical/src/idempotency/idempotency';
-import { hashPurposeBoundSecret } from '../../../packages/technical/src/security/secret-hash';
+import { canonicalRequestHash, IdempotencyService } from '@c48/technical/idempotency/idempotency';
+import { hashPurposeBoundSecret } from '@c48/technical/security/secret-hash';
 import { AuthService } from '../src/auth/auth.service';
 import { AdminRequest, IdentityAdminSupport } from '../src/admin/admin-security';
 import { CreateUserDto, ResetPasswordDto } from '../src/users/users.dto';

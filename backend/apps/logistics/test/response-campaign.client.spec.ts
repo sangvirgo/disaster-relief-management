@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { LogisticsResponseCampaignClient } from '../src/integrations/response/response-campaign.client';
-import { AppError } from '../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 
 const campaignId = '66666666-6666-4666-8666-666666666666';
 const organizationId = '11111111-1111-4111-8111-111111111111';

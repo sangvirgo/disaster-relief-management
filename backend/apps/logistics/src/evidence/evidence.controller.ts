@@ -3,10 +3,7 @@ import type { Request, Response } from 'express';
 import { AttachmentLifecycleService } from '../attachments/attachment-lifecycle.service';
 import { DonationAttachmentsService } from '../drives/donation-attachments.service';
 import { HandoffAttachmentsService } from '../distributions/handoff-attachments.service';
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
-}
+import { noStore } from '@c48/technical/http/response-headers';
 
 @Controller()
 export class EvidenceController {

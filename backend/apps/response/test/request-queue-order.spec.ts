@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { encodeKeysetCursor } from '../../../packages/technical/src/pagination/keyset';
+import { encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { RequestOperationsQueriesService } from '../src/operations/request-operations.queries.service';
 import { filtersHash } from '../src/operations/request-operations.helpers';
 

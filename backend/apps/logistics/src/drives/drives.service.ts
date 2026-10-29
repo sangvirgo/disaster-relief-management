@@ -2,14 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '@c48/technical/idempotency/idempotency';
 import { validateQuantity } from '../common/quantity';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { DriveItemDto, CreateDriveDto, PatchDriveDto, DriveReasonActionDto, DriveVersionActionDto } from './drives.dto';
 import { ResponseCampaign, LogisticsResponseCampaignClient } from '../integrations/response/response-campaign.client';
 import { assertExpectedVersion, cleanDriveText, requireDrivePermission } from './drives.helpers';
+import { requireIdempotencyKey as idempotencyKey } from '@c48/technical/http/response-headers';
 
 export type DriveCommandRequest = Request & { idempotencyKey?: string };
 
@@ -35,11 +35,6 @@ interface WarehouseRow {
   organization_id: string;
   region_code: string;
   status: string;
-}
-
-function idempotencyKey(request: DriveCommandRequest): string {
-  if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
-  return request.idempotencyKey;
 }
 
 function iso(value: Date | string | null): string | null {
@@ -213,7 +208,7 @@ export class DrivesService {
     const campaign = action === 'open' || action === 'resume'
       ? before.campaign_id ? await this.activeCampaign(before.campaign_id, before.organization_id) : null
       : null;
-    const nextStatus = this.nextStatus(before.status, action);
+    this.nextStatus(before.status, action); // rejects an invalid transition before any work starts
 
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `user:${session.userId}`,

@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import type { DataSource } from 'typeorm';
-import { AppError } from '../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import { finalDistributionHandoffPredicate } from '../src/reports/donation-report.helpers';
 import { DonationReportService } from '../src/reports/donation-report.service';
 

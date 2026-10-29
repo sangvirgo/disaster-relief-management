@@ -2,13 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService, type IdempotentOutcome, type IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotencyService, type IdempotentOutcome, type IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { cleanText, checkVersion } from '../operations/request-operations.helpers';
 import { ReporterSessionService, type ReporterSession } from '../requests/reporter-session';
 import { RequestResolutionFinalizer } from './request-resolution-finalizer.service';
 import type { RequestVersionReasonDto } from './request-resolution.dto';
+import { assertRequestPermission } from '../requests/request-scope';
 
 type OperationRequest = Request & { idempotencyKey?: string };
 interface RequestRow {
@@ -278,9 +278,7 @@ export class RequestResolutionLifecycleService {
     row: Pick<RequestRow, 'organization_id' | 'region_code' | 'campaign_id'>,
     permission: 'REQUEST_CANCEL' | 'REQUEST_RESOLVE',
   ): void {
-    if (!hasPermission(session.grants, permission, {
-      organizationId: row.organization_id, regionCode: row.region_code, campaignId: row.campaign_id,
-    })) throw new AppError('FORBIDDEN', { status: 403 });
+    assertRequestPermission(session, permission, row);
   }
 
   private logDeferred(operationId: string, error: unknown): void {

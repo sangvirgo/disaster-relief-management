@@ -2,12 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService, type IdempotentOutcome, type IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotencyService, type IdempotentOutcome, type IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { checkVersion, cleanText } from '../operations/request-operations.helpers';
 import { ReporterSessionService, type ReporterSession } from '../requests/reporter-session';
 import type { FailureReviewDto } from './request-resolution.dto';
+import { assertRequestPermission } from '../requests/request-scope';
 
 interface FailureMissionRow {
   id: string;
@@ -166,9 +166,7 @@ export class RequestFailureReviewService {
   }
 
   private assertPermission(session: ReporterSession, row: Pick<FailureMissionRow, 'organization_id' | 'region_code' | 'campaign_id'>): void {
-    if (!hasPermission(session.grants, 'REQUEST_RESOLVE', {
-      organizationId: row.organization_id, regionCode: row.region_code, campaignId: row.campaign_id,
-    })) throw new AppError('FORBIDDEN', { status: 403 });
+    assertRequestPermission(session, 'REQUEST_RESOLVE', row);
   }
 
   private resultValue(missionId: string, missionVersion: number, requestVersion: number, payload: Record<string, unknown>): Record<string, unknown> {

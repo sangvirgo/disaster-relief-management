@@ -1,8 +1,9 @@
 import { Controller, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import { ResponseServiceTokenGuard } from '../campaigns/service-token.guard';
 import { RequestAdmissionService } from './request-admission.service';
+import { noStore } from '@c48/technical/http/response-headers';
 
 type InternalRequest = Request & { serviceCaller?: string };
 
@@ -13,10 +14,6 @@ function actorRequest(request: InternalRequest): Request {
     throw new AppError('UNAUTHENTICATED', { status: 401 });
   }
   return { ...request, method: 'GET', headers: { authorization } } as Request;
-}
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
 }
 
 function parseWorkCycle(value: string): number {

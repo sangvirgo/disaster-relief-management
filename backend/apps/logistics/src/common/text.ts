@@ -1,4 +1,4 @@
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 
 export function cleanText(value: string, maxLength: number): string {
   if (!value || value.length > maxLength || !value.trim() || value !== value.normalize('NFC')) {

@@ -2,11 +2,11 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { IdempotencyService, IdempotentResult, ResourceRef } from '../../../../packages/technical/src/idempotency/idempotency';
-import { JobRunner } from '../../../../packages/technical/src/persistence/jobs';
-import { EvidenceMime } from '../../../../packages/technical/src/media/evidence-media';
-import { stageEvidenceMultipart, StagedEvidenceFile } from '../../../../packages/technical/src/uploads/evidence-upload';
+import { AppError } from '@c48/technical/errors/errors';
+import { IdempotencyService, IdempotentResult, ResourceRef } from '@c48/technical/idempotency/idempotency';
+import { JobRunner } from '@c48/technical/persistence/jobs';
+import { EvidenceMime } from '@c48/technical/media/evidence-media';
+import { stageEvidenceMultipart, StagedEvidenceFile } from '@c48/technical/uploads/evidence-upload';
 import { AttachmentStorage, LOGISTICS_ATTACHMENT_STORAGE } from './attachment-storage';
 
 const maxMultipartBytes = 55 * 1024 * 1024;

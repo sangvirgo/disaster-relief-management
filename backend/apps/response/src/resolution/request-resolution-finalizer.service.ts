@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { withDatabaseRetry } from '../../../../packages/technical/src/persistence/postgres-errors';
-import { hasPermission, type Permission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import { withDatabaseRetry } from '@c48/technical/persistence/postgres-errors';
+import { hasPermission, type Permission } from '@c48/identity-contracts/permissions';
 import { LogisticsCycleClient } from '../integrations/logistics/logistics-cycle.client';
-import { ReporterSessionService, type RequestCoordinatorGrant } from '../requests/reporter-session';
+import { ReporterSessionService } from '../requests/reporter-session';
 
 type IntentSnapshot = {
   id: string;

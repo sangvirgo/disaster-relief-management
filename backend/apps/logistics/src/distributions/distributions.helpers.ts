@@ -1,4 +1,4 @@
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 
 export type DistributionHandoffKind =
   | 'DIRECT_HOUSEHOLD'

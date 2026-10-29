@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { LogisticsResponseCampaignClient, ResponseCampaign } from '../integrations/response/response-campaign.client';
 import { hasWarehouseScope, requireWarehousePermission } from '../stock/stock.scope';
@@ -15,6 +15,7 @@ import { lockDistributionAssets } from './distribution-assets.helpers';
 import { availableCommitmentLines, issueDistributionLines, loadDispatchLines } from './distribution-stock.helpers';
 import { CreateDistributionDto, DistributionLineDto, ExpectedDistributionVersionDto, ReplaceDistributionLinesDto } from './distributions.dto';
 import { DistributionContext, loadDistribution, readDistributionView } from './distributions.read';
+import { requireIdempotencyKey as idempotencyKey } from '@c48/technical/http/response-headers';
 
 type DistributionRequest = Request & { idempotencyKey?: string };
 
@@ -22,11 +23,6 @@ interface WarehouseContext {
   id: string;
   organization_id: string;
   region_code: string;
-}
-
-function idempotencyKey(request: DistributionRequest): string {
-  if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
-  return request.idempotencyKey;
 }
 
 function requireScope(
@@ -38,10 +34,6 @@ function requireScope(
     throw new AppError('NOT_FOUND', { status: 404 });
   }
   requireWarehousePermission(grants, permission, distribution.organization_id, distribution.warehouse_region_code);
-}
-
-function requestLines(dto: CreateDistributionDto | ReplaceDistributionLinesDto): DistributionLineDto[] {
-  return dto.lines.map((line) => ({ ...line }));
 }
 
 function distributionState(row: DistributionContext): Record<string, unknown> {

@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import type { DataSource, EntityManager } from 'typeorm';
-import type { Grant } from '../../../packages/identity-contracts/src/permissions';
+import type { Grant } from '@c48/identity-contracts/permissions';
 import type { DistributionContext } from '../src/distributions/distributions.read';
 import type { CreateDistributionDto } from '../src/distributions/distributions.dto';
 

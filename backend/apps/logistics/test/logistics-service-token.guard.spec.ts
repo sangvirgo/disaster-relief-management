@@ -1,6 +1,6 @@
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { jest } from '@jest/globals';
-import { AppError } from '../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import { LogisticsServiceTokenGuard } from '../src/auth/logistics-service-token.guard';
 
 describe('LogisticsServiceTokenGuard', () => {

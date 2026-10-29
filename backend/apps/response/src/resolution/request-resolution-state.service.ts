@@ -2,13 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService, type IdempotentOutcome, type IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotencyService, type IdempotentOutcome, type IdempotentResult } from '@c48/technical/idempotency/idempotency';
+import { hasPermission } from '@c48/identity-contracts/permissions';
 import { checkVersion, cleanText } from '../operations/request-operations.helpers';
 import { ReporterSessionService, type ReporterSession } from '../requests/reporter-session';
 import type { ReopenRequestDto, RequestVersionDto } from './request-resolution.dto';
 import { enqueueAiAdvisory } from '../ai/ai-advisory-input';
+import { assertRequestPermission } from '../requests/request-scope';
 
 interface RequestStateRow {
   id: string;
@@ -174,9 +175,7 @@ export class RequestResolutionStateService {
   }
 
   private assertPermission(session: ReporterSession, row: RequestStateRow, permission: 'REQUEST_RESOLVE' | 'REQUEST_REOPEN'): void {
-    if (!hasPermission(session.grants, permission, {
-      organizationId: row.organization_id, regionCode: row.region_code, campaignId: row.campaign_id,
-    })) throw new AppError('FORBIDDEN', { status: 403 });
+    assertRequestPermission(session, permission, row);
   }
 
   private assertOrganizationCorrection(session: ReporterSession, organizationId: string): void {

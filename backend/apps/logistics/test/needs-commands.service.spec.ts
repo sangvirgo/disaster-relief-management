@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import type { DataSource, EntityManager } from 'typeorm';
-import type { Grant } from '../../../packages/identity-contracts/src/permissions';
-import type { IdempotencyService } from '../../../packages/technical/src/idempotency/idempotency';
+import type { Grant } from '@c48/identity-contracts/permissions';
+import type { IdempotencyService } from '@c48/technical/idempotency/idempotency';
 import type { LogisticsSessionService } from '../src/auth/logistics-session.service';
 import { NeedCommandsService } from '../src/needs/need-commands.service';
 import type { AdjustNeedQuantityDto, CancelNeedDto } from '../src/needs/needs.dto';

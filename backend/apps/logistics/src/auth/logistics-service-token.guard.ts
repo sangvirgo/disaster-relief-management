@@ -1,8 +1,8 @@
 import { CanActivate, ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import type { Request } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { verifyServiceToken } from '../../../../packages/technical/src/security/service-token';
-import type { ServiceName } from '../../../../packages/technical/src/security/service-token';
+import { AppError } from '@c48/technical/errors/errors';
+import { verifyServiceToken } from '@c48/technical/security/service-token';
+import type { ServiceName } from '@c48/technical/security/service-token';
 import { LOGISTICS_AUTH_CONFIG } from './logistics-session.service';
 import type { LogisticsAuthConfig } from './logistics-auth';
 

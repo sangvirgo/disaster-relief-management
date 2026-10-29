@@ -1,5 +1,5 @@
-import { hasPermission, Grant, Permission } from '../../../../packages/identity-contracts/src/permissions';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { hasPermission, Grant, Permission } from '@c48/identity-contracts/permissions';
+import { AppError } from '@c48/technical/errors/errors';
 
 export function hasWarehouseScope(grants: readonly Grant[], organizationId: string, regionCode: string): boolean {
   return grants.some((grant) => {

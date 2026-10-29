@@ -1,7 +1,7 @@
 import type { Request } from 'express';
 import type { EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { hasPermission, Grant } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import { hasPermission, Grant } from '@c48/identity-contracts/permissions';
 import { ResponseAdmission } from './response-admission.client';
 
 export type NeedCommandRequest = Request & { idempotencyKey?: string };

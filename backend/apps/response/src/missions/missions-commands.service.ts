@@ -2,16 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import {
   canonicalRequestHash, IdempotencyService, IdempotentOutcome, IdempotentResult,
-} from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+} from '@c48/technical/idempotency/idempotency';
 import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';
 import { RequestOperationsService } from '../operations/request-operations.service';
 import { cleanText, checkVersion } from '../operations/request-operations.helpers';
 import { CreateMissionDto, MissionReasonDto, MissionTransitionDto, MissionVersionDto, RecordMissionOnBehalfDto } from './missions.dto';
 import { missionProgressStatus, missionTransitionAllowed, MissionStatus } from './missions.helpers';
+import { canAccessRequest } from '../requests/request-scope';
 
 type MissionRequest = Request & { idempotencyKey?: string };
 type Queryable = Pick<DataSource | EntityManager, 'query'>;
@@ -276,9 +276,7 @@ export class MissionsCommandsService {
         [teamId, session.userId],
       ) as unknown[];
       if (team.reporting_mode !== 'APP' || team.status !== 'ACTIVE' || !leaders.length) throw new AppError('MISSION_NOT_LEADER', { status: 403 });
-    } else if (change.mode === 'ASSIGN' && !hasPermission(session.grants, 'MISSION_ASSIGN', {
-      organizationId: request.organization_id, regionCode: request.region_code, campaignId: request.campaign_id,
-    })) {
+    } else if (change.mode === 'ASSIGN' && !canAccessRequest(session, 'MISSION_ASSIGN', request)) {
       throw new AppError('FORBIDDEN', { status: 403 });
     }
 
@@ -346,9 +344,7 @@ export class MissionsCommandsService {
     const row = rows[0];
     if (!row) throw new AppError('NOT_FOUND', { status: 404 });
     if (row.campaign_id !== pointers[0].campaign_id) throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
-    if (permission && !hasPermission(session.grants, permission, {
-      organizationId: row.organization_id, regionCode: row.region_code, campaignId: row.campaign_id,
-    })) throw new AppError('FORBIDDEN', { status: 403 });
+    if (permission && !canAccessRequest(session, permission, row)) throw new AppError('FORBIDDEN', { status: 403 });
     return row;
   }
 

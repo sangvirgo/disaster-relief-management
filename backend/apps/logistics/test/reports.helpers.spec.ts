@@ -1,5 +1,5 @@
-import { AppError } from '../../../packages/technical/src/errors/errors';
-import { encodeKeysetCursor } from '../../../packages/technical/src/pagination/keyset';
+import { AppError } from '@c48/technical/errors/errors';
+import { encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { decodeReportIdCursor, decodeReportPairCursor, reportWindow } from '../src/reports/reports.helpers';
 
 describe('Logistics report helpers', () => {

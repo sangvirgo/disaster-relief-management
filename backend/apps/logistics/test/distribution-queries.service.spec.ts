@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import type { Request } from 'express';
-import type { Grant } from '../../../packages/identity-contracts/src/permissions';
+import type { Grant } from '@c48/identity-contracts/permissions';
 import { DistributionQueriesService } from '../src/distributions/distribution-queries.service';
 
 const distributionId = '88888888-8888-4888-8888-888888888888';

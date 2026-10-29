@@ -1,22 +1,15 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UseInterceptors } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { AssetsQueriesService } from './assets-queries.service';
 import {
   AssetPageQueryDto, CreateReliefPointDto, CreateVehicleDto, CreateWarehouseDto, DeactivateAssetDto,
   PatchReliefPointDto, PatchVehicleDto, PatchWarehouseDto,
 } from './assets.dto';
 import { AssetsService } from './assets.service';
+import { noStore, markIdempotentReplay as replay } from '@c48/technical/http/response-headers';
 
 type AssetRequest = Request & { idempotencyKey?: string };
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
-}
-
-function replay(response: Response, value: boolean): void {
-  if (value) response.setHeader('Idempotent-Replay', 'true');
-}
 
 @Controller()
 export class AssetsController {

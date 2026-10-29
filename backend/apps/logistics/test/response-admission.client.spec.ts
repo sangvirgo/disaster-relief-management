@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
-import type { CircuitBreakerClient, ServiceResponse } from '../../../packages/technical/src/http/service-client';
-import { AppError } from '../../../packages/technical/src/errors/errors';
+import type { CircuitBreakerClient, ServiceResponse } from '@c48/technical/http/service-client';
+import { AppError } from '@c48/technical/errors/errors';
 import type { LogisticsIdentityService } from '../src/auth/logistics-identity.service';
 import { ResponseAdmissionClient } from '../src/needs/response-admission.client';
 

@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { describe, expect, it, jest } from '@jest/globals';
 import type { DataSource, EntityManager } from 'typeorm';
-import type { IdempotentCommand, IdempotencyService } from '../../../packages/technical/src/idempotency/idempotency';
+import type { IdempotentCommand, IdempotencyService } from '@c48/technical/idempotency/idempotency';
 import type { ReporterSession, ReporterSessionService } from '../src/requests/reporter-session';
 import type { TeamRow } from '../src/teams/teams.helpers';
 import type { TeamsQueriesService } from '../src/teams/teams-queries.service';

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { CircuitBreakerClient } from '../../../../packages/technical/src/http/service-client';
+import { CircuitBreakerClient } from '@c48/technical/http/service-client';
 import { LogisticsAuthModule } from '../auth/logistics-auth.module';
 import { LogisticsServiceTokenGuard } from '../auth/logistics-service-token.guard';
 import { ResponseCycleIntentClient, RESPONSE_CYCLE_INTENT_CLIENT } from '../integrations/response/response-cycle-intent.client';

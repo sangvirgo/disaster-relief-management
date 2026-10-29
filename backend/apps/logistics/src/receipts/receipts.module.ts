@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { IdempotencyService } from '../../../../packages/technical/src/idempotency/idempotency';
+import { IdempotencyService } from '@c48/technical/idempotency/idempotency';
 import { LogisticsAuthModule } from '../auth/logistics-auth.module';
 import { DonationReceiptsController } from './donation-receipts.controller';
 import { DonationReceiptsQueriesService } from './donation-receipts-queries.service';

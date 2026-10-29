@@ -2,13 +2,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import type { Request } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { ReporterSessionService } from '../requests/reporter-session';
 import { asObject, filtersHash, scopeSql, toIso } from '../operations/request-operations.helpers';
 import { MissionPageQueryDto } from './missions.dto';
 import { MISSIONS_CONFIG, MissionsConfig } from './missions.config';
+import { canAccessRequest } from '../requests/request-scope';
 
 interface MissionRow extends Record<string, unknown> {
   id: string;
@@ -109,9 +109,7 @@ export class MissionsQueriesService {
       [row.team_id, session.userId],
     ) as Array<{ member_role: 'LEADER' | 'MEMBER' }>;
     const isMember = memberRows.length > 0;
-    const staffAllowed = hasPermission(session.grants, 'REQUEST_DETAIL_READ', {
-      organizationId: row.organization_id, regionCode: row.region_code, campaignId: row.campaign_id,
-    });
+    const staffAllowed = canAccessRequest(session, 'REQUEST_DETAIL_READ', row);
     if (!isMember && !staffAllowed) throw new AppError('FORBIDDEN', { status: 403 });
     const isLeader = memberRows[0]?.member_role === 'LEADER';
     const includeContacts = staffAllowed || isLeader;

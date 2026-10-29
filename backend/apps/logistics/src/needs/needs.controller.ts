@@ -1,8 +1,8 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, Res, UseGuards, UseInterceptors } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
-import type { IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
+import { AppError } from '@c48/technical/errors/errors';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
+import type { IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { LogisticsServiceTokenGuard } from '../auth/logistics-service-token.guard';
 import { AdjustNeedQuantityDto, CancelNeedDto, CreateNeedCommitmentDto, CreateNeedDto, FulfillmentQueryDto, NeedContributionsQueryDto, NeedsListQueryDto, ReleaseCommitmentDto } from './needs.dto';
 import { NeedCommandsService } from './need-commands.service';
@@ -10,10 +10,7 @@ import { NeedCommitmentsService } from './need-commitments.service';
 import { NeedCommandRequest } from './needs.helpers';
 import { NeedsQueriesService } from './needs-queries.service';
 import { NeedsService } from './needs.service';
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
-}
+import { noStore } from '@c48/technical/http/response-headers';
 
 function actorRequest(request: Request): Request {
   const header = request.headers['x-actor-authorization'];

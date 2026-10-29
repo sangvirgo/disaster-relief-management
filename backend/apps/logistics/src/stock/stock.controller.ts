@@ -1,22 +1,15 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, Res, UseInterceptors } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { StockQueriesService } from './stock-queries.service';
 import {
   CreateStockAdjustmentDto, OpeningStockDto, ReviewStockAdjustmentDto, StockAdjustmentListQueryDto,
   StockListQueryDto, StockPageQueryDto,
 } from './stock.dto';
 import { StockService } from './stock.service';
+import { noStore, markIdempotentReplay as replay } from '@c48/technical/http/response-headers';
 
 type StockRequest = Request & { idempotencyKey?: string };
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
-}
-
-function replay(response: Response, value: boolean): void {
-  if (value) response.setHeader('Idempotent-Replay', 'true');
-}
 
 @Controller('stock')
 export class StockController {

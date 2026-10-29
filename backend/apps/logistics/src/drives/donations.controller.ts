@@ -2,7 +2,7 @@ import {
   Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, Res, UseInterceptors,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import {
   CreateDonationDeliveryDto, DeclarationRevisionDto, DonationRecoveryIssueDto, DonationRecoveryRedeemDto,
   OpenDonationDisputeDto,
@@ -10,14 +10,7 @@ import {
 import { DonationCommandRequest, DonationsService } from './donations.service';
 import { DonationsQueriesService } from './donations-queries.service';
 import { DonationAttachmentsService } from './donation-attachments.service';
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
-}
-
-function replay(response: Response, isReplay: boolean): void {
-  if (isReplay) response.setHeader('Idempotent-Replay', 'true');
-}
+import { noStore, markIdempotentReplay as replay } from '@c48/technical/http/response-headers';
 
 @Controller()
 export class DonationsController {

@@ -2,10 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '../../../../packages/technical/src/idempotency/idempotency';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '@c48/technical/idempotency/idempotency';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
 import { requireWarehousePermission, hasWarehouseScope } from '../stock/stock.scope';
 import { decimalFromUnits } from '../common/quantity';
 import {
@@ -17,6 +16,7 @@ import {
 } from './donation-receipts.helpers';
 import { readReceiptLines, readReceiptView } from './donation-receipts.read';
 import { cleanDriveText } from '../drives/drives.helpers';
+import { requireIdempotencyKey as key } from '@c48/technical/http/response-headers';
 
 type ReceiptRequest = Request & { idempotencyKey?: string };
 
@@ -49,11 +49,6 @@ interface DeliveryCreateContext {
 
 interface CountLine extends ReceiptLineFacts {
   unit_scale: number;
-}
-
-function key(request: ReceiptRequest): string {
-  if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
-  return request.idempotencyKey;
 }
 
 function requireReceiptPermission(

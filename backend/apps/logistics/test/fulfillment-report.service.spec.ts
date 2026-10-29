@@ -1,7 +1,7 @@
 import type { Request } from 'express';
 import type { DataSource } from 'typeorm';
 import { jest } from '@jest/globals';
-import { AppError } from '../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import type { LogisticsSessionService } from '../src/auth/logistics-session.service';
 import { FulfillmentReportService } from '../src/reports/fulfillment-report.service';
 

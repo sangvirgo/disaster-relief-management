@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource } from 'typeorm';
-import { encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
+import { encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { decodeReportPairCursor } from './reports.helpers';
 import { reportScopeSql } from './reports.scope';

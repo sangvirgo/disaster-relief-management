@@ -3,7 +3,7 @@ import type { ExecutionContext } from '@nestjs/common';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import type { RequestIntakeConfig } from '../src/requests/request-intake.service';
 import { ResponseServiceTokenGuard } from '../src/campaigns/service-token.guard';
-import type { ServiceName, ServiceTokenClaims } from '../../../packages/technical/src/security/service-token';
+import type { ServiceName, ServiceTokenClaims } from '@c48/technical/security/service-token';
 
 const pair = generateKeyPairSync('rsa', { modulusLength: 3072, publicExponent: 0x10001 });
 const issuer = 'https://c48.test';

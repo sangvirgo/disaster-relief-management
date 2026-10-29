@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, Matches } from 'class-validator';
-import { Role, ScopeType } from '../../../../packages/identity-contracts/src/permissions';
+import { Role, ScopeType } from '@c48/identity-contracts/permissions';
 
 const roles: readonly Role[] = ['CITIZEN', 'VOLUNTEER', 'COORDINATOR', 'CAMPAIGN_MANAGER', 'OPERATIONS_MANAGER', 'INTAKE_STAFF', 'REVIEWER', 'DISTRIBUTION_STAFF', 'ADMIN'];
 const scopes: readonly ScopeType[] = ['SYSTEM', 'ORGANIZATION', 'REGION', 'CAMPAIGN'];

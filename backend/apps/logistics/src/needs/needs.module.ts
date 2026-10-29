@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { CircuitBreakerClient } from '../../../../packages/technical/src/http/service-client';
-import { IdempotencyService } from '../../../../packages/technical/src/idempotency/idempotency';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { CircuitBreakerClient } from '@c48/technical/http/service-client';
+import { IdempotencyService } from '@c48/technical/idempotency/idempotency';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { LogisticsAuthModule } from '../auth/logistics-auth.module';
 import { LogisticsServiceTokenGuard } from '../auth/logistics-service-token.guard';
 import { ResponseCampaignModule } from '../integrations/response/response-campaign.module';

@@ -2,29 +2,18 @@ import {
   Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, Res, UseInterceptors,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
 import { AiAdvisoryReviewDto } from './request-operations.dto';
 import { RequestOperationsAiAdvisoryService } from './request-operations.ai-advisory.service';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import {
   AuthorityReferralDto, ContactAttemptDto, ConcurRequestDto, CorrectRegionDto, DuplicateRequestDto,
   AttachCampaignDto, RejectRequestDto, RequestQueueQueryDto, RequestOperationPageDto, RequestVersionDto, TeamCandidatesQueryDto,
   SupplementReviewDto, TriageRequestDto, VerifyRequestDto,
 } from './request-operations.dto';
 import { RequestOperationsService } from './request-operations.service';
+import { noStore, requireIdempotencyKey as key, markIdempotentReplay as replay } from '@c48/technical/http/response-headers';
 
 type OperationRequest = Request & { idempotencyKey?: string };
-
-function noStore(response: Response): void { response.setHeader('Cache-Control', 'no-store'); }
-
-function key(request: OperationRequest): string {
-  if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
-  return request.idempotencyKey;
-}
-
-function replay(response: Response, isReplay: boolean): void {
-  if (isReplay) response.setHeader('Idempotent-Replay', 'true');
-}
 
 @Controller()
 export class RequestOperationsController {

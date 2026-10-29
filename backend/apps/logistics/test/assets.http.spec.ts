@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { jest } from '@jest/globals';
 import request from 'supertest';
-import { IdempotencyKeyInterceptor } from '../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { AssetsController } from '../src/assets/assets.controller';
 import { AssetsQueriesService } from '../src/assets/assets-queries.service';
 import { AssetsService } from '../src/assets/assets.service';

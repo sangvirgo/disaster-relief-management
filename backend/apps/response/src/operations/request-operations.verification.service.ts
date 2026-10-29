@@ -2,9 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import type { IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import type { IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { ReporterSessionService } from '../requests/reporter-session';
 import type { RequestCoordinatorGrant } from '../requests/reporter-session';
 import type { ContactAttemptDto, ConcurRequestDto, RejectRequestDto, RequestVersionDto, VerifyRequestDto } from "./request-operations.dto";
@@ -14,6 +13,7 @@ import { RequestOperationsCommandRunner } from './request-operations.command-run
 import { RequestOperationsPersistenceService } from './request-operations.persistence.service';
 import { hasPendingSupplement, latestMaterialFactEventId, validConcurrence, validateSourceRefs, approvedFacts as loadApprovedFacts } from './request-operations.verification.helpers';
 import type { OperationRequestRow } from './request-operations.types';
+import { assertRequestPermission, canAccessRequest } from '../requests/request-scope';
 @Injectable()
 export class RequestOperationsVerificationService {
   constructor(
@@ -202,9 +202,7 @@ export class RequestOperationsVerificationService {
         }
         const row = lockedRows.get(requestId);
         if (!row) throw new AppError('NOT_FOUND', { status: 404 });
-        if (!hasPermission(session.grants, 'REQUEST_VERIFY', { organizationId: row.organization_id, regionCode: row.region_code, campaignId: row.campaign_id })) {
-          throw new AppError('FORBIDDEN', { status: 403 });
-        }
+        assertRequestPermission(session, 'REQUEST_VERIFY', row);
         const childRows = [...lockedRows.values()].filter((child) => child.canonical_request_id === requestId);
         const currentChildren = await manager.query(
           'SELECT id,organization_id FROM assistance_request WHERE canonical_request_id=$1 ORDER BY id', [requestId],
@@ -261,7 +259,7 @@ export class RequestOperationsVerificationService {
                FROM unnest($3::uuid[]) AS recipient
              ON CONFLICT DO NOTHING`, [child.id, version, recipients],
           );
-          if (hasPermission(session.grants, 'REQUEST_DETAIL_READ', { organizationId: child.organization_id, regionCode: child.region_code, campaignId: child.campaign_id })) {
+          if (canAccessRequest(session, 'REQUEST_DETAIL_READ', child)) {
             orphaned.push({ id: child.id, status: 'VERIFYING', version });
           }
         }
@@ -281,9 +279,7 @@ export class RequestOperationsVerificationService {
             WHERE orphan.event_type='DUPLICATE_ORPHANED' AND orphan.payload->>'rejection_decision_id'=$1
             ORDER BY orphan.occurred_at,orphan.id`, [rows[0].id],
         ) as Array<{ id: string; status: string; version: number; organization_id: string; region_code: string | null; campaign_id: string | null }>;
-        const visible = events.filter((child) => hasPermission(session.grants, 'REQUEST_DETAIL_READ', {
-          organizationId: child.organization_id, regionCode: child.region_code, campaignId: child.campaign_id,
-        }));
+        const visible = events.filter((child) => canAccessRequest(session, 'REQUEST_DETAIL_READ', child));
         return { ...current, decision_id: rows[0].id, orphaned_duplicates: { items: visible.slice(0, 20).map(({ id, status, version }) => ({ id, status, version })), more: visible.length > 20 } };
       },
     );

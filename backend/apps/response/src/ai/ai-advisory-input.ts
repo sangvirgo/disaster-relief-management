@@ -1,5 +1,5 @@
 import type { EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import { aiInputHash, buildAiAssessmentInput, scoreRequestRisk, type AiAssessmentFacts } from './ai-risk';
 
 export interface StoredAssessmentFacts extends AiAssessmentFacts {

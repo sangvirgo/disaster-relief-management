@@ -1,9 +1,9 @@
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
-import { CircuitBreakerClient } from '../../../../packages/technical/src/http/service-client';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import type { ServiceName } from '../../../../packages/technical/src/security/service-token';
-import { Grant, validGrant } from '../../../../packages/identity-contracts/src/permissions';
-import { ServiceTokenCache } from '../../../../packages/technical/src/http/service-token-cache';
+import { CircuitBreakerClient } from '@c48/technical/http/service-client';
+import { AppError } from '@c48/technical/errors/errors';
+import type { ServiceName } from '@c48/technical/security/service-token';
+import { Grant, validGrant } from '@c48/identity-contracts/permissions';
+import { ServiceTokenCache } from '@c48/technical/http/service-token-cache';
 import type { LogisticsAccessTokenClaims } from './logistics-auth';
 
 export const LOGISTICS_IDENTITY_CONFIG = Symbol('LOGISTICS_IDENTITY_CONFIG');

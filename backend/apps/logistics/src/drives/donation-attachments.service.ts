@@ -3,10 +3,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotentResult, ResourceRef } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
-import { EvidenceMime } from '../../../../packages/technical/src/media/evidence-media';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotentResult, ResourceRef } from '@c48/technical/idempotency/idempotency';
+import { hasPermission } from '@c48/identity-contracts/permissions';
+import { EvidenceMime } from '@c48/technical/media/evidence-media';
 import { AuthenticatedLogisticsSession, LogisticsSessionService } from '../auth/logistics-session.service';
 import {
   DONATION_SECRET_CONFIG, DonationSecretConfig, donationCapabilityHash, verifyDonationCapability,

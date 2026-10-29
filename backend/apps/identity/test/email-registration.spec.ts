@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { createHmac } from 'node:crypto';
 import argon2 from 'argon2';
-import type { IdempotentCommand } from '../../../packages/technical/src/idempotency/idempotency';
-import { JobRunner } from '../../../packages/technical/src/persistence/jobs';
+import type { IdempotentCommand } from '@c48/technical/idempotency/idempotency';
+import { JobRunner } from '@c48/technical/persistence/jobs';
 import { AuthService } from '../src/auth/auth.service';
 import { loadIdentityAuthConfig } from '../src/auth/auth-security';
 
