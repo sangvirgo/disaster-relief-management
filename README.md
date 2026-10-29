@@ -1,83 +1,107 @@
+<div align="center">
+
+<img src="frontend/web/public/reliva-logo.png" alt="Reliva logo" width="120" />
+
 # Reliva
 
-**Emergency Response and Disaster Relief Management System**
+### Emergency Response and Disaster Relief Management System
 
-**Vietnamese:** Hệ thống quản lý ứng phó khẩn cấp và cứu trợ thiên tai
+*Hệ thống quản lý ứng phó khẩn cấp và cứu trợ thiên tai*
 
-Reliva is a Web and Mobile project for coordinating emergency reports, rescue missions, volunteers, and in-kind relief. It connects affected residents with rescue teams, coordinators, operations staff, and administrators through a shared workflow and auditable records.
+**From an SOS call to a verified rescue mission and an auditable relief delivery, in one coordinated workflow.**
 
-## Problem and goals
+![NestJS](https://img.shields.io/badge/NestJS-12-E0234E?logo=nestjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![Expo](https://img.shields.io/badge/Expo-React%20Native-000020?logo=expo&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL%20%2B%20PostGIS-17-4169E1?logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker%20Compose-ready-2496ED?logo=docker&logoColor=white)
+![OpenAPI](https://img.shields.io/badge/OpenAPI-contracts-6BA539?logo=openapiinitiative&logoColor=white)
+![Language](https://img.shields.io/badge/UI-Ti%E1%BA%BFng%20Vi%E1%BB%87t-DA251D)
 
-During floods, storms, landslides, and other emergencies, information about people who need help, available teams, and relief supplies can arrive through disconnected channels. Responders need to know whether a report was received, who is reviewing it, which team accepted a mission, what supplies were received, and what was delivered.
+[Overview](#-overview) · [Screenshots](#-screenshots) · [Features](#-key-features) · [Architecture](#-architecture) · [Tech stack](#-tech-stack) · [Quick start](#-quick-start) · [Docs](#-documentation)
 
-Reliva brings those records into one coordination system. Its goals are to:
+</div>
 
-- Receive SOS and assistance reports with incident details, location, contact information, and optional evidence.
-- Help authorized coordinators verify reports, review possible duplicates, set priority, assign teams, and track outcomes.
-- Help rescue teams receive missions, report progress, and record results.
-- Coordinate relief campaigns, donation drives, warehouses, vehicles, relief points, stock, and distribution.
-- Provide scoped maps, operational dashboards, reports, and history for accountability.
+---
 
-The project’s research compares the coordination needs addressed by platforms and approaches such as Ushahidi, Sahana Eden, Vietnamese volunteer response sites, Zalo SOS, and shared phone/spreadsheet workflows. Reliva focuses on linking intake, verification, team missions, in-kind donation review, stock, and distribution records in one traceable flow. The full background and comparison are in the [project report](report/main.tex).
+## Overview
 
-## People and workflows
+During floods, storms, and landslides, information about people who need help, available rescue teams, and relief supplies arrives through disconnected channels: phone calls, social posts, chat groups, and spreadsheets. Responders cannot tell whether a report was received, who is reviewing it, which team accepted it, or what was actually delivered.
 
-| Role | Main activities |
+**Reliva** connects affected residents, rescue teams, coordinators, operations managers, and administrators through one shared, traceable system on **Web and Mobile**.
+
+| | |
 |---|---|
-| Resident or reporter | Submit an SOS for themselves or report a household, share the affected location, follow progress, and add information when allowed. |
-| Volunteer or rescue team | Maintain team skills and availability, view assigned missions, accept or decline offers, update progress, and report outcomes. |
-| Coordinator | Review reports, verify information, handle duplicates, set official priority, select and assign eligible teams, and monitor work on scoped maps and queues. |
-| Campaign or operations manager | Manage campaigns, donation drives, warehouses, vehicles, relief points, supply needs, commitments, and distribution. |
-| Intake staff and independent reviewer | Record donated goods, count and classify items, preserve discrepancies, and approve or reject a count independently. |
-| Distribution staff and receiving party | Prepare and approve distributions, dispatch supplies, record handoffs, and reconcile delivery, return, or loss. |
-| System administrator | Manage accounts, organizations, membership, access grants, and administrative history. |
+| **Report** | Residents send a GPS-based SOS, as a guest or signed in, for themselves or on behalf of a household. |
+| **Verify** | Coordinators review reports, resolve duplicates, and set the official priority. A human always decides. |
+| **Respond** | Eligible rescue teams receive missions, accept or decline, report progress, and record the outcome. |
+| **Relieve** | Campaigns, donation drives, warehouses, stock, and distribution stay linked end to end. |
+| **Account** | Every important decision keeps its actor, time, reason, and before/after state. |
 
-Key workflows include:
+> The core demo path is **SOS → human verification and priority → team assignment and progress → resolution**. Donations and logistics are supporting capabilities. AI is optional and only advises coordinators.
 
-1. **SOS intake:** A resident submits a self-report (`SELF`) as a guest or signed-in user. Reporting for a household at another location (`PROXY`) requires sign-in. Reporter details stay distinct from the affected person’s details.
-2. **Review and response:** A coordinator verifies the report, records the decision and reason, reviews duplicate candidates, sets priority, and offers a mission to an eligible team. Team acceptance and progress update the request timeline.
-3. **In-kind relief:** A donor declares goods handed over. Intake staff count the goods; a separate reviewer checks that count before accepted quantities enter stock. Needs, commitments, stock movements, distributions, and handoffs remain separately traceable.
-4. **Operational monitoring:** Authorized users view queues, team locations, campaigns, inventory, fulfillment, and reports within their organization, region, or assigned resource scope.
+## Screenshots
 
-## Requirements and use cases
+### Web
 
-The report preserves requirement and use-case identifiers for traceability.
+<table>
+  <tr>
+    <td width="50%"><img src="report/images/web-citizen-sos.png" alt="Citizen SOS form" /><br /><sub><b>Citizen SOS intake</b></sub></td>
+    <td width="50%"><img src="report/images/web-coordinator-queue.png" alt="Coordinator queue" /><br /><sub><b>Coordinator queue and map</b></sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="report/images/web-volunteer-missions.png" alt="Volunteer missions" /><br /><sub><b>Volunteer and rescue missions</b></sub></td>
+    <td width="50%"><img src="report/images/web-operations-stock.png" alt="Operations stock" /><br /><sub><b>Warehouse and stock operations</b></sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="report/images/web-donation-drive.png" alt="Donation drive" /><br /><sub><b>Donation drives</b></sub></td>
+    <td width="50%"><img src="report/images/web-admin-users.png" alt="Admin users" /><br /><sub><b>Account and access administration</b></sub></td>
+  </tr>
+</table>
 
-| ID | Requirement area |
-|---|---|
-| UR-01–02 | Submit SOS or household assistance reports, track progress, and provide permitted updates. |
-| UR-03–04 | Verify and prioritize reports; review teams and manage assigned missions. |
-| UR-05–07 | Manage campaigns and relief operations, accounts and permissions, dashboards, and service information. |
-| UR-08–10 | Declare donations, independently count and review them, and distribute or reconcile goods. |
+### Mobile
 
-| Functional requirement group | Coverage |
-|---|---|
-| `FR-IAM-01..03` | Authentication, sessions, accounts, and scoped permissions. |
-| `FR-REQ-01..11` | SOS intake, tracking, updates, review, duplicate handling, priority, and history. |
-| `FR-MSN-01..06`, `FR-TEAM-01` | Team profiles, skills, availability, mission assignment, and progress. |
-| `FR-MAP-01` | Scoped operational maps and heatmaps without public personal details or automatic dispatch. |
-| `FR-CAM-01`, `FR-LOG-01..07` | Campaigns, supply needs, commitments, inventory, and partial fulfillment. |
-| `FR-DON-01..05` | Donation drives, declarations, independent review, receipts, and disputes. |
-| `FR-REC-01`, `FR-RPT-01`, `FR-AUD-01` | Reconciliation, reports, and audit history. |
-| `FR-FILE-01`, `FR-NOT-01..02` | Private evidence files and in-app notifications; device push is an extension. |
-| `FR-OFF-01`, `FR-AI-01..07`, `FR-EVT-01` | Optional offline, AI, and event extensions. Core workflows do not depend on them. |
+<table>
+  <tr>
+    <td align="center"><img src="report/images/trang%20ch%E1%BB%A7.jpg" alt="Home" width="200" /><br /><sub><b>Home</b></sub></td>
+    <td align="center"><img src="report/images/map.jpg" alt="Map" width="200" /><br /><sub><b>Map</b></sub></td>
+    <td align="center"><img src="report/images/Danh%20s%C3%A1ch%20nhi%E1%BB%87m%20v%E1%BB%A5.jpg" alt="Mission list" width="200" /><br /><sub><b>Mission list</b></sub></td>
+    <td align="center"><img src="report/images/Chi%20ti%E1%BA%BFt%20nhi%E1%BB%87m%20v%E1%BB%A5.jpg" alt="Mission detail" width="200" /><br /><sub><b>Mission detail</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="report/images/b%E1%BA%B1ng%20ch%E1%BB%A9ng.jpg" alt="Evidence" width="200" /><br /><sub><b>Evidence upload</b></sub></td>
+    <td align="center"><img src="report/images/B%E1%BA%A3ng%20%C4%91i%E1%BB%81u%20khi%E1%BB%83n%20%C4%91%E1%BB%99i%20tr%C6%B0%E1%BB%9Fng.jpg" alt="Team leader dashboard" width="200" /><br /><sub><b>Team leader dashboard</b></sub></td>
+    <td align="center"><img src="report/images/quy%C3%AAn%20g%C3%B3p%20c%E1%BB%A9u%20tr%E1%BB%A3.jpg" alt="Donate" width="200" /><br /><sub><b>Relief donation</b></sub></td>
+    <td align="center"><img src="report/images/Khai%20b%C3%A1o%20b%C3%A0n%20giao.jpg" alt="Handoff" width="200" /><br /><sub><b>Handoff declaration</b></sub></td>
+  </tr>
+</table>
 
-The report also groups non-functional requirements around security (`NFR-SEC-01..04`), privacy (`NFR-PRV-01`), reliability (`NFR-REL-01`), performance targets (`NFR-PERF-01..02`), usability (`NFR-UX-01`), Vietnamese localization (`NFR-L10N-01`), compatibility (`NFR-COMP-01`), and testing and operations (`NFR-TEST-01`, `NFR-OPS-01`). Performance values are project targets: 10,000 requests, 20 concurrent virtual users, read API p95 at or below 2 seconds, SOS submission at or below 3 seconds excluding uploads, and HTTP errors below 1% during a stable measurement interval.
+All user-facing copy is in **Vietnamese**, in line with the project's language policy.
 
-Principal use cases include `UC-01` SOS intake, `UC-02` report verification, `UC-03` mission assignment, `UC-04` partial fulfillment, `UC-05` dashboards and reports, `UC-06` account administration, `UC-07` optional AI advice, `UC-08` campaign management, `UC-09` relief assets, `UC-10..13` donations and distribution, `UC-15` proxy reporting, `UC-16` maps and queues, and `UC-17/18` team profiles and missions.
+## Key features
 
-The project deliverables include the Web/Mobile system, requirements and design documentation (SRS/SDD), use cases, test cases, installation and user guides, and demonstration materials.
+### Emergency response
+- **GPS-based SOS** for a guest or signed-in resident, with `SELF` and `PROXY` (report for another household) modes.
+- Reporter and affected-person details are stored separately.
+- Location keeps its source, accuracy, capture time, and server receive time as distinct values.
+- **Verification workflow**: decision and reason, duplicate-candidate review, official priority.
+- **Mission assignment** to eligible teams. Teams accept or decline, post progress, and report results into the request timeline.
+- **Scoped operational maps and queues** limited by organization, region, or assigned resource, with no public personal details.
 
-## Scope boundaries and operating principles
+### Relief and logistics
+- Campaigns, supply needs, commitments, warehouses, vehicles, and relief points.
+- **Independent counting and review**: a donor declaration never adds stock. Only goods counted and approved by a separate reviewer enter inventory.
+- **Stock ledger**: stock movements are the single source of truth.
+- Distribution, handoff, and delivery/return/loss reconciliation.
 
-- Relief collection covers physical goods. Cash collection and payment processing are outside the project scope.
-- Verification, official priority, and dispatch are human decisions. AI can provide structured summaries or advice for review; it cannot automatically prioritize or assign rescue work.
-- SOS location is captured as a point with its source, accuracy when available, capture time, and server receive time. Continuous background tracking is outside the core workflow.
-- Guests can submit a self-report. A remote household report requires a signed-in reporter; the affected household does not need an account.
-- External agencies are coordination partners, not automatically internal system users.
-- Use synthetic names, contact details, locations, and files for development and demonstrations. The system is a coordination tool and does not replace the authority of emergency services or response commanders.
+### Platform
+- **Role-based and scope-based access** (resident, volunteer/team, coordinator, operations manager, intake and reviewer staff, admin). Authorization is enforced in the APIs, not by hiding buttons.
+- **Audit trail** with actor, time, reason, and before/after state. Retryable commands use idempotency keys.
+- **Private evidence storage** (photos and files) with per-owner authorization on every download.
+- **Optional AI advice** (Gemini, schema-constrained output, Vietnamese explanations) that is always human-reviewed and never prioritizes or dispatches on its own.
 
-## Architecture and data ownership
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -101,131 +125,143 @@ flowchart LR
   Response -. optional advice .-> AI[Gemini API]
 ```
 
-Each NestJS service owns its database, credentials, migrations, and business records. Services exchange identifiers and data through versioned REST APIs; they do not share database tables or create cross-service foreign keys.
+Reliva uses **three domain services**. Each NestJS service owns its database, credentials, migrations, and business records. Services exchange identifiers through versioned REST APIs, with **no shared tables and no cross-service foreign keys**.
 
-| Component | Data and responsibility |
+| Service | Owns |
 |---|---|
-| Identity | Accounts, authentication, organizations, regions, memberships, scoped grants, and session records. |
-| Response | SOS requests, affected-person and location records, verification history, teams, missions, campaigns, and operational notifications. |
-| Logistics | Supply catalog, warehouses, drives, donor declarations, counts and reviews, stock ledger, needs, commitments, distributions, and handoffs. |
-| Web and Mobile | Vietnamese role-based interfaces for public intake and operational workflows. Authorization is enforced by the APIs, not by hiding interface controls. |
-| Object storage | Private evidence files. PostgreSQL stores ownership and file metadata; the owning API authorizes access. |
+| **Identity** | Accounts, authentication, organizations, regions, memberships, scoped grants, sessions. |
+| **Response** | SOS requests, affected-person and location records, verification history, teams, missions, campaigns, notifications. |
+| **Logistics** | Supply catalog, warehouses, drives, donor declarations, counts and reviews, stock ledger, needs, commitments, distributions, handoffs. |
 
-## Technology choices
+More diagrams: [system overview](docs/diagrams/c48-system-overview.svg) · [container architecture](docs/diagrams/c48-container-architecture.svg) · [use cases](docs/diagrams/c48-overall-use-cases.svg) · [physical ERD (65 tables)](docs/diagrams/erd/c48-erd-physical-overall.svg)
 
-| Area | Technology |
+## Tech stack
+
+| Layer | Technology |
 |---|---|
-| Backend | NestJS, TypeScript, TypeORM, REST/JSON |
-| Databases | PostgreSQL; PostGIS for location data in Response |
-| Web | React, TypeScript, Vite |
-| Mobile | React Native, Expo, TypeScript |
-| Ingress and local stack | Nginx and Docker Compose |
-| Evidence storage | MinIO Community built from the upstream source tag, single-node academic lab, no license needed |
-| Optional AI provider | Gemini, with schema-constrained output and coordinator review |
+| **Backend** | NestJS 12, TypeScript, TypeORM, REST/JSON, class-validator |
+| **Database** | PostgreSQL 17 with PostGIS 3.5, one database per service |
+| **Web** | React 19, TypeScript, Vite, Leaflet, MapLibre GL |
+| **Mobile** | React Native, Expo (Expo Router), TanStack Query, Zustand, react-native-maps |
+| **API contracts** | OpenAPI for each service, with TypeScript types generated for the Web client |
+| **Gateway and infra** | Nginx ingress, Docker Compose (single stack) |
+| **Object storage** | MinIO Community, built from the upstream source tag, single-node lab setup |
+| **Optional AI** | Gemini with schema-constrained output and coordinator review |
 
-NestJS/TypeScript was selected after comparison with Spring Boot, Django REST Framework, FastAPI, and Flask. The shared TypeScript stack supports the backend and clients; PostgreSQL/PostGIS provides relational transactions and spatial queries. These are design choices for the project, not requirements from the original brief.
+**Why NestJS?** It was chosen after comparison with Spring Boot, Django REST Framework, FastAPI, and Flask. One TypeScript stack across backend, Web, and Mobile keeps contracts consistent, and PostgreSQL/PostGIS provides relational transactions together with spatial queries. See the [technology and delivery plan](docs/c48-technology-and-delivery-plan.md).
 
 ## Data protection and integrity
 
-- Locations use WGS84/SRID 4326; GeoJSON coordinates are ordered longitude then latitude. Keep location source, capture time, accuracy, and server receive time distinct.
-- Scope exact locations, phone numbers, files, queues, exports, and notifications to authorized roles and regions. Public maps and reports do not expose personal identifiers.
-- Record important decisions with the actor, time, reason, and before/after state. Retryable commands use idempotency keys.
-- Treat stock movements as the ledger. A donor declaration does not add stock; accepted goods enter inventory only after an independent review.
-- Keep object-storage buckets private and authorize each download against its owning request, mission, or distribution.
-- Use Vietnamese for all user-facing Web/Mobile copy and backend human-readable messages. API field names, error codes, enum values, and identifiers remain stable machine-readable contracts.
+- Locations use WGS84 (SRID 4326), with GeoJSON ordered longitude then latitude.
+- Exact locations, phone numbers, files, queues, exports, and notifications are scoped to authorized roles and regions.
+- Buckets are private. Every download is authorized against its owning request, mission, or distribution.
+- Machine-readable contracts (paths, field names, error codes, enums) stay stable and English. Clients branch on codes, never on Vietnamese message text.
+- Use synthetic names, contacts, locations, and files for development and demos.
 
-## Repository map
+Scope boundaries: relief covers physical goods only (no cash or payments), and Reliva is a coordination tool that does not replace emergency services or incident commanders.
 
-```text
-backend/
-  apps/identity/       Accounts, authentication, organizations, and permissions
-  apps/response/       SOS reports, verification, teams, missions, and AI advice
-  apps/logistics/      Donations, inventory, fulfillment, and distribution
-  infra/compose.yaml   The single Compose definition
-  scripts/db/          Migrations, synthetic seeding, backup, and recovery tools
-  postman/             API collection for manual demonstrations
-contracts/openapi/     Identity, Response, and Logistics API contracts
-frontend/web/           Vietnamese React Web application
-mobile/                 Vietnamese React Native / Expo application
-docs/
-  backend/              Setup, schemas, API guides, permissions, and seed data
-  diagrams/             Architecture and data-model diagrams
-report/main.tex         Full Vietnamese project report source
-```
+## Quick start
 
-## Run the local demonstration stack
-
-### Requirements
-
-- Docker Engine and the Docker Compose plugin.
-- Node.js `>=24.15.0 <25` and npm `>=10 <13` for host development and checks.
-- Provider credentials only for optional flows you want to exercise.
-
-### Configure and start
-
-From the repository root:
+**Requirements:** Docker Engine with the Compose plugin, Node.js `>=24.15.0 <25`, npm `>=10 <13`.
 
 ```bash
+# 1. Configure (from the repository root)
 cp -n backend/.env.example backend/.env
 node backend/scripts/dev/gen-keys.mjs
-```
+# Set SEED_PASSWORD and EMAIL_OTP_PEPPER in backend/.env, and keep .env private.
 
-Set a local `SEED_PASSWORD` and `EMAIL_OTP_PEPPER` in `backend/.env`, then review the [backend setup guide](docs/backend/00-setup.md). Keep `.env` private.
-
-Start the core stack from `backend/`:
-
-```bash
+# 2. Start the stack (from backend/)
+cd backend
 docker compose up --build -d
-```
 
-The Web application and public API ingress use <http://127.0.0.1:8080>. API paths are `/api/v1/identity`, `/api/v1/response`, and `/api/v1/logistics`.
-
-Load synthetic demo data from `backend/`:
-
-```bash
+# 3. Load synthetic demo data
 docker compose --profile seed up seed
 ```
 
-On empty databases, the seed job loads the full fixtures. On populated databases, it adds deterministic demo users, regions, campaigns, teams, reports, and relief records with insert-only statements. It does not reset existing data. The optional `storage` profile builds MinIO Community locally and needs no license; see [technology plan §6.3](docs/c48-technology-and-delivery-plan.md#63-gps-and-evidence-files).
+Open **<http://127.0.0.1:8080>** for the Web app and API ingress. API prefixes are `/api/v1/identity`, `/api/v1/response`, and `/api/v1/logistics`.
 
-Do not use `docker compose down -v`. For an intentional demo reset, use only `bash scripts/db/reset-demo --reset` or `bash scripts/db/test-db --reset` from `backend/`; these reset only PostgreSQL data and preserve MinIO data and its objects.
+> Never run `docker compose down -v`. For an intentional demo reset use only `bash scripts/db/reset-demo --reset` or `bash scripts/db/test-db --reset`. These remove only PostgreSQL data and keep MinIO objects. The optional MinIO store runs under the `storage` profile.
 
-### Development commands
-
-Backend commands run from `backend/`:
+<details>
+<summary><b>Development commands</b></summary>
 
 ```bash
+# Backend (from backend/)
 npm ci
 npm run build
 npm test
 npm run contracts:check
 npm run check:compose-env
-```
 
-Web commands run from `frontend/web/`:
-
-```bash
+# Web (from frontend/web/)
 npm ci
-npm run build
-```
+npm run dev        # local dev server
+npm run build      # typecheck and production build
 
-Mobile commands run from `mobile/`:
-
-```bash
+# Mobile (from mobile/)
 npm ci
-npm start
+npm start          # Expo
 npm run lint
 ```
 
-Database and API integration checks use the primary project databases and APIs. See the [backend setup guide](docs/backend/00-setup.md) before running database checks.
+Integration and smoke checks run from the host against the main stack's APIs and primary databases. See the [backend setup guide](docs/backend/00-setup.md) first.
 
-## Project documents and API contracts
+</details>
 
-- [Full project report (LaTeX source)](report/main.tex)
-- [Assigned project scope and context](docs/c48-project-context.md)
-- [Technology and delivery plan](docs/c48-technology-and-delivery-plan.md)
-- [Backend setup and database rules](docs/backend/00-setup.md)
-- [Backend architecture and guide](docs/backend/README.md)
-- [Identity API contract](contracts/openapi/identity.json) · [Response API contract](contracts/openapi/response.json) · [Logistics API contract](contracts/openapi/logistics.json)
-- [System diagrams](docs/diagrams/c48-implemented-system.md)
-- [Postman demonstration collection](backend/postman/C48-backend-demo.postman_collection.json)
+## Repository map
+
+```text
+backend/
+  apps/identity/       Accounts, authentication, organizations, permissions
+  apps/response/       SOS, verification, teams, missions, AI advice
+  apps/logistics/      Donations, inventory, fulfillment, distribution
+  infra/compose.yaml   The single Compose definition
+  scripts/db/          Migrations, synthetic seed, backup and recovery
+  postman/             API collection for demos
+contracts/openapi/     Identity, Response, Logistics API contracts
+frontend/web/          Vietnamese React Web application
+mobile/                Vietnamese React Native / Expo application
+docs/                  Plan, backend guides, diagrams, weekly reports
+report/main.tex        Full Vietnamese project report (LaTeX)
+```
+
+## Requirements traceability
+
+Identifiers are preserved from the report through the implementation.
+
+| Area | IDs |
+|---|---|
+| User requirements | `UR-01..10` |
+| Identity and access | `FR-IAM-01..03` |
+| SOS requests | `FR-REQ-01..11` |
+| Teams and missions | `FR-TEAM-01`, `FR-MSN-01..06` |
+| Maps | `FR-MAP-01` |
+| Campaigns and logistics | `FR-CAM-01`, `FR-LOG-01..07` |
+| Donations | `FR-DON-01..05` |
+| Reconciliation, reports, audit | `FR-REC-01`, `FR-RPT-01`, `FR-AUD-01` |
+| Files and notifications | `FR-FILE-01`, `FR-NOT-01..02` |
+| Optional extensions | `FR-OFF-01`, `FR-AI-01..07`, `FR-EVT-01` |
+| Use cases | `UC-01..18` |
+
+Performance targets: 10,000 requests at 20 concurrent virtual users, read API p95 at or below 2 s, SOS submission at or below 3 s excluding uploads, and HTTP errors below 1%.
+
+## Documentation
+
+| Document | Link |
+|---|---|
+| Full project report (LaTeX) | [report/main.tex](report/main.tex) |
+| Project scope and context | [docs/c48-project-context.md](docs/c48-project-context.md) |
+| Technology and delivery plan | [docs/c48-technology-and-delivery-plan.md](docs/c48-technology-and-delivery-plan.md) |
+| Backend setup and database rules | [docs/backend/00-setup.md](docs/backend/00-setup.md) |
+| Backend architecture guide | [docs/backend/README.md](docs/backend/README.md) |
+| API contracts | [Identity](contracts/openapi/identity.json) · [Response](contracts/openapi/response.json) · [Logistics](contracts/openapi/logistics.json) |
+| System diagrams | [docs/diagrams/c48-implemented-system.md](docs/diagrams/c48-implemented-system.md) |
+| Postman demo collection | [backend/postman](backend/postman/C48-backend-demo.postman_collection.json) |
+
+---
+
+<div align="center">
+
+**Reliva** · capstone project (C48) · built to help responders see, decide, and act faster.
+
+</div>
