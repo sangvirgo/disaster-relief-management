@@ -7,7 +7,7 @@ Scope note from `AGENTS.md`: the SOS -> verification/priority -> assignment/prog
 
 ## 1. API coverage (backend vs web)
 
-Operations excluding `/internal/*`: Identity 38 total, Response 84, Logistics 86. Routes below have no caller in the web source (leaf-name grep returned nothing).
+Only public/client-facing operations are counted: Identity 25, Response 72, Logistics 71. All `/internal/*` routes (service-to-service) are out of scope for the frontend and are deliberately excluded. Routes below have no caller in the web source (leaf-name grep returned nothing).
 
 How to verify an item: open `contracts/openapi/<service>.json`, find the path, then search `frontend/web/src` for the leaf name. Check the matching role in `frontend/web/src/app/catalog.ts` (menu) and the feature file.
 
@@ -95,3 +95,41 @@ Mark each as OK, needs polish, or recommend redesign.
 ## 5. How to record findings
 
 Create one row per finding: file or route, observed behavior, expected behavior (cite the OpenAPI path or doc section), severity (High/Medium/Low), and a suggested owner. Use stable identifiers (UR/FR/NFR/UC/TC) from `docs/c48-project-context.md` when a finding maps to a requirement. Keep all user-facing text Vietnamese and technical identifiers English.
+
+## 6. Defects found so far (fix list for coworkers)
+
+Confirmed by reading code (not by running the app):
+
+| # | Type | Where | Problem | Severity |
+|---|---|---|---|---|
+| W1 | Validation | `features/citizen/SosForm.tsx:103-141` | Errors are thrown as a single banner; the failing field is not highlighted | Medium |
+| W2 | Validation | `SosForm.tsx:107` | Phone length is checked on the raw string, format on the normalized string | Low |
+| W3 | Validation | `components/CommandForm.tsx` | `number` fields default to `min = 1`; any field that may be 0 is blocked unless `min` is set | Medium |
+| W4 | Validation | `main.tsx` register | No client check for common passwords or password equal to username (mobile has both) | Low |
+| W5 | UI | 7 files | `window.confirm` used for confirmations; native, unstyled, inconsistent | Medium |
+| W6 | UI/perf | build output | Main JS chunk about 1.6 MB, no lazy loading | Medium |
+| W7 | Maintainability | `main.tsx`, `Coordinator.tsx`, `Operations.tsx`, `Volunteer.tsx` | Files of 1100-1600 lines | Medium |
+| W8 | Maintainability | `style.css`, `refinements.css`, `workflow.css`, `sos.css` | Four stylesheets layered on each other | Medium |
+| W9 | Contract | `i18n/labels.ts` | `ASSIGNED` status does not exist in the backend enum | Medium |
+| W10 | Permission UI | Volunteer mission screen | Members see leader-only actions (needs a backend field first) | High |
+| W11 | Accessibility | whole app | Keyboard, focus, contrast, and screen reader behavior never tested | Medium |
+| W12 | Feature gap | section 1 | Missing UI for contact attempts, authority referral, failed mission, team membership | High |
+
+## 7. Extra things to check by hand (not verified yet)
+
+Each item is a prompt for the reviewer; mark as OK or defect.
+
+- Double submit: click a submit button twice quickly; is it disabled while busy?
+- Back button and refresh in the middle of a multi-step form: is data lost without warning?
+- Session expiry: what the user sees after a 401 while filling a form.
+- Long text, long names, and Vietnamese diacritics: overflow, truncation, and line breaks in cards and tables.
+- Large lists (hundreds of requests): pagination or virtual scrolling, and filter behavior.
+- Date and time: format, time zone, and "Invalid Date" cases.
+- Number formatting: thousands separators and units consistent everywhere.
+- Image or evidence upload: file type and size limits, preview, and error messages in Vietnamese.
+- Map failures: no GPS permission, no network, missing map key.
+- Buttons that look enabled but do nothing; dead links in the sidebar.
+- Role switching: a user with several grants sees only what they may use; direct URL access to a forbidden page.
+- Any English text visible to users (placeholders, tooltips, `title` attributes, raw error codes).
+- Raw server messages or stack traces shown in the UI.
+- Consistent spacing, button sizes, and heading levels between workspaces.

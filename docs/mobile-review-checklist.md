@@ -96,3 +96,38 @@ Suggested handoff format: screenshot of Web and mobile for the same flow, a shor
 ## 7. How to record findings
 
 One row per finding: screen or route, observed behavior, expected behavior (cite the OpenAPI path, a Web screen, or a doc section), severity, and suggested owner. Reference UR/FR/NFR/UC/TC identifiers where they apply. User-facing text stays Vietnamese; technical identifiers stay English.
+
+## 8. Defects found so far (fix list for coworkers)
+
+Confirmed by reading code (not by running the app):
+
+| # | Type | Where | Problem | Severity |
+|---|---|---|---|---|
+| M1 | Build | `package.json` / `node_modules` | `expo-router` and `expo-clipboard` declared but not installed; `tsc` fails | High |
+| M2 | Type | `ProxySOSScreen.tsx:557` | Implicit `any` on `_event`, `selectedDate` | Low |
+| M3 | Tooling | `eslint.config.js` | `Cannot find module 'eslint/config'`; `expo lint` cannot run | Medium |
+| M4 | Testing | repo | No `test` script; no unit tests for `formValidation.ts` | Medium |
+| M5 | Accessibility | whole app | Only 14 `accessibilityLabel` and 23 `accessibilityRole` for 19 files with pressables | Medium |
+| M6 | Maintainability | `DonationScreen` (2478 lines) and 7 other screens above 1000 lines | Hard to review and change | Medium |
+| M7 | Consistency | `labels.ts` vs Web `labels.ts` | Different wording for statuses, categories, priorities | High |
+| M8 | Consistency | `RegisterScreen.tsx` | Username lowercased on mobile only | Medium |
+| M9 | Consistency | validation | Password rules differ between Web and mobile | Low |
+| M10 | Feature gap | section 1 | Missing leader change, remove member, report mission failure, revoke tracking secret | High |
+| M11 | UI | `Alert.alert` (about 115 uses) | Heavy use of system popups instead of inline messages | Low |
+| M12 | Types | `src/types/api.ts` | Hand-written types (440 lines) can drift from OpenAPI | Medium |
+
+## 9. Extra things to check by hand (not verified yet)
+
+- Small phones (width 320-360) and large font sizes: clipped text or buttons.
+- Keyboard covering inputs, and scrolling to the first error on submit.
+- Android hardware back and iOS swipe back inside forms and modals.
+- Safe areas (notch, home indicator) on every screen and modal.
+- Offline, slow network, and airplane mode: SOS draft restore, retry, and clear messages.
+- Token expiry while on a screen: refresh once, then return to login without losing a draft.
+- Location permission denied or GPS off: fallback to manual coordinates works.
+- Image picker and camera permission denied; large image upload.
+- Dark mode: the theme defines only light colors, so check what happens on a dark-mode device.
+- Loading skeletons or spinners, pull to refresh, and empty states on every list.
+- Touch target size (at least 44 px) for icon buttons and the SOS button.
+- Any English text, raw error code, or technical message shown to the user.
+- Double tap on submit or accept mission: duplicate requests prevented?
