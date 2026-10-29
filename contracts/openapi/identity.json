@@ -6204,7 +6204,8 @@
               "required": [
                 "code",
                 "name",
-                "status"
+                "status",
+                "version"
               ],
               "properties": {
                 "code": {
@@ -6219,6 +6220,9 @@
                     "ACTIVE",
                     "INACTIVE"
                   ]
+                },
+                "version": {
+                  "type": "integer"
                 }
               }
             }

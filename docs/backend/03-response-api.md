@@ -117,7 +117,7 @@ Request error codes (messages in [07-error-catalog.md](07-error-catalog.md)): `S
 
 **Contract notes from the review:** `reject` takes `reason_kind` (`CLEARLY_INVALID`/`UNREACHABLE`/`OTHER`, stored on the decision); every list above is keyset-paginated; internal routes accept end-user context only through a short-lived signed on-behalf-of token issued by Identity (never a free `actor` parameter), and each internal route has an allow-list of caller client ids.
 
-**Mission view** for members: category, description, `mission_kind`, `people_affected`, exact location (leader and members of the **assigned** team), reporter contact phone (**leader only**), beneficiary/alternate contact (leader only), declared-danger flag, own mission timeline, evidence of this mission. Never: other requests, priority rationale, other teams, verification notes.
+**Mission view** for members: category, description, `mission_kind`, `people_affected`, exact location (leader and members of the **assigned** team), reporter contact phone (**leader only**), beneficiary/alternate contact (leader only), declared-danger flag, `can_manage_mission` (true only for an active leader of the mission's team, derived server-side so clients need not infer the role from contact fields), own mission timeline, evidence of this mission. Never: other requests, priority rationale, other teams, verification notes.
 
 Errors: `TEAM_BUSY`, `TEAM_NOT_ELIGIBLE` (details: reason codes `INACTIVE|UNAVAILABLE|SKILL_MISSING|SCOPE_MISMATCH`), `TEAM_HAS_ACTIVE_MISSION`, `MISSION_NOT_LEADER`, `OVERRIDE_REASON_REQUIRED`, `CAMPAIGN_PAUSED`, `RECORDED_BASIS_REQUIRED`, `USER_IN_OTHER_TEAM`, `LEADER_REQUIRED`.
 

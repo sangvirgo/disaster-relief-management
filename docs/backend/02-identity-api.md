@@ -30,7 +30,7 @@ Schema: [schema/identity.sql](schema/identity.sql). Conventions: [00](00-setup.m
 | `POST /auth/logout` | session, CSRF | `204`; revokes the family, clears cookies |
 | `POST /auth/change-password` | session, CSRF | `{ current_password, new_password }` → `204`; revokes all other families; clears `must_change_password`. Errors `INVALID_CREDENTIALS`, `PASSWORD_WEAK` |
 | `GET /me` | session | → `200 { id, username, display_name, must_change_password, grants: [ { id, role_code, scope_type, organization_id, region_code, campaign_id } ] }` |
-| `GET /regions` | session | → `{ items: [ { code, name, status } ], next_cursor }` (paginated like every list; the catalog is small) |
+| `GET /regions` | session | → `{ items: [ { code, name, status, version } ], next_cursor }` (paginated like every list; the catalog is small) |
 
 A registration idempotency replay returns the same prospective account and the current challenge while the attempt is live, without sending another email. After ten minutes or cleanup, replay returns `410 REGISTRATION_EXPIRED`; register again with a new key. Distinct attempts may use the same username/email until one is verified; only actual accounts reserve identifiers. Passwords are Argon2id hashes, OTPs are purpose-bound hashes, and both hashes are cleared from the attempt on confirmation. No pending attempt can authenticate.
 

@@ -190,9 +190,9 @@ test('main verification is a location/information/image review with no phone-con
 test('main scenario explicitly changes actors and finishes the rescue before resolving', () => {
   const operations = main.map((item) => meta(item).operationId);
   assert.deepEqual(operations, [
-    'login', 'listIdentityOrganizations', 'createIdentityUser', 'createIdentityUserGrant', 'login', 'createSelfRequest', 'trackSelfRequest', 'supplementSelfRequest',
+    'login', 'listIdentityOrganizations', 'listIdentityRegions', 'createIdentityUser', 'createIdentityUserGrant', 'login', 'createSelfRequest', 'trackSelfRequest', 'supplementSelfRequest',
     'login', 'getStaffRequestDetail', 'startRequestVerification', 'verifyRequest', 'triageRequest',
-    'responseTeamsCreate', 'createMissionOffer', 'login', 'acceptMission', 'transitionMission', 'transitionMission', 'transitionMission',
+    'responseTeamsCreate', 'createMissionOffer', 'login', 'getMission', 'acceptMission', 'transitionMission', 'transitionMission', 'transitionMission',
     'login', 'getStaffRequestDetail', 'responseRequestResolutionResolve', 'responseRequestResolutionOperation', 'login', 'trackSelfRequest',
   ]);
   assert.deepEqual(main.filter((item) => meta(item).operationId === 'transitionMission').map((item) => JSON.parse(item.request.body.raw.replace('{{missionVersion}}', '1')).to), ['EN_ROUTE', 'ON_SCENE', 'COMPLETED']);
@@ -318,6 +318,7 @@ test('complete main script chain carries actor tokens, IDs and versions without 
   const runner = sandbox(); let version = 1; let missionVersion = 1; let detailCalls = 0;
   const responses = {
     listIdentityOrganizations: () => ({ items: [{ id: 'intake-org-a', name: 'Trung tâm điều phối C48 (demo)', status: 'ACTIVE' }] }),
+    listIdentityRegions: () => ({ items: [{ code: 'DEMO_A', name: 'Khu A', status: 'ACTIVE', version: 1 }], next_cursor: null }),
     createIdentityUser: () => ({ id: 'leader-a' }), createIdentityUserGrant: () => ({ id: 'grant-a' }),
     createSelfRequest: () => ({ id: 'sos-a', tracking_code: 'ABC1234567', review_lane: 'NORMAL' }),
     trackSelfRequest: () => ({ id: 'sos-a', version, status: version === 10 ? 'RESOLVED' : 'SUBMITTED' }),
@@ -327,6 +328,7 @@ test('complete main script chain carries actor tokens, IDs and versions without 
     verifyRequest: () => ({ id: 'sos-a', version: ++version }), triageRequest: () => ({ id: 'sos-a', version: ++version }),
     responseTeamsCreate: () => ({ id: 'team-a' }),
     createMissionOffer: () => ({ id: 'mission-a', request_id: 'sos-a', version: missionVersion }),
+    getMission: () => ({ id: 'mission-a', version: missionVersion, can_manage_mission: true }),
     acceptMission: () => ({ id: 'mission-a', version: ++missionVersion }), transitionMission: () => ({ id: 'mission-a', version: ++missionVersion }),
     responseRequestResolutionResolve: () => ({ operation_id: 'operation-a' }),
     responseRequestResolutionOperation: () => { version = 10; return { state: 'COMPLETED', request_id: 'sos-a', request_status: 'RESOLVED' }; },
@@ -346,12 +348,47 @@ test('complete main script chain carries actor tokens, IDs and versions without 
     }
     if (operation === 'responseRequestResolutionResolve') assert.equal(runner.body.expected_version, 9);
     if (operation === 'transitionMission') assert.equal(actor, runner.values.get('demoLeaderUsername'));
+    if (operation === 'getMission') assert.equal(actor, runner.values.get('demoLeaderUsername'));
     if (item !== main.at(-1)) assert.notEqual(runner.next, null, item.name);
   }
   assert.deepEqual(actors, ['admin', 'citizen1', 'coord1', runner.values.get('demoLeaderUsername'), 'coord1', 'citizen1']);
   assert.equal(runner.next, null);
 });
 
+test('leader mission read requires server-derived can_manage_mission', () => {
+  const read = op(main, 'getMission');
+  assert.equal(read.request.method, 'GET');
+  assert.equal(read.request.url, '{{responseBaseUrl}}/missions/{{missionId}}');
+  assert.ok(!read.request.header.some(({ key }) => ['Idempotency-Key', 'Content-Type'].includes(key)));
+  assert.ok(read.request.header.some(({ key, value }) => key === 'Authorization' && value === 'Bearer {{activeAccessToken}}'));
+  const ok = sandbox({ activeAccessToken: 'leader-token', missionId: 'mission-a' });
+  ok.send(read, { id: 'mission-a', version: 2, can_manage_mission: true });
+  assert.deepEqual(ok.failures, []);
+  for (const body of [
+    { id: 'mission-a', version: 2, can_manage_mission: false },
+    { id: 'mission-a', version: 2 },
+    { id: 'mission-other', version: 2, can_manage_mission: true },
+  ]) {
+    const bad = sandbox({ activeAccessToken: 'leader-token', missionId: 'mission-a' });
+    bad.send(read, body);
+    assert.equal(bad.failures.length, 1, JSON.stringify(body));
+    assert.equal(bad.next, null);
+  }
+});
+test('admin region list requires an integer version on every region', () => {
+  const read = op(main, 'listIdentityRegions');
+  assert.equal(read.request.method, 'GET');
+  assert.equal(read.request.url, '{{identityBaseUrl}}/regions?limit=100');
+  const ok = sandbox({ activeAccessToken: 'admin-token' });
+  ok.send(read, { items: [{ code: 'A', name: 'A', status: 'ACTIVE', version: 3 }], next_cursor: null });
+  assert.deepEqual(ok.failures, []);
+  for (const items of [[], [{ code: 'A', name: 'A', status: 'ACTIVE' }], [{ code: 'A', status: 'ACTIVE', version: '3' }], [{ code: 'A', version: 0 }]]) {
+    const bad = sandbox({ activeAccessToken: 'admin-token' });
+    bad.send(read, { items, next_cursor: null });
+    assert.equal(bad.failures.length, 1, JSON.stringify(items));
+    assert.equal(bad.next, null);
+  }
+});
 test('PROXY captures the actual event_id contract for independent concurrence', () => {
   assert.equal(JSON.parse(op(folder('PROXY'), 'login').request.body.raw).username, 'citizen3');
   const runner = sandbox({ activeAccessToken: 'coord2', requestId: 'proxy-a', requestVersion: '4' });

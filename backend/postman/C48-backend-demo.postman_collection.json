@@ -370,6 +370,54 @@
               ]
             },
             {
+              "id": "main-01c-regions",
+              "name": "01c · Quản trị viên đọc danh sách khu vực và version",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{activeAccessToken}}"
+                  }
+                ],
+                "url": "{{identityBaseUrl}}/regions?limit=100",
+                "description": "GET danh sách khu vực; mỗi khu vực phải có version nguyên để lệnh vô hiệu hóa gửi expected_version."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.set('_c48', \"{\\\"service\\\": \\\"identity\\\", \\\"operationId\\\": \\\"listIdentityRegions\\\", \\\"expectedStatus\\\": 200}\");",
+                      "(function () {\n\nconst source = pm.request.url.toString() + ' ' + (pm.request.body?.raw || '') + ' ' + ['Authorization','X-Tracking-Code','X-Tracking-Secret','X-Donation-Secret','X-Recovery-Code'].map(k => pm.request.headers.get(k) || '').join(' ');\nconst missing = [...source.matchAll(/\\{\\{([A-Za-z][A-Za-z0-9_]*)\\}\\}/g)].map(match => match[1]).filter(key => !String(pm.variables.get(key) ?? '').trim());\nif (missing.length) { pm.test('Đã có dữ liệu cho bước này', function () { throw new Error('Thiếu biến: ' + [...new Set(missing)].join(', ')); }); pm.execution.setNextRequest(null); pm.execution.skipRequest(); }\n})();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "(function () {",
+                      "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
+                      "const body = pm.response.json();",
+                      "try {",
+                      "if (!Array.isArray(body.items) || !body.items.length) throw new Error('Danh sách khu vực đang trống.');",
+                      "const invalid = body.items.filter((row) => !row.code || !Number.isInteger(row.version) || row.version < 1);",
+                      "if (invalid.length) throw new Error('Khu vực thiếu version nguyên: ' + invalid.map((row) => row.code).join(', '));",
+                      "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
+                      "})();"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
               "id": "main-02",
               "name": "02 · Tạo đội trưởng mới trong tổ chức tiếp nhận",
               "request": {
@@ -1223,6 +1271,53 @@
                       "const body = pm.response.json();",
                       "try {",
                       "if (!body.access_token || !body.refresh_token) throw new Error('Đăng nhập chưa trả token.'); pm.collectionVariables.set('activeAccessToken', body.access_token); pm.collectionVariables.set('activeRefreshToken', body.refresh_token);",
+                      "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
+                      "})();"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "id": "main-16a-mission",
+              "name": "15b · Đội trưởng đọc nhiệm vụ và quyền điều khiển",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{activeAccessToken}}"
+                  }
+                ],
+                "url": "{{responseBaseUrl}}/missions/{{missionId}}",
+                "description": "GET chi tiết nhiệm vụ; đội trưởng của đội được giao phải nhận can_manage_mission = true từ máy chủ."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.set('_c48', \"{\\\"service\\\": \\\"response\\\", \\\"operationId\\\": \\\"getMission\\\", \\\"expectedStatus\\\": 200}\");",
+                      "(function () {\n\nconst source = pm.request.url.toString() + ' ' + (pm.request.body?.raw || '') + ' ' + ['Authorization','X-Tracking-Code','X-Tracking-Secret','X-Donation-Secret','X-Recovery-Code'].map(k => pm.request.headers.get(k) || '').join(' ');\nconst missing = [...source.matchAll(/\\{\\{([A-Za-z][A-Za-z0-9_]*)\\}\\}/g)].map(match => match[1]).filter(key => !String(pm.variables.get(key) ?? '').trim());\nif (missing.length) { pm.test('Đã có dữ liệu cho bước này', function () { throw new Error('Thiếu biến: ' + [...new Set(missing)].join(', ')); }); pm.execution.setNextRequest(null); pm.execution.skipRequest(); }\n})();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "(function () {",
+                      "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
+                      "const body = pm.response.json();",
+                      "try {",
+                      "if (body.id !== pm.collectionVariables.get('missionId')) throw new Error('Nhiệm vụ không thuộc SOS đang chạy.');",
+                      "if (body.can_manage_mission !== true) throw new Error('Đội trưởng phải có can_manage_mission = true.');",
                       "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                       "})();"
                     ]

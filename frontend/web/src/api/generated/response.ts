@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * List scoped coordinator requests
-         * @description Defaults to the NORMAL lane, except overdue=true without an explicit review_lane includes all lanes. Queue coordinates are rounded to about 100 m and phone numbers are masked.
+         * @description Defaults to the NORMAL lane, except overdue=true without an explicit review_lane includes all lanes. Requests are ordered by newest received first. Queue coordinates are rounded to about 100 m and phone numbers are masked.
          */
         get: operations["listRequestQueue"];
         put?: never;
@@ -1314,7 +1314,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List active members of a rescue team.
+         * @description Accessible to active team members, scoped TEAM_READ callers, and team managers. Returns display names resolved through Identity and a keyset page ordered by user ID.
+         */
+        get: operations["responseTeamsListMembers"];
         put?: never;
         /**
          * TeamsController.addMember
@@ -1420,6 +1424,46 @@ export interface paths {
          * @description Uses expected_version for concurrency control. Omitted facts retain their current values. The request must be owned by the signed-in reporter or accompanied by valid tracking credentials.
          */
         put: operations["responseTrackingUpdateReport"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/{id}/ai-advisories/{advisoryId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue a coordinator-requested retry for a failed AI advisory.
+         * @description Requires REQUEST_VERIFY scope, the current request expected_version, an idempotency key, a configured Gemini API key, and the latest advisory to be FAILED and fresh for current SOS facts. Resets that advisory retry budget, appends a staff timeline event, and returns 202. A stale or superseded advisory is not retried. This does not change request facts, official priority, or team assignment.
+         */
+        post: operations["responseRequestOperationsRetryAiAdvisory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{id}/member-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search accounts that can be added to a rescue team.
+         * @description Available only to the active team leader or a scoped TEAM_MANAGE_ANY caller. Searches ACTIVE Identity accounts by username or display-name prefix and excludes accounts already assigned to any active team. Any ACTIVE account remains eligible; the add command rechecks status and the one-active-team invariant.
+         */
+        get: operations["responseTeamsListMemberCandidates"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2145,6 +2189,8 @@ export interface components {
                 [key: string]: unknown;
             } | null;
             declared_danger: boolean;
+            /** @description True only for an active leader of the mission's team, who alone may accept, decline, and advance the mission. Clients may use it to show or hide those controls; the server remains the authority. */
+            can_manage_mission: boolean;
             /** @description Leader-only. */
             reporter_contact_phone?: string | null;
             /** @description Leader-only. */
@@ -6951,6 +6997,92 @@ export interface operations {
             };
         };
     };
+    responseTeamsListMembers: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active team member page. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        team_id: string;
+                        can_manage_members: boolean;
+                        items: {
+                            /** Format: uuid */
+                            user_id: string;
+                            display_name: string;
+                            /** @enum {string} */
+                            member_role: "LEADER" | "MEMBER";
+                            /** Format: date-time */
+                            joined_at: string;
+                        }[];
+                        more: boolean;
+                        cursor?: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     responseTeamsAddMember: {
         parameters: {
             query?: never;
@@ -7459,6 +7591,172 @@ export interface operations {
             };
             /** @description Documented error response; clients branch on the stable code. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseRequestOperationsRetryAiAdvisory: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["RequestId"];
+                advisoryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description AI advisory queued for a coordinator-requested retry. */
+            202: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
+                    "Idempotent-Replay": components["headers"]["IdempotentReplay"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        request_id: string;
+                        /** Format: uuid */
+                        advisory_id: string;
+                        /** @constant */
+                        status: "QUEUED";
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseTeamsListMemberCandidates: {
+        parameters: {
+            query: {
+                query: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Search results eligible for a team membership attempt. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            user_id: string;
+                            username: string;
+                            display_name: string;
+                        }[];
+                        more: boolean;
+                        cursor?: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
