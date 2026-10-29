@@ -1,6 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
-import { CreateProxySOSPayload, CreateSOSPayload, DonationDeclarationPayload } from '../types/api';
+import {
+  CreateProxySOSPayload,
+  CreateSOSPayload,
+  DonationDeclarationPayload,
+  DonationEvidenceReference,
+} from '../types/api';
 
 const KEYS = {
   ACCESS_TOKEN: 'c48_access_token',
@@ -8,6 +13,7 @@ const KEYS = {
   USER_INFO: 'c48_user_info',
   GUEST_TRACKING_SECRETS: 'c48_guest_tracking_secrets', // Map tracking_code -> secret
   GUEST_DONATION_SECRETS: 'c48_guest_donation_secrets', // Map public_code -> secret
+  GUEST_DONATION_EVIDENCE: 'c48_guest_donation_evidence', // Map donation ID -> evidence references
   PENDING_SOS: 'c48_pending_sos_command',
   PENDING_PROXY_SOS: 'c48_pending_proxy_sos_command',
   PENDING_DONATION: 'c48_pending_donation_command',
@@ -216,22 +222,44 @@ export const StorageService = {
   async saveDonationReceipt(receipt: {
     id: string;
     public_code: string;
-    secret: string;
+    secret?: string;
     drive_title?: string;
     created_at?: string;
+    evidence?: DonationEvidenceReference[];
   }): Promise<void> {
+    const existing = await this.getSavedDonationReceipts();
+    const previous = existing.find((item) => item.id === receipt.id || item.public_code === receipt.public_code);
+    const evidence = receipt.evidence ?? previous?.evidence ?? [];
     const metadata = {
       id: receipt.id,
       public_code: receipt.public_code,
-      drive_title: receipt.drive_title || 'Chiến dịch quyên góp cứu trợ',
-      created_at: receipt.created_at || new Date().toISOString(),
+      drive_title: receipt.drive_title || previous?.drive_title || 'Chiến dịch quyên góp cứu trợ',
+      created_at: receipt.created_at || previous?.created_at || new Date().toISOString(),
     };
-    const existing = await this.getSavedDonationReceipts();
-    const updated = [metadata, ...existing.filter((item) => item.id !== receipt.id && item.public_code !== receipt.public_code)].slice(0, 10);
+    const updated = [
+      metadata,
+      ...existing
+        .filter((item) => item.id !== receipt.id && item.public_code !== receipt.public_code)
+        .map(({ id, public_code, drive_title, created_at }) => ({ id, public_code, drive_title, created_at })),
+    ].slice(0, 10);
     const sanitizedId = receipt.id.replace(/[^a-zA-Z0-9._-]/g, '_');
     const sanitizedCode = receipt.public_code.replace(/[^a-zA-Z0-9._-]/g, '_');
-    await SecureStore.setItemAsync(`${KEYS.GUEST_DONATION_SECRETS}_${sanitizedId}`, receipt.secret);
-    await SecureStore.setItemAsync(`${KEYS.GUEST_DONATION_SECRETS}_${sanitizedCode}`, receipt.secret);
+    if (receipt.secret) {
+      await SecureStore.setItemAsync(`${KEYS.GUEST_DONATION_SECRETS}_${sanitizedId}`, receipt.secret);
+      await SecureStore.setItemAsync(`${KEYS.GUEST_DONATION_SECRETS}_${sanitizedCode}`, receipt.secret);
+    }
+    const evidenceKey = `${KEYS.GUEST_DONATION_EVIDENCE}_${sanitizedId}`;
+    if (evidence.length > 0) {
+      await SecureStore.setItemAsync(evidenceKey, JSON.stringify(evidence.slice(-5)));
+    } else {
+      await SecureStore.deleteItemAsync(evidenceKey);
+    }
+    const retainedIds = new Set(updated.map((item) => item.id));
+    await Promise.allSettled(existing
+      .filter((item) => !retainedIds.has(item.id))
+      .map((item) => SecureStore.deleteItemAsync(
+        `${KEYS.GUEST_DONATION_EVIDENCE}_${item.id.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+      )));
     await SecureStore.setItemAsync(`${KEYS.GUEST_DONATION_SECRETS}_index`, JSON.stringify(updated));
   },
 
@@ -240,10 +268,27 @@ export const StorageService = {
     public_code: string;
     drive_title?: string;
     created_at: string;
+    evidence?: DonationEvidenceReference[];
   }[]> {
     try {
       const data = await SecureStore.getItemAsync(`${KEYS.GUEST_DONATION_SECRETS}_index`);
-      return data ? JSON.parse(data) : [];
+      const receipts = data ? JSON.parse(data) as {
+        id: string;
+        public_code: string;
+        drive_title?: string;
+        created_at: string;
+        evidence?: DonationEvidenceReference[];
+      }[] : [];
+      return await Promise.all(receipts.map(async (receipt) => {
+        try {
+          const sanitizedId = receipt.id.replace(/[^a-zA-Z0-9._-]/g, '_');
+          const savedEvidence = await SecureStore.getItemAsync(`${KEYS.GUEST_DONATION_EVIDENCE}_${sanitizedId}`);
+          const evidence = savedEvidence ? JSON.parse(savedEvidence) as DonationEvidenceReference[] : receipt.evidence;
+          return { ...receipt, ...(Array.isArray(evidence) ? { evidence } : {}) };
+        } catch {
+          return receipt;
+        }
+      }));
     } catch {
       return [];
     }

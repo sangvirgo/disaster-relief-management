@@ -2,15 +2,14 @@ import type { Mission } from '../../../types/api';
 
 export type TeamMembershipRole = 'LEADER' | 'MEMBER' | 'UNKNOWN';
 
-type MissionRoleView = Pick<Mission, 'team' | 'reporter_contact_phone'>;
+type MissionRoleView = Pick<Mission, 'team' | 'can_manage_mission'>;
 
 /**
- * /missions/mine includes contact fields only for an active team leader.
- * Do not use this inference with the single-mission detail response, which
- * may also include contacts for scoped staff.
+ * Mission views include the server-derived permission flag so clients do not
+ * infer authority from the presence of private contact fields.
  */
 export const getTeamRoleFromMissionView = (mission: MissionRoleView): Exclude<TeamMembershipRole, 'UNKNOWN'> =>
-  Object.prototype.hasOwnProperty.call(mission, 'reporter_contact_phone') ? 'LEADER' : 'MEMBER';
+  mission.can_manage_mission ? 'LEADER' : 'MEMBER';
 
 export const getTeamRoleFromMissionList = (
   missions: MissionRoleView[],

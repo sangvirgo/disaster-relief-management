@@ -114,8 +114,10 @@ export const IdentityApi = {
   },
 
   // Danh mục khu vực hành chính (GET /identity/regions)
-  async getRegions(): Promise<{ items: RegionItem[]; next_cursor?: string }> {
-    const response = await apiClient.get<{ items: RegionItem[]; next_cursor?: string }>('/identity/regions');
+  async getRegions(limit = 100, cursor?: string): Promise<{ items: RegionItem[]; next_cursor?: string | null }> {
+    const response = await apiClient.get<{ items: RegionItem[]; next_cursor?: string | null }>('/identity/regions', {
+      params: { limit, ...(cursor ? { cursor } : {}) },
+    });
     return response.data;
   },
 };

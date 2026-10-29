@@ -26,8 +26,6 @@ import { INCIDENT_CATEGORIES, MISSION_KIND_LABELS, MISSION_STATUS_LABELS } from 
 import { THEME } from '../../../constants/theme';
 import { generateUUID } from '../../../utils/secureStore';
 import { getEvidenceSizeLimitBytes, getSupportedEvidenceMimeType } from '../../../utils/evidence';
-import { getTeamRoleFromMissionView } from '../utils/teamMembershipRole';
-import type { TeamMembershipRole } from '../utils/teamMembershipRole';
 import {
   Users,
   Phone,
@@ -50,18 +48,10 @@ const isLoopbackDownloadUrl = (url: string) =>
 
 export const MissionDetailScreen: React.FC = () => {
   const router = useRouter();
-  const { missionId: routeMissionId, teamRole: routeTeamRole } = useLocalSearchParams<{
-    missionId?: string;
-    teamRole?: string;
-  }>();
+  const { missionId: routeMissionId } = useLocalSearchParams<{ missionId?: string }>();
   const missionId = Array.isArray(routeMissionId) ? routeMissionId[0] : routeMissionId;
-  const routeTeamRoleValue = Array.isArray(routeTeamRole) ? routeTeamRole[0] : routeTeamRole;
-  const teamRoleHint: TeamMembershipRole | undefined = routeTeamRoleValue === 'LEADER' || routeTeamRoleValue === 'MEMBER'
-    ? routeTeamRoleValue
-    : undefined;
 
   const [mission, setMission] = useState<MissionDetail | null>(null);
-  const [teamRole, setTeamRole] = useState<TeamMembershipRole>(teamRoleHint ?? 'UNKNOWN');
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
@@ -162,16 +152,8 @@ export const MissionDetailScreen: React.FC = () => {
     if (!missionId) return;
     setLoading(true);
     try {
-      const [data, missionsPage] = await Promise.all([
-        ResponseApi.getMissionDetail(missionId),
-        ResponseApi.getMyMissions(50).catch(() => null),
-      ]);
-      const missionFromMine = missionsPage?.items.find((item) => item.id === missionId);
-      const currentTeamRole = missionFromMine
-        ? getTeamRoleFromMissionView(missionFromMine)
-        : teamRoleHint ?? 'UNKNOWN';
-      setTeamRole(currentTeamRole);
-      if (currentTeamRole !== 'LEADER') {
+      const data = await ResponseApi.getMissionDetail(missionId);
+      if (!data.can_manage_mission) {
         setShowCompleteModal(false);
         setShowDeclineModal(false);
       }
@@ -181,7 +163,7 @@ export const MissionDetailScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [missionId, teamRoleHint]);
+  }, [missionId]);
 
   useEffect(() => {
     // Fetch the route's initial mission snapshot.
@@ -204,7 +186,7 @@ export const MissionDetailScreen: React.FC = () => {
 
   // Gọi điện thoại trực tiếp cho nạn nhân
   const callVictimPhone = () => {
-    const phone = teamRole === 'LEADER' ? mission?.reporter_contact_phone : undefined;
+    const phone = mission?.can_manage_mission ? mission.reporter_contact_phone : undefined;
     if (!phone) return;
     Linking.openURL(`tel:${phone}`).catch(() => Alert.alert('Không thể gọi điện', 'Thiết bị không hỗ trợ cuộc gọi điện thoại.'));
   };
@@ -384,8 +366,8 @@ export const MissionDetailScreen: React.FC = () => {
   const timeline = mission.timeline.items;
   const evidence = mission.evidence.items;
   const canManageMission = mission.can_manage_mission === true;
-  const reporterContactPhone = teamRole === 'LEADER' ? mission.reporter_contact_phone : undefined;
-  const alternateContact = teamRole === 'LEADER' ? mission.alternate_contact : undefined;
+  const reporterContactPhone = canManageMission ? mission.reporter_contact_phone : undefined;
+  const alternateContact = canManageMission ? mission.alternate_contact : undefined;
 
   return (
     <ScreenContainer
@@ -594,26 +576,50 @@ export const MissionDetailScreen: React.FC = () => {
 
           {/* Khi đã tiếp nhận (ACCEPTED) */}
           {mission.status === 'ACCEPTED' && (
-            <TouchableOpacity
-              style={styles.primaryActionBtn}
-              onPress={() => handleTransition('EN_ROUTE', 'Đang trên đường di chuyển')}
-              disabled={actionLoading}
-            >
-              <Truck size={20} color="#FFFFFF" />
-              <Text style={styles.primaryActionText}>Bắt đầu di chuyển đến hiện trường</Text>
-            </TouchableOpacity>
+            <View>
+              <TouchableOpacity
+                style={styles.primaryActionBtn}
+                onPress={() => handleTransition('EN_ROUTE', 'Đang trên đường di chuyển')}
+                disabled={actionLoading}
+              >
+                <Truck size={20} color="#FFFFFF" />
+                <Text style={styles.primaryActionText}>Bắt đầu di chuyển đến hiện trường</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.failedBtn}
+                onPress={() => {
+                  setDeclineReason('');
+                  setShowDeclineModal(true);
+                }}
+                disabled={actionLoading}
+              >
+                <Text style={styles.failedBtnText}>Báo không thể triển khai nhiệm vụ</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {/* Khi đang di chuyển (EN_ROUTE) */}
           {mission.status === 'EN_ROUTE' && (
-            <TouchableOpacity
-              style={[styles.primaryActionBtn, { backgroundColor: '#7C3AED' }]}
-              onPress={() => handleTransition('ON_SCENE', 'Đã tiếp cận hiện trường')}
-              disabled={actionLoading}
-            >
-              <Flag size={20} color="#FFFFFF" />
-              <Text style={styles.primaryActionText}>Xác nhận đã tiếp cận hiện trường</Text>
-            </TouchableOpacity>
+            <View>
+              <TouchableOpacity
+                style={[styles.primaryActionBtn, { backgroundColor: '#7C3AED' }]}
+                onPress={() => handleTransition('ON_SCENE', 'Đã tiếp cận hiện trường')}
+                disabled={actionLoading}
+              >
+                <Flag size={20} color="#FFFFFF" />
+                <Text style={styles.primaryActionText}>Xác nhận đã tiếp cận hiện trường</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.failedBtn}
+                onPress={() => {
+                  setDeclineReason('');
+                  setShowDeclineModal(true);
+                }}
+                disabled={actionLoading}
+              >
+                <Text style={styles.failedBtnText}>Báo không thể tiếp cận hiện trường</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {/* Khi đã ở hiện trường (ON_SCENE) */}
@@ -639,24 +645,18 @@ export const MissionDetailScreen: React.FC = () => {
                 }}
                 disabled={actionLoading}
               >
-                <Text style={styles.failedBtnText}>Báo trở ngại không thể tiếp cận</Text>
+                <Text style={styles.failedBtnText}>Báo không thể hoàn thành tại hiện trường</Text>
               </TouchableOpacity>
             </View>
           )}
           </>
         ) : (
           <View style={styles.roleNotice}>
-            <Info size={18} color={teamRole === 'MEMBER' ? THEME.colors.primary.main : THEME.colors.warning.dark} />
+            <Info size={18} color={THEME.colors.primary.main} />
             <View style={{ flex: 1, marginLeft: 8 }}>
-              <Text style={styles.roleNoticeTitle}>
-                {teamRole === 'MEMBER' ? 'Thành viên đội cứu hộ' : teamRole === 'LEADER' ? 'Chưa thể cập nhật nhiệm vụ' : 'Chưa xác định vai trò đội'}
-              </Text>
+              <Text style={styles.roleNoticeTitle}>Chế độ xem nhiệm vụ</Text>
               <Text style={styles.roleNoticeText}>
-                {teamRole === 'MEMBER'
-                  ? 'Bạn có thể xem nhiệm vụ. Đội trưởng phụ trách tiếp nhận, từ chối và cập nhật tiến độ.'
-                  : teamRole === 'LEADER'
-                    ? 'Đội hiện không đủ điều kiện cập nhật nhiệm vụ qua ứng dụng. Vui lòng liên hệ điều phối viên.'
-                    : 'Bạn vẫn có thể xem nhiệm vụ. Các thao tác cập nhật chỉ hiển thị khi hệ thống xác nhận quyền của bạn.'}
+                Bạn có thể xem thông tin, tiến trình và minh chứng. Các thao tác chỉ hiển thị khi máy chủ xác nhận bạn là đội trưởng đang hoạt động của đội được giao.
               </Text>
             </View>
           </View>

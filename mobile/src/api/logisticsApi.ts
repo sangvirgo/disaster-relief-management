@@ -3,6 +3,7 @@ import {
   DonationDrive,
   DonationDeclarationPayload,
   DonationTrackingDetail,
+  DonationEvidenceReference,
   ReviseDonationDeclarationPayload,
   PublicDonationReportSummary,
   EvidenceDownload,
@@ -63,7 +64,7 @@ export const LogisticsApi = {
     file: { uri: string; name: string; type: string },
     donationSecret?: string,
     disputeId?: string
-  ): Promise<any> {
+  ): Promise<DonationEvidenceReference> {
     const formData = new FormData();
     formData.append('file', file as any);
 
@@ -80,7 +81,7 @@ export const LogisticsApi = {
       params.dispute_id = disputeId;
     }
 
-    const response = await apiClient.post(`/logistics/public/donations/${donationId}/evidence`, formData, {
+    const response = await apiClient.post<DonationEvidenceReference>(`/logistics/public/donations/${donationId}/evidence`, formData, {
       headers,
       params,
     });

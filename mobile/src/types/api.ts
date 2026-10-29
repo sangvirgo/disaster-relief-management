@@ -204,7 +204,7 @@ export interface Mission {
   people_affected: number | null;
   declared_danger: boolean;
   /** True only for an active leader of the mission's team; server-derived. */
-  can_manage_mission?: boolean;
+  can_manage_mission: boolean;
   location: GeoLocation | null;
   reporter_contact_phone?: string | null; // Chỉ dành cho Đội trưởng
   beneficiary_contact_phone?: string | null;
@@ -235,8 +235,8 @@ export interface TeamSkillOption {
 export interface RegionItem {
   code: string;
   name: string;
-  status: string;
-  version?: number;
+  status: 'ACTIVE' | 'INACTIVE';
+  version: number;
 }
 
 export interface TeamPositionLocation {
@@ -385,6 +385,14 @@ export interface DonationTrackingDetail {
     opened_at: string;
     resolution_note?: string | null;
   }[];
+}
+
+export interface DonationEvidenceReference {
+  id: string;
+  state: 'READY';
+  size_bytes: number;
+  detected_mime: 'image/jpeg' | 'image/png' | 'video/mp4';
+  created_at: string;
 }
 
 // Bằng chứng đa phương tiện (Ảnh / Video)

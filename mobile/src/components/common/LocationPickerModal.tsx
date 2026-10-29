@@ -568,28 +568,35 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
                   <Text style={styles.resultsCloseText}>Đóng</Text>
                 </TouchableOpacity>
               </View>
-              {searchResults.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.resultItem}
-                  onPress={() => handleSelectSearchResult(item)}
-                  activeOpacity={0.7}
-                >
-                  <MapPin
-                    size={16}
-                    color={THEME.colors.emergency.main}
-                    style={{ marginTop: 2 }}
-                  />
-                  <View style={styles.resultItemTextWrap}>
-                    <Text style={styles.resultItemName} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={styles.resultItemAddress} numberOfLines={2}>
-                      {item.fullAddress}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+              <ScrollView
+                style={styles.resultsList}
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator
+              >
+                {searchResults.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.resultItem}
+                    onPress={() => handleSelectSearchResult(item)}
+                    activeOpacity={0.7}
+                  >
+                    <MapPin
+                      size={16}
+                      color={THEME.colors.emergency.main}
+                      style={{ marginTop: 2 }}
+                    />
+                    <View style={styles.resultItemTextWrap}>
+                      <Text style={styles.resultItemName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <Text style={styles.resultItemAddress} numberOfLines={2}>
+                        {item.fullAddress}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
           )}
 
@@ -844,6 +851,9 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.primary.bg,
     borderBottomWidth: 1,
     borderBottomColor: THEME.colors.primary.border,
+  },
+  resultsList: {
+    maxHeight: 145,
   },
   resultsHeaderText: {
     fontSize: 11,

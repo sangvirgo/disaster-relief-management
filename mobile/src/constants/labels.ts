@@ -154,6 +154,14 @@ export const TIMELINE_EVENT_LABELS: Record<string, { title: string; desc: string
     title: 'Hồ sơ đã được đánh dấu hoàn tất',
     desc: 'Xem thông tin kết quả được ghi nhận trong hồ sơ cứu trợ.',
   },
+  REQUEST_CANCELLED: {
+    title: 'Yêu cầu đã được hủy',
+    desc: 'Trung tâm điều phối đã ghi nhận yêu cầu dừng xử lý. Liên hệ điều phối viên nếu thông tin này chưa chính xác.',
+  },
+  REQUEST_CLOSED: {
+    title: 'Hồ sơ đã đóng',
+    desc: 'Quy trình xử lý hồ sơ này đã kết thúc.',
+  },
   SUPPLEMENT_RECEIVED: {
     title: 'Đã ghi nhận thông tin & bằng chứng bổ sung',
     desc: 'Điều phối viên và đội cứu nạn đã nhận được ghi chú/ảnh hiện trường mới.',
@@ -161,6 +169,10 @@ export const TIMELINE_EVENT_LABELS: Record<string, { title: string; desc: string
   REQUEST_DUPLICATED: {
     title: 'Gộp vào hồ sơ cứu nạn gốc',
     desc: 'Yêu cầu của bạn được xử lý chung cùng hồ sơ cứu nạn tại cùng điểm ngập.',
+  },
+  DUPLICATE_ORPHANED: {
+    title: 'Hồ sơ được chuyển sang xác minh riêng',
+    desc: 'Hồ sơ gốc đã thay đổi trạng thái. Điều phối viên sẽ xem xét lại yêu cầu này độc lập.',
   },
   REQUEST_REJECTED: {
     title: 'Yêu cầu không thuộc diện cứu nạn khẩn cấp',
@@ -229,6 +241,18 @@ export function formatNoticeDisplay(notice: any): {
     REQUEST_CLOSED: {
       title: 'Hồ Sơ Cứu Hộ Đã Đóng',
       message: 'Hồ sơ yêu cầu cứu nạn của bạn đã kết thúc toàn bộ quy trình xử lý trên hệ thống.',
+    },
+    REQUEST_CANCELLED: {
+      title: 'Yêu Cầu Đã Được Hủy',
+      message: 'Trung tâm điều phối đã ghi nhận yêu cầu dừng xử lý hồ sơ này.',
+    },
+    REQUEST_REOPENED: {
+      title: 'Hồ Sơ Được Mở Lại',
+      message: 'Hồ sơ đã được chuyển lại để tiếp tục xử lý. Vui lòng theo dõi các cập nhật mới.',
+    },
+    DUPLICATE_ORPHANED: {
+      title: 'Hồ Sơ Được Xem Xét Riêng',
+      message: 'Hồ sơ gốc đã thay đổi trạng thái; yêu cầu này sẽ được điều phối viên xem xét độc lập.',
     },
     REQUEST_REJECTED: {
       title: 'Thông Báo Về Yêu Cầu Cứu Trợ',

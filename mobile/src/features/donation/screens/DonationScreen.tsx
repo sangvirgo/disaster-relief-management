@@ -10,6 +10,7 @@ import {
   Modal,
   Image,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
@@ -23,10 +24,12 @@ import { LogisticsApi } from '../../../api/logisticsApi';
 import {
   DonationDrive,
   DonationTrackingDetail,
+  DonationEvidenceReference,
   PublicDonationReportSummary,
 } from '../../../types/api';
 import { PendingDonationCommand, StorageService, generateUUID } from '../../../utils/secureStore';
 import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
+import { getEvidenceSizeLimitBytes, getSupportedEvidenceMimeType } from '../../../utils/evidence';
 import { useAuthStore } from '../../../store/authStore';
 import { THEME } from '../../../constants/theme';
 import { getTrackingSecretError, isValidPhone, isValidTrackingSecret, normalizePhone } from '../../../utils/formValidation';
@@ -44,6 +47,7 @@ import {
   Camera,
   Copy,
   ImageIcon,
+  Video,
   X,
   BookmarkCheck,
   MessageSquareWarning,
@@ -81,6 +85,8 @@ const donationQueryError = (value: string) => {
 };
 const quantityFieldError = (value: string) => quantityError(value) ||
   (value.trim() && !isPositiveQuantity(value) ? 'Số lượng phải lớn hơn 0.' : undefined);
+const isLoopbackDownloadUrl = (url: string) =>
+  /^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::|\/)/i.test(url);
 
 export const DonationScreen: React.FC = () => {
   const router = useRouter();
@@ -127,6 +133,8 @@ export const DonationScreen: React.FC = () => {
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
   const [trackingCapabilityAvailable, setTrackingCapabilityAvailable] = useState<boolean>(false);
   const [claimedDonationIds, setClaimedDonationIds] = useState<string[]>([]);
+  const [loadingEvidenceId, setLoadingEvidenceId] = useState<string | null>(null);
+  const [uploadingDonationEvidence, setUploadingDonationEvidence] = useState(false);
 
   // Khiếu nại kiểm đếm
   const [showDisputeModal, setShowDisputeModal] = useState<boolean>(false);
@@ -150,6 +158,7 @@ export const DonationScreen: React.FC = () => {
       public_code: string;
       drive_title?: string;
       created_at: string;
+      evidence?: DonationEvidenceReference[];
     }[]
   >([]);
 
@@ -211,19 +220,43 @@ export const DonationScreen: React.FC = () => {
     setDonationPhoto(null);
   };
 
-  const pickDonationPhoto = async () => {
+  const chooseDonationEvidence = async (): Promise<ImagePicker.ImagePickerAsset | null> => {
     try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Quyền thư viện', 'Vui lòng cấp quyền truy cập thư viện để chọn ảnh hoặc video minh chứng.');
+        return null;
+      }
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
+        mediaTypes: ['images', 'videos'],
+        allowsEditing: false,
         quality: 0.8,
       });
       if (!result.canceled && result.assets[0]) {
-        setDonationPhoto(result.assets[0]);
+        const asset = result.assets[0];
+        const mimeType = getSupportedEvidenceMimeType(asset);
+        if (!mimeType) {
+          Alert.alert('Định dạng chưa hỗ trợ', 'Chỉ chọn ảnh JPEG, PNG hoặc video MP4.');
+          return null;
+        }
+        if (asset.fileSize !== undefined && asset.fileSize > getEvidenceSizeLimitBytes(mimeType)) {
+          Alert.alert('Tệp quá lớn', mimeType === 'video/mp4'
+            ? 'Video MP4 phải có dung lượng không quá 50 MB.'
+            : 'Ảnh phải có dung lượng không quá 10 MB.');
+          return null;
+        }
+        return asset;
       }
+      return null;
     } catch {
-      Alert.alert('Thông báo', 'Không thể mở thư viện ảnh.');
+      Alert.alert('Thông báo', 'Không thể mở thư viện ảnh và video.');
+      return null;
     }
+  };
+
+  const pickDonationPhoto = async () => {
+    const asset = await chooseDonationEvidence();
+    if (asset) setDonationPhoto(asset);
   };
 
   const takeDonationPhoto = async () => {
@@ -238,7 +271,17 @@ export const DonationScreen: React.FC = () => {
         quality: 0.8,
       });
       if (!result.canceled && result.assets[0]) {
-        setDonationPhoto(result.assets[0]);
+        const asset = result.assets[0];
+        const mimeType = getSupportedEvidenceMimeType(asset);
+        if (!mimeType) {
+          Alert.alert('Định dạng chưa hỗ trợ', 'Ảnh chụp cần ở định dạng JPEG hoặc PNG.');
+          return;
+        }
+        if (asset.fileSize !== undefined && asset.fileSize > getEvidenceSizeLimitBytes(mimeType)) {
+          Alert.alert('Tệp quá lớn', 'Ảnh phải có dung lượng không quá 10 MB.');
+          return;
+        }
+        setDonationPhoto(asset);
       }
     } catch {
       Alert.alert('Thông báo', 'Không thể mở máy ảnh.');
@@ -296,6 +339,7 @@ export const DonationScreen: React.FC = () => {
 
     setIsSubmitting(true);
     let evidenceFailed = false;
+    const uploadedEvidence: DonationEvidenceReference[] = [];
     try {
       const payload = pendingDonationCommand?.payload || {
         donor_name: donorName.trim(),
@@ -318,15 +362,19 @@ export const DonationScreen: React.FC = () => {
       // Tải ảnh kiện hàng lên MinIO nếu người hảo tâm đã chọn ảnh
       if (donationPhoto) {
         try {
-          await LogisticsApi.uploadDonationEvidence(
+          const mimeType = getSupportedEvidenceMimeType(donationPhoto);
+          if (!mimeType) throw new Error('DONATION_EVIDENCE_TYPE_INVALID');
+          const evidence = await LogisticsApi.uploadDonationEvidence(
             res.id,
             {
               uri: donationPhoto.uri,
-              name: donationPhoto.fileName || `donation-${res.id}.jpg`,
-              type: donationPhoto.mimeType || 'image/jpeg',
+              name: donationPhoto.fileName || `donation-${res.id}.${mimeType.split('/')[1]}`,
+              type: mimeType,
             },
             command.donationSecret
           );
+          if (evidence.state !== 'READY') throw new Error('DONATION_EVIDENCE_NOT_READY');
+          uploadedEvidence.push(evidence);
         } catch {
           evidenceFailed = true;
         }
@@ -338,6 +386,7 @@ export const DonationScreen: React.FC = () => {
         public_code: res.public_code,
         secret: command.donationSecret,
         drive_title: command.driveTitle,
+        evidence: uploadedEvidence,
       });
       await StorageService.clearPendingDonation();
       setPendingDonationCommand(null);
@@ -352,7 +401,7 @@ export const DonationScreen: React.FC = () => {
         publicCode: res.public_code,
         secret: command.donationSecret,
         description: evidenceFailed
-          ? 'Tờ khai đã được ghi nhận, nhưng ảnh minh chứng chưa tải lên. Vui lòng liên hệ kho tiếp nhận để gửi bổ sung.'
+          ? 'Tờ khai đã được ghi nhận, nhưng minh chứng chưa tải lên. Bạn có thể bổ sung ảnh hoặc video trong phần tra cứu biên nhận.'
           : 'Thủ kho sẽ kiểm đếm độc lập khi nhận hàng.',
       });
     } catch (error: any) {
@@ -501,6 +550,93 @@ export const DonationScreen: React.FC = () => {
     }
   };
 
+  const handleViewDonationEvidence = async (evidence: DonationEvidenceReference) => {
+    if (!trackingResult) return;
+    setLoadingEvidenceId(evidence.id);
+    try {
+      const secret = await getReceiptSecret(trackingResult.id, trackingResult.public_code);
+      const download = await LogisticsApi.getDonationEvidenceDownloadUrl(evidence.id, secret || undefined);
+      if (!download.url || download.expires_in <= 0) {
+        Alert.alert('Chưa mở được minh chứng', 'Chưa nhận được đường dẫn tệp hợp lệ. Vui lòng thử lại.');
+        return;
+      }
+      if (isLoopbackDownloadUrl(download.url)) {
+        Alert.alert('Không thể mở minh chứng', 'Đường dẫn tệp chưa truy cập được từ điện thoại. Vui lòng kiểm tra cấu hình kho lưu trữ.');
+        return;
+      }
+      if (evidence.detected_mime === 'video/mp4') {
+        await Linking.openURL(download.url);
+      } else {
+        setPreviewPhotoUri(download.url);
+      }
+    } catch (error) {
+      Alert.alert('Lỗi', getApiErrorMessage(error, 'Không thể mở tệp minh chứng.'));
+    } finally {
+      setLoadingEvidenceId(null);
+    }
+  };
+
+  const handleAddDonationEvidence = async () => {
+    if (!trackingResult || uploadingDonationEvidence) return;
+    const asset = await chooseDonationEvidence();
+    if (!asset) return;
+    const mimeType = getSupportedEvidenceMimeType(asset);
+    if (!mimeType) return;
+
+    setUploadingDonationEvidence(true);
+    try {
+      const saved = recentReceipts.find(
+        (receipt) => receipt.id === trackingResult.id || receipt.public_code === trackingResult.public_code
+      );
+      const secret = await getReceiptSecret(trackingResult.id, trackingResult.public_code);
+      const uploaded = await LogisticsApi.uploadDonationEvidence(
+        trackingResult.id,
+        {
+          uri: asset.uri,
+          name: asset.fileName || `donation-${trackingResult.id}.${mimeType.split('/')[1]}`,
+          type: mimeType,
+        },
+        secret || undefined
+      );
+      if (uploaded.state !== 'READY') throw new Error('DONATION_EVIDENCE_NOT_READY');
+
+      const evidence = [
+        ...(saved?.evidence ?? []).filter((item) => item.id !== uploaded.id),
+        uploaded,
+      ].slice(-5);
+      try {
+        await StorageService.saveDonationReceipt({
+          id: trackingResult.id,
+          public_code: trackingResult.public_code,
+          secret: secret || undefined,
+          drive_title: saved?.drive_title,
+          created_at: saved?.created_at,
+          evidence,
+        });
+        await loadRecentReceipts();
+      } catch {
+        setRecentReceipts((current) => {
+          const previous = current.find((receipt) => receipt.id === trackingResult.id);
+          const metadata = {
+            id: trackingResult.id,
+            public_code: trackingResult.public_code,
+            drive_title: saved?.drive_title || previous?.drive_title,
+            created_at: saved?.created_at || previous?.created_at || new Date().toISOString(),
+            evidence,
+          };
+          return [metadata, ...current.filter((receipt) => receipt.id !== trackingResult.id)].slice(0, 10);
+        });
+        Alert.alert('Đã tải minh chứng', 'Tệp đã được tải lên nhưng không thể lưu tham chiếu vào bộ nhớ an toàn. Tệp sẽ không còn hiển thị sau khi đóng màn hình.');
+        return;
+      }
+      Alert.alert('Đã tải minh chứng', 'Tệp đã được gắn vào biên nhận và lưu tham chiếu trên thiết bị này.');
+    } catch (error) {
+      Alert.alert('Lỗi tải minh chứng', getApiErrorMessage(error, 'Không thể tải tệp lên. Hãy kiểm tra quyền truy cập biên nhận và thử lại.'));
+    } finally {
+      setUploadingDonationEvidence(false);
+    }
+  };
+
   const handleRecoverDonation = async () => {
     const publicCode = searchCode.trim().toUpperCase();
     if (!isPublicDonationCode(publicCode) || searchCode.length > 16) {
@@ -644,6 +780,11 @@ export const DonationScreen: React.FC = () => {
     searchCode.trim() &&
     !isDonationUuid(searchCode)
   );
+  const savedTrackingReceipt = trackingResult
+    ? recentReceipts.find((receipt) => receipt.id === trackingResult.id || receipt.public_code === trackingResult.public_code)
+    : undefined;
+  const trackingEvidence = savedTrackingReceipt?.evidence ?? [];
+  const canUploadTrackingEvidence = Boolean(isAuthenticated || trackingCapabilityAvailable);
   const hasPositiveQuantity = Object.values(quantities).some(isPositiveQuantity);
   const hasInvalidQuantity = Object.values(quantities).some((value) => Boolean(quantityFieldError(value)));
   const declarationSubmitDisabled = isSubmitting || (!pendingDonationCommand && (
@@ -1056,6 +1197,59 @@ export const DonationScreen: React.FC = () => {
                 ) : null}
               </View>
 
+              <View style={styles.evidenceCard}>
+                <View style={styles.evidenceHeader}>
+                  <FileCheck size={17} color={THEME.colors.primary.main} />
+                  <Text style={styles.evidenceTitle}>MINH CHỨNG BÀN GIAO</Text>
+                </View>
+                {trackingEvidence.length === 0 ? (
+                  <Text style={styles.evidenceHint}>
+                    Chưa có minh chứng được lưu trên thiết bị này. Tra cứu biên nhận không trả danh sách tệp.
+                  </Text>
+                ) : trackingEvidence.map((evidence) => (
+                  <TouchableOpacity
+                    key={evidence.id}
+                    style={styles.evidenceItem}
+                    onPress={() => void handleViewDonationEvidence(evidence)}
+                    disabled={loadingEvidenceId !== null}
+                    activeOpacity={0.8}
+                  >
+                    {evidence.detected_mime === 'video/mp4'
+                      ? <Video size={17} color={THEME.colors.primary.main} />
+                      : <ImageIcon size={17} color={THEME.colors.primary.main} />}
+                    <View style={{ flex: 1, marginHorizontal: 9 }}>
+                      <Text style={styles.evidenceItemTitle}>
+                        {evidence.detected_mime === 'video/mp4' ? 'Video MP4' : 'Ảnh minh chứng'}
+                      </Text>
+                      <Text style={styles.evidenceItemMeta}>
+                        {(evidence.size_bytes / (1024 * 1024)).toFixed(1)} MB · {new Date(evidence.created_at).toLocaleDateString('vi-VN')}
+                      </Text>
+                    </View>
+                    {loadingEvidenceId === evidence.id
+                      ? <ActivityIndicator size="small" color={THEME.colors.primary.main} />
+                      : <Text style={styles.evidenceOpenText}>Mở</Text>}
+                  </TouchableOpacity>
+                ))}
+                {canUploadTrackingEvidence ? (
+                  <TouchableOpacity
+                    style={[styles.evidenceAddButton, uploadingDonationEvidence && { opacity: 0.6 }]}
+                    onPress={() => void handleAddDonationEvidence()}
+                    disabled={uploadingDonationEvidence}
+                    activeOpacity={0.8}
+                  >
+                    {uploadingDonationEvidence
+                      ? <ActivityIndicator size="small" color={THEME.colors.primary.main} />
+                      : <Plus size={16} color={THEME.colors.primary.main} />}
+                    <Text style={styles.evidenceAddText}>
+                      {uploadingDonationEvidence ? 'Đang tải minh chứng…' : 'Thêm ảnh hoặc video minh chứng'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+                {trackingEvidence.length > 0 ? (
+                  <Text style={styles.evidenceHint}>Liên kết xem tệp có hiệu lực trong 60 giây sau khi mở.</Text>
+                ) : null}
+              </View>
+
               {/* BẢNG ĐỐI CHIẾU KIỂM ĐẾM CHI TIẾT */}
               <View style={styles.linesCard}>
                 <Text style={styles.linesSectionTitle}>CHI TIẾT KIỂM ĐẾM TỪNG LOẠI HIỆN VẬT</Text>
@@ -1340,10 +1534,19 @@ export const DonationScreen: React.FC = () => {
 
             {/* ĐÍNH KÈM ẢNH KIỆN HÀNG */}
             <View style={styles.donationPhotoSection}>
-              <Text style={styles.inputLabel}>Ảnh kiện hàng / biên lai thực tế (khuyến khích):</Text>
+              <Text style={styles.inputLabel}>Ảnh JPEG/PNG hoặc video MP4 của kiện hàng (khuyến khích):</Text>
               {donationPhoto ? (
                 <View style={styles.photoPreviewWrapper}>
-                  <Image source={{ uri: donationPhoto.uri }} style={styles.photoPreview} />
+                  {donationPhoto.type === 'video' ? (
+                    <View style={styles.videoPreview}>
+                      <Video size={24} color={THEME.colors.primary.main} />
+                      <Text style={styles.videoPreviewText} numberOfLines={2}>
+                        {donationPhoto.fileName || 'Video MP4'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Image source={{ uri: donationPhoto.uri }} style={styles.photoPreview} />
+                  )}
                   <TouchableOpacity
                     style={styles.removePhotoBtn}
                     onPress={() => setDonationPhoto(null)}
@@ -2006,6 +2209,71 @@ const styles = StyleSheet.create({
     borderColor: THEME.colors.surface.border,
     ...THEME.shadows.sm,
   },
+  evidenceCard: {
+    backgroundColor: THEME.colors.surface.card,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+  },
+  evidenceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 7,
+  },
+  evidenceTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: THEME.colors.text.primary,
+    letterSpacing: 0.3,
+  },
+  evidenceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 48,
+    paddingHorizontal: 8,
+    borderTopWidth: 1,
+    borderTopColor: THEME.colors.surface.border,
+  },
+  evidenceItemTitle: {
+    fontSize: THEME.typography.fontSizes.xs,
+    fontWeight: '700',
+    color: THEME.colors.text.primary,
+  },
+  evidenceItemMeta: {
+    fontSize: 10,
+    color: THEME.colors.text.muted,
+    marginTop: 2,
+  },
+  evidenceOpenText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: THEME.colors.primary.main,
+  },
+  evidenceAddButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+    marginTop: 8,
+    backgroundColor: THEME.colors.primary.bg,
+    borderWidth: 1,
+    borderColor: THEME.colors.primary.border,
+    borderRadius: 9,
+    gap: 6,
+  },
+  evidenceAddText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.colors.primary.main,
+  },
+  evidenceHint: {
+    fontSize: 10,
+    lineHeight: 15,
+    color: THEME.colors.text.muted,
+  },
   resultSummaryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2352,6 +2620,24 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignSelf: 'flex-start',
     marginTop: 6,
+  },
+  videoPreview: {
+    width: 150,
+    minHeight: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+    backgroundColor: THEME.colors.primary.bg,
+  },
+  videoPreviewText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: THEME.colors.text.secondary,
+    textAlign: 'center',
+    marginTop: 4,
   },
   photoPreview: {
     width: 80,

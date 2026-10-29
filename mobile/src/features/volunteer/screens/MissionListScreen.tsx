@@ -17,7 +17,6 @@ import { getApiErrorMessage } from '../../../api/client';
 import { Mission } from '../../../types/api';
 import { INCIDENT_CATEGORIES, MISSION_KIND_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
-import { getTeamRoleFromMissionView } from '../utils/teamMembershipRole';
 import { AlertTriangle, Users, ChevronRight, Inbox } from 'lucide-react-native';
 
 export const MissionListScreen: React.FC = () => {
@@ -70,7 +69,7 @@ export const MissionListScreen: React.FC = () => {
         style={styles.missionCard}
         onPress={() => router.push({
           pathname: '/mission-detail',
-          params: { missionId: item.id, teamRole: getTeamRoleFromMissionView(item) },
+          params: { missionId: item.id },
         })}
         activeOpacity={0.85}
       >
