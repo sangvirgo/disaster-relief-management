@@ -119,18 +119,14 @@ export function CitizenRequests({
 
 export function CitizenAccount({
   user,
-  onTrack,
   onChangePassword,
-  onLogout,
 }: {
   user: Me;
-  onTrack: (code: string) => void;
   onChangePassword: () => void;
-  onLogout: () => void;
 }) {
   const roleNames = [...new Set(user.grants.map((grant) => label(grant.role_code)))];
   return (
-    <div className="account-layout">
+    <div className="account-layout account-layout--profile-only">
       <section className="card account-profile">
         <span className="eyebrow">Hồ sơ của bạn</span>
         <h2>{user.display_name}</h2>
@@ -142,14 +138,9 @@ export function CitizenAccount({
           {!user.must_change_password && (
             <button type="button" className="button secondary" onClick={onChangePassword}>Đổi mật khẩu</button>
           )}
-          <button type="button" className="button secondary" onClick={onLogout}>Đăng xuất</button>
         </div>
-        <p className="account-hint">
-          Không gian Người dân dành cho mọi tài khoản để gửi và theo dõi yêu cầu của chính mình.
-          Không gian nghiệp vụ chỉ xuất hiện khi tài khoản được cấp vai trò tương ứng.
-        </p>
+        <p className="account-hint">Các không gian làm việc xuất hiện theo vai trò được cấp cho tài khoản.</p>
       </section>
-      <CitizenRequests user={user} onTrack={onTrack} />
     </div>
   );
 }

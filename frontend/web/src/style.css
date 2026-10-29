@@ -950,7 +950,9 @@ textarea:focus-visible {
     gap: 4px;
   }
   .user-avatar {
-    display: none;
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
   }
   .breadcrumb-page {
     font-size: 12px;

@@ -15,8 +15,8 @@ const empty = (): Line => ({
   item_id: '',
   counted_quantity: '',
   accepted_quantity: '',
-  held_quantity: '',
-  rejected_quantity: '',
+  held_quantity: '0',
+  rejected_quantity: '0',
   condition_note: '',
   expiry_date: '',
 });
@@ -40,8 +40,8 @@ export function ReceiptCountForm({
           item_id: line.item_id || '',
           counted_quantity: line.counted_quantity || '',
           accepted_quantity: line.accepted_quantity || '',
-          held_quantity: line.held_quantity || '',
-          rejected_quantity: line.rejected_quantity || '',
+          held_quantity: line.held_quantity || '0',
+          rejected_quantity: line.rejected_quantity || '0',
           condition_note: line.condition_note || '',
           expiry_date: line.expiry_date || '',
         }))

@@ -14,22 +14,10 @@ export interface Page {
 export const pages: Record<Workspace, Page[]> = {
   citizen: [
     {
-      id: 'home',
-      title: 'Tổng quan',
-      icon: 'home',
-      note: 'Gửi yêu cầu hỗ trợ, theo dõi tiến độ và tìm thông tin cứu trợ.',
-    },
-    {
       id: 'sos',
       title: 'Gửi yêu cầu SOS',
       icon: 'sos',
       note: 'Cho biết tình huống và vị trí của người cần hỗ trợ để gửi yêu cầu.',
-    },
-    {
-      id: 'receipt',
-      title: 'Xác nhận tiếp nhận',
-      icon: 'receipt',
-      note: 'Mã theo dõi chỉ hiện sau khi máy chủ xác nhận yêu cầu.',
     },
     { id: 'track', title: 'Theo dõi SOS', icon: 'track', note: 'Xem các SOS của bạn và tiến độ xử lý.' },
     {
@@ -45,25 +33,6 @@ export const pages: Record<Workspace, Page[]> = {
       icon: 'drive',
       service: 'logistics',
       path: '/public/donation-drives',
-    },
-    {
-      id: 'declare',
-      title: 'Khai báo vật phẩm',
-      icon: 'declare',
-      note: 'Chọn một đợt quyên góp đang mở để xem vật phẩm được tiếp nhận.',
-    },
-    {
-      id: 'donation',
-      title: 'Theo dõi đóng góp',
-      icon: 'donation',
-      note: 'Bản khai không làm tăng tồn kho. Số lượng được tiếp nhận chỉ xác định sau kiểm đếm và duyệt độc lập.',
-    },
-    {
-      id: 'account',
-      title: 'Tài khoản',
-      icon: 'account',
-      service: 'response',
-      path: '/requests/mine',
     },
   ],
   volunteer: [
@@ -81,39 +50,15 @@ export const pages: Record<Workspace, Page[]> = {
       service: 'response',
       path: '/missions/mine',
     },
-    {
-      id: 'progress',
-      title: 'Tiến độ',
-      icon: 'progress',
-      service: 'response',
-      path: '/missions/mine',
-    },
     { id: 'team', title: 'Đội cứu hộ', icon: 'team', service: 'response', path: '/teams' },
     { id: 'notices', title: 'Thông báo', icon: 'notice', service: 'response', path: '/notices' },
   ],
   coordinator: [
-    { id: 'queue', title: 'Hàng đợi SOS', icon: 'queue', service: 'response', path: '/requests' },
     {
-      id: 'verify',
-      title: 'Xác minh',
-      icon: 'verify',
-      service: 'response',
-      path: '/requests?status=SUBMITTED',
+      id: 'reports', title: 'Tổng quan', icon: 'report', service: 'response',
+      path: '/reports/summary', note: 'Số liệu bảy ngày gần đây từ dịch vụ Response.',
     },
-    {
-      id: 'triage',
-      title: 'Ưu tiên',
-      icon: 'priority',
-      service: 'response',
-      path: '/requests?status=VERIFIED',
-    },
-    {
-      id: 'assign',
-      title: 'Giao đội',
-      icon: 'assign',
-      service: 'response',
-      path: '/requests?status=VERIFIED',
-    },
+    { id: 'queue', title: 'Xử lý SOS', icon: 'queue', service: 'response', path: '/requests' },
     {
       id: 'map',
       title: 'Bản đồ',
@@ -128,14 +73,6 @@ export const pages: Record<Workspace, Page[]> = {
       icon: 'campaign',
       service: 'response',
       path: '/campaigns',
-    },
-    {
-      id: 'reports',
-      title: 'Tổng quan',
-      icon: 'report',
-      service: 'response',
-      path: '/reports/summary',
-      note: 'Số liệu bảy ngày gần đây từ dịch vụ Response.',
     },
   ],
   operations: [
@@ -253,7 +190,7 @@ export function allowedWorkspaces(user: Me | null): Workspace[] {
 export function allowedPages(workspace: Workspace, user: Me | null): Page[] {
   const r = roles(user);
   return pages[workspace].filter((page) => {
-    if (workspace === 'citizen') return page.id !== 'account' || !!user;
+    if (workspace === 'citizen') return true;
     if (workspace === 'volunteer') return r.has('VOLUNTEER');
     if (workspace === 'coordinator') return r.has('COORDINATOR');
     if (workspace === 'admin') return r.has('ADMIN');

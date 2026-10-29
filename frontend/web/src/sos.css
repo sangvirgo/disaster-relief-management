@@ -1,7 +1,9 @@
 /* SOS Form & Citizen Location Styling đồng bộ Mobile THEME */
 .sos-form {
   max-width: 900px;
+  margin-inline: auto;
 }
+.content--sos > .heading { max-width: 900px; margin-inline: auto; }
 
 .sos-form textarea,
 .sos-form select {

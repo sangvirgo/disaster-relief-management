@@ -169,7 +169,10 @@ export function Notices({ onOpenMission }: { onOpenMission?: (missionId: string)
   );
 }
 
-export function Volunteer({ page, initialMissionId }: { page: string; initialMissionId?: string }) {
+export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingMessage = '', onToggleSharing }: {
+  page: string; initialMissionId?: string; sharingTeamId?: string; sharingMessage?: string;
+  onToggleSharing?: (teamId: string) => void;
+}) {
   const isTeam = page === 'team';
   const [items, setItems] = useState<Mission[] | Team[]>([]);
   const [loading, setLoading] = useState(true);
@@ -239,7 +242,10 @@ export function Volunteer({ page, initialMissionId }: { page: string; initialMis
     )
       .then((value) => {
         if (live) {
-          setItems(value.items);
+          if (isTeam) setItems(value.items as Team[]);
+          else setItems([...(value.items as Mission[])].sort((a, b) =>
+            Date.parse(b.created_at) - Date.parse(a.created_at)
+          ));
           setNext(value.cursor || '');
         }
       })
@@ -532,9 +538,7 @@ export function Volunteer({ page, initialMissionId }: { page: string; initialMis
     <div className="grid-two">
       {/* Cột trái: Danh sách Nhiệm vụ hoặc Đội */}
       <section className="card">
-        <h2>
-          {isTeam ? 'Đội của tôi' : page === 'progress' ? 'Tiến độ nhiệm vụ' : 'Nhiệm vụ của tôi'}
-        </h2>
+        <h2>{isTeam ? 'Đội của tôi' : 'Nhiệm vụ và tiến độ'}</h2>
         {error && (
           <p role="alert" className="notice error">
             {error}
@@ -682,7 +686,16 @@ export function Volunteer({ page, initialMissionId }: { page: string; initialMis
 
                 <hr />
                 <h3>Cập nhật vị trí GPS của đội</h3>
-                <p>Vị trí mới nhất giúp điều phối viên tìm đội gần nơi cần hỗ trợ.</p>
+                <p>Vị trí mới nhất giúp điều phối viên tìm đội gần nơi cần hỗ trợ. Chỉ chia sẻ khi bạn bật và tab trình duyệt đang hoạt động.</p>
+                {onToggleSharing && <div className="team-sharing-control">
+                  <button type="button" className={`button ${sharingTeamId === selectedTeam.id ? 'secondary' : ''}`}
+                    onClick={() => onToggleSharing(selectedTeam.id)}>
+                    {sharingTeamId === selectedTeam.id ? 'Dừng chia sẻ vị trí' : 'Bắt đầu chia sẻ vị trí'}
+                  </button>
+                  <small>Tự động gửi GPS mỗi 2 phút. Bạn có thể dừng bất kỳ lúc nào.</small>
+                  {sharingTeamId === selectedTeam.id && sharingMessage && <p role="status" className="notice">{sharingMessage}</p>}
+                </div>}
+                <p>Hoặc chọn vị trí thủ công khi GPS không khả dụng:</p>
                 <div className="action-grid">
                   <button
                     type="button"
@@ -817,11 +830,14 @@ export function Volunteer({ page, initialMissionId }: { page: string; initialMis
                 {directionsUrl ? (
                   <div className="mission-location">
                     <h3>Vị trí hiện trường</h3>
-                    <p>
-                      Tọa độ:{' '}
-                      {(activeMission.location as { coordinates: [number, number] }).coordinates[1]}
-                      ,{' '}
-                      {(activeMission.location as { coordinates: [number, number] }).coordinates[0]}
+                    <div className="mission-route-summary">
+                      <div><small>Điểm xuất phát</small><strong>Chọn trên Google Maps</strong></div>
+                      <span aria-hidden="true">→</span>
+                      <div><small>Điểm đến</small><strong>Tọa độ hiện trường</strong></div>
+                    </div>
+                    <p className="mission-route-coordinates">
+                      Vĩ độ {(activeMission.location as { coordinates: [number, number] }).coordinates[1]}
+                      {' · '}Kinh độ {(activeMission.location as { coordinates: [number, number] }).coordinates[0]}
                     </p>
                     <a
                       className="button mission-directions"
@@ -829,8 +845,9 @@ export function Volunteer({ page, initialMissionId }: { page: string; initialMis
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Mở Google Maps chỉ đường
+                      Mở chỉ đường trên Google Maps ↗
                     </a>
+                    <p className="mission-route-note">Google Maps mở trong tab mới. Kiểm tra lối tiếp cận an toàn trước khi di chuyển.</p>
                   </div>
                 ) : (
                   <p className="notice">

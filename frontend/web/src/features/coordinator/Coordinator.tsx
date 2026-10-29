@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
+import { DetailSurface } from '../../components/DetailSurface';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { AnalyticsRegionField, useAnalyticsRegion } from '../../components/AnalyticsRegion';
 import { HeatmapPanel } from './HeatmapPanel';
-import { LocationPicker, type Point } from '../../maps/LocationPicker';
 
 type QueueItem = {
   id: string;
@@ -162,44 +162,6 @@ function NearbyAddress({ coordinates }: { coordinates?: [number, number] }) {
   return <>{address && !address.startsWith('Chưa tìm') && !address.startsWith('Đang tìm') ? `Địa chỉ gần đúng: ${address}` : address || 'Đang tìm địa chỉ gần vị trí SOS…'} <small>({key})</small></>;
 }
 
-function TeamPositionRefresh({ team, onUpdated }: {
-  team: Candidate['team']; onUpdated: () => void;
-}) {
-  const [point, setPoint] = useState<Point | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
-  async function save() {
-    if (!point) return;
-    setBusy(true);
-    setMessage('');
-    try {
-      await api('response', `/teams/${team.id}/position`, {
-        method: 'PUT',
-        body: {
-          location: { type: 'Point', coordinates: [point.longitude, point.latitude], source: 'COORDINATOR_REPORTED' },
-          captured_at: new Date().toISOString(),
-          note: 'Vị trí đội do điều phối viên xác nhận',
-        },
-      });
-      setMessage('Đã cập nhật vị trí đội. Đang tải lại danh sách phù hợp…');
-      onUpdated();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : 'Không thể cập nhật vị trí đội.');
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <div className="team-position-refresh">
-      <p><strong>{team.name}</strong> · Vị trí đã cũ hoặc chưa có. Xác nhận vị trí thực tế của đội để đưa vào danh sách xét giao nhiệm vụ.</p>
-      <LocationPicker value={point} onSelect={setPoint} />
-      <button type="button" className="button secondary" disabled={!point || busy} onClick={() => void save()}>
-        {busy ? 'Đang cập nhật…' : 'Cập nhật vị trí đội'}
-      </button>
-      {message && <p role="status">{message}</p>}
-    </div>
-  );
-}
 type DuplicateCandidate = {
   id: string;
   tracking_code?: string;
@@ -208,6 +170,17 @@ type DuplicateCandidate = {
   received_at: string;
   distance_m: number;
 };
+
+function SosCommandPopup({ spec, onSuccess, onStale }: { spec: CommandSpec; onSuccess: () => void; onStale: () => void }) {
+  const [open, setOpen] = useState(false);
+  if (!spec.fields?.length) return <CommandForm spec={spec} onSuccess={onSuccess} onStale={onStale} />;
+  return <div className="sos-action-entry">
+    <button type="button" className="button" onClick={() => setOpen(true)}>{spec.title}</button>
+    <DetailSurface modal open={open} label={spec.title} onClose={() => setOpen(false)}>
+      <CommandForm spec={spec} onSuccess={() => { setOpen(false); onSuccess(); }} onStale={onStale} />
+    </DetailSurface>
+  </div>;
+}
 
 function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onStale }: {
   missionId: string; teamId: string; revision: number; onSuccess: () => void; onStale: () => void;
@@ -275,7 +248,7 @@ const queueStatuses = [
   ['CANCELLED', 'Đã hủy'],
 ] as const;
 const title: Record<string, string> = {
-  queue: 'Danh sách yêu cầu',
+  queue: 'Xử lý tín hiệu SOS',
   verify: 'Xác minh yêu cầu',
   triage: 'Quyết định ưu tiên',
   assign: 'Chọn đội cứu hộ',
@@ -496,7 +469,7 @@ export function Coordinator({ page }: { page: string }) {
   }, []);
   function command(spec: CommandSpec) {
     return (
-      <CommandForm
+      <SosCommandPopup
         key={spec.path + detail?.version}
         spec={spec}
         onSuccess={done}
@@ -746,7 +719,7 @@ export function Coordinator({ page }: { page: string }) {
                 <a href="#request-full-detail">Xem toàn bộ hồ sơ và lịch sử ↓</a>
               </div>
             )}
-            {page === 'queue' && detail.subject.location && (
+            {page === 'queue' && detail.status !== 'VERIFIED' && detail.subject.location && (
               <div className="queue-context-map">
                 <h3>Vị trí SOS đang chọn</h3>
                 <HeatmapPanel
@@ -763,7 +736,7 @@ export function Coordinator({ page }: { page: string }) {
                 />
               </div>
             )}
-            {page === 'triage' && (
+            {(page === 'triage' || (page === 'queue' && detail.status === 'VERIFIED')) && (
               <div className="triage-context">
                 <div className="triage-context-summary">
                   <h3>Thông tin để quyết định ưu tiên</h3>
@@ -1479,13 +1452,9 @@ export function Coordinator({ page }: { page: string }) {
                       })}
                     </div>
                   ))}
-                  {candidates?.unknown_position.map((candidate) => candidate.team.reporting_mode === 'COORDINATOR' ? (
-                    <TeamPositionRefresh key={candidate.team.id} team={candidate.team} onUpdated={done} />
-                  ) : (
-                    <p className="notice warning" key={candidate.team.id}>
-                      {candidate.team.name}: vị trí đã cũ hoặc chưa có. Nhờ đội trưởng cập nhật trên tài khoản đội.
-                    </p>
-                  ))}
+                  {candidates?.unknown_position.map((candidate) => (
+<p className="notice warning" key={candidate.team.id}>{candidate.team.name}: vị trí đã cũ hoặc chưa có. Đội trưởng cần cập nhật vị trí trước khi được xét giao nhiệm vụ.</p>
+))}
                 </section>
               )}
               {['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(detail.status) && (

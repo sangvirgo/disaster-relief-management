@@ -51,13 +51,16 @@ function secret32(): string {
     .replaceAll('=', '');
 }
 
-export function Donations({
-  page,
-  user,
-}: {
-  page: 'drives' | 'declare' | 'donation';
-  user: Me | null;
-}) {
+export function Donations({ user }: { user: Me | null }) {
+  const [view, setView] = useState<'drives' | 'donation'>('drives');
+  const [showDeclaration, setShowDeclaration] = useState(false);
+  const [closingDeclaration, setClosingDeclaration] = useState(false);
+  function closeDeclaration() {
+    setClosingDeclaration(true);
+    window.setTimeout(() => { setShowDeclaration(false); setClosingDeclaration(false); }, 180);
+  }
+  const [dialogOffset, setDialogOffset] = useState({ x: 0, y: 0 });
+  const dragStart = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const [drives, setDrives] = useState<Drive[]>([]);
   const [selected, setSelected] = useState<Drive | null>(null);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
@@ -70,6 +73,8 @@ export function Donations({
   const [trackId, setTrackId] = useState('');
   const [trackSecret, setTrackSecret] = useState('');
   const [tracking, setTracking] = useState<Tracking | null>(null);
+  const selectedCardRef = useRef<HTMLDivElement | null>(null);
+  const trackingCardRef = useRef<HTMLElement | null>(null);
   const [verifiedSecret, setVerifiedSecret] = useState('');
   const lookupVersion = useRef(0);
   const [disputeReason, setDisputeReason] = useState('');
@@ -86,10 +91,22 @@ export function Donations({
   const pending = useRef<Pending | null>(null);
   const guestCredentials = user ? ('include' as const) : ('omit' as const);
   const [showCreatedTracking, setShowCreatedTracking] = useState(false);
+  const nav = <div className="donation-nav" role="group" aria-label="Mục đóng góp">
+    <button type="button" className={`button ${view === 'drives' ? '' : 'secondary'}`} onClick={() => { setView('drives'); setShowCreatedTracking(false); setError(''); }}>Đợt quyên góp</button>
+    <button type="button" className={`button ${view === 'donation' ? '' : 'secondary'}`} onClick={() => { setView('donation'); setError(''); }}>Theo dõi đóng góp</button>
+  </div>;
   useEffect(() => {
-    setShowCreatedTracking(false);
-    setError('');
-  }, [page]);
+    if (!showDeclaration) return;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') closeDeclaration(); };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [showDeclaration]);
+  useEffect(() => {
+    if (selected && !showDeclaration) selectedCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [selected, showDeclaration]);
+  useEffect(() => {
+    if (tracking) trackingCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [tracking]);
   async function attachCreated(event: FormEvent) {
     event.preventDefault();
     if (!created || !createdFile) return;
@@ -117,7 +134,6 @@ export function Donations({
     }
   }
   useEffect(() => {
-    if (page === 'donation') return;
     let live = true;
     setLoading(true);
     setError('');
@@ -134,12 +150,20 @@ export function Donations({
     return () => {
       live = false;
     };
-  }, [page]);
-  async function choose(id: string) {
+  }, []);
+  async function choose(id: string, openDeclaration = false) {
+    if (selected?.id === id) {
+      if (openDeclaration) { setShowDeclaration(true); setDialogOffset({ x: 0, y: 0 }); }
+      return;
+    }
     setError('');
+    setSelected(null);
+    setShowDeclaration(false);
     setLoading(true);
     try {
       setSelected(await api('logistics', `/public/donation-drives/${encodeURIComponent(id)}`));
+      setShowDeclaration(openDeclaration);
+      setDialogOffset({ x: 0, y: 0 });
       pending.current = null;
       setQuantities({});
     } catch (cause) {
@@ -209,11 +233,10 @@ export function Donations({
       setLoading(false);
     }
   }
-  async function track(event: FormEvent) {
-    event.preventDefault();
+  async function lookupDonation(idValue: string, secretValue: string) {
     const version = ++lookupVersion.current;
-    const id = trackId.trim();
-    const secret = trackSecret.trim();
+    const id = idValue.trim();
+    const secret = secretValue.trim();
     setLoading(true);
     setError('');
     setTracking(null);
@@ -233,6 +256,10 @@ export function Donations({
     } finally {
       if (version === lookupVersion.current) setLoading(false);
     }
+  }
+  function track(event: FormEvent) {
+    event.preventDefault();
+    void lookupDonation(trackId, trackSecret);
   }
   function invalidateTracking() {
     lookupVersion.current += 1;
@@ -357,8 +384,9 @@ export function Donations({
       setLoading(false);
     }
   }
-  if (page === 'donation' || showCreatedTracking)
+  if (view === 'donation' || showCreatedTracking)
     return (
+      <>{nav}
       <div className="grid-two donation-layout">
         <section className="card">
           <h2>Tra cứu đóng góp</h2>
@@ -400,6 +428,8 @@ export function Donations({
             </p>
           )}
           {user && (
+            <details className="donation-recovery">
+              <summary>Khôi phục bản khai</summary>
             <form className="form-stack command-form" onSubmit={recover}>
               <h3>Khôi phục bản khai</h3>
               <p>Nhập mã một lần do nhân viên tiếp nhận cấp sau khi xác minh liên hệ.</p>
@@ -436,10 +466,11 @@ export function Donations({
                 </p>
               )}
             </form>
+            </details>
           )}
         </section>
         {tracking && (
-          <section className="card">
+          <section className="card" ref={trackingCardRef}>
             <h2>Đóng góp {tracking.public_code}</h2>
             <span className="chip">{label(tracking.status)}</span>
             <h3>Đã khai báo</h3>
@@ -524,9 +555,11 @@ export function Donations({
           </section>
         )}
       </div>
+      </>
     );
   if (created)
     return (
+      <>{nav}
       <section className="card confirmation" role="status">
         <h2>Đã nhận bản khai vật phẩm</h2>
         <p>
@@ -575,20 +608,35 @@ export function Donations({
           <button
             className="button"
             onClick={() => {
+              setView('donation');
               setTrackId(created.id);
               setTrackSecret(createdSecret);
               setCreated(null);
               setCreatedSecret('');
               setShowCreatedTracking(true);
+              void lookupDonation(created.id, createdSecret);
             }}
           >
             Chuyển đến màn hình tra cứu đóng góp này
           </button>
         </div>
       </section>
+      </>
     );
+  const driveActions = (drive: Drive) => (
+    <div className="donation-drive-actions">
+      <button type="button" className="button secondary" aria-expanded={selected?.id === drive.id}
+        onClick={() => selected?.id === drive.id ? setSelected(null) : choose(drive.id)}>
+        {selected?.id === drive.id ? 'Ẩn vật phẩm' : 'Xem vật phẩm'}
+      </button>
+      <button type="button" className="button" onClick={() => choose(drive.id, true)}>
+        Khai báo vật phẩm
+      </button>
+    </div>
+  );
   return (
-    <div className="grid-two donation-layout">
+    <>{nav}
+    <div className="donation-layout">
       <section className="card">
         <h2>Đợt quyên góp đang mở</h2>
         {loading && <p role="status">Đang tải…</p>}
@@ -602,28 +650,48 @@ export function Donations({
         )}
         <div className="record-list">
           {drives.map((drive) => (
-            <article className="record" key={drive.id}>
-              <div>
-                <strong>{drive.title}</strong>
-                <p>{drive.description}</p>
-                <small>{drive.intake_location?.warehouse_name}</small>
+            <article className="record donation-drive-card" key={drive.id}>
+              <div className="donation-drive-header">
+                <div>
+                  <strong>{drive.title}</strong>
+                  <p>{drive.description}</p>
+                  <small>Điểm tiếp nhận: {drive.intake_location?.warehouse_name}</small>
+                </div>
+                {selected?.id !== drive.id && driveActions(drive)}
               </div>
-              <button type="button" className="button secondary" onClick={() => choose(drive.id)}>
-                Xem vật phẩm
-              </button>
+              {selected?.id === drive.id && (
+                <div className="donation-drive-detail" ref={selectedCardRef}>
+                  <p>{selected.intake_location?.address_note}</p>
+                  <p className="table-swipe-hint">Vuốt ngang bảng để xem đầy đủ các cột.</p>
+                  <div className="stock-table-scroll">
+                    <table className="stock-table donation-item-table">
+                      <thead><tr><th scope="col">Vật phẩm</th><th scope="col" className="numeric">Mục tiêu</th><th scope="col" className="numeric">Đã tiếp nhận</th><th scope="col" className="numeric">Còn cần</th></tr></thead>
+                      <tbody>
+                        {selected.items.map((item) => {
+                          const remaining = Math.max(0, Number(item.target_quantity) - Number(item.accepted_total));
+                          return <tr key={item.item_id}>
+                            <th scope="row"><strong>{item.item_name}</strong>{item.acceptance_note && <small>{item.acceptance_note}</small>}</th>
+                            <td className="numeric" data-label="Mục tiêu">{formatQuantity(item.target_quantity)} {item.unit_name}</td>
+                            <td className="numeric" data-label="Đã tiếp nhận"><span className="available-value">{formatQuantity(item.accepted_total)} {item.unit_name}</span></td>
+                            <td className="numeric" data-label="Còn cần">{formatQuantity(remaining.toFixed(item.scale))} {item.unit_name}</td>
+                          </tr>;
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="muted">Số đã tiếp nhận chỉ tính vật phẩm đã kiểm đếm, duyệt và ghi sổ.</p>
+                  {driveActions(drive)}
+                </div>
+              )}
             </article>
           ))}
         </div>
       </section>
-      {selected && (
-        <section className="card">
-          <h2>{selected.title}</h2>
-          <p>{selected.description}</p>
-          <p>
-            Điểm tiếp nhận: {selected.intake_location?.warehouse_name} ·{' '}
-            {selected.intake_location?.address_note}
-          </p>
-          {page === 'declare' && (
+      {selected && showDeclaration && <div className={`donation-modal-backdrop ${closingDeclaration ? 'is-closing' : ''}`} onMouseDown={(event) => { if (event.target === event.currentTarget) closeDeclaration(); }}>
+            <section className="donation-modal" role="dialog" aria-modal="true" aria-label="Khai báo vật phẩm" style={{ transform: `translate(${dialogOffset.x}px, ${dialogOffset.y}px)` }}>
+              <div className="donation-modal-header" onPointerDown={(event) => { if ((event.target as HTMLElement).closest('button')) return; dragStart.current = { x: event.clientX, y: event.clientY, left: dialogOffset.x, top: dialogOffset.y }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={(event) => { if (!dragStart.current) return; setDialogOffset({ x: Math.max(-Math.min(220, innerWidth / 3), Math.min(Math.min(220, innerWidth / 3), dragStart.current.left + event.clientX - dragStart.current.x)), y: Math.max(-120, Math.min(120, dragStart.current.top + event.clientY - dragStart.current.y)) }); }} onPointerUp={() => { dragStart.current = null; }}>
+                <h2>Khai báo vật phẩm</h2><button type="button" className="modal-close-button" aria-label="Đóng cửa sổ khai báo" onClick={closeDeclaration}>×</button>
+              </div>
             <form className="form-stack" onSubmit={declare} noValidate>
               <div className="form-grid">
                 <label>
@@ -681,19 +749,10 @@ export function Donations({
                 Gửi bản khai vật phẩm
               </button>
             </form>
-          )}
-          {page === 'drives' && (
-            <div>
-              {selected.items.map((item) => (
-                <p key={item.item_id}>
-                  {item.item_name} · đã chấp nhận {formatQuantity(item.accepted_total)}{' '}
-                  {item.unit_name} / mục tiêu {formatQuantity(item.target_quantity)}
-                </p>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
+            {error && <p className="notice error" role="alert">{error}</p>}
+            </section>
+          </div>}
     </div>
+    </>
   );
 }
