@@ -2,7 +2,7 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable } from '@nestjs/common';
 import { createReadStream } from 'node:fs';
-import { EvidenceMime } from '../../../../packages/technical/src/media/evidence-media';
+import { EvidenceMime } from '@c48/technical/media/evidence-media';
 
 export const RESPONSE_EVIDENCE_STORAGE = Symbol('RESPONSE_EVIDENCE_STORAGE');
 

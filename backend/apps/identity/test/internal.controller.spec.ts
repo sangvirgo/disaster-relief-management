@@ -2,7 +2,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { validate } from 'class-validator';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import type { Response } from 'express';
-import { AppError } from '../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import { AdminRequest, IdentityServiceGuard } from '../src/admin/admin-security';
 import { RegionLookupDto } from '../src/internal/internal.dto';
 import { InternalController } from '../src/internal/internal.controller';

@@ -1,7 +1,7 @@
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import type { Request } from 'express';
-import { AppError } from '../../../../../packages/technical/src/errors/errors';
-import { CircuitBreakerClient } from '../../../../../packages/technical/src/http/service-client';
+import { AppError } from '@c48/technical/errors/errors';
+import { CircuitBreakerClient } from '@c48/technical/http/service-client';
 import { ReporterSessionService } from '../../requests/reporter-session';
 
 export const LOGISTICS_CYCLE_CONFIG = Symbol('LOGISTICS_CYCLE_CONFIG');

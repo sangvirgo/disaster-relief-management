@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import type { IdempotentCommand } from '../../../packages/technical/src/idempotency/idempotency';
+import type { IdempotentCommand } from '@c48/technical/idempotency/idempotency';
 import { RequestFailureReviewService } from '../src/resolution/request-failure-review.service';
 
 const requestId = '40000000-0000-4000-8000-000000000001';

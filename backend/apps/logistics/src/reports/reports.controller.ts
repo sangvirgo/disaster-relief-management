@@ -7,10 +7,7 @@ import {
 } from './reports.dto';
 import { ReconciliationReportService } from './reconciliation-report.service';
 import { StockReportService } from './stock-report.service';
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
-}
+import { noStore } from '@c48/technical/http/response-headers';
 
 @Controller()
 export class ReportsController {

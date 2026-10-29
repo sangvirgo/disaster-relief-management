@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
-import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, loadErrorCatalog, PinoNestLogger, validateEnvironment } from '../../../packages/technical/src';
-import { setupOpenApiDocs } from '../../../packages/technical/src/openapi-docs';
+import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, loadErrorCatalog, PinoNestLogger, validateEnvironment } from '@c48/technical';
+import { setupOpenApiDocs } from '@c48/technical/openapi-docs';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {

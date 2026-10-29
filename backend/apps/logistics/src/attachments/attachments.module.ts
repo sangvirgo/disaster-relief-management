@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { IdempotencyService } from '../../../../packages/technical/src/idempotency/idempotency';
+import { IdempotencyService } from '@c48/technical/idempotency/idempotency';
 import {
   createAttachmentStorage, loadAttachmentStorageConfig, LOGISTICS_ATTACHMENT_STORAGE,
 } from './attachment-storage';

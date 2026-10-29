@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Request } from 'express';
-import type { IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
+import type { IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import type { ReporterSession } from '../requests/reporter-session';
 import type {
   AuthorityReferralDto, ContactAttemptDto, ConcurRequestDto, CorrectRegionDto, DuplicateRequestDto,

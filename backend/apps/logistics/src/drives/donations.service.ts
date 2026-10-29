@@ -3,9 +3,9 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { randomBytes } from 'node:crypto';
 import type { Request } from 'express';
 import { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '../../../../packages/technical/src/idempotency/idempotency';
-import { hashPurposeBoundSecret } from '../../../../packages/technical/src/security/secret-hash';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '@c48/technical/idempotency/idempotency';
+import { hashPurposeBoundSecret } from '@c48/technical/security/secret-hash';
 import { validateQuantity } from '../common/quantity';
 import { LogisticsSessionService, AuthenticatedLogisticsSession } from '../auth/logistics-session.service';
 import {
@@ -15,6 +15,7 @@ import {
 import { DonationPhoneThrottle } from './donation-phone-throttle.service';
 import { assertDriveWindow, assertExpectedVersion, cleanDriveText, generatePublicCode, requireDrivePermission } from './drives.helpers';
 import { DONATION_SECRET_CONFIG, DonationSecretConfig, donationCapabilityHash, verifyDonationCapability } from './donations.helpers';
+import { requireIdempotencyKey as key } from '@c48/technical/http/response-headers';
 
 export type DonationCommandRequest = Request & { idempotencyKey?: string };
 
@@ -33,11 +34,6 @@ interface DeliveryRow {
   opens_at?: Date | string | null;
   closes_at?: Date | string | null;
   campaign_status?: string | null;
-}
-
-function key(request: DonationCommandRequest): string {
-  if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
-  return request.idempotencyKey;
 }
 
 function validRecoveryCode(code: string | undefined): code is string {

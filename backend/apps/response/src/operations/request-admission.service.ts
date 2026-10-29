@@ -1,11 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
 import { ReporterSessionService } from '../requests/reporter-session';
 import { hasPendingSupplement } from './request-operations.verification.helpers';
+import { assertRequestPermission } from '../requests/request-scope';
 
 interface AdmissionRequestRow {
   id: string;
@@ -31,11 +31,7 @@ export class RequestAdmissionService {
     const session = await this.sessions.require(request);
     return this.dataSource.transaction(async (manager) => {
       const row = await this.findRequest(manager, requestId);
-      if (!hasPermission(session.grants, 'NEED_MANAGE', {
-        organizationId: row.organization_id,
-        regionCode: row.region_code,
-        campaignId: row.campaign_id,
-      })) throw new AppError('FORBIDDEN', { status: 403 });
+      assertRequestPermission(session, 'NEED_MANAGE', row);
       if (Number(row.work_cycle) !== workCycle) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
       if (!['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(row.status)) {
         throw new AppError('REQUEST_NOT_VERIFIED', { status: 409 });

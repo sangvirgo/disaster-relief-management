@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { hasPermission, Permission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import { Permission } from '@c48/identity-contracts/permissions';
 import type { ReporterSession } from '../requests/reporter-session';
 import type { OperationRequestRow } from './request-operations.types';
+import { assertRequestPermission } from '../requests/request-scope';
 
 @Injectable()
 export class RequestOperationsPersistenceService {
@@ -20,9 +21,7 @@ export class RequestOperationsPersistenceService {
     ) as OperationRequestRow[];
     const row = rows[0];
     if (!row) throw new AppError('NOT_FOUND', { status: 404 });
-    if (!hasPermission(session.grants, permission, { organizationId: row.organization_id, regionCode: row.region_code, campaignId: row.campaign_id })) {
-      throw new AppError('FORBIDDEN', { status: 403 });
-    }
+    assertRequestPermission(session, permission, row);
     return row;
   }
 

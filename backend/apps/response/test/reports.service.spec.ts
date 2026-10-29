@@ -1,7 +1,7 @@
 import type { Request } from 'express';
 import { jest } from '@jest/globals';
 import type { DataSource } from 'typeorm';
-import type { Grant } from '../../../packages/identity-contracts/src/permissions';
+import type { Grant } from '@c48/identity-contracts/permissions';
 import { ReportsService } from '../src/reports/reports.service';
 import { MissionsConfig } from '../src/missions/missions.config';
 

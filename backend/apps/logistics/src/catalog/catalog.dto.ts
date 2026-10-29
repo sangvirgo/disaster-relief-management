@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 
 const itemTypeCode = /^[A-Z0-9_]{2,40}$/u;
 const unitCode = /^[A-Z0-9_]{1,20}$/u;

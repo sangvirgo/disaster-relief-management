@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough, Readable } from 'node:stream';
 import type { Request } from 'express';
-import { AppError } from '../../../packages/technical/src/errors/errors';
-import { stageEvidenceMultipart, type StagedEvidenceFile } from '../../../packages/technical/src/uploads/evidence-upload';
+import { AppError } from '@c48/technical/errors/errors';
+import { stageEvidenceMultipart, type StagedEvidenceFile } from '@c48/technical/uploads/evidence-upload';
 
 function multipart(file: Buffer, filename = 'photo.png', declaredType = 'application/octet-stream') {
   const boundary = '----c48-evidence-test';

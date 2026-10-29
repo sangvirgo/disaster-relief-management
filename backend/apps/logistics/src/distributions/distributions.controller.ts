@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query, Req, Res, UseInterceptors } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
-import type { IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
+import type { IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { HandoffAttachmentsService } from './handoff-attachments.service';
 import {
   CreateDistributionDto, CreateHandoffDto, DistributionListQueryDto, ExpectedDistributionVersionDto,
@@ -10,16 +10,9 @@ import {
 import { DistributionCommandsService } from './distribution-commands.service';
 import { DistributionQueriesService } from './distribution-queries.service';
 import { HandoffCommandsService } from './handoff-commands.service';
+import { noStore, markIdempotentReplay as replay } from '@c48/technical/http/response-headers';
 
 type DistributionCommandRequest = Request & { idempotencyKey?: string };
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
-}
-
-function replay(response: Response, isReplay: boolean): void {
-  if (isReplay) response.setHeader('Idempotent-Replay', 'true');
-}
 
 @Controller('distributions')
 export class DistributionsController {

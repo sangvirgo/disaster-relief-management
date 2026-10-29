@@ -3,7 +3,7 @@ import { jest } from '@jest/globals';
 import type { DataSource, EntityManager } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import type { IdempotencyService } from '../../../packages/technical/src/idempotency/idempotency';
+import type { IdempotencyService } from '@c48/technical/idempotency/idempotency';
 import type { ReporterSession, ReporterSessionService } from '../src/requests/reporter-session';
 import { RequestCampaignAssociationService } from '../src/operations/request-campaign-association.service';
 import { RequestOperationsCommandRunner } from '../src/operations/request-operations.command-runner.service';

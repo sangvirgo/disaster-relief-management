@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
-import { postgresOptions } from '../../../../packages/technical/src/persistence/postgres-options';
+import { AppError } from '@c48/technical/errors/errors';
+import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
+import { postgresOptions } from '@c48/technical/persistence/postgres-options';
 import { IDENTITY_SERVICE_TOKEN_CONFIG, issueServiceToken, ServiceName, ServiceTokenConfig } from '../auth/service-tokens';
 
 interface IntrospectionRow {

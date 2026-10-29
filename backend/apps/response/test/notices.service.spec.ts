@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
-import { decodeKeysetCursor, encodeKeysetCursor } from '../../../packages/technical/src/pagination/keyset';
-import { AppError } from '../../../packages/technical/src/errors/errors';
+import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
+import { AppError } from '@c48/technical/errors/errors';
 import { NoticesService } from '../src/notices/notices.service';
 
 const noticeId = '00000000-0000-4000-8000-000000000001';

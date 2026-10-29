@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import { ResponseCycleIntentClient } from '../integrations/response/response-cycle-intent.client';
 import type { ResolutionOutcomeBasis, ResponseCycleIntent } from '../integrations/response/response-cycle-intent.client';
 import { CycleIntentDto, SealCycleDto } from './fulfillment-cycles.dto';

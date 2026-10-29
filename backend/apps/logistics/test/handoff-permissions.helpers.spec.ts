@@ -1,4 +1,4 @@
-import type { Grant } from '../../../packages/identity-contracts/src/permissions';
+import type { Grant } from '@c48/identity-contracts/permissions';
 import { requireHandoffPermission } from '../src/distributions/handoff-permissions.helpers';
 
 const distribution = { organization_id: 'organization-1', warehouse_region_code: 'REGION_1' };

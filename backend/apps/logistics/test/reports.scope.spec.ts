@@ -1,5 +1,5 @@
-import { AppError } from '../../../packages/technical/src/errors/errors';
-import type { Grant, Permission } from '../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import type { Grant, Permission } from '@c48/identity-contracts/permissions';
 import { reportScopeSql } from '../src/reports/reports.scope';
 
 const reportPermissions: Permission[] = ['REPORT_READ'];

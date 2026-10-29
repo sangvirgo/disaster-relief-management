@@ -2,25 +2,12 @@ import {
   Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, Res, UseInterceptors,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { AddTeamMemberDto, CreateTeamDto, SetTeamPositionDto, TeamMemberCandidatesQueryDto, TeamMembersPageQueryDto, TeamPageQueryDto, TransferTeamLeaderDto, UpdateTeamDto } from './teams.dto';
 import { TeamsService } from './teams.service';
+import { noStore, requireIdempotencyKey as key, markIdempotentReplay as replayHeader } from '@c48/technical/http/response-headers';
 
 type TeamRequest = Request & { idempotencyKey?: string };
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
-}
-
-function key(request: TeamRequest): string {
-  if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
-  return request.idempotencyKey;
-}
-
-function replayHeader(response: Response, replay: boolean): void {
-  if (replay) response.setHeader('Idempotent-Replay', 'true');
-}
 
 @Controller()
 export class TeamsController {

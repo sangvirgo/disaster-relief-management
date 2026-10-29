@@ -4,7 +4,7 @@ COPY backend/package.json backend/package-lock.json ./backend/
 COPY backend/apps ./backend/apps
 COPY backend/packages ./backend/packages
 COPY backend/scripts ./backend/scripts
-COPY backend/nest-cli.json backend/tsconfig.json backend/tsconfig.test.json backend/jest.config.cjs ./backend/
+COPY backend/nest-cli.json backend/tsconfig.json backend/tsconfig.test.json backend/jest.config.cjs backend/eslint.config.mjs ./backend/
 COPY docs/backend/schema ./backend/schema
 COPY docs/backend/07-error-catalog.md ./backend/docs/backend/07-error-catalog.md
 COPY docs/backend/seed ./backend/seed

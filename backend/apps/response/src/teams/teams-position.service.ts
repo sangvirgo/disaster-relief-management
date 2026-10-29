@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import { hasPermission } from '@c48/identity-contracts/permissions';
 import { ReporterSessionService } from '../requests/reporter-session';
 import { SetTeamPositionDto } from './teams.dto';
 
@@ -78,7 +78,16 @@ export class TeamsPositionService {
       ) as TeamPositionRow[];
       const current = currentRows[0];
       // shortcut: captured_at is the only stored position time; use a server receive timestamp if device clock skew must not affect suppression.
-      if (current && (current.within_window || Number(current.distance_m) < 25)) return;
+      if (current?.within_window) return;
+      // A team that has not moved keeps its stored location, accuracy, source and owner but still refreshes captured_at,
+      // because team candidates treat a fix older than 30 minutes as an unknown position. It writes no audit row.
+      const stationary = current !== undefined && Number(current.distance_m) < 25;
+      if (current && stationary) {
+        if (new Date(dto.captured_at).getTime() > new Date(current.captured_at).getTime()) {
+          await manager.query('UPDATE team_position SET captured_at=$2 WHERE team_id=$1', [teamId, dto.captured_at]);
+        }
+        return;
+      }
 
       const values = [teamId, longitude, latitude, dto.accuracy_m ?? null, dto.captured_at, dto.location.source, session.userId];
       if (current) {

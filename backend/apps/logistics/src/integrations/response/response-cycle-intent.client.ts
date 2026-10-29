@@ -1,6 +1,6 @@
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
-import { AppError } from '../../../../../packages/technical/src/errors/errors';
-import { CircuitBreakerClient } from '../../../../../packages/technical/src/http/service-client';
+import { AppError } from '@c48/technical/errors/errors';
+import { CircuitBreakerClient } from '@c48/technical/http/service-client';
 import { LogisticsIdentityService } from '../../auth/logistics-identity.service';
 
 export const RESPONSE_CYCLE_INTENT_CLIENT = Symbol('RESPONSE_CYCLE_INTENT_CLIENT');

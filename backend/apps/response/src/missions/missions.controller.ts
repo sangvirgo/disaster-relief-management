@@ -2,8 +2,7 @@ import {
   Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, Res, UseInterceptors,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { FailureReviewDto } from '../resolution/request-resolution.dto';
 import { RequestFailureReviewService } from '../resolution/request-failure-review.service';
 import {
@@ -12,21 +11,9 @@ import {
 } from './missions.dto';
 import { MissionsCommandsService } from './missions-commands.service';
 import { MissionsQueriesService } from './missions-queries.service';
+import { noStore, requireIdempotencyKey as key, markIdempotentReplay as replay } from '@c48/technical/http/response-headers';
 
 type MissionRequest = Request & { idempotencyKey?: string };
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
-}
-
-function key(request: MissionRequest): string {
-  if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
-  return request.idempotencyKey;
-}
-
-function replay(response: Response, value: boolean): void {
-  if (value) response.setHeader('Idempotent-Replay', 'true');
-}
 
 @Controller()
 export class MissionsController {

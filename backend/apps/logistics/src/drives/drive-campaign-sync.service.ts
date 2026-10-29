@@ -1,8 +1,8 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { jitteredInterval } from '../../../../packages/technical/src/persistence/postgres-errors';
+import { AppError } from '@c48/technical/errors/errors';
+import { jitteredInterval } from '@c48/technical/persistence/postgres-errors';
 import { LogisticsResponseCampaignClient } from '../integrations/response/response-campaign.client';
 
 const intervalMs = 5 * 60_000;

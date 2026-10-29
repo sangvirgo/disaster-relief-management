@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { hashPurposeBoundSecret, verifyPurposeBoundSecret } from '../../../../packages/technical/src/security/secret-hash';
-import type { PepperSet } from '../../../../packages/technical/src/security/secret-hash';
+import { AppError } from '@c48/technical/errors/errors';
+import { hashPurposeBoundSecret, verifyPurposeBoundSecret } from '@c48/technical/security/secret-hash';
+import type { PepperSet } from '@c48/technical/security/secret-hash';
 
 export const DONATION_SECRET_CONFIG = Symbol('DONATION_SECRET_CONFIG');
 const DONATION_SECRET_PURPOSE = 'donation-delivery';

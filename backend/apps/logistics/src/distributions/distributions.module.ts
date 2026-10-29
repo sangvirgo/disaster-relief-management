@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { IdempotencyService } from '../../../../packages/technical/src/idempotency/idempotency';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { IdempotencyService } from '@c48/technical/idempotency/idempotency';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { LogisticsAuthModule } from '../auth/logistics-auth.module';
 import { AttachmentsModule } from '../attachments/attachments.module';
 import { ResponseCampaignModule } from '../integrations/response/response-campaign.module';

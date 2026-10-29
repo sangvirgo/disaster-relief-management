@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import { scopeSql } from '../operations/request-operations.helpers';
 import { ReporterSessionService } from '../requests/reporter-session';
 import { analyticsCacheKey, AnalyticsCache, dateWindowFilters } from '../analytics/analytics.helpers';

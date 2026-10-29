@@ -325,7 +325,10 @@ try {
             accuracy_m,source,captured_at,set_by_user_id
        FROM team_position WHERE team_id=$1`, [appTeam.value.id],
   );
-  assert.deepEqual(afterDistanceSuppression.rows[0], beforeDistanceSuppression.rows[0], 'a move under 25 m must not write');
+  const { captured_at: capturedBeforeStay, ...stayBefore } = beforeDistanceSuppression.rows[0];
+  const { captured_at: capturedAfterStay, ...stayAfter } = afterDistanceSuppression.rows[0];
+  assert.deepEqual(stayAfter, stayBefore, 'a move under 25 m must not change the stored location, accuracy, source or owner');
+  assert.ok(capturedAfterStay > capturedBeforeStay, 'a move under 25 m must refresh captured_at so the fix does not go stale');
   const auditAfterDistanceSuppression = await responseDb.query(
     `SELECT count(*)::int AS count FROM audit_log
       WHERE entity_type='rescue_team' AND entity_id=$1 AND action='TEAM_POSITION_SET'`, [appTeam.value.id],

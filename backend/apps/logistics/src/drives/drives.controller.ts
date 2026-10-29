@@ -2,18 +2,11 @@ import {
   Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UseInterceptors,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { CreateDriveDto, DrivePageQueryDto, DriveReasonActionDto, DriveVersionActionDto, PatchDriveDto } from './drives.dto';
 import { DriveCommandRequest, DrivesService } from './drives.service';
 import { DriveQueriesService } from './drives-queries.service';
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
-}
-
-function replay(response: Response, isReplay: boolean): void {
-  if (isReplay) response.setHeader('Idempotent-Replay', 'true');
-}
+import { noStore, markIdempotentReplay as replay } from '@c48/technical/http/response-headers';
 
 @Controller()
 export class DrivesController {

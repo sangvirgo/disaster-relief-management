@@ -1,7 +1,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Inject, Post, Req, Res, UseInterceptors } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
+import { AppError } from '@c48/technical/errors/errors';
 import { CreateProxyRequestDto, CreateSelfRequestDto } from './request-intake.dto';
 import { REQUEST_INTAKE_CONFIG, RequestIntakeConfig, RequestIntakeService } from './request-intake.service';
 import { ReporterSessionService } from './reporter-session';

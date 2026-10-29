@@ -2,12 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '@c48/technical/idempotency/idempotency';
+import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { AuthenticatedLogisticsSession, LogisticsSessionService } from '../auth/logistics-session.service';
 import { hasCatalogManageGrant } from './catalog.helpers';
 import { CatalogPageQueryDto, CreateItemDto, CreateItemTypeDto, CreateUnitDto, DeactivateItemDto, ItemPageQueryDto } from './catalog.dto';
+import { requireIdempotencyKey as key } from '@c48/technical/http/response-headers';
 
 type Queryable = Pick<DataSource | EntityManager, 'query'>;
 type LogisticsRequest = Request & { idempotencyKey?: string };
@@ -31,11 +32,6 @@ interface ItemRow {
   status: 'ACTIVE' | 'INACTIVE';
   version: number;
   created_at: Date | string;
-}
-
-function key(request: LogisticsRequest): string {
-  if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
-  return request.idempotencyKey;
 }
 
 function requireCatalogManage(session: AuthenticatedLogisticsSession): void {

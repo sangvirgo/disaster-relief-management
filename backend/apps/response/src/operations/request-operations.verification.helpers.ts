@@ -1,5 +1,5 @@
 import type { EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import type { RequestCoordinatorGrant, ReporterSession } from '../requests/reporter-session';
 import type { SupplementReviewDto, VerifyRequestDto } from './request-operations.dto';
 import { asObject, grantCovers, scopeSql, toIso } from './request-operations.helpers';

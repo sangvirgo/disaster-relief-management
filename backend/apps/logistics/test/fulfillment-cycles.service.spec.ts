@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import type { ResponseCycleIntent, ResponseCycleIntentClient } from '../src/integrations/response/response-cycle-intent.client';
 import { FulfillmentCyclesService } from '../src/fulfillment-cycles/fulfillment-cycles.service';
 

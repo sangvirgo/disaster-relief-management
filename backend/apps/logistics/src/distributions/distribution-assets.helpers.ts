@@ -1,5 +1,5 @@
 import type { EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import type { DistributionContext } from './distributions.read';
 
 type DistributionAssetReferences = Pick<DistributionContext, 'warehouse_id' | 'relief_point_id' | 'vehicle_id'> & {

@@ -1,4 +1,4 @@
-import { AppError } from '../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import { jest } from '@jest/globals';
 import { DriveCampaignSyncService } from '../src/drives/drive-campaign-sync.service';
 

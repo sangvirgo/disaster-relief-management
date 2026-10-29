@@ -2,10 +2,7 @@ import { Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Quer
 import type { Request, Response } from 'express';
 import { NoticePageQueryDto } from './notices.dto';
 import { NoticesService } from './notices.service';
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
-}
+import { noStore } from '@c48/technical/http/response-headers';
 
 @Controller()
 export class NoticesController {

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req, Res, UseGuards, UseInterceptors } from '@nestjs/common';
 import type { Response } from 'express';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { AuthTransportGuard, IdentitySessionGuard } from '../auth/auth.guard';
 import { AdminRequest, IdentityPermissionGuard, RequireIdentityPermission } from '../admin/admin-security';
 import { CreateRegionDto, DeactivateRegionDto, RegionListQueryDto } from './regions.dto';

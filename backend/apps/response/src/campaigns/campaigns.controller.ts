@@ -3,20 +3,11 @@ import {
   UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { CampaignActionDto, CampaignCreateDto, CampaignPageQueryDto, CampaignPatchDto, CampaignReasonActionDto } from './campaigns.dto';
 import { CampaignCommandRequest, CampaignsService } from './campaigns.service';
 import { ResponseServiceTokenGuard } from './service-token.guard';
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
-}
-
-function key(request: CampaignCommandRequest): string {
-  if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
-  return request.idempotencyKey;
-}
+import { noStore, requireIdempotencyKey as key } from '@c48/technical/http/response-headers';
 
 function replay(response: Response, result: { replay: boolean }): void {
   if (result.replay) response.setHeader('Idempotent-Replay', 'true');

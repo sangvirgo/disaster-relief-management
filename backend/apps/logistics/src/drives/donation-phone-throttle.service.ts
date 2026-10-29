@@ -1,6 +1,6 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 
 const windowMs = 15 * 60_000;
 const maxAttempts = 5;

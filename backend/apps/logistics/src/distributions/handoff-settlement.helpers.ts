@@ -1,5 +1,5 @@
 import type { EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import { decimalFromUnits, quantityUnits } from '../common/quantity';
 import { DistributionHandoffKind, HandoffSourceStage, SettlementType, handoffSettlementType } from './distributions.helpers';
 

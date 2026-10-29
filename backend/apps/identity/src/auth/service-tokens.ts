@@ -1,9 +1,9 @@
 import { KeyObject, randomUUID, sign, timingSafeEqual } from 'node:crypto';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import type { ServiceName, ServiceTokenClaims } from '../../../../packages/technical/src/security/service-token';
+import { AppError } from '@c48/technical/errors/errors';
+import type { ServiceName, ServiceTokenClaims } from '@c48/technical/security/service-token';
 
-export { verifyServiceToken } from '../../../../packages/technical/src/security/service-token';
-export type { ServiceName, ServiceTokenClaims } from '../../../../packages/technical/src/security/service-token';
+export { verifyServiceToken } from '@c48/technical/security/service-token';
+export type { ServiceName, ServiceTokenClaims } from '@c48/technical/security/service-token';
 
 export const IDENTITY_SERVICE_TOKEN_CONFIG = Symbol('IDENTITY_SERVICE_TOKEN_CONFIG');
 

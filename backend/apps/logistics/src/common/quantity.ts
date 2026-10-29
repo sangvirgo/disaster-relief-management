@@ -1,4 +1,4 @@
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 
 const decimalPattern = /^(-?(?:0|[1-9][0-9]*))(?:\.([0-9]+))?$/u;
 

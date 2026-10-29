@@ -1,13 +1,13 @@
 import { jest } from '@jest/globals';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../packages/technical/src/errors/errors';
-import type { Grant } from '../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import type { Grant } from '@c48/identity-contracts/permissions';
 import { NeedsService } from '../src/needs/needs.service';
 import type { CreateNeedDto } from '../src/needs/needs.dto';
 import type { LogisticsSessionService } from '../src/auth/logistics-session.service';
 import type { ResponseAdmissionClient } from '../src/needs/response-admission.client';
-import type { IdempotencyService } from '../../../packages/technical/src/idempotency/idempotency';
+import type { IdempotencyService } from '@c48/technical/idempotency/idempotency';
 
 const requestId = '11111111-1111-4111-8111-111111111111';
 const organizationId = '22222222-2222-4222-8222-222222222222';

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { CircuitBreakerClient } from '../../../../packages/technical/src/http/service-client';
+import { CircuitBreakerClient } from '@c48/technical/http/service-client';
 import { loadLogisticsAuthConfig } from './logistics-auth';
 import {
   LOGISTICS_IDENTITY_CLIENT,

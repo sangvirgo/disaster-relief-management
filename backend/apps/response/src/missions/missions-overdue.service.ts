@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
-import { JobRunner } from '../../../../packages/technical/src/persistence/jobs';
+import { JobRunner } from '@c48/technical/persistence/jobs';
 import { grantCovers } from '../operations/request-operations.helpers';
 import { ReporterSessionService, RequestCoordinatorGrant } from '../requests/reporter-session';
 import { MISSIONS_CONFIG, MissionsConfig } from './missions.config';

@@ -1,7 +1,7 @@
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createReadStream } from 'node:fs';
-import type { EvidenceMime } from '../../../../packages/technical/src/media/evidence-media';
+import type { EvidenceMime } from '@c48/technical/media/evidence-media';
 
 export const LOGISTICS_ATTACHMENT_STORAGE = Symbol('LOGISTICS_ATTACHMENT_STORAGE');
 

@@ -2,13 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
-import { hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '@c48/technical/idempotency/idempotency';
+import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
+import { hasPermission } from '@c48/identity-contracts/permissions';
 import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';
 import { AddTeamMemberDto, TeamMemberCandidatesQueryDto, TeamMembersPageQueryDto, TransferTeamLeaderDto } from './teams.dto';
-import { teamView, TeamRow, validateExpectedVersion } from './teams.helpers';
+import { TeamRow, validateExpectedVersion } from './teams.helpers';
 import { TeamsQueriesService } from './teams-queries.service';
 
 type TeamCommandRequest = Request & { idempotencyKey?: string };

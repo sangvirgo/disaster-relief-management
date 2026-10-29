@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
+import { AppError } from '@c48/technical/errors/errors';
 import {
   canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef,
-} from '../../../../packages/technical/src/idempotency/idempotency';
+} from '@c48/technical/idempotency/idempotency';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { validateQuantity } from '../common/quantity';
 import { CreateNeedDto } from './needs.dto';
-import { NeedCommandRequest, needCommandKey, NeedRow, readNeed, requireNeedManage, writeNeedAudit } from './needs.helpers';
+import { NeedCommandRequest, needCommandKey, readNeed, requireNeedManage, writeNeedAudit } from './needs.helpers';
 import { ResponseAdmission, ResponseAdmissionClient } from './response-admission.client';
 
 export type { NeedCommandRequest } from './needs.helpers';

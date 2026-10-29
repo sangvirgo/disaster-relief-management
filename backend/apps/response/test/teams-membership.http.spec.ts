@@ -3,7 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { beforeEach, jest } from '@jest/globals';
 import request from 'supertest';
-import { ApiExceptionFilter, loadErrorCatalog } from '../../../packages/technical/src';
+import { ApiExceptionFilter, loadErrorCatalog } from '@c48/technical';
 import { TeamsController } from '../src/teams/teams.controller';
 import { TeamsService } from '../src/teams/teams.service';
 

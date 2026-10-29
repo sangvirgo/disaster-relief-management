@@ -1,6 +1,6 @@
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { decodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
-import type { KeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
+import { AppError } from '@c48/technical/errors/errors';
+import { decodeKeysetCursor } from '@c48/technical/pagination/keyset';
+import type { KeysetCursor } from '@c48/technical/pagination/keyset';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const utcTimestampPattern = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?Z$/u;

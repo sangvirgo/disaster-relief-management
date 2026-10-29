@@ -1,17 +1,14 @@
 import { Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, Res, UseInterceptors } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { IdempotencyKeyInterceptor } from '../../../../packages/technical/src/idempotency/idempotency.interceptor';
+import { AppError } from '@c48/technical/errors/errors';
+import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { EvidenceService } from './evidence.service';
+import { noStore } from '@c48/technical/http/response-headers';
 
 type EvidenceRequest = Request & { idempotencyKey?: string };
 
 function headerValue(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
-}
-
-function noStore(response: Response): void {
-  response.setHeader('Cache-Control', 'no-store');
 }
 
 @Controller()

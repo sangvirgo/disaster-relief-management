@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { DonationsService } from '../src/drives/donations.service';
-import { hashPurposeBoundSecret } from '../../../packages/technical/src/security/secret-hash';
+import { hashPurposeBoundSecret } from '@c48/technical/security/secret-hash';
 
 const deliveryId = '44444444-4444-4444-8444-444444444444';
 const userId = '11111111-1111-4111-8111-111111111111';

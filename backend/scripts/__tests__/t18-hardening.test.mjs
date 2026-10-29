@@ -261,7 +261,7 @@ test('the setup and T18 evidence docs distinguish passed backend checks from pen
   const setup = readFileSync(new URL('../../../docs/backend/00-setup.md', import.meta.url), 'utf8');
   const runbook = readFileSync(new URL('../../../docs/backend/t18-hardening.md', import.meta.url), 'utf8');
   const tasks = readFileSync(new URL('../../../docs/backend/06-implementation-tasks.md', import.meta.url), 'utf8');
-  const tracking = readFileSync(new URL('../../apps/response/src/tracking/tracking.service.ts', import.meta.url), 'utf8');
+  const tracking = readFileSync(new URL('../../apps/response/src/tracking/tracking-read-rate-limiter.ts', import.meta.url), 'utf8');
 
   assert.match(setup, /TC-29 restore execution remains pending/u);
   assert.doesNotMatch(setup, /restore verified on an empty stack/u);

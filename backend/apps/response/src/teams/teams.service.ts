@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Request } from 'express';
-import type { IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
+import type { IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { AddTeamMemberDto, CreateTeamDto, SetTeamPositionDto, TeamMemberCandidatesQueryDto, TeamMembersPageQueryDto, TeamPageQueryDto, TransferTeamLeaderDto, UpdateTeamDto } from './teams.dto';
 import { TeamsProfileService } from './teams-profile.service';
 import { TeamsPositionService } from './teams-position.service';

@@ -1,8 +1,8 @@
 import { CanActivate, ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import type { Request } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { verifyServiceToken } from '../../../../packages/technical/src/security/service-token';
-import type { ServiceName } from '../../../../packages/technical/src/security/service-token';
+import { AppError } from '@c48/technical/errors/errors';
+import { verifyServiceToken } from '@c48/technical/security/service-token';
+import type { ServiceName } from '@c48/technical/security/service-token';
 import { REQUEST_INTAKE_CONFIG } from '../requests/request-intake.service';
 import type { RequestIntakeConfig } from '../requests/request-intake.service';
 

@@ -1,81 +1,33 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
-import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '../../../../packages/technical/src/idempotency/idempotency';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
-import { hasPermission, ROLE_PERMISSIONS } from '../../../../packages/identity-contracts/src/permissions';
-import { hashPurposeBoundSecret } from '../../../../packages/technical/src/security/secret-hash';
+import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '@c48/technical/idempotency/idempotency';
+import { AppError } from '@c48/technical/errors/errors';
+import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
+import { ROLE_PERMISSIONS } from '@c48/identity-contracts/permissions';
+import { hashPurposeBoundSecret } from '@c48/technical/security/secret-hash';
 import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from '../requests/request-intake.service';
 import { ReporterAccessService, ReporterRequestRow, trackingCodeMatches } from './reporter-access.service';
+import { TrackingReadRateLimiter } from './tracking-read-rate-limiter';
+import { previouslyReportedFacts, unverifiedRequestAssignments, unverifiedSubjectAssignments } from './supplement.update';
+import { invalidField, supplementAllowed, validateSupplement } from './supplement.validation';
 import { RecoveryIssueDto, RequestEventsQueryDto, SupplementRequestDto } from './tracking.dto';
 import { RequestOperationsService } from '../operations/request-operations.service';
+import { terminalStatuses, unverifiedStatuses } from '../operations/request-operations.helpers';
 import { assessmentFields, enqueueAiAdvisory } from '../ai/ai-advisory-input';
+import { assertRequestPermission } from '../requests/request-scope';
 
-const terminalStatuses = new Set(['REJECTED', 'DUPLICATE', 'RESOLVED', 'CLOSED', 'CANCELLED']);
-const preVerificationStatuses = new Set(['SUBMITTED', 'VERIFYING']);
 const recoveryCodePattern = /^[A-Za-z0-9_-]{43}$/;
 const cursorFilters = (requestId: string) => ({ request_id: requestId, visibility: 'REPORTER' });
+
+export { supplementAllowed };
 
 export interface ReporterEventView {
   event_type: string;
   occurred_at: string;
   public_text_code: string;
-}
-
-export function supplementAllowed(status: string, reviewLane: string): boolean {
-  return reviewLane === 'NORMAL' && ['SUBMITTED', 'VERIFYING', 'VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(status);
-}
-
-function invalidField(field: string, code: string): AppError {
-  return new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: { [field]: [code] } });
-}
-
-function validateSupplement(dto: SupplementRequestDto): void {
-  const hasValue = ['description', 'household_reference_note', 'people_affected', 'children_count', 'elderly_count', 'location', 'reporter_declared_danger', 'needs_rescue', 'needs_relief_supplies']
-    .some((field) => Object.hasOwn(dto, field));
-  if (!hasValue) throw invalidField('body', 'VALIDATION_FAILED');
-  if (Object.hasOwn(dto, 'description')) {
-    if (typeof dto.description !== 'string' || !dto.description.trim() || dto.description !== dto.description.normalize('NFC')) {
-      throw invalidField('description', 'VALIDATION_FAILED');
-    }
-  }
-  if (Object.hasOwn(dto, 'household_reference_note')) {
-    if (typeof dto.household_reference_note !== 'string' || !dto.household_reference_note.trim() || dto.household_reference_note !== dto.household_reference_note.normalize('NFC')) {
-      throw invalidField('household_reference_note', 'VALIDATION_FAILED');
-    }
-  }
-  if (dto.people_affected !== undefined && dto.people_affected !== null && (!Number.isInteger(dto.people_affected) || dto.people_affected < 1 || dto.people_affected > 10_000)) {
-    throw invalidField('people_affected', 'PEOPLE_AFFECTED_OUT_OF_RANGE');
-  }
-  for (const [field, value] of [['children_count', dto.children_count], ['elderly_count', dto.elderly_count]] as const) {
-    if (value !== undefined && value !== null && (!Number.isInteger(value) || value < 0 || value > 10_000)) throw invalidField(field, 'VULNERABLE_COUNT_OUT_OF_RANGE');
-  }
-  if (Object.hasOwn(dto, 'location')) {
-    const location = dto.location;
-    if (!location) throw invalidField('location', 'VALIDATION_FAILED');
-    const [longitude, latitude] = location.coordinates;
-    if (!Number.isFinite(longitude) || !Number.isFinite(latitude) || longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) {
-      throw invalidField('location.coordinates', 'COORDINATES_OUT_OF_RANGE');
-    }
-    if (location.source === 'GPS' && (location.accuracy_m == null || location.captured_at == null)) {
-      throw invalidField('location', 'ACCURACY_REQUIRED');
-    }
-    if (location.accuracy_m != null && (!Number.isFinite(location.accuracy_m) || location.accuracy_m < 0 || location.accuracy_m > 9_999_999.9)) {
-      throw invalidField('location.accuracy_m', 'VALIDATION_FAILED');
-    }
-    if (location.source === 'MANUAL_PIN' && Object.hasOwn(location, 'accuracy_m')) {
-      throw invalidField('location.accuracy_m', 'VALIDATION_FAILED');
-    }
-  }
-  if (Object.hasOwn(dto, 'reporter_declared_danger') && typeof dto.reporter_declared_danger !== 'boolean') {
-    throw invalidField('reporter_declared_danger', 'VALIDATION_FAILED');
-  }
-  if (Object.hasOwn(dto, 'needs_rescue') && typeof dto.needs_rescue !== 'boolean') throw invalidField('needs_rescue', 'VALIDATION_FAILED');
-  if (Object.hasOwn(dto, 'needs_relief_supplies') && typeof dto.needs_relief_supplies !== 'boolean') throw invalidField('needs_relief_supplies', 'VALIDATION_FAILED');
-  if (dto.needs_rescue === false && dto.needs_relief_supplies === false) throw invalidField('needs_rescue', 'AT_LEAST_ONE_NEED_REQUIRED');
 }
 
 function requestHashWithSecret(payload: unknown, secretHash: string | undefined): string {
@@ -91,58 +43,9 @@ function asPlain(value: unknown): Record<string, unknown> | undefined {
   return undefined;
 }
 
-function assertScoped(session: ReporterSession, permission: 'REQUEST_VERIFY' | 'REQUEST_DETAIL_READ', row: ReporterRequestRow): void {
-  if (!hasPermission(session.grants, permission, {
-    organizationId: row.organization_id,
-    regionCode: row.region_code,
-    campaignId: row.campaign_id,
-  })) throw new AppError('FORBIDDEN', { status: 403 });
-}
-
 function versionConflict(actual: number, expected: number): never {
   if (actual !== expected) throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: actual } });
   throw new AppError('INTERNAL_ERROR', { status: 500 });
-}
-
-const trackingMinuteMs = 60_000;
-const trackingHourMs = 60 * trackingMinuteMs;
-
-class TrackingReadRateLimiter {
-  private readonly attempts = new Map<string, number[]>();
-  private lastPrunedAt = Number.NEGATIVE_INFINITY;
-
-  assertAllowed(clientIp: string): void {
-    const now = Date.now();
-    const key = createHash('sha256').update(clientIp).digest('hex');
-    const recent = (this.attempts.get(key) ?? []).filter((timestamp) => timestamp > now - trackingHourMs);
-    const minute = recent.filter((timestamp) => timestamp > now - trackingMinuteMs);
-    let retryAfterMs = 0;
-
-    if (recent.length >= 60) retryAfterMs = Math.max(retryAfterMs, recent[0]! + trackingHourMs - now);
-    if (minute.length >= 10) retryAfterMs = Math.max(retryAfterMs, minute[0]! + trackingMinuteMs - now);
-    if (retryAfterMs > 0) {
-      this.attempts.set(key, recent);
-      throw new AppError('RATE_LIMITED', { status: 429, retryAfterSeconds: Math.ceil(retryAfterMs / 1_000) });
-    }
-
-    if (!this.attempts.has(key) && this.attempts.size >= 20_000 && now - this.lastPrunedAt >= trackingMinuteMs) {
-      this.lastPrunedAt = now;
-      this.prune(now);
-    }
-    if (!this.attempts.has(key) && this.attempts.size >= 20_000) {
-      throw new AppError('RATE_LIMITED', { status: 429, retryAfterSeconds: 60 * 60 });
-    }
-    this.attempts.set(key, [...recent, now]);
-  }
-
-  private prune(now: number): void {
-    for (const [key, timestamps] of this.attempts) {
-      const recent = timestamps.filter((timestamp) => timestamp > now - trackingHourMs);
-      if (recent.length) this.attempts.set(key, recent);
-      else this.attempts.delete(key);
-      if (this.attempts.size < 20_000) return;
-    }
-  }
 }
 
 function trackingClientIp(request: import('express').Request): string {
@@ -253,7 +156,7 @@ export class TrackingService {
         ) as Array<Record<string, unknown>>;
         const before = subjectRows[0];
         if (!before) throw new AppError('INTERNAL_ERROR', { status: 500 });
-        const verified = !preVerificationStatuses.has(row.status);
+        const verified = !unverifiedStatuses.has(row.status);
         const nextNeedsRescue = dto.needs_rescue ?? row.needs_rescue;
         const nextNeedsRelief = dto.needs_relief_supplies ?? row.needs_relief_supplies;
         if (!nextNeedsRescue && !nextNeedsRelief) throw invalidField('needs_rescue', 'AT_LEAST_ONE_NEED_REQUIRED');
@@ -261,19 +164,7 @@ export class TrackingService {
         const nextChildren = Object.hasOwn(dto, 'children_count') ? dto.children_count ?? null : before.children_count as number | null;
         const nextElderly = Object.hasOwn(dto, 'elderly_count') ? dto.elderly_count ?? null : before.elderly_count as number | null;
         if (nextPeople != null && (nextChildren ?? 0) + (nextElderly ?? 0) > nextPeople) throw invalidField('children_count', 'VULNERABLE_COUNT_EXCEEDS_TOTAL');
-        const previouslyReported = Object.fromEntries(Object.keys(dto).filter((field) => field !== 'expected_version').map((field) => {
-          if (field === 'description') return [field, row.description];
-          if (field === 'reporter_declared_danger') return [field, row.reporter_declared_danger];
-          if (field === 'needs_rescue') return [field, row.needs_rescue];
-          if (field === 'needs_relief_supplies') return [field, row.needs_relief_supplies];
-          if (field === 'location') return [field, {
-            coordinates: [before.longitude, before.latitude],
-            source: before.location_source,
-            accuracy_m: before.location_accuracy_m,
-            captured_at: before.location_captured_at == null ? null : toIso(before.location_captured_at as Date | string),
-          }];
-          return [field, before[field] ?? null];
-        }));
+        const previouslyReported = previouslyReportedFacts(dto, row, before);
         const regionRows = dto.location && !verified
           ? await manager.query(
             `SELECT min(region_code) AS region_code FROM region_boundary
@@ -289,46 +180,18 @@ export class TrackingService {
           pending_review: verified,
           danger_alert_raised: dto.reporter_declared_danger === true && !row.reporter_declared_danger,
         };
-        const requestValues: unknown[] = [row.id, dto.expected_version];
-        const requestSets: string[] = [];
-        const setRequest = (column: string, value: unknown, cast = '') => {
-          requestValues.push(value);
-          requestSets.push(`${column}=$${requestValues.length}${cast}`);
-        };
-        if (!verified && Object.hasOwn(dto, 'description')) setRequest('description', dto.description ?? null, '::text');
-        if (!verified && Object.hasOwn(dto, 'reporter_declared_danger')) {
-          if (mode === 'PUT') setRequest('reporter_declared_danger', dto.reporter_declared_danger, '::boolean');
-          else if (dto.reporter_declared_danger) requestSets.push('reporter_declared_danger=true');
-        }
-        if (!verified && Object.hasOwn(dto, 'needs_rescue')) setRequest('needs_rescue', dto.needs_rescue, '::boolean');
-        if (!verified && Object.hasOwn(dto, 'needs_relief_supplies')) setRequest('needs_relief_supplies', dto.needs_relief_supplies, '::boolean');
-        if (!verified && dto.location) setRequest('region_code', regionRows[0]?.region_code ?? null, '::text');
-        requestSets.push('version=version+1');
+        const requestChange = verified
+          ? { sets: [] as string[], values: [row.id, dto.expected_version] as unknown[] }
+          : unverifiedRequestAssignments(dto, mode, row.id, regionRows[0]?.region_code ?? null);
+        requestChange.sets.push('version=version+1');
         const [requestUpdates] = await manager.query(
-          `UPDATE assistance_request SET ${requestSets.join(',')} WHERE id=$1 AND version=$2 RETURNING status,version,tracking_code`,
-          requestValues,
+          `UPDATE assistance_request SET ${requestChange.sets.join(',')} WHERE id=$1 AND version=$2 RETURNING status,version,tracking_code`,
+          requestChange.values,
         ) as [Array<{ status: string; version: number; tracking_code: string }>, number];
         const updated = requestUpdates[0];
         if (!updated) versionConflict(Number(row.version), dto.expected_version);
         if (!verified) {
-          const values: unknown[] = [row.id];
-          const sets: string[] = [];
-          const add = (column: string, value: unknown, cast = '') => {
-            values.push(value);
-            sets.push(`${column} = $${values.length}${cast}`);
-          };
-          if (Object.hasOwn(dto, 'people_affected')) add('people_affected', dto.people_affected ?? null, '::integer');
-          if (Object.hasOwn(dto, 'children_count')) add('children_count', dto.children_count ?? null, '::integer');
-          if (Object.hasOwn(dto, 'elderly_count')) add('elderly_count', dto.elderly_count ?? null, '::integer');
-          if (Object.hasOwn(dto, 'household_reference_note')) add('household_reference_note', dto.household_reference_note ?? null, '::text');
-          if (dto.location) {
-            const location = dto.location;
-            values.push(location.coordinates[0], location.coordinates[1]);
-            sets.push(`location = ST_SetSRID(ST_MakePoint($${values.length - 1}, $${values.length}),4326)::geography`);
-            add('location_source', location.source, '::text');
-            add('location_accuracy_m', location.accuracy_m ?? null, '::numeric');
-            add('location_captured_at', location.captured_at ?? null, '::timestamptz');
-          }
+          const { sets, values } = unverifiedSubjectAssignments(dto, row.id);
           if (sets.length) await manager.query(`UPDATE request_subject SET ${sets.join(', ')} WHERE request_id = $1`, values);
           if (assessmentFields.some((field) => Object.hasOwn(dto, field))) await enqueueAiAdvisory(manager, row.id);
         }
@@ -605,7 +468,7 @@ export class TrackingService {
     ) as ReporterRequestRow[];
     const row = rows[0];
     if (!row) throw new AppError('NOT_FOUND', { status: 404 });
-    assertScoped(session, 'REQUEST_VERIFY', row);
+    assertRequestPermission(session, 'REQUEST_VERIFY', row);
     return row;
   }
 }

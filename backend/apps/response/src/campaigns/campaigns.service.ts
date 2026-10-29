@@ -1,15 +1,15 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import { DataSource, EntityManager } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '../../../../packages/technical/src/idempotency/idempotency';
-import { decodeKeysetCursor, encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
-import { Grant, hasPermission } from '../../../../packages/identity-contracts/src/permissions';
+import { AppError } from '@c48/technical/errors/errors';
+import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '@c48/technical/idempotency/idempotency';
+import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
+import { Grant, hasPermission } from '@c48/identity-contracts/permissions';
 import { CampaignActionDto, CampaignCreateDto, CampaignPageQueryDto, CampaignPatchDto, CampaignReasonActionDto } from './campaigns.dto';
 import {
   campaignNextStatus, campaignScopePredicate, campaignView, cleanCampaignName, CampaignAction, CampaignRow,
-  CampaignStatus, publicCampaignView, validCampaignCursor, validateCampaignDates,
+  publicCampaignView, validCampaignCursor, validateCampaignDates,
 } from './campaigns.helpers';
 import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';
 

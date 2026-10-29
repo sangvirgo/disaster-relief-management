@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { encodeKeysetCursor } from '../../../packages/technical/src/pagination/keyset';
+import { encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { CatalogService } from '../src/catalog/catalog.service';
 import { hasCatalogManageGrant } from '../src/catalog/catalog.helpers';
 

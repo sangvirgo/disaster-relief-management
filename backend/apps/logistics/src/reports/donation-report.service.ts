@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { encodeKeysetCursor } from '../../../../packages/technical/src/pagination/keyset';
+import { AppError } from '@c48/technical/errors/errors';
+import { encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { finalDistributionHandoffPredicate } from './donation-report.helpers';
 import { decodeReportIdCursor } from './reports.helpers';
 import type { PublicDonationReportQueryDto } from './reports.dto';

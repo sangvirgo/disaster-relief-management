@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { DonationsService } from '../src/drives/donations.service';
-import { hashPurposeBoundSecret } from '../../../packages/technical/src/security/secret-hash';
+import { hashPurposeBoundSecret } from '@c48/technical/security/secret-hash';
 
 const driveId = '22222222-2222-4222-8222-222222222222';
 const itemId = '33333333-3333-4333-8333-333333333333';

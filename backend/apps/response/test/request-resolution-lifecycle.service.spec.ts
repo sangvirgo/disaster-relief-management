@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import type { IdempotentCommand } from '../../../packages/technical/src/idempotency/idempotency';
+import type { IdempotentCommand } from '@c48/technical/idempotency/idempotency';
 import { RequestResolutionFinalizer } from '../src/resolution/request-resolution-finalizer.service';
 import { RequestResolutionLifecycleService } from '../src/resolution/request-resolution-lifecycle.service';
 

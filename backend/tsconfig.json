@@ -5,6 +5,11 @@
     "moduleResolution": "Node10",
     "ignoreDeprecations": "6.0",
     "rootDir": ".",
+    "paths": {
+      "@c48/technical": ["./packages/technical/src"],
+      "@c48/technical/*": ["./packages/technical/src/*"],
+      "@c48/identity-contracts/*": ["./packages/identity-contracts/src/*"]
+    },
     "outDir": "./dist",
     "strict": true,
     "noImplicitOverride": true,

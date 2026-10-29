@@ -1,10 +1,10 @@
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import type { Request } from 'express';
-import { AppError } from '../../../../packages/technical/src/errors/errors';
-import { CircuitBreakerClient } from '../../../../packages/technical/src/http/service-client';
-import { Grant, validGrant } from '../../../../packages/identity-contracts/src/permissions';
-import { ServiceTokenCache } from '../../../../packages/technical/src/http/service-token-cache';
-import type { ServiceName } from '../../../../packages/technical/src/security/service-token';
+import { AppError } from '@c48/technical/errors/errors';
+import { CircuitBreakerClient } from '@c48/technical/http/service-client';
+import { Grant, validGrant } from '@c48/identity-contracts/permissions';
+import { ServiceTokenCache } from '@c48/technical/http/service-token-cache';
+import type { ServiceName } from '@c48/technical/security/service-token';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from './request-intake.service';
 import { reporterAccessClaims, ReporterAccessTokenClaims } from './reporter-token';
 

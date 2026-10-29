@@ -4,7 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { jest } from '@jest/globals';
 import request from 'supertest';
-import { ApiExceptionFilter, loadErrorCatalog } from '../../../packages/technical/src';
+import { ApiExceptionFilter, loadErrorCatalog } from '@c48/technical';
 import { LOGISTICS_AUTH_CONFIG } from '../src/auth/logistics-session.service';
 import { LogisticsServiceTokenGuard } from '../src/auth/logistics-service-token.guard';
 import { FulfillmentCyclesController } from '../src/fulfillment-cycles/fulfillment-cycles.controller';
