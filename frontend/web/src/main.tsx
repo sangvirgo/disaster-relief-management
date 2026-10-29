@@ -119,11 +119,7 @@ function AuthModal({
   const googleButton = useRef<HTMLDivElement>(null);
   const authCallbacks = useRef({ onReady, onClose });
   authCallbacks.current = { onReady, onClose };
-  // The local HTTP demo uses password/email login; its Google OAuth origin is
-  // not registered. Keep the unavailable button out of that flow.
-  const googleClientId = ['localhost', '127.0.0.1'].includes(window.location.hostname)
-    ? ''
-    : import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
