@@ -23,6 +23,7 @@
 .verification-detail-card > h2 { order: -3; }
 .verification-detail-card > .notice { order: -2; }
 .verification-detail-card > .verification-summary { order: -2; }
+.verification-detail-card > .queue-context-map { order: -2; }
 .verification-detail-card > .action-grid { order: -1; }
 
 .verification-summary {
@@ -428,14 +429,71 @@
 .heatmap-soft-layer {
   position: absolute;
   inset: 0;
-  z-index: 350;
+  z-index: 450;
   pointer-events: none;
+  mix-blend-mode: multiply;
 }
 
 .heatmap-overview-dot {
   cursor: pointer;
-  filter: drop-shadow(0 2px 5px rgba(102, 33, 20, 0.35));
+  filter: drop-shadow(0 2px 5px rgba(15, 37, 69, 0.65));
 }
+
+.heatmap-pin {
+  background: transparent;
+  border: 0;
+  overflow: visible;
+}
+
+.heatmap-pin-figure {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 2px 3px rgba(34, 27, 24, 0.42));
+}
+
+.heatmap-pin-figure svg { display: block; width: 100%; height: 100%; }
+
+.heatmap-pin-selected::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  width: 30px;
+  height: 10px;
+  border: 2px solid #e11d2e;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  animation: heatmap-pin-ring 1.2s ease-in-out infinite;
+}
+
+.heatmap-pin-selected .heatmap-pin-figure {
+  animation: heatmap-pin-jump 1.2s ease-in-out infinite;
+}
+
+@keyframes heatmap-pin-jump {
+  0%, 55%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-15px); }
+}
+
+@keyframes heatmap-pin-ring {
+  30% { opacity: 0.35; transform: translateX(-50%) scale(0.7); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heatmap-pin-selected::after,
+  .heatmap-pin-selected .heatmap-pin-figure { animation: none; }
+}
+
+.heatmap-refresh { margin: 0 0 12px; }
+
+.heatmap-cell-popup strong,
+.heatmap-cell-popup span {
+  display: block;
+}
+
+.heatmap-cell-popup strong { margin-bottom: 4px; }
+.heatmap-cell-popup span { max-width: 220px; line-height: 1.4; }
 
 .heatmap-dot-count {
   display: grid;
@@ -452,6 +510,27 @@
 
 .heatmap-panel-compact .heatmap-canvas {
   height: 285px;
+}
+
+.heatmap-opacity-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.heatmap-opacity-control input {
+  flex: 1;
+  min-width: 80px;
+  accent-color: #c2410c;
+}
+
+.heatmap-opacity-control output {
+  min-width: 36px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .heatmap-canvas .leaflet-container {
@@ -482,16 +561,15 @@
   width: 115px;
   height: 12px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #facc15 0%, #f59e0b 36%, #ea580c 70%, #b42318 100%);
+  background: linear-gradient(90deg, #facc15 0%, #f97316 25%, #ef4444 50%, #dc2626 75%, #7f1d1d 100%);
 }
 
-.heatmap-sos-halo {
-  animation: sos-map-pulse 1.8s ease-in-out infinite;
+.queue-context-map {
+  margin: 18px 0 22px;
+  min-width: 0;
 }
 
-@keyframes sos-map-pulse {
-  50% { fill-opacity: 0.08; stroke-opacity: 0.45; }
-}
+.queue-context-map h3 { margin: 0 0 12px; }
 
 .triage-context {
   display: grid;

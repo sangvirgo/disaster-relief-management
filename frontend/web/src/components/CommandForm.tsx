@@ -5,7 +5,7 @@ import { LocationPicker } from '../maps/LocationPicker';
 export type Field = {
   name: string;
   label: string;
-  type?: 'text' | 'number' | 'password' | 'textarea' | 'select' | 'datetime-local' | 'location' | 'reference';
+  type?: 'text' | 'number' | 'password' | 'textarea' | 'select' | 'choice-cards' | 'datetime-local' | 'location' | 'reference';
   required?: boolean;
   min?: number;
   max?: number;
@@ -13,6 +13,7 @@ export type Field = {
   maxLength?: number;
   integer?: boolean;
   options?: { value: string; label: string }[];
+  emptyLabel?: string;
   placeholder?: string;
   initialValue?: string;
 };
@@ -59,7 +60,7 @@ export function CommandForm({
       const value = (values[field.name] || '').trim();
       if (field.required && !value)
         invalid[field.name] =
-          `Vui lòng ${field.type === 'select' || field.type === 'reference' ? 'chọn' : 'nhập'} ${sentenceLabel(field.label)}.`;
+          `Vui lòng ${['select', 'reference', 'choice-cards'].includes(field.type || '') ? 'chọn' : 'nhập'} ${sentenceLabel(field.label)}.`;
       else if (value && field.minLength && value.length < field.minLength)
         invalid[field.name] = `${field.label} cần ít nhất ${field.minLength} ký tự.`;
       else if (value && field.maxLength && value.length > field.maxLength)
@@ -108,7 +109,9 @@ export function CommandForm({
               (name) => name === field.name || name.endsWith(`.${field.name}`)
             )
           )
-            errors[field.name] = `Vui lòng kiểm tra ${sentenceLabel(field.label)}.`;
+            errors[field.name] = field.name === 'region_code' && spec.path === '/campaigns'
+              ? 'Khu vực này chưa được cấu hình cho điều phối. Hãy chọn khu vực khác hoặc không gắn khu vực.'
+              : `Vui lòng kiểm tra ${sentenceLabel(field.label)}.`;
         }
         setFieldErrors(errors);
       }
@@ -127,9 +130,33 @@ export function CommandForm({
     <form className="form-stack command-form" onSubmit={submit} noValidate>
       <h3>{spec.title}</h3>
       {spec.fields?.map((field) =>
-        field.type === 'reference' ? (
+        field.type === 'choice-cards' ? (
+          <fieldset key={field.name} className="command-choice-list" aria-invalid={Boolean(fieldErrors[field.name])}>
+            <legend>{field.label}{field.required && <> <span className="required-mark" aria-hidden="true">*</span></>}</legend>
+            {field.options?.length ? field.options.map((option) => (
+              <button
+                type="button"
+                key={option.value}
+                className={`command-choice-card ${values[field.name] === option.value ? 'selected' : ''}`}
+                aria-pressed={values[field.name] === option.value}
+                onClick={() => {
+                  setValues((current) => ({ ...current, [field.name]: option.value }));
+                  setFieldErrors((current) => ({ ...current, [field.name]: '' }));
+                  setMessage('');
+                  key.current = null;
+                }}
+              >
+                <span>{option.label}</span>
+                <span aria-hidden="true">{values[field.name] === option.value ? '✓' : '○'}</span>
+              </button>
+            )) : <p className="empty">Chưa có chiến dịch đang hoạt động phù hợp với khu vực này.</p>}
+            {fieldErrors[field.name] && <small className="field-error" role="alert">{fieldErrors[field.name]}</small>}
+          </fieldset>
+        ) : field.type === 'reference' ? (
           <div key={field.name} className="form-stack">
-            <label htmlFor={`reference-${field.name}`}>{field.label}</label>
+            <label htmlFor={`reference-${field.name}`}>
+              <span>{field.label}{field.required && <> <span className="required-mark" aria-hidden="true"> *</span></>}</span>
+            </label>
             {field.options?.length && !manualFields[field.name] &&
             (!values[field.name] || field.options.some((option) => option.value === values[field.name])) ? (
               <select
@@ -190,7 +217,7 @@ export function CommandForm({
           </div>
         ) : field.type === 'location' ? (
           <div key={field.name} className="form-stack">
-            <strong>{field.label}</strong>
+            <strong>{field.label}{field.required && <> <span className="required-mark" aria-hidden="true">*</span></>}</strong>
             <LocationPicker
               value={pointValue(values[field.name] || '')}
               onSelect={(point) => {
@@ -212,7 +239,7 @@ export function CommandForm({
           </div>
         ) : (
         <label key={field.name}>
-          {field.label}
+          <span>{field.label}{field.required && <> <span className="required-mark" aria-hidden="true"> *</span></>}</span>
           {field.type === 'textarea' ? (
             <textarea
               required={field.required}
@@ -240,7 +267,7 @@ export function CommandForm({
                 key.current = null;
               }}
             >
-              <option value="">Chọn giá trị</option>
+              <option value="">{field.emptyLabel || `Chọn ${sentenceLabel(field.label)}`}</option>
               {field.options?.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}

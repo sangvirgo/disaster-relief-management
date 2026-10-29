@@ -15,6 +15,7 @@ type Campaign = {
   ends_at: string | null;
   created_at: string;
 };
+type Region = { code: string; name: string; status: string };
 export function Campaigns() {
   const [items, setItems] = useState<Campaign[]>([]);
   const [cursor, setCursor] = useState('');
@@ -24,6 +25,29 @@ export function Campaigns() {
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [regionError, setRegionError] = useState('');
+  useEffect(() => {
+    let live = true;
+    async function loadRegions() {
+      try {
+        const all: Region[] = [];
+        let next = '';
+        do {
+          const query = new URLSearchParams({ limit: '100' });
+          if (next) query.set('cursor', next);
+          const page = await api<{ items: Region[]; next_cursor?: string | null }>('identity', `/regions?${query}`);
+          all.push(...page.items);
+          next = page.next_cursor || '';
+        } while (next);
+        if (live) setRegions(all.filter((region) => region.status === 'ACTIVE'));
+      } catch {
+        if (live) setRegionError('Chưa tải được danh sách khu vực. Bạn vẫn có thể tạo chiến dịch không gắn khu vực.');
+      }
+    }
+    void loadRegions();
+    return () => { live = false; };
+  }, [revision]);
   useEffect(() => {
     let live = true;
     setError('');
@@ -58,18 +82,24 @@ export function Campaigns() {
     path: '/campaigns',
     fields: [
       { name: 'name', label: 'Tên chiến dịch', required: true },
-      { name: 'objective', label: 'Mục tiêu', type: 'textarea' },
-      { name: 'region_code', label: 'Mã khu vực nếu có', placeholder: 'Ví dụ: DEMO_A' },
-      { name: 'starts_at', label: 'Thời điểm bắt đầu', type: 'datetime-local' },
-      { name: 'ends_at', label: 'Thời điểm kết thúc', type: 'datetime-local' },
+      { name: 'objective', label: 'Mục tiêu (nếu có)', type: 'textarea' },
+      { name: 'region_code', label: 'Khu vực', type: 'select',
+        emptyLabel: 'Không chọn khu vực',
+        options: regions.map((region) => ({ value: region.code, label: `${region.name} (${region.code})` })) },
+      { name: 'starts_at', label: 'Thời điểm bắt đầu (nếu có)', type: 'datetime-local' },
+      { name: 'ends_at', label: 'Thời điểm kết thúc (nếu có)', type: 'datetime-local' },
     ],
-    build: (values) => ({
-      name: values.name,
-      ...(values.objective ? { objective: values.objective } : {}),
-      ...(values.region_code ? { region_code: values.region_code } : {}),
-      ...(values.starts_at ? { starts_at: new Date(values.starts_at).toISOString() } : {}),
-      ...(values.ends_at ? { ends_at: new Date(values.ends_at).toISOString() } : {}),
-    }),
+    build: (values) => {
+      if (values.starts_at && values.ends_at && new Date(values.ends_at) <= new Date(values.starts_at))
+        throw new Error('Thời điểm kết thúc phải sau thời điểm bắt đầu.');
+      return {
+        name: values.name.trim().normalize('NFC'),
+        ...(values.objective?.trim() ? { objective: values.objective.trim() } : {}),
+        ...(values.region_code ? { region_code: values.region_code } : {}),
+        ...(values.starts_at ? { starts_at: new Date(values.starts_at).toISOString() } : {}),
+        ...(values.ends_at ? { ends_at: new Date(values.ends_at).toISOString() } : {}),
+      };
+    },
   };
   const id = selected?.id;
   const version = selected?.version;
@@ -206,7 +236,10 @@ export function Campaigns() {
             </div>
           </>
         ) : (
-          <CommandForm spec={create} onSuccess={done} />
+          <>
+            {regionError && <p className="notice warning" role="status">{regionError}</p>}
+            <CommandForm spec={create} onSuccess={done} />
+          </>
         )}
       </section>
     </div>

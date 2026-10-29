@@ -7,7 +7,7 @@ type CampaignPage = {
   cursor?: string;
 };
 
-export function useAnalyticsRegion(enabled = true) {
+export function useAnalyticsRegion(enabled = true, includeRequestRegions = false) {
   const [region, setRegion] = useState('');
   const [regions, setRegions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +36,21 @@ export function useAnalyticsRegion(enabled = true) {
           if (!result.more || !result.cursor) break;
           cursor = result.cursor;
         }
+        if (includeRequestRegions) {
+          cursor = '';
+          for (let page = 0; page < 20; page++) {
+            const result = await api<{
+              items: { region_code?: string | null }[];
+              more: boolean;
+              cursor?: string;
+            }>('response', `/requests?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+            for (const request of result.items) {
+              if (request.region_code) found.add(request.region_code);
+            }
+            if (!result.more || !result.cursor) break;
+            cursor = result.cursor;
+          }
+        }
         if (active) {
           const values = [...found].sort();
           setRegions(values);
@@ -51,7 +66,7 @@ export function useAnalyticsRegion(enabled = true) {
     return () => {
       active = false;
     };
-  }, [enabled]);
+  }, [enabled, includeRequestRegions]);
 
   return { region, setRegion, regions, loading, error };
 }

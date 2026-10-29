@@ -1245,6 +1245,7 @@ function App() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [latestReceipt, setLatestReceipt] = useState<SosReceipt | null>(null);
   const [selectedTrackingCode, setSelectedTrackingCode] = useState('');
+  const [selectedMissionId, setSelectedMissionId] = useState('');
 
   useEffect(() => {
     me()
@@ -1278,6 +1279,7 @@ function App() {
 
   function changePage(id: string) {
     if (id === 'track') setSelectedTrackingCode('');
+    setSelectedMissionId('');
     setPageId(id);
     setMenuOpen(false);
   }
@@ -1406,7 +1408,6 @@ function App() {
         <main className="content">
           <div className="heading">
             <div>
-              <span className="eyebrow">HỆ THỐNG RELIVA</span>
               <h1>{selected.title}</h1>
               {selected.id === 'track'
                 ? <p>{user ? 'Xem danh sách SOS đã gắn với tài khoản và tiến độ xử lý.' : 'Nhập mã theo dõi để xem tiến độ SOS đã gửi.'}</p>
@@ -1521,12 +1522,15 @@ function App() {
                   <Operations page="needs" user={user} />
                 ) : ['volunteer', 'coordinator'].includes(workspace) &&
                   selected.id === 'notices' ? (
-                  <Notices />
+                  <Notices onOpenMission={workspace === 'volunteer' ? (missionId) => {
+                    setSelectedMissionId(missionId);
+                    setPageId('missions');
+                  } : undefined} />
                 ) : ['coordinator', 'operations'].includes(workspace) &&
                   selected.id === 'campaigns' ? (
                   <Campaigns key={workspace} />
                 ) : workspace === 'volunteer' ? (
-                  <Volunteer key={selected.id} page={selected.id} />
+                  <Volunteer key={`${selected.id}:${selectedMissionId}`} page={selected.id} initialMissionId={selectedMissionId} />
                 ) : workspace === 'operations' && selected.id === 'overview' ? (
                   <OperationsDashboard />
                 ) : workspace === 'operations' && user ? (

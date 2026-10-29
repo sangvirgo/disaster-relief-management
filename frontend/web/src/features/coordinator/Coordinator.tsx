@@ -281,14 +281,27 @@ export function Coordinator({ page }: { page: string }) {
   }[]>([]);
   useEffect(() => {
     let live = true;
-    void api<{ items: { id: string; name: string; status: string; region_code: string | null }[] }>('response', '/campaigns')
-      .then((value) => {
-        if (live) setCampaignOptions(value.items
+    async function loadCampaigns() {
+      try {
+        const campaigns: { id: string; name: string; status: string; region_code: string | null }[] = [];
+        let cursor = '';
+        do {
+          const query = new URLSearchParams({ limit: '100' });
+          if (cursor) query.set('cursor', cursor);
+          const page = await api<{ items: typeof campaigns; more: boolean; cursor?: string }>('response', `/campaigns?${query}`);
+          campaigns.push(...page.items);
+          cursor = page.more ? page.cursor || '' : '';
+        } while (cursor);
+        if (live) setCampaignOptions(campaigns
           .filter((campaign) => campaign.status === 'ACTIVE')
-          .map((campaign) => ({ value: campaign.id, label: campaign.name,
+          .map((campaign) => ({ value: campaign.id,
+            label: `${campaign.name} · ${campaign.region_code || 'Nhiều khu vực'}`,
             regionCode: campaign.region_code })));
-      })
-      .catch(() => { /* Vẫn có thể nhập mã khi không tải được danh sách. */ });
+      } catch {
+        if (live) setCampaignOptions([]);
+      }
+    }
+    void loadCampaigns();
     return () => { live = false; };
   }, [revision]);
   const refreshReasonRef = useRef<'success' | 'stale' | null>(null);
@@ -665,6 +678,22 @@ export function Coordinator({ page }: { page: string }) {
                 <a href="#request-full-detail">Xem toàn bộ hồ sơ và lịch sử ↓</a>
               </div>
             )}
+            {page === 'queue' && detail.subject.location && (
+              <div className="queue-context-map">
+                <h3>Vị trí SOS đang chọn</h3>
+                <HeatmapPanel
+                  region={detail.region_code || ''}
+                  showLayers={false}
+                  compact
+                  selected={{
+                    id: detail.id,
+                    trackingCode: detail.tracking_code,
+                    longitude: detail.subject.location.coordinates[0],
+                    latitude: detail.subject.location.coordinates[1],
+                  }}
+                />
+              </div>
+            )}
             {page === 'triage' && (
               <div className="triage-context">
                 <div className="triage-context-summary">
@@ -675,7 +704,7 @@ export function Coordinator({ page }: { page: string }) {
                   <p>{detail.declared_danger ? 'Có khai báo nguy hiểm tính mạng' : 'Chưa khai báo nguy hiểm tính mạng'}</p>
                   <p>{detail.needs_rescue ? 'Cần cứu hộ' : 'Không khai báo cần cứu hộ'}
                     {detail.needs_relief_supplies ? ' · Cần hàng cứu trợ' : ''}</p>
-                  <small>Ghim đỏ là SOS đang chọn; vùng nhiệt cho biết mật độ SOS gần đó.</small>
+                  <small>Ghim đỏ đang nhảy là SOS đang chọn; vùng nhiệt cho biết mật độ SOS gần đó.</small>
                 </div>
                 <div className="triage-context-map">
                   <h3>Vị trí trên bản đồ nhiệt</h3>
@@ -1130,11 +1159,10 @@ export function Coordinator({ page }: { page: string }) {
                   path: `/requests/${detail.id}/attach-campaign`,
                   version: detail.version,
                   fields: [
-                    { name: 'campaign_id', label: 'Chiến dịch', type: 'reference', required: true,
+                    { name: 'campaign_id', label: 'Chiến dịch', type: 'choice-cards', required: true,
                       options: campaignOptions
                         .filter((campaign) => campaign.regionCode === null || campaign.regionCode === detail.region_code)
-                        .map(({ value, label: name }) => ({ value, label: name })),
-                      placeholder: 'Dán mã chiến dịch' },
+                        .map(({ value, label: name }) => ({ value, label: name })) },
                   ],
                   warning: 'Xác nhận gắn yêu cầu này vào chiến dịch đã chọn?',
                 })}
@@ -1464,7 +1492,7 @@ export function CoordinatorMap() {
     regions,
     loading: regionLoading,
     error: regionError,
-  } = useAnalyticsRegion();
+  } = useAnalyticsRegion(true, true);
   return (
     <section className="card">
       <h2>Bản đồ nhiệt SOS</h2>
@@ -1480,7 +1508,7 @@ export function CoordinatorMap() {
         </button>
       </div>
       {!national && <AnalyticsRegionField region={region} onChange={setRegion} regions={regions} />}
-      {national && <p className="muted">Tổng hợp các khu vực có chiến dịch mà tài khoản được cấp quyền xem.</p>}
+      {national && <p className="muted">Tổng hợp khu vực từ SOS và chiến dịch mà tài khoản được cấp quyền xem.</p>}
       {regionError && (
         <p role="alert" className="notice error">
           {regionError}

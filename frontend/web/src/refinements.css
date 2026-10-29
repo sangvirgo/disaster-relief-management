@@ -367,16 +367,17 @@
   gap: 14px;
   min-height: 78px;
   padding: 15px;
-  border: 1px dashed #86b3ee;
+  border: 1px solid #cbd7e7;
   border-radius: 12px;
-  background: #f5f9ff;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(24, 43, 77, 0.06);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 .tracking-file-picker:hover,
 .tracking-file-picker:focus-within {
-  background: #ebf4ff;
-  border-color: #2874d7;
+  background: #f6f9ff;
+  border-color: #2563eb;
 }
 .tracking-file-picker input {
   position: absolute;
@@ -400,9 +401,59 @@
 .tracking-file-picker strong,
 .tracking-file-picker small { display: block; }
 .tracking-file-picker small { color: var(--color-text-secondary); font-weight: 400; margin-top: 3px; }
+.mission-status-offered { background: #fff7e7; border-color: #f5ce77; color: #8b5800; }
+.mission-status-accepted { background: #eef2ff; border-color: #b8c2ff; color: #3730a3; }
+.mission-status-en_route { background: #e8f7fc; border-color: #8ed6eb; color: #075b75; }
+.mission-status-on_scene { background: #fff0e8; border-color: #f9b995; color: #9a3412; }
+.mission-status-completed { background: #eaf8ef; border-color: #9fd8b0; color: #166534; }
+.mission-status-failed { background: #fef0f0; border-color: #efb4b4; color: #a32222; }
+.mission-status-declined, .mission-status-cancelled { background: #f2f4f7; border-color: #cbd1d9; color: #475467; }
+.mission-detail-card { scroll-margin-top: 64px; }
 .tracking-evidence-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
 .tracking-recent-evidence { margin-top: 22px; }
 .tracking-recent-evidence h3 { margin-bottom: 12px; }
+.sos-required-note {
+  margin: -4px 0 4px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+.sos-required-note span,
+.required-mark {
+  color: #b42318;
+  font-weight: 800;
+}
+.command-choice-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.command-choice-list legend {
+  margin-bottom: 9px;
+  font-weight: 700;
+}
+.command-choice-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid var(--color-surface-border);
+  border-radius: 12px;
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.command-choice-card:hover,
+.command-choice-card.selected {
+  border-color: var(--color-primary);
+  background: var(--sidebar-active-bg);
+}
+.command-choice-card.selected { box-shadow: 0 0 0 2px rgba(37, 99, 235, .12); }
+.command-choice-card span:last-child { color: var(--color-primary); font-weight: 800; }
 .emergency-bar {
   position: sticky;
   top: 0;
@@ -979,5 +1030,22 @@
   .detail-grid p {
     grid-template-columns: minmax(112px, 38%) minmax(0, 1fr);
     column-gap: 12px;
+  }
+}
+.donation-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.donation-layout .record > div {
+  min-width: 0;
+}
+
+.donation-layout .record > .button {
+  flex-shrink: 0;
+}
+
+@media (min-width: 1320px) {
+  .donation-layout:has(> .card:nth-child(2)) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

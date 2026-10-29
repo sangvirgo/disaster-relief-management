@@ -101,6 +101,12 @@ export function SosForm({
   }
   function build(): Pending {
     if (!category) throw new Error('Vui lòng chọn loại sự cố.');
+    if (name.trim().length > 200) throw new Error('Họ tên người báo không được quá 200 ký tự.');
+    if (phone.trim()) {
+      const normalizedPhone = phone.trim().replace(/[ ()-]/g, '');
+      if (phone.length > 32 || !/^\+?[0-9]{8,15}$/.test(normalizedPhone))
+        throw new Error('Số điện thoại cần có 8–15 chữ số; có thể thêm dấu + ở đầu.');
+    }
     const lon = Number(longitude),
       lat = Number(latitude);
     if (
@@ -131,6 +137,8 @@ export function SosForm({
     if (mode === 'PROXY' && !user) throw new Error('Vui lòng đăng nhập để báo hộ.');
     if (mode === 'PROXY' && (!relationship.trim() || !informationSource.trim() || !situationAt))
       throw new Error('Vui lòng nhập quan hệ, nguồn thông tin và thời điểm biết tình hình.');
+    if (mode === 'PROXY' && (relationship.trim().length > 100 || informationSource.trim().length > 500))
+      throw new Error('Quan hệ tối đa 100 ký tự và nguồn thông tin tối đa 500 ký tự.');
     const location = {
       type: 'Point',
       coordinates: [lon, lat],
@@ -220,6 +228,7 @@ export function SosForm({
       <p>
         Vị trí phải là nơi cần hỗ trợ. Yêu cầu chỉ được ghi nhận khi máy chủ trả về mã theo dõi.
       </p>
+      <p className="sos-required-note"><span aria-hidden="true">*</span> Trường bắt buộc</p>
       {user && (
         <fieldset>
           <legend>Người cần hỗ trợ</legend>
@@ -249,7 +258,7 @@ export function SosForm({
       )}
       <div className="form-grid">
         <label>
-          Loại sự cố
+          <span>Loại sự cố <span className="required-mark" aria-hidden="true">*</span></span>
           <select
             required
             value={category}
@@ -272,6 +281,7 @@ export function SosForm({
             type="number"
             min="1"
             max="10000"
+            placeholder="Từ 1 đến 10.000"
             value={people}
             onChange={(e) => {
               setPeople(e.target.value);
@@ -285,6 +295,7 @@ export function SosForm({
             type="number"
             min="0"
             max="10000"
+            placeholder="Từ 0 đến 10.000"
             value={children}
             onChange={(e) => {
               setChildren(e.target.value);
@@ -298,6 +309,7 @@ export function SosForm({
             type="number"
             min="0"
             max="10000"
+            placeholder="Từ 0 đến 10.000"
             value={elderly}
             onChange={(e) => {
               setElderly(e.target.value);
@@ -309,6 +321,7 @@ export function SosForm({
           Họ tên người báo (nếu muốn)
           <input
             value={name}
+            maxLength={200}
             onChange={(e) => {
               setName(e.target.value);
               pending.current = null;
@@ -319,6 +332,10 @@ export function SosForm({
           Số điện thoại liên hệ (nếu có)
           <input
             type="tel"
+            maxLength={32}
+            inputMode="tel"
+            title="Nhập 8–15 chữ số; có thể thêm dấu + ở đầu"
+            placeholder="Ví dụ: 0912345678"
             value={phone}
             onChange={(e) => {
               setPhone(e.target.value);
@@ -328,7 +345,7 @@ export function SosForm({
         </label>
       </div>
       <label>
-        Mô tả tình hình
+        Mô tả tình hình (nếu muốn)
         <textarea
           maxLength={2000}
           value={description}
@@ -345,7 +362,7 @@ export function SosForm({
         Không nhập thông tin cá nhân không cần thiết.
       </div>
       <fieldset className="sos-needs">
-        <legend>Nhu cầu cần hỗ trợ</legend>
+        <legend>Nhu cầu cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></legend>
         <label className="radio">
           <input
             type="checkbox"
@@ -381,7 +398,7 @@ export function SosForm({
         Có dấu hiệu nguy hiểm tính mạng theo thông tin tôi biết
       </label>
       <div className="location-heading">
-        <h3>Vị trí cần hỗ trợ</h3>
+        <h3>Vị trí cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></h3>
         <button type="button" className="button secondary" onClick={locate}>
           Dùng vị trí hiện tại
         </button>
@@ -396,10 +413,12 @@ export function SosForm({
       />
       <div className="form-grid">
         <label>
-          Kinh độ
+          <span>Kinh độ <span className="required-mark" aria-hidden="true">*</span></span>
           <input
             type="number"
             step="any"
+            min="-180"
+            max="180"
             required
             value={longitude}
             onChange={(e) => changeCoordinates(setLongitude, e.target.value)}
@@ -407,10 +426,12 @@ export function SosForm({
           />
         </label>
         <label>
-          Vĩ độ
+          <span>Vĩ độ <span className="required-mark" aria-hidden="true">*</span></span>
           <input
             type="number"
             step="any"
+            min="-90"
+            max="90"
             required
             value={latitude}
             onChange={(e) => changeCoordinates(setLatitude, e.target.value)}
@@ -425,9 +446,10 @@ export function SosForm({
           </div>
           <div className="form-grid">
             <label>
-              Quan hệ với gia đình cần hỗ trợ
+              <span>Quan hệ với gia đình cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></span>
               <input
                 required
+                maxLength={100}
                 value={relationship}
                 onChange={(e) => {
                   setRelationship(e.target.value);
@@ -436,9 +458,10 @@ export function SosForm({
               />
             </label>
             <label>
-              Nguồn thông tin
+              <span>Nguồn thông tin <span className="required-mark" aria-hidden="true">*</span></span>
               <input
                 required
+                maxLength={500}
                 value={informationSource}
                 onChange={(e) => {
                   setInformationSource(e.target.value);
@@ -447,7 +470,7 @@ export function SosForm({
               />
             </label>
             <label>
-              Thời điểm biết tình hình
+              <span>Thời điểm biết tình hình <span className="required-mark" aria-hidden="true">*</span></span>
               <input
                 required
                 type="datetime-local"

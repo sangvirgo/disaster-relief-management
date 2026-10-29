@@ -358,7 +358,7 @@ export function Donations({
   }
   if (page === 'donation' || showCreatedTracking)
     return (
-      <div className="grid-two">
+      <div className="grid-two donation-layout">
         <section className="card">
           <h2>Tra cứu đóng góp</h2>
           <p>Nhập định danh bản khai và mã bảo mật riêng tư. Mã bảo mật không nằm trong URL.</p>
@@ -587,7 +587,7 @@ export function Donations({
       </section>
     );
   return (
-    <div className="grid-two">
+    <div className="grid-two donation-layout">
       <section className="card">
         <h2>Đợt quyên góp đang mở</h2>
         {loading && <p role="status">Đang tải…</p>}

@@ -54,7 +54,7 @@ function missionEvidenceError(file: File): string | null {
   return null;
 }
 
-export function Notices() {
+export function Notices({ onOpenMission }: { onOpenMission?: (missionId: string) => void }) {
   const [items, setItems] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState('');
@@ -146,11 +146,16 @@ export function Notices() {
               <p>{timeLabel(item.created_at)}</p>
               <small>{item.read_at ? `Đã đọc lúc ${timeLabel(item.read_at)}` : 'Chưa đọc'}</small>
             </div>
-            {!item.read_at && (
-              <button className="button secondary" onClick={() => markRead(item.id)}>
-                Đánh dấu đã đọc
-              </button>
-            )}
+            <div className="record-actions">
+              {onOpenMission && typeof item.payload.mission_id === 'string' &&
+                <button className="button secondary" type="button"
+                  onClick={() => onOpenMission(item.payload.mission_id as string)}>Xem nhiệm vụ</button>}
+              {!item.read_at && (
+                <button className="button secondary" onClick={() => markRead(item.id)}>
+                  Đánh dấu đã đọc
+                </button>
+              )}
+            </div>
           </article>
         ))}
       </div>
@@ -163,7 +168,7 @@ export function Notices() {
   );
 }
 
-export function Volunteer({ page }: { page: string }) {
+export function Volunteer({ page, initialMissionId }: { page: string; initialMissionId?: string }) {
   const isTeam = page === 'team';
   const [items, setItems] = useState<Mission[] | Team[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,6 +180,7 @@ export function Volunteer({ page }: { page: string }) {
   // Selected mission and detailed state
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
   const [missionDetail, setMissionDetail] = useState<MissionDetail | null>(null);
+  const missionCardRef = useRef<HTMLElement | null>(null);
   const [missionLoading, setMissionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -200,6 +206,17 @@ export function Volunteer({ page }: { page: string }) {
   const commandKeyRef = useRef<string | null>(null);
   const completionUploadKeyRef = useRef<{ file: File; key: string } | null>(null);
   const completionFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!initialMissionId || isTeam) return;
+    let live = true;
+    api<MissionDetail>('response', `/missions/${encodeURIComponent(initialMissionId)}`)
+      .then((mission) => { if (live) setSelectedMission(mission); })
+      .catch((cause) => {
+        if (live) setError(cause instanceof Error ? cause.message : 'Không thể mở nhiệm vụ từ thông báo.');
+      });
+    return () => { live = false; };
+  }, [initialMissionId, isTeam]);
 
   useEffect(() => {
     if (!completionFile || !completionFile.type.startsWith('image/')) return;
@@ -262,6 +279,11 @@ export function Volunteer({ page }: { page: string }) {
       live = false;
     };
   }, [selectedMission?.id, revision]);
+
+  useEffect(() => {
+    if (initialMissionId && missionDetail?.id === initialMissionId)
+      missionCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [initialMissionId, missionDetail?.id]);
 
   function refreshAll() {
     setRevision((val) => val + 1);
@@ -570,7 +592,7 @@ export function Volunteer({ page }: { page: string }) {
                     <strong>{mission.team.name}</strong>
                     <p>
                       {label(mission.category)} ·{' '}
-                      <span className="chip">{label(mission.status)}</span>
+                      <span className={`chip mission-status mission-status-${mission.status.toLowerCase()}`}>{label(mission.status)}</span>
                     </p>
                     {mission.declared_danger && (
                       <p className="notice warning">Có nguy hiểm tính mạng</p>
@@ -595,7 +617,7 @@ export function Volunteer({ page }: { page: string }) {
       </section>
 
       {/* Cột phải: Bảng điều hành chi tiết */}
-      <section className="card">
+      <section className="card mission-detail-card" ref={missionCardRef}>
         {isTeam ? (
           <>
             <h2>Chi tiết & Vị trí Đội cứu hộ</h2>
@@ -933,8 +955,7 @@ export function Volunteer({ page }: { page: string }) {
                         placeholder="Mô tả kết quả (số người đã giải cứu an toàn, tình trạng sức khỏe, nơi chuyển đến...)"
                       />
                     </label>
-                    <label>
-                      Ảnh hoặc video hiện trường (không bắt buộc)
+                    <label className="tracking-file-picker">
                       <input
                         ref={completionFileInputRef}
                         type="file"
@@ -947,6 +968,11 @@ export function Volunteer({ page }: { page: string }) {
                           setActionMessage(file ? missionEvidenceError(file) || '' : '');
                         }}
                       />
+                      <span className="tracking-file-icon" aria-hidden="true">↑</span>
+                      <span>
+                        <strong>{completionFile ? completionFile.name : 'Thêm ảnh hoặc video khi hoàn thành'}</strong>
+                        <small>Không bắt buộc · JPEG, PNG hoặc MP4</small>
+                      </span>
                     </label>
                     {completionFile && (
                       <div className="mission-evidence-preview">
@@ -1004,14 +1030,18 @@ export function Volunteer({ page }: { page: string }) {
                       Hình ảnh giải cứu, tình hình nước ngập hoặc tài liệu hiện trường (JPEG, PNG,
                       MP4).
                     </p>
-                    <label>
-                      Chọn tệp hình ảnh/video:
+                    <label className="tracking-file-picker">
                       <input
                         type="file"
                         required
                         accept="image/jpeg,image/png,video/mp4"
                         onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)}
                       />
+                      <span className="tracking-file-icon" aria-hidden="true">↑</span>
+                      <span>
+                        <strong>{evidenceFile ? evidenceFile.name : 'Chọn ảnh hoặc video hiện trường'}</strong>
+                        <small>JPEG, PNG hoặc MP4</small>
+                      </span>
                     </label>
                     <button className="button secondary" disabled={busy || !evidenceFile}>
                       {busy ? 'Đang tải minh chứng…' : 'Tải minh chứng lên'}
