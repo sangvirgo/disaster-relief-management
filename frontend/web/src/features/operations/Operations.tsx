@@ -6,7 +6,7 @@ import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { formatQuantity } from '../../i18n/quantity';
 import { ReceiptCountForm } from './ReceiptCountForm';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
-import { DetailCloseButton } from '../../components/DetailCloseButton';
+import { DetailSurface } from '../../components/DetailSurface';
 
 type Row = Record<string, unknown> & {
   id?: string;
@@ -312,7 +312,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   };
   return (
     <div
-      className={`coordinator-layout ${page === 'stock' || (page === 'reports' && report === 'stock-summary') ? 'operations-table-layout' : ''}`}
+      className={`coordinator-layout ${page === 'review' ? 'operations-review-layout' : ''} ${page === 'stock' || (page === 'reports' && report === 'stock-summary') ? 'operations-table-layout' : ''}`}
     >
       <section className="card">
         <h2>{headings[page]}</h2>
@@ -545,15 +545,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           </button>
         )}
       </section>
-      <section className={`card detail-panel-card ${selected ? 'is-open' : ''}`}>
-        {selected && (
-          <DetailCloseButton
-            onClick={() => {
-              setSelected(null);
-              setDetail(null);
-            }}
-          />
-        )}
+      <DetailSurface modal={page === 'review'} open={Boolean(selected)} onClose={() => { setSelected(null); setDetail(null); }}>
         <h2>
           {selected
             ? page === 'stock'
@@ -1258,7 +1250,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             lượng được giữ theo từng đơn vị vật phẩm.
           </p>
         )}
-      </section>
+      </DetailSurface>
     </div>
   );
 }

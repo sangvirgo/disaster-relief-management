@@ -719,6 +719,13 @@
   text-decoration: none;
   min-height: 42px;
 }
+.mission-route-summary { display: flex; align-items: center; gap: 14px; margin: 12px 0; }
+.mission-route-summary > div { flex: 1; min-width: 0; padding: 12px; border-radius: 10px; background: #fff; border: 1px solid var(--color-primary-border); }
+.mission-route-summary small { display: block; color: var(--color-text-secondary); margin-bottom: 4px; }
+.mission-route-summary strong { display: block; overflow-wrap: anywhere; }
+.mission-location .mission-route-coordinates { margin: 10px 0 14px; font-variant-numeric: tabular-nums; }
+.mission-location .mission-route-note { margin: 10px 0 0; font-size: 12px; }
+@media (max-width: 600px) { .mission-route-summary { gap: 8px; } .mission-route-summary > div { padding: 10px; } }
 
 @media (max-width: 1050px) {
   .coordinator-layout {

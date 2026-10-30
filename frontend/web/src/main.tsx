@@ -57,7 +57,6 @@ const Donations = React.lazy(() => import('./features/citizen/Donations').then((
 const TrackingActions = React.lazy(() => import('./features/citizen/TrackingActions').then((module) => ({ default: module.TrackingActions })));
 const Coordinator = React.lazy(() => import('./features/coordinator/Coordinator').then((module) => ({ default: module.Coordinator })));
 const CoordinatorMap = React.lazy(() => import('./features/coordinator/Coordinator').then((module) => ({ default: module.CoordinatorMap })));
-const HeatmapPanel = React.lazy(() => import('./features/coordinator/HeatmapPanel').then((module) => ({ default: module.HeatmapPanel })));
 const Campaigns = React.lazy(() => import('./features/coordinator/Campaigns').then((module) => ({ default: module.Campaigns })));
 const Notices = React.lazy(() => import('./features/volunteer/Volunteer').then((module) => ({ default: module.Notices })));
 const Volunteer = React.lazy(() => import('./features/volunteer/Volunteer').then((module) => ({ default: module.Volunteer })));
@@ -96,7 +95,6 @@ type DataPage = {
   active_missions?: number;
   overdue_missions?: number;
 };
-type SosReceipt = ResponseComponents['schemas']['CreatedSelfRequest'];
 const icon = (name: string) => <img src={`/icons/${name}.svg`} alt="" aria-hidden="true" />;
 const text = (value: unknown) => (typeof value === 'string' ? value : undefined);
 
@@ -495,22 +493,6 @@ function AuthModal({
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function AuthRequiredNotice({ onOpenAuth }: { onOpenAuth: () => void }) {
-  return (
-    <div className="card auth-required-card">
-      <div className="eyebrow">Yêu cầu xác thực</div>
-      <h2>Vui lòng đăng nhập</h2>
-      <p>
-        Khu vực này yêu cầu đăng nhập tài khoản để bảo mật dữ liệu và liên kết đúng phân quyền của
-        bạn.
-      </p>
-      <button className="button" onClick={onOpenAuth}>
-        Đăng nhập / Đăng ký ngay
-      </button>
     </div>
   );
 }
@@ -1045,6 +1027,33 @@ function DetailPanel({
   );
 }
 
+function PublicCampaignDialog({ campaign, onClose }: { campaign: Record<string, unknown>; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const [closing, setClosing] = useState(false);
+  function closeDialog() { setClosing(true); window.setTimeout(() => dialogRef.current?.close(), 180); }
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    return () => { if (dialog?.open) dialog.close(); };
+  }, []);
+  return (
+    <dialog ref={dialogRef} className={`campaign-public-dialog ${closing ? 'is-closing' : ''}`} aria-label="Chi tiết chiến dịch" onClose={onClose} onCancel={(event) => { event.preventDefault(); closeDialog(); }}
+      onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog(); }}>
+      <div className="campaign-dialog-header">
+        <div><span className="eyebrow">CHIẾN DỊCH CỨU TRỢ</span><h2>{text(campaign.title) || 'Chiến dịch cứu trợ'}</h2></div>
+        <button type="button" className="modal-close-button" aria-label="Đóng chi tiết chiến dịch" onClick={closeDialog}>×</button>
+      </div>
+      <p className="campaign-dialog-objective">{text(campaign.objective) || 'Chưa có mô tả mục tiêu.'}</p>
+      <dl className="fact-list">
+        <div><dt>Trạng thái</dt><dd><span className="chip">{label(campaign.status)}</span></dd></div>
+        <div><dt>Khu vực</dt><dd>{text(campaign.region_name) || 'Chưa ghi khu vực'}</dd></div>
+        <div><dt>Bắt đầu</dt><dd>{campaign.starts_at ? timeLabel(campaign.starts_at) : 'Chưa ấn định'}</dd></div>
+        <div><dt>Kết thúc</dt><dd>{campaign.ends_at ? timeLabel(campaign.ends_at) : 'Chưa ấn định'}</dd></div>
+      </dl>
+    </dialog>
+  );
+}
+
 function LivePage({ page, user }: { page: Page; user: Me | null }) {
   const {
     region,
@@ -1058,10 +1067,12 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
   const [loading, setLoading] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
   const [detailPath, setDetailPath] = useState<string | null>(null);
+  const [selectedPublicCampaign, setSelectedPublicCampaign] = useState<Record<string, unknown> | null>(null);
   function openDetail(item: Record<string, unknown>): void {
     const id = text(item.id);
     if (!id) return;
-    if (page.service === 'response' && page.path?.startsWith('/requests'))
+    if (page.path === '/public/campaigns') setSelectedPublicCampaign(item);
+    else if (page.service === 'response' && page.path?.startsWith('/requests'))
       setDetailPath(`/requests/${encodeURIComponent(id)}`);
     else if (page.service === 'response' && page.path === '/missions/mine')
       setDetailPath(`/missions/${encodeURIComponent(id)}`);
@@ -1069,6 +1080,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
       setDetailPath(`/users/${encodeURIComponent(id)}`);
   }
   const canOpen =
+    page.path === '/public/campaigns' ||
     (page.service === 'response' &&
       (page.path?.startsWith('/requests') || page.path === '/missions/mine')) ||
     (page.service === 'identity' && page.path === '/users');
@@ -1121,6 +1133,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
       {page.note && page.path !== '/reports/summary' && <p>{page.note}</p>}
       {page.path === '/reports/summary' && (
         <>
+          <p className="muted">Số liệu báo cáo thuộc khu vực đang chọn. Heatmap có bộ chọn phạm vi riêng và mặc định tổng hợp các khu vực được cấp quyền.</p>
           <AnalyticsRegionField
             region={region}
             onChange={(value) => {
@@ -1165,9 +1178,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
           ) : 'status_counts' in data ? (
             <div className="report-content">
               <div className="report-heatmap">
-                <h3>Bản đồ nhiệt SOS</h3>
-                <p>Chấm tròn cho biết nơi có SOS; phóng gần để xem vùng nhiệt theo mật độ.</p>
-                <HeatmapPanel region={region} />
+                <CoordinatorMap />
               </div>
               <div className="report-metrics">
                 <div className="metric-tile">
@@ -1225,6 +1236,9 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
           {data.generated_at && (
             <p className="muted">Dữ liệu tạo lúc {timeLabel(data.generated_at)}</p>
           )}
+          {page.path === '/public/campaigns' && selectedPublicCampaign && (
+            <PublicCampaignDialog campaign={selectedPublicCampaign} onClose={() => setSelectedPublicCampaign(null)} />
+          )}
           {(data.next_cursor || (data.more && data.cursor)) && (
             <button
               className="button secondary"
@@ -1273,14 +1287,56 @@ function App() {
   );
   const [sessionError, setSessionError] = useState('');
   const [workspace, setWorkspace] = useState<Workspace>('citizen');
-  const [pageId, setPageId] = useState('home');
+  const [pageId, setPageId] = useState('sos');
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutError, setLogoutError] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [latestReceipt, setLatestReceipt] = useState<SosReceipt | null>(null);
   const [selectedTrackingCode, setSelectedTrackingCode] = useState('');
   const [selectedMissionId, setSelectedMissionId] = useState('');
+  const [sharingTeamId, setSharingTeamId] = useState('');
+  const [sharingMessage, setSharingMessage] = useState('');
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const closeMenu = (event: PointerEvent) => {
+      if (!(event.target as Element).closest('.profile-menu-wrap')) setProfileMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setProfileMenuOpen(false); };
+    document.addEventListener('pointerdown', closeMenu);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => { document.removeEventListener('pointerdown', closeMenu); document.removeEventListener('keydown', closeOnEscape); };
+  }, [profileMenuOpen]);
+
+  useEffect(() => {
+    if (!sharingTeamId || !user) return;
+    let active = true;
+    let sending = false;
+    const sendPosition = () => {
+      if (!active || sending || document.visibilityState !== 'visible') return;
+      if (!navigator.geolocation) { setSharingMessage('Trình duyệt không hỗ trợ chia sẻ vị trí.'); setSharingTeamId(''); return; }
+      sending = true;
+      navigator.geolocation.getCurrentPosition(async ({ coords, timestamp }) => {
+        if (!active) { sending = false; return; }
+        try {
+          await api('response', `/teams/${encodeURIComponent(sharingTeamId)}/position`, {
+            method: 'PUT',
+            body: { location: { type: 'Point', coordinates: [coords.longitude, coords.latitude], source: 'GPS' },
+              captured_at: new Date(timestamp).toISOString(), accuracy_m: coords.accuracy },
+          });
+          if (active) setSharingMessage('Đã gửi vị trí đội cứu hộ. Sẽ tự cập nhật sau 2 phút.');
+        } catch (cause) {
+          if (active) setSharingMessage(cause instanceof Error ? cause.message : 'Không gửi được vị trí. Sẽ thử lại sau 2 phút.');
+        } finally { sending = false; }
+      }, () => { if (active) setSharingMessage('Không lấy được GPS. Kiểm tra quyền vị trí; ứng dụng sẽ thử lại sau 2 phút.'); sending = false; },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    };
+    sendPosition();
+    const timer = window.setInterval(sendPosition, 120000);
+    document.addEventListener('visibilitychange', sendPosition);
+    return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', sendPosition); };
+  }, [sharingTeamId, user]);
 
   useEffect(() => {
     me()
@@ -1289,7 +1345,7 @@ function App() {
         setSessionState('ready');
         const defaultWs = defaultWorkspaceForUser(value);
         setWorkspace(defaultWs);
-        setPageId(allowedPages(defaultWs, value)[0]?.id || 'home');
+        setPageId(allowedPages(defaultWs, value)[0]?.id || 'sos');
       })
       .catch((cause) => {
         if (cause instanceof ApiError && cause.status === 401) {
@@ -1303,13 +1359,15 @@ function App() {
 
   const workspaces = allowedWorkspaces(user);
   const navigation = allowedPages(workspace, user);
-  const selected =
-    navigation.find((page) => page.id === pageId) || navigation[0] || pages.citizen[0];
+  const selected = pageId === 'account' && user
+    ? { id: 'account', title: 'Tài khoản', icon: 'account' }
+    : navigation.find((page) => page.id === pageId) || navigation[0] || pages.citizen[0];
 
   function changeWorkspace(next: Workspace) {
     setWorkspace(next);
-    setPageId(allowedPages(next, user)[0]?.id || 'home');
+    setPageId(allowedPages(next, user)[0]?.id || 'sos');
     setMenuOpen(false);
+    setProfileMenuOpen(false);
   }
 
   function changePage(id: string) {
@@ -1317,6 +1375,7 @@ function App() {
     setSelectedMissionId('');
     setPageId(id);
     setMenuOpen(false);
+    setProfileMenuOpen(false);
   }
 
   function trackOwnedRequest(code: string) {
@@ -1330,7 +1389,7 @@ function App() {
     try {
       await logout();
       setUser(null);
-      setLatestReceipt(null);
+      setSharingTeamId('');
       setSessionState('guest');
       changeWorkspace('citizen');
     } catch (cause) {
@@ -1400,16 +1459,12 @@ function App() {
           </div>
 
           <div className="top-actions">
+            {sharingTeamId && <button type="button" className="sharing-indicator" onClick={() => setSharingTeamId('')} title={sharingMessage || 'Dừng tự cập nhật vị trí đội cứu hộ'}>Tự cập nhật GPS đang bật · Dừng</button>}
             {user ? (
-              <button
-                type="button"
-                className="user-profile profile-trigger"
-                onClick={() => {
-                  changeWorkspace('citizen');
-                  setPageId('account');
-                }}
-                aria-label="Mở tài khoản của tôi"
-              >
+              <div className="profile-menu-wrap">
+              <button type="button" className="user-profile profile-trigger"
+                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                aria-label="Mở trình đơn tài khoản" aria-expanded={profileMenuOpen}>
                 <span className="user-avatar" aria-hidden="true">
                   {user.display_name ? user.display_name.trim().charAt(0).toUpperCase() : 'U'}
                 </span>
@@ -1420,6 +1475,11 @@ function App() {
                   </span>
                 </span>
               </button>
+              {profileMenuOpen && <div className="profile-menu" role="menu">
+                <button type="button" role="menuitem" onClick={() => { setPageId('account'); setProfileMenuOpen(false); }}>Xem hồ sơ</button>
+                <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); void signOut(); }}>Đăng xuất</button>
+              </div>}
+              </div>
             ) : (
               <div className="guest-actions">
                 <span className="guest-badge">Khách vãng lai</span>
@@ -1440,7 +1500,7 @@ function App() {
           </div>
         </div>
 
-        <main className="content">
+        <main className={`content ${workspace === 'citizen' && selected.id === 'sos' ? 'content--sos' : ''}`}>
           <ContentErrorBoundary key={`${workspace}:${selected.id}`}>
           <React.Suspense fallback={<div className="card" role="status">Đang tải nội dung…</div>}>
           <div className="heading">
@@ -1481,63 +1541,13 @@ function App() {
             sessionState !== 'loading' &&
             sessionState !== 'error' && (
               <>
-                {workspace === 'citizen' && selected.id === 'home' ? (
-                  <section className="card">
-                    <h2>Bạn cần hỗ trợ?</h2>
-                    <p>
-                      Gửi yêu cầu SOS khi cần cứu hộ, giữ mã theo dõi sau khi máy chủ xác nhận và
-                      tra cứu tiến độ tại đây.
-                    </p>
-                    <div className="action-grid">
-                      <button className="button" onClick={() => changePage('sos')}>
-                        Gửi yêu cầu SOS
-                      </button>
-                      <button className="button secondary" onClick={() => changePage('track')}>
-                        Theo dõi SOS
-                      </button>
-                      <button className="button secondary" onClick={() => changePage('drives')}>
-                        Xem đợt quyên góp
-                      </button>
-                    </div>
-                  </section>
-                ) : workspace === 'citizen' && selected.id === 'receipt' ? (
-                  <section className="card" role="status">
-                    <h2>Xác nhận tiếp nhận SOS</h2>
-                    {latestReceipt ? (
-                      <>
-                        <p>
-                          Mã theo dõi: <strong>{latestReceipt.tracking_code}</strong>
-                        </p>
-                        <p>
-                          Trạng thái: {label(latestReceipt.status)} · Thời điểm:{' '}
-                          {timeLabel(latestReceipt.received_at)}
-                        </p>
-                        <p>
-                          Mã bảo mật chỉ hiện một lần trên màn hình gửi SOS. Nếu đã rời màn hình đó,
-                          hãy dùng mã đã lưu để tra cứu.
-                        </p>
-                        <button className="button secondary" onClick={() => changePage('track')}>
-                          Theo dõi tiến độ
-                        </button>
-                      </>
-                    ) : (
-                      <p>
-                        Chưa có yêu cầu SOS nào được xác nhận trong phiên mở trang này. Hãy gửi yêu
-                        cầu hoặc tra cứu bằng mã theo dõi đã lưu.
-                      </p>
-                    )}
-                  </section>
-                ) : selected.id === 'account' && !user ? (
-                  <AuthRequiredNotice onOpenAuth={() => setShowAuthModal(true)} />
-                ) : workspace === 'citizen' && selected.id === 'account' && user ? (
+                {selected.id === 'account' && user ? (
                   <CitizenAccount
                     user={user}
-                    onTrack={trackOwnedRequest}
                     onChangePassword={() => setShowPasswordModal(true)}
-                    onLogout={signOut}
                   />
                 ) : workspace === 'citizen' && selected.id === 'sos' ? (
-                  <SosForm user={user} onConfirmed={setLatestReceipt} />
+                  <SosForm user={user} onTrack={trackOwnedRequest} />
                 ) : selected.id === 'track' ? (
                   <Tracking
                     key={selectedTrackingCode}
@@ -1547,9 +1557,8 @@ function App() {
                     onBack={() => changePage('track')}
                     onNewSos={() => changePage('sos')}
                   />
-                ) : workspace === 'citizen' &&
-                  ['drives', 'declare', 'donation'].includes(selected.id) ? (
-                  <Donations page={selected.id as 'drives' | 'declare' | 'donation'} user={user} />
+                ) : workspace === 'citizen' && selected.id === 'drives' ? (
+                  <Donations user={user} />
                 ) : workspace === 'coordinator' &&
                   ['queue', 'verify', 'triage', 'assign'].includes(selected.id) ? (
                   <Coordinator key={selected.id} page={selected.id} />
@@ -1567,7 +1576,9 @@ function App() {
                   selected.id === 'campaigns' ? (
                   <Campaigns key={workspace} />
                 ) : workspace === 'volunteer' ? (
-                  <Volunteer key={`${selected.id}:${selectedMissionId}`} page={selected.id} initialMissionId={selectedMissionId} />
+                  <Volunteer key={`${selected.id}:${selectedMissionId}`} page={selected.id} initialMissionId={selectedMissionId}
+                    sharingTeamId={sharingTeamId} sharingMessage={sharingMessage}
+                    onToggleSharing={(teamId) => { setSharingTeamId((current) => current === teamId ? '' : teamId); setSharingMessage(''); }} />
                 ) : workspace === 'operations' && selected.id === 'overview' ? (
                   <OperationsDashboard />
                 ) : workspace === 'operations' && user ? (
@@ -1590,11 +1601,10 @@ function App() {
         onClose={() => setShowAuthModal(false)}
         onReady={(loggedInUser) => {
           setUser(loggedInUser);
-          setLatestReceipt(null);
           setSessionState('ready');
           const defaultWs = defaultWorkspaceForUser(loggedInUser);
           setWorkspace(defaultWs);
-          setPageId(allowedPages(defaultWs, loggedInUser)[0]?.id || 'home');
+          setPageId(allowedPages(defaultWs, loggedInUser)[0]?.id || 'sos');
           setShowAuthModal(false);
         }}
       />

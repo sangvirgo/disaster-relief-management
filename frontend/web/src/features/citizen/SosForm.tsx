@@ -36,9 +36,11 @@ function secret32(): string {
 export function SosForm({
   user,
   onConfirmed,
+  onTrack,
 }: {
   user: Me | null;
   onConfirmed?: (receipt: Created) => void;
+  onTrack?: (code: string) => void;
 }) {
   const [mode, setMode] = useState<'SELF' | 'PROXY'>('SELF');
   const [category, setCategory] = useState('');
@@ -235,6 +237,11 @@ export function SosForm({
           Điều phối viên sẽ xác minh và quyết định ưu tiên. Nếu đang nguy hiểm, hãy gọi 113, 114
           hoặc 115.
         </p>
+        {user && onTrack && (
+          <button type="button" className="button" onClick={() => onTrack(created.tracking_code)}>
+            Theo dõi tiến độ
+          </button>
+        )}
       </section>
     );
   return (

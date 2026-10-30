@@ -109,6 +109,7 @@ function HeatmapCanvas({
       zoomControl: true, scrollWheelZoom: true,
     });
     mapRef.current = map;
+    let resizeBaseMap = () => {};
     if (tileUrl) {
       L.tileLayer(tileUrl, { attribution: tileAttribution, maxZoom: 19 })
         .on('tileerror', () => setTileError(true))
@@ -116,6 +117,7 @@ function HeatmapCanvas({
         .addTo(map);
     } else {
       const vectorLayer = maplibreGL({ style: mapStyleUrl }).addTo(map);
+      resizeBaseMap = () => vectorLayer.getMaplibreMap().resize();
       vectorLayer.getMaplibreMap().on('error', () => setTileError(true));
       vectorLayer.getMaplibreMap().on('load', () => setTileError(false));
     }
@@ -127,9 +129,13 @@ function HeatmapCanvas({
     canvasRef.current = canvas;
     map.fitBounds([[8.2, 102.1], [23.5, 110.4]], { padding: [12, 12], animate: false });
     onResolutionChange(resolutionForZoom(map.getZoom()));
-    const sizeTimer = window.setTimeout(() => map.invalidateSize(), 150);
+    const resizeMap = () => { map.invalidateSize(); resizeBaseMap(); };
+    const sizeTimer = window.setTimeout(resizeMap, 150);
+    const resizeObserver = new ResizeObserver(resizeMap);
+    resizeObserver.observe(elementRef.current);
     return () => {
       window.clearTimeout(sizeTimer);
+      resizeObserver.disconnect();
       map.remove();
       canvas.remove();
       mapRef.current = null;

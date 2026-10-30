@@ -207,6 +207,7 @@
   grid-template-columns: minmax(240px, 0.7fr) minmax(0, 1.3fr);
   align-items: start;
 }
+.account-layout--profile-only { display: block; max-width: 720px; margin-inline: auto; }
 .account-profile {
   background: linear-gradient(155deg, #f0fdf4, #fff 58%);
 }
@@ -1035,6 +1036,66 @@
 .donation-layout {
   grid-template-columns: minmax(0, 1fr);
 }
+.donation-layout > .card { scroll-margin-top: 76px; }
+.donation-layout .record-list { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.donation-drive-card { display: block; padding: 18px; min-width: 0; max-width: 100%; transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.donation-drive-card:hover { border-color: #b9d4f4; box-shadow: 0 12px 28px rgba(23, 74, 129, .08); transform: translateY(-2px); }
+.donation-drive-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+.donation-drive-header > div:first-child { min-width: 0; }
+.donation-drive-header p { margin: 8px 0; }
+.donation-drive-actions { display: flex; gap: 10px; flex-wrap: wrap; flex-shrink: 0; }
+.donation-drive-detail > .donation-drive-actions { justify-content: flex-end; margin-top: 18px; }
+.donation-drive-actions .button { white-space: nowrap; }
+.donation-drive-detail { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--color-surface-border); scroll-margin-top: 76px; min-width: 0; max-width: 100%; animation: reliefReveal .25s ease-out; }
+.donation-drive-detail .stock-table-scroll { max-width: 100%; }
+.donation-drive-detail > p:first-child { color: var(--color-text-secondary); }
+.donation-item-table { min-width: 620px; }
+.donation-item-table tbody th small { display: block; margin-top: 5px; color: var(--color-text-secondary); font-weight: 400; }
+.donation-item-table .available-value { white-space: nowrap; }
+@media (max-width: 600px) {
+  .donation-drive-detail .table-swipe-hint { display: none; }
+  .donation-item-table { min-width: 0; }
+  .donation-item-table thead { display: none; }
+  .donation-item-table tbody { display: grid; gap: 10px; padding: 10px; }
+  .donation-item-table tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--color-surface-border); border-radius: 10px; overflow: hidden; }
+  .donation-item-table tbody th { grid-column: 1 / -1; background: #f8fafc; }
+  .donation-item-table tbody td { text-align: left; border-bottom: 0; padding: 10px 12px; }
+  .donation-item-table tbody td::before { content: attr(data-label); display: block; margin-bottom: 4px; color: var(--color-text-secondary); font-size: 11px; font-weight: 700; }
+  .donation-item-table tbody td:last-child { grid-column: 1 / -1; border-top: 1px solid var(--color-surface-border); }
+}
+.campaign-public-dialog { width: min(600px, calc(100vw - 32px)); max-height: min(80dvh, 700px); padding: 0; border: 1px solid #dce5f0; border-radius: 20px; background: #fff; color: var(--color-text-primary); box-shadow: 0 28px 70px #0b254455; animation: reliefReveal .22s ease-out; }
+.campaign-public-dialog::backdrop { background: #10243a99; backdrop-filter: blur(4px); animation: reliefFade .2s ease-out; }
+.campaign-dialog-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 24px 26px 18px; border-bottom: 1px solid var(--color-surface-border); }
+.campaign-dialog-header h2 { margin: 7px 0 0; font-size: clamp(19px, 3vw, 24px); line-height: 1.25; }
+.campaign-dialog-header .modal-close-button { position: static; flex-shrink: 0; }
+.campaign-dialog-objective { margin: 0; padding: 22px 26px 10px; line-height: 1.6; }
+.campaign-public-dialog .fact-list { margin: 0; padding: 0 26px 26px; }
+@keyframes reliefReveal { from { opacity: 0; transform: translateY(8px) scale(.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes reliefFade { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 900px) {
+  .donation-drive-header { flex-direction: column; }
+  .donation-drive-actions { width: 100%; }
+  .donation-drive-actions .button { flex: 1 1 170px; }
+}
+.grid-two { align-items: start; }
+.donation-nav { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+.donation-nav .button { min-width: 170px; }
+@media (max-width: 900px) { .donation-nav .button { flex: 1 1 0; min-width: 0; } }
+@media (max-width: 520px) { .donation-drive-detail > .donation-drive-actions .button { flex: 1 1 100%; } .campaign-dialog-header { padding: 20px; } .campaign-dialog-objective { padding: 18px 20px 8px; } .campaign-public-dialog .fact-list { padding: 0 20px 20px; } }
+@media (prefers-reduced-motion: reduce) { .donation-drive-card, .donation-drive-detail, .campaign-public-dialog, .campaign-public-dialog::backdrop { animation: none; transition: none; } .donation-drive-card:hover { transform: none; } }
+.donation-modal-backdrop { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 20px; background: rgba(15, 23, 42, .55); backdrop-filter: blur(4px); }
+.donation-modal { width: min(680px, 100%); max-height: calc(100dvh - 40px); overflow-y: auto; background: #fff; border-radius: 18px; box-shadow: 0 25px 60px rgba(15, 23, 42, .3); padding: 0 24px 24px; }
+.donation-modal-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 18px 0; margin-bottom: 10px; background: #fff; cursor: grab; touch-action: none; border-bottom: 1px solid var(--color-surface-border); }
+.donation-modal-header:active { cursor: grabbing; }
+.donation-modal-header h2 { margin: 0; }
+.donation-modal-header .modal-close-button { position: static; cursor: pointer; }
+.team-sharing-control { display: grid; justify-items: start; gap: 8px; padding: 16px; border-radius: 12px; background: #eff6ff; }
+.team-sharing-control small { color: var(--color-text-secondary); }
+.sharing-indicator { border: 1px solid #86b7e9; background: #eff6ff; color: #174b7e; border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.profile-menu-wrap { position: relative; }
+.profile-menu { position: absolute; right: 0; top: calc(100% + 10px); z-index: 50; min-width: 190px; padding: 6px; background: #fff; border: 1px solid var(--color-surface-border); border-radius: 12px; box-shadow: var(--shadow-lg); }
+.profile-menu button { display: block; width: 100%; padding: 11px 12px; border: 0; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; color: var(--color-text-primary); }
+.profile-menu button:hover, .profile-menu button:focus-visible { background: var(--color-surface-bg); }
 
 .donation-layout .record > div {
   min-width: 0;
@@ -1117,3 +1178,32 @@
 .sos-coordinate-details .muted { margin: 0 0 12px; font-size: .87rem; }
 .sos-location-jump { width: fit-content; }
 #sos-location { scroll-margin-top: 125px; }
+/* Keep records inside their column; review uses a focused dialog. */
+.queue-row { min-width: 0; max-width: 100%; }
+.queue-row > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.queue-row .chip { white-space: normal; max-width: 100%; text-align: center; }
+.operations-review-layout { grid-template-columns: minmax(0, 1fr); }
+.operations-review-layout .record-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.operations-review-layout .queue-row { align-items: flex-start; flex-direction: column; border: 1px solid var(--color-surface-border); padding: 18px; gap: 12px; }
+.record-detail-dialog { border: 1px solid #dbe5f1; border-radius: 22px; padding: 28px; width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; box-shadow: 0 24px 80px #172b4d40; animation: reliefDialogIn .2s ease both; }
+.record-detail-dialog::backdrop { background: #172b4d66; backdrop-filter: blur(5px); }
+.record-detail-dialog > h2 { margin-top: 8px; padding-right: 90px; }
+.detail-close-button, .modal-close-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 38px; min-height: 38px; border: 1px solid #dce5f0; border-radius: 12px; background: #f4f7fb; color: #41536b; cursor: pointer; transition: background .15s, color .15s, transform .15s; }
+.detail-close-button { float: right; padding: 7px 12px; }
+.detail-close-button span { font-size: 22px; line-height: 1; }
+.detail-close-button:hover, .modal-close-button:hover { background: #feecec; color: #b42318; transform: translateY(-1px); }
+.detail-close-button:focus-visible, .modal-close-button:focus-visible { outline: 3px solid #93baff; outline-offset: 3px; }
+@keyframes reliefDialogIn { from { opacity: 0; translate: 0 12px; scale: .98; } to { opacity: 1; translate: 0 0; scale: 1; } }
+@keyframes reliefDialogOut { to { opacity: 0; translate: 0 10px; scale: .98; } }
+.record-detail-dialog.is-closing, .campaign-public-dialog.is-closing { animation: reliefDialogOut .18s ease both; }
+.record-detail-dialog.is-closing::backdrop, .campaign-public-dialog.is-closing::backdrop, .donation-modal-backdrop.is-closing { animation: reliefDialogOut .18s ease both; }
+@media (max-width: 680px) { .operations-review-layout .record-list { grid-template-columns: minmax(0, 1fr); } .record-detail-dialog { padding: 20px; } }
+@media (prefers-reduced-motion: reduce) { .record-detail-dialog, .record-detail-dialog.is-closing, .campaign-public-dialog.is-closing, .donation-modal-backdrop.is-closing { animation-duration: 1ms; } }
+.detail-close-button { flex-direction: row !important; white-space: nowrap; line-height: 1; }
+.detail-close-button .close-icon { display: block; flex: 0 0 16px; }
+.detail-close-button .close-label { display: inline; font-size: 14px; line-height: 20px; }
+.record-detail-dialog { position: fixed; }
+.record-detail-dialog > .command-form { padding-top: 24px; }
+.record-detail-dialog > .command-form > h3 { padding-right: 92px; margin-top: 0; font-size: 22px; }
+.sos-action-entry { padding: 16px 0; border-top: 1px solid var(--color-surface-border); }
+.report-heatmap > .card { border: 0; padding: 0; box-shadow: none; background: transparent; }
