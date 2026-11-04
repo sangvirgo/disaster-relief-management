@@ -47,7 +47,9 @@ export const EmergencyHomeScreen: React.FC = () => {
   } = useAuthStore();
 
   useEffect(() => {
-    if (isAuthenticated && !user?.must_change_password && (isCitizen() || isVolunteerOrLeader())) {
+    if (isAuthenticated && !user?.must_change_password && (
+      isCitizen() || isVolunteerOrLeader() || teamMembershipUserId === user?.id
+    )) {
       ResponseApi.getNotices()
         .then((res) => {
           if (res?.items) {
@@ -56,14 +58,14 @@ export const EmergencyHomeScreen: React.FC = () => {
         })
         .catch(() => {});
     }
-  }, [isAuthenticated, isCitizen, isVolunteerOrLeader, user?.must_change_password]);
+  }, [isAuthenticated, isCitizen, isVolunteerOrLeader, teamMembershipUserId, user?.id, user?.must_change_password]);
 
   useEffect(() => {
     if (!isAuthenticated || isVolunteerOrLeader() || !user?.id) return;
     let isCurrentUser = true;
-    void ResponseApi.getMyTeams(1)
-      .then((page) => {
-        if (isCurrentUser) setTeamMembershipUserId(page.items.length > 0 ? user.id : null);
+    void ResponseApi.getMyMissions(1)
+      .then(() => {
+        if (isCurrentUser) setTeamMembershipUserId(user.id);
       })
       .catch(() => {
         if (isCurrentUser) setTeamMembershipUserId(null);
@@ -144,7 +146,7 @@ export const EmergencyHomeScreen: React.FC = () => {
     );
   }
 
-  if (isAuthenticated && !isCitizen() && !isVolunteerOrLeader()) {
+  if (isAuthenticated && !isCitizen() && !isVolunteerOrLeader() && teamMembershipUserId !== user?.id) {
     return (
       <ScreenContainer title="Ứng dụng di động Reliva">
         <View style={styles.accessNoticeCard}>
@@ -377,7 +379,7 @@ export const EmergencyHomeScreen: React.FC = () => {
             <Users size={24} color={THEME.colors.primary.main} />
           </View>
           <View style={styles.modeInfo}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.modeTitleBlock}>
               <Text style={styles.modeTitle}>Báo cứu trợ cho người thân ở xa</Text>
               {isAuthenticated && (
                 <View style={styles.verifiedBadge}>
@@ -710,6 +712,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    minWidth: 0,
+    marginRight: 8,
   },
   userAvatarBox: {
     width: 38,
@@ -722,22 +726,27 @@ const styles = StyleSheet.create({
   },
   userSessionInfo: {
     flex: 1,
+    minWidth: 0,
   },
   userNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   userSessionName: {
     fontSize: 13,
     fontWeight: '700',
     color: THEME.colors.text.primary,
     marginRight: 6,
+    flexShrink: 1,
+    minWidth: 0,
   },
   userRoleTag: {
     backgroundColor: THEME.colors.primary.bg,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
+    flexShrink: 0,
   },
   userRoleTagText: {
     fontSize: 10,
@@ -753,6 +762,7 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     backgroundColor: '#F1F5F9',
+    flexShrink: 0,
   },
   guestBar: {
     flexDirection: 'row',
@@ -790,11 +800,12 @@ const styles = StyleSheet.create({
   verifiedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
     backgroundColor: THEME.colors.success.bg,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
-    marginLeft: 6,
+    marginTop: 4,
   },
   verifiedBadgeText: {
     fontSize: 10,
@@ -834,6 +845,9 @@ const styles = StyleSheet.create({
   },
   modeInfo: {
     flex: 1,
+  },
+  modeTitleBlock: {
+    alignSelf: 'stretch',
   },
   modeTitle: {
     fontSize: THEME.typography.fontSizes.sm + 1,

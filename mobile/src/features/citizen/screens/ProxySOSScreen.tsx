@@ -21,7 +21,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { INCIDENT_CATEGORIES, CONTACTABILITY_LABELS } from '../../../constants/labels';
 import { IncidentCategoryCode, CreateProxySOSPayload, GeoLocation } from '../../../types/api';
 import { ResponseApi } from '../../../api/responseApi';
-import { getApiErrorMessage } from '../../../api/client';
+import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { PendingProxySOSCommand, StorageService } from '../../../utils/secureStore';
 import { THEME } from '../../../constants/theme';
 import { isValidPhone, normalizePhone } from '../../../utils/formValidation';
@@ -166,7 +166,10 @@ export const ProxySOSScreen: React.FC = () => {
         setAlternateContactName(payload.alternate_contact?.name || '');
         setAlternateContactPhone(payload.alternate_contact?.phone || '');
         setContactability(payload.contactability);
-        setDescription(payload.description || '');
+        const savedDescription = payload.description || '';
+        const addressNoteMatch = savedDescription.match(/^Địa chỉ tham chiếu do người báo cung cấp: ([^\n]*)(?:\n|$)/);
+        setHouseholdAddressNote(addressNoteMatch?.[1] || '');
+        setDescription(addressNoteMatch ? savedDescription.slice(addressNoteMatch[0].length) : savedDescription);
         setInformationSource(payload.information_source);
         setLastKnownSituationAt(payload.last_known_situation_at);
       })
@@ -362,7 +365,24 @@ export const ProxySOSScreen: React.FC = () => {
 
       setSubmissionSuccessCode(response.tracking_code);
     } catch (error: any) {
-      Alert.alert('Lỗi gửi yêu cầu', getApiErrorMessage(error, 'Không thể gửi báo hộ. Nội dung và khóa lần gửi được giữ lại để thử lại an toàn.'));
+      if (error instanceof Error && error.message === 'PENDING_COMMAND_TOO_LARGE') {
+        Alert.alert('Bản gửi quá dài', 'Không thể lưu an toàn để bảo đảm gửi lại đúng một lần. Hãy rút gọn nội dung rồi thử lại.');
+      } else if (error instanceof Error && error.message === 'PENDING_PROXY_SOS_MUST_BE_RESUMED') {
+        Alert.alert('Có yêu cầu đang chờ xác nhận', 'Ứng dụng giữ nguyên nội dung và khóa của lần gửi trước để tránh tạo yêu cầu trùng. Hãy gửi tiếp bản cũ hoặc xóa bản cũ để soạn mới.');
+      } else if (isApiErrorCode(error, 'VALIDATION_FAILED')) {
+        try {
+          await StorageService.clearPendingProxySOS();
+          setPendingCommand(null);
+          Alert.alert(
+            'Yêu cầu chưa được gửi',
+            'Hệ thống từ chối dữ liệu báo hộ đã lưu. Nội dung vẫn còn trên biểu mẫu để bạn chỉnh sửa rồi gửi lại.',
+          );
+        } catch {
+          Alert.alert('Lỗi gửi yêu cầu', getApiErrorMessage(error, 'Không thể gửi báo hộ.'));
+        }
+      } else {
+        Alert.alert('Lỗi gửi yêu cầu', getApiErrorMessage(error, 'Không thể gửi báo hộ. Nội dung và khóa lần gửi được giữ lại để thử lại an toàn.'));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -382,7 +402,7 @@ export const ProxySOSScreen: React.FC = () => {
             <Text style={styles.pendingBannerTitle}>Có bản báo hộ chưa hoàn tất</Text>
           </View>
           <Text style={styles.pendingBannerDesc}>
-            Ứng dụng đã khôi phục lại dữ liệu báo hộ của lần trước để bạn gửi tiếp. Bạn có thể kiểm tra lại rồi bấm Gửi tiếp, hoặc hủy bản cũ để tạo mới.
+            Nội dung đã lưu được khóa để lần gửi lại giữ nguyên dữ liệu và mã chống trùng. Bấm Gửi tiếp để thử lại hoặc xóa bản cũ để soạn báo hộ mới.
           </Text>
           <TouchableOpacity
             style={styles.discardPendingBtn}
@@ -395,6 +415,7 @@ export const ProxySOSScreen: React.FC = () => {
         </View>
       ) : null}
 
+      <View pointerEvents={pendingCommand || restoringPending ? 'none' : 'auto'}>
       <View style={styles.noticeBox}>
         <Clock size={18} color={THEME.colors.primary.main} />
         <Text style={styles.noticeText}>
@@ -472,7 +493,7 @@ export const ProxySOSScreen: React.FC = () => {
 
       {/* Modal Ghim Vị Trí Trên Bản Đồ */}
       <LocationPickerModal
-        visible={isMapModalVisible}
+        visible={isMapModalVisible && !pendingCommand && !restoringPending}
         initialCoordinates={householdLocation?.coordinates}
         initialAddressNote={householdAddressNote}
         title="Ghim Vị Trí Hộ Gia Đình Người Thân"
@@ -482,7 +503,7 @@ export const ProxySOSScreen: React.FC = () => {
       />
 
       <Modal
-        visible={isSituationPickerVisible}
+        visible={isSituationPickerVisible && !pendingCommand && !restoringPending}
         transparent
         animationType="fade"
         statusBarTranslucent
@@ -890,6 +911,8 @@ export const ProxySOSScreen: React.FC = () => {
           maxLength={2001}
         />
         <FormFieldError message={formErrors.description} />
+      </View>
+
       </View>
 
       {/* NÚT BẤM GỬI */}

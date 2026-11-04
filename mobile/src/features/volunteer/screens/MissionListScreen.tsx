@@ -30,12 +30,22 @@ export const MissionListScreen: React.FC = () => {
   const [cursor, setCursor] = useState<string | undefined>();
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'OFFERED' | 'ACTIVE' | 'COMPLETED'>(initialTab);
+  const [hasTeam, setHasTeam] = useState<boolean | null>(null);
 
   const fetchMissions = async (nextCursor?: string, append = false) => {
     setErrorMessage(null);
     if (append) setLoadingMore(true);
     else setLoading(true);
     try {
+      const teamsPage = await ResponseApi.getMyTeams(1);
+      const isTeamMember = teamsPage.items.length > 0;
+      setHasTeam(isTeamMember);
+      if (!isTeamMember) {
+        setMissions([]);
+        setCursor(undefined);
+        setHasMore(false);
+        return;
+      }
       const page = await ResponseApi.getMyMissions(50, nextCursor);
       setMissions((current) => append ? [...current, ...page.items] : page.items);
       setCursor(page.cursor);
@@ -95,7 +105,9 @@ export const MissionListScreen: React.FC = () => {
         )}
 
         <Text style={styles.missionDesc} numberOfLines={2}>
-          {item.description || 'Nạn nhân cần hỗ trợ khẩn cấp, chưa có mô tả chi tiết.'}
+          {item.description || (item.mission_kind === 'DELIVERY'
+            ? 'Nhiệm vụ tiếp tế được giao, chưa có mô tả chi tiết.'
+            : 'Yêu cầu cứu trợ chưa có mô tả chi tiết.')}
         </Text>
 
         <View style={styles.cardBottomRow}>
@@ -118,7 +130,7 @@ export const MissionListScreen: React.FC = () => {
   return (
     <ScreenContainer
       title="Danh Sách Nhiệm Vụ"
-      subtitle="Nhiệm vụ cứu hộ được chỉ định"
+      subtitle="Nhiệm vụ được giao cho đội của bạn"
       scrollable={false}
       onBack={() => goBackOrHome(router)}
     >
@@ -135,7 +147,7 @@ export const MissionListScreen: React.FC = () => {
           style={[styles.tabButton, activeTab === 'ACTIVE' && styles.tabButtonActive]}
           onPress={() => setActiveTab('ACTIVE')}
         >
-          <Text style={[styles.tabText, activeTab === 'ACTIVE' && styles.tabTextActive]}>Đang cứu</Text>
+          <Text style={[styles.tabText, activeTab === 'ACTIVE' && styles.tabTextActive]}>Đang thực hiện</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -164,13 +176,15 @@ export const MissionListScreen: React.FC = () => {
       ) : filteredMissions.length === 0 ? (
         <View style={styles.emptyBox}>
           <Inbox size={48} color={THEME.colors.text.muted} />
-          <Text style={styles.emptyTitle}>Chưa có nhiệm vụ nào</Text>
+          <Text style={styles.emptyTitle}>{hasTeam === false ? 'Bạn chưa tham gia đội cứu hộ' : 'Chưa có nhiệm vụ nào'}</Text>
           <Text style={styles.emptySubtitle}>
-            {activeTab === 'OFFERED'
-              ? 'Hiện tại không có nhiệm vụ mới đang chờ tiếp nhận.'
-              : 'Không có nhiệm vụ trong mục này.'}
+            {hasTeam === false
+              ? 'Danh sách nhiệm vụ chỉ dành cho thành viên của đội cứu hộ. Hãy liên hệ điều phối viên để được hướng dẫn tham gia đội.'
+              : activeTab === 'OFFERED'
+                ? 'Hiện tại không có nhiệm vụ mới đang chờ tiếp nhận.'
+                : 'Không có nhiệm vụ trong mục này.'}
           </Text>
-          {hasMore ? (
+          {hasTeam !== false && hasMore ? (
             <TouchableOpacity
               style={styles.retryButton}
               onPress={() => cursor && fetchMissions(cursor, true)}

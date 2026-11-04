@@ -167,7 +167,10 @@ export const CreateSOSScreen: React.FC = () => {
         setNeedsRelief(Boolean(pending.payload.needs_relief_supplies));
         setReporterName(pending.payload.reporter_name || '');
         setReporterPhone(pending.payload.reporter_contact_phone || '');
-        setDescription(pending.payload.description || '');
+        const savedDescription = pending.payload.description || '';
+        const locationNoteMatch = savedDescription.match(/^\[Vị trí: ([\s\S]*?)\](?:\s+|$)/);
+        setLocationNote(locationNoteMatch?.[1] || '');
+        setDescription(locationNoteMatch ? savedDescription.slice(locationNoteMatch[0].length) : savedDescription);
         setLocationSnapshot(pending.payload.location);
       })
       .catch(() => {
@@ -329,7 +332,7 @@ export const CreateSOSScreen: React.FC = () => {
             <Text style={styles.pendingBannerTitle}>Có bản gửi cứu nạn chưa hoàn tất</Text>
           </View>
           <Text style={styles.pendingBannerDesc}>
-            Ứng dụng đã khôi phục lại dữ liệu lần gửi trước để bạn không phải nhập lại. Bạn có thể kiểm tra lại rồi bấm Gửi tiếp, hoặc hủy bản cũ để tạo mới.
+            Nội dung đã lưu được khóa để lần gửi lại giữ nguyên dữ liệu và mã chống trùng. Bấm Gửi tiếp để thử lại hoặc xóa bản cũ để soạn yêu cầu mới.
           </Text>
           <TouchableOpacity
             style={styles.discardPendingBtn}
@@ -342,6 +345,7 @@ export const CreateSOSScreen: React.FC = () => {
         </View>
       ) : null}
 
+      <View pointerEvents={pendingCommand || restoringPending ? 'none' : 'auto'}>
       {/* 1. TỌA ĐỘ VỊ TRÍ HIỆN TRƯỜNG */}
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
@@ -475,7 +479,7 @@ export const CreateSOSScreen: React.FC = () => {
 
       {/* Modal Ghim Vị Trí Trên Bản Đồ */}
       <LocationPickerModal
-        visible={isMapModalVisible}
+        visible={isMapModalVisible && !pendingCommand && !restoringPending}
         initialCoordinates={location ? location.coordinates : undefined}
         initialAddressNote={locationNote}
         title="Ghim Vị Trí Cứu Nạn"
@@ -681,6 +685,8 @@ export const CreateSOSScreen: React.FC = () => {
           />
           <FormFieldError message={formErrors.description} />
         </View>
+      </View>
+
       </View>
 
       {/* NÚT BẤM GỬI CỨU NẠN */}

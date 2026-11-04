@@ -172,8 +172,8 @@ export const SOSTrackingScreen: React.FC = () => {
     }
   };
 
-  const fetchTrackingData = useCallback(async () => {
-    const normalizedCode = trackingCode.trim().toUpperCase();
+  const fetchTrackingData = useCallback(async (codeInput?: string, secretInput?: string | null) => {
+    const normalizedCode = (codeInput ?? trackingCode).trim().toUpperCase();
     setEventsCursor(undefined);
     setEventsMore(false);
     if (!normalizedCode) {
@@ -192,8 +192,8 @@ export const SOSTrackingScreen: React.FC = () => {
     setErrorMsg(null);
     try {
       // Nếu chưa có secret thì thử lấy từ SecureStore của máy
-      let secret: string | undefined = trackingSecret;
-      if (!secret) {
+      let secret: string | undefined = secretInput === undefined ? trackingSecret : secretInput || undefined;
+      if (!secret && secretInput !== null) {
         const found = await StorageService.getSecretForTrackingCode(normalizedCode);
         if (found) {
           secret = found;
@@ -222,7 +222,8 @@ export const SOSTrackingScreen: React.FC = () => {
           // The successful API result remains usable for this screen session.
         }
       }
-      setData(result);
+      // The tracking summary returns newest first; render the timeline chronologically.
+      setData({ ...result, timeline: [...result.timeline].reverse() });
 
       // Tải danh sách sự kiện chi tiết từ API chuyên biệt GET /requests/:id/events
       if (result?.id) {
@@ -475,12 +476,17 @@ export const SOSTrackingScreen: React.FC = () => {
     setIsRecovering(true);
     try {
       const result = await ResponseApi.recoverRequest(code, token);
+      try {
+        await StorageService.deleteGuestTrackingSecret(result.tracking_code || code);
+      } catch {
+        // Recovery succeeded; a local cleanup failure must not change that result.
+      }
       setShowRecoveryModal(false);
       setRecoveryCode('');
       setTrackingCode(result.tracking_code || code);
       setTrackingSecret('');
       Alert.alert('Thành công', 'Yêu cầu cứu trợ đã được khôi phục và liên kết thành công vào tài khoản của bạn.');
-      await fetchTrackingData();
+      await fetchTrackingData(result.tracking_code || code, null);
     } catch (err: any) {
       Alert.alert('Không thể khôi phục', getApiErrorMessage(err, 'Mã khôi phục không hợp lệ hoặc đã hết hiệu lực.'));
     } finally {
@@ -512,7 +518,7 @@ export const SOSTrackingScreen: React.FC = () => {
       subtitle={trackingCode ? `Mã: ${trackingCode}` : 'Tra cứu bằng mã và khóa bí mật'}
       onBack={() => goBackOrHome(router)}
       headerRight={
-        <TouchableOpacity onPress={fetchTrackingData} style={styles.refreshBtn}>
+        <TouchableOpacity onPress={() => void fetchTrackingData()} style={styles.refreshBtn}>
           <RefreshCw size={20} color={THEME.colors.primary.main} />
         </TouchableOpacity>
       }
@@ -594,7 +600,7 @@ export const SOSTrackingScreen: React.FC = () => {
           <FormFieldError message={errorMsg ?? undefined} />
           <TouchableOpacity
             style={[styles.retryBtn, lookupDisabled && { opacity: 0.5 }]}
-            onPress={fetchTrackingData}
+            onPress={() => void fetchTrackingData()}
             disabled={lookupDisabled}
           >
             <Text style={styles.retryBtnText}>Tra cứu</Text>
@@ -620,7 +626,7 @@ export const SOSTrackingScreen: React.FC = () => {
           <AlertCircle size={40} color={THEME.colors.emergency.main} />
           <Text style={styles.errorCardTitle}>Không tìm thấy yêu cầu</Text>
           <Text style={styles.errorCardDesc}>{errorMsg}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={fetchTrackingData}>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => void fetchTrackingData()}>
             <Text style={styles.retryBtnText}>Thử lại</Text>
           </TouchableOpacity>
           <TouchableOpacity

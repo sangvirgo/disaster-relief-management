@@ -21,7 +21,7 @@ import { StatusBadge } from '../../../components/common/StatusBadge';
 import { TimelineStep } from '../../../components/common/TimelineStep';
 import { ResponseApi } from '../../../api/responseApi';
 import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
-import { MissionDetail, MissionStatus } from '../../../types/api';
+import { MissionDetail, MissionProgressTarget, MissionStatus } from '../../../types/api';
 import { INCIDENT_CATEGORIES, MISSION_KIND_LABELS, MISSION_STATUS_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
 import { generateUUID } from '../../../utils/secureStore';
@@ -132,7 +132,7 @@ export const MissionDetailScreen: React.FC = () => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Quyền máy ảnh', 'Vui lòng cấp quyền máy ảnh để chụp ảnh hiện trường cứu nạn.');
+        Alert.alert('Quyền máy ảnh', 'Vui lòng cấp quyền máy ảnh để chụp ảnh minh chứng tại hiện trường.');
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
@@ -243,7 +243,7 @@ export const MissionDetailScreen: React.FC = () => {
   };
 
   // Xử lý Chuyển trạng thái tiến độ (EN_ROUTE, ON_SCENE)
-  const handleTransition = async (toStatus: MissionStatus, promptTitle: string) => {
+  const handleTransition = async (toStatus: MissionProgressTarget, promptTitle: string) => {
     if (!mission?.can_manage_mission) return;
     Alert.alert('Xác nhận cập nhật', `Đồng chí xác nhận chuyển trạng thái sang: "${promptTitle}"?`, [
       { text: 'Hủy' },
@@ -264,12 +264,12 @@ export const MissionDetailScreen: React.FC = () => {
     ]);
   };
 
-  // Xử lý Hoàn thành cứu nạn thành công (kèm ảnh bằng chứng nếu có)
+  // Ghi nhận kết quả hoàn thành nhiệm vụ (kèm ảnh bằng chứng nếu có)
   const handleCompleteSubmit = async () => {
     if (!mission?.can_manage_mission) return;
     const outcome = outcomeNote.trim();
     if (!outcome) {
-      setFormErrors((current) => ({ ...current, outcomeNote: 'Vui lòng nhập báo cáo kết quả cứu hộ.' }));
+      setFormErrors((current) => ({ ...current, outcomeNote: 'Vui lòng nhập báo cáo kết quả nhiệm vụ.' }));
       return;
     }
     if (outcome.length > 2000) {
@@ -347,7 +347,7 @@ export const MissionDetailScreen: React.FC = () => {
       <ScreenContainer title="Chi Tiết Nhiệm Vụ" onBack={() => goBackOrHome(router)}>
         <View style={styles.centerBox}>
           <ActivityIndicator size="large" color={THEME.colors.primary.main} />
-          <Text style={styles.loadingText}>Đang tải chi tiết nhiệm vụ cứu nạn...</Text>
+          <Text style={styles.loadingText}>Đang tải chi tiết nhiệm vụ...</Text>
         </View>
       </ScreenContainer>
     );
@@ -356,7 +356,7 @@ export const MissionDetailScreen: React.FC = () => {
   if (!mission) {
     return (
       <ScreenContainer title="Chi Tiết Nhiệm Vụ" onBack={() => goBackOrHome(router)}>
-        <Text style={styles.errorText}>Không tìm thấy thông tin ca cứu hộ này.</Text>
+        <Text style={styles.errorText}>Không tìm thấy thông tin nhiệm vụ này.</Text>
       </ScreenContainer>
     );
   }
@@ -367,11 +367,29 @@ export const MissionDetailScreen: React.FC = () => {
   const evidence = mission.evidence.items;
   const canManageMission = mission.can_manage_mission === true;
   const reporterContactPhone = canManageMission ? mission.reporter_contact_phone : undefined;
+  const beneficiaryContactPhone = canManageMission ? mission.beneficiary_contact_phone : undefined;
   const alternateContact = canManageMission ? mission.alternate_contact : undefined;
+  const isDeliveryMission = mission.mission_kind === 'DELIVERY';
+  const isCombinedMission = mission.mission_kind === 'COMBINED';
+  const missionTitle = isDeliveryMission
+    ? 'Chi Tiết Nhiệm Vụ Tiếp Tế'
+    : isCombinedMission
+      ? 'Chi Tiết Nhiệm Vụ Cứu Nạn & Tiếp Tế'
+      : 'Chi Tiết Nhiệm Vụ Cứu Nạn';
+  const locationTitle = isDeliveryMission
+    ? 'VỊ TRÍ ĐIỂM NHIỆM VỤ'
+    : isCombinedMission
+      ? 'VỊ TRÍ TIẾP NHẬN HỖ TRỢ'
+      : 'VỊ TRÍ HIỆN TRƯỜNG';
+  const outcomeTitle = isDeliveryMission
+    ? 'BÁO CÁO KẾT QUẢ TIẾP TẾ'
+    : isCombinedMission
+      ? 'BÁO CÁO KẾT QUẢ CỨU NẠN & TIẾP TẾ'
+      : 'BÁO CÁO KẾT QUẢ CỨU NẠN';
 
   return (
     <ScreenContainer
-      title="Chi Tiết Nhiệm Vụ Cứu Nạn"
+      title={missionTitle}
       subtitle={`Mã: ${mission.id.slice(0, 8)}`}
       onBack={() => goBackOrHome(router)}
     >
@@ -406,7 +424,7 @@ export const MissionDetailScreen: React.FC = () => {
           <View style={styles.metaCol}>
             <Users size={18} color={THEME.colors.text.secondary} />
             <Text style={styles.metaValue}>{mission.people_affected ?? 'Chưa rõ'}{mission.people_affected == null ? '' : ' người'}</Text>
-            <Text style={styles.metaLabel}>Cần cứu nạn</Text>
+            <Text style={styles.metaLabel}>Số người liên quan</Text>
           </View>
 
         </View>
@@ -414,7 +432,7 @@ export const MissionDetailScreen: React.FC = () => {
 
       {/* 2. VỊ TRÍ & ĐIỀU HƯỚNG BẢN ĐỒ */}
       <View style={styles.card}>
-        <Text style={styles.cardSectionTitle}>VỊ TRÍ NẠN NHÂN MẮC KẸT</Text>
+        <Text style={styles.cardSectionTitle}>{locationTitle}</Text>
         {mission.location?.coordinates ? (
           <>
             <Text style={styles.coordsText}>
@@ -428,15 +446,33 @@ export const MissionDetailScreen: React.FC = () => {
           </>
         ) : (
           <Text style={styles.coordsText}>
-            Chưa có thông tin tọa độ GPS cụ thể từ hiện trường.
+            Chưa có thông tin tọa độ GPS cụ thể của nhiệm vụ.
           </Text>
         )}
       </View>
 
       {/* 3. LIÊN HỆ HIỆN TRƯỜNG */}
       <View style={styles.card}>
-        <Text style={styles.cardSectionTitle}>LIÊN HỆ NẠN NHÂN / NGƯỜI BÁO TIN</Text>
+        <Text style={styles.cardSectionTitle}>LIÊN HỆ HIỆN TRƯỜNG</Text>
         <>
+            {beneficiaryContactPhone ? (
+              <View style={styles.contactRow}>
+                <View>
+                  <Text style={styles.phoneText}>{beneficiaryContactPhone}</Text>
+                  <Text style={styles.phoneLabel}>Số điện thoại người nhận hỗ trợ</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.callBtn}
+                  onPress={() => Linking.openURL(`tel:${beneficiaryContactPhone}`).catch(() =>
+                    Alert.alert('Không thể gọi điện', 'Thiết bị không hỗ trợ cuộc gọi điện thoại.')
+                  )}
+                >
+                  <Phone size={18} color="#FFFFFF" />
+                  <Text style={styles.callBtnText}>Gọi điện</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
             {reporterContactPhone ? (
               <View style={styles.contactRow}>
                 <View>
@@ -459,7 +495,9 @@ export const MissionDetailScreen: React.FC = () => {
                 {alternateContact.phone ? (
                   <TouchableOpacity
                     style={styles.callBtn}
-                    onPress={() => Linking.openURL(`tel:${alternateContact.phone}`)}
+                    onPress={() => Linking.openURL(`tel:${alternateContact.phone}`).catch(() =>
+                      Alert.alert('Không thể gọi điện', 'Thiết bị không hỗ trợ cuộc gọi điện thoại.')
+                    )}
                   >
                     <Phone size={18} color="#FFFFFF" />
                     <Text style={styles.callBtnText}>Gọi điện</Text>
@@ -467,7 +505,7 @@ export const MissionDetailScreen: React.FC = () => {
                 ) : null}
               </View>
             ) : null}
-            {!reporterContactPhone && !alternateContact ? (
+            {!beneficiaryContactPhone && !reporterContactPhone && !alternateContact ? (
               <Text style={styles.noContactText}>
                 {canManageMission
                   ? 'Hồ sơ hiện không có thông tin liên hệ được cung cấp.'
@@ -477,11 +515,11 @@ export const MissionDetailScreen: React.FC = () => {
         </>
       </View>
 
-      {/* 4. KẾT QUẢ CỨU NẠN THỰC ĐỊA (KHI ĐÃ HOÀN THÀNH) */}
+      {/* 4. KẾT QUẢ THỰC ĐỊA (KHI ĐÃ HOÀN THÀNH) */}
       {/* 5. TIẾN TRÌNH NHIỆM VỤ (TIMELINE) */}
       {timeline.length > 0 && (
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>TIẾN TRÌNH NHIỆM VỤ CỨU HỘ</Text>
+          <Text style={styles.cardSectionTitle}>TIẾN TRÌNH NHIỆM VỤ</Text>
           {timeline.map((evt, idx) => {
             const info = MISSION_STATUS_LABELS[evt.to_status as MissionStatus] || { label: evt.to_status };
             const isLast = idx === timeline.length - 1;
@@ -514,7 +552,7 @@ export const MissionDetailScreen: React.FC = () => {
       {/* 6. MINH CHỨNG HIỆN TRƯỜNG ĐÃ TẢI LÊN */}
       {evidence.length > 0 && (
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>ẢNH / VIDEO HIỆN TRƯỜNG ({evidence.length})</Text>
+          <Text style={styles.cardSectionTitle}>ẢNH / VIDEO MINH CHỨNG ({evidence.length})</Text>
           {loadingEvidence && (
             <ActivityIndicator size="small" color={THEME.colors.primary.main} style={{ marginBottom: 8 }} />
           )}
@@ -530,7 +568,7 @@ export const MissionDetailScreen: React.FC = () => {
                   ? <Video size={22} color={THEME.colors.primary.main} />
                   : <ImageIcon size={22} color={THEME.colors.primary.main} />}
                 <Text style={styles.evidenceThumbText} numberOfLines={1}>
-                  {ev.detected_mime.includes('video') ? 'Video hiện trường' : 'Ảnh hiện trường'}
+                  {ev.detected_mime.includes('video') ? 'Video minh chứng' : 'Ảnh minh chứng'}
                 </Text>
                 <Text style={styles.evidenceSizeText}>
                   {(ev.size_bytes / (1024 * 1024)).toFixed(1)} MB · Chạm để xem
@@ -583,7 +621,7 @@ export const MissionDetailScreen: React.FC = () => {
                 disabled={actionLoading}
               >
                 <Truck size={20} color="#FFFFFF" />
-                <Text style={styles.primaryActionText}>Bắt đầu di chuyển đến hiện trường</Text>
+                <Text style={styles.primaryActionText}>Bắt đầu di chuyển đến điểm nhiệm vụ</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.failedBtn}
@@ -603,11 +641,11 @@ export const MissionDetailScreen: React.FC = () => {
             <View>
               <TouchableOpacity
                 style={[styles.primaryActionBtn, { backgroundColor: '#7C3AED' }]}
-                onPress={() => handleTransition('ON_SCENE', 'Đã tiếp cận hiện trường')}
+                onPress={() => handleTransition('ON_SCENE', 'Đã tiếp cận điểm nhiệm vụ')}
                 disabled={actionLoading}
               >
                 <Flag size={20} color="#FFFFFF" />
-                <Text style={styles.primaryActionText}>Xác nhận đã tiếp cận hiện trường</Text>
+                <Text style={styles.primaryActionText}>Xác nhận đã tiếp cận điểm nhiệm vụ</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.failedBtn}
@@ -617,7 +655,7 @@ export const MissionDetailScreen: React.FC = () => {
                 }}
                 disabled={actionLoading}
               >
-                <Text style={styles.failedBtnText}>Báo không thể tiếp cận hiện trường</Text>
+                <Text style={styles.failedBtnText}>Báo không thể tiếp cận điểm nhiệm vụ</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -645,7 +683,7 @@ export const MissionDetailScreen: React.FC = () => {
                 }}
                 disabled={actionLoading}
               >
-                <Text style={styles.failedBtnText}>Báo không thể hoàn thành tại hiện trường</Text>
+                <Text style={styles.failedBtnText}>Báo không thể hoàn thành nhiệm vụ</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -667,14 +705,14 @@ export const MissionDetailScreen: React.FC = () => {
       <Modal visible={showCompleteModal} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>BÁO CÁO KẾT QUẢ CỨU NẠN</Text>
+            <Text style={styles.modalTitle}>{outcomeTitle}</Text>
             <Text style={styles.modalSubtitle}>
               Ghi chú kết quả hoàn thành để trung tâm điều phối chốt hồ sơ <RequiredAsterisk />:
             </Text>
 
             <TextInput
               style={styles.modalInput}
-              placeholder="Ví dụ: Đã đưa 2 người lên ca nô an toàn, sức khỏe bình thường, đã bàn giao cho trạm y tế xã..."
+              placeholder="Mô tả kết quả, số người hoặc hàng hóa đã hỗ trợ và nơi bàn giao (nếu có)..."
               placeholderTextColor={THEME.colors.text.muted}
               value={outcomeNote}
               onChangeText={(value) => {
@@ -685,7 +723,7 @@ export const MissionDetailScreen: React.FC = () => {
                 }));
               }}
               onBlur={() => {
-                if (!outcomeNote.trim()) setFormErrors((current) => ({ ...current, outcomeNote: 'Báo cáo kết quả cứu hộ là bắt buộc.' }));
+                if (!outcomeNote.trim()) setFormErrors((current) => ({ ...current, outcomeNote: 'Báo cáo kết quả nhiệm vụ là bắt buộc.' }));
               }}
               multiline={true}
               numberOfLines={4}
@@ -693,9 +731,9 @@ export const MissionDetailScreen: React.FC = () => {
             />
             <FormFieldError message={formErrors.outcomeNote} />
 
-            {/* ĐÍNH KÈM ẢNH HOẶC VIDEO BẰNG CHỨNG CỨU NẠN */}
+            {/* ĐÍNH KÈM ẢNH HOẶC VIDEO MINH CHỨNG */}
             <View style={styles.imagePickerSection}>
-              <Text style={styles.imageSectionTitle}>ẢNH HOẶC VIDEO MP4 BẰNG CHỨNG (KHUYẾN KHÍCH):</Text>
+              <Text style={styles.imageSectionTitle}>ẢNH HOẶC VIDEO MP4 MINH CHỨNG (KHUYẾN KHÍCH):</Text>
               {completionImage ? (
                 <View style={styles.imagePreviewContainer}>
                   {getSupportedEvidenceMimeType(completionImage) === 'video/mp4' ? (
@@ -768,7 +806,7 @@ export const MissionDetailScreen: React.FC = () => {
               LÝ DO TỪ CHỐI / TRỞ NGẠI
             </Text>
             <Text style={styles.modalSubtitle}>
-              Nêu rõ lý do để điều phối viên cử đội cứu nạn khác chi viện:
+              Nêu rõ lý do để điều phối viên cập nhật phương án xử lý:
             </Text>
             <Text style={styles.modalSubtitle}>Lý do từ chối hoặc trở ngại <RequiredAsterisk /></Text>
 

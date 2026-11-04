@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { User, RoleGrant } from '../types/api';
 import { StorageService } from '../utils/secureStore';
 import { IdentityApi } from '../api/identityApi';
+import { MobileApiError } from '../api/client';
 
 interface AuthState {
   user: User | null;
@@ -105,8 +106,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         isLoading: false,
       });
-    } catch {
-      await StorageService.clearTokens();
+    } catch (error) {
+      const status = error instanceof MobileApiError ? error.status : undefined;
+      const temporaryFailure = status === undefined || status >= 500 || status === 429;
+      if (!temporaryFailure) await StorageService.clearTokens();
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },

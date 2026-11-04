@@ -93,9 +93,9 @@ export const MISSION_STATUS_LABELS: Record<MissionStatus, { label: string; color
   OFFERED: { label: 'Nhiệm vụ mới nhận', color: '#D97706', bg: '#FEF3C7' },
   ACCEPTED: { label: 'Đã tiếp nhận nhiệm vụ', color: '#2563EB', bg: '#EFF6FF' },
   DECLINED: { label: 'Đã từ chối nhiệm vụ', color: '#DC2626', bg: '#FEF2F2' },
-  EN_ROUTE: { label: 'Đang di chuyển đến hiện trường', color: '#0284C7', bg: '#F0F9FF' },
-  ON_SCENE: { label: 'Đã tiếp cận vị trí nạn nhân', color: '#7C3AED', bg: '#F5F3FF' },
-  COMPLETED: { label: 'Hoàn thành cứu nạn thành công', color: '#16A34A', bg: '#DCFCE7' },
+  EN_ROUTE: { label: 'Đang di chuyển đến điểm nhiệm vụ', color: '#0284C7', bg: '#F0F9FF' },
+  ON_SCENE: { label: 'Đã tiếp cận điểm nhiệm vụ', color: '#7C3AED', bg: '#F5F3FF' },
+  COMPLETED: { label: 'Đã hoàn thành nhiệm vụ', color: '#16A34A', bg: '#DCFCE7' },
   FAILED: { label: 'Gặp trở ngại / Thất bại', color: '#EF4444', bg: '#FEE2E2' },
   CANCELLED: { label: 'Nhiệm vụ đã bị hủy', color: '#64748B', bg: '#F1F5F9' },
 };
@@ -135,20 +135,36 @@ export const TIMELINE_EVENT_LABELS: Record<string, { title: string; desc: string
     desc: 'Trung tâm đã đánh giá độ khẩn và chuẩn bị chỉ định lực lượng ứng cứu.',
   },
   MISSION_DISPATCHED: {
-    title: 'Đã điều phối đội cứu hộ tiếp cận',
+    title: 'Đã điều phối đội thực hiện nhiệm vụ',
     desc: 'Hồ sơ đã được chuyển đến bước điều phối. Theo dõi các cập nhật tiếp theo tại đây.',
   },
   MISSION_ACCEPTED: {
-    title: 'Đội cứu hộ đã tiếp nhận lệnh',
-    desc: 'Đội trưởng đã xác nhận xuất kích đến vị trí của bạn.',
+    title: 'Đội phụ trách đã tiếp nhận nhiệm vụ',
+    desc: 'Đội trưởng đã xác nhận sẽ triển khai đến địa điểm được giao.',
   },
   MISSION_EN_ROUTE: {
-    title: 'Đội cứu hộ đang di chuyển đến hiện trường',
-    desc: 'Phương tiện cứu trợ (ca nô/xuồng/xe lội nước) đang trên đường tới.',
+    title: 'Đội phụ trách đang di chuyển',
+    desc: 'Đội thực hiện đang trên đường đến địa điểm nhiệm vụ.',
   },
   MISSION_ON_SCENE: {
-    title: 'Đội cứu hộ đã tiếp cận vị trí của bạn',
-    desc: 'Lực lượng cứu hộ đang triển khai ứng cứu trực tiếp tại chỗ.',
+    title: 'Đội phụ trách đã đến địa điểm nhiệm vụ',
+    desc: 'Đội thực hiện đang triển khai công việc tại địa điểm được giao.',
+  },
+  MISSION_COMPLETED: {
+    title: 'Đội thực hiện đã báo cáo hoàn thành nhiệm vụ',
+    desc: 'Trung tâm điều phối đang ghi nhận kết quả xử lý tại hiện trường.',
+  },
+  MISSION_DECLINED: {
+    title: 'Đội cứu hộ đã từ chối nhiệm vụ',
+    desc: 'Điều phối viên sẽ xem xét lý do và cập nhật phương án xử lý.',
+  },
+  MISSION_FAILED: {
+    title: 'Đội cứu hộ báo không thể hoàn thành nhiệm vụ',
+    desc: 'Điều phối viên sẽ xem xét trở ngại và cập nhật phương án tiếp theo.',
+  },
+  MISSION_CANCELLED: {
+    title: 'Nhiệm vụ của đội đã bị hủy',
+    desc: 'Trạng thái yêu cầu cứu trợ được cập nhật bởi trung tâm điều phối.',
   },
   REQUEST_RESOLVED: {
     title: 'Hồ sơ đã được đánh dấu hoàn tất',

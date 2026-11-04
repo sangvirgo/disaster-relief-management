@@ -20,6 +20,142 @@ const KEYS = {
   PENDING_SUPPLEMENT: 'c48_pending_supplement_command',
 };
 
+const SECURE_JSON_CHUNK_BYTES = 1200;
+const SECURE_JSON_MAX_CHUNKS = 16;
+
+interface SecureJsonChunkManifest {
+  __c48_secure_chunks: 1;
+  id: string;
+  count: number;
+}
+
+function isSecureJsonChunkManifest(value: unknown): value is SecureJsonChunkManifest {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<SecureJsonChunkManifest>;
+  return candidate.__c48_secure_chunks === 1 &&
+    typeof candidate.id === 'string' &&
+    Number.isInteger(candidate.count) &&
+    (candidate.count as number) > 0 &&
+    (candidate.count as number) <= SECURE_JSON_MAX_CHUNKS;
+}
+
+function splitUtf8String(value: string, maxBytes: number): string[] {
+  const chunks: string[] = [];
+  let current = '';
+  let currentBytes = 0;
+
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    const characterBytes = codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4;
+    if (current && currentBytes + characterBytes > maxBytes) {
+      chunks.push(current);
+      current = '';
+      currentBytes = 0;
+    }
+    current += character;
+    currentBytes += characterBytes;
+  }
+
+  if (current || chunks.length === 0) chunks.push(current);
+  return chunks;
+}
+
+function secureJsonChunkKey(key: string, id: string, index: number): string {
+  return `${key}__${id}_${index}`;
+}
+
+async function deleteSecureJsonChunks(key: string, id: string, count: number): Promise<void> {
+  await Promise.allSettled(
+    Array.from({ length: count }, (_, index) =>
+      SecureStore.deleteItemAsync(secureJsonChunkKey(key, id, index))
+    )
+  );
+}
+
+async function readSecureJson<T>(key: string): Promise<T | null> {
+  const stored = await SecureStore.getItemAsync(key);
+  if (!stored) return null;
+
+  let value: unknown;
+  try {
+    value = JSON.parse(stored);
+  } catch {
+    await SecureStore.deleteItemAsync(key);
+    return null;
+  }
+
+  if (!isSecureJsonChunkManifest(value)) return value as T;
+
+  const chunks = await Promise.all(
+    Array.from({ length: value.count }, (_, index) =>
+      SecureStore.getItemAsync(secureJsonChunkKey(key, value.id, index))
+    )
+  );
+  if (chunks.some((chunk) => chunk === null)) {
+    await SecureStore.deleteItemAsync(key);
+    await deleteSecureJsonChunks(key, value.id, value.count);
+    return null;
+  }
+
+  try {
+    return JSON.parse((chunks as string[]).join('')) as T;
+  } catch {
+    await SecureStore.deleteItemAsync(key);
+    await deleteSecureJsonChunks(key, value.id, value.count);
+    return null;
+  }
+}
+
+async function saveSecureJson(key: string, value: unknown): Promise<void> {
+  const serialized = JSON.stringify(value);
+  const chunks = splitUtf8String(serialized, SECURE_JSON_CHUNK_BYTES);
+  if (chunks.length > SECURE_JSON_MAX_CHUNKS) throw new Error('PENDING_COMMAND_TOO_LARGE');
+
+  const previousStored = await SecureStore.getItemAsync(key);
+  let previousManifest: SecureJsonChunkManifest | null = null;
+  if (previousStored) {
+    try {
+      const parsed: unknown = JSON.parse(previousStored);
+      if (isSecureJsonChunkManifest(parsed)) previousManifest = parsed;
+    } catch {
+      // Legacy or malformed values are replaced by the new complete command.
+    }
+  }
+
+  const id = generateUUID();
+  try {
+    for (const [index, chunk] of chunks.entries()) {
+      await SecureStore.setItemAsync(secureJsonChunkKey(key, id, index), chunk);
+    }
+    await SecureStore.setItemAsync(key, JSON.stringify({
+      __c48_secure_chunks: 1,
+      id,
+      count: chunks.length,
+    } satisfies SecureJsonChunkManifest));
+  } catch (error) {
+    await deleteSecureJsonChunks(key, id, chunks.length);
+    throw error;
+  }
+
+  if (previousManifest) {
+    await deleteSecureJsonChunks(key, previousManifest.id, previousManifest.count);
+  }
+}
+
+async function clearSecureJson(key: string): Promise<void> {
+  const stored = await SecureStore.getItemAsync(key);
+  await SecureStore.deleteItemAsync(key);
+  if (!stored) return;
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    if (isSecureJsonChunkManifest(parsed)) {
+      await deleteSecureJsonChunks(key, parsed.id, parsed.count);
+    }
+  } catch {
+    // Older versions stored the JSON value directly under the main key.
+  }
+}
+
 // Sinh UUID v4 chuẩn cho Idempotency-Key
 export function generateUUID(): string {
   return Crypto.randomUUID();
@@ -123,23 +259,17 @@ export const StorageService = {
     return SecureStore.getItemAsync(key);
   },
 
+  async deleteGuestTrackingSecret(trackingCode: string): Promise<void> {
+    const key = `${KEYS.GUEST_TRACKING_SECRETS}_${trackingCode.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    await SecureStore.deleteItemAsync(key);
+  },
+
   async savePendingSOS(command: PendingSOSCommand): Promise<void> {
-    const serialized = JSON.stringify(command);
-    if (serialized.length > 1800) {
-      throw new Error('PENDING_COMMAND_TOO_LARGE');
-    }
-    await SecureStore.setItemAsync(KEYS.PENDING_SOS, serialized);
+    await saveSecureJson(KEYS.PENDING_SOS, command);
   },
 
   async getPendingSOS(): Promise<PendingSOSCommand | null> {
-    const data = await SecureStore.getItemAsync(KEYS.PENDING_SOS);
-    if (!data) return null;
-    try {
-      return JSON.parse(data) as PendingSOSCommand;
-    } catch {
-      await SecureStore.deleteItemAsync(KEYS.PENDING_SOS);
-      return null;
-    }
+    return readSecureJson<PendingSOSCommand>(KEYS.PENDING_SOS);
   },
 
   async getOrCreatePendingSOS(payload: CreateSOSPayload): Promise<PendingSOSCommand> {
@@ -160,24 +290,15 @@ export const StorageService = {
   },
 
   async clearPendingSOS(): Promise<void> {
-    await SecureStore.deleteItemAsync(KEYS.PENDING_SOS);
+    await clearSecureJson(KEYS.PENDING_SOS);
   },
 
   async getPendingProxySOS(): Promise<PendingProxySOSCommand | null> {
-    const data = await SecureStore.getItemAsync(KEYS.PENDING_PROXY_SOS);
-    if (!data) return null;
-    try {
-      return JSON.parse(data) as PendingProxySOSCommand;
-    } catch {
-      await SecureStore.deleteItemAsync(KEYS.PENDING_PROXY_SOS);
-      return null;
-    }
+    return readSecureJson<PendingProxySOSCommand>(KEYS.PENDING_PROXY_SOS);
   },
 
   async savePendingProxySOS(command: PendingProxySOSCommand): Promise<void> {
-    const serialized = JSON.stringify(command);
-    if (serialized.length > 1800) throw new Error('PENDING_COMMAND_TOO_LARGE');
-    await SecureStore.setItemAsync(KEYS.PENDING_PROXY_SOS, serialized);
+    await saveSecureJson(KEYS.PENDING_PROXY_SOS, command);
   },
 
   async getOrCreatePendingProxySOS(payload: CreateProxySOSPayload): Promise<PendingProxySOSCommand> {
@@ -192,7 +313,7 @@ export const StorageService = {
   },
 
   async clearPendingProxySOS(): Promise<void> {
-    await SecureStore.deleteItemAsync(KEYS.PENDING_PROXY_SOS);
+    await clearSecureJson(KEYS.PENDING_PROXY_SOS);
   },
 
   async getOrCreatePendingDonation(
@@ -304,26 +425,15 @@ export const StorageService = {
   },
 
   async getPendingDonation(): Promise<PendingDonationCommand | null> {
-    const data = await SecureStore.getItemAsync(KEYS.PENDING_DONATION);
-    if (!data) return null;
-    try {
-      return JSON.parse(data) as PendingDonationCommand;
-    } catch {
-      await SecureStore.deleteItemAsync(KEYS.PENDING_DONATION);
-      return null;
-    }
+    return readSecureJson<PendingDonationCommand>(KEYS.PENDING_DONATION);
   },
 
   async savePendingDonation(command: PendingDonationCommand): Promise<void> {
-    const serialized = JSON.stringify(command);
-    if (serialized.length > 1800) {
-      throw new Error('PENDING_COMMAND_TOO_LARGE');
-    }
-    await SecureStore.setItemAsync(KEYS.PENDING_DONATION, serialized);
+    await saveSecureJson(KEYS.PENDING_DONATION, command);
   },
 
   async clearPendingDonation(): Promise<void> {
-    await SecureStore.deleteItemAsync(KEYS.PENDING_DONATION);
+    await clearSecureJson(KEYS.PENDING_DONATION);
   },
 
   async getOrCreatePendingSupplement(
@@ -331,18 +441,10 @@ export const StorageService = {
     payload: { expected_version: number; description: string }
   ): Promise<PendingSupplementCommand> {
     const key = `${KEYS.PENDING_SUPPLEMENT}_${requestId.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    const data = await SecureStore.getItemAsync(key);
-    if (data) {
-      try {
-        const existing = JSON.parse(data) as PendingSupplementCommand;
-        if (existing.requestId === requestId && existing.payload?.description === payload.description) {
-          return existing;
-        }
-        throw new Error('PENDING_SUPPLEMENT_MUST_BE_RESUMED');
-      } catch (error) {
-        if (error instanceof Error && error.message === 'PENDING_SUPPLEMENT_MUST_BE_RESUMED') throw error;
-        await SecureStore.deleteItemAsync(key);
-      }
+    const existing = await readSecureJson<PendingSupplementCommand>(key);
+    if (existing) {
+      if (existing.requestId === requestId && existing.payload?.description === payload.description) return existing;
+      throw new Error('PENDING_SUPPLEMENT_MUST_BE_RESUMED');
     }
 
     const command: PendingSupplementCommand = {
@@ -350,25 +452,18 @@ export const StorageService = {
       payload,
       idempotencyKey: generateUUID(),
     };
-    await SecureStore.setItemAsync(key, JSON.stringify(command));
+    await saveSecureJson(key, command);
     return command;
   },
 
   async getPendingSupplement(requestId: string): Promise<PendingSupplementCommand | null> {
     const key = `${KEYS.PENDING_SUPPLEMENT}_${requestId.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    const data = await SecureStore.getItemAsync(key);
-    if (!data) return null;
-    try {
-      const command = JSON.parse(data) as PendingSupplementCommand;
-      return command.requestId === requestId ? command : null;
-    } catch {
-      await SecureStore.deleteItemAsync(key);
-      return null;
-    }
+    const command = await readSecureJson<PendingSupplementCommand>(key);
+    return command?.requestId === requestId ? command : null;
   },
 
   async clearPendingSupplement(requestId: string): Promise<void> {
     const key = `${KEYS.PENDING_SUPPLEMENT}_${requestId.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    await SecureStore.deleteItemAsync(key);
+    await clearSecureJson(key);
   },
 };

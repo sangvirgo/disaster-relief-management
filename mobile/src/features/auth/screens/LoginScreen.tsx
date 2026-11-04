@@ -17,13 +17,36 @@ import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { FormFieldError } from '../../../components/common/FormFieldError';
 import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { useAuthStore } from '../../../store/authStore';
-import { getApiErrorMessage } from '../../../api/client';
+import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
+import { ResponseApi } from '../../../api/responseApi';
 import { THEME } from '../../../constants/theme';
 import { User, Lock, ArrowRight, Eye, EyeOff, UserPlus } from 'lucide-react-native';
 
+type MobileActor = 'citizen' | 'team' | 'unsupported' | 'unavailable';
+
+async function resolveMobileActor(): Promise<MobileActor> {
+  const auth = useAuthStore.getState();
+  if (auth.isVolunteerOrLeader()) return 'team';
+  if (auth.isCitizen()) return 'citizen';
+
+  // Team membership is an authorization relationship in Response. Members do
+  // not need a VOLUNTEER grant just to read their assigned missions.
+  try {
+    await ResponseApi.getMyMissions(1);
+    return 'team';
+  } catch (error) {
+    if (isApiErrorCode(error, 'FORBIDDEN')) return 'unsupported';
+    Alert.alert(
+      'Chưa thể xác minh quyền thành viên đội',
+      getApiErrorMessage(error, 'Vui lòng kiểm tra kết nối rồi thử lại.'),
+    );
+    return 'unavailable';
+  }
+}
+
 export const LoginScreen: React.FC = () => {
   const router = useRouter();
-  const { login, loginWithGoogle, logout, isLoading, isVolunteerOrLeader } = useAuthStore();
+  const { login, loginWithGoogle, logout, isLoading } = useAuthStore();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -66,7 +89,9 @@ export const LoginScreen: React.FC = () => {
         router.replace('/change-password');
         return;
       }
-      if (!authState.isVolunteerOrLeader() && !authState.isCitizen()) {
+      const mobileActor = await resolveMobileActor();
+      if (mobileActor === 'unavailable') return;
+      if (mobileActor === 'unsupported') {
         try {
           await logout();
         } catch {
@@ -74,12 +99,12 @@ export const LoginScreen: React.FC = () => {
         }
         Alert.alert(
           'Vai trò chưa được hỗ trợ trên ứng dụng',
-          'Ứng dụng di động dành cho Công dân và Tình nguyện viên. Vui lòng sử dụng cổng điều phối trên Web cho vai trò này.'
+          'Ứng dụng di động dành cho Công dân và thành viên đội cứu hộ. Vui lòng sử dụng cổng điều phối trên Web cho vai trò quản lý.'
         );
         router.replace('/login');
         return;
       }
-      const isVolunteer = isVolunteerOrLeader();
+      const isVolunteer = mobileActor === 'team';
       const currentUser = useAuthStore.getState().user;
       const displayName = currentUser?.display_name || trimmedUsername;
 
@@ -129,8 +154,12 @@ export const LoginScreen: React.FC = () => {
       const authState = useAuthStore.getState();
       if (authState.user?.must_change_password) {
         router.replace('/change-password');
-      } else if (authState.isVolunteerOrLeader()) router.replace('/team');
-      else if (authState.isCitizen()) goBackOrHome(router);
+        return;
+      }
+      const mobileActor = await resolveMobileActor();
+      if (mobileActor === 'unavailable') return;
+      if (mobileActor === 'team') router.replace('/team');
+      else if (mobileActor === 'citizen') goBackOrHome(router);
       else {
         try {
           await logout();
@@ -139,7 +168,7 @@ export const LoginScreen: React.FC = () => {
         }
         Alert.alert(
           'Vai trò chưa được hỗ trợ trên ứng dụng',
-          'Ứng dụng di động dành cho Công dân và Tình nguyện viên. Vui lòng sử dụng cổng điều phối trên Web cho vai trò này.'
+          'Ứng dụng di động dành cho Công dân và thành viên đội cứu hộ. Vui lòng sử dụng cổng điều phối trên Web cho vai trò quản lý.'
         );
         router.replace('/login');
       }

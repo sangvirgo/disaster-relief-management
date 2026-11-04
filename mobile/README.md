@@ -58,7 +58,7 @@ npx expo start -c
 - **Cấu hình qua file `.env`:**
   Sao chép `mobile/.env.example` thành `mobile/.env`, sau đó cập nhật địa chỉ backend nếu cần:
   ```env
-  EXPO_PUBLIC_API_BASE_URL=http://192.168.1.2:8080/api/v1
+  EXPO_PUBLIC_API_BASE_URL=http://10.251.22.32:8080/api/v1
   ```
   *(Nếu đổi mạng Wi-Fi, kiểm tra IPv4 của máy tính bằng lệnh `ipconfig` và cập nhật lại IP này).*
 - **Các kịch bản kết nối:**

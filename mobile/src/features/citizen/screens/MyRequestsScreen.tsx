@@ -22,6 +22,7 @@ import { getApiErrorMessage } from '../../../api/client';
 import { MyRequestItem } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
 import { getTrackingCodeError, getTrackingSecretError, isValidTrackingCode, isValidTrackingSecret } from '../../../utils/formValidation';
+import { StorageService } from '../../../utils/secureStore';
 import {
   ClipboardList,
   ChevronRight,
@@ -104,7 +105,12 @@ export const MyRequestsScreen: React.FC = () => {
 
     setIsClaiming(true);
     try {
-      await ResponseApi.claimRequest(code, secret);
+      const claimed = await ResponseApi.claimRequest(code, secret);
+      try {
+        await StorageService.deleteGuestTrackingSecret(claimed.tracking_code || code);
+      } catch {
+        // Claiming succeeded; a local cleanup failure must not change that result.
+      }
       Alert.alert(
         'Gắn yêu cầu thành công',
         `Yêu cầu cứu hộ ${code} đã được gắn chính thức vào tài khoản của bạn.`

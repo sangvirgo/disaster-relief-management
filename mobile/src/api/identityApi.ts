@@ -28,8 +28,15 @@ export const IdentityApi = {
     return response.data;
   },
 
-  async verifyEmail(challengeId: string, code: string, idempotencyKey = generateUUID()): Promise<{ verified: true }> {
-    const response = await apiClient.post<{ verified: true }>('/identity/auth/email/verify', {
+  async verifyEmail(
+    challengeId: string,
+    code: string,
+    idempotencyKey = generateUUID(),
+  ): Promise<{ verified: true; user: { id: string; username: string; display_name: string } }> {
+    const response = await apiClient.post<{
+      verified: true;
+      user: { id: string; username: string; display_name: string };
+    }>('/identity/auth/email/verify', {
       challenge_id: challengeId,
       code: code.trim(),
     }, { headers: { 'Idempotency-Key': idempotencyKey } });

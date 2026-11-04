@@ -158,6 +158,8 @@ export type MissionStatus =
   | 'FAILED'
   | 'CANCELLED';
 
+export type MissionProgressTarget = 'EN_ROUTE' | 'ON_SCENE' | 'COMPLETED' | 'FAILED';
+
 export type MissionKind = 'RESCUE' | 'DELIVERY' | 'COMBINED';
 
 export interface MissionTimelineEvent {

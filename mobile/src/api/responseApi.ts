@@ -7,7 +7,7 @@ import {
   MyRequestItem,
   Mission,
   MissionDetail,
-  MissionStatus,
+  MissionProgressTarget,
   RescueTeam,
   RescueTeamDetail,
   GeoLocation,
@@ -243,7 +243,7 @@ export const ResponseApi = {
   async transitionMission(
     missionId: string,
     expectedVersion: number,
-    toStatus: MissionStatus,
+    toStatus: MissionProgressTarget,
     note?: string,
     outcomeNote?: string,
     idempotencyKey?: string

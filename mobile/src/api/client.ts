@@ -164,6 +164,31 @@ const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue = [];
 };
 
+async function rotateNativeSession(refreshToken: string): Promise<string> {
+  const response = await axios.post(`${API_BASE_URL}/identity/auth/refresh`, {
+    refresh_token: refreshToken,
+  }, { timeout: 15000, headers: { Accept: 'application/json' } });
+
+  const accessToken = response.data?.access_token;
+  const nextRefreshToken = response.data?.refresh_token;
+  if (typeof accessToken !== 'string' || typeof nextRefreshToken !== 'string') {
+    throw new MobileApiError('Không thể làm mới phiên đăng nhập. Vui lòng thử lại.', { status: 502 });
+  }
+  await StorageService.saveTokens(accessToken, nextRefreshToken);
+  return accessToken;
+}
+
+function isRetryableRefreshFailure(error: MobileApiError): boolean {
+  return error.code === 'REFRESH_RACE' || error.status === undefined || error.status >= 500 || error.status === 429;
+}
+
+async function rejectRefreshFailure(error: unknown): Promise<never> {
+  const formattedError = formatApiError(error);
+  processQueue(formattedError);
+  if (!isRetryableRefreshFailure(formattedError)) await StorageService.clearTokens();
+  return Promise.reject(formattedError);
+}
+
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const token = await StorageService.getAccessToken();
@@ -172,7 +197,8 @@ apiClient.interceptors.request.use(
     }
 
     const method = config.method?.toLowerCase();
-    const exemptPost = config.url?.includes('/auth/login') || config.url?.includes('/auth/refresh') ||
+    const exemptPost = config.url?.includes('/auth/login') || config.url?.includes('/auth/google') ||
+      config.url?.includes('/auth/refresh') ||
       config.url?.includes('/auth/logout') || config.url?.endsWith('/notices/') || config.url?.includes('/notices/') && config.url.endsWith('/read');
     if (['post', 'put', 'patch', 'delete'].includes(method || '') && !exemptPost && !config.headers['Idempotency-Key']) {
       config.headers['Idempotency-Key'] = generateUUID();
@@ -186,9 +212,14 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiErrorEnvelope>) => {
     const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
-    const isAuthEndpoint = originalRequest?.url?.includes('/auth/login') || originalRequest?.url?.includes('/auth/refresh');
+    const isAuthEndpoint = originalRequest?.url?.includes('/auth/login') ||
+      originalRequest?.url?.includes('/auth/google') ||
+      originalRequest?.url?.includes('/auth/refresh') ||
+      originalRequest?.url?.includes('/auth/logout');
+    const expiredSessionCode = error.response?.data?.code === 'SESSION_EXPIRED' ||
+      error.response?.data?.code === 'UNAUTHENTICATED';
 
-    if (error.response?.status !== 401 || !originalRequest || originalRequest._retry || isAuthEndpoint) {
+    if (error.response?.status !== 401 || !expiredSessionCode || !originalRequest || originalRequest._retry || isAuthEndpoint) {
       return Promise.reject(formatApiError(error));
     }
 
@@ -212,20 +243,33 @@ apiClient.interceptors.response.use(
     }
 
     try {
-      const refreshResponse = await axios.post(`${API_BASE_URL}/identity/auth/refresh`, {
-        refresh_token: refreshToken,
-      }, { timeout: 15000, headers: { Accept: 'application/json' } });
+      let accessToken: string;
+      try {
+        accessToken = await rotateNativeSession(refreshToken);
+      } catch (refreshError) {
+        const formattedError = formatApiError(refreshError);
+        if (formattedError.code !== 'REFRESH_RACE') {
+          return rejectRefreshFailure(formattedError);
+        }
 
-      const { access_token, refresh_token: newRefreshToken } = refreshResponse.data;
-      await StorageService.saveTokens(access_token, newRefreshToken);
-      originalRequest.headers.Authorization = `Bearer ${access_token}`;
-      processQueue(null, access_token);
+        // Another native request may have rotated this family in a different
+        // runtime. Retry once only when SecureStore now holds a newer token.
+        const latestRefreshToken = await StorageService.getRefreshToken();
+        if (!latestRefreshToken || latestRefreshToken === refreshToken) {
+          return rejectRefreshFailure(formattedError);
+        }
+        try {
+          accessToken = await rotateNativeSession(latestRefreshToken);
+        } catch (latestRefreshError) {
+          return rejectRefreshFailure(latestRefreshError);
+        }
+      }
+
+      originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+      processQueue(null, accessToken);
       return apiClient(originalRequest);
     } catch (refreshError) {
-      const formattedError = formatApiError(refreshError);
-      processQueue(formattedError);
-      await StorageService.clearTokens();
-      return Promise.reject(formattedError);
+      return rejectRefreshFailure(refreshError);
     } finally {
       isRefreshing = false;
     }

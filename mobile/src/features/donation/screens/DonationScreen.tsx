@@ -405,7 +405,10 @@ export const DonationScreen: React.FC = () => {
           : 'Thủ kho sẽ kiểm đếm độc lập khi nhận hàng.',
       });
     } catch (error: any) {
-      Alert.alert('Lỗi', getApiErrorMessage(error, 'Không thể gửi khai báo. Bản khai và khóa lần gửi được giữ lại để thử lại an toàn.'));
+      const message = error instanceof Error && error.message === 'PENDING_COMMAND_TOO_LARGE'
+        ? 'Bản khai vượt quá dung lượng lưu an toàn. Hãy giảm số dòng khai báo rồi thử lại.'
+        : getApiErrorMessage(error, 'Không thể gửi khai báo. Bản khai và khóa lần gửi được giữ lại để thử lại an toàn.');
+      Alert.alert('Lỗi', message);
     } finally {
       setIsSubmitting(false);
     }

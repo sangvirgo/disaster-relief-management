@@ -317,6 +317,7 @@ export function Coordinator({ page }: { page: string }) {
   const [aiReviewBusy, setAiReviewBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [detailRevision, setDetailRevision] = useState(0);
   const [campaignOptions, setCampaignOptions] = useState<{
     value: string; label: string; regionCode: string | null
   }[]>([]);
@@ -361,6 +362,21 @@ export function Coordinator({ page }: { page: string }) {
     }, 20000);
     return () => window.clearInterval(timer);
   }, []);
+  const hasActiveMissions = Boolean(detail?.active_missions?.items.length);
+  useEffect(() => {
+    if (!selected || !hasActiveMissions) return;
+    const refreshActiveMissionDetail = () => {
+      if (document.visibilityState === 'visible') setDetailRevision((value) => value + 1);
+    };
+    const timer = window.setInterval(refreshActiveMissionDetail, 5000);
+    window.addEventListener('focus', refreshActiveMissionDetail);
+    document.addEventListener('visibilitychange', refreshActiveMissionDetail);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshActiveMissionDetail);
+      document.removeEventListener('visibilitychange', refreshActiveMissionDetail);
+    };
+  }, [selected, hasActiveMissions]);
   useEffect(() => {
     let live = true;
     setLoading(true);
@@ -417,7 +433,7 @@ export function Coordinator({ page }: { page: string }) {
     return () => {
       live = false;
     };
-  }, [selected, revision]);
+  }, [selected, revision, detailRevision]);
   useEffect(() => { setCandidates(null); }, [selected]);
   useEffect(() => {
     if (!selected || !detail || detail.status !== 'TRIAGED') return;

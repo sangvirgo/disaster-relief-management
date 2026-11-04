@@ -202,14 +202,16 @@ export const TeamDashboardScreen: React.FC = () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const [teamsPage, missionsPage, skillsResult] = await Promise.all([
+      const [teamsPage, skillsResult] = await Promise.all([
         ResponseApi.getMyTeams(),
-        ResponseApi.getMyMissions(),
         ResponseApi.getTeamSkills().catch(() => ({ items: [] as TeamSkillOption[] })),
       ]);
       setTeamSkills(skillsResult.items);
       const teamsData = teamsPage.items;
-      const missionsData = missionsPage.items;
+      // GET /missions/mine chỉ áp dụng cho tài khoản đã thuộc ít nhất một đội.
+      const missionsData = teamsData.length > 0
+        ? (await ResponseApi.getMyMissions()).items
+        : [];
 
       if (teamsData.length > 0) {
         const firstTeam = teamsData[0];
@@ -686,7 +688,7 @@ export const TeamDashboardScreen: React.FC = () => {
           {/* Trạng thái sẵn sàng nhận lệnh của đội */}
           <View style={styles.availabilityRow}>
             <View style={{ flex: 1, marginRight: 8 }}>
-              <Text style={styles.availTitle}>Trực chiến nhận nhiệm vụ cứu nạn</Text>
+              <Text style={styles.availTitle}>Trực chiến nhận nhiệm vụ</Text>
               <Text style={styles.availSubtitle}>
                 {isAvailable ? 'Đội đang sẵn sàng nhận phân công nhiệm vụ mới' : 'Đội đang tạm dừng nhận nhiệm vụ'}
               </Text>
@@ -839,7 +841,7 @@ export const TeamDashboardScreen: React.FC = () => {
             >
               <Clock size={20} color={THEME.colors.primary.main} />
               <Text style={[styles.statNumber, { color: THEME.colors.primary.dark }]}>{activeCount}</Text>
-              <Text style={styles.statLabel}>Đang cứu</Text>
+              <Text style={styles.statLabel}>Đang thực hiện</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
