@@ -7,7 +7,7 @@ type CampaignPage = {
   cursor?: string;
 };
 
-export function useAnalyticsRegion(enabled = true, includeRequestRegions = false) {
+export function useAnalyticsRegion(enabled = true, includeRequestRegions = false, autoSelect = true) {
   const [region, setRegion] = useState('');
   const [regions, setRegions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,8 +33,10 @@ export function useAnalyticsRegion(enabled = true, includeRequestRegions = false
           for (const campaign of result.items) {
             if (campaign.region_code) found.add(campaign.region_code);
           }
-          if (!result.more || !result.cursor) break;
-          cursor = result.cursor;
+          if (page === 19 && result.more) throw new Error('Danh sách chiến dịch quá dài để xác định đủ khu vực. Vui lòng chọn khu vực cụ thể.');
+          if (result.more && !result.cursor) throw new Error('Danh sách chiến dịch thiếu mã trang tiếp theo. Vui lòng thử lại.');
+          if (!result.more) break;
+          cursor = result.cursor!;
         }
         if (includeRequestRegions) {
           cursor = '';
@@ -47,14 +49,16 @@ export function useAnalyticsRegion(enabled = true, includeRequestRegions = false
             for (const request of result.items) {
               if (request.region_code) found.add(request.region_code);
             }
-            if (!result.more || !result.cursor) break;
-            cursor = result.cursor;
+            if (page === 19 && result.more) throw new Error('Danh sách SOS quá dài để xác định đủ khu vực. Vui lòng chọn khu vực cụ thể.');
+            if (result.more && !result.cursor) throw new Error('Danh sách SOS thiếu mã trang tiếp theo. Vui lòng thử lại.');
+            if (!result.more) break;
+            cursor = result.cursor!;
           }
         }
         if (active) {
           const values = [...found].sort();
           setRegions(values);
-          setRegion((current) => current || values[0] || '');
+          if (autoSelect) setRegion((current) => current || values[0] || '');
         }
       } catch (cause) {
         if (active) setError(cause instanceof Error ? cause.message : 'Không thể tải khu vực.');
@@ -66,7 +70,7 @@ export function useAnalyticsRegion(enabled = true, includeRequestRegions = false
     return () => {
       active = false;
     };
-  }, [enabled, includeRequestRegions]);
+  }, [enabled, includeRequestRegions, autoSelect]);
 
   return { region, setRegion, regions, loading, error };
 }
@@ -75,12 +79,21 @@ export function AnalyticsRegionField({
   region,
   onChange,
   regions,
+  id = 'analytics-region',
+  title = 'Khu vực báo cáo',
+  hint = 'Chọn phạm vi để cập nhật số liệu',
+  allowAll = false,
 }: {
   region: string;
   onChange: (value: string) => void;
   regions: string[];
+  id?: string;
+  title?: string;
+  hint?: string;
+  allowAll?: boolean;
 }) {
   const [manual, setManual] = useState(false);
+  const [draft, setDraft] = useState('');
   const listed = regions.includes(region);
   return (
     <div className="region-control">
@@ -89,23 +102,24 @@ export function AnalyticsRegionField({
           ⌖
         </span>
         <span>
-          <strong>Khu vực báo cáo</strong>
-          <small>Chọn phạm vi để cập nhật số liệu</small>
+          <strong>{title}</strong>
+          <small>{hint}</small>
         </span>
       </div>
       <div className="region-control-inputs">
-        <label className="visually-hidden" htmlFor="analytics-region">
-          Chọn khu vực báo cáo
+        <label className="visually-hidden" htmlFor={id}>
+          Chọn {title.toLowerCase()}
         </label>
         <select
-          id="analytics-region"
-          value={listed && !manual ? region : ''}
+          id={id}
+          disabled={manual}
+          value={(listed || (allowAll && !region)) && !manual ? region : ''}
           onChange={(event) => {
             setManual(false);
             onChange(event.target.value);
           }}
         >
-          <option value="">Chọn khu vực</option>
+          <option value="">{manual ? 'Đang nhập mã khu vực' : allowAll ? 'Toàn Việt Nam' : 'Chọn khu vực'}</option>
           {regions.map((code) => (
             <option key={code} value={code}>
               {code}
@@ -115,21 +129,34 @@ export function AnalyticsRegionField({
         <button
           type="button"
           className="region-manual-button"
-          onClick={() => setManual((value) => !value)}
+          onClick={() => {
+            if (manual && region && !listed) onChange(allowAll ? '' : regions[0] || '');
+            if (!manual) setDraft(region && !listed ? region : '');
+            setManual((value) => !value);
+          }}
         >
           {manual ? 'Ẩn nhập mã' : 'Nhập mã khác'}
         </button>
       </div>
       {manual && (
-        <label className="region-manual-field">
-          Mã khu vực khác
-          <input
-            value={region}
-            onChange={(event) => onChange(event.target.value.trim())}
-            placeholder="Ví dụ: DEMO_A"
-            autoComplete="off"
-          />
-        </label>
+        <form className="region-manual-field" onSubmit={(event) => {
+          event.preventDefault();
+          if (draft.trim()) onChange(draft.trim());
+        }}>
+          <label htmlFor={`${id}-manual`}>Mã khu vực khác</label>
+          <div className="region-control-inputs">
+            <input
+              id={`${id}-manual`}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Ví dụ: DEMO_A"
+              autoComplete="off"
+              maxLength={64}
+            />
+            <button type="submit" className="region-manual-button" disabled={!draft.trim() || draft.trim() === region}>Áp dụng</button>
+          </div>
+          {region && !listed && <small>Không có mã này trong danh sách gợi ý. Hãy kiểm tra mã khu vực trước khi dùng số liệu.</small>}
+        </form>
       )}
       {regions.length > 0 && (
         <div className="region-shortcuts" role="group" aria-label="Khu vực thường dùng">

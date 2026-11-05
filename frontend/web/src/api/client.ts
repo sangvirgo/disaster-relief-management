@@ -98,6 +98,8 @@ const messages: Record<string, string> = {
   SELF_APPROVAL_FORBIDDEN: 'Bạn không thể tự duyệt bản ghi do mình lập hoặc kiểm đếm.',
   APPROVAL_STALE: 'Bản kiểm đếm đã thay đổi. Vui lòng tải lại trước khi duyệt.',
   STATE_TRANSITION_INVALID: 'Trạng thái hiện tại không cho phép thao tác này.',
+  RESOLUTION_BLOCKED: 'Chưa thể kết thúc SOS. Hãy kiểm tra nhiệm vụ đang giao, kết quả cứu hộ và việc bàn giao vật tư trong hồ sơ.',
+  RESOLUTION_BASIS_INVALID: 'Căn cứ kết thúc chưa phù hợp với kết quả nhiệm vụ hoặc vật tư hiện tại.',
   IDENTITY_UNAVAILABLE: 'Dịch vụ tài khoản tạm thời không khả dụng. Vui lòng thử lại.',
   PASSWORD_WEAK:
     'Mật khẩu chưa đủ mạnh. Mật khẩu phải từ 10 ký tự, khác tên tài khoản và không dùng mật khẩu phổ biến (như password123, 1234567890...).',

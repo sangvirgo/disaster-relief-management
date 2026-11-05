@@ -14,6 +14,8 @@ export type Field = {
   maxLength?: number;
   integer?: boolean;
   options?: { value: string; label: string }[];
+  optionsFor?: (values: Record<string, string>) => { value: string; label: string }[];
+  resetOnChange?: string[];
   emptyLabel?: string;
   placeholder?: string;
   initialValue?: string;
@@ -54,7 +56,7 @@ export function CommandForm({
   const [message, setMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [manualFields, setManualFields] = useState<Record<string, boolean>>({});
-  const key = useRef<string | null>(null);
+  const pending = useRef<{ scope: string; key: string; body: Record<string, unknown> } | null>(null);
   async function submit(event: FormEvent) {
     event.preventDefault();
     const invalid: Record<string, string> = {};
@@ -89,17 +91,26 @@ export function CommandForm({
     setMessage('');
     setFieldErrors({});
     try {
-      key.current ||= newCommandKey();
-      const body = spec.build
-        ? spec.build(values)
-        : Object.fromEntries(Object.entries(values).filter(([, value]) => value.trim() !== ''));
-      if (spec.version !== undefined) body.expected_version = spec.version;
+      const scope = `${spec.service}:${spec.method || 'POST'}:${spec.path}:${spec.version ?? ''}`;
+      if (pending.current?.scope !== scope) pending.current = null;
+      if (!pending.current) {
+        const visibleValues = Object.fromEntries(
+          Object.entries(values).filter(([name, value]) => {
+            const field = spec.fields?.find((candidate) => candidate.name === name);
+            return value.trim() !== '' &&
+              (!field?.visibleWhen || values[field.visibleWhen.field] === field.visibleWhen.value);
+          })
+        );
+        const body = spec.build ? spec.build(values) : visibleValues;
+        if (spec.version !== undefined) body.expected_version = spec.version;
+        pending.current = { scope, key: newCommandKey(), body };
+      }
       await api(spec.service, spec.path, {
         method: spec.method || 'POST',
-        body,
-        idempotencyKey: key.current,
+        body: pending.current.body,
+        idempotencyKey: pending.current.key,
       });
-      key.current = null;
+      pending.current = null;
       setMessage('Thao tác đã được máy chủ xác nhận.');
       onSuccess();
     } catch (cause) {
@@ -122,7 +133,7 @@ export function CommandForm({
         cause instanceof ApiError &&
         ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'].includes(cause.code)
       ) {
-        key.current = null;
+        pending.current = null;
         onStale?.();
       }
     } finally {
@@ -146,11 +157,11 @@ export function CommandForm({
                   setValues((current) => ({ ...current, [field.name]: option.value }));
                   setFieldErrors((current) => ({ ...current, [field.name]: '' }));
                   setMessage('');
-                  key.current = null;
+                  pending.current = null;
                 }}
               >
                 <span>{option.label}</span>
-                <span aria-hidden="true">{values[field.name] === option.value ? '✓' : '○'}</span>
+                <span className="command-choice-indicator" aria-hidden="true">{values[field.name] === option.value ? '✓' : ''}</span>
               </button>
             )) : <p className="empty">Chưa có chiến dịch đang hoạt động phù hợp với khu vực này.</p>}
             {fieldErrors[field.name] && <small className="field-error" role="alert">{fieldErrors[field.name]}</small>}
@@ -176,7 +187,7 @@ export function CommandForm({
                   }
                   setFieldErrors((current) => ({ ...current, [field.name]: '' }));
                   setMessage('');
-                  key.current = null;
+                  pending.current = null;
                 }}
               >
                 <option value="">Chọn {sentenceLabel(field.label)}</option>
@@ -197,7 +208,7 @@ export function CommandForm({
                     setValues((current) => ({ ...current, [field.name]: event.target.value }));
                     setFieldErrors((current) => ({ ...current, [field.name]: '' }));
                     setMessage('');
-                    key.current = null;
+                    pending.current = null;
                   }}
                 />
                 {Boolean(field.options?.length) && (
@@ -230,7 +241,7 @@ export function CommandForm({
                 }));
                 setFieldErrors((current) => ({ ...current, [field.name]: '' }));
                 setMessage('');
-                key.current = null;
+                pending.current = null;
               }}
             />
             {pointValue(values[field.name] || '') && (
@@ -252,10 +263,14 @@ export function CommandForm({
               placeholder={field.placeholder}
               value={values[field.name] || ''}
               onChange={(event) => {
-                setValues({ ...values, [field.name]: event.target.value });
+                setValues((current) => ({
+                  ...current,
+                  ...Object.fromEntries((field.resetOnChange || []).map((name) => [name, ''])),
+                  [field.name]: event.target.value,
+                }));
                 setFieldErrors((current) => ({ ...current, [field.name]: '' }));
                 setMessage('');
-                key.current = null;
+                pending.current = null;
               }}
             />
           ) : field.type === 'select' ? (
@@ -264,14 +279,18 @@ export function CommandForm({
               aria-invalid={Boolean(fieldErrors[field.name])}
               value={values[field.name] || ''}
               onChange={(event) => {
-                setValues({ ...values, [field.name]: event.target.value });
+                setValues((current) => ({
+                  ...current,
+                  ...Object.fromEntries((field.resetOnChange || []).map((name) => [name, ''])),
+                  [field.name]: event.target.value,
+                }));
                 setFieldErrors((current) => ({ ...current, [field.name]: '' }));
                 setMessage('');
-                key.current = null;
+                pending.current = null;
               }}
             >
               <option value="">{field.emptyLabel || `Chọn ${sentenceLabel(field.label)}`}</option>
-              {field.options?.map((option) => (
+              {(field.optionsFor?.(values) || field.options)?.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -300,7 +319,7 @@ export function CommandForm({
                 setValues({ ...values, [field.name]: event.target.value });
                 setFieldErrors((current) => ({ ...current, [field.name]: '' }));
                 setMessage('');
-                key.current = null;
+                pending.current = null;
               }}
             />
           )}

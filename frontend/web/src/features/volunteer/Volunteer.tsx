@@ -7,6 +7,7 @@ import type { components as ResponseComponents } from '../../api/generated/respo
 import { googleMapsDirectionsUrl } from '../../maps/googleMaps';
 import { LocationPicker, type Point } from '../../maps/LocationPicker';
 import { confirmAction } from '../../components/confirmAction';
+import { DetailSurface } from '../../components/DetailSurface';
 
 type Mission = ResponseComponents['schemas']['MissionView'];
 type MissionDetail = ResponseComponents['schemas']['MissionDetail'];
@@ -57,8 +58,12 @@ function missionEvidenceError(file: File): string | null {
   return null;
 }
 
-export function Notices({ onOpenMission }: { onOpenMission?: (missionId: string) => void }) {
+export function Notices({ onOpenMission, onOpenRequest }: {
+  onOpenMission?: (missionId: string) => void;
+  onOpenRequest?: (requestId: string) => void;
+}) {
   const [items, setItems] = useState<Notice[]>([]);
+  const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState('');
   const [next, setNext] = useState('');
@@ -175,12 +180,13 @@ export function Notices({ onOpenMission }: { onOpenMission?: (missionId: string)
       )}
       <div className="record-list">
         {items.map((item) => (
-          <article className="record" key={item.id}>
-            <div>
+          <article className={`record notice-record ${item.read_at ? '' : 'is-unread'}`} key={item.id}>
+            <button className="notice-record-open" type="button" onClick={() => setSelectedNotice(item)}
+              aria-label={`Xem chi tiết: ${noticeNames[item.notice_type] || 'Có cập nhật mới'}`}>
               <strong>{noticeNames[item.notice_type] || 'Có cập nhật mới'}</strong>
               <p>{timeLabel(item.created_at)}</p>
               <small>{item.read_at ? `Đã đọc lúc ${timeLabel(item.read_at)}` : 'Chưa đọc'}</small>
-            </div>
+            </button>
             <div className="record-actions">
               {onOpenMission && typeof item.payload.mission_id === 'string' &&
                 <button className="button secondary" type="button"
@@ -194,6 +200,31 @@ export function Notices({ onOpenMission }: { onOpenMission?: (missionId: string)
           </article>
         ))}
       </div>
+      <DetailSurface modal open={Boolean(selectedNotice)} label="Chi tiết thông báo"
+        onClose={() => setSelectedNotice(null)} className="notice-detail-dialog">
+        {selectedNotice && <div className="notice-detail-content">
+          <span className="eyebrow">THÔNG BÁO</span>
+          <h2>{noticeNames[selectedNotice.notice_type] || 'Có cập nhật mới'}</h2>
+          <p className="muted">Nhận lúc {timeLabel(selectedNotice.created_at)}</p>
+          <p>{selectedNotice.notice_type.startsWith('MISSION')
+            ? 'Nhiệm vụ của đội có cập nhật. Mở nhiệm vụ để xem tình huống và tiến độ mới nhất.'
+            : selectedNotice.notice_type.startsWith('REQUEST')
+              ? 'Yêu cầu SOS có cập nhật. Hãy kiểm tra hồ sơ và trạng thái mới nhất trong mục Xử lý SOS.'
+              : 'Có cập nhật về hoạt động cứu trợ của bạn.'}</p>
+          {typeof selectedNotice.payload.request_id === 'string' &&
+            <p className="notice-reference">Mã hồ sơ SOS: <code>{selectedNotice.payload.request_id}</code></p>}
+          {typeof selectedNotice.payload.mission_id === 'string' &&
+            <p className="notice-reference">Mã nhiệm vụ: <code>{selectedNotice.payload.mission_id}</code></p>}
+          <div className="notice-detail-actions">
+            {onOpenRequest && typeof selectedNotice.payload.request_id === 'string' &&
+              <button className="button" type="button" onClick={() => onOpenRequest(selectedNotice.payload.request_id as string)}>Mở hồ sơ SOS</button>}
+            {onOpenMission && typeof selectedNotice.payload.mission_id === 'string' &&
+              <button className="button" type="button" onClick={() => onOpenMission(selectedNotice.payload.mission_id as string)}>Mở nhiệm vụ</button>}
+            {!selectedNotice.read_at && <button className="button secondary" type="button"
+              onClick={() => { void markRead(selectedNotice.id); setSelectedNotice(null); }}>Đánh dấu đã đọc</button>}
+          </div>
+        </div>}
+      </DetailSurface>
       {next && (
         <button className="button secondary" onClick={() => setCursor(next)}>
           Xem thêm

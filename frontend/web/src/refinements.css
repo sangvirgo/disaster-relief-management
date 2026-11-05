@@ -284,6 +284,26 @@
 .account-request small {
   display: block;
 }
+.account-request { width: 100%; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.account-request:focus-visible { outline: 3px solid #8bb8ff; outline-offset: 2px; }
+.account-request-arrow { color: var(--color-primary); font-size: 26px; line-height: 1; }
+.admin-record-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 18px; }
+.admin-status-badge, .admin-version-badge { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border: 1px solid #d6e0ed; border-radius: 9px; background: #f7f9fc; color: #43546b; font-size: 13px; font-weight: 700; }
+.admin-status-badge.is-active { border-color: #a9dfc4; background: #ecfdf3; color: #087443; }
+.admin-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
+.admin-status-badge.is-active .admin-status-dot { background: #16a34a; }
+.admin-version-badge { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #fff; }
+.notice-record { align-items: center; }
+.notice-record.is-unread { border-color: #b9d2ff; background: #f6f9ff; }
+.notice-record-open { display: block; flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.notice-record-open:hover strong { color: var(--color-primary); text-decoration: underline; }
+.notice-record-open:focus-visible { outline: 3px solid #8bb8ff; outline-offset: 4px; border-radius: 4px; }
+.notice-detail-dialog { width: min(540px, calc(100vw - 32px)); }
+.notice-detail-content { padding-top: 8px; }
+.notice-detail-content h2 { margin: 8px 90px 6px 0; font-size: 23px; }
+.notice-detail-content > p { line-height: 1.6; }
+.notice-reference { overflow-wrap: anywhere; border: 1px solid #dce5f0; border-radius: 10px; padding: 10px 12px; background: #f8fafc; }
+.notice-detail-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
 .account-manual-lookup {
   margin-top: 10px;
 }
@@ -448,7 +468,8 @@
   background: var(--sidebar-active-bg);
 }
 .command-choice-card.selected { box-shadow: 0 0 0 2px rgba(37, 99, 235, .12); }
-.command-choice-card span:last-child { color: var(--color-primary); font-weight: 800; }
+.command-choice-indicator { display: inline-grid; flex: 0 0 22px; width: 22px; height: 22px; place-items: center; border: 2px solid #9bb0cf; border-radius: 50%; color: #fff; font-size: 13px; font-weight: 800; line-height: 1; }
+.command-choice-card.selected .command-choice-indicator { border-color: var(--color-primary); background: var(--color-primary); }
 .emergency-bar {
   position: sticky;
   top: 0;
@@ -634,6 +655,10 @@
   flex: 1;
   min-width: 0;
 }
+.region-manual-field input {
+  flex: 1;
+  min-width: 0;
+}
 .region-manual-button,
 .region-shortcuts button,
 .campaign-filters button {
@@ -652,6 +677,10 @@
 .region-shortcuts button:hover,
 .campaign-filters button:hover {
   background: var(--color-primary-bg);
+}
+.region-manual-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 .region-shortcuts {
   display: flex;
@@ -1196,7 +1225,7 @@
 .detail-close-button .close-icon { display: block; flex: 0 0 16px; }
 .detail-close-button .close-label { display: inline; font-size: 14px; line-height: 20px; }
 .record-detail-dialog { position: fixed; }
-.record-detail-dialog > .command-form { padding-top: 24px; }
+.record-detail-dialog > .command-form { border-top: 0; padding-top: 8px; }
 .record-detail-dialog > .command-form > h3 { padding-right: 92px; margin-top: 0; font-size: 22px; }
 .admin-create-brand { display: flex; align-items: center; gap: 12px; min-height: 56px; padding-right: 94px; margin-bottom: 14px; }
 .admin-create-brand-copy { display: grid; gap: 2px; }

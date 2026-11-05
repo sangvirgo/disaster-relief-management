@@ -1080,9 +1080,10 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
     regions,
     loading: regionLoading,
     error: regionError,
-  } = useAnalyticsRegion(page.path === '/reports/summary');
+  } = useAnalyticsRegion(page.path === '/reports/summary', true, false);
   const [data, setData] = useState<DataPage | null>(null);
   const [error, setError] = useState('');
+  const [forbidden, setForbidden] = useState(false);
   const [loading, setLoading] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
   const [detailPath, setDetailPath] = useState<string | null>(null);
@@ -1103,20 +1104,45 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
     (page.service === 'response' &&
       (page.path?.startsWith('/requests') || page.path === '/missions/mine')) ||
     (page.service === 'identity' && page.path === '/users');
+  const isResponseSummary = page.service === 'response' && page.path === '/reports/summary';
   useEffect(() => {
     if (!page.service || !page.path) return;
-    if (page.path === '/reports/summary' && !region) return;
+    if (isResponseSummary && !region && (regionLoading || !regions.length)) return;
     let active = true;
     setLoading(true);
     setError('');
-    const reportPath =
-      page.service === 'response' && page.path === '/reports/summary'
-        ? `/reports/summary?from=${encodeURIComponent(new Date(Date.now() - 7 * 86_400_000).toISOString())}&to=${encodeURIComponent(new Date().toISOString())}&region_code=${encodeURIComponent(region)}`
-        : page.path;
-    const path =
-      reportPath +
-      (cursor ? `${reportPath.includes('?') ? '&' : '?'}cursor=${encodeURIComponent(cursor)}` : '');
-    api<DataPage>(page.service, path)
+    setForbidden(false);
+    const now = new Date();
+    const summaryWindow = new URLSearchParams({
+      from: new Date(now.getTime() - 7 * 86_400_000).toISOString(),
+      to: now.toISOString(),
+    });
+    const load = async (): Promise<DataPage> => {
+      if (isResponseSummary) {
+        const scopes = region ? [region] : regions;
+        const summaries = await Promise.all(scopes.map((code) =>
+          api<DataPage>('response', `/reports/summary?${summaryWindow}&region_code=${encodeURIComponent(code)}`)
+        ));
+        if (summaries.length === 1) return summaries[0];
+        const addCounts = (key: 'status_counts' | 'priority_counts') =>
+          summaries.reduce<Record<string, number>>((totals, summary) => {
+            for (const [status, count] of Object.entries(summary[key] || {}))
+              totals[status] = (totals[status] || 0) + count;
+            return totals;
+          }, {});
+        return {
+          status_counts: addCounts('status_counts'),
+          priority_counts: addCounts('priority_counts'),
+          active_missions: summaries.reduce((total, summary) => total + (summary.active_missions || 0), 0),
+          overdue_missions: summaries.reduce((total, summary) => total + (summary.overdue_missions || 0), 0),
+          generated_at: summaries.map((summary) => summary.generated_at).filter(Boolean).sort().at(-1),
+        };
+      }
+      const path = page.path! +
+        (cursor ? `${page.path!.includes('?') ? '&' : '?'}cursor=${encodeURIComponent(cursor)}` : '');
+      return api<DataPage>(page.service!, path);
+    };
+    load()
       .then((result) => {
         if (active) setData((current) => ({
           ...result,
@@ -1126,7 +1152,10 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
         }));
       })
       .catch((cause) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'Không thể tải dữ liệu.');
+        if (active) {
+          setError(cause instanceof Error ? cause.message : 'Không thể tải dữ liệu.');
+          setForbidden(cause instanceof ApiError && cause.status === 403);
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -1134,7 +1163,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
     return () => {
       active = false;
     };
-  }, [page, cursor, user, region]);
+  }, [page, cursor, user, region, regions, regionLoading, isResponseSummary]);
   if (!page.service || !page.path)
     return (
       <div className="card">
@@ -1156,28 +1185,33 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
       {page.note && page.path !== '/reports/summary' && <p>{page.note}</p>}
       {page.path === '/reports/summary' && (
         <>
-          <p className="muted">Chọn khu vực để xem số liệu. Bản đồ nhiệt có thể hiển thị tất cả khu vực bạn được cấp quyền xem.</p>
+          <p className="muted">Mặc định xem SOS trên toàn Việt Nam trong phạm vi được cấp quyền. Chọn một khu vực để lọc bản đồ và xem số liệu chi tiết.</p>
           <AnalyticsRegionField
             region={region}
             onChange={(value) => {
               setCursor(null);
+              setData(null);
               setRegion(value);
             }}
             regions={regions}
+            title="Khu vực"
+            hint="Dùng chung cho bản đồ nhiệt và số liệu"
+            allowAll
           />
           {regionError && (
             <p role="alert" className="notice error">
               {regionError}
             </p>
           )}
-          {!region && !regionLoading && <p>Chọn hoặc nhập mã khu vực để xem báo cáo.</p>}
+          {!region && !regionLoading && !regions.length && <p className="muted">Chưa tìm thấy khu vực được cấp quyền để tổng hợp số liệu.</p>}
+          <div className="report-heatmap"><CoordinatorMap region={region} regions={regions} /></div>
         </>
       )}
       {loading && <p role="status">Đang tải dữ liệu…</p>}
       {error && (
         <div role="alert" className="notice error">
           {error}
-          {error.includes('quyền') && (
+          {forbidden && (
             <p>Dữ liệu trong phạm vi này hiện không được cấp cho tài khoản của bạn.</p>
           )}
         </div>
@@ -1200,9 +1234,6 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
             )
           ) : 'status_counts' in data ? (
             <div className="report-content">
-              <div className="report-heatmap">
-                <CoordinatorMap />
-              </div>
               <div className="report-metrics">
                 <div className="metric-tile">
                   <span>Nhiệm vụ đang hoạt động</span>
@@ -1219,7 +1250,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
                   <strong>
                     {Object.values(data.status_counts || {}).reduce((sum, count) => sum + count, 0)}
                   </strong>
-                  <small>Trong khu vực đã chọn</small>
+                  <small>{region ? 'Trong khu vực đã chọn' : 'Trong các khu vực được cấp quyền'}</small>
                 </div>
               </div>
               <div className="report-breakdown">
@@ -1318,6 +1349,7 @@ function App() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedTrackingCode, setSelectedTrackingCode] = useState('');
   const [selectedMissionId, setSelectedMissionId] = useState('');
+  const [selectedRequestId, setSelectedRequestId] = useState('');
   const [sharingTeamId, setSharingTeamId] = useState('');
   const [sharingMessage, setSharingMessage] = useState('');
 
@@ -1328,6 +1360,7 @@ function App() {
     setPageId('sos');
     setSelectedTrackingCode('');
     setSelectedMissionId('');
+    setSelectedRequestId('');
     setSharingTeamId('');
     setSharingMessage('');
     setShowPasswordModal(false);
@@ -1421,6 +1454,7 @@ function App() {
   function changePage(id: string) {
     if (id === 'track') setSelectedTrackingCode('');
     setSelectedMissionId('');
+    setSelectedRequestId('');
     setPageId(id);
     setMenuOpen(false);
     setProfileMenuOpen(false);
@@ -1594,7 +1628,7 @@ function App() {
                     onChangePassword={() => setShowPasswordModal(true)}
                   />
                 ) : workspace === 'citizen' && selected.id === 'sos' ? (
-                  <SosForm user={user} onTrack={trackOwnedRequest} />
+                  <SosForm key={user?.id || 'guest'} user={user} onTrack={trackOwnedRequest} />
                 ) : selected.id === 'track' ? (
                   <Tracking
                     key={selectedTrackingCode}
@@ -1608,12 +1642,16 @@ function App() {
                   <Donations user={user} />
                 ) : workspace === 'coordinator' &&
                   ['queue', 'verify', 'triage', 'assign'].includes(selected.id) ? (
-                  <Coordinator key={selected.id} page={selected.id} />
+                  <Coordinator key={`${selected.id}:${selectedRequestId}`} page={selected.id}
+                    initialRequestId={selectedRequestId} />
                 ) : workspace === 'coordinator' && selected.id === 'needs' && user ? (
                   <Operations page="needs" user={user} />
                 ) : ['volunteer', 'coordinator'].includes(workspace) &&
                   selected.id === 'notices' ? (
-                  <Notices onOpenMission={workspace === 'volunteer' ? (missionId) => {
+                  <Notices onOpenRequest={workspace === 'coordinator' ? (requestId) => {
+                    setSelectedRequestId(requestId);
+                    setPageId('queue');
+                  } : undefined} onOpenMission={workspace === 'volunteer' ? (missionId) => {
                     setSelectedMissionId(missionId);
                     setPageId('missions');
                   } : undefined} />

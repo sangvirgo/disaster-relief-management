@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { api, newCommandKey } from '../../api/client';
+import { api, ApiError, newCommandKey } from '../../api/client';
 import { label } from '../../i18n/labels';
 import { confirmAction } from '../../components/confirmAction';
 
@@ -9,11 +9,13 @@ export function AsyncRequestForm({
   version,
   kind,
   onCompleted,
+  onStale,
 }: {
   requestId: string;
   version: number;
   kind: Kind;
   onCompleted: () => void;
+  onStale?: () => void;
 }) {
   const [reason, setReason] = useState('');
   const [basis, setBasis] = useState('');
@@ -87,6 +89,10 @@ export function AsyncRequestForm({
       setMessage('Máy chủ đã nhận lệnh xử lý. Đang kiểm tra kết quả cuối cùng.');
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Lệnh chưa được xác nhận.');
+      if (cause instanceof ApiError && ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'].includes(cause.code)) {
+        key.current = null;
+        onStale?.();
+      }
     } finally {
       setBusy(false);
     }

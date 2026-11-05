@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { maplibreGL } from '@maplibre/maplibre-gl-leaflet';
@@ -57,44 +57,6 @@ const heatColors = [
   { at: 0.75, rgb: [220, 38, 38] },
   { at: 1, rgb: [127, 29, 29] },
 ];
-
-const EXTRA_SOS_CENTERS: ReadonlyArray<readonly [number, number]> = [
-  [103.02, 21.38], [103.46, 22.40], [103.91, 21.33], [104.33, 22.14], [104.87, 21.71],
-  [105.22, 21.82], [104.98, 22.82], [106.25, 22.67], [105.83, 22.15], [106.76, 21.85],
-  [105.84, 21.59], [105.83, 21.03], [106.07, 21.19], [106.20, 21.27], [106.31, 20.94],
-  [106.69, 20.86], [107.08, 20.95], [105.34, 20.81], [105.97, 20.25], [106.16, 20.42],
-  [105.78, 19.80], [105.68, 18.68], [105.90, 18.34], [106.62, 17.47], [107.18, 16.82],
-  [107.58, 16.46], [108.20, 16.06], [108.33, 15.88], [108.48, 15.57], [108.80, 15.12],
-  [108.00, 14.35], [108.00, 13.98], [109.22, 13.78], [108.05, 12.67], [107.68, 12.00],
-  [108.44, 11.94], [107.82, 11.55], [109.19, 12.24], [108.99, 11.56], [108.10, 10.93],
-  [107.08, 10.35], [107.18, 10.50], [106.70, 10.82], [106.82, 10.95], [106.10, 11.31],
-  [106.99, 11.53], [106.65, 10.98], [106.36, 10.36], [106.37, 10.24], [105.97, 10.25],
-  [105.78, 10.04], [105.43, 10.39], [105.75, 10.46], [105.08, 10.01], [105.15, 9.18],
-  [105.72, 9.29], [105.98, 9.60], [105.47, 9.78], [103.96, 10.23],
-];
-
-function createAdditionalHeatmapCells(
-  layer: 'confirmed' | 'unverified',
-  resolution: number,
-): HeatmapCell[] {
-  if (layer !== 'unverified') return [];
-  return EXTRA_SOS_CENTERS.map(([longitude, latitude]): HeatmapCell => {
-    const latitudeHalfSize = resolution / (2 * 111_320);
-    const longitudeHalfSize = latitudeHalfSize / Math.max(0.1, Math.cos(latitude * Math.PI / 180));
-    const ring = [
-      [longitude - longitudeHalfSize, latitude - latitudeHalfSize],
-      [longitude + longitudeHalfSize, latitude - latitudeHalfSize],
-      [longitude + longitudeHalfSize, latitude + latitudeHalfSize],
-      [longitude - longitudeHalfSize, latitude + latitudeHalfSize],
-      [longitude - longitudeHalfSize, latitude - latitudeHalfSize],
-    ];
-    return {
-      cell: { type: 'Polygon', coordinates: [ring] },
-      center: { type: 'Point', coordinates: [longitude, latitude] },
-      count: 8,
-    };
-  });
-}
 
 const cellPinIcon = L.divIcon({
   className: 'heatmap-pin heatmap-pin-cell',
@@ -397,15 +359,12 @@ export function HeatmapPanel({
   const [warning, setWarning] = useState('');
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
-  const includeAdditionalSignals = !compact && Boolean(overviewRegions?.length);
-  const additionalCells = useMemo(() => createAdditionalHeatmapCells(layer, resolution), [layer, resolution]);
-  const visibleCells = useMemo(
-    () => includeAdditionalSignals ? [...(data?.items ?? []), ...additionalCells] : data?.items ?? [],
-    [data?.items, additionalCells, includeAdditionalSignals],
-  );
+  const previousQuery = useRef('');
+  const visibleCells = data?.items ?? [];
   const count = visibleCells.reduce((sum, cell) => sum + cell.count, 0);
   const targetRegions = overviewRegions?.length ? [...new Set(overviewRegions)] : region ? [region] : [];
   const regionKey = targetRegions.join('|');
+  const queryKey = `${regionKey}|${layer}|${resolution}`;
   const onResolutionChange = useCallback((next: typeof resolution) => {
     setResolution((current) => current === next ? current : next);
   }, []);
@@ -419,6 +378,10 @@ export function HeatmapPanel({
     }
     let active = true;
     setLoading(true);
+    if (previousQuery.current !== queryKey) {
+      setData(null);
+      previousQuery.current = queryKey;
+    }
     setError('');
     setWarning('');
     const now = new Date().toISOString();
@@ -487,9 +450,9 @@ export function HeatmapPanel({
             </>}
             <small>{count} SOS · 7 ngày gần đây · độ chi tiết {resolution >= 1000 ? `${resolution / 1000} km` : `${resolution} m`}</small>
           </div>
-          {zoom > 10 && <p className="muted">Vùng không có SOS giữ nguyên nền bản đồ. Ghim đỏ đại diện cho ô có SOS; nhấn ghim để xem số yêu cầu. Mật độ được tính trong phạm vi 1 km quanh ô.</p>}
+          {zoom > 10 && <p className="muted">Ghim đỏ là khu vực có SOS. Nhấn ghim để xem số yêu cầu và mật độ trong bán kính 1 km.</p>}
           {compact && validPoint(selected) && <p className="muted">
-            Ghim đỏ đang nhảy là SOS đang chọn, đặt theo tọa độ trong hồ sơ. Ghim có thể xuất hiện ngay cả khi SOS chưa thuộc lớp dữ liệu đang xem.
+            Ghim đỏ nhấp nháy là SOS đang chọn.
           </p>}
           {count === 0 && <p className="muted">
             Chưa có SOS thuộc lớp dữ liệu này trong khu vực và thời gian đã chọn.

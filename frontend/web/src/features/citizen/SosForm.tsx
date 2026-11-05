@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react';
-import { api, newCommandKey } from '../../api/client';
+import { api, ApiError, newCommandKey } from '../../api/client';
 import type { Me } from '../../auth/session';
 import type { components as ResponseComponents } from '../../api/generated/response';
 import { requestStatusLabel, timeLabel } from '../../i18n/labels';
@@ -50,6 +50,10 @@ export function SosForm({
   const [elderly, setElderly] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [beneficiaryPhone, setBeneficiaryPhone] = useState('');
+  const [alternateName, setAlternateName] = useState('');
+  const [alternatePhone, setAlternatePhone] = useState('');
+  const [proxyContactsOpen, setProxyContactsOpen] = useState(false);
   const [danger, setDanger] = useState(false);
   const [needsRescue, setNeedsRescue] = useState(true);
   const [needsRelief, setNeedsRelief] = useState(false);
@@ -64,6 +68,7 @@ export function SosForm({
   const [contactability, setContactability] = useState('UNKNOWN');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [networkError, setNetworkError] = useState(false);
   const [fieldError, setFieldError] = useState<{ field: string; message: string } | null>(null);
   const [created, setCreated] = useState<Created | null>(null);
   const [ackSecret, setAckSecret] = useState('');
@@ -83,6 +88,8 @@ export function SosForm({
         setCaptured(new Date(timestamp).toISOString());
         setSource('GPS');
         setFieldError(null);
+        setError('');
+        setNetworkError(false);
         pending.current = null;
       },
       () => setError('Không thể lấy vị trí. Hãy nhập tọa độ vị trí cần hỗ trợ.'),
@@ -103,6 +110,8 @@ export function SosForm({
     setAccuracy(null);
     setCaptured(null);
     setFieldError(null);
+    setError('');
+    setNetworkError(false);
     pending.current = null;
   }
   function build(): Pending {
@@ -111,11 +120,16 @@ export function SosForm({
     };
     if (!category) invalid('category', 'Vui lòng chọn loại sự cố.');
     if (name.trim().length > 200) invalid('name', 'Họ tên người báo không được quá 200 ký tự.');
-    if (phone.trim()) {
-      const normalizedPhone = phone.trim().replace(/[ ()-]/g, '');
+    for (const [field, value] of [['phone', phone], ['beneficiaryPhone', beneficiaryPhone], ['alternatePhone', alternatePhone]] as const) {
+      if (!value.trim()) continue;
+      const normalizedPhone = value.trim().replace(/[ ()-]/g, '');
       if (normalizedPhone.length > 16 || !/^\+?[0-9]{8,15}$/.test(normalizedPhone))
-        invalid('phone', 'Số điện thoại cần có 8–15 chữ số; có thể thêm dấu + ở đầu.');
+        invalid(field, 'Số điện thoại cần có 8–15 chữ số; có thể thêm dấu + ở đầu.');
     }
+    if (mode === 'PROXY' && alternateName.trim().length > 200)
+      invalid('alternateName', 'Tên người liên hệ thay thế không được quá 200 ký tự.');
+    if (mode === 'PROXY' && alternatePhone.trim() && !alternateName.trim())
+      invalid('alternateName', 'Vui lòng nhập tên người liên hệ thay thế khi có số điện thoại.');
     const lon = Number(longitude),
       lat = Number(latitude);
     if (
@@ -173,6 +187,11 @@ export function SosForm({
         information_source: informationSource.trim(),
         last_known_situation_at: new Date(situationAt).toISOString(),
         contactability,
+        ...(beneficiaryPhone.trim() ? { beneficiary_contact_phone: beneficiaryPhone.trim() } : {}),
+        ...(alternateName.trim() ? { alternate_contact: {
+          name: alternateName.trim(),
+          ...(alternatePhone.trim() ? { phone: alternatePhone.trim() } : {}),
+        } } : {}),
       });
     return {
       key: newCommandKey(),
@@ -184,6 +203,7 @@ export function SosForm({
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError('');
+    setNetworkError(false);
     setFieldError(null);
     setBusy(true);
     try {
@@ -201,9 +221,11 @@ export function SosForm({
       pending.current = null;
     } catch (cause) {
       if (cause instanceof Error && 'field' in cause && typeof cause.field === 'string') {
+        if (['beneficiaryPhone', 'alternateName', 'alternatePhone'].includes(cause.field)) setProxyContactsOpen(true);
         setFieldError({ field: cause.field, message: cause.message });
-        document.querySelector<HTMLElement>(`[data-sos-field="${cause.field}"]`)?.focus();
+        requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-sos-field="${cause.field}"]`)?.focus());
       } else {
+        setNetworkError(cause instanceof ApiError && cause.code === 'NETWORK_UNAVAILABLE');
         setError(cause instanceof Error ? cause.message : 'Chưa gửi được yêu cầu. Vui lòng thử lại.');
       }
     } finally {
@@ -246,7 +268,12 @@ export function SosForm({
       </section>
     );
   return (
-    <form className="card form-stack sos-form" onSubmit={submit} onChange={() => setFieldError(null)} noValidate>
+    <form className="card form-stack sos-form" onSubmit={submit} onChange={() => {
+      setFieldError(null);
+      setError('');
+      setNetworkError(false);
+      pending.current = null;
+    }} noValidate>
       <h2>Thông tin yêu cầu hỗ trợ</h2>
       {user && (
         <fieldset>
@@ -363,7 +390,7 @@ export function SosForm({
           {fieldMessage('name')}
         </label>
         <label>
-          Số điện thoại liên hệ (nếu có)
+          {mode === 'PROXY' ? 'Số điện thoại người báo hộ (nếu có)' : 'Số điện thoại liên hệ (nếu có)'}
           <input
             data-sos-field="phone"
             aria-invalid={fieldError?.field === 'phone'}
@@ -488,65 +515,67 @@ export function SosForm({
           <div className="notice warning">
             Vị trí ở trên phải là vị trí của gia đình cần hỗ trợ, không phải của người báo hộ.
           </div>
-          <div className="form-grid">
+          <div className="form-grid sos-proxy-required">
             <label>
               <span>Quan hệ với gia đình cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></span>
-              <input
-                required
-                maxLength={100}
-                value={relationship}
-                onChange={(e) => {
-                  setRelationship(e.target.value);
-                  pending.current = null;
-                }}
-              />
+              <input required maxLength={100} value={relationship}
+                onChange={(e) => { setRelationship(e.target.value); pending.current = null; }} />
             </label>
             <label>
               <span>Nguồn thông tin <span className="required-mark" aria-hidden="true">*</span></span>
-              <input
-                required
-                maxLength={500}
-                value={informationSource}
-                onChange={(e) => {
-                  setInformationSource(e.target.value);
-                  pending.current = null;
-                }}
-              />
+              <input required maxLength={500} value={informationSource}
+                onChange={(e) => { setInformationSource(e.target.value); pending.current = null; }} />
             </label>
             <label>
               <span>Thời điểm biết tình hình <span className="required-mark" aria-hidden="true">*</span></span>
-              <input
-                required
-                type="datetime-local"
-                value={situationAt}
-                onChange={(e) => {
-                  setSituationAt(e.target.value);
-                  pending.current = null;
-                }}
-              />
+              <input required type="datetime-local" value={situationAt}
+                onChange={(e) => { setSituationAt(e.target.value); pending.current = null; }} />
             </label>
             <label>
               Khả năng liên hệ
-              <select
-                value={contactability}
-                onChange={(e) => {
-                  setContactability(e.target.value);
-                  pending.current = null;
-                }}
-              >
+              <select value={contactability} onChange={(e) => { setContactability(e.target.value); pending.current = null; }}>
                 <option value="UNKNOWN">Chưa rõ</option>
                 <option value="REACHABLE">Có thể liên hệ</option>
                 <option value="UNREACHABLE">Không thể liên hệ</option>
               </select>
             </label>
           </div>
+          <details className="sos-proxy-contacts" open={proxyContactsOpen}
+            onToggle={(event) => setProxyContactsOpen(event.currentTarget.open)}>
+            <summary>Thêm liên hệ của gia đình hoặc người liên hệ thay thế <span>Không bắt buộc</span></summary>
+          <div className="form-grid">
+            <label>
+              Số điện thoại gia đình cần hỗ trợ (nếu biết)
+              <input data-sos-field="beneficiaryPhone" aria-invalid={fieldError?.field === 'beneficiaryPhone'}
+                type="tel" inputMode="tel" maxLength={32} value={beneficiaryPhone}
+                onChange={(e) => { setBeneficiaryPhone(e.target.value); pending.current = null; }}
+                placeholder="Ví dụ: 0912345678" />
+              {fieldMessage('beneficiaryPhone')}
+            </label>
+            <label>
+              Tên người liên hệ thay thế (nếu có)
+              <input data-sos-field="alternateName" aria-invalid={fieldError?.field === 'alternateName'}
+                maxLength={200} value={alternateName}
+                onChange={(e) => { setAlternateName(e.target.value); pending.current = null; }} />
+              {fieldMessage('alternateName')}
+            </label>
+            <label>
+              Số điện thoại người liên hệ thay thế (nếu có)
+              <input data-sos-field="alternatePhone" aria-invalid={fieldError?.field === 'alternatePhone'}
+                type="tel" inputMode="tel" maxLength={32} value={alternatePhone}
+                onChange={(e) => { setAlternatePhone(e.target.value); pending.current = null; }}
+                placeholder="Ví dụ: 0912345678" />
+              {fieldMessage('alternatePhone')}
+            </label>
+          </div>
+          </details>
           {fieldMessage('proxy')}
         </>
       )}
       {error && (
         <p role="alert" className="notice error">
           {error}{' '}
-          {error.includes('kết nối') &&
+          {networkError &&
             'Bạn có thể thử lại với cùng yêu cầu; ứng dụng giữ khóa gửi lại khi trang còn mở.'}
         </p>
       )}

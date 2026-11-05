@@ -559,11 +559,10 @@ export function LocationPicker({
                   reverseAbortRef.current?.abort();
                   if (reverseTimerRef.current !== null) window.clearTimeout(reverseTimerRef.current);
                   chosenSearchRef.current = null;
-                  confirmedPointRef.current = null;
                   setSearchQuery(e.target.value);
-                  setSelectedAddress('');
-                  setDraftPoint(null);
-                  selectRef.current(null);
+                  setSelectedAddress(confirmedPointRef.current
+                    ? 'Vị trí đã xác nhận vẫn được giữ. Chọn địa điểm mới và xác nhận ghim để thay đổi.'
+                    : '');
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') e.preventDefault();

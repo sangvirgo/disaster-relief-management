@@ -123,7 +123,7 @@ export function Admin({ page }: { page: string }) {
     fields: [
       { name: 'username', label: 'Tên đăng nhập', required: true },
       { name: 'display_name', label: 'Tên hiển thị', required: true },
-      { name: 'temporary_password', label: 'Mật khẩu tạm', type: 'password', required: true },
+      { name: 'temporary_password', label: 'Mật khẩu tạm', type: 'password', required: true, minLength: 10 },
       { name: 'organization_id', label: 'Mã tổ chức (nếu có)' },
     ],
   };
@@ -279,9 +279,12 @@ export function Admin({ page }: { page: string }) {
               <strong>{detail.display_name || detail.name}</strong>{' '}
               {detail.username ? `· ${detail.username}` : ''}
             </p>
-            <p>
-              Trạng thái: {label(detail.status)} · phiên bản {detail.version}
-            </p>
+            <div className="admin-record-meta">
+              <span className="admin-version-badge">V{detail.version}</span>
+              <span className={`admin-status-badge ${detail.status === 'ACTIVE' ? 'is-active' : ''}`}>
+                <span className="admin-status-dot" aria-hidden="true" />{label(detail.status)}
+              </span>
+            </div>
             {!['organizations', 'regions'].includes(page) && (
               <>
                 <h3>Quyền hiện có</h3>
@@ -359,6 +362,7 @@ export function Admin({ page }: { page: string }) {
                         label: 'Mật khẩu tạm mới',
                         type: 'password',
                         required: true,
+                        minLength: 10,
                       },
                       { name: 'reason', label: 'Lý do', type: 'textarea', required: true },
                     ],
@@ -406,20 +410,24 @@ export function Admin({ page }: { page: string }) {
                         type: 'select',
                         required: true,
                         options: roles.map((value) => ({ value, label: label(value) })),
+                        resetOnChange: ['scope_type', 'organization_id', 'region_code', 'campaign_id'],
                       },
                       {
                         name: 'scope_type',
                         label: 'Phạm vi',
                         type: 'select',
                         required: true,
-                        options: ['SYSTEM', 'ORGANIZATION', 'REGION', 'CAMPAIGN'].map((value) => ({
-                          value,
-                          label: label(value),
-                        })),
+                        optionsFor: (values) => (
+                          values.role_code === 'ADMIN' ? ['SYSTEM']
+                            : ['CITIZEN', 'VOLUNTEER'].includes(values.role_code)
+                              ? ['SYSTEM', 'ORGANIZATION']
+                              : values.role_code ? ['ORGANIZATION', 'REGION', 'CAMPAIGN'] : []
+                        ).map((value) => ({ value, label: label(value) })),
+                        resetOnChange: ['organization_id', 'region_code', 'campaign_id'],
                       },
-                      { name: 'organization_id', label: 'Mã tổ chức' },
-                      { name: 'region_code', label: 'Mã khu vực' },
-                      { name: 'campaign_id', label: 'Mã chiến dịch' },
+                      { name: 'organization_id', label: 'Mã tổ chức', required: true, visibleWhen: { field: 'scope_type', value: 'ORGANIZATION' } },
+                      { name: 'region_code', label: 'Mã khu vực', required: true, visibleWhen: { field: 'scope_type', value: 'REGION' } },
+                      { name: 'campaign_id', label: 'Mã chiến dịch', required: true, visibleWhen: { field: 'scope_type', value: 'CAMPAIGN' } },
                       { name: 'reason', label: 'Lý do', type: 'textarea', required: true },
                     ],
                   }}

@@ -89,7 +89,9 @@ export function CitizenRequests({
       )}
       <div className="account-request-list">
         {items.map((item) => (
-          <article className="account-request" key={item.id}>
+          <button className="account-request" type="button" key={item.id}
+            onClick={() => onTrack(item.tracking_code)}
+            aria-label={`Xem tiến độ SOS ${item.tracking_code}, ${requestStatusLabel(item.status)}`}>
             <div>
               <strong>{item.tracking_code}</strong>
               <small>Tiếp nhận {timeLabel(item.received_at)}</small>
@@ -97,10 +99,8 @@ export function CitizenRequests({
             <span className={`chip request-status request-status--${requestStatusTone(item.status)}`}>
               {requestStatusLabel(item.status)}
             </span>
-            <button className="button secondary" type="button" onClick={() => onTrack(item.tracking_code)}>
-              Xem tiến độ
-            </button>
-          </article>
+            <span className="account-request-arrow" aria-hidden="true">›</span>
+          </button>
         ))}
       </div>
       {next && (

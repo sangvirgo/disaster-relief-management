@@ -6,7 +6,6 @@ import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
-import { AnalyticsRegionField, useAnalyticsRegion } from '../../components/AnalyticsRegion';
 import { HeatmapPanel } from './HeatmapPanel';
 
 type QueueItem = {
@@ -89,7 +88,7 @@ type Detail = QueueItem & {
     contactability?: string | null;
     household_reference_note?: string | null;
   };
-  contact_attempts: { items: { id: string; contact_target: string; outcome: string; attempted_at?: string }[] };
+  contact_attempts: { items: { id: string; contact_target: string; outcome: string; note?: string | null; attempted_at?: string }[] };
   timeline: { items: Event[] };
   proxy_activity_flags: unknown[];
   active_missions?: {
@@ -174,11 +173,24 @@ type DuplicateCandidate = {
 
 function SosCommandPopup({ spec, onSuccess, onStale }: { spec: CommandSpec; onSuccess: () => void; onStale: () => void }) {
   const [open, setOpen] = useState(false);
-  if (!spec.fields?.length) return <CommandForm spec={spec} onSuccess={onSuccess} onStale={onStale} />;
   return <div className="sos-action-entry">
     <button type="button" className="button" onClick={() => setOpen(true)}>{spec.title}</button>
     <DetailSurface modal open={open} label={spec.title} onClose={() => setOpen(false)}>
       <CommandForm spec={spec} onSuccess={() => { setOpen(false); onSuccess(); }} onStale={onStale} />
+    </DetailSurface>
+  </div>;
+}
+
+function CancelRequestPopup({ requestId, version, onCompleted }: {
+  requestId: string; version: number; onCompleted: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return <div className="secondary-command">
+    <button type="button" className="secondary-action-button" onClick={() => setOpen(true)}>Hủy yêu cầu</button>
+    <DetailSurface modal open={open} label="Hủy yêu cầu" onClose={() => setOpen(false)}>
+      <AsyncRequestForm requestId={requestId} version={version} kind="cancel"
+        onCompleted={() => { setOpen(false); onCompleted(); }}
+        onStale={() => { setOpen(false); onCompleted(); }} />
     </DetailSurface>
   </div>;
 }
@@ -203,29 +215,42 @@ function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onS
   }, [missionId, teamId, revision]);
   if (loadError) return <p className="notice error">{loadError}</p>;
   if (!mission || !reportingMode) return <p>Đang tải nhiệm vụ…</p>;
-  if (reportingMode !== 'COORDINATOR') return null;
+  const cancel = <SosCommandPopup
+    key={`${missionId}-${mission.version}-cancel`}
+    spec={{ title: 'Hủy giao nhiệm vụ', service: 'response', path: `/missions/${missionId}/cancel`,
+      version: mission.version, warning: 'Xác nhận hủy nhiệm vụ này? Đội sẽ không tiếp tục xử lý nhiệm vụ đã hủy.',
+      fields: [{ name: 'reason', label: 'Lý do hủy nhiệm vụ', type: 'textarea', required: true }] }}
+    onSuccess={onSuccess} onStale={onStale}
+  />;
+  if (reportingMode !== 'COORDINATOR') return cancel;
   const next = { OFFERED: 'ACCEPTED', ACCEPTED: 'EN_ROUTE', EN_ROUTE: 'ON_SCENE', ON_SCENE: 'COMPLETED' }[mission.status];
-  if (!next) return null;
-  const nextLabel = { ACCEPTED: 'Đội đã nhận', EN_ROUTE: 'Đội đang di chuyển', ON_SCENE: 'Đội đã đến nơi', COMPLETED: 'Đội đã hoàn thành' }[next];
-  return <CommandForm
+  if (!next) return cancel;
+  return <><CommandForm
     key={`${missionId}-${mission.version}`}
     spec={{
-      title: `Ghi nhận qua liên lạc: ${nextLabel}`,
+      title: 'Ghi tiến độ qua liên lạc',
       service: 'response', path: `/missions/${missionId}/record-on-behalf`, version: mission.version,
       fields: [
+        { name: 'to', label: 'Trạng thái được đội báo', type: 'select', required: true,
+          options: [
+            { value: next, label: { ACCEPTED: 'Đội đã nhận', EN_ROUTE: 'Đội đang di chuyển', ON_SCENE: 'Đội đã đến nơi', COMPLETED: 'Đội đã hoàn thành' }[next] || 'Tiến độ tiếp theo' },
+            ...(mission.status === 'OFFERED' ? [{ value: 'DECLINED', label: 'Đội từ chối nhiệm vụ' }] : []),
+            { value: 'FAILED', label: 'Nhiệm vụ thất bại' },
+          ] },
         { name: 'recorded_basis', label: 'Cách nhận thông tin', type: 'select', required: true,
           options: [{ value: 'RADIO', label: 'Bộ đàm' }, { value: 'PHONE', label: 'Điện thoại' },
             { value: 'IN_PERSON', label: 'Trao đổi trực tiếp' }, { value: 'OTHER', label: 'Cách khác' }] },
         { name: 'reported_by', label: 'Người báo từ đội', required: true },
         { name: 'reason', label: 'Nội dung xác nhận', required: true, type: 'textarea' },
-        ...(next === 'COMPLETED' ? [{ name: 'outcome_note', label: 'Kết quả nhiệm vụ', required: true, type: 'textarea' as const }] : []),
+        { name: 'outcome_note', label: 'Kết quả nhiệm vụ', required: true, type: 'textarea',
+          visibleWhen: { field: 'to', value: 'COMPLETED' } },
       ],
-      build: (values) => ({ to: next, recorded_basis: values.recorded_basis, reported_by: values.reported_by,
+      build: (values) => ({ to: values.to, recorded_basis: values.recorded_basis, reported_by: values.reported_by,
         reason: values.reason, occurred_at: new Date().toISOString(),
-        ...(next === 'COMPLETED' ? { result: { outcome_note: values.outcome_note } } : {}) }),
+        ...(values.to === 'COMPLETED' ? { result: { outcome_note: values.outcome_note } } : {}) }),
     }}
     onSuccess={onSuccess} onStale={onStale}
-  />;
+  />{cancel}</>;
 }
 const priorities = ['P1', 'P2', 'P3', 'P4'].map((value) => ({ value, label: value }));
 const stateFilter: Record<string, string> = {
@@ -299,11 +324,11 @@ function advisoryScoreLabel(score: number | null, level: string | null): string 
   return `${advisoryLevelLabels[level]} · ${score}/100`;
 }
 
-export function Coordinator({ page }: { page: string }) {
+export function Coordinator({ page, initialRequestId }: { page: string; initialRequestId?: string }) {
   const [queue, setQueue] = useState<Queue | null>(null);
   const [queueStatus, setQueueStatus] = useState(stateFilter[page] || '');
   const [cursor, setCursor] = useState('');
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(initialRequestId || null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [candidates, setCandidates] = useState<Candidates | null>(null);
   const [candidateError, setCandidateError] = useState('');
@@ -352,11 +377,11 @@ export function Coordinator({ page }: { page: string }) {
   useEffect(() => {
     setQueueStatus(stateFilter[page] || '');
     setCursor('');
-    setSelected(null);
+    setSelected(initialRequestId || null);
     setDetail(null);
     setUpdateMessage('');
     refreshReasonRef.current = null;
-  }, [page]);
+  }, [page, initialRequestId]);
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') setRevision((value) => value + 1);
@@ -499,10 +524,9 @@ export function Coordinator({ page }: { page: string }) {
   }
   function secondaryCommand(spec: CommandSpec) {
     return (
-      <details className="secondary-command">
-        <summary>{spec.title}</summary>
+      <div className="secondary-command">
         {command(spec)}
-      </details>
+      </div>
     );
   }
   async function reviewAiAdvisory(decision: 'ACCEPTED' | 'ADJUSTED' | 'REJECTED') {
@@ -556,20 +580,23 @@ export function Coordinator({ page }: { page: string }) {
       <section className="card">
         <h2>{title[page] || title.queue}</h2>
         <p>Yêu cầu mới nhất ở trên cùng. Chọn một yêu cầu để xem và xử lý.</p>
-        <div className="queue-filter-panel">
-          <div className="queue-filter-heading">
-            <div>
-              <strong>Bộ lọc</strong>
-            </div>
-            <button
-              type="button"
-              className="button secondary queue-refresh-button"
-              onClick={() => setRevision((value) => value + 1)}
-            >
-              <span aria-hidden="true">↻</span> Cập nhật
-            </button>
-          </div>
-          <label className="queue-status-field">
+        <div className="queue-filter-toolbar">
+          <button
+            type="button"
+            className="button secondary queue-refresh-button"
+            onClick={() => setRevision((value) => value + 1)}
+          >
+            <span aria-hidden="true">↻</span> Cập nhật
+          </button>
+        </div>
+        <details className="queue-filter-panel">
+          <summary>
+            Bộ lọc · {queueStatuses.find(([status]) => status === queueStatus)?.[1] || 'Tất cả trạng thái'}
+            {reviewLane !== 'NORMAL' ? ' · Hàng rà soát' : ''}
+            {overdue ? ' · Cần chú ý' : ''}
+          </summary>
+          <div className="queue-filter-fields">
+            <label className="queue-status-field">
             <span>Trạng thái yêu cầu</span>
             <span className="queue-status-select-wrap">
               <select
@@ -587,8 +614,8 @@ export function Coordinator({ page }: { page: string }) {
                 ))}
               </select>
             </span>
-          </label>
-          <div className="tabs queue-review-tabs" aria-label="Loại hàng đợi">
+            </label>
+            <div className="tabs queue-review-tabs" aria-label="Loại hàng đợi">
             {[
               ['NORMAL', 'Thông thường'],
               ['RATE_LIMITED_REVIEW', 'Rà soát tần suất'],
@@ -607,8 +634,8 @@ export function Coordinator({ page }: { page: string }) {
                 {title}
               </button>
             ))}
-          </div>
-          <label className="check queue-attention-filter">
+            </div>
+            <label className="check queue-attention-filter">
             <input
               type="checkbox"
               checked={overdue}
@@ -619,8 +646,9 @@ export function Coordinator({ page }: { page: string }) {
               }}
             />
             Chỉ xem yêu cầu cần chú ý
-          </label>
-        </div>
+            </label>
+          </div>
+        </details>
         {loading && <p role="status">Đang cập nhật danh sách…</p>}
         {error && (
           <p className="notice error" role="alert">
@@ -652,6 +680,7 @@ export function Coordinator({ page }: { page: string }) {
                 >
                   <span>
                     <strong>{item.tracking_code}</strong>
+                    {item.tracking_code.startsWith('C48HM') && <small className="chip">SOS mô phỏng · bản đồ nhiệt</small>}
                     <small>
                       {label(item.category)} · {timeLabel(item.received_at)}
                     </small>
@@ -730,6 +759,7 @@ export function Coordinator({ page }: { page: string }) {
               <div className="verification-summary">
                 <span className="eyebrow">{detail.status === 'SUBMITTED' ? 'BƯỚC 1 · MỞ XÁC MINH' : 'BƯỚC 2 · KIỂM TRA THÔNG TIN'}</span>
                 <h3>{detail.tracking_code} · {label(detail.category)}</h3>
+                {detail.tracking_code.startsWith('C48HM') && <p className="notice warning">Đây là SOS mô phỏng để hiển thị bản đồ nhiệt, không phải tín hiệu cứu hộ thực tế.</p>}
                 <p>{detail.description || 'Chưa có mô tả tình huống.'}</p>
                 <div className="verification-facts">
                   <span>{detail.subject.people_affected ?? 'Chưa rõ số'} người cần hỗ trợ</span>
@@ -797,7 +827,7 @@ export function Coordinator({ page }: { page: string }) {
                   <p>{detail.declared_danger ? 'Có khai báo nguy hiểm tính mạng' : 'Chưa khai báo nguy hiểm tính mạng'}</p>
                   <p>{detail.needs_rescue ? 'Cần cứu hộ' : 'Không khai báo cần cứu hộ'}
                     {detail.needs_relief_supplies ? ' · Cần hàng cứu trợ' : ''}</p>
-                  <small>Ghim đỏ đang nhảy là SOS đang chọn; vùng nhiệt cho biết mật độ SOS gần đó.</small>
+                  <small>Ghim đỏ nhấp nháy là SOS đang chọn; vùng nhiệt cho biết mật độ SOS gần đó.</small>
                 </div>
                 <div className="triage-context-map">
                   <h3>Vị trí trên bản đồ nhiệt</h3>
@@ -991,7 +1021,7 @@ export function Coordinator({ page }: { page: string }) {
                 )}
               </section>
             )}
-            {detail.ai_priority_advisory && (
+            {detail.ai_priority_advisory && detail.ai_advisory?.status !== 'COMPLETED' && (
               <section className="notice">
                 <h3>
                   {detail.ai_priority_advisory.source === 'DEMO_FIXTURE'
@@ -1224,6 +1254,29 @@ export function Coordinator({ page }: { page: string }) {
                       {mission.override_reason && (
                         <p>Lý do chọn đội khác đề xuất: {mission.override_reason}</p>
                       )}
+                      {mission.status === 'FAILED' &&
+                        ['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(detail.status) &&
+                        !detail.timeline.items.some((event) =>
+                          event.event_type === 'MISSION_FAILURE_REVIEW' && event.payload?.mission_id === mission.id
+                        ) && command({
+                          title: 'Rà soát nhiệm vụ thất bại',
+                          service: 'response',
+                          path: `/missions/${mission.id}/review-failure`,
+                          version: detail.version,
+                          fields: [
+                            { name: 'disposition', label: 'Kết luận xử lý', type: 'select', required: true,
+                              options: [
+                                { value: 'REPLACED', label: 'Đã thay bằng nhiệm vụ hoàn thành' },
+                                { value: 'NO_FURTHER_ACTION', label: 'Không cần giao thêm đội' },
+                                { value: 'REFERRED', label: 'Đã chuyển cơ quan có thẩm quyền' },
+                              ] },
+                            { name: 'replacement_mission_id', label: 'Nhiệm vụ thay thế đã hoàn thành', type: 'select', required: true,
+                              visibleWhen: { field: 'disposition', value: 'REPLACED' },
+                              options: detail.mission_history?.items.filter((item) => item.status === 'COMPLETED' && item.id !== mission.id)
+                                .map((item) => ({ value: item.id, label: `${item.team_name} · ${item.id.slice(0, 8)}` })) || [] },
+                            { name: 'reason', label: 'Căn cứ rà soát', type: 'textarea', required: true },
+                          ],
+                        })}
                     </div>
                   ))}
                 </div>
@@ -1254,6 +1307,17 @@ export function Coordinator({ page }: { page: string }) {
               ))}
             </div>
             <div className="action-grid">
+              {!['RESOLVING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
+                secondaryCommand({
+                  title: 'Ghi nhận chuyển cơ quan chức năng',
+                  service: 'response',
+                  path: `/requests/${detail.id}/authority-referrals`,
+                  fields: [
+                    { name: 'referred_body', label: 'Cơ quan tiếp nhận', required: true, maxLength: 200 },
+                    { name: 'note', label: 'Nội dung và căn cứ chuyển', type: 'textarea', required: true, maxLength: 1000 },
+                  ],
+                  warning: 'Xác nhận đã liên hệ và chuyển thông tin yêu cầu này cho cơ quan chức năng?',
+                })}
               {!detail.campaign_id &&
                 secondaryCommand({
                   title: 'Gắn vào chiến dịch cứu trợ',
@@ -1523,6 +1587,7 @@ export function Coordinator({ page }: { page: string }) {
                   version={detail.version}
                   kind="resolve"
                   onCompleted={done}
+                  onStale={done}
                 />
               )}
               {[
@@ -1533,16 +1598,8 @@ export function Coordinator({ page }: { page: string }) {
                 'DISPATCHED',
                 'IN_PROGRESS',
               ].includes(detail.status) && (
-                <details className="secondary-command">
-                  <summary>Hủy yêu cầu</summary>
-                  <AsyncRequestForm
-                    key={`cancel-${detail.id}-${detail.version}`}
-                    requestId={detail.id}
-                    version={detail.version}
-                    kind="cancel"
-                    onCompleted={done}
-                  />
-                </details>
+                <CancelRequestPopup key={`cancel-${detail.id}-${detail.version}`}
+                  requestId={detail.id} version={detail.version} onCompleted={done} />
               )}
               {detail.status === 'RESOLVED' &&
                 command({
@@ -1566,7 +1623,7 @@ export function Coordinator({ page }: { page: string }) {
               {detail.contact_attempts.items.some(
                 (item) =>
                   item.outcome === 'REACHED' &&
-                  ['REPORTER', 'ALTERNATE'].includes(item.contact_target)
+                  item.contact_target === 'REPORTER'
               ) && (
                 <details className="secondary-command">
                   <summary>Cấp mã khôi phục</summary>
@@ -1588,39 +1645,14 @@ export function Coordinator({ page }: { page: string }) {
   );
 }
 
-export function CoordinatorMap() {
-  const [national, setNational] = useState(true);
-  const {
-    region,
-    setRegion,
-    regions,
-    loading: regionLoading,
-    error: regionError,
-  } = useAnalyticsRegion(true, true);
+export function CoordinatorMap({ region, regions }: { region: string; regions: string[] }) {
   return (
     <section className="card">
       <h2>Bản đồ nhiệt SOS</h2>
       <p>
         Bản đồ mở ở tầm nhìn Việt Nam. Chấm tròn cho biết khu vực có SOS; phóng gần bằng chuột hoặc nút + để xem vùng nhiệt.
       </p>
-      <div className="tabs map-scope-switch" role="group" aria-label="Phạm vi bản đồ">
-        <button type="button" className={national ? 'active' : ''} onClick={() => setNational(true)}>
-          Các khu vực của tôi
-        </button>
-        <button type="button" className={!national ? 'active' : ''} onClick={() => setNational(false)}>
-          Một khu vực
-        </button>
-      </div>
-      {!national && <AnalyticsRegionField region={region} onChange={setRegion} regions={regions} />}
-      {national && <p className="muted">Tổng hợp khu vực từ SOS và chiến dịch mà tài khoản được cấp quyền xem.</p>}
-      {regionError && (
-        <p role="alert" className="notice error">
-          {regionError}
-        </p>
-      )}
-      {national && !regions.length && !regionLoading && <p>Chưa có khu vực nào để tổng hợp. Hãy chọn “Một khu vực” và nhập mã.</p>}
-      {!national && !region && !regionLoading && <p>Chọn hoặc nhập mã khu vực để tải bản đồ.</p>}
-      <HeatmapPanel region={national ? '' : region} overviewRegions={national ? regions : undefined} />
+      <HeatmapPanel region={region} overviewRegions={region ? undefined : regions} />
     </section>
   );
 }
