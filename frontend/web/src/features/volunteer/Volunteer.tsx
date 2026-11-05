@@ -259,6 +259,14 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [progressNote, setProgressNote] = useState('');
   const [outcomeNote, setOutcomeNote] = useState('');
+  const [missionFormTouched, setMissionFormTouched] = useState<Record<string, boolean>>({});
+  const [missionFormAttempted, setMissionFormAttempted] = useState<Record<string, boolean>>({});
+  const declineReasonError = !declineReason.trim() ? 'Lý do từ chối nhiệm vụ là bắt buộc.'
+    : declineReason.length > 2000 ? 'Lý do từ chối không được vượt quá 2.000 ký tự.' : '';
+  const outcomeNoteError = !outcomeNote.trim() ? 'Ghi chú kết quả cứu nạn là bắt buộc.'
+    : outcomeNote.length > 2000 ? 'Ghi chú kết quả không được vượt quá 2.000 ký tự.' : '';
+  const progressNoteError = !progressNote.trim() ? 'Lý do không thể tiếp cận hoặc thất bại là bắt buộc.'
+    : progressNote.length > 2000 ? 'Lý do không được vượt quá 2.000 ký tự.' : '';
   const [showCompleteForm, setShowCompleteForm] = useState(false);
   const [showFailForm, setShowFailForm] = useState(false);
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
@@ -416,7 +424,8 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
 
   async function declineMission(event: FormEvent, mission: Mission | MissionDetail) {
     event.preventDefault();
-    if (!declineReason.trim()) return;
+    setMissionFormAttempted((current) => ({ ...current, decline: true }));
+    if (declineReasonError) return;
     setBusy(true);
     setActionMessage('');
     try {
@@ -955,18 +964,26 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                 {canManageMission && showDeclineForm && activeMission.status === 'OFFERED' && (
                   <form
                     className="form-stack command-form"
+                    noValidate
                     onSubmit={(e) => declineMission(e, activeMission)}
                   >
                     <label>
-                      Lý do từ chối nhiệm vụ: <span className="required-mark" aria-hidden="true">*</span>
+                      <span>Lý do từ chối nhiệm vụ: <span className="required-mark" aria-hidden="true">*</span></span>
                       <textarea
                         required
+                        maxLength={2001}
+                        aria-invalid={Boolean((missionFormAttempted.decline || missionFormTouched.decline) && declineReasonError)}
                         value={declineReason}
-                        onChange={(e) => setDeclineReason(e.target.value)}
+                        onChange={(e) => {
+                          setDeclineReason(e.target.value);
+                          setMissionFormTouched((current) => ({ ...current, decline: true }));
+                        }}
+                        onBlur={() => setMissionFormTouched((current) => ({ ...current, decline: true }))}
                         placeholder="Nhập lý do (ví dụ: đang bận cứu nạn ca khác, thiếu phương tiện chuyên dụng...)"
                       />
+                      {(missionFormAttempted.decline || missionFormTouched.decline) && declineReasonError && <small className="field-error" role="alert">{declineReasonError}</small>}
                     </label>
-                    <button className="button" disabled={busy || !declineReason.trim()}>
+                    <button className="button" disabled={busy || Boolean(declineReasonError)}>
                       Xác nhận từ chối
                     </button>
                   </form>
@@ -1027,20 +1044,29 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                 {canManageMission && showCompleteForm && ['EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) && (
                   <form
                     className="form-stack command-form"
+                    noValidate
                     onSubmit={(e) => {
                       e.preventDefault();
+                      setMissionFormAttempted((current) => ({ ...current, outcome: true }));
+                      if (outcomeNoteError) return;
                       transitionMission(activeMission, 'COMPLETED', { outcome_note: outcomeNote });
                     }}
                   >
                     <label>
-                      Ghi chú kết quả cứu nạn (bắt buộc): <span className="required-mark" aria-hidden="true">*</span>
+                      <span>Ghi chú kết quả cứu nạn (bắt buộc): <span className="required-mark" aria-hidden="true">*</span></span>
                       <textarea
                         required
-                        maxLength={2000}
+                        maxLength={2001}
+                        aria-invalid={Boolean((missionFormAttempted.outcome || missionFormTouched.outcome) && outcomeNoteError)}
                         value={outcomeNote}
-                        onChange={(e) => setOutcomeNote(e.target.value)}
+                        onChange={(e) => {
+                          setOutcomeNote(e.target.value);
+                          setMissionFormTouched((current) => ({ ...current, outcome: true }));
+                        }}
+                        onBlur={() => setMissionFormTouched((current) => ({ ...current, outcome: true }))}
                         placeholder="Mô tả kết quả (số người đã giải cứu an toàn, tình trạng sức khỏe, nơi chuyển đến...)"
                       />
+                      {(missionFormAttempted.outcome || missionFormTouched.outcome) && outcomeNoteError && <small className="field-error" role="alert">{outcomeNoteError}</small>}
                     </label>
                     <label className="tracking-file-picker">
                       <input
@@ -1075,7 +1101,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                       </div>
                     )}
                     <p className="account-hint">Nếu chọn tệp, Web sẽ tải minh chứng trước rồi mới ghi nhận hoàn thành. Ảnh tối đa 10 MB; video MP4 tối đa 50 MB.</p>
-                    <button className="button" disabled={busy || !outcomeNote.trim()}>
+                    <button className="button" disabled={busy || Boolean(outcomeNoteError)}>
                       Xác nhận hoàn thành giải cứu
                     </button>
                   </form>
@@ -1084,21 +1110,31 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                 {canManageMission && showFailForm && ['EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) && (
                   <form
                     className="form-stack command-form"
+                    noValidate
                     onSubmit={(e) => {
                       e.preventDefault();
+                      setMissionFormAttempted((current) => ({ ...current, failed: true }));
+                      if (progressNoteError) return;
                       transitionMission(activeMission, 'FAILED', { note: progressNote });
                     }}
                   >
                     <label>
-                      Lý do không thể tiếp cận / Thất bại (bắt buộc): <span className="required-mark" aria-hidden="true">*</span>
+                      <span>Lý do không thể tiếp cận / Thất bại (bắt buộc): <span className="required-mark" aria-hidden="true">*</span></span>
                       <textarea
                         required
+                        maxLength={2001}
+                        aria-invalid={Boolean((missionFormAttempted.failed || missionFormTouched.failed) && progressNoteError)}
                         value={progressNote}
-                        onChange={(e) => setProgressNote(e.target.value)}
+                        onChange={(e) => {
+                          setProgressNote(e.target.value);
+                          setMissionFormTouched((current) => ({ ...current, failed: true }));
+                        }}
+                        onBlur={() => setMissionFormTouched((current) => ({ ...current, failed: true }))}
                         placeholder="Mô tả trở ngại (nước lũ chảy quá xiết, sạt lở chia cắt đường bộ, không tìm thấy người...)"
                       />
+                      {(missionFormAttempted.failed || missionFormTouched.failed) && progressNoteError && <small className="field-error" role="alert">{progressNoteError}</small>}
                     </label>
-                    <button className="button" disabled={busy || !progressNote.trim()}>
+                    <button className="button" disabled={busy || Boolean(progressNoteError)}>
                       Xác nhận báo cáo thất bại
                     </button>
                   </form>
@@ -1118,7 +1154,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                       MP4).
                     </p>
                     <label className="tracking-file-picker">
-                      <span className="required-mark" aria-hidden="true">*</span><input
+                      <input
                         type="file"
                         required
                         accept="image/jpeg,image/png,video/mp4"
@@ -1126,7 +1162,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                       />
                       <span className="tracking-file-icon" aria-hidden="true">↑</span>
                       <span>
-                        <strong>{evidenceFile ? evidenceFile.name : 'Chọn ảnh hoặc video hiện trường'}</strong>
+                        <strong>{evidenceFile ? evidenceFile.name : 'Chọn ảnh hoặc video hiện trường'} <span className="required-mark" aria-hidden="true">*</span></strong>
                         <small>JPEG, PNG hoặc MP4</small>
                       </span>
                     </label>

@@ -94,6 +94,9 @@ export function AnalyticsRegionField({
 }) {
   const [manual, setManual] = useState(false);
   const [draft, setDraft] = useState('');
+  const [draftTouched, setDraftTouched] = useState(false);
+  const [draftAttempted, setDraftAttempted] = useState(false);
+  const draftError = draft.length > 64 ? 'Mã khu vực không được vượt quá 64 ký tự.' : '';
   const listed = regions.includes(region);
   return (
     <div className="region-control">
@@ -139,22 +142,29 @@ export function AnalyticsRegionField({
         </button>
       </div>
       {manual && (
-        <form className="region-manual-field" onSubmit={(event) => {
+        <form className="region-manual-field" noValidate onSubmit={(event) => {
           event.preventDefault();
-          if (draft.trim()) onChange(draft.trim());
+          setDraftAttempted(true);
+          if (draft.trim() && !draftError) onChange(draft.trim());
         }}>
           <label htmlFor={`${id}-manual`}>Mã khu vực khác</label>
           <div className="region-control-inputs">
             <input
               id={`${id}-manual`}
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                setDraftTouched(true);
+              }}
+              onBlur={() => setDraftTouched(true)}
+              aria-invalid={Boolean((draftTouched || draftAttempted) && draftError)}
               placeholder="Ví dụ: DEMO_A"
               autoComplete="off"
-              maxLength={64}
+              maxLength={65}
             />
-            <button type="submit" className="region-manual-button" disabled={!draft.trim() || draft.trim() === region}>Áp dụng</button>
+            <button type="submit" className="region-manual-button" disabled={!draft.trim() || Boolean(draftError) || draft.trim() === region}>Áp dụng</button>
           </div>
+          {(draftTouched || draftAttempted) && draftError && <small className="field-error" role="alert">{draftError}</small>}
           {region && !listed && <small>Không có mã này trong danh sách gợi ý. Hãy kiểm tra mã khu vực trước khi dùng số liệu.</small>}
         </form>
       )}

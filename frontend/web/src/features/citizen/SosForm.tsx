@@ -70,6 +70,8 @@ export function SosForm({
   const [error, setError] = useState('');
   const [networkError, setNetworkError] = useState(false);
   const [fieldError, setFieldError] = useState<{ field: string; message: string } | null>(null);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [attempted, setAttempted] = useState(false);
   const [created, setCreated] = useState<Created | null>(null);
   const [ackSecret, setAckSecret] = useState('');
   const pending = useRef<Pending | null>(null);
@@ -82,6 +84,7 @@ export function SosForm({
     setError('');
     navigator.geolocation.getCurrentPosition(
       ({ coords, timestamp }) => {
+        setTouched((current) => ({ ...current, location: true }));
         setLongitude(String(coords.longitude));
         setLatitude(String(coords.latitude));
         setAccuracy(coords.accuracy);
@@ -104,6 +107,7 @@ export function SosForm({
     pending.current = null;
   }
   function chooseMapPoint(point: { longitude: number; latitude: number } | null) {
+    setTouched((current) => ({ ...current, location: true }));
     setLongitude(point ? String(point.longitude) : '');
     setLatitude(point ? String(point.latitude) : '');
     setSource('MANUAL_PIN');
@@ -114,54 +118,55 @@ export function SosForm({
     setNetworkError(false);
     pending.current = null;
   }
+  function getClientErrors(): Record<string, string> {
+    const errors: Record<string, string> = {};
+    if (!category) errors.category = 'Loại sự cố là bắt buộc.';
+    if (description.length > 2000) errors.description = 'Mô tả không được vượt quá 2.000 ký tự.';
+    if (name.length > 200) errors.name = 'Họ tên người báo không được vượt quá 200 ký tự.';
+    for (const [field, value] of [['phone', phone], ['beneficiaryPhone', beneficiaryPhone], ['alternatePhone', alternatePhone]] as const) {
+      if (!value.trim()) continue;
+      const normalizedPhone = value.trim().replace(/[ ()-]/g, '');
+      if (value.length > 32)
+        errors[field] = 'Số điện thoại không được vượt quá 32 ký tự.';
+      else if (!/^\+?[0-9]{8,15}$/.test(normalizedPhone))
+        errors[field] = 'Số điện thoại cần có 8–15 chữ số; có thể thêm dấu + ở đầu.';
+    }
+    const lon = Number(longitude), lat = Number(latitude);
+    if (!longitude || !latitude) errors.location = 'Vị trí cần hỗ trợ là bắt buộc.';
+    else if (!Number.isFinite(lon) || !Number.isFinite(lat) || Math.abs(lon) > 180 || Math.abs(lat) > 90)
+      errors.location = 'Vị trí cần hỗ trợ không hợp lệ.';
+    if (people && (!Number.isInteger(Number(people)) || Number(people) < 1 || Number(people) > 10000))
+      errors.people = 'Số người cần hỗ trợ phải từ 1 đến 10.000.';
+    if (children && (!Number.isInteger(Number(children)) || Number(children) < 0 || Number(children) > 10000))
+      errors.children = 'Số trẻ em phải từ 0 đến 10.000.';
+    if (elderly && (!Number.isInteger(Number(elderly)) || Number(elderly) < 0 || Number(elderly) > 10000))
+      errors.elderly = 'Số người cao tuổi phải từ 0 đến 10.000.';
+    if (people && Number(children || 0) + Number(elderly || 0) > Number(people))
+      errors.people = 'Tổng số trẻ em và người cao tuổi không được lớn hơn tổng số người.';
+    if (!needsRescue && !needsRelief) errors.needs = 'Nhu cầu cần hỗ trợ là bắt buộc.';
+    if (mode === 'PROXY') {
+      if (!user) errors.mode = 'Vui lòng đăng nhập để báo hộ.';
+      if (!relationship.trim()) errors.relationship = 'Quan hệ với gia đình cần hỗ trợ là bắt buộc.';
+      else if (relationship.length > 100) errors.relationship = 'Quan hệ không được vượt quá 100 ký tự.';
+      if (!informationSource.trim()) errors.informationSource = 'Nguồn thông tin là bắt buộc.';
+      else if (informationSource.length > 500) errors.informationSource = 'Nguồn thông tin không được vượt quá 500 ký tự.';
+      if (!situationAt) errors.situationAt = 'Thời điểm biết tình hình là bắt buộc.';
+      if (alternateName.length > 200) errors.alternateName = 'Tên người liên hệ thay thế không được vượt quá 200 ký tự.';
+      if (alternatePhone.trim() && !alternateName.trim()) errors.alternateName = 'Tên người liên hệ thay thế là bắt buộc.';
+    }
+    return errors;
+  }
+  const clientErrors = getClientErrors();
+  const hasInvalidFields = Boolean(fieldError || Object.keys(clientErrors).length);
   function build(): Pending {
     const invalid = (field: string, message: string): never => {
       throw Object.assign(new Error(message), { field });
     };
-    if (!category) invalid('category', 'Vui lòng chọn loại sự cố.');
-    if (name.trim().length > 200) invalid('name', 'Họ tên người báo không được quá 200 ký tự.');
-    for (const [field, value] of [['phone', phone], ['beneficiaryPhone', beneficiaryPhone], ['alternatePhone', alternatePhone]] as const) {
-      if (!value.trim()) continue;
-      const normalizedPhone = value.trim().replace(/[ ()-]/g, '');
-      if (normalizedPhone.length > 16 || !/^\+?[0-9]{8,15}$/.test(normalizedPhone))
-        invalid(field, 'Số điện thoại cần có 8–15 chữ số; có thể thêm dấu + ở đầu.');
-    }
-    if (mode === 'PROXY' && alternateName.trim().length > 200)
-      invalid('alternateName', 'Tên người liên hệ thay thế không được quá 200 ký tự.');
-    if (mode === 'PROXY' && alternatePhone.trim() && !alternateName.trim())
-      invalid('alternateName', 'Vui lòng nhập tên người liên hệ thay thế khi có số điện thoại.');
     const lon = Number(longitude),
       lat = Number(latitude);
-    if (
-      !longitude ||
-      !latitude ||
-      !Number.isFinite(lon) ||
-      !Number.isFinite(lat) ||
-      Math.abs(lon) > 180 ||
-      Math.abs(lat) > 90
-    )
-      invalid('location', 'Vui lòng chọn vị trí hợp lệ của nơi cần hỗ trợ.');
-    if (
-      people &&
-      (!Number.isInteger(Number(people)) || Number(people) < 1 || Number(people) > 10000)
-    )
-      invalid('people', 'Số người cần hỗ trợ phải từ 1 đến 10.000.');
-    for (const [label, value] of [
-      ['trẻ em', children],
-      ['người cao tuổi', elderly],
-    ] as const) {
-      if (value && (!Number.isInteger(Number(value)) || Number(value) < 0 || Number(value) > 10000))
-        invalid(label === 'trẻ em' ? 'children' : 'elderly', `Số ${label} phải từ 0 đến 10.000.`);
-    }
-    if (people && Number(children || 0) + Number(elderly || 0) > Number(people))
-      invalid('people', 'Tổng số trẻ em và người cao tuổi không được lớn hơn tổng số người.');
-    if (!needsRescue && !needsRelief)
-      invalid('needs', 'Hãy chọn ít nhất một nhu cầu: cứu hộ hoặc hàng cứu trợ.');
-    if (mode === 'PROXY' && !user) invalid('mode', 'Vui lòng đăng nhập để báo hộ.');
-    if (mode === 'PROXY' && (!relationship.trim() || !informationSource.trim() || !situationAt))
-      invalid('proxy', 'Vui lòng nhập quan hệ, nguồn thông tin và thời điểm biết tình hình.');
-    if (mode === 'PROXY' && (relationship.trim().length > 100 || informationSource.trim().length > 500))
-      invalid('proxy', 'Quan hệ tối đa 100 ký tự và nguồn thông tin tối đa 500 ký tự.');
+    const errors = getClientErrors();
+    const firstError = Object.entries(errors)[0];
+    if (firstError) invalid(firstError[0], firstError[1]);
     const location = {
       type: 'Point',
       coordinates: [lon, lat],
@@ -202,9 +207,18 @@ export function SosForm({
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
+    setAttempted(true);
     setError('');
     setNetworkError(false);
     setFieldError(null);
+    const errors = getClientErrors();
+    if (Object.keys(errors).length) {
+      const [field, message] = Object.entries(errors)[0];
+      if (['beneficiaryPhone', 'alternateName', 'alternatePhone'].includes(field)) setProxyContactsOpen(true);
+      setFieldError({ field, message });
+      requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-sos-field="${field}"]`)?.focus());
+      return;
+    }
     setBusy(true);
     try {
       const command = pending.current || build();
@@ -232,9 +246,14 @@ export function SosForm({
       setBusy(false);
     }
   }
-  const fieldMessage = (field: string) => fieldError?.field === field
-    ? <span className="sos-field-error" role="alert">{fieldError.message}</span>
-    : null;
+  const fieldMessage = (field: string) => {
+    const message = fieldError?.field === field ? fieldError.message : clientErrors[field];
+    return message && (attempted || touched[field])
+      ? <span className="sos-field-error" role="alert">{message}</span>
+      : null;
+  };
+  const fieldInvalid = (field: string) =>
+    fieldError?.field === field || Boolean((attempted || touched[field]) && clientErrors[field]);
   if (created)
     return (
       <section className="card confirmation" role="status">
@@ -268,7 +287,12 @@ export function SosForm({
       </section>
     );
   return (
-    <form className="card form-stack sos-form" onSubmit={submit} onChange={() => {
+    <form className="card form-stack sos-form" onSubmit={submit} onBlurCapture={(event) => {
+      const field = (event.target as HTMLElement).dataset.sosField;
+      if (field) setTouched((current) => ({ ...current, [field]: true }));
+    }} onChange={(event) => {
+      const field = (event.target as HTMLElement).dataset.sosField;
+      if (field) setTouched((current) => ({ ...current, [field]: true }));
       setFieldError(null);
       setError('');
       setNetworkError(false);
@@ -307,7 +331,7 @@ export function SosForm({
           <span>Loại sự cố <span className="required-mark" aria-hidden="true">*</span></span>
           <select
             data-sos-field="category"
-            aria-invalid={fieldError?.field === 'category'}
+            aria-invalid={fieldInvalid('category')}
             required
             value={category}
             onChange={(e) => {
@@ -328,7 +352,7 @@ export function SosForm({
           Số người cần hỗ trợ (nếu biết)
           <input
             data-sos-field="people"
-            aria-invalid={fieldError?.field === 'people'}
+            aria-invalid={fieldInvalid('people')}
             type="number"
             min="1"
             max="10000"
@@ -345,7 +369,7 @@ export function SosForm({
           Trẻ em (nếu biết)
           <input
             data-sos-field="children"
-            aria-invalid={fieldError?.field === 'children'}
+            aria-invalid={fieldInvalid('children')}
             type="number"
             min="0"
             max="10000"
@@ -362,7 +386,7 @@ export function SosForm({
           Người cao tuổi (nếu biết)
           <input
             data-sos-field="elderly"
-            aria-invalid={fieldError?.field === 'elderly'}
+            aria-invalid={fieldInvalid('elderly')}
             type="number"
             min="0"
             max="10000"
@@ -379,9 +403,9 @@ export function SosForm({
           Họ tên người báo (nếu muốn)
           <input
             data-sos-field="name"
-            aria-invalid={fieldError?.field === 'name'}
+            aria-invalid={fieldInvalid('name')}
             value={name}
-            maxLength={200}
+            maxLength={201}
             onChange={(e) => {
               setName(e.target.value);
               pending.current = null;
@@ -393,9 +417,9 @@ export function SosForm({
           {mode === 'PROXY' ? 'Số điện thoại người báo hộ (nếu có)' : 'Số điện thoại liên hệ (nếu có)'}
           <input
             data-sos-field="phone"
-            aria-invalid={fieldError?.field === 'phone'}
+            aria-invalid={fieldInvalid('phone')}
             type="tel"
-            maxLength={32}
+            maxLength={33}
             inputMode="tel"
             title="Nhập 8–15 chữ số; có thể thêm dấu + ở đầu"
             placeholder="Ví dụ: 0912345678"
@@ -411,7 +435,9 @@ export function SosForm({
       <label>
         Mô tả tình hình (nếu muốn)
         <textarea
-          maxLength={2000}
+          data-sos-field="description"
+          maxLength={2001}
+          aria-invalid={fieldInvalid('description')}
           value={description}
           onChange={(e) => {
             setDescription(e.target.value);
@@ -419,17 +445,19 @@ export function SosForm({
           }}
           placeholder="Mô tả ngắn tình trạng và điều cần hỗ trợ"
         />
+        {fieldMessage('description')}
       </label>
       <div className="notice warning">
         Mô tả giúp điều phối viên hiểu tình huống và có thể được rút gọn để AI hỗ trợ đánh giá.
         Số điện thoại, tọa độ chính xác và tệp đính kèm không được đưa vào phần đánh giá AI.
         Không nhập thông tin cá nhân không cần thiết trong mô tả.
       </div>
-      <fieldset className="sos-needs">
+      <fieldset className="sos-needs" aria-invalid={fieldInvalid('needs')}>
         <legend>Nhu cầu cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></legend>
         <label className="radio">
           <input
             type="checkbox"
+            data-sos-field="needs"
             checked={needsRescue}
             onChange={(e) => {
               setNeedsRescue(e.target.checked);
@@ -441,6 +469,7 @@ export function SosForm({
         <label className="radio">
           <input
             type="checkbox"
+            data-sos-field="needs"
             checked={needsRelief}
             onChange={(e) => {
               setNeedsRelief(e.target.checked);
@@ -485,6 +514,7 @@ export function SosForm({
           <span>Kinh độ <span className="required-mark" aria-hidden="true">*</span></span>
           <input
             data-sos-field="location"
+            aria-invalid={fieldInvalid('location')}
             type="number"
             step="any"
             min="-180"
@@ -498,6 +528,8 @@ export function SosForm({
         <label>
           <span>Vĩ độ <span className="required-mark" aria-hidden="true">*</span></span>
           <input
+            data-sos-field="location"
+            aria-invalid={fieldInvalid('location')}
             type="number"
             step="any"
             min="-90"
@@ -518,18 +550,21 @@ export function SosForm({
           <div className="form-grid sos-proxy-required">
             <label>
               <span>Quan hệ với gia đình cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></span>
-              <input required maxLength={100} value={relationship}
+              <input required data-sos-field="relationship" maxLength={101} aria-invalid={fieldInvalid('relationship')} value={relationship}
                 onChange={(e) => { setRelationship(e.target.value); pending.current = null; }} />
+              {fieldMessage('relationship')}
             </label>
             <label>
               <span>Nguồn thông tin <span className="required-mark" aria-hidden="true">*</span></span>
-              <input required maxLength={500} value={informationSource}
+              <input required data-sos-field="informationSource" maxLength={501} aria-invalid={fieldInvalid('informationSource')} value={informationSource}
                 onChange={(e) => { setInformationSource(e.target.value); pending.current = null; }} />
+              {fieldMessage('informationSource')}
             </label>
             <label>
               <span>Thời điểm biết tình hình <span className="required-mark" aria-hidden="true">*</span></span>
-              <input required type="datetime-local" value={situationAt}
+              <input required data-sos-field="situationAt" aria-invalid={fieldInvalid('situationAt')} type="datetime-local" value={situationAt}
                 onChange={(e) => { setSituationAt(e.target.value); pending.current = null; }} />
+              {fieldMessage('situationAt')}
             </label>
             <label>
               Khả năng liên hệ
@@ -546,23 +581,23 @@ export function SosForm({
           <div className="form-grid">
             <label>
               Số điện thoại gia đình cần hỗ trợ (nếu biết)
-              <input data-sos-field="beneficiaryPhone" aria-invalid={fieldError?.field === 'beneficiaryPhone'}
-                type="tel" inputMode="tel" maxLength={32} value={beneficiaryPhone}
+              <input data-sos-field="beneficiaryPhone" aria-invalid={fieldInvalid('beneficiaryPhone')}
+                type="tel" inputMode="tel" maxLength={33} value={beneficiaryPhone}
                 onChange={(e) => { setBeneficiaryPhone(e.target.value); pending.current = null; }}
                 placeholder="Ví dụ: 0912345678" />
               {fieldMessage('beneficiaryPhone')}
             </label>
             <label>
-              Tên người liên hệ thay thế (nếu có)
-              <input data-sos-field="alternateName" aria-invalid={fieldError?.field === 'alternateName'}
-                maxLength={200} value={alternateName}
+              <span>Tên người liên hệ thay thế (nếu có){Boolean(alternatePhone.trim()) && <> <span className="required-mark" aria-hidden="true">*</span></>}</span>
+              <input data-sos-field="alternateName" aria-invalid={fieldInvalid('alternateName')}
+                maxLength={201} value={alternateName}
                 onChange={(e) => { setAlternateName(e.target.value); pending.current = null; }} />
               {fieldMessage('alternateName')}
             </label>
             <label>
               Số điện thoại người liên hệ thay thế (nếu có)
-              <input data-sos-field="alternatePhone" aria-invalid={fieldError?.field === 'alternatePhone'}
-                type="tel" inputMode="tel" maxLength={32} value={alternatePhone}
+              <input data-sos-field="alternatePhone" aria-invalid={fieldInvalid('alternatePhone')}
+                type="tel" inputMode="tel" maxLength={33} value={alternatePhone}
                 onChange={(e) => { setAlternatePhone(e.target.value); pending.current = null; }}
                 placeholder="Ví dụ: 0912345678" />
               {fieldMessage('alternatePhone')}
@@ -579,7 +614,7 @@ export function SosForm({
             'Bạn có thể thử lại với cùng yêu cầu; ứng dụng giữ khóa gửi lại khi trang còn mở.'}
         </p>
       )}
-      <button type="submit" className="button" disabled={busy}>
+      <button type="submit" className="button" disabled={busy || hasInvalidFields}>
         {busy ? 'Đang gửi…' : 'Gửi yêu cầu SOS'}
       </button>
       <small>

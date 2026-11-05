@@ -39,11 +39,20 @@ export function TrackingActions({
   const [cursor, setCursor] = useState<string | null>(tracking.cursor || null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [supplementTouched, setSupplementTouched] = useState<Record<string, boolean>>({});
+  const [supplementAttempted, setSupplementAttempted] = useState(false);
   const supplementKey = useRef<string | null>(null);
   const fileKey = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const descriptionError = description.length > 2000 ? 'Mô tả mới không được vượt quá 2.000 ký tự.' : '';
+  const peopleError = people && (!Number.isInteger(Number(people)) || Number(people) < 1 || Number(people) > 10000)
+    ? 'Số người cần hỗ trợ phải là số nguyên từ 1 đến 10.000.' : '';
+  const hasSupplementChanges = Boolean(description.trim() || people || danger || supplementPoint);
+  const supplementInvalid = Boolean(descriptionError || peopleError);
   async function supplement(event: FormEvent) {
     event.preventDefault();
+    setSupplementAttempted(true);
+    if (supplementInvalid || !hasSupplementChanges) return;
     setMessage('');
     setBusy(true);
     try {
@@ -189,17 +198,22 @@ export function TrackingActions({
     <section className="card">
       <h2>Cập nhật yêu cầu</h2>
       {tracking.can_supplement ? (
-        <form className="form-stack" onSubmit={supplement}>
+        <form className="form-stack" onSubmit={supplement} noValidate>
           <p>Thông tin bổ sung sau xác minh sẽ được điều phối viên rà soát trước khi áp dụng.</p>
           <label>
             Mô tả mới
             <textarea
+              maxLength={2001}
+              aria-invalid={Boolean((supplementAttempted || supplementTouched.description) && descriptionError)}
               value={description}
               onChange={(event) => {
                 setDescription(event.target.value);
+                setSupplementTouched((current) => ({ ...current, description: true }));
                 supplementKey.current = null;
               }}
+              onBlur={() => setSupplementTouched((current) => ({ ...current, description: true }))}
             />
+            {(supplementAttempted || supplementTouched.description) && descriptionError && <small className="field-error" role="alert">{descriptionError}</small>}
           </label>
           <label>
             Số người cần hỗ trợ
@@ -207,12 +221,16 @@ export function TrackingActions({
               type="number"
               min="1"
               max="10000"
+              aria-invalid={Boolean((supplementAttempted || supplementTouched.people) && peopleError)}
               value={people}
               onChange={(event) => {
                 setPeople(event.target.value);
+                setSupplementTouched((current) => ({ ...current, people: true }));
                 supplementKey.current = null;
               }}
+              onBlur={() => setSupplementTouched((current) => ({ ...current, people: true }))}
             />
+            {(supplementAttempted || supplementTouched.people) && peopleError && <small className="field-error" role="alert">{peopleError}</small>}
           </label>
           <label className="tracking-danger-toggle">
             <input
@@ -249,7 +267,7 @@ export function TrackingActions({
           </div>
           <button
             className="button"
-            disabled={busy || (!description.trim() && !people && !danger && !supplementPoint)}
+            disabled={busy || supplementInvalid || !hasSupplementChanges}
           >
             Gửi thông tin bổ sung
           </button>

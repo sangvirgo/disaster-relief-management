@@ -52,7 +52,45 @@ export function ReceiptCountForm({
   const [error, setError] = useState('');
   const [itemsError, setItemsError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [attempted, setAttempted] = useState(false);
   const key = useRef<string | null>(null);
+  const fieldErrors: Record<string, string> = {};
+  const seenItems = new Set<string>();
+  for (const [index, line] of lines.entries()) {
+    const itemKey = `${index}.item_id`;
+    if (!line.item_id.trim()) fieldErrors[itemKey] = 'Mã vật phẩm là bắt buộc.';
+    else if (line.item_id.trim().length > 36) fieldErrors[itemKey] = 'Mã vật phẩm không được vượt quá 36 ký tự.';
+    else if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(line.item_id.trim()))
+      fieldErrors[itemKey] = 'Mã vật phẩm không đúng định dạng.';
+    else if (seenItems.has(line.item_id.trim())) fieldErrors[itemKey] = 'Mỗi vật phẩm chỉ được xuất hiện một lần.';
+    if (line.item_id.trim()) seenItems.add(line.item_id.trim());
+    const item = items.find((candidate) => candidate.id === line.item_id);
+    for (const [field, title] of [
+      ['counted_quantity', 'Số đã đếm'],
+      ['accepted_quantity', 'Số tiếp nhận'],
+      ['held_quantity', 'Số tạm giữ'],
+      ['rejected_quantity', 'Số từ chối'],
+    ] as const) {
+      const quantity = line[field].trim();
+      const errorKey = `${index}.${field}`;
+      if (!quantity) fieldErrors[errorKey] = `${title} là bắt buộc.`;
+      else if (!/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(quantity)) fieldErrors[errorKey] = `${title} phải là số không âm.`;
+      else if (item && (quantity.split('.')[1]?.length || 0) > item.scale)
+        fieldErrors[errorKey] = `${title} chỉ được có tối đa ${item.scale} chữ số thập phân.`;
+    }
+    if (line.condition_note.length > 1000)
+      fieldErrors[`${index}.condition_note`] = 'Ghi chú tình trạng không được vượt quá 1.000 ký tự.';
+    const quantities = [line.counted_quantity, line.accepted_quantity, line.held_quantity, line.rejected_quantity];
+    if (quantities.every((quantity) => quantity.trim() && /^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(quantity.trim())) &&
+      Math.abs(Number(line.counted_quantity) - Number(line.accepted_quantity) - Number(line.held_quantity) - Number(line.rejected_quantity)) > 1e-9)
+      fieldErrors[`${index}.counted_quantity`] = 'Số đã đếm phải bằng số tiếp nhận cộng số tạm giữ và số từ chối.';
+  }
+  if (note.length > 1000) fieldErrors.note = 'Ghi chú chung không được vượt quá 1.000 ký tự.';
+  const hasInvalidFields = Object.keys(fieldErrors).length > 0;
+  function showFieldError(field: string, value: string) {
+    return attempted || touched[field] || Boolean(value);
+  }
   useEffect(() => {
     fetchAll<Item>('logistics', '/items?status=ACTIVE')
       .then(setItems)
@@ -64,54 +102,14 @@ export function ReceiptCountForm({
     setLines((current) =>
       current.map((line, position) => (position === index ? { ...line, [field]: value } : line))
     );
+    setTouched((current) => ({ ...current, [`${index}.${field}`]: true }));
     key.current = null;
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
+    setAttempted(true);
+    if (hasInvalidFields) return;
     setError('');
-    for (const [index, line] of lines.entries()) {
-      if (!line.item_id.trim()) {
-        setError(`Vật phẩm ${index + 1}: vui lòng chọn hoặc nhập mã vật phẩm.`);
-        return;
-      }
-      for (const [field, title] of [
-        ['counted_quantity', 'Số đã đếm'],
-        ['accepted_quantity', 'Số tiếp nhận'],
-        ['held_quantity', 'Số tạm giữ'],
-        ['rejected_quantity', 'Số từ chối'],
-      ] as const) {
-        const quantity = line[field].trim();
-        if (!quantity || !/^\d+(?:\.\d+)?$/.test(quantity)) {
-          setError(`Vật phẩm ${index + 1}: ${title.toLowerCase()} phải là số không âm.`);
-          return;
-        }
-        const item = items.find((candidate) => candidate.id === line.item_id);
-        if (item && (quantity.split('.')[1]?.length || 0) > item.scale) {
-          setError(
-            `Vật phẩm ${index + 1}: ${title.toLowerCase()} chỉ được có tối đa ${item.scale} chữ số thập phân.`
-          );
-          return;
-        }
-      }
-    }
-    if (new Set(lines.map((line) => line.item_id)).size !== lines.length) {
-      setError('Mỗi vật phẩm chỉ xuất hiện một lần trong lần kiểm đếm.');
-      return;
-    }
-    if (
-      lines.some(
-        (line) =>
-          Math.abs(
-            Number(line.counted_quantity) -
-              Number(line.accepted_quantity) -
-              Number(line.held_quantity) -
-              Number(line.rejected_quantity)
-          ) > 1e-9
-      )
-    ) {
-      setError('Với mỗi vật phẩm, số đã đếm phải bằng số tiếp nhận cộng số tạm giữ và số từ chối.');
-      return;
-    }
     setBusy(true);
     try {
       key.current ||= newCommandKey();
@@ -170,13 +168,17 @@ export function ReceiptCountForm({
             </select>
           </label>
           <label>
-            Mã vật phẩm <span className="required-mark" aria-hidden="true">*</span>
+            <span>Mã vật phẩm <span className="required-mark" aria-hidden="true">*</span></span>
             <input
               required
+              maxLength={37}
+              aria-invalid={Boolean(showFieldError(`${index}.item_id`, line.item_id) && fieldErrors[`${index}.item_id`])}
               value={line.item_id}
               onChange={(event) => edit(index, 'item_id', event.target.value)}
+              onBlur={() => setTouched((current) => ({ ...current, [`${index}.item_id`]: true }))}
               placeholder="Mã vật phẩm trong danh mục"
             />
+            {showFieldError(`${index}.item_id`, line.item_id) && fieldErrors[`${index}.item_id`] && <small className="field-error" role="alert">{fieldErrors[`${index}.item_id`]}</small>}
           </label>
           <div className="form-grid">
             {(
@@ -188,24 +190,31 @@ export function ReceiptCountForm({
               ] as const
             ).map(([field, title]) => (
               <label key={field}>
-                {title} <span className="required-mark" aria-hidden="true">*</span>
+                <span>{title} <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   required
                   type="number"
                   min="0"
                   step="any"
+                  aria-invalid={Boolean(showFieldError(`${index}.${field}`, line[field]) && fieldErrors[`${index}.${field}`])}
                   value={line[field]}
                   onChange={(event) => edit(index, field, event.target.value)}
+                  onBlur={() => setTouched((current) => ({ ...current, [`${index}.${field}`]: true }))}
                 />
+                {showFieldError(`${index}.${field}`, line[field]) && fieldErrors[`${index}.${field}`] && <small className="field-error" role="alert">{fieldErrors[`${index}.${field}`]}</small>}
               </label>
             ))}
           </div>
           <label>
             Ghi chú tình trạng
             <input
+              maxLength={1001}
+              aria-invalid={Boolean(showFieldError(`${index}.condition_note`, line.condition_note) && fieldErrors[`${index}.condition_note`])}
               value={line.condition_note}
               onChange={(event) => edit(index, 'condition_note', event.target.value)}
+              onBlur={() => setTouched((current) => ({ ...current, [`${index}.condition_note`]: true }))}
             />
+            {showFieldError(`${index}.condition_note`, line.condition_note) && fieldErrors[`${index}.condition_note`] && <small className="field-error" role="alert">{fieldErrors[`${index}.condition_note`]}</small>}
           </label>
           <label>
             Hạn sử dụng nếu có
@@ -244,19 +253,24 @@ export function ReceiptCountForm({
       <label>
         Ghi chú chung
         <textarea
+          maxLength={1001}
+          aria-invalid={Boolean(showFieldError('note', note) && fieldErrors.note)}
           value={note}
           onChange={(event) => {
             setNote(event.target.value);
+            setTouched((current) => ({ ...current, note: true }));
             key.current = null;
           }}
+          onBlur={() => setTouched((current) => ({ ...current, note: true }))}
         />
+        {showFieldError('note', note) && fieldErrors.note && <small className="field-error" role="alert">{fieldErrors.note}</small>}
       </label>
       {error && (
         <p className="notice error" role="alert">
           {error}
         </p>
       )}
-      <button className="button" disabled={busy}>
+      <button className="button" disabled={busy || hasInvalidFields}>
         {busy ? 'Đang gửi kết quả…' : 'Gửi kiểm đếm để duyệt'}
       </button>
     </form>

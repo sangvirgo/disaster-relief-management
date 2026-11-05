@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, type Service, type HttpMethod } from '../api/client';
 import { LocationPicker } from '../maps/LocationPicker';
 import { confirmAction } from './confirmAction';
@@ -39,6 +39,32 @@ function pointValue(value: string) {
     ? { longitude, latitude }
     : null;
 }
+function fieldValidationError(field: Field, value: string): string | undefined {
+  const trimmed = value.trim();
+  if (field.type === 'location') {
+    return field.required && !pointValue(value)
+      ? `${field.label} là bắt buộc.`
+      : undefined;
+  }
+  if (field.required && !trimmed)
+    return `${field.label} là bắt buộc.`;
+  if (!trimmed) return undefined;
+  if (field.minLength !== undefined && trimmed.length < field.minLength)
+    return `${field.label} cần ít nhất ${field.minLength} ký tự.`;
+  if (field.maxLength !== undefined && value.length > field.maxLength)
+    return `${field.label} không được quá ${field.maxLength} ký tự.`;
+  if (field.type === 'number') {
+    const number = Number(trimmed);
+    const min = field.min ?? 1;
+    if (!Number.isFinite(number)) return `${field.label} phải là số hợp lệ.`;
+    if (number < min) return `${field.label} phải từ ${min} trở lên.`;
+    if (field.max !== undefined && number > field.max)
+      return `${field.label} không được vượt quá ${field.max}.`;
+    if ((field.integer || field.name === 'work_cycle') && !Number.isInteger(number))
+      return `${field.label} phải là số nguyên.`;
+  }
+  return undefined;
+}
 export function CommandForm({
   spec,
   onSuccess,
@@ -55,34 +81,54 @@ export function CommandForm({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [attempted, setAttempted] = useState(false);
   const [manualFields, setManualFields] = useState<Record<string, boolean>>({});
+  const formId = useId();
   const pending = useRef<{ scope: string; key: string; body: Record<string, unknown> } | null>(null);
+  const visibleFields = (spec.fields || []).filter(
+    (field) => !field.visibleWhen || values[field.visibleWhen.field] === field.visibleWhen.value
+  );
+  const validationErrors = Object.fromEntries(visibleFields.map((field) => [
+    field.name,
+    fieldValidationError(field, values[field.name] || ''),
+  ]));
+  const hasInvalidFields = visibleFields.some(
+    (field) => Boolean(fieldErrors[field.name] || validationErrors[field.name])
+  );
+  function errorFor(field: Field): string {
+    return fieldErrors[field.name] ||
+      ((attempted || touched[field.name] || Boolean(values[field.name]))
+        ? validationErrors[field.name] || ''
+        : '');
+  }
+  function errorId(field: Field): string {
+    return `${formId}-${field.name}-error`;
+  }
+  function updateField(field: Field, value: string) {
+    const resetNames = field.resetOnChange || [];
+    setValues((current) => ({
+      ...current,
+      ...Object.fromEntries(resetNames.map((name) => [name, ''])),
+      [field.name]: value,
+    }));
+    setTouched((current) => ({
+      ...current,
+      [field.name]: true,
+      ...Object.fromEntries(resetNames.map((name) => [name, false])),
+    }));
+    setFieldErrors((current) => ({
+      ...current,
+      [field.name]: '',
+      ...Object.fromEntries(resetNames.map((name) => [name, ''])),
+    }));
+    setMessage('');
+    pending.current = null;
+  }
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const invalid: Record<string, string> = {};
-    for (const field of spec.fields || []) {
-      if (field.visibleWhen && values[field.visibleWhen.field] !== field.visibleWhen.value) continue;
-      const value = (values[field.name] || '').trim();
-      if (field.required && !value)
-        invalid[field.name] =
-          `Vui lòng ${['select', 'reference', 'choice-cards'].includes(field.type || '') ? 'chọn' : 'nhập'} ${sentenceLabel(field.label)}.`;
-      else if (value && field.minLength && value.length < field.minLength)
-        invalid[field.name] = `${field.label} cần ít nhất ${field.minLength} ký tự.`;
-      else if (value && field.maxLength && value.length > field.maxLength)
-        invalid[field.name] = `${field.label} không được quá ${field.maxLength} ký tự.`;
-      else if (value && field.type === 'number') {
-        const number = Number(value);
-        const min = field.min ?? 1;
-        if (!Number.isFinite(number)) invalid[field.name] = `${field.label} phải là số hợp lệ.`;
-        else if (number < min) invalid[field.name] = `${field.label} phải từ ${min} trở lên.`;
-        else if (field.max !== undefined && number > field.max)
-          invalid[field.name] = `${field.label} không được vượt quá ${field.max}.`;
-        else if ((field.integer || field.name === 'work_cycle') && !Number.isInteger(number))
-          invalid[field.name] = `${field.label} phải là số nguyên.`;
-      }
-    }
-    setFieldErrors(invalid);
-    if (Object.keys(invalid).length) {
+    setAttempted(true);
+    if (hasInvalidFields) {
       setMessage('Hãy kiểm tra các trường được đánh dấu.');
       return;
     }
@@ -143,9 +189,12 @@ export function CommandForm({
   return (
     <form className="form-stack command-form" onSubmit={submit} autoComplete="off" noValidate>
       <h3>{spec.title}</h3>
-      {spec.fields?.filter((field) => !field.visibleWhen || values[field.visibleWhen.field] === field.visibleWhen.value).map((field) =>
+      {visibleFields.map((field) => {
+        const inlineError = errorFor(field);
+        const describedBy = inlineError ? errorId(field) : undefined;
+        return (
         field.type === 'choice-cards' ? (
-          <fieldset key={field.name} className="command-choice-list" aria-invalid={Boolean(fieldErrors[field.name])}>
+          <fieldset key={field.name} className="command-choice-list" aria-invalid={Boolean(inlineError)} aria-describedby={describedBy}>
             <legend>{field.label}{field.required && <> <span className="required-mark" aria-hidden="true">*</span></>}</legend>
             {field.options?.length ? field.options.map((option) => (
               <button
@@ -154,17 +203,14 @@ export function CommandForm({
                 className={`command-choice-card ${values[field.name] === option.value ? 'selected' : ''}`}
                 aria-pressed={values[field.name] === option.value}
                 onClick={() => {
-                  setValues((current) => ({ ...current, [field.name]: option.value }));
-                  setFieldErrors((current) => ({ ...current, [field.name]: '' }));
-                  setMessage('');
-                  pending.current = null;
+                  updateField(field, option.value);
                 }}
               >
                 <span>{option.label}</span>
                 <span className="command-choice-indicator" aria-hidden="true">{values[field.name] === option.value ? '✓' : ''}</span>
               </button>
             )) : <p className="empty">Chưa có chiến dịch đang hoạt động phù hợp với khu vực này.</p>}
-            {fieldErrors[field.name] && <small className="field-error" role="alert">{fieldErrors[field.name]}</small>}
+            {inlineError && <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>}
           </fieldset>
         ) : field.type === 'reference' ? (
           <div key={field.name} className="form-stack">
@@ -176,18 +222,17 @@ export function CommandForm({
               <select
                 id={`reference-${field.name}`}
                 required={field.required}
-                aria-invalid={Boolean(fieldErrors[field.name])}
+                aria-invalid={Boolean(inlineError)}
+                aria-describedby={describedBy}
                 value={values[field.name] || ''}
+                onBlur={() => setTouched((current) => ({ ...current, [field.name]: true }))}
                 onChange={(event) => {
                   if (event.target.value === '__manual__') {
                     setManualFields((current) => ({ ...current, [field.name]: true }));
-                    setValues((current) => ({ ...current, [field.name]: '' }));
+                    updateField(field, '');
                   } else {
-                    setValues((current) => ({ ...current, [field.name]: event.target.value }));
+                    updateField(field, event.target.value);
                   }
-                  setFieldErrors((current) => ({ ...current, [field.name]: '' }));
-                  setMessage('');
-                  pending.current = null;
                 }}
               >
                 <option value="">Chọn {sentenceLabel(field.label)}</option>
@@ -201,15 +246,14 @@ export function CommandForm({
                 <input
                   id={`reference-${field.name}`}
                   required={field.required}
-                  aria-invalid={Boolean(fieldErrors[field.name])}
+                  minLength={field.minLength}
+                  maxLength={field.maxLength !== undefined ? field.maxLength + 1 : undefined}
+                  aria-invalid={Boolean(inlineError)}
+                  aria-describedby={describedBy}
                   placeholder={field.placeholder || 'Dán mã bản ghi'}
                   value={values[field.name] || ''}
-                  onChange={(event) => {
-                    setValues((current) => ({ ...current, [field.name]: event.target.value }));
-                    setFieldErrors((current) => ({ ...current, [field.name]: '' }));
-                    setMessage('');
-                    pending.current = null;
-                  }}
+                  onBlur={() => setTouched((current) => ({ ...current, [field.name]: true }))}
+                  onChange={(event) => updateField(field, event.target.value)}
                 />
                 {Boolean(field.options?.length) && (
                   <button
@@ -217,7 +261,7 @@ export function CommandForm({
                     className="button secondary"
                     onClick={() => {
                       setManualFields((current) => ({ ...current, [field.name]: false }));
-                      setValues((current) => ({ ...current, [field.name]: '' }));
+                      updateField(field, '');
                     }}
                   >
                     Chọn từ danh sách
@@ -225,30 +269,24 @@ export function CommandForm({
                 )}
               </>
             )}
-            {fieldErrors[field.name] && (
-              <small className="field-error" role="alert">{fieldErrors[field.name]}</small>
+            {inlineError && (
+              <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>
             )}
           </div>
         ) : field.type === 'location' ? (
-          <div key={field.name} className="form-stack">
+          <div key={field.name} className="form-stack" role="group" aria-invalid={Boolean(inlineError)} aria-describedby={describedBy}>
             <strong>{field.label}{field.required && <> <span className="required-mark" aria-hidden="true">*</span></>}</strong>
             <LocationPicker
               value={pointValue(values[field.name] || '')}
               onSelect={(point) => {
-                setValues((current) => ({
-                  ...current,
-                  [field.name]: point ? `${point.longitude},${point.latitude}` : '',
-                }));
-                setFieldErrors((current) => ({ ...current, [field.name]: '' }));
-                setMessage('');
-                pending.current = null;
+                updateField(field, point ? `${point.longitude},${point.latitude}` : '');
               }}
             />
             {pointValue(values[field.name] || '') && (
               <small>Vị trí đã chọn: {pointValue(values[field.name] || '')?.latitude.toFixed(6)}, {pointValue(values[field.name] || '')?.longitude.toFixed(6)}</small>
             )}
-            {fieldErrors[field.name] && (
-              <small className="field-error" role="alert">{fieldErrors[field.name]}</small>
+            {inlineError && (
+              <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>
             )}
           </div>
         ) : (
@@ -258,35 +296,23 @@ export function CommandForm({
             <textarea
               required={field.required}
               minLength={field.minLength}
-              maxLength={field.maxLength}
-              aria-invalid={Boolean(fieldErrors[field.name])}
+              maxLength={field.maxLength !== undefined ? field.maxLength + 1 : undefined}
+              aria-invalid={Boolean(inlineError)}
+              aria-describedby={describedBy}
               placeholder={field.placeholder}
               value={values[field.name] || ''}
-              onChange={(event) => {
-                setValues((current) => ({
-                  ...current,
-                  ...Object.fromEntries((field.resetOnChange || []).map((name) => [name, ''])),
-                  [field.name]: event.target.value,
-                }));
-                setFieldErrors((current) => ({ ...current, [field.name]: '' }));
-                setMessage('');
-                pending.current = null;
-              }}
+              onBlur={() => setTouched((current) => ({ ...current, [field.name]: true }))}
+              onChange={(event) => updateField(field, event.target.value)}
             />
           ) : field.type === 'select' ? (
             <select
               required={field.required}
-              aria-invalid={Boolean(fieldErrors[field.name])}
+              aria-invalid={Boolean(inlineError)}
+              aria-describedby={describedBy}
               value={values[field.name] || ''}
+              onBlur={() => setTouched((current) => ({ ...current, [field.name]: true }))}
               onChange={(event) => {
-                setValues((current) => ({
-                  ...current,
-                  ...Object.fromEntries((field.resetOnChange || []).map((name) => [name, ''])),
-                  [field.name]: event.target.value,
-                }));
-                setFieldErrors((current) => ({ ...current, [field.name]: '' }));
-                setMessage('');
-                pending.current = null;
+                updateField(field, event.target.value);
               }}
             >
               <option value="">{field.emptyLabel || `Chọn ${sentenceLabel(field.label)}`}</option>
@@ -311,24 +337,22 @@ export function CommandForm({
                   : undefined
               }
               minLength={field.minLength}
-              maxLength={field.maxLength}
-              aria-invalid={Boolean(fieldErrors[field.name])}
+              maxLength={field.maxLength !== undefined ? field.maxLength + 1 : undefined}
+              aria-invalid={Boolean(inlineError)}
+              aria-describedby={describedBy}
               placeholder={field.placeholder}
               value={values[field.name] || ''}
-              onChange={(event) => {
-                setValues({ ...values, [field.name]: event.target.value });
-                setFieldErrors((current) => ({ ...current, [field.name]: '' }));
-                setMessage('');
-                pending.current = null;
-              }}
+              onBlur={() => setTouched((current) => ({ ...current, [field.name]: true }))}
+              onChange={(event) => updateField(field, event.target.value)}
             />
           )}
-          {fieldErrors[field.name] && (
-            <small className="field-error">{fieldErrors[field.name]}</small>
+          {inlineError && (
+            <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>
           )}
         </label>
         )
-      )}
+        );
+      })}
       {message && (
         <p
           role={message.startsWith('Thao tác đã') ? 'status' : 'alert'}
@@ -337,7 +361,7 @@ export function CommandForm({
           {message}
         </p>
       )}
-      <button className="button" disabled={busy}>
+      <button className="button" disabled={busy || hasInvalidFields}>
         {busy ? 'Đang xử lý…' : spec.title}
       </button>
     </form>

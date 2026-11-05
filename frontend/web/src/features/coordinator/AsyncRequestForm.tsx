@@ -23,7 +23,16 @@ export function AsyncRequestForm({
   const [message, setMessage] = useState('');
   const [operationId, setOperationId] = useState('');
   const [state, setState] = useState('');
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const key = useRef<string | null>(null);
+  const terminalHandled = useRef(false);
+  const reasonError = !reason.trim()
+    ? 'Lý do là bắt buộc.'
+    : reason.length > 2000
+      ? 'Lý do không được vượt quá 2.000 ký tự.'
+      : '';
+  const basisError = kind === 'resolve' && !basis ? 'Căn cứ kết thúc là bắt buộc.' : '';
+  const invalid = Boolean(reasonError || basisError);
   useEffect(() => {
     if (!operationId || ['COMPLETED', 'ABORTED'].includes(state)) return;
     let active = true;
@@ -35,7 +44,8 @@ export function AsyncRequestForm({
         const result = await api<{ state: string }>('response', `/operations/${operationId}`);
         if (active) {
           setState(result.state);
-          if (result.state === 'COMPLETED') {
+          if (['COMPLETED', 'ABORTED'].includes(result.state) && !terminalHandled.current) {
+            terminalHandled.current = true;
             key.current = null;
             onCompleted();
           }
@@ -56,6 +66,8 @@ export function AsyncRequestForm({
   }, [operationId, state, onCompleted]);
   async function submit(event: FormEvent) {
     event.preventDefault();
+    setTouched({ reason: true, basis: true });
+    if (invalid) return;
     if (
       !(await confirmAction(
         kind === 'cancel'
@@ -86,6 +98,7 @@ export function AsyncRequestForm({
       );
       setOperationId(result.operation_id);
       setState(result.state);
+      terminalHandled.current = false;
       setMessage('Máy chủ đã nhận lệnh xử lý. Đang kiểm tra kết quả cuối cùng.');
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Lệnh chưa được xác nhận.');
@@ -103,35 +116,46 @@ export function AsyncRequestForm({
       {!operationId && (
         <>
           <label>
-            Lý do <span className="required-mark" aria-hidden="true">*</span>
+            <span>Lý do <span className="required-mark" aria-hidden="true">*</span></span>
             <textarea
               required
+              maxLength={2001}
+              aria-invalid={Boolean(touched.reason && reasonError)}
+              aria-describedby={touched.reason && reasonError ? 'async-request-reason-error' : undefined}
               value={reason}
               onChange={(event) => {
                 setReason(event.target.value);
+                setTouched((current) => ({ ...current, reason: true }));
                 key.current = null;
               }}
+              onBlur={() => setTouched((current) => ({ ...current, reason: true }))}
             />
+            {touched.reason && reasonError && <small className="field-error" id="async-request-reason-error" role="alert">{reasonError}</small>}
           </label>
           {kind === 'resolve' && (
             <label>
-              Căn cứ kết thúc <span className="required-mark" aria-hidden="true">*</span>
+              <span>Căn cứ kết thúc <span className="required-mark" aria-hidden="true">*</span></span>
               <select
                 required
+                aria-invalid={Boolean(touched.basis && basisError)}
+                aria-describedby={touched.basis && basisError ? 'async-request-basis-error' : undefined}
                 value={basis}
                 onChange={(event) => {
                   setBasis(event.target.value);
+                  setTouched((current) => ({ ...current, basis: true }));
                   key.current = null;
                 }}
+                onBlur={() => setTouched((current) => ({ ...current, basis: true }))}
               >
                 <option value="">Chọn căn cứ</option>
                 <option value="RESCUE_COMPLETED">Nhiệm vụ cứu hộ đã hoàn thành</option>
                 <option value="SUPPLY_ONLY">Chỉ hỗ trợ vật tư và đã bàn giao</option>
                 <option value="NO_ACTION_REQUIRED">Không còn cần hành động</option>
               </select>
+              {touched.basis && basisError && <small className="field-error" id="async-request-basis-error" role="alert">{basisError}</small>}
             </label>
           )}
-          <button className="button" disabled={busy}>
+          <button className="button" disabled={busy || invalid}>
             {busy ? 'Đang gửi lệnh…' : kind === 'cancel' ? 'Xác nhận hủy' : 'Gửi đề nghị kết thúc'}
           </button>
         </>
@@ -139,7 +163,9 @@ export function AsyncRequestForm({
       {operationId && (
         <p className="notice" role="status">
           Tiến độ xử lý: {label(state)}.{' '}
-          {state !== 'COMPLETED' && 'Yêu cầu chưa có kết quả cuối cùng.'}
+          {state === 'ABORTED'
+            ? 'Thao tác đã được hủy; hồ sơ trở về trạng thái trước đó.'
+            : state !== 'COMPLETED' && 'Yêu cầu chưa có kết quả cuối cùng.'}
         </p>
       )}
       {message && (

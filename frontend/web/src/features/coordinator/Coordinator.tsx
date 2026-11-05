@@ -5,8 +5,11 @@ import { DetailSurface } from '../../components/DetailSurface';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
-import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { HeatmapPanel } from './HeatmapPanel';
+import { ContactAttemptPanel } from './ContactAttemptPanel';
+import { operationIdFromTimeline, ResolutionOperationPanel } from './ResolutionOperationPanel';
+import { RequestTimeline } from './RequestTimeline';
+import { RequestEvidencePanel } from './RequestEvidencePanel';
 
 type QueueItem = {
   id: string;
@@ -88,8 +91,11 @@ type Detail = QueueItem & {
     contactability?: string | null;
     household_reference_note?: string | null;
   };
-  contact_attempts: { items: { id: string; contact_target: string; outcome: string; note?: string | null; attempted_at?: string }[] };
-  timeline: { items: Event[] };
+  contact_attempts: {
+    items: { id: string; contact_target: string; outcome: string; note?: string | null; attempted_at?: string }[];
+    more: boolean;
+  };
+  timeline: { items: Event[]; more: boolean };
   proxy_activity_flags: unknown[];
   active_missions?: {
     items: { id: string; status: string; created_at: string; team_id: string }[];
@@ -129,7 +135,7 @@ type Detail = QueueItem & {
     error_code?: string | null;
     human_review_required: boolean;
   } | null;
-  evidence?: { items: { id: string; state: string; size_bytes: number; created_at: string }[] };
+  evidence?: { items: { id: string; state: string; size_bytes: number; detected_mime?: string; created_at: string }[] };
 };
 type Candidate = {
   team: { id: string; name: string; reporting_mode: 'APP' | 'COORDINATOR' };
@@ -575,6 +581,9 @@ export function Coordinator({ page, initialRequestId }: { page: string; initialR
   const pendingSupplements = detail?.timeline.items.filter((event) =>
     event.event_type === 'REPORTER_SUPPLEMENT' && event.payload?.pending_review === true && !reviewedSupplementIds.has(event.id)
   ) ?? [];
+  const pendingOperationId = detail?.status === 'RESOLVING'
+    ? operationIdFromTimeline(detail.timeline.items)
+    : undefined;
   return (
     <div className="coordinator-layout">
       <section className="card">
@@ -1282,30 +1291,36 @@ export function Coordinator({ page, initialRequestId }: { page: string; initialR
                 </div>
               </section>
             )}
-            {detail.evidence && detail.evidence.items.length > 0 && (
-              <section>
-                <h3>Minh chứng hiện trường ({detail.evidence.items.length})</h3>
-                <div className="record-list">
-                  {detail.evidence.items.map((ev) => (
-                    <div className="candidate" key={ev.id}>
-                      <strong>Tệp {ev.id.slice(0, 8)}</strong>
-                      <p>
-                        {label(ev.state)} · {timeLabel(ev.created_at)} ·{' '}
-                        {Math.ceil(ev.size_bytes / 1024)} KB
-                      </p>
-                    </div>
-                  ))}
-                </div>
+            <RequestEvidencePanel items={detail.evidence?.items ?? []} />
+            <ContactAttemptPanel
+              key={`contacts-${detail.id}-${detail.version}`}
+              requestId={detail.id}
+              status={detail.status}
+              version={detail.version}
+              initial={detail.contact_attempts}
+              onSuccess={done}
+              onStale={refreshAfterConflict}
+            />
+            <RequestTimeline
+              key={`timeline-${detail.id}-${detail.version}-${detail.timeline.items[0]?.id ?? 'empty'}`}
+              requestId={detail.id}
+              initial={detail.timeline}
+            />
+            {detail.status === 'RESOLVING' && (pendingOperationId ? (
+              <ResolutionOperationPanel
+                key={pendingOperationId}
+                operationId={pendingOperationId}
+                requestVersion={detail.version}
+                onChanged={done}
+                onStale={refreshAfterConflict}
+              />
+            ) : (
+              <section className="notice warning">
+                <h3>Thao tác kết thúc đang chờ</h3>
+                <p>Chưa tìm thấy mã thao tác trong lịch sử tải về. Tải lại hồ sơ để đồng bộ trạng thái mới nhất.</p>
+                <button type="button" className="button secondary" onClick={refreshAfterConflict}>Tải lại hồ sơ</button>
               </section>
-            )}
-            <h3>Lịch sử</h3>
-            <div className="timeline">
-              {detail.timeline.items.map((event) => (
-                <p className="timeline-item" key={event.id}>
-                  {label(event.event_type)} · {timeLabel(event.occurred_at)}
-                </p>
-              ))}
-            </div>
+            ))}
             <div className="action-grid">
               {!['RESOLVING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
                 secondaryCommand({
@@ -1620,23 +1635,6 @@ export function Coordinator({ page, initialRequestId }: { page: string; initialR
                     { name: 'reason', label: 'Lý do mở lại', type: 'textarea', required: true },
                   ],
                 })}
-              {detail.contact_attempts.items.some(
-                (item) =>
-                  item.outcome === 'REACHED' &&
-                  item.contact_target === 'REPORTER'
-              ) && (
-                <details className="secondary-command">
-                  <summary>Cấp mã khôi phục</summary>
-                  <RecoveryIssue
-                    key={`recovery-${detail.id}-${detail.version}`}
-                    service="response"
-                    path={`/requests/${detail.id}/recovery`}
-                    version={detail.version}
-                    kind="sos"
-                    contacts={detail.contact_attempts.items}
-                  />
-                </details>
-              )}
             </div>
           </>
         )}

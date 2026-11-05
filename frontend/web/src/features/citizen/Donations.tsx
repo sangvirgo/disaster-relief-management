@@ -90,6 +90,47 @@ export function Donations({ user }: { user: Me | null }) {
   const [createdFile, setCreatedFile] = useState<File | null>(null);
   const [createdUploadMessage, setCreatedUploadMessage] = useState('');
   const pending = useRef<Pending | null>(null);
+  const [declarationTouched, setDeclarationTouched] = useState<Record<string, boolean>>({});
+  const [declarationAttempted, setDeclarationAttempted] = useState(false);
+  const [trackingTouched, setTrackingTouched] = useState<Record<string, boolean>>({});
+  const [trackingAttempted, setTrackingAttempted] = useState(false);
+  const [recoveryTouched, setRecoveryTouched] = useState<Record<string, boolean>>({});
+  const [recoveryAttempted, setRecoveryAttempted] = useState(false);
+  const [disputeTouched, setDisputeTouched] = useState(false);
+  const [disputeAttempted, setDisputeAttempted] = useState(false);
+  const declarationErrors: Record<string, string> = {};
+  if (!donorName.trim()) declarationErrors.donorName = 'Họ tên người đóng góp là bắt buộc.';
+  else if (donorName.length > 200) declarationErrors.donorName = 'Họ tên không được vượt quá 200 ký tự.';
+  const normalizedDonorPhone = donorPhone.trim().replace(/[ ()-]/g, '');
+  if (!normalizedDonorPhone) declarationErrors.donorPhone = 'Số điện thoại người đóng góp là bắt buộc.';
+  else if (donorPhone.length > 32) declarationErrors.donorPhone = 'Số điện thoại không được vượt quá 32 ký tự.';
+  else if (!/^\+?[0-9]{8,15}$/.test(normalizedDonorPhone))
+    declarationErrors.donorPhone = 'Số điện thoại cần có 8–15 chữ số; có thể bắt đầu bằng dấu +.';
+  const hasPositiveQuantity = Boolean(selected?.items.some((item) => Number(quantities[item.item_id]) > 0));
+  for (const item of selected?.items || []) {
+    const value = (quantities[item.item_id] || '').trim();
+    if (!value) continue;
+    if (!/^\d+(?:\.\d+)?$/.test(value) || Number(value) < 0)
+      declarationErrors[`quantity:${item.item_id}`] = 'Số lượng phải là số không âm.';
+    else if ((value.split('.')[1]?.length || 0) > item.scale)
+      declarationErrors[`quantity:${item.item_id}`] = `Số lượng chỉ được có tối đa ${item.scale} chữ số thập phân.`;
+  }
+  const declarationInvalid = Boolean(Object.keys(declarationErrors).length || !hasPositiveQuantity);
+  const donationTrackIdError = !trackId.trim() ? 'Định danh bản khai là bắt buộc.'
+    : trackId.trim().length > 36 ? 'Định danh bản khai không được vượt quá 36 ký tự.'
+      : !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trackId.trim())
+        ? 'Định danh bản khai không đúng định dạng.' : '';
+  const donationTrackSecretError = !user && !trackSecret.trim() ? 'Mã bảo mật bản khai là bắt buộc.'
+    : trackSecret.length > 43 ? 'Mã bảo mật không được vượt quá 43 ký tự.'
+      : trackSecret.trim() && !/^[A-Za-z0-9_-]{43}$/.test(trackSecret.trim()) ? 'Mã bảo mật không đúng định dạng.' : '';
+  const donationRecoveryPublicError = !recoveryPublicCode.trim() ? 'Mã bản khai công khai là bắt buộc.'
+    : recoveryPublicCode.length > 16 ? 'Mã bản khai công khai không được vượt quá 16 ký tự.'
+      : !/^[0-9A-HJKMNP-TV-Z]{8,16}$/i.test(recoveryPublicCode.trim()) ? 'Mã bản khai công khai không đúng định dạng.' : '';
+  const donationRecoveryCodeError = !recoveryCode.trim() ? 'Mã khôi phục một lần là bắt buộc.'
+    : recoveryCode.length > 43 ? 'Mã khôi phục không được vượt quá 43 ký tự.'
+      : !/^[A-Za-z0-9_-]{43}$/.test(recoveryCode.trim()) ? 'Mã khôi phục không đúng định dạng.' : '';
+  const donationDisputeError = !disputeReason.trim() ? 'Nội dung cần rà soát là bắt buộc.'
+    : disputeReason.length > 2000 ? 'Nội dung cần rà soát không được vượt quá 2.000 ký tự.' : '';
   const guestCredentials = user ? ('include' as const) : ('omit' as const);
   const [showCreatedTracking, setShowCreatedTracking] = useState(false);
   const nav = <div className="donation-nav" role="group" aria-label="Mục đóng góp">
@@ -176,28 +217,9 @@ export function Donations({ user }: { user: Me | null }) {
   async function declare(event: FormEvent) {
     event.preventDefault();
     if (!selected) return;
+    setDeclarationAttempted(true);
     setError('');
-    if (!donorName.trim()) {
-      setError('Vui lòng nhập họ tên người đóng góp.');
-      return;
-    }
-    const digits = donorPhone.replace(/\D/g, '');
-    if (!/^[+0-9 ()-]+$/.test(donorPhone.trim()) || digits.length < 8 || digits.length > 15) {
-      setError('Số điện thoại người đóng góp cần có 8–15 chữ số và không chứa chữ cái.');
-      return;
-    }
-    for (const item of selected.items) {
-      const value = quantities[item.item_id]?.trim();
-      if (!value) continue;
-      if (!/^\d+(?:\.\d+)?$/.test(value) || Number(value) < 0) {
-        setError(`${item.item_name}: số lượng phải là số không âm.`);
-        return;
-      }
-      if ((value.split('.')[1]?.length || 0) > item.scale) {
-        setError(`${item.item_name}: chỉ được có tối đa ${item.scale} chữ số thập phân.`);
-        return;
-      }
-    }
+    if (declarationInvalid) return;
     setLoading(true);
     try {
       let command = pending.current;
@@ -205,12 +227,11 @@ export function Donations({ user }: { user: Me | null }) {
         const lines = selected.items
           .filter((item) => quantities[item.item_id] && Number(quantities[item.item_id]) > 0)
           .map((item) => ({ item_id: item.item_id, declared_quantity: quantities[item.item_id] }));
-        if (!lines.length) throw new Error('Vui lòng nhập số lượng cho ít nhất một vật phẩm.');
         command = {
           key: newCommandKey(),
           secret: user ? '' : secret32(),
           driveId: selected.id,
-          body: { donor_name: donorName.trim(), donor_phone: donorPhone.trim(), lines },
+          body: { donor_name: donorName.trim(), donor_phone: normalizedDonorPhone, lines },
         };
         pending.current = command;
       }
@@ -260,6 +281,8 @@ export function Donations({ user }: { user: Me | null }) {
   }
   function track(event: FormEvent) {
     event.preventDefault();
+    setTrackingAttempted(true);
+    if (donationTrackIdError || donationTrackSecretError) return;
     void lookupDonation(trackId, trackSecret);
   }
   function invalidateTracking() {
@@ -275,6 +298,8 @@ export function Donations({ user }: { user: Me | null }) {
   async function dispute(event: FormEvent) {
     event.preventDefault();
     if (!tracking) return;
+    setDisputeAttempted(true);
+    if (donationDisputeError) return;
     setLoading(true);
     setActionMessage('');
     try {
@@ -288,6 +313,8 @@ export function Donations({ user }: { user: Me | null }) {
       });
       disputeKey.current = null;
       setDisputeReason('');
+      setDisputeTouched(false);
+      setDisputeAttempted(false);
       setActionMessage('Máy chủ đã tiếp nhận khiếu nại của bạn.');
       try {
         setTracking(
@@ -364,18 +391,22 @@ export function Donations({ user }: { user: Me | null }) {
   }
   async function recover(event: FormEvent) {
     event.preventDefault();
+    setRecoveryAttempted(true);
+    if (donationRecoveryPublicError || donationRecoveryCodeError) return;
     setLoading(true);
     setRecoveryMessage('');
     try {
       recoveryKey.current ||= newCommandKey();
       await api('logistics', '/public/donations/recover', {
         method: 'POST',
-        body: { public_code: recoveryPublicCode.trim() },
+        body: { public_code: recoveryPublicCode.trim().toUpperCase() },
         headers: { 'X-Recovery-Code': recoveryCode.trim() },
         idempotencyKey: recoveryKey.current,
       });
       recoveryKey.current = null;
       setRecoveryCode('');
+      setRecoveryTouched({});
+      setRecoveryAttempted(false);
       setRecoveryMessage(
         'Bản khai đã được gắn với tài khoản. Hãy tra cứu bằng định danh bản khai.'
       );
@@ -392,34 +423,45 @@ export function Donations({ user }: { user: Me | null }) {
         <section className="card">
           <h2>Tra cứu đóng góp</h2>
           <p>Nhập định danh bản khai và mã bảo mật riêng tư. Mã bảo mật không nằm trong URL.</p>
-          <form className="form-stack" onSubmit={track}>
+          <form className="form-stack" onSubmit={track} noValidate>
             <label>
-              Định danh bản khai <span className="required-mark" aria-hidden="true">*</span>
+              <span>Định danh bản khai <span className="required-mark" aria-hidden="true">*</span></span>
               <input
                 required
                 disabled={loading}
+                maxLength={37}
+                aria-invalid={Boolean((trackingAttempted || trackingTouched.trackId) && donationTrackIdError)}
                 value={trackId}
                 onChange={(e) => {
                   setTrackId(e.target.value);
+                  setTrackingTouched((current) => ({ ...current, trackId: true }));
                   invalidateTracking();
                 }}
+                onBlur={() => setTrackingTouched((current) => ({ ...current, trackId: true }))}
                 autoComplete="off"
               />
+              {(trackingAttempted || trackingTouched.trackId) && donationTrackIdError && <small className="field-error" role="alert">{donationTrackIdError}</small>}
             </label>
             <label>
-              Mã bảo mật (nếu khai với tư cách khách)
+              <span>Mã bảo mật (nếu khai với tư cách khách){!user && <> <span className="required-mark" aria-hidden="true">*</span></>}</span>
               <input
                 type="password"
                 disabled={loading}
+                required={!user}
+                maxLength={44}
+                aria-invalid={Boolean((trackingAttempted || trackingTouched.trackSecret) && donationTrackSecretError)}
                 value={trackSecret}
                 onChange={(e) => {
                   setTrackSecret(e.target.value);
+                  setTrackingTouched((current) => ({ ...current, trackSecret: true }));
                   invalidateTracking();
                 }}
+                onBlur={() => setTrackingTouched((current) => ({ ...current, trackSecret: true }))}
                 autoComplete="off"
               />
+              {(trackingAttempted || trackingTouched.trackSecret) && donationTrackSecretError && <small className="field-error" role="alert">{donationTrackSecretError}</small>}
             </label>
-            <button className="button" disabled={loading}>
+            <button className="button" disabled={loading || Boolean(donationTrackIdError || donationTrackSecretError)}>
               Xem tiến độ
             </button>
           </form>
@@ -431,34 +473,44 @@ export function Donations({ user }: { user: Me | null }) {
           {user && (
             <details className="donation-recovery">
               <summary>Khôi phục bản khai</summary>
-            <form className="form-stack command-form" onSubmit={recover}>
+            <form className="form-stack command-form" onSubmit={recover} noValidate>
               <h3>Khôi phục bản khai</h3>
               <p>Nhập mã một lần do nhân viên tiếp nhận cấp sau khi xác minh liên hệ.</p>
               <label>
-                Mã bản khai công khai <span className="required-mark" aria-hidden="true">*</span>
+                <span>Mã bản khai công khai <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   required
+                  maxLength={17}
+                  aria-invalid={Boolean((recoveryAttempted || recoveryTouched.publicCode) && donationRecoveryPublicError)}
                   value={recoveryPublicCode}
                   onChange={(event) => {
                     setRecoveryPublicCode(event.target.value);
+                    setRecoveryTouched((current) => ({ ...current, publicCode: true }));
                     recoveryKey.current = null;
                   }}
+                  onBlur={() => setRecoveryTouched((current) => ({ ...current, publicCode: true }))}
                   autoComplete="off"
                 />
+                {(recoveryAttempted || recoveryTouched.publicCode) && donationRecoveryPublicError && <small className="field-error" role="alert">{donationRecoveryPublicError}</small>}
               </label>
               <label>
-                Mã khôi phục một lần <span className="required-mark" aria-hidden="true">*</span>
+                <span>Mã khôi phục một lần <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   required
+                  maxLength={44}
+                  aria-invalid={Boolean((recoveryAttempted || recoveryTouched.code) && donationRecoveryCodeError)}
                   value={recoveryCode}
                   onChange={(event) => {
                     setRecoveryCode(event.target.value);
+                    setRecoveryTouched((current) => ({ ...current, code: true }));
                     recoveryKey.current = null;
                   }}
+                  onBlur={() => setRecoveryTouched((current) => ({ ...current, code: true }))}
                   autoComplete="off"
                 />
+                {(recoveryAttempted || recoveryTouched.code) && donationRecoveryCodeError && <small className="field-error" role="alert">{donationRecoveryCodeError}</small>}
               </label>
-              <button className="button secondary" disabled={loading}>
+              <button className="button secondary" disabled={loading || Boolean(donationRecoveryPublicError || donationRecoveryCodeError)}>
                 Gắn bản khai với tài khoản
               </button>
               {recoveryMessage && (
@@ -509,25 +561,30 @@ export function Donations({ user }: { user: Me | null }) {
             ) : (
               <p>Chưa có khiếu nại.</p>
             )}
-            <form className="form-stack donation-dispute-form" onSubmit={dispute}>
+          <form className="form-stack donation-dispute-form" onSubmit={dispute} noValidate>
               <label>
-                Nội dung cần rà soát <span className="required-mark" aria-hidden="true">*</span>
+                <span>Nội dung cần rà soát <span className="required-mark" aria-hidden="true">*</span></span>
                 <textarea
                   required
+                  maxLength={2001}
+                  aria-invalid={Boolean((disputeAttempted || disputeTouched) && donationDisputeError)}
                   value={disputeReason}
                   onChange={(event) => {
                     setDisputeReason(event.target.value);
+                    setDisputeTouched(true);
                     disputeKey.current = null;
                   }}
+                  onBlur={() => setDisputeTouched(true)}
                 />
+                {(disputeAttempted || disputeTouched) && donationDisputeError && <small className="field-error" role="alert">{donationDisputeError}</small>}
               </label>
-              <button className="button donation-action" disabled={loading}>
+              <button className="button donation-action" disabled={loading || Boolean(donationDisputeError)}>
                 Gửi khiếu nại
               </button>
             </form>
             <form className="form-stack donation-evidence-form" onSubmit={attach}>
               <label>
-                Minh chứng riêng tư (JPEG, PNG hoặc MP4) <span className="required-mark" aria-hidden="true">*</span>
+                <span>Minh chứng riêng tư (JPEG, PNG hoặc MP4) <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   className="donation-file-input"
                   type="file"
@@ -587,7 +644,7 @@ export function Donations({ user }: { user: Me | null }) {
         >
           <h3>Đính kèm ảnh kiện hàng / biên nhận bàn giao</h3>
           <label>
-            Chọn tệp ảnh (JPEG, PNG hoặc MP4) <span className="required-mark" aria-hidden="true">*</span>
+            <span>Chọn tệp ảnh (JPEG, PNG hoặc MP4) <span className="required-mark" aria-hidden="true">*</span></span>
             <input
               className="donation-file-input"
               type="file"
@@ -694,34 +751,44 @@ export function Donations({ user }: { user: Me | null }) {
                 <h2>Khai báo vật phẩm</h2><button type="button" className="modal-close-button" aria-label="Đóng cửa sổ khai báo" onClick={closeDeclaration}>×</button>
               </div>
             <form className="form-stack" onSubmit={declare} noValidate>
-              <p className="required-note">Cho biết tên, số điện thoại và số lượng bạn dự định mang đến của ít nhất một vật phẩm.</p>
+              <p className="required-note"><span className="required-mark" aria-hidden="true">*</span> Số lượng dự kiến của ít nhất một vật phẩm là bắt buộc.</p>
               <div className="form-grid">
                 <label>
-                  Họ tên người đóng góp <span className="required-mark" aria-hidden="true">*</span>
+                  <span>Họ tên người đóng góp <span className="required-mark" aria-hidden="true">*</span></span>
                   <input
                     required
+                    maxLength={201}
+                    aria-invalid={Boolean((declarationAttempted || declarationTouched.donorName) && declarationErrors.donorName)}
                     value={donorName}
                     onChange={(e) => {
                       setDonorName(e.target.value);
+                      setDeclarationTouched((current) => ({ ...current, donorName: true }));
                       pending.current = null;
                     }}
+                    onBlur={() => setDeclarationTouched((current) => ({ ...current, donorName: true }))}
                   />
+                  {(declarationAttempted || declarationTouched.donorName) && declarationErrors.donorName && <small className="field-error" role="alert">{declarationErrors.donorName}</small>}
                 </label>
                 <label>
-                  Số điện thoại <span className="required-mark" aria-hidden="true">*</span>
+                  <span>Số điện thoại <span className="required-mark" aria-hidden="true">*</span></span>
                   <input
                     required
                     type="tel"
                     inputMode="tel"
                     autoComplete="tel"
+                    maxLength={33}
+                    aria-invalid={Boolean((declarationAttempted || declarationTouched.donorPhone) && declarationErrors.donorPhone)}
                     aria-describedby="donor-phone-hint"
                     value={donorPhone}
                     onChange={(e) => {
                       setDonorPhone(e.target.value);
+                      setDeclarationTouched((current) => ({ ...current, donorPhone: true }));
                       pending.current = null;
                     }}
+                    onBlur={() => setDeclarationTouched((current) => ({ ...current, donorPhone: true }))}
                   />
                   <small id="donor-phone-hint">Số liên hệ gồm 8–15 chữ số, có thể bắt đầu bằng +.</small>
+                  {(declarationAttempted || declarationTouched.donorPhone) && declarationErrors.donorPhone && <small className="field-error" role="alert">{declarationErrors.donorPhone}</small>}
                 </label>
               </div>
               {selected.items.map((item) => (
@@ -731,13 +798,18 @@ export function Donations({ user }: { user: Me | null }) {
                     type="number"
                     min="0"
                     step={item.scale ? 1 / 10 ** item.scale : 1}
+                    aria-invalid={Boolean((declarationAttempted || declarationTouched[`quantity:${item.item_id}`]) && declarationErrors[`quantity:${item.item_id}`])}
                     value={quantities[item.item_id] || ''}
                     onChange={(e) => {
                       setQuantities({ ...quantities, [item.item_id]: e.target.value });
+                      setDeclarationTouched((current) => ({ ...current, [`quantity:${item.item_id}`]: true }));
                       pending.current = null;
                     }}
+                    onBlur={() => setDeclarationTouched((current) => ({ ...current, [`quantity:${item.item_id}`]: true }))}
                     placeholder="Số lượng dự kiến bàn giao"
                   />
+                  {(declarationAttempted || declarationTouched[`quantity:${item.item_id}`]) && declarationErrors[`quantity:${item.item_id}`] && <small className="field-error" role="alert">{declarationErrors[`quantity:${item.item_id}`]}</small>}
+                  {selected.items[0]?.item_id === item.item_id && (declarationAttempted || Object.keys(declarationTouched).some((field) => field.startsWith('quantity:'))) && !hasPositiveQuantity && <small className="field-error" role="alert">Số lượng của ít nhất một vật phẩm là bắt buộc.</small>}
                   <small>{item.acceptance_note}</small>
                 </label>
               ))}
@@ -749,6 +821,7 @@ export function Donations({ user }: { user: Me | null }) {
                 className="button"
                 disabled={
                   loading ||
+                  declarationInvalid ||
                   (selected.campaign_status != null && selected.campaign_status !== 'ACTIVE')
                 }
               >

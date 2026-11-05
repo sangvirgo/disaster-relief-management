@@ -141,6 +141,46 @@ function AuthModal({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [authErrors, setAuthErrors] = useState<Record<string, string>>({});
+  const [authTouched, setAuthTouched] = useState<Record<string, boolean>>({});
+  const [authAttempted, setAuthAttempted] = useState(false);
+  function getAuthValidationErrors(): Record<string, string> {
+    const invalid: Record<string, string> = {};
+    if (mode === 'verify') {
+      if (!otp.trim()) invalid.otp = 'Mã xác thực là bắt buộc.';
+      else if (otp.length > 6 || !/^[0-9]{6}$/.test(otp.trim()))
+        invalid.otp = 'Vui lòng nhập đúng mã xác thực gồm 6 chữ số.';
+      return invalid;
+    }
+    if (mode === 'register') {
+      if (!email.trim()) invalid.email = 'Email là bắt buộc.';
+      else if (email.length > 254) invalid.email = 'Email không được vượt quá 254 ký tự.';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+        invalid.email = 'Vui lòng nhập địa chỉ email hợp lệ để nhận mã xác thực.';
+      if (!displayName.trim()) invalid.display_name = 'Họ và tên là bắt buộc.';
+      else if (displayName.length > 200) invalid.display_name = 'Họ và tên không được vượt quá 200 ký tự.';
+    }
+    if (!username.trim()) invalid.username = 'Tên đăng nhập là bắt buộc.';
+    else if (username.length > 64) invalid.username = 'Tên đăng nhập không được vượt quá 64 ký tự.';
+    else if (mode === 'register' && !/^[A-Za-z0-9._-]{3,64}$/.test(username.trim()))
+      invalid.username = 'Tên đăng nhập cần 3–64 ký tự, chỉ gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.';
+    if (!password) invalid.password = 'Mật khẩu là bắt buộc.';
+    else if (password.length > 256) invalid.password = 'Mật khẩu không được vượt quá 256 ký tự.';
+    else if (mode === 'register' && password.length < 10)
+      invalid.password = 'Mật khẩu đăng ký cần ít nhất 10 ký tự.';
+    else if (mode === 'register' && password.toLocaleLowerCase('vi-VN') === username.trim().toLocaleLowerCase('vi-VN'))
+      invalid.password = 'Mật khẩu phải khác tên đăng nhập.';
+    else if (mode === 'register' && commonPasswords.has(password.toLowerCase()))
+      invalid.password = 'Mật khẩu quá phổ biến. Hãy chọn mật khẩu riêng khó đoán.';
+    return invalid;
+  }
+  const authValidationErrors = getAuthValidationErrors();
+  const activeAuthFields = mode === 'verify' ? ['otp']
+    : mode === 'register' ? ['email', 'display_name', 'username', 'password']
+      : ['username', 'password'];
+  const hasAuthErrors = activeAuthFields.some((field) => Boolean(authErrors[field] || authValidationErrors[field]));
+  function authErrorFor(field: string, value: string) {
+    return authErrors[field] || ((authAttempted || authTouched[field] || Boolean(value)) ? authValidationErrors[field] : '');
+  }
 
   useEffect(() => {
     if (!isOpen) {
@@ -149,6 +189,8 @@ function AuthModal({
       setShowPassword(false);
       setMessage('');
       setAuthErrors({});
+      setAuthTouched({});
+      setAuthAttempted(false);
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose();
@@ -217,27 +259,8 @@ function AuthModal({
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    const invalid: Record<string, string> = {};
-    if (mode === 'verify') {
-      if (!/^[0-9]{6}$/.test(otp.trim()))
-        invalid.otp = 'Vui lòng nhập đúng mã xác thực gồm 6 chữ số.';
-    } else {
-      if (mode === 'register' && !displayName.trim())
-        invalid.display_name = 'Vui lòng nhập họ và tên.';
-      if (mode === 'register' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
-        invalid.email = 'Vui lòng nhập địa chỉ email hợp lệ để nhận mã xác thực.';
-      if (!username.trim()) invalid.username = 'Vui lòng nhập tên đăng nhập.';
-      else if (mode === 'register' && !/^[A-Za-z0-9._-]{3,64}$/.test(username.trim()))
-        invalid.username =
-          'Tên đăng nhập cần 3–64 ký tự, chỉ gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.';
-      if (!password) invalid.password = 'Vui lòng nhập mật khẩu.';
-      else if (mode === 'register' && password.length < 10)
-        invalid.password = 'Mật khẩu đăng ký cần ít nhất 10 ký tự.';
-      else if (mode === 'register' && password.toLocaleLowerCase('vi-VN') === username.trim().toLocaleLowerCase('vi-VN'))
-        invalid.password = 'Mật khẩu phải khác tên đăng nhập.';
-      else if (mode === 'register' && commonPasswords.has(password.toLowerCase()))
-        invalid.password = 'Mật khẩu quá phổ biến. Hãy chọn mật khẩu riêng khó đoán.';
-    }
+    setAuthAttempted(true);
+    const invalid = getAuthValidationErrors();
     setAuthErrors(invalid);
     if (Object.keys(invalid).length) {
       setMessage('Hãy sửa các trường được đánh dấu.');
@@ -250,6 +273,8 @@ function AuthModal({
         const result = await register(username.trim(), password, displayName.trim(), email.trim());
         setChallengeId(result.verification.challenge_id);
         setMode('verify');
+        setAuthTouched({});
+        setAuthAttempted(false);
         setMessage(
           result.email_sent
             ? 'Mã xác thực đã được gửi đến email. Mã có hiệu lực 5 phút.'
@@ -259,6 +284,8 @@ function AuthModal({
         await verifyEmail(challengeId, otp.trim());
         setMode('login');
         setOtp('');
+        setAuthTouched({});
+        setAuthAttempted(false);
         setMessage('Email đã được xác thực. Bạn có thể đăng nhập.');
       } else {
         const loggedUser = await login(username.trim(), password);
@@ -322,99 +349,109 @@ function AuthModal({
           <form onSubmit={submit} noValidate className="form-stack">
             {mode === 'register' && (
               <label className="auth-field">
-                Email nhận mã xác thực
+                <span>Email nhận mã xác thực <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   required
                   type="email"
-                  maxLength={254}
-                  aria-invalid={Boolean(authErrors.email)}
+                  maxLength={255}
+                  aria-invalid={Boolean(authErrorFor('email', email))}
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
                     setAuthErrors((current) => ({ ...current, email: '' }));
+                    setAuthTouched((current) => ({ ...current, email: true }));
                   }}
+                  onBlur={() => setAuthTouched((current) => ({ ...current, email: true }))}
                   autoComplete="email"
                   placeholder="ten@example.com"
                 />
-                {authErrors.email && <small className="field-error">{authErrors.email}</small>}
+                {authErrorFor('email', email) && <small className="field-error" role="alert">{authErrorFor('email', email)}</small>}
               </label>
             )}
             {mode === 'verify' && (
               <label className="auth-field">
-                Mã xác thực 6 chữ số
+                <span>Mã xác thực 6 chữ số <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   required
                   inputMode="numeric"
                   pattern="[0-9]{6}"
-                  maxLength={6}
-                  aria-invalid={Boolean(authErrors.otp)}
+                  maxLength={7}
+                  aria-invalid={Boolean(authErrorFor('otp', otp))}
                   value={otp}
                   onChange={(e) => {
-                    setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
+                    setOtp(e.target.value.replace(/\D/g, '').slice(0, 7));
                     setAuthErrors((current) => ({ ...current, otp: '' }));
+                    setAuthTouched((current) => ({ ...current, otp: true }));
                   }}
+                  onBlur={() => setAuthTouched((current) => ({ ...current, otp: true }))}
                   autoComplete="one-time-code"
                 />
-                {authErrors.otp && <small className="field-error">{authErrors.otp}</small>}
+                {authErrorFor('otp', otp) && <small className="field-error" role="alert">{authErrorFor('otp', otp)}</small>}
               </label>
             )}
             {mode !== 'verify' && (
               <>
                 {mode === 'register' && (
                   <label className="auth-field">
-                    Họ và tên
+                    <span>Họ và tên <span className="required-mark" aria-hidden="true">*</span></span>
                     <input
                       required
-                      maxLength={200}
-                      aria-invalid={Boolean(authErrors.display_name)}
+                      maxLength={201}
+                      aria-invalid={Boolean(authErrorFor('display_name', displayName))}
                       value={displayName}
                       onChange={(e) => {
                         setDisplayName(e.target.value);
                         setAuthErrors((current) => ({ ...current, display_name: '' }));
+                        setAuthTouched((current) => ({ ...current, display_name: true }));
                       }}
+                      onBlur={() => setAuthTouched((current) => ({ ...current, display_name: true }))}
                       autoComplete="name"
                       placeholder="Nguyễn Văn A"
                     />
-                    {authErrors.display_name && (
-                      <small className="field-error">{authErrors.display_name}</small>
+                    {authErrorFor('display_name', displayName) && (
+                      <small className="field-error" role="alert">{authErrorFor('display_name', displayName)}</small>
                     )}
                   </label>
                 )}
                 <label className="auth-field">
-                  Tên đăng nhập
+                  <span>Tên đăng nhập <span className="required-mark" aria-hidden="true">*</span></span>
                   <input
                     required
-                    maxLength={64}
-                    aria-invalid={Boolean(authErrors.username)}
+                    maxLength={65}
+                    aria-invalid={Boolean(authErrorFor('username', username))}
                     value={username}
                     onChange={(e) => {
                       setUsername(e.target.value);
                       setAuthErrors((current) => ({ ...current, username: '' }));
+                      setAuthTouched((current) => ({ ...current, username: true }));
                     }}
+                    onBlur={() => setAuthTouched((current) => ({ ...current, username: true }))}
                     autoComplete="username"
                     placeholder="Nhập tên đăng nhập"
                   />
-                  {authErrors.username && (
-                    <small className="field-error">{authErrors.username}</small>
+                  {authErrorFor('username', username) && (
+                    <small className="field-error" role="alert">{authErrorFor('username', username)}</small>
                   )}
                 </label>
               </>
             )}
             {mode !== 'verify' && (
               <label className="auth-field">
-                Mật khẩu
+                <span>Mật khẩu <span className="required-mark" aria-hidden="true">*</span></span>
                 <span className="auth-password-field">
                   <input
                     required
                     type={showPassword ? 'text' : 'password'}
                     minLength={mode === 'register' ? 10 : undefined}
-                    maxLength={256}
-                    aria-invalid={Boolean(authErrors.password)}
+                    maxLength={257}
+                    aria-invalid={Boolean(authErrorFor('password', password))}
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value);
                       setAuthErrors((current) => ({ ...current, password: '' }));
+                      setAuthTouched((current) => ({ ...current, password: true }));
                     }}
+                    onBlur={() => setAuthTouched((current) => ({ ...current, password: true }))}
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                     placeholder={mode === 'register' ? 'Tối thiểu 10 ký tự' : 'Nhập mật khẩu'}
                   />
@@ -427,8 +464,8 @@ function AuthModal({
                     {showPassword ? 'Ẩn' : 'Hiện'}
                   </button>
                 </span>
-                {authErrors.password && (
-                  <small className="field-error">{authErrors.password}</small>
+                {authErrorFor('password', password) && (
+                  <small className="field-error" role="alert">{authErrorFor('password', password)}</small>
                 )}
               </label>
             )}
@@ -440,7 +477,7 @@ function AuthModal({
                 {message}
               </p>
             )}
-            <button disabled={busy} className="button" type="submit">
+            <button disabled={busy || hasAuthErrors} className="button" type="submit">
               {busy
                 ? 'Đang xử lý…'
                 : mode === 'login'
@@ -506,6 +543,8 @@ function AuthModal({
               setShowPassword(false);
               setMessage('');
               setAuthErrors({});
+              setAuthTouched({});
+              setAuthAttempted(false);
             }}
           >
             {mode === 'login' ? 'Chưa có tài khoản? Đăng ký ngay' : 'Quay lại đăng nhập'}
@@ -527,9 +566,18 @@ function PasswordChange({
   const [newPassword, setNewPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const oldPasswordError = !oldPassword ? 'Mật khẩu hiện tại là bắt buộc.'
+    : oldPassword.length > 256 ? 'Mật khẩu hiện tại không được vượt quá 256 ký tự.' : '';
+  const newPasswordError = !newPassword ? 'Mật khẩu mới là bắt buộc.'
+    : newPassword.length < 10 ? 'Mật khẩu mới cần ít nhất 10 ký tự.'
+      : newPassword.length > 256 ? 'Mật khẩu mới không được vượt quá 256 ký tự.' : '';
+  const hasInvalidFields = Boolean(oldPasswordError || newPasswordError);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    setTouched({ oldPassword: true, newPassword: true });
+    if (hasInvalidFields) return;
     setBusy(true);
     setError('');
     try {
@@ -557,29 +605,43 @@ function PasswordChange({
         mật khẩu hiện tại (Ví dụ: <code>MatKhauRieng!2026</code>).
       </div>
 
-      <form className="form-stack" onSubmit={submit}>
+      <form className="form-stack" onSubmit={submit} noValidate>
         <label>
-          Mật khẩu hiện tại{forced ? ' (mật khẩu tạm)' : ''}
+          <span>Mật khẩu hiện tại{forced ? ' (mật khẩu tạm)' : ''} <span className="required-mark" aria-hidden="true">*</span></span>
           <input
             type="password"
             required
+            maxLength={257}
+            aria-invalid={Boolean(touched.oldPassword && oldPasswordError)}
             value={oldPassword}
-            onChange={(e) => setOldPassword(e.target.value)}
+            onChange={(e) => {
+              setOldPassword(e.target.value);
+              setTouched((current) => ({ ...current, oldPassword: true }));
+            }}
+            onBlur={() => setTouched((current) => ({ ...current, oldPassword: true }))}
             autoComplete="current-password"
             placeholder="Nhập mật khẩu bạn vừa dùng để đăng nhập"
           />
+          {touched.oldPassword && oldPasswordError && <small className="field-error" role="alert">{oldPasswordError}</small>}
         </label>
         <label>
-          Mật khẩu mới
+          <span>Mật khẩu mới <span className="required-mark" aria-hidden="true">*</span></span>
           <input
             type="password"
             required
             minLength={10}
+            maxLength={257}
+            aria-invalid={Boolean(touched.newPassword && newPasswordError)}
             value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
+            onChange={(e) => {
+              setNewPassword(e.target.value);
+              setTouched((current) => ({ ...current, newPassword: true }));
+            }}
+            onBlur={() => setTouched((current) => ({ ...current, newPassword: true }))}
             autoComplete="new-password"
             placeholder="Tối thiểu 10 ký tự (Ví dụ: MatKhauRieng!2026)"
           />
+          {touched.newPassword && newPasswordError && <small className="field-error" role="alert">{newPasswordError}</small>}
         </label>
         {error && (
           <p className="notice error" role="alert">
@@ -587,7 +649,7 @@ function PasswordChange({
           </p>
         )}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
-          <button className="button" disabled={busy} type="submit" style={{ flex: 1 }}>
+          <button className="button" disabled={busy || hasInvalidFields} type="submit" style={{ flex: 1 }}>
             {busy ? 'Đang cập nhật…' : 'Cập nhật mật khẩu'}
           </button>
         </div>
@@ -620,6 +682,19 @@ function Tracking({
   const [recoveryMessage, setRecoveryMessage] = useState('');
   const recoveryKey = useRef<string | null>(null);
   const [manualMode, setManualMode] = useState(false);
+  const [lookupTouched, setLookupTouched] = useState<Record<string, boolean>>({});
+  const [lookupAttempted, setLookupAttempted] = useState(false);
+  const [recoveryTouched, setRecoveryTouched] = useState(false);
+  const codeError = !code.trim() ? 'Mã theo dõi là bắt buộc.'
+    : code.trim().length > 10 ? 'Mã theo dõi không được vượt quá 10 ký tự.'
+      : !/^[0-9A-HJKMNP-TV-Z]{10}$/i.test(code.trim()) ? 'Mã theo dõi cần gồm 10 ký tự hợp lệ.' : '';
+  const secretError = !user && !secret.trim() ? 'Mã bảo mật là bắt buộc.'
+    : secret.length > 43 ? 'Mã bảo mật không được vượt quá 43 ký tự.'
+      : secret.trim() && !/^[A-Za-z0-9_-]{43}$/.test(secret.trim()) ? 'Mã bảo mật cần gồm 43 ký tự hợp lệ.' : '';
+  const recoveryError = !recoveryCode.trim() ? 'Mã khôi phục một lần là bắt buộc.'
+    : recoveryCode.length > 43 ? 'Mã khôi phục không được vượt quá 43 ký tự.'
+      : !/^[A-Za-z0-9_-]{43}$/.test(recoveryCode.trim()) ? 'Mã khôi phục không đúng định dạng.' : '';
+  const lookupInvalid = Boolean(codeError || secretError);
   useEffect(() => {
     if (!user || !initialCode.trim()) return;
     let active = true;
@@ -663,6 +738,8 @@ function Tracking({
   }
   async function lookup(event: React.FormEvent) {
     event.preventDefault();
+    setLookupAttempted(true);
+    if (lookupInvalid) return;
     const version = ++lookupVersion.current;
     const credentials = { code: code.trim(), secret: secret.trim() };
     setBusy(true);
@@ -687,6 +764,8 @@ function Tracking({
   }
   async function recover(event: React.FormEvent) {
     event.preventDefault();
+    setRecoveryTouched(true);
+    if (codeError || recoveryError) return;
     setBusy(true);
     setRecoveryMessage('');
     try {
@@ -699,6 +778,7 @@ function Tracking({
       });
       recoveryKey.current = null;
       setRecoveryCode('');
+      setRecoveryTouched(false);
       setSecret('');
       invalidateLookup();
       setRecoveryMessage('Yêu cầu đã được gắn với tài khoản. Hãy tra cứu lại bằng mã theo dõi.');
@@ -731,36 +811,46 @@ function Tracking({
           <p>
             Nhập mã theo dõi đã nhận khi gửi SOS. Nếu gửi khi chưa đăng nhập, nhập thêm mã bảo mật.
           </p>
-          <form onSubmit={lookup} className="form-stack">
+          <form onSubmit={lookup} className="form-stack" noValidate>
           <label>
-            Mã theo dõi
+            <span>Mã theo dõi <span className="required-mark" aria-hidden="true">*</span></span>
             <input
               required
               name="tracking_code"
+              maxLength={11}
+              aria-invalid={Boolean((lookupAttempted || lookupTouched.code) && codeError)}
               value={code}
               onChange={(e) => {
                 setCode(e.target.value);
+                setLookupTouched((current) => ({ ...current, code: true }));
                 recoveryKey.current = null;
                 invalidateLookup();
               }}
+              onBlur={() => setLookupTouched((current) => ({ ...current, code: true }))}
               autoComplete="off"
             />
+            {(lookupAttempted || lookupTouched.code) && codeError && <small className="field-error" role="alert">{codeError}</small>}
           </label>
           <label>
-            Mã bảo mật {user ? '(nếu chưa gắn với tài khoản)' : ''}
+            <span>Mã bảo mật {user ? '(nếu chưa gắn với tài khoản)' : ''}{!user && <> <span className="required-mark" aria-hidden="true">*</span></>}</span>
             <input
               required={!user}
               type="password"
               name="tracking_secret"
+              maxLength={44}
+              aria-invalid={Boolean((lookupAttempted || lookupTouched.secret) && secretError)}
               value={secret}
               onChange={(e) => {
                 setSecret(e.target.value);
+                setLookupTouched((current) => ({ ...current, secret: true }));
                 invalidateLookup();
               }}
+              onBlur={() => setLookupTouched((current) => ({ ...current, secret: true }))}
               autoComplete="new-password"
             />
+            {(lookupAttempted || lookupTouched.secret) && secretError && <small className="field-error" role="alert">{secretError}</small>}
           </label>
-          <button className="button" disabled={busy}>
+          <button className="button" disabled={busy || lookupInvalid}>
             {busy ? 'Đang tra cứu…' : 'Xem tiến độ'}
           </button>
           </form>
@@ -772,25 +862,30 @@ function Tracking({
         {user && (
           <details className="tracking-recovery">
             <summary>Khôi phục SOS cũ vào tài khoản</summary>
-          <form className="form-stack command-form" onSubmit={recover}>
+          <form className="form-stack command-form" onSubmit={recover} noValidate>
             <h3>Khôi phục quyền theo dõi</h3>
             <p>
               Nhập mã một lần do điều phối viên cấp sau khi xác minh liên hệ. Mã theo dõi ở biểu mẫu
               phía trên cũng được dùng tại đây.
             </p>
             <label>
-              Mã khôi phục một lần
+              <span>Mã khôi phục một lần <span className="required-mark" aria-hidden="true">*</span></span>
               <input
                 required
+                maxLength={44}
+                aria-invalid={Boolean(recoveryTouched && recoveryError)}
                 value={recoveryCode}
                 onChange={(event) => {
                   setRecoveryCode(event.target.value);
+                  setRecoveryTouched(true);
                   recoveryKey.current = null;
                 }}
+                onBlur={() => setRecoveryTouched(true)}
                 autoComplete="off"
               />
+              {recoveryTouched && recoveryError && <small className="field-error" role="alert">{recoveryError}</small>}
             </label>
-            <button className="button secondary" disabled={busy || !code.trim()}>
+            <button className="button secondary" disabled={busy || lookupInvalid || Boolean(recoveryError)}>
               Gắn yêu cầu với tài khoản
             </button>
             {recoveryMessage && (
