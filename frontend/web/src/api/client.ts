@@ -105,6 +105,12 @@ const messages: Record<string, string> = {
 };
 let csrfToken: string | null = null;
 let refreshPromise: Promise<void> | null = null;
+const expiredSessionCodes = new Set(['UNAUTHENTICATED', 'SESSION_EXPIRED', 'REFRESH_REUSED']);
+function notifyExpiredSession(error: ApiError): void {
+  if (error.status === 401 || expiredSessionCodes.has(error.code)) {
+    window.dispatchEvent(new Event('c48:session-expired'));
+  }
+}
 
 export async function csrf(): Promise<void> {
   let response: Response;
@@ -208,16 +214,19 @@ export async function api<T>(
       return api<T>(service, path, { ...options, retryAuth: false });
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === 'REFRESH_RACE') throw cause;
+      if (cause instanceof ApiError) notifyExpiredSession(cause);
     }
   }
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as ErrorEnvelope;
-    throw serverError(
+    const error = serverError(
       service,
       response.status,
       payload,
       'Yêu cầu chưa hoàn tất. Vui lòng thử lại.'
     );
+    if (credentials !== 'omit' && options.retryAuth === false && path !== '/auth/login') notifyExpiredSession(error);
+    throw error;
   }
   return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
 }
@@ -265,16 +274,19 @@ export async function upload<T>(
       return upload<T>(service, path, file, options, false);
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === 'REFRESH_RACE') throw cause;
+      if (cause instanceof ApiError) notifyExpiredSession(cause);
     }
   }
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as ErrorEnvelope;
-    throw serverError(
+    const error = serverError(
       service,
       response.status,
       payload,
       'Không thể tải tệp lên. Vui lòng kiểm tra tệp và thử lại.'
     );
+    if (credentials !== 'omit' && !retryAuth) notifyExpiredSession(error);
+    throw error;
   }
   return response.json() as Promise<T>;
 }

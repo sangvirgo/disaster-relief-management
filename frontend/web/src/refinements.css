@@ -413,12 +413,6 @@
 .tracking-evidence-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
 .tracking-recent-evidence { margin-top: 22px; }
 .tracking-recent-evidence h3 { margin-bottom: 12px; }
-.sos-required-note {
-  margin: -4px 0 4px;
-  color: var(--color-text-secondary);
-  font-size: 13px;
-}
-.sos-required-note span,
 .required-mark {
   color: #b42318;
   font-weight: 800;
@@ -1176,7 +1170,6 @@
 .sos-coordinate-details summary { cursor: pointer; color: #194b79; font-weight: 700; }
 .sos-coordinate-details[open] summary { margin-bottom: 12px; }
 .sos-coordinate-details .muted { margin: 0 0 12px; font-size: .87rem; }
-.sos-location-jump { width: fit-content; }
 #sos-location { scroll-margin-top: 125px; }
 /* Keep records inside their column; review uses a focused dialog. */
 .queue-row { min-width: 0; max-width: 100%; }
@@ -1205,5 +1198,46 @@
 .record-detail-dialog { position: fixed; }
 .record-detail-dialog > .command-form { padding-top: 24px; }
 .record-detail-dialog > .command-form > h3 { padding-right: 92px; margin-top: 0; font-size: 22px; }
+.admin-create-brand { display: flex; align-items: center; gap: 12px; min-height: 56px; padding-right: 94px; margin-bottom: 14px; }
+.admin-create-brand-copy { display: grid; gap: 2px; }
+.admin-create-brand-copy strong { color: #174c83; font-size: 22px; line-height: 1.1; }
+.admin-create-brand-copy small { color: #54718d; font-size: 10px; font-weight: 750; letter-spacing: .09em; }
+.record-detail-dialog.admin-create-dialog > .command-form { border-top: 0; padding-top: 0; }
+.admin-create-dialog > .command-form > .button { width: 100%; min-height: 46px; border: 0; border-radius: 12px; background-color: #205be5; background-image: linear-gradient(110deg, #2865eb, #174fc6 55%, #0b7691); background-size: 180% 100%; color: #fff; font-weight: 750; box-shadow: 0 8px 20px #1e56d13d; transition: background-position .25s ease, box-shadow .2s ease, transform .2s ease; }
+.admin-create-dialog > .command-form > .button:hover:not(:disabled) { background-position: 100% 0; box-shadow: 0 12px 26px #1e56d152; }
+.admin-create-dialog > .command-form > .button:focus-visible { outline: 3px solid #8bb8ff; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .admin-create-dialog > .command-form > .button { transition: none; } }
+.admin-list-layout { grid-template-columns: minmax(0, 1fr); }
+.admin-list-layout > .card { width: 100%; max-width: 1000px; margin-inline: auto; }
+.admin-record-list { gap: 10px; margin-top: 4px; }
+.admin-record-card { display: grid; gap: 7px; width: 100%; min-width: 0; padding: 15px 18px; border: 1px solid #dce6f1; border-radius: 13px; background: #f9fbfe; color: var(--color-text-primary); text-align: left; cursor: pointer; transition: border-color .16s ease, background-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.admin-record-card:hover { border-color: #8db7ec; background: #eef5ff; box-shadow: 0 6px 18px #1c5bc118; transform: translateY(-1px); }
+.admin-record-card:focus-visible { outline: 3px solid #8bb8ff; outline-offset: 2px; }
+.admin-record-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.admin-record-heading strong { min-width: 0; overflow-wrap: anywhere; font-size: 15px; }
+.admin-record-status { display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: 12px; font-weight: 650; white-space: nowrap; }
+.admin-record-status.is-active { color: #16733e; }
+.admin-record-status.is-inactive { color: #64748b; }
+.admin-status-dot { width: 9px; height: 9px; flex: none; border-radius: 50%; background: #16a34a; box-shadow: 0 0 0 3px #dcfce7; }
+.admin-record-status.is-inactive .admin-status-dot { background: #94a3b8; box-shadow: 0 0 0 3px #e2e8f0; }
+.admin-record-username, .admin-record-card small { color: #596b82; font-size: 13px; overflow-wrap: anywhere; }
+@media (max-width: 540px) { .admin-record-heading { align-items: flex-start; } .admin-record-status { font-size: 0; padding-top: 4px; } .admin-record-status .admin-status-dot { width: 10px; height: 10px; } }
+@media (prefers-reduced-motion: reduce) { .admin-record-card { transition: none; } .admin-record-card:hover { transform: none; } }
+.operations-list-only { grid-template-columns: minmax(0, 1fr); }
+.operations-list-only > .card:first-child { width: 100%; max-width: 1080px; margin-inline: auto; }
+.list-action-header { align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+.list-action-header h2 { margin: 0; }
+.list-create-button { min-height: 40px; border-radius: 11px; }
+.notice-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
+.button.secondary:hover:not(:disabled), .record-actions .button.secondary:hover:not(:disabled) { background: #e8f1ff; border-color: #75a9ef; color: #174c9b; box-shadow: 0 5px 16px #1c5bc124; }
+.button.secondary:focus-visible, .list-create-button:focus-visible { outline: 3px solid #8bb8ff; outline-offset: 3px; }
+.tabs button:not(.active):hover, .campaign-filters button:not(.active):hover { background: #e8f1ff; border-color: #75a9ef; color: #174c9b; }
+.queue-row:hover { background: #edf5ff; box-shadow: inset 3px 0 #93c5fd; }
+.queue-row.selected { background: #e8f1ff; box-shadow: inset 3px 0 #2563eb, 0 5px 16px #1c5bc11a; }
+.operations-detail-transition { animation: detailSwitchIn .24s ease-out; }
+@keyframes detailSwitchIn { from { opacity: .55; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (min-width: 1051px) { .campaign-detail-panel { position: sticky; top: 20px; max-height: calc(100dvh - 40px); overflow-y: auto; scrollbar-width: thin; } }
+@media (max-width: 600px) { .list-action-header { align-items: stretch; } .list-action-header h2, .list-create-button { width: 100%; } .notice-header-actions { justify-content: flex-start; } }
+@media (prefers-reduced-motion: reduce) { .operations-detail-transition { animation: none; } }
 .sos-action-entry { padding: 16px 0; border-top: 1px solid var(--color-surface-border); }
 .report-heatmap > .card { border: 0; padding: 0; box-shadow: none; background: transparent; }

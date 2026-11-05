@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import { label, timeLabel } from '../../i18n/labels';
 import { formatQuantity } from '../../i18n/quantity';
 import { AnalyticsRegionField, useAnalyticsRegion } from '../../components/AnalyticsRegion';
+import { fetchAll } from '../../api/fetchAll';
 
 type ResponseSummary = {
   status_counts: Record<string, number>;
@@ -33,6 +34,7 @@ export function OperationsDashboard() {
   } = useAnalyticsRegion();
   const [response, setResponse] = useState<ResponseSummary | null>(null);
   const [stock, setStock] = useState<Stock | null>(null);
+  const [warehouseNames, setWarehouseNames] = useState<Record<string, string>>({});
   const [responseError, setResponseError] = useState('');
   const [stockError, setStockError] = useState('');
   useEffect(() => {
@@ -61,6 +63,13 @@ export function OperationsDashboard() {
   }, [region]);
   useEffect(() => {
     let live = true;
+    void fetchAll<{ id: string; name: string }>('logistics', '/warehouses')
+      .then((warehouses) => {
+        if (live) setWarehouseNames(Object.fromEntries(warehouses.map(({ id, name }) => [id, name])));
+      })
+      .catch(() => {
+        // Stock remains readable when warehouse names cannot be loaded.
+      });
     api<Stock>('logistics', '/reports/stock-summary?limit=10')
       .then((value) => {
         if (live) setStock(value);
@@ -179,7 +188,7 @@ export function OperationsDashboard() {
                     {stock.items.map((item, index) => (
                       <tr key={`${item.warehouse_id}:${item.item.name}:${index}`}>
                         <th scope="row">{item.item.name}</th>
-                        <td title={item.warehouse_id}>Mã …{item.warehouse_id.slice(-8)}</td>
+                        <td title={item.warehouse_id}>{warehouseNames[item.warehouse_id] || `Kho …${item.warehouse_id.slice(-8)}`}</td>
                         <td>{item.unit.display_name}</td>
                         <td className="numeric">{formatQuantity(item.on_hand)}</td>
                         <td className="numeric">{formatQuantity(item.reserved)}</td>

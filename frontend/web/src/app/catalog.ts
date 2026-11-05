@@ -37,13 +37,6 @@ export const pages: Record<Workspace, Page[]> = {
   ],
   volunteer: [
     {
-      id: 'overview',
-      title: 'Tổng quan',
-      icon: 'home',
-      service: 'response',
-      path: '/missions/mine',
-    },
-    {
       id: 'missions',
       title: 'Nhiệm vụ',
       icon: 'mission',
@@ -55,16 +48,10 @@ export const pages: Record<Workspace, Page[]> = {
   ],
   coordinator: [
     {
-      id: 'reports', title: 'Tổng quan', icon: 'report', service: 'response',
-      path: '/reports/summary', note: 'Số liệu bảy ngày gần đây từ dịch vụ Response.',
+      id: 'reports', title: 'Tổng quan và bản đồ', icon: 'report', service: 'response',
+      path: '/reports/summary', note: 'Tình hình SOS, nhiệm vụ và bản đồ nhiệt theo khu vực.',
     },
     { id: 'queue', title: 'Xử lý SOS', icon: 'queue', service: 'response', path: '/requests' },
-    {
-      id: 'map',
-      title: 'Bản đồ',
-      icon: 'map',
-      note: 'Bản đồ chỉ hiển thị dữ liệu đã tổng hợp theo quyền truy cập; không hiển thị vị trí nạn nhân công khai.',
-    },
     { id: 'notices', title: 'Thông báo', icon: 'notice', service: 'response', path: '/notices' },
     { id: 'needs', title: 'Nhu cầu vật tư', icon: 'needs', service: 'logistics', path: '/needs' },
     {
@@ -104,13 +91,6 @@ export const pages: Record<Workspace, Page[]> = {
       service: 'logistics',
       path: '/donation-deliveries',
     },
-    {
-      id: 'review',
-      title: 'Duyệt biên nhận',
-      icon: 'review',
-      service: 'logistics',
-      path: '/donation-disputes',
-    },
     { id: 'stock', title: 'Tồn kho', icon: 'stock', service: 'logistics', path: '/stock' },
     {
       id: 'assets',
@@ -128,22 +108,14 @@ export const pages: Record<Workspace, Page[]> = {
       path: '/distributions',
     },
     {
-      id: 'handoff',
-      title: 'Bàn giao',
-      icon: 'handoff',
-      service: 'logistics',
-      path: '/distributions',
-    },
-    {
       id: 'reports',
-      title: 'Đối soát',
+      title: 'Báo cáo',
       icon: 'report',
       service: 'logistics',
       path: '/reconciliation',
     },
   ],
   admin: [
-    { id: 'overview', title: 'Tổng quan', icon: 'home', service: 'identity', path: '/users' },
     { id: 'users', title: 'Người dùng', icon: 'users', service: 'identity', path: '/users' },
     {
       id: 'organizations',
@@ -152,13 +124,12 @@ export const pages: Record<Workspace, Page[]> = {
       service: 'identity',
       path: '/organizations',
     },
-    { id: 'grants', title: 'Phân quyền', icon: 'grants', service: 'identity', path: '/users' },
     { id: 'regions', title: 'Khu vực', icon: 'regions', service: 'identity', path: '/regions' },
     {
       id: 'audit',
       title: 'Nhật ký kiểm toán',
       icon: 'audit',
-      note: 'Chọn loại đối tượng trước khi tra cứu nhật ký; lý do thao tác là dữ liệu hạn chế.',
+      note: 'Xem lịch sử thay đổi người dùng, quyền truy cập, tổ chức và khu vực.',
     },
   ],
 };
@@ -203,8 +174,7 @@ export function allowedPages(workspace: Workspace, user: Me | null): Page[] {
       );
     if (page.id === 'campaigns') return r.has('OPERATIONS_MANAGER') || r.has('CAMPAIGN_MANAGER');
     if (page.id === 'intake') return r.has('INTAKE_STAFF') || r.has('REVIEWER');
-    if (page.id === 'review') return r.has('REVIEWER');
-    if (page.id === 'distribution' || page.id === 'handoff')
+    if (page.id === 'distribution')
       return (
         r.has('OPERATIONS_MANAGER') ||
         r.has('DISTRIBUTION_STAFF') ||
@@ -221,5 +191,7 @@ export function allowedPages(workspace: Workspace, user: Me | null): Page[] {
         r.has('DISTRIBUTION_STAFF')
       );
     return r.has('OPERATIONS_MANAGER') || r.has('CAMPAIGN_MANAGER');
-  });
+  }).map((page) => workspace === 'operations' && page.id === 'intake' && r.has('REVIEWER')
+    ? { ...page, title: 'Tiếp nhận và duyệt' }
+    : page);
 }

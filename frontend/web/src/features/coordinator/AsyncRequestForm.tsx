@@ -97,7 +97,7 @@ export function AsyncRequestForm({
       {!operationId && (
         <>
           <label>
-            Lý do
+            Lý do <span className="required-mark" aria-hidden="true">*</span>
             <textarea
               required
               value={reason}
@@ -109,7 +109,7 @@ export function AsyncRequestForm({
           </label>
           {kind === 'resolve' && (
             <label>
-              Căn cứ kết thúc
+              Căn cứ kết thúc <span className="required-mark" aria-hidden="true">*</span>
               <select
                 required
                 value={basis}

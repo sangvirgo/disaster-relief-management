@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, newCommandKey } from '../../api/client';
+import { fetchAll } from '../../api/fetchAll';
 
 type Item = { id: string; name: string; unit_name: string; scale: number };
 type Line = {
@@ -53,8 +54,8 @@ export function ReceiptCountForm({
   const [busy, setBusy] = useState(false);
   const key = useRef<string | null>(null);
   useEffect(() => {
-    api<{ items: Item[] }>('logistics', '/items?status=ACTIVE&limit=100')
-      .then((result) => setItems(result.items))
+    fetchAll<Item>('logistics', '/items?status=ACTIVE')
+      .then(setItems)
       .catch((cause) =>
         setItemsError(cause instanceof Error ? cause.message : 'Không thể tải danh mục vật phẩm.')
       );
@@ -169,7 +170,7 @@ export function ReceiptCountForm({
             </select>
           </label>
           <label>
-            Mã vật phẩm
+            Mã vật phẩm <span className="required-mark" aria-hidden="true">*</span>
             <input
               required
               value={line.item_id}
@@ -187,7 +188,7 @@ export function ReceiptCountForm({
               ] as const
             ).map(([field, title]) => (
               <label key={field}>
-                {title}
+                {title} <span className="required-mark" aria-hidden="true">*</span>
                 <input
                   required
                   type="number"

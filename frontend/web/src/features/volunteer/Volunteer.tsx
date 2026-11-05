@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
+import { appendPage } from '../../api/pagination';
+import { fetchAll } from '../../api/fetchAll';
 import { label, timeLabel } from '../../i18n/labels';
 import type { components as ResponseComponents } from '../../api/generated/response';
 import { googleMapsDirectionsUrl } from '../../maps/googleMaps';
@@ -63,12 +65,14 @@ export function Notices({ onOpenMission }: { onOpenMission?: (missionId: string)
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [revision, setRevision] = useState(0);
+  const [markingAll, setMarkingAll] = useState(false);
+  const [markAllMessage, setMarkAllMessage] = useState('');
 
   useEffect(() => {
     let live = true;
     setLoading(true);
     setError('');
-    setItems([]);
+    if (!cursor) setItems([]);
     const params = new URLSearchParams();
     if (cursor) params.set('cursor', cursor);
     if (filter === 'unread') params.set('unread', 'true');
@@ -77,7 +81,7 @@ export function Notices({ onOpenMission }: { onOpenMission?: (missionId: string)
     api<{ items: Notice[]; cursor?: string }>('response', path)
       .then((value) => {
         if (live) {
-          setItems(value.items);
+          setItems((current) => cursor ? appendPage(current, value.items, (item) => item.id) : value.items);
           setNext(value.cursor || '');
         }
       })
@@ -105,10 +109,38 @@ export function Notices({ onOpenMission }: { onOpenMission?: (missionId: string)
     }
   }
 
+  async function markAllRead() {
+    setError('');
+    setMarkAllMessage('');
+    setMarkingAll(true);
+    let completed = 0;
+    try {
+      const unread = await fetchAll<Notice>('response', '/notices?unread=true');
+      for (const notice of unread) {
+        await api('response', `/notices/${notice.id}/read`, {
+          method: 'POST',
+          idempotencyKey: newCommandKey(),
+        });
+        completed += 1;
+      }
+      setMarkAllMessage(unread.length ? `Đã đánh dấu đã đọc ${unread.length} thông báo.` : 'Không còn thông báo chưa đọc.');
+    } catch (cause) {
+      setError(`${completed ? `Đã xử lý ${completed} thông báo. ` : ''}${cause instanceof Error ? cause.message : 'Chưa thể đánh dấu tất cả đã đọc.'}`);
+    } finally {
+      setMarkingAll(false);
+      setCursor('');
+      setRevision((value) => value + 1);
+    }
+  }
+
   return (
     <section className="card">
       <div className="section-header">
         <h2>Thông báo của tôi</h2>
+        <div className="notice-header-actions">
+        <button type="button" className="button secondary" onClick={markAllRead} disabled={markingAll}>
+          {markingAll ? 'Đang đánh dấu…' : 'Đánh dấu tất cả đã đọc'}
+        </button>
         <div className="tabs">
           <button
             className={filter === 'all' ? 'active' : ''}
@@ -129,7 +161,9 @@ export function Notices({ onOpenMission }: { onOpenMission?: (missionId: string)
             Chưa đọc
           </button>
         </div>
+        </div>
       </div>
+      {markAllMessage && <p className="notice success" role="status">{markAllMessage}</p>}
       {error && (
         <p role="alert" className="notice error">
           {error}
@@ -152,7 +186,7 @@ export function Notices({ onOpenMission }: { onOpenMission?: (missionId: string)
                 <button className="button secondary" type="button"
                   onClick={() => onOpenMission(item.payload.mission_id as string)}>Xem nhiệm vụ</button>}
               {!item.read_at && (
-                <button className="button secondary" onClick={() => markRead(item.id)}>
+                <button className="button secondary" onClick={() => markRead(item.id)} disabled={markingAll}>
                   Đánh dấu đã đọc
                 </button>
               )}
@@ -234,7 +268,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
     let live = true;
     setLoading(true);
     setError('');
-    setItems([]);
+    if (!cursor) setItems([]);
     const path = isTeam ? '/teams' : '/missions/mine';
     api<{ items: Mission[] | Team[]; cursor?: string }>(
       'response',
@@ -242,8 +276,12 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
     )
       .then((value) => {
         if (live) {
-          if (isTeam) setItems(value.items as Team[]);
-          else setItems([...(value.items as Mission[])].sort((a, b) =>
+          if (isTeam) setItems((current) => cursor
+            ? appendPage(current as Team[], value.items as Team[], (item) => item.id)
+            : value.items as Team[]);
+          else setItems((current) => (cursor
+            ? appendPage(current as Mission[], value.items as Mission[], (item) => item.id)
+            : value.items as Mission[]).sort((a, b) =>
             Date.parse(b.created_at) - Date.parse(a.created_at)
           ));
           setNext(value.cursor || '');
@@ -889,7 +927,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     onSubmit={(e) => declineMission(e, activeMission)}
                   >
                     <label>
-                      Lý do từ chối nhiệm vụ:
+                      Lý do từ chối nhiệm vụ: <span className="required-mark" aria-hidden="true">*</span>
                       <textarea
                         required
                         value={declineReason}
@@ -964,7 +1002,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     }}
                   >
                     <label>
-                      Ghi chú kết quả cứu nạn (bắt buộc):
+                      Ghi chú kết quả cứu nạn (bắt buộc): <span className="required-mark" aria-hidden="true">*</span>
                       <textarea
                         required
                         maxLength={2000}
@@ -1021,7 +1059,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     }}
                   >
                     <label>
-                      Lý do không thể tiếp cận / Thất bại (bắt buộc):
+                      Lý do không thể tiếp cận / Thất bại (bắt buộc): <span className="required-mark" aria-hidden="true">*</span>
                       <textarea
                         required
                         value={progressNote}
@@ -1049,7 +1087,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                       MP4).
                     </p>
                     <label className="tracking-file-picker">
-                      <input
+                      <span className="required-mark" aria-hidden="true">*</span><input
                         type="file"
                         required
                         accept="image/jpeg,image/png,video/mp4"

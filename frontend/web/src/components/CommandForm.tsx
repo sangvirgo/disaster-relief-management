@@ -17,6 +17,7 @@ export type Field = {
   emptyLabel?: string;
   placeholder?: string;
   initialValue?: string;
+  visibleWhen?: { field: string; value: string };
 };
 export interface CommandSpec {
   title: string;
@@ -58,6 +59,7 @@ export function CommandForm({
     event.preventDefault();
     const invalid: Record<string, string> = {};
     for (const field of spec.fields || []) {
+      if (field.visibleWhen && values[field.visibleWhen.field] !== field.visibleWhen.value) continue;
       const value = (values[field.name] || '').trim();
       if (field.required && !value)
         invalid[field.name] =
@@ -128,9 +130,9 @@ export function CommandForm({
     }
   }
   return (
-    <form className="form-stack command-form" onSubmit={submit} noValidate>
+    <form className="form-stack command-form" onSubmit={submit} autoComplete="off" noValidate>
       <h3>{spec.title}</h3>
-      {spec.fields?.map((field) =>
+      {spec.fields?.filter((field) => !field.visibleWhen || values[field.visibleWhen.field] === field.visibleWhen.value).map((field) =>
         field.type === 'choice-cards' ? (
           <fieldset key={field.name} className="command-choice-list" aria-invalid={Boolean(fieldErrors[field.name])}>
             <legend>{field.label}{field.required && <> <span className="required-mark" aria-hidden="true">*</span></>}</legend>
@@ -279,6 +281,7 @@ export function CommandForm({
             <input
               required={field.required}
               type={field.type || 'text'}
+              autoComplete={field.type === 'password' ? 'new-password' : 'off'}
               min={field.type === 'number' ? (field.min ?? 1) : undefined}
               max={field.type === 'number' ? field.max : undefined}
               step={

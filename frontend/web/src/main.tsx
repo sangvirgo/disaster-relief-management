@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api, ApiError, newCommandKey } from './api/client';
+import { appendPage } from './api/pagination';
 import {
   changePassword,
   googleLogin,
@@ -63,6 +64,24 @@ const Volunteer = React.lazy(() => import('./features/volunteer/Volunteer').then
 const Admin = React.lazy(() => import('./features/admin/Admin').then((module) => ({ default: module.Admin })));
 const Operations = React.lazy(() => import('./features/operations/Operations').then((module) => ({ default: module.Operations })));
 const OperationsDashboard = React.lazy(() => import('./features/operations/Dashboard').then((module) => ({ default: module.OperationsDashboard })));
+
+function IntakeReview({ user }: { user: Me }) {
+  const canReview = roles(user).has('REVIEWER');
+  const [step, setStep] = useState<'intake' | 'review'>('intake');
+  return (
+    <div>
+      {canReview && (
+        <div className="tabs" role="group" aria-label="Bước xử lý đóng góp">
+          <button type="button" className={step === 'intake' ? 'active' : ''}
+            aria-pressed={step === 'intake'} onClick={() => setStep('intake')}>Tiếp nhận</button>
+          <button type="button" className={step === 'review' ? 'active' : ''}
+            aria-pressed={step === 'review'} onClick={() => setStep('review')}>Duyệt và khiếu nại</button>
+        </div>
+      )}
+      <Operations key={step} page={canReview ? step : 'intake'} user={user} />
+    </div>
+  );
+}
 
 class ContentErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -803,7 +822,7 @@ function Tracking({
           <span className={`chip request-status request-status--${requestStatusTone(data.status)}`}>
             {requestStatusLabel(data.status)}
           </span>
-          <p>Máy chủ tiếp nhận: {timeLabel(data.received_at)}</p>
+          <p>Tiếp nhận lúc: {timeLabel(data.received_at)}</p>
           <div className="timeline">
             {data.timeline.map((entry, index) => {
               return (
@@ -1090,7 +1109,6 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
     let active = true;
     setLoading(true);
     setError('');
-    setData(null);
     const reportPath =
       page.service === 'response' && page.path === '/reports/summary'
         ? `/reports/summary?from=${encodeURIComponent(new Date(Date.now() - 7 * 86_400_000).toISOString())}&to=${encodeURIComponent(new Date().toISOString())}&region_code=${encodeURIComponent(region)}`
@@ -1100,7 +1118,12 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
       (cursor ? `${reportPath.includes('?') ? '&' : '?'}cursor=${encodeURIComponent(cursor)}` : '');
     api<DataPage>(page.service, path)
       .then((result) => {
-        if (active) setData(result);
+        if (active) setData((current) => ({
+          ...result,
+          items: cursor && current?.items && result.items
+            ? appendPage(current.items, result.items, (item) => String(item.id))
+            : result.items,
+        }));
       })
       .catch((cause) => {
         if (active) setError(cause instanceof Error ? cause.message : 'Không thể tải dữ liệu.');
@@ -1133,7 +1156,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
       {page.note && page.path !== '/reports/summary' && <p>{page.note}</p>}
       {page.path === '/reports/summary' && (
         <>
-          <p className="muted">Số liệu báo cáo thuộc khu vực đang chọn. Heatmap có bộ chọn phạm vi riêng và mặc định tổng hợp các khu vực được cấp quyền.</p>
+          <p className="muted">Chọn khu vực để xem số liệu. Bản đồ nhiệt có thể hiển thị tất cả khu vực bạn được cấp quyền xem.</p>
           <AnalyticsRegionField
             region={region}
             onChange={(value) => {
@@ -1298,6 +1321,31 @@ function App() {
   const [sharingTeamId, setSharingTeamId] = useState('');
   const [sharingMessage, setSharingMessage] = useState('');
 
+  function resetSession(openLogin = false) {
+    setUser(null);
+    setSessionState('guest');
+    setWorkspace('citizen');
+    setPageId('sos');
+    setSelectedTrackingCode('');
+    setSelectedMissionId('');
+    setSharingTeamId('');
+    setSharingMessage('');
+    setShowPasswordModal(false);
+    setProfileMenuOpen(false);
+    setMenuOpen(false);
+    setShowAuthModal(openLogin);
+  }
+
+  useEffect(() => {
+    const onExpired = () => {
+      if (!user) return;
+      resetSession(true);
+      setSessionError('Phiên đã hết hạn. Vui lòng đăng nhập lại.');
+    };
+    window.addEventListener('c48:session-expired', onExpired);
+    return () => window.removeEventListener('c48:session-expired', onExpired);
+  }, [user]);
+
   useEffect(() => {
     if (!profileMenuOpen) return;
     const closeMenu = (event: PointerEvent) => {
@@ -1388,12 +1436,11 @@ function App() {
     setLogoutError('');
     try {
       await logout();
-      setUser(null);
-      setSharingTeamId('');
-      setSessionState('guest');
-      changeWorkspace('citizen');
-    } catch (cause) {
-      setLogoutError(cause instanceof Error ? cause.message : 'Không thể đăng xuất.');
+    } catch {
+      // A failed server revocation must not keep this device in the signed-in UI.
+    } finally {
+      resetSession();
+      setSessionError('');
     }
   }
 
@@ -1490,7 +1537,7 @@ function App() {
             )}
           </div>
         </header>
-        <div className="emergency-bar" role="note">
+        {workspace === 'citizen' && <div className="emergency-bar" role="note">
           <span className="emergency-icon" aria-hidden="true">!</span>
           <strong>Khẩn cấp? Gọi ngay</strong>
           <div className="emergency-links">
@@ -1498,7 +1545,7 @@ function App() {
             <a href="tel:114">114 <span>Cứu hỏa</span></a>
             <a href="tel:115">115 <span>Cấp cứu</span></a>
           </div>
-        </div>
+        </div>}
 
         <main className={`content ${workspace === 'citizen' && selected.id === 'sos' ? 'content--sos' : ''}`}>
           <ContentErrorBoundary key={`${workspace}:${selected.id}`}>
@@ -1562,8 +1609,6 @@ function App() {
                 ) : workspace === 'coordinator' &&
                   ['queue', 'verify', 'triage', 'assign'].includes(selected.id) ? (
                   <Coordinator key={selected.id} page={selected.id} />
-                ) : workspace === 'coordinator' && selected.id === 'map' ? (
-                  <CoordinatorMap />
                 ) : workspace === 'coordinator' && selected.id === 'needs' && user ? (
                   <Operations page="needs" user={user} />
                 ) : ['volunteer', 'coordinator'].includes(workspace) &&
@@ -1581,6 +1626,8 @@ function App() {
                     onToggleSharing={(teamId) => { setSharingTeamId((current) => current === teamId ? '' : teamId); setSharingMessage(''); }} />
                 ) : workspace === 'operations' && selected.id === 'overview' ? (
                   <OperationsDashboard />
+                ) : workspace === 'operations' && selected.id === 'intake' && user ? (
+                  <IntakeReview user={user} />
                 ) : workspace === 'operations' && user ? (
                   <Operations key={selected.id} page={selected.id} user={user} />
                 ) : workspace === 'admin' ? (

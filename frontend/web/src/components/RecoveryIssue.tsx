@@ -84,7 +84,7 @@ export function RecoveryIssue({
       ) : (
         <form className="form-stack" onSubmit={submit}>
           <label>
-            Lý do khôi phục
+            Lý do khôi phục <span className="required-mark" aria-hidden="true">*</span>
             <textarea
               required
               value={reason}
@@ -96,7 +96,7 @@ export function RecoveryIssue({
           </label>
           {kind === 'sos' ? (
             <label>
-              Lần liên hệ xác nhận
+              Lần liên hệ xác nhận <span className="required-mark" aria-hidden="true">*</span>
               <select
                 required
                 value={basis}
@@ -115,7 +115,7 @@ export function RecoveryIssue({
             </label>
           ) : (
             <label>
-              Căn cứ xác nhận liên hệ
+              Căn cứ xác nhận liên hệ <span className="required-mark" aria-hidden="true">*</span>
               <input
                 required
                 value={basis}

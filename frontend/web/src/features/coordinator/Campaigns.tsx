@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
+import { appendPage } from '../../api/pagination';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { DetailCloseButton } from '../../components/DetailCloseButton';
 import { label, timeLabel } from '../../i18n/labels';
@@ -58,7 +59,7 @@ export function Campaigns() {
     )
       .then((value) => {
         if (live) {
-          setItems(value.items);
+          setItems((current) => cursor ? appendPage(current, value.items, (item) => item.id) : value.items);
           setNext(value.more ? value.cursor || '' : '');
         }
       })

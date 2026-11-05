@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
+import { fetchAll } from '../../api/fetchAll';
 import { label } from '../../i18n/labels';
 import { formatQuantity } from '../../i18n/quantity';
 import type { Me } from '../../auth/session';
@@ -137,9 +138,9 @@ export function Donations({ user }: { user: Me | null }) {
     let live = true;
     setLoading(true);
     setError('');
-    api<{ items: Drive[] }>('logistics', '/public/donation-drives')
-      .then((result) => {
-        if (live) setDrives(result.items);
+    fetchAll<Drive>('logistics', '/public/donation-drives')
+      .then((items) => {
+        if (live) setDrives(items);
       })
       .catch((cause) => {
         if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải đợt quyên góp.');
@@ -393,7 +394,7 @@ export function Donations({ user }: { user: Me | null }) {
           <p>Nhập định danh bản khai và mã bảo mật riêng tư. Mã bảo mật không nằm trong URL.</p>
           <form className="form-stack" onSubmit={track}>
             <label>
-              Định danh bản khai
+              Định danh bản khai <span className="required-mark" aria-hidden="true">*</span>
               <input
                 required
                 disabled={loading}
@@ -434,7 +435,7 @@ export function Donations({ user }: { user: Me | null }) {
               <h3>Khôi phục bản khai</h3>
               <p>Nhập mã một lần do nhân viên tiếp nhận cấp sau khi xác minh liên hệ.</p>
               <label>
-                Mã bản khai công khai
+                Mã bản khai công khai <span className="required-mark" aria-hidden="true">*</span>
                 <input
                   required
                   value={recoveryPublicCode}
@@ -446,7 +447,7 @@ export function Donations({ user }: { user: Me | null }) {
                 />
               </label>
               <label>
-                Mã khôi phục một lần
+                Mã khôi phục một lần <span className="required-mark" aria-hidden="true">*</span>
                 <input
                   required
                   value={recoveryCode}
@@ -510,7 +511,7 @@ export function Donations({ user }: { user: Me | null }) {
             )}
             <form className="form-stack donation-dispute-form" onSubmit={dispute}>
               <label>
-                Nội dung cần rà soát
+                Nội dung cần rà soát <span className="required-mark" aria-hidden="true">*</span>
                 <textarea
                   required
                   value={disputeReason}
@@ -526,7 +527,7 @@ export function Donations({ user }: { user: Me | null }) {
             </form>
             <form className="form-stack donation-evidence-form" onSubmit={attach}>
               <label>
-                Minh chứng riêng tư (JPEG, PNG hoặc MP4)
+                Minh chứng riêng tư (JPEG, PNG hoặc MP4) <span className="required-mark" aria-hidden="true">*</span>
                 <input
                   className="donation-file-input"
                   type="file"
@@ -586,7 +587,7 @@ export function Donations({ user }: { user: Me | null }) {
         >
           <h3>Đính kèm ảnh kiện hàng / biên nhận bàn giao</h3>
           <label>
-            Chọn tệp ảnh (JPEG, PNG hoặc MP4)
+            Chọn tệp ảnh (JPEG, PNG hoặc MP4) <span className="required-mark" aria-hidden="true">*</span>
             <input
               className="donation-file-input"
               type="file"
@@ -693,9 +694,10 @@ export function Donations({ user }: { user: Me | null }) {
                 <h2>Khai báo vật phẩm</h2><button type="button" className="modal-close-button" aria-label="Đóng cửa sổ khai báo" onClick={closeDeclaration}>×</button>
               </div>
             <form className="form-stack" onSubmit={declare} noValidate>
+              <p className="required-note">Cho biết tên, số điện thoại và số lượng bạn dự định mang đến của ít nhất một vật phẩm.</p>
               <div className="form-grid">
                 <label>
-                  Họ tên người đóng góp
+                  Họ tên người đóng góp <span className="required-mark" aria-hidden="true">*</span>
                   <input
                     required
                     value={donorName}
@@ -706,16 +708,20 @@ export function Donations({ user }: { user: Me | null }) {
                   />
                 </label>
                 <label>
-                  Số điện thoại
+                  Số điện thoại <span className="required-mark" aria-hidden="true">*</span>
                   <input
                     required
                     type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    aria-describedby="donor-phone-hint"
                     value={donorPhone}
                     onChange={(e) => {
                       setDonorPhone(e.target.value);
                       pending.current = null;
                     }}
                   />
+                  <small id="donor-phone-hint">Số liên hệ gồm 8–15 chữ số, có thể bắt đầu bằng +.</small>
                 </label>
               </div>
               {selected.items.map((item) => (

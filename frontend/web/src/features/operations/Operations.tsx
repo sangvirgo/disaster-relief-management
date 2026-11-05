@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
+import { fetchAll } from '../../api/fetchAll';
+import { appendPage } from '../../api/pagination';
 import { roles, type Me } from '../../auth/session';
 import { CommandForm, type CommandSpec, type Field } from '../../components/CommandForm';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
@@ -24,6 +26,8 @@ type List = {
   more?: boolean;
   generated_at?: string;
 };
+type ReferenceOptions = Record<string, { value: string; label: string }[]>;
+const referenceCache = new Map<string, { expiresAt: number; options: ReferenceOptions }>();
 const routes: Record<string, string> = {
   overview: '/reports/stock-summary',
   drives: '/donation-drives',
@@ -92,47 +96,56 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const [next, setNext] = useState<string | null>(null);
   const [generatedAt, setGeneratedAt] = useState('');
   const [selected, setSelected] = useState<Row | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
-  const [references, setReferences] = useState<Record<string, { value: string; label: string }[]>>({});
+  const [references, setReferences] = useState<ReferenceOptions>({});
   useEffect(() => {
+    const cached = referenceCache.get(user.id);
+    if (revision === 0 && cached && cached.expiresAt > Date.now()) {
+      setReferences(cached.options);
+      return;
+    }
     let live = true;
     const sources = [
       ['organizations', 'identity', '/organizations'],
+      ['regions', 'identity', '/regions'],
       ['warehouses', 'logistics', '/warehouses'],
       ['drives', 'logistics', '/donation-drives'],
       ['items', 'logistics', '/items'],
       ['campaigns', 'response', '/campaigns'],
       ['reliefPoints', 'logistics', '/relief-points'],
       ['vehicles', 'logistics', '/vehicles'],
-      ['requests', 'response', '/requests'],
+      ...(rights.has('COORDINATOR') ? [['requests', 'response', '/requests']] as const : []),
     ] as const;
-    void Promise.allSettled(sources.map(([, service, path]) => api<List>(service, path))).then((results) => {
+    void Promise.allSettled(sources.map(([, service, path]) => fetchAll<Row>(service, path))).then((results) => {
       if (!live) return;
       const options: Record<string, { value: string; label: string }[]> = {};
       results.forEach((result, index) => {
         if (result.status !== 'fulfilled') return;
         const key = sources[index][0];
-        options[key] = (result.value.items || [])
-          .filter((item) => item.id && (!['campaigns', 'organizations'].includes(key) || item.status === 'ACTIVE'))
+        options[key] = result.value
+          .filter((item) => (item.id || item.code) && (!['campaigns', 'organizations', 'regions'].includes(key) || item.status === 'ACTIVE'))
           .map((item) => ({
-            value: item.id!,
+            value: key === 'regions' ? string(item.code) : item.id!,
             label: key === 'requests'
               ? `SOS ${string(item.tracking_code) || item.id!.slice(0, 8)} · ${requestStatusLabel(string(item.status))}`
+              : key === 'regions'
+                ? string(item.name) ? `${string(item.name)} (${string(item.code)})` : string(item.code)
               : string(item.name) || string(item.title) || string(item.identifier) ||
                 string(item.item_name) || `Mã …${item.id!.slice(-8)}`,
           }));
       });
       if (!options.warehouses?.length) {
-        const driveResult = results[2];
+        const driveResult = results[3];
         if (driveResult.status === 'fulfilled') {
-          options.driveWarehouses = (driveResult.value.items || [])
+          options.driveWarehouses = driveResult.value
             .filter((drive) => drive.id && string(drive.intake_warehouse_id))
             .map((drive) => ({ value: drive.id!, label: string(drive.intake_warehouse_id) }));
           const byWarehouse = new Map<string, string>();
-          for (const drive of driveResult.value.items || []) {
+          for (const drive of driveResult.value) {
             const warehouseId = string(drive.intake_warehouse_id);
             if (warehouseId && !byWarehouse.has(warehouseId)) {
               byWarehouse.set(warehouseId, `Kho của đợt “${string(drive.title) || 'quyên góp'}”`);
@@ -142,14 +155,22 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         }
       }
       setReferences(options);
+      referenceCache.set(user.id, { expiresAt: Date.now() + 30_000, options });
     });
     return () => { live = false; };
-  }, [revision]);
+  }, [revision, user.id]);
   const organizationOptions = references.organizations?.length
     ? references.organizations
     : [...new Set(user.grants.map((grant) => grant.organization_id).filter((id): id is string => Boolean(id)))]
         .map((id) => ({ value: id, label: `Tổ chức trong quyền của tôi · …${id.slice(-8)}` }));
   const warehouseOptions = [...(references.warehouses || [])];
+  const regionOptions = references.regions?.length ? references.regions
+    : [...new Set(user.grants.map((grant) => grant.region_code).filter((code): code is string => Boolean(code)))]
+      .map((code) => ({ value: code, label: code }));
+  useEffect(() => {
+    if (!warehouse && warehouseOptions.length) setWarehouse(warehouseOptions[0].value);
+    if (!region && regionOptions.length) setRegion(regionOptions[0].value);
+  }, [references, warehouse, region]);
   for (const item of items) {
     const id = string(item.warehouse_id);
     if (id && !warehouseOptions.some((option) => option.value === id))
@@ -204,11 +225,12 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     let live = true;
     setLoading(true);
     setError('');
-    setItems([]);
     api<List>('logistics', path)
       .then((value) => {
         if (live) {
-          setItems(value.items || []);
+          setItems((current) => cursor
+            ? appendPage(current, value.items || [], (item) => String(item.id))
+            : value.items || []);
           setNext(value.next_cursor || (value.more ? value.cursor || null : null));
           setGeneratedAt(value.generated_at || '');
         }
@@ -310,12 +332,25 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       quantity: values.quantity,
     }),
   };
+  const canCreatePage =
+    (page === 'drives' && (rights.has('CAMPAIGN_MANAGER') || rights.has('OPERATIONS_MANAGER'))) ||
+    (page === 'needs' && (rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR'))) ||
+    (page === 'assets' && rights.has('OPERATIONS_MANAGER')) ||
+    (page === 'distribution' &&
+      (rights.has('DISTRIBUTION_STAFF') || rights.has('INTAKE_STAFF') || rights.has('OPERATIONS_MANAGER')));
+  const createTitle = page === 'drives' ? 'Tạo đợt quyên góp' : page === 'needs' ? 'Ghi nhận nhu cầu' :
+    page === 'assets' ? asset === 'vehicles' ? 'Thêm phương tiện' : asset === 'warehouses' ? 'Thêm kho' : 'Thêm điểm cứu trợ' :
+    'Tạo phiếu phân phối';
+  useEffect(() => { setShowCreate(false); }, [page, asset]);
   return (
     <div
-      className={`coordinator-layout ${page === 'review' ? 'operations-review-layout' : ''} ${page === 'stock' || (page === 'reports' && report === 'stock-summary') ? 'operations-table-layout' : ''}`}
+      className={`coordinator-layout ${!selected ? 'operations-list-only' : ''} ${page === 'review' ? 'operations-review-layout' : ''} ${page === 'stock' || (page === 'reports' && report === 'stock-summary') ? 'operations-table-layout' : ''}`}
     >
       <section className="card">
-        <h2>{headings[page]}</h2>
+        <div className="section-header list-action-header">
+          <h2>{headings[page]}</h2>
+          {canCreatePage && <button type="button" className="button primary list-create-button" onClick={() => setShowCreate(true)}>{createTitle}</button>}
+        </div>
         {page === 'assets' && (
           <div className="tabs">
             {(
@@ -388,31 +423,37 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             </div>
             {report === 'reconciliation' && (
               <label className="filter">
-                Mã kho cần đối soát
-                <input
+                Kho cần đối soát
+                <select
                   value={warehouse}
                   onChange={(event) => {
                     setWarehouse(event.target.value);
                     setCursor('');
                   }}
-                />
+                >
+                  <option value="">Chọn kho</option>
+                  {warehouseOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
               </label>
             )}
             {report === 'fulfillment' && (
               <label className="filter">
-                Mã khu vực trong 30 ngày gần đây
-                <input
+                Khu vực trong 30 ngày gần đây
+                <select
                   value={region}
                   onChange={(event) => {
                     setRegion(event.target.value);
                     setCursor('');
                   }}
-                />
+                >
+                  <option value="">Chọn khu vực</option>
+                  {regionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
               </label>
             )}
           </>
         )}
-        {!ready && <p>Nhập bộ lọc bắt buộc để tải báo cáo theo phạm vi được cấp quyền.</p>}
+        {!ready && <p>Chọn kho hoặc khu vực để tải báo cáo theo phạm vi được cấp quyền.</p>}
         {loading && <p role="status">Đang tải dữ liệu…</p>}
         {error && (
           <p className="notice error" role="alert">
@@ -545,16 +586,14 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           </button>
         )}
       </section>
-      <DetailSurface modal={page === 'review'} open={Boolean(selected)} onClose={() => { setSelected(null); setDetail(null); }}>
-        <h2>
+      {(selected || showCreate) && <DetailSurface key={selected?.id || 'create'} className="operations-detail-transition" modal={page === 'review' || showCreate} open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? 'Chi tiết bản ghi' : createTitle}>
+        {!showCreate && <h2>
           {selected
             ? page === 'stock'
               ? 'Chi tiết tồn kho'
               : 'Chi tiết và thao tác'
-            : ['drives', 'needs', 'assets', 'distribution'].includes(page)
-              ? 'Tạo bản ghi'
-              : 'Thông tin theo phạm vi'}
-        </h2>
+            : createTitle}
+        </h2>}
         {selected && !detail && <p role="status">Đang tải chi tiết…</p>}
         {detail && (
           <>
@@ -1049,7 +1088,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     })}
                 </>
               )}
-              {page === 'handoff' &&
+              {page === 'distribution' &&
                 id &&
                 status === 'DISPATCHED' &&
                 detail.dispatch_actor_user_id !== user.id &&
@@ -1221,22 +1260,22 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 ].map(([value, title]) => ({ value, label: title })),
               },
               { name: 'quantity', label: 'Số lượng', type: 'number', required: true },
-              ...fields([['commitment_id', 'Mã cam kết khi hỗ trợ yêu cầu SOS']]),
-              referenceField('campaign_id', 'Chiến dịch (khi phân phối theo chiến dịch)', 'campaigns'),
-              referenceField('relief_point_id', 'Điểm cứu trợ (khi bổ sung tại điểm)', 'reliefPoints'),
+              { ...referenceField('commitment_id', 'Mã cam kết hỗ trợ SOS', 'commitments'), visibleWhen: { field: 'purpose', value: 'REQUEST_AID' } },
+              { ...referenceField('campaign_id', 'Chiến dịch', 'campaigns', true), visibleWhen: { field: 'purpose', value: 'CAMPAIGN_DISTRIBUTION' } },
+              { ...referenceField('relief_point_id', 'Điểm cứu trợ', 'reliefPoints', true), visibleWhen: { field: 'purpose', value: 'POINT_REPLENISHMENT' } },
               referenceField('vehicle_id', 'Phương tiện (nếu có)', 'vehicles'),
             ],
             build: (values) => ({
               warehouse_id: values.warehouse_id,
               purpose: values.purpose,
-              ...(values.campaign_id ? { campaign_id: values.campaign_id } : {}),
-              ...(values.relief_point_id ? { relief_point_id: values.relief_point_id } : {}),
+              ...(values.purpose === 'CAMPAIGN_DISTRIBUTION' && values.campaign_id ? { campaign_id: values.campaign_id } : {}),
+              ...(values.purpose === 'POINT_REPLENISHMENT' && values.relief_point_id ? { relief_point_id: values.relief_point_id } : {}),
               ...(values.vehicle_id ? { vehicle_id: values.vehicle_id } : {}),
               lines: [
                 {
                   item_id: values.item_id,
                   quantity: values.quantity,
-                  ...(values.commitment_id ? { commitment_id: values.commitment_id } : {}),
+                  ...(values.purpose === 'REQUEST_AID' && values.commitment_id ? { commitment_id: values.commitment_id } : {}),
                 },
               ],
             }),
@@ -1250,7 +1289,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             lượng được giữ theo từng đơn vị vật phẩm.
           </p>
         )}
-      </DetailSurface>
+      </DetailSurface>}
     </div>
   );
 }

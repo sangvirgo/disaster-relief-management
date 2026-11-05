@@ -12,6 +12,15 @@ setWorkerUrl(workerUrl);
 export type Point = { longitude: number; latitude: number };
 type SearchPlace = { id: string; name: string; address: string; point: Point };
 
+function distanceMeters(a: Point, b: Point): number {
+  const lat = Math.PI / 180;
+  const dLat = (b.latitude - a.latitude) * lat;
+  const dLon = (b.longitude - a.longitude) * lat;
+  const arc = Math.sin(dLat / 2) ** 2 +
+    Math.cos(a.latitude * lat) * Math.cos(b.latitude * lat) * Math.sin(dLon / 2) ** 2;
+  return 12_742_000 * Math.asin(Math.min(1, Math.sqrt(arc)));
+}
+
 function photonPlaces(value: unknown): SearchPlace[] {
   if (
     !value ||
@@ -156,10 +165,12 @@ export function LocationPicker({
         if (!result.ok) throw new Error('REVERSE_SEARCH_FAILED');
         const [nearest] = photonPlaces(await result.json());
         if (controller.signal.aborted) return;
-        const label = nearest ? [nearest.name, nearest.address].filter(Boolean).join(' · ') : `Tọa độ ${pointLabel(point)}`;
+        const label = nearest && distanceMeters(point, nearest.point) <= 250
+          ? [nearest.name, nearest.address].filter(Boolean).join(' · ')
+          : `Tọa độ ${pointLabel(point)}`;
         chosenSearchRef.current = { point, label };
         setSearchQuery(label);
-        setSelectedAddress(`${confirmedPointRef.current && samePoint(confirmedPointRef.current, point) ? 'Đã xác nhận' : 'Địa chỉ gần ghim'}: ${label}`);
+        setSelectedAddress(`${confirmedPointRef.current && samePoint(confirmedPointRef.current, point) ? 'Đã xác nhận' : 'Vị trí ghim'}: ${label}`);
       } catch {
         if (controller.signal.aborted) return;
         const label = `Tọa độ ${pointLabel(point)}`;

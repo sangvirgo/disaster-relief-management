@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
+import { appendPage } from '../../api/pagination';
 import { DetailSurface } from '../../components/DetailSurface';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
@@ -46,6 +47,27 @@ type Event = {
   occurred_at: string;
   payload?: Record<string, unknown>;
 };
+const supplementLabels: Record<string, string> = {
+  description: 'Mô tả tình hình',
+  household_reference_note: 'Ghi chú về hộ gia đình',
+  people_affected: 'Số người cần hỗ trợ',
+  children_count: 'Số trẻ em',
+  elderly_count: 'Số người cao tuổi',
+  location: 'Vị trí cần hỗ trợ',
+  reporter_declared_danger: 'Có nguy hiểm tính mạng',
+  needs_rescue: 'Cần đội cứu hộ',
+  needs_relief_supplies: 'Cần hàng cứu trợ',
+};
+function supplementValue(value: unknown): string {
+  if (value === null) return 'Chưa rõ';
+  if (typeof value === 'boolean') return value ? 'Có' : 'Không';
+  if (typeof value === 'object' && value && 'coordinates' in value) {
+    const coordinates = (value as { coordinates?: unknown }).coordinates;
+    if (Array.isArray(coordinates) && coordinates.length === 2)
+      return `${coordinates[1]}, ${coordinates[0]}`;
+  }
+  return typeof value === 'string' || typeof value === 'number' ? String(value) : 'Xem chi tiết trong hồ sơ';
+}
 type Detail = QueueItem & {
   version: number;
   description?: string | null;
@@ -134,32 +156,11 @@ type Candidate = {
 };
 type Candidates = { items: Candidate[]; unknown_position: Candidate[] };
 
-const addressCache = new Map<string, string>();
 function NearbyAddress({ coordinates }: { coordinates?: [number, number] }) {
   const longitude = coordinates?.[0];
   const latitude = coordinates?.[1];
-  const key = longitude === undefined || latitude === undefined ? '' : `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
-  const [address, setAddress] = useState(key ? addressCache.get(key) || '' : '');
-  useEffect(() => {
-    if (!key || latitude === undefined || longitude === undefined) return;
-    const cached = addressCache.get(key);
-    if (cached) { setAddress(cached); return; }
-    setAddress('Đang tìm địa chỉ gần vị trí SOS…');
-    const controller = new AbortController();
-    void fetch(`https://photon.komoot.io/reverse?lat=${latitude}&lon=${longitude}&limit=1`, { signal: controller.signal })
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error('REVERSE_FAILED')))
-      .then((data: { features?: { properties?: Record<string, string> }[] }) => {
-        const properties = data.features?.[0]?.properties;
-        const parts = [properties?.name, properties?.street, properties?.district, properties?.city].filter(Boolean);
-        const label = parts.length ? [...new Set(parts)].join(', ') : 'Chưa tìm được địa chỉ gần vị trí SOS';
-        addressCache.set(key, label);
-        setAddress(label);
-      })
-      .catch(() => { if (!controller.signal.aborted) setAddress('Chưa tìm được địa chỉ gần vị trí SOS'); });
-    return () => controller.abort();
-  }, [key]);
-  if (!key) return <>Chưa có tọa độ</>;
-  return <>{address && !address.startsWith('Chưa tìm') && !address.startsWith('Đang tìm') ? `Địa chỉ gần đúng: ${address}` : address || 'Đang tìm địa chỉ gần vị trí SOS…'} <small>({key})</small></>;
+  if (longitude === undefined || latitude === undefined) return <>Chưa có tọa độ</>;
+  return <>Tọa độ SOS: {latitude.toFixed(6)}, {longitude.toFixed(6)}. Xem ghim trên bản đồ để đối chiếu vị trí.</>;
 }
 
 type DuplicateCandidate = {
@@ -248,7 +249,7 @@ const queueStatuses = [
   ['CANCELLED', 'Đã hủy'],
 ] as const;
 const title: Record<string, string> = {
-  queue: 'Xử lý tín hiệu SOS',
+  queue: 'Danh sách SOS',
   verify: 'Xác minh yêu cầu',
   triage: 'Quyết định ưu tiên',
   assign: 'Chọn đội cứu hộ',
@@ -388,7 +389,10 @@ export function Coordinator({ page }: { page: string }) {
     if (overdue) params.set('overdue', 'true');
     api<Queue>('response', `/requests${params.size ? '?' + params : ''}`)
       .then((value) => {
-        if (live) setQueue(value);
+        if (live) setQueue((current) => ({
+          ...value,
+          items: cursor && current ? appendPage(current.items, value.items, (item) => item.id) : value.items,
+        }));
       })
       .catch((cause) => {
         if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải hàng đợi.');
@@ -486,7 +490,7 @@ export function Coordinator({ page }: { page: string }) {
   function command(spec: CommandSpec) {
     return (
       <SosCommandPopup
-        key={spec.path + detail?.version}
+        key={spec.path + spec.title + detail?.version}
         spec={spec}
         onSuccess={done}
         onStale={refreshAfterConflict}
@@ -540,6 +544,13 @@ export function Coordinator({ page }: { page: string }) {
         (typeof aiFacts?.needs_relief_supplies === 'boolean' &&
           aiFacts.needs_relief_supplies !== detail.needs_relief_supplies))
   );
+  const reviewedSupplementIds = new Set(
+    detail?.timeline.items.filter((event) => event.event_type === 'SUPPLEMENT_REVIEW')
+      .map((event) => event.payload?.reviewed_event_id).filter((id): id is string => typeof id === 'string') ?? []
+  );
+  const pendingSupplements = detail?.timeline.items.filter((event) =>
+    event.event_type === 'REPORTER_SUPPLEMENT' && event.payload?.pending_review === true && !reviewedSupplementIds.has(event.id)
+  ) ?? [];
   return (
     <div className="coordinator-layout">
       <section className="card">
@@ -548,8 +559,7 @@ export function Coordinator({ page }: { page: string }) {
         <div className="queue-filter-panel">
           <div className="queue-filter-heading">
             <div>
-              <span className="queue-filter-eyebrow">BỘ LỌC HÀNG ĐỢI</span>
-              <strong>Lọc danh sách</strong>
+              <strong>Bộ lọc</strong>
             </div>
             <button
               type="button"
@@ -735,6 +745,31 @@ export function Coordinator({ page }: { page: string }) {
                 <a href="#request-full-detail">Xem toàn bộ hồ sơ và lịch sử ↓</a>
               </div>
             )}
+            {pendingSupplements.map((event) => {
+              const facts = event.payload?.reported_facts;
+              const changes = facts && typeof facts === 'object' && !Array.isArray(facts)
+                ? Object.entries(facts).filter(([name]) => name in supplementLabels) : [];
+              return (
+                <section className="notice warning" key={event.id}>
+                  <h3>Thông tin mới cần đối chiếu</h3>
+                  <p>Người báo đã bổ sung thông tin lúc {timeLabel(event.occurred_at)}. Hãy so sánh với hồ sơ và xác minh trước khi quyết định.</p>
+                  <dl className="fact-list">
+                    {changes.map(([name, value]) => <div key={name}><dt>{supplementLabels[name]}</dt><dd>{supplementValue(value)}</dd></div>)}
+                  </dl>
+                  {(['ACCEPT', 'REJECT'] as const).map((decision) => command({
+                    title: decision === 'ACCEPT' ? 'Chấp nhận thông tin bổ sung' : 'Không chấp nhận thông tin bổ sung',
+                    service: 'response',
+                    path: `/requests/${detail.id}/supplements/${event.id}/review`,
+                    version: detail.version,
+                    warning: decision === 'ACCEPT'
+                      ? 'Xác nhận thông tin mới đã được đối chiếu và có thể cập nhật vào hồ sơ SOS?'
+                      : 'Xác nhận không sử dụng thông tin bổ sung này?',
+                    fields: [{ name: 'reason', label: 'Lý do quyết định', type: 'textarea', required: true }],
+                    build: (values) => ({ decision, reason: values.reason }),
+                  }))}
+                </section>
+              );
+            })}
             {page === 'queue' && detail.status !== 'VERIFIED' && detail.subject.location && (
               <div className="queue-context-map">
                 <h3>Vị trí SOS đang chọn</h3>
@@ -1023,6 +1058,14 @@ export function Coordinator({ page }: { page: string }) {
                 </p>
               </section>
             )}
+            {detail.ai_advisory?.status === 'FAILED' && !detail.ai_advisory.review_status &&
+              detail.ai_priority_advisory?.source === 'GEMINI' && command({
+                title: 'Thử đánh giá AI lại',
+                service: 'response',
+                path: `/requests/${detail.id}/ai-advisories/${detail.ai_advisory.id}/retry`,
+                version: detail.version,
+                warning: 'Gửi lại yêu cầu đánh giá AI? Kết quả vẫn chỉ để tham khảo; bạn tiếp tục xử lý SOS theo thông tin đã xác minh.',
+              })}
             {detail.ai_advisory && detail.ai_advisory.status === 'COMPLETED' && (
               <section className="notice">
                 <h3>

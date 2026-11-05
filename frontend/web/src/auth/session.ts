@@ -50,8 +50,11 @@ export async function googleLogin(id_token: string): Promise<Me> {
   return me();
 }
 export async function logout(): Promise<void> {
-  await api<void>('identity', '/auth/logout', { method: 'POST', retryAuth: false });
-  invalidateCsrf();
+  try {
+    await api<void>('identity', '/auth/logout', { method: 'POST' });
+  } finally {
+    invalidateCsrf();
+  }
 }
 export async function changePassword(current_password: string, new_password: string): Promise<Me> {
   await api<void>('identity', '/auth/change-password', {

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
+import { appendPage } from '../../api/pagination';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
-import { DetailCloseButton } from '../../components/DetailCloseButton';
+import { DetailSurface } from '../../components/DetailSurface';
 import { label, timeLabel } from '../../i18n/labels';
 
 type Row = Record<string, unknown> & {
@@ -48,6 +49,7 @@ export function Admin({ page }: { page: string }) {
   const [cursor, setCursor] = useState('');
   const [next, setNext] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -73,7 +75,9 @@ export function Admin({ page }: { page: string }) {
     api<Page>('identity', path)
       .then((value) => {
         if (live) {
-          setItems(value.items);
+          setItems((current) => cursor
+            ? appendPage(current, value.items, (item) => String(item.id || item.code))
+            : value.items);
           setNext(value.next_cursor || null);
         }
       })
@@ -108,6 +112,7 @@ export function Admin({ page }: { page: string }) {
   }, [selected, revision, page, items]);
   function success() {
     setSelected(null);
+    setShowCreate(false);
     setDetail(null);
     setRevision((value) => value + 1);
   }
@@ -149,18 +154,28 @@ export function Admin({ page }: { page: string }) {
       { name: 'name', label: 'Tên khu vực', required: true },
     ],
   };
+  const createTitle = page === 'users' ? 'Thêm người dùng' : page === 'organizations' ? 'Thêm tổ chức' : 'Thêm khu vực';
+  useEffect(() => { setShowCreate(false); setSelected(null); }, [page]);
   return (
-    <div className="grid-two">
+    <div className="grid-two admin-list-layout">
       <section className="card">
-        <h2>
-          {page === 'audit'
-            ? 'Bản ghi kiểm toán'
-            : page === 'regions'
-              ? 'Danh sách khu vực'
-              : page === 'organizations'
-                ? 'Danh sách tổ chức'
-                : 'Danh sách người dùng'}
-        </h2>
+        <div className="section-header list-action-header">
+          <h2>
+            {page === 'audit'
+              ? 'Lịch sử thay đổi'
+              : page === 'regions'
+                ? 'Danh sách khu vực'
+                : page === 'organizations'
+                  ? 'Danh sách tổ chức'
+                  : 'Danh sách người dùng'}
+          </h2>
+          {['users', 'organizations', 'regions'].includes(page) && (
+            <button type="button" className="button primary list-create-button" onClick={() => setShowCreate(true)}>
+              {page === 'users' && <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M10 3v14M3 10h14" /></svg>}
+              {createTitle}
+            </button>
+          )}
+        </div>
         {page === 'audit' && (
           <label className="filter">
             Loại đối tượng
@@ -197,16 +212,29 @@ export function Admin({ page }: { page: string }) {
             {error}
           </p>
         )}
-        {!loading && !items.length && !error && <div className="empty">Chưa có bản ghi.</div>}
-        <div className="record-list">
-          {items.map((item, index) => (
-            <article className="record" key={item.id || item.code || index}>
+        {!loading && !items.length && !error && <div className="empty">{page === 'audit' ? 'Chưa có thay đổi nào thuộc loại đã chọn.' : 'Chưa có dữ liệu để hiển thị.'}</div>}
+        <div className={`record-list ${page === 'audit' ? '' : 'admin-record-list'}`}>
+          {items.map((item, index) => {
+            const canOpen = ['users', 'grants', 'overview', 'organizations', 'regions'].includes(page) && Boolean(item.id || item.code);
+            const title = page === 'audit'
+              ? label(item.action)
+              : item.display_name || item.name || item.username || 'Bản ghi';
+            if (canOpen) return (
+              <button type="button" className="admin-record-card" key={item.id || item.code || index}
+                onClick={() => setSelected(item.id || item.code || null)} aria-label={`${String(title)}${item.status ? `, ${label(item.status)}` : ''}, xem chi tiết`}>
+                <span className="admin-record-heading">
+                  <strong>{String(title)}</strong>
+                  {item.status && <span className={`admin-record-status ${item.status === 'ACTIVE' ? 'is-active' : 'is-inactive'}`}>
+                    <span className="admin-status-dot" aria-hidden="true" />{label(item.status)}
+                  </span>}
+                </span>
+                {item.username && <span className="admin-record-username">{item.username}</span>}
+                {Boolean(item.created_at) && <small>{timeLabel(item.created_at)}</small>}
+              </button>
+            );
+            return <article className="record" key={item.id || item.code || index}>
               <div>
-                <strong>
-                  {page === 'audit'
-                    ? label(item.action)
-                    : item.display_name || item.name || item.username || 'Bản ghi'}
-                </strong>
+                <strong>{title}</strong>
                 {item.username && <p>{item.username}</p>}
                 {page === 'audit' && (
                   <>
@@ -220,13 +248,8 @@ export function Admin({ page }: { page: string }) {
                 {item.status && <span className="chip">{label(item.status)}</span>}
                 {Boolean(item.created_at) && <small>{timeLabel(item.created_at)}</small>}
               </div>
-              {['users', 'grants', 'overview', 'organizations', 'regions'].includes(page) && (item.id || item.code) && (
-                <button className="button secondary" onClick={() => setSelected(item.id || item.code || null)}>
-                  Xem chi tiết
-                </button>
-              )}
             </article>
-          ))}
+          })}
         </div>
         {next && (
           <button className="button secondary" onClick={() => setCursor(next)}>
@@ -234,22 +257,21 @@ export function Admin({ page }: { page: string }) {
           </button>
         )}
       </section>
-      <section className={`card detail-panel-card ${selected ? 'is-open' : ''}`}>
-        {selected && (
-          <DetailCloseButton
-            onClick={() => {
-              setSelected(null);
-              setDetail(null);
-            }}
-          />
+      <DetailSurface modal open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? 'Chi tiết bản ghi' : createTitle} className={showCreate && page === 'users' ? 'admin-create-dialog' : ''}>
+        {showCreate && page === 'users' && (
+          <div className="admin-create-brand">
+            <span className="auth-logo-frame"><img src="/reliva-logo.png" alt="" /></span>
+            <span className="admin-create-brand-copy"><strong>Reliva</strong><small>QUẢN TRỊ NGƯỜI DÙNG</small></span>
+          </div>
         )}
-        <h2>
+        {selected && <h2>
           {selected
-            ? 'Chi tiết và thao tác'
-            : ['users', 'organizations', 'regions'].includes(page)
-              ? 'Tạo bản ghi'
-              : 'Thông tin quản trị'}
-        </h2>
+            ? page === 'users' ? 'Chi tiết người dùng' : page === 'organizations' ? 'Chi tiết tổ chức' : 'Chi tiết khu vực'
+            : page === 'users' ? 'Thêm người dùng'
+              : page === 'organizations' ? 'Thêm tổ chức'
+                : page === 'regions' ? 'Thêm khu vực'
+                  : 'Thông tin quản trị'}
+        </h2>}
         {selected && !detail && <p role="status">Đang tải chi tiết…</p>}
         {detail && (
           <>
@@ -270,7 +292,7 @@ export function Admin({ page }: { page: string }) {
                         {label(grant.role_code)} · {label(grant.scope_type)}{' '}
                         {grant.region_code || ''} {grant.revoked_at ? '(đã thu hồi)' : ''}
                       </p>
-                      {page === 'grants' && !grant.revoked_at && (
+                      {page === 'users' && !grant.revoked_at && (
                         <CommandForm
                           spec={{
                             title: 'Thu hồi quyền',
@@ -370,7 +392,7 @@ export function Admin({ page }: { page: string }) {
                   onSuccess={success}
                 />
               )}
-              {page === 'grants' && (
+              {page === 'users' && (
                 <CommandForm
                   spec={{
                     title: 'Cấp quyền',
@@ -415,8 +437,7 @@ export function Admin({ page }: { page: string }) {
         {!selected && page === 'grants' && <p>Chọn người dùng để xem và cấp quyền theo phạm vi.</p>}
         {!selected && page === 'audit' && (
           <p>
-            Nhật ký chỉ hiển thị với quyền kiểm toán. Lý do và dữ liệu trước/sau cần được xem trong
-            phạm vi quản trị được cấp.
+            Chỉ tài khoản được cấp quyền mới xem được lý do và nội dung thay đổi.
           </p>
         )}
         {!selected && page === 'overview' && (
@@ -425,7 +446,7 @@ export function Admin({ page }: { page: string }) {
             và quyền hiện tại.
           </p>
         )}
-      </section>
+      </DetailSurface>
     </div>
   );
 }

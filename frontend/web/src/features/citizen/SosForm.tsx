@@ -83,6 +83,7 @@ export function SosForm({
         setCaptured(new Date(timestamp).toISOString());
         setSource('GPS');
         setFieldError(null);
+        pending.current = null;
       },
       () => setError('Không thể lấy vị trí. Hãy nhập tọa độ vị trí cần hỗ trợ.'),
       { enableHighAccuracy: true, timeout: 10000 }
@@ -215,7 +216,7 @@ export function SosForm({
   if (created)
     return (
       <section className="card confirmation" role="status">
-        <span className="eyebrow">Máy chủ đã xác nhận</span>
+        <span className="eyebrow">Đã gửi thành công</span>
         <h2>Yêu cầu đã được tiếp nhận</h2>
         <p>
           Mã theo dõi: <strong>{created.tracking_code}</strong>
@@ -247,14 +248,6 @@ export function SosForm({
   return (
     <form className="card form-stack sos-form" onSubmit={submit} onChange={() => setFieldError(null)} noValidate>
       <h2>Thông tin yêu cầu hỗ trợ</h2>
-      <p>
-        Vị trí phải là nơi cần hỗ trợ. Yêu cầu chỉ được ghi nhận khi máy chủ trả về mã theo dõi.
-      </p>
-      <button type="button" className="button secondary sos-location-jump"
-        onClick={() => document.getElementById('sos-location')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-        Chuyển tới chọn vị trí
-      </button>
-      <p className="sos-required-note"><span aria-hidden="true">*</span> Trường bắt buộc</p>
       {user && (
         <fieldset>
           <legend>Người cần hỗ trợ</legend>
