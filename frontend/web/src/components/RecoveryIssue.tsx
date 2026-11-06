@@ -9,16 +9,19 @@ export function RecoveryIssue({
   version,
   kind,
   contacts,
+  currentUserId,
 }: {
   service: Service;
   path: string;
   version: number;
   kind: 'sos' | 'donation';
-  contacts?: { id: string; outcome: string; contact_target: string; attempted_at?: string }[];
+  contacts?: { id: string; outcome: string; contact_target: string; actor_user_id?: string | null; attempted_at?: string }[];
+  currentUserId?: string;
 }) {
   const [reason, setReason] = useState('');
   const eligibleContacts = contacts?.filter(
-    (item) => item.outcome === 'REACHED' && ['REPORTER', 'ALTERNATE'].includes(item.contact_target)
+    (item) => item.outcome === 'REACHED' && item.contact_target === 'REPORTER'
+      && item.actor_user_id !== currentUserId
   ) ?? [];
   const [basis, setBasis] = useState(eligibleContacts.length === 1 ? eligibleContacts[0].id : '');
   const [note, setNote] = useState('');
@@ -97,7 +100,7 @@ export function RecoveryIssue({
           {result.expires_at && <p>Hết hạn: {timeLabel(result.expires_at)}</p>}
         </div>
       ) : (
-        <form className="form-stack" onSubmit={submit}>
+        <form className="form-stack" onSubmit={submit} noValidate>
           <label>
             <span>Lý do khôi phục <span className="required-mark" aria-hidden="true">*</span></span>
             <textarea
@@ -179,7 +182,7 @@ export function RecoveryIssue({
               {error}
             </p>
           )}
-          <button className="button" disabled={busy || invalid}>
+          <button className="button" disabled={busy}>
             {busy ? 'Đang cấp mã…' : 'Cấp mã khôi phục'}
           </button>
         </form>

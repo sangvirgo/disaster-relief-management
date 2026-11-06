@@ -9,6 +9,9 @@ import { formatQuantity } from '../../i18n/quantity';
 import { ReceiptCountForm } from './ReceiptCountForm';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { DetailSurface } from '../../components/DetailSurface';
+import { StatusBadge } from '../../components/StatusBadge';
+import { useUrlView } from '../../app/useUrlView';
+import { assetViews, reportViews, reviewViews } from '../../app/routeViews';
 
 type Row = Record<string, unknown> & {
   id?: string;
@@ -84,11 +87,9 @@ const fields = (entries: [string, string, boolean?][]) =>
 
 export function Operations({ page, user }: { page: string; user: Me }) {
   const rights = roles(user);
-  const [asset, setAsset] = useState<'relief-points' | 'vehicles' | 'warehouses'>('relief-points');
-  const [reviewTab, setReviewTab] = useState<'receipts' | 'disputes'>('receipts');
-  const [report, setReport] = useState<'stock-summary' | 'fulfillment' | 'reconciliation'>(
-    'stock-summary'
-  );
+  const [asset, setAsset] = useUrlView('view', assetViews, 'relief-points');
+  const [reviewTab, setReviewTab] = useUrlView('view', reviewViews, 'receipts');
+  const [report, setReport] = useUrlView('view', reportViews, 'stock-summary');
   const [warehouse, setWarehouse] = useState('');
   const [region, setRegion] = useState('');
   const [items, setItems] = useState<Row[]>([]);
@@ -278,6 +279,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   function done() {
     setSelected(null);
     setDetail(null);
+    setShowCreate(false);
     setRevision((value) => value + 1);
   }
   function command(spec: CommandSpec) {
@@ -575,7 +577,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   )}
                   {item.receipt_id && <small>Đã lập biên nhận</small>}
                 </span>
-                {item.status && <span className="chip">{label(item.status)}</span>}
+                {item.status && (page === 'intake' ? <StatusBadge status={item.status} /> : <span className="chip">{label(item.status)}</span>)}
               </button>
             ))}
           </div>
@@ -1051,6 +1053,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       warning: 'Kiểm tra hàng thực tế và xác nhận xuất kho?',
                     })}
                   {status === 'DRAFT' &&
+                    detail.purpose === 'REQUEST_AID' &&
+                    detail.preparer_user_id === user.id &&
                     (rights.has('DISTRIBUTION_STAFF') ||
                       rights.has('INTAKE_STAFF') ||
                       rights.has('OPERATIONS_MANAGER')) &&
@@ -1143,6 +1147,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     {
                       name: 'receiver_label',
                       label: 'Người hoặc đơn vị nhận (không nhập khi thất thoát)',
+                      requiredWhen: {
+                        field: 'handoff_kind',
+                        values: ['DIRECT_HOUSEHOLD', 'POINT_RECEIPT', 'HOUSEHOLD_HANDOUT', 'RETURN'],
+                      },
                     },
                     { name: 'confirmation_basis', label: 'Căn cứ xác nhận', required: true },
                     {

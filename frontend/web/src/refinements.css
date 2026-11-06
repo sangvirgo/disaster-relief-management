@@ -143,15 +143,18 @@
 }
 .auth-password-field input {
   width: 100%;
-  padding-right: 60px;
+  padding-right: 58px;
 }
 .auth-password-toggle {
   position: absolute;
   top: 50%;
   right: 8px;
   transform: translateY(-50%);
-  min-width: 48px;
-  padding: 7px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 40px;
+  padding: 3px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -161,6 +164,7 @@
   font-weight: 700;
   cursor: pointer;
 }
+.password-peek-icon { display: block; width: 37px; height: 31px; }
 .auth-password-toggle:hover,
 .auth-password-toggle:focus-visible {
   background: #eaf3ff;
@@ -850,6 +854,12 @@
   color: #64748b;
   font-size: 12px;
 }
+.status-badge { gap: 8px; }
+.status-badge-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #94a3b8; box-shadow: 0 0 0 3px #e2e8f0; }
+.status-badge-success .status-badge-dot { background: #16a34a; box-shadow: 0 0 0 3px #dcfce7; }
+.status-badge-warning .status-badge-dot { background: #d97706; box-shadow: 0 0 0 3px #fef3c7; }
+.status-badge-info .status-badge-dot { background: #2563eb; box-shadow: 0 0 0 3px #dbeafe; }
+.status-badge-danger .status-badge-dot { background: #dc2626; box-shadow: 0 0 0 3px #fee2e2; }
 .campaign-objective {
   padding: 12px 14px;
   background: #f8fafc;

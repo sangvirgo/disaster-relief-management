@@ -22,9 +22,12 @@ import {
   type Page,
   type Workspace,
 } from './app/catalog';
+import { useUrlView } from './app/useUrlView';
+import { assetViews, donationViews, intakeSteps, noticeViews, reportViews, reviewViews } from './app/routeViews';
 import { label, requestStatusLabel, timeLabel } from './i18n/labels';
 import { AnalyticsRegionField, useAnalyticsRegion } from './components/AnalyticsRegion';
 import { CitizenAccount, CitizenRequests, requestStatusTone } from './features/citizen/CitizenAccount';
+import { clearAllSosDrafts } from './features/citizen/sosDraft';
 import type { components as ResponseComponents } from './api/generated/response';
 import './style.css';
 
@@ -67,15 +70,22 @@ const OperationsDashboard = React.lazy(() => import('./features/operations/Dashb
 
 function IntakeReview({ user }: { user: Me }) {
   const canReview = roles(user).has('REVIEWER');
-  const [step, setStep] = useState<'intake' | 'review'>('intake');
+  const [step, setStep] = useUrlView('step', intakeSteps, 'intake');
+  function changeStep(next: 'intake' | 'review') {
+    if (next === step) return;
+    setStep(next);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('view');
+    window.history.replaceState(null, '', url);
+  }
   return (
     <div>
       {canReview && (
         <div className="tabs" role="group" aria-label="Bước xử lý đóng góp">
           <button type="button" className={step === 'intake' ? 'active' : ''}
-            aria-pressed={step === 'intake'} onClick={() => setStep('intake')}>Tiếp nhận</button>
+            aria-pressed={step === 'intake'} onClick={() => changeStep('intake')}>Tiếp nhận</button>
           <button type="button" className={step === 'review' ? 'active' : ''}
-            aria-pressed={step === 'review'} onClick={() => setStep('review')}>Duyệt và khiếu nại</button>
+            aria-pressed={step === 'review'} onClick={() => changeStep('review')}>Duyệt và khiếu nại</button>
         </div>
       )}
       <Operations key={step} page={canReview ? step : 'intake'} user={user} />
@@ -460,8 +470,23 @@ function AuthModal({
                     className="auth-password-toggle"
                     onClick={() => setShowPassword((value) => !value)}
                     aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    aria-pressed={showPassword}
                   >
-                    {showPassword ? 'Ẩn' : 'Hiện'}
+                    <svg className="password-peek-icon" viewBox="0 0 44 36" fill="none" aria-hidden="true">
+                      <path d="M10 7Q22 1 34 7L37 25Q22 34 7 25Z" fill="#DBEDFF" stroke="#3263A8" strokeWidth="1.5" />
+                      <path d="M15 11L18 9M27 9L30 11" stroke="#3263A8" strokeWidth="1.5" strokeLinecap="round" />
+                      {showPassword ? <>
+                        <ellipse cx="16" cy="18" rx="4" ry="5" fill="white" stroke="#3263A8" strokeWidth="1.2" />
+                        <ellipse cx="28" cy="18" rx="4" ry="5" fill="white" stroke="#3263A8" strokeWidth="1.2" />
+                        <circle cx={16 + (password.length % 5 - 2) * 0.7} cy="19" r="1.7" fill="#173A70" />
+                        <circle cx={28 + (password.length % 5 - 2) * 0.7} cy="19" r="1.7" fill="#173A70" />
+                        <path d="M19 26Q22 28 25 26" stroke="#3263A8" strokeWidth="1.3" strokeLinecap="round" />
+                      </> : <>
+                        <path d="M11 18L18 21M26 21L33 18" stroke="#3263A8" strokeWidth="2" strokeLinecap="round" />
+                        <path d="M3 20Q7 14 13 18L18 21L15 29Q8 30 3 25Z" fill="#F7C8A9" stroke="#B87966" strokeWidth="1.2" />
+                        <path d="M41 20Q37 14 31 18L26 21L29 29Q36 30 41 25Z" fill="#F7C8A9" stroke="#B87966" strokeWidth="1.2" />
+                      </>}
+                    </svg>
                   </button>
                 </span>
                 {authErrorFor('password', password) && (
@@ -1429,6 +1454,52 @@ function defaultWorkspaceForUser(user: Me | null): Workspace {
   return 'citizen';
 }
 
+function routeFromUrl(url = new URL(window.location.href)): { workspace: Workspace; page: string } | null {
+  const params = url.searchParams;
+  const workspace = params.get('workspace');
+  const page = params.get('page');
+  if (!workspace || !Object.prototype.hasOwnProperty.call(pages, workspace)) return null;
+  return { workspace: workspace as Workspace, page: page || '' };
+}
+
+function permittedRoute(user: Me | null, requested: ReturnType<typeof routeFromUrl>) {
+  const fallbackWorkspace = defaultWorkspaceForUser(user);
+  const fallbackPage = allowedPages(fallbackWorkspace, user)[0]?.id || 'sos';
+  if (!requested || !allowedWorkspaces(user).includes(requested.workspace)) {
+    return { workspace: fallbackWorkspace, page: fallbackPage };
+  }
+  if (requested.page === 'account' && user) return requested;
+  if (allowedPages(requested.workspace, user).some((page) => page.id === requested.page)) return requested;
+  return { workspace: requested.workspace, page: allowedPages(requested.workspace, user)[0]?.id || fallbackPage };
+}
+
+function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me | null) {
+  const allowedViews: readonly string[] = workspace === 'citizen' && page === 'drives' ? donationViews
+    : (workspace === 'volunteer' || workspace === 'coordinator') && page === 'notices' ? noticeViews
+    : workspace === 'operations' && page === 'assets' ? assetViews
+    : workspace === 'operations' && page === 'reports' ? reportViews
+    : workspace === 'operations' && page === 'intake' && roles(user).has('REVIEWER')
+      && url.searchParams.get('step') === 'review' ? reviewViews : [];
+  if (!allowedViews.includes(url.searchParams.get('view') || '')) url.searchParams.delete('view');
+  if (!(workspace === 'operations' && page === 'intake' && roles(user).has('REVIEWER')
+    && (intakeSteps as readonly string[]).includes(url.searchParams.get('step') || ''))) url.searchParams.delete('step');
+}
+
+function writeRoute(workspace: Workspace, page: string, user: Me | null, mode: 'push' | 'replace' = 'push') {
+  const url = new URL(window.location.href);
+  const changed = url.searchParams.get('workspace') !== workspace || url.searchParams.get('page') !== page;
+  url.searchParams.set('workspace', workspace);
+  url.searchParams.set('page', page);
+  if (changed) {
+    url.searchParams.delete('view');
+    url.searchParams.delete('step');
+  } else {
+    normalizeSubview(url, workspace, page, user);
+  }
+  if (url.href === window.location.href) return;
+  window.history[changed && mode === 'push' ? 'pushState' : 'replaceState'](null, '', url);
+}
+
 function App() {
   const [user, setUser] = useState<Me | null>(null);
   const [sessionState, setSessionState] = useState<'loading' | 'guest' | 'ready' | 'error'>(
@@ -1447,12 +1518,31 @@ function App() {
   const [selectedRequestId, setSelectedRequestId] = useState('');
   const [sharingTeamId, setSharingTeamId] = useState('');
   const [sharingMessage, setSharingMessage] = useState('');
+  const sessionChannelRef = useRef<BroadcastChannel | null>(null);
+  const sessionGenerationRef = useRef(0);
+  const pendingRouteRef = useRef<string | null>(null);
+
+  function notifyOtherTabs(change: 'signed-in' | 'signed-out' | 'expired') {
+    sessionChannelRef.current?.postMessage(change);
+  }
 
   function resetSession(openLogin = false) {
+    clearAllSosDrafts();
+    try {
+      for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
+        const key = window.sessionStorage.key(index);
+        if (key?.startsWith('c48:coordinator-queue:')) window.sessionStorage.removeItem(key);
+      }
+    } catch {
+      // Session cleanup still completes if browser storage is unavailable.
+    }
+    sessionGenerationRef.current += 1;
+    pendingRouteRef.current = null;
     setUser(null);
     setSessionState('guest');
     setWorkspace('citizen');
     setPageId('sos');
+    writeRoute('citizen', 'sos', null, 'replace');
     setSelectedTrackingCode('');
     setSelectedMissionId('');
     setSelectedRequestId('');
@@ -1464,15 +1554,77 @@ function App() {
     setShowAuthModal(openLogin);
   }
 
+  function routeAfterLogin(value: Me, preferRoleDefault = false) {
+    const pendingUrl = pendingRouteRef.current ? new URL(pendingRouteRef.current) : null;
+    const requested = pendingUrl ? routeFromUrl(pendingUrl) : preferRoleDefault ? null : routeFromUrl();
+    const route = permittedRoute(value, requested);
+    setWorkspace(route.workspace);
+    setPageId(route.page);
+    writeRoute(route.workspace, route.page, value, 'replace');
+    if (pendingUrl && requested?.workspace === route.workspace && requested.page === route.page) {
+      const url = new URL(window.location.href);
+      for (const key of ['step', 'view']) {
+        const parameter = pendingUrl.searchParams.get(key);
+        if (parameter) url.searchParams.set(key, parameter);
+      }
+      normalizeSubview(url, route.workspace, route.page, value);
+      window.history.replaceState(null, '', url);
+    }
+    pendingRouteRef.current = null;
+  }
+
   useEffect(() => {
     const onExpired = () => {
       if (!user) return;
       resetSession(true);
       setSessionError('Phiên đã hết hạn. Vui lòng đăng nhập lại.');
+      notifyOtherTabs('expired');
     };
     window.addEventListener('c48:session-expired', onExpired);
     return () => window.removeEventListener('c48:session-expired', onExpired);
   }, [user]);
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const channel = new BroadcastChannel('c48-web-session');
+    sessionChannelRef.current = channel;
+    channel.onmessage = (event: MessageEvent) => {
+      if (event.data === 'signed-out' || event.data === 'expired') {
+        resetSession(event.data === 'expired');
+        return;
+      }
+      if (event.data !== 'signed-in') return;
+      const generation = ++sessionGenerationRef.current;
+      setSessionState('loading');
+      void me()
+        .then((value) => {
+          if (generation !== sessionGenerationRef.current) return;
+          setUser(value);
+          setSessionState('ready');
+          setSessionError('');
+          setShowAuthModal(false);
+          setShowPasswordModal(false);
+          setProfileMenuOpen(false);
+          setMenuOpen(false);
+          routeAfterLogin(value);
+          setSelectedTrackingCode('');
+          setSelectedMissionId('');
+          setSelectedRequestId('');
+          setSharingTeamId('');
+        })
+        .catch((cause) => {
+          if (generation !== sessionGenerationRef.current) return;
+          if (cause instanceof ApiError && cause.status === 401) {
+            resetSession();
+          } else {
+            resetSession();
+            setSessionError(cause instanceof Error ? cause.message : 'Không thể kiểm tra phiên.');
+            setSessionState('error');
+          }
+        });
+    };
+    return () => { channel.close(); sessionChannelRef.current = null; };
+  }, []);
 
   useEffect(() => {
     if (!profileMenuOpen) return;
@@ -1515,17 +1667,27 @@ function App() {
   }, [sharingTeamId, user]);
 
   useEffect(() => {
+    const generation = ++sessionGenerationRef.current;
     me()
       .then((value) => {
+        if (generation !== sessionGenerationRef.current) return;
         setUser(value);
         setSessionState('ready');
-        const defaultWs = defaultWorkspaceForUser(value);
-        setWorkspace(defaultWs);
-        setPageId(allowedPages(defaultWs, value)[0]?.id || 'sos');
+        routeAfterLogin(value);
       })
       .catch((cause) => {
+        if (generation !== sessionGenerationRef.current) return;
         if (cause instanceof ApiError && cause.status === 401) {
           setSessionState('guest');
+          const requested = routeFromUrl();
+          if (requested && (requested.workspace !== 'citizen' || requested.page === 'account')) {
+            pendingRouteRef.current = window.location.href;
+            setShowAuthModal(true);
+          }
+          const route = permittedRoute(null, requested);
+          setWorkspace(route.workspace);
+          setPageId(route.page);
+          writeRoute(route.workspace, route.page, null, 'replace');
         } else {
           setSessionError(cause instanceof Error ? cause.message : 'Không thể kiểm tra phiên.');
           setSessionState('error');
@@ -1533,31 +1695,58 @@ function App() {
       });
   }, []);
 
+  useEffect(() => {
+    const restoreRoute = () => {
+      const route = permittedRoute(user, routeFromUrl());
+      setWorkspace(route.workspace);
+      setPageId(route.page);
+      setSelectedTrackingCode('');
+      setSelectedMissionId('');
+      setSelectedRequestId('');
+      setMenuOpen(false);
+      setProfileMenuOpen(false);
+      writeRoute(route.workspace, route.page, user, 'replace');
+    };
+    window.addEventListener('popstate', restoreRoute);
+    return () => window.removeEventListener('popstate', restoreRoute);
+  }, [user]);
+
   const workspaces = allowedWorkspaces(user);
   const navigation = allowedPages(workspace, user);
   const selected = pageId === 'account' && user
     ? { id: 'account', title: 'Tài khoản', icon: 'account' }
     : navigation.find((page) => page.id === pageId) || navigation[0] || pages.citizen[0];
 
+  useEffect(() => {
+    document.title = sessionState === 'loading' ? 'Reliva · Chung tay cứu trợ thiên tai' : `${selected.title} · Reliva`;
+  }, [sessionState, selected.title]);
+
   function changeWorkspace(next: Workspace) {
+    pendingRouteRef.current = null;
     setWorkspace(next);
-    setPageId(allowedPages(next, user)[0]?.id || 'sos');
+    const nextPage = allowedPages(next, user)[0]?.id || 'sos';
+    setPageId(nextPage);
+    writeRoute(next, nextPage, user);
     setMenuOpen(false);
     setProfileMenuOpen(false);
   }
 
   function changePage(id: string) {
+    pendingRouteRef.current = null;
     if (id === 'track') setSelectedTrackingCode('');
     setSelectedMissionId('');
     setSelectedRequestId('');
     setPageId(id);
+    writeRoute(workspace, id, user);
     setMenuOpen(false);
     setProfileMenuOpen(false);
   }
 
   function trackOwnedRequest(code: string) {
+    pendingRouteRef.current = null;
     setSelectedTrackingCode(code);
     setPageId('track');
+    writeRoute('citizen', 'track', user);
     setMenuOpen(false);
   }
 
@@ -1570,7 +1759,12 @@ function App() {
     } finally {
       resetSession();
       setSessionError('');
+      notifyOtherTabs('signed-out');
     }
+  }
+
+  if (sessionState === 'loading') {
+    return <div className="session-loading" role="status">Đang kiểm tra phiên đăng nhập…</div>;
   }
 
   return (
@@ -1652,7 +1846,7 @@ function App() {
                 </span>
               </button>
               {profileMenuOpen && <div className="profile-menu" role="menu">
-                <button type="button" role="menuitem" onClick={() => { setPageId('account'); setProfileMenuOpen(false); }}>Xem hồ sơ</button>
+                <button type="button" role="menuitem" onClick={() => changePage('account')}>Xem hồ sơ</button>
                 <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); void signOut(); }}>Đăng xuất</button>
               </div>}
               </div>
@@ -1677,7 +1871,7 @@ function App() {
         </div>}
 
         <main className={`content ${workspace === 'citizen' && selected.id === 'sos' ? 'content--sos' : ''}`}>
-          <ContentErrorBoundary key={`${workspace}:${selected.id}`}>
+          <ContentErrorBoundary key={`${user?.id || 'guest'}:${workspace}:${selected.id}`}>
           <React.Suspense fallback={<div className="card" role="status">Đang tải nội dung…</div>}>
           <div className="heading">
             <div>
@@ -1688,11 +1882,6 @@ function App() {
             </div>
           </div>
 
-          {sessionState === 'loading' && (
-            <div className="card" role="status">
-              Đang kiểm tra phiên đăng nhập…
-            </div>
-          )}
           {sessionState === 'error' && (
             <div className="card notice error" role="alert">
               {sessionError}
@@ -1714,7 +1903,6 @@ function App() {
           {user?.must_change_password ? (
             <PasswordChange forced onChanged={setUser} />
           ) : (
-            sessionState !== 'loading' &&
             sessionState !== 'error' && (
               <>
                 {selected.id === 'account' && user ? (
@@ -1737,18 +1925,20 @@ function App() {
                   <Donations user={user} />
                 ) : workspace === 'coordinator' &&
                   ['queue', 'verify', 'triage', 'assign'].includes(selected.id) ? (
-                  <Coordinator key={`${selected.id}:${selectedRequestId}`} page={selected.id}
+                  <Coordinator key={`${selected.id}:${selectedRequestId}`} page={selected.id} currentUserId={user!.id}
                     initialRequestId={selectedRequestId} />
                 ) : workspace === 'coordinator' && selected.id === 'needs' && user ? (
                   <Operations page="needs" user={user} />
                 ) : ['volunteer', 'coordinator'].includes(workspace) &&
                   selected.id === 'notices' ? (
-                  <Notices onOpenRequest={workspace === 'coordinator' ? (requestId) => {
+                  <Notices key={workspace} onOpenRequest={workspace === 'coordinator' ? (requestId) => {
                     setSelectedRequestId(requestId);
                     setPageId('queue');
+                    writeRoute('coordinator', 'queue', user);
                   } : undefined} onOpenMission={workspace === 'volunteer' ? (missionId) => {
                     setSelectedMissionId(missionId);
                     setPageId('missions');
+                    writeRoute('volunteer', 'missions', user);
                   } : undefined} />
                 ) : ['coordinator', 'operations'].includes(workspace) &&
                   selected.id === 'campaigns' ? (
@@ -1780,12 +1970,13 @@ function App() {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         onReady={(loggedInUser) => {
+          sessionGenerationRef.current += 1;
           setUser(loggedInUser);
           setSessionState('ready');
-          const defaultWs = defaultWorkspaceForUser(loggedInUser);
-          setWorkspace(defaultWs);
-          setPageId(allowedPages(defaultWs, loggedInUser)[0]?.id || 'sos');
+          setSessionError('');
+          routeAfterLogin(loggedInUser, true);
           setShowAuthModal(false);
+          notifyOtherTabs('signed-in');
         }}
       />
       {showPasswordModal && user && (

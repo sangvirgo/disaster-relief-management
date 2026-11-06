@@ -8,6 +8,7 @@ type ContactAttempt = {
   id: string;
   contact_target: string;
   outcome: string;
+  actor_user_id?: string | null;
   note?: string | null;
   attempted_at?: string;
 };
@@ -34,6 +35,8 @@ export function ContactAttemptPanel({
   requestId,
   status,
   version,
+  currentUserId,
+  reporterUserId,
   initial,
   onSuccess,
   onStale,
@@ -41,6 +44,8 @@ export function ContactAttemptPanel({
   requestId: string;
   status: string;
   version: number;
+  currentUserId: string;
+  reporterUserId?: string | null;
   initial: ContactAttemptPage;
   onSuccess: () => void;
   onStale: () => void;
@@ -97,25 +102,28 @@ export function ContactAttemptPanel({
     }
   }
 
+  const canRecover = !reporterUserId && !['REJECTED', 'DUPLICATE', 'RESOLVED', 'CLOSED', 'CANCELLED'].includes(status);
   const eligibleContacts = attempts.filter(
-    (item) => item.outcome === 'REACHED' && ['REPORTER', 'ALTERNATE'].includes(item.contact_target)
+    (item) => item.outcome === 'REACHED' && item.contact_target === 'REPORTER'
+      && item.actor_user_id !== currentUserId
   );
-  if (status !== 'VERIFYING' && attempts.length === 0 && !more) return null;
+  if ((!canRecover || status !== 'VERIFYING') && attempts.length === 0 && !more) return null;
 
   return (
     <section className="contact-attempt-panel">
-      {status === 'VERIFYING' && (
+      <details className="secondary-command">
+        <summary>{canRecover ? 'Khôi phục mã theo dõi SOS' : 'Lịch sử liên hệ'}</summary>
+      {canRecover && status === 'VERIFYING' && (
         <>
-          <h3>Ghi nhận lần liên hệ xác minh</h3>
-          <p>Ghi lại người đã liên hệ và kết quả. Hệ thống lưu điều phối viên thực hiện vào lịch sử.</p>
+          <p>Chỉ ghi nhận liên hệ khi cần cấp lại mã theo dõi. Điều phối viên cấp mã phải khác người đã liên hệ.</p>
           <CommandForm
             key={`contact-attempt-${requestId}-${version}`}
             spec={{
-              title: 'Thêm lần liên hệ',
+              title: 'Ghi nhận liên hệ cho khôi phục mã',
               service: 'response',
               path: `/requests/${requestId}/contact-attempts`,
               fields: [
-                { name: 'contact_target', label: 'Đối tượng liên hệ', type: 'select', required: true, options: contactTargets },
+                { name: 'contact_target', label: 'Đối tượng liên hệ', type: 'select', required: true, options: contactTargets.filter((target) => target.value === 'REPORTER') },
                 { name: 'outcome', label: 'Kết quả liên hệ', type: 'select', required: true, options: contactOutcomes },
                 { name: 'note', label: 'Ghi chú', type: 'textarea', maxLength: 1000 },
               ],
@@ -157,9 +165,8 @@ export function ContactAttemptPanel({
       )}
       {error && <p className="notice error" role="alert">{error}</p>}
 
-      {eligibleContacts.length > 0 && (
-        <details className="secondary-command">
-          <summary>Cấp mã khôi phục</summary>
+      {canRecover && eligibleContacts.length > 0 && (
+        <div className="recovery-issue-panel">
           <RecoveryIssue
             key={`recovery-${requestId}-${version}-${eligibleContacts.length}`}
             service="response"
@@ -167,9 +174,11 @@ export function ContactAttemptPanel({
             version={version}
             kind="sos"
             contacts={attempts}
+            currentUserId={currentUserId}
           />
-        </details>
+        </div>
       )}
+      </details>
     </section>
   );
 }

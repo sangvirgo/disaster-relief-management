@@ -5,6 +5,8 @@ import { label } from '../../i18n/labels';
 import { formatQuantity } from '../../i18n/quantity';
 import type { Me } from '../../auth/session';
 import { confirmAction } from '../../components/confirmAction';
+import { useUrlView } from '../../app/useUrlView';
+import { donationViews } from '../../app/routeViews';
 
 type DriveItem = {
   item_id: string;
@@ -53,7 +55,7 @@ function secret32(): string {
 }
 
 export function Donations({ user }: { user: Me | null }) {
-  const [view, setView] = useState<'drives' | 'donation'>('drives');
+  const [view, setView] = useUrlView('view', donationViews, 'drives');
   const [showDeclaration, setShowDeclaration] = useState(false);
   const [closingDeclaration, setClosingDeclaration] = useState(false);
   function closeDeclaration() {
@@ -133,6 +135,23 @@ export function Donations({ user }: { user: Me | null }) {
     : disputeReason.length > 2000 ? 'Nội dung cần rà soát không được vượt quá 2.000 ký tự.' : '';
   const guestCredentials = user ? ('include' as const) : ('omit' as const);
   const [showCreatedTracking, setShowCreatedTracking] = useState(false);
+  const accountKey = user?.id ?? 'guest';
+  const previousAccountKey = useRef(accountKey);
+  useEffect(() => {
+    if (previousAccountKey.current === accountKey) return;
+    previousAccountKey.current = accountKey;
+    lookupVersion.current += 1;
+    setTrackId('');
+    setTrackSecret('');
+    setVerifiedSecret('');
+    setTracking(null);
+    setCreated(null);
+    setCreatedSecret('');
+    setShowCreatedTracking(false);
+    setTrackingAttempted(false);
+    setTrackingTouched({});
+    setError('');
+  }, [accountKey]);
   const nav = <div className="donation-nav" role="group" aria-label="Mục đóng góp">
     <button type="button" className={`button ${view === 'drives' ? '' : 'secondary'}`} onClick={() => { setView('drives'); setShowCreatedTracking(false); setError(''); }}>Đợt quyên góp</button>
     <button type="button" className={`button ${view === 'donation' ? '' : 'secondary'}`} onClick={() => { setView('donation'); setError(''); }}>Theo dõi đóng góp</button>
@@ -461,7 +480,7 @@ export function Donations({ user }: { user: Me | null }) {
               />
               {(trackingAttempted || trackingTouched.trackSecret) && donationTrackSecretError && <small className="field-error" role="alert">{donationTrackSecretError}</small>}
             </label>
-            <button className="button" disabled={loading || Boolean(donationTrackIdError || donationTrackSecretError)}>
+            <button className="button" disabled={loading}>
               Xem tiến độ
             </button>
           </form>
@@ -510,7 +529,7 @@ export function Donations({ user }: { user: Me | null }) {
                 />
                 {(recoveryAttempted || recoveryTouched.code) && donationRecoveryCodeError && <small className="field-error" role="alert">{donationRecoveryCodeError}</small>}
               </label>
-              <button className="button secondary" disabled={loading || Boolean(donationRecoveryPublicError || donationRecoveryCodeError)}>
+              <button className="button secondary" disabled={loading}>
                 Gắn bản khai với tài khoản
               </button>
               {recoveryMessage && (
@@ -578,7 +597,7 @@ export function Donations({ user }: { user: Me | null }) {
                 />
                 {(disputeAttempted || disputeTouched) && donationDisputeError && <small className="field-error" role="alert">{donationDisputeError}</small>}
               </label>
-              <button className="button donation-action" disabled={loading || Boolean(donationDisputeError)}>
+              <button className="button donation-action" disabled={loading}>
                 Gửi khiếu nại
               </button>
             </form>

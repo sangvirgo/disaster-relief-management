@@ -8,6 +8,9 @@ import { googleMapsDirectionsUrl } from '../../maps/googleMaps';
 import { LocationPicker, type Point } from '../../maps/LocationPicker';
 import { confirmAction } from '../../components/confirmAction';
 import { DetailSurface } from '../../components/DetailSurface';
+import { useUrlView } from '../../app/useUrlView';
+import { noticeViews } from '../../app/routeViews';
+import { TeamMembers } from './TeamMembers';
 
 type Mission = ResponseComponents['schemas']['MissionView'];
 type MissionDetail = ResponseComponents['schemas']['MissionDetail'];
@@ -68,7 +71,7 @@ export function Notices({ onOpenMission, onOpenRequest }: {
   const [cursor, setCursor] = useState('');
   const [next, setNext] = useState('');
   const [error, setError] = useState('');
-  const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [filter, setFilter] = useUrlView('view', noticeViews, 'all');
   const [revision, setRevision] = useState(0);
   const [markingAll, setMarkingAll] = useState(false);
   const [markAllMessage, setMarkAllMessage] = useState('');
@@ -276,6 +279,9 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
 
   // Team management state
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [canManageTeam, setCanManageTeam] = useState(false);
+  const [manageableTeamIds, setManageableTeamIds] = useState<Set<string>>(new Set());
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [teamPoint, setTeamPoint] = useState<Point | null>(null);
   const [teamAccuracy, setTeamAccuracy] = useState<number | null>(null);
   const [teamMessage, setTeamMessage] = useState('');
@@ -336,6 +342,19 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
       live = false;
     };
   }, [isTeam, cursor, revision]);
+
+  useEffect(() => {
+    if (!isTeam) return;
+    let live = true;
+    const teams = items as Team[];
+    Promise.all(teams.map(async (team) => {
+      try {
+        const page = await api<{ can_manage_members: boolean }>('response', `/teams/${team.id}/members?limit=1`);
+        return page.can_manage_members ? team.id : null;
+      } catch { return null; }
+    })).then((ids) => { if (live) setManageableTeamIds(new Set(ids.filter((id): id is string => Boolean(id)))); });
+    return () => { live = false; };
+  }, [isTeam, items]);
 
   // Load mission details on selection
   useEffect(() => {
@@ -631,43 +650,51 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
           {isTeam
             ? (items as Team[]).map((team) => (
                 <article
-                  className={`record ${selectedTeam?.id === team.id ? 'selected' : ''}`}
+                  className={`record volunteer-team-card ${selectedTeam?.id === team.id ? 'selected' : ''}`}
                   key={team.id}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => {
+                >
+                  <button type="button" className="volunteer-team-open" aria-label={`Xem đội ${team.name}`} onClick={() => {
+                    setCanManageTeam(false);
                     setSelectedTeam(team);
                     setTeamPoint(null);
                     setTeamMessage('');
-                  }}
-                >
-                  <div>
+                  }}>
+                  <span className="volunteer-team-summary">
                     <strong>{team.name}</strong>
-                    <p>
-                      {label(team.kind)} · <span className="chip">{label(team.availability)}</span>
-                    </p>
-                    <p>
+                    <span className="team-summary-line">
+                      {label(team.kind)} · <span className={`chip team-availability-status ${team.availability === 'AVAILABLE' && team.status === 'ACTIVE' ? 'is-ready' : ''}`}><span className="team-availability-dot" aria-hidden="true" />{label(team.availability)}</span>
+                    </span>
+                    <span className="team-summary-line">
                       Kỹ năng: {team.skills.length ? team.skills.map(label).join(', ') : 'Chưa có'}
-                    </p>
+                    </span>
                     <small>
                       {team.position
                         ? `Vị trí cập nhật ${positionAge(team.position.age_s)} trước (${label(team.position.source)})`
                         : 'Chưa có dữ liệu tọa độ'}
                     </small>
-                  </div>
-                  <button
-                    className="button secondary"
-                    type="button"
-                    onClick={() => setSelectedTeam(team)}
-                  >
-                    Quản lý đội
+                  </span>
                   </button>
+                  {manageableTeamIds.has(team.id) && <button type="button" className="button secondary team-card-add" onClick={() => {
+                    setCanManageTeam(false);
+                    setSelectedTeam(team);
+                    setTeamPoint(null);
+                    setTeamMessage('');
+                    setAddMemberOpen(true);
+                  }}>Thêm thành viên</button>}
                 </article>
               ))
             : (items as Mission[]).map((mission) => (
                 <article
-                  className={`record ${selectedMission?.id === mission.id ? 'selected' : ''}`}
+                  className={`record volunteer-record-open ${selectedMission?.id === mission.id ? 'selected' : ''}`}
                   key={mission.id}
-                  style={{ cursor: 'pointer' }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Xem nhiệm vụ của ${mission.team.name}, ${label(mission.status)}, tạo lúc ${timeLabel(mission.created_at)}`}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    selectMission(mission);
+                  }}
                   onClick={() => selectMission(mission)}
                 >
                   <div>
@@ -681,13 +708,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     )}
                     <small>{timeLabel(mission.created_at)}</small>
                   </div>
-                  <button
-                    className="button secondary"
-                    type="button"
-                    onClick={(event) => { event.stopPropagation(); selectMission(mission); }}
-                  >
-                    Xem nhiệm vụ
-                  </button>
+                  <span className="button secondary" aria-hidden="true">Xem nhiệm vụ</span>
                 </article>
               ))}
         </div>
@@ -702,14 +723,15 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
       <section className="card mission-detail-card" ref={missionCardRef}>
         {isTeam ? (
           <>
-            <h2>Chi tiết & Vị trí Đội cứu hộ</h2>
+            <h2>Chi tiết đội cứu hộ</h2>
             {!selectedTeam && (
               <div className="empty">
-                Chọn một đội cứu hộ từ danh sách để xem và cập nhật vị trí.
+                Chọn một đội cứu hộ để xem thông tin và thành viên.
               </div>
             )}
             {selectedTeam && (
               <div className="form-stack">
+                {canManageTeam && <span className="chip team-leader-badge">Bạn đang quản lý đội này</span>}
                 <div className="detail-grid mission-facts">
                   <p>
                     <strong>Tên đội</strong>
@@ -729,7 +751,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                       {label(selectedTeam.availability)}
                     </span>
                   </p>
-                  <p className="muted">Sẵn sàng hoạt động nghĩa là đội đang bật nhận việc. Đội vẫn không được giao thêm khi có nhiệm vụ đang thực hiện.</p>
+                  <p className="muted team-availability-help">Đội sẵn sàng nhận việc khi không có nhiệm vụ đang thực hiện.</p>
                   <p>
                     <strong>Chế độ báo cáo</strong>
                     <span className="detail-value">
@@ -750,7 +772,9 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   </p>
                 </div>
 
-                <div className="action-grid">
+                <TeamMembers key={selectedTeam.id} teamId={selectedTeam.id} onManageChange={setCanManageTeam} addOpen={addMemberOpen} onCloseAdd={() => setAddMemberOpen(false)} />
+
+                {canManageTeam && <div className="action-grid">
                   <button
                     className={`button ${selectedTeam.availability === 'AVAILABLE' ? 'secondary' : ''}`}
                     disabled={busy}
@@ -760,8 +784,9 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                       ? 'Chuyển sang Tạm ngưng'
                       : 'Chuyển sang Sẵn sàng hoạt động'}
                   </button>
-                </div>
+                </div>}
 
+                {canManageTeam && selectedTeam.reporting_mode === 'APP' && selectedTeam.status === 'ACTIVE' && <>
                 <hr />
                 <h3>Cập nhật vị trí GPS của đội</h3>
                 <p>Vị trí mới nhất giúp điều phối viên tìm đội gần nơi cần hỗ trợ. Chỉ chia sẻ khi bạn bật và tab trình duyệt đang hoạt động.</p>
@@ -814,15 +839,16 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     {teamMessage}
                   </p>
                 )}
+                </>}
               </div>
             )}
           </>
         ) : (
           <>
-            <h2>Điều hành nhiệm vụ cứu nạn</h2>
+            <h2>Chi tiết nhiệm vụ cứu nạn</h2>
             {!activeMission && (
               <div className="empty">
-                Chọn một nhiệm vụ để xem thông tin và thực hiện điều hành.
+                Chọn một nhiệm vụ để xem thông tin và tiến độ.
               </div>
             )}
             {missionLoading && <p role="status">Đang tải hồ sơ nhiệm vụ…</p>}
@@ -934,7 +960,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                 )}
 
                 <hr />
-                <h3>Thao tác điều hành nhiệm vụ</h3>
+                <h3>{canManageMission ? 'Thao tác điều hành nhiệm vụ' : 'Theo dõi nhiệm vụ'}</h3>
                 {!canManageMission && (
                   <p className="notice">
                     Bạn có thể xem nhiệm vụ và minh chứng. Đội trưởng phụ trách tiếp nhận, cập nhật tiến độ và báo cáo kết quả.
@@ -983,7 +1009,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                       />
                       {(missionFormAttempted.decline || missionFormTouched.decline) && declineReasonError && <small className="field-error" role="alert">{declineReasonError}</small>}
                     </label>
-                    <button className="button" disabled={busy || Boolean(declineReasonError)}>
+                    <button className="button" disabled={busy}>
                       Xác nhận từ chối
                     </button>
                   </form>
@@ -1015,19 +1041,21 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   </div>
                 )}
 
-                {/* 4. Trạng thái EN_ROUTE hoặc ON_SCENE: Hoàn thành hoặc Thất bại */}
+                {/* 4. Hoàn thành chỉ sau khi tới hiện trường; thất bại có thể báo khi đang di chuyển. */}
                 {canManageMission && ['EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) && (
                   <div className="action-grid">
-                    <button
-                      className="button"
-                      disabled={busy}
-                      onClick={() => {
-                        setShowCompleteForm(true);
-                        setShowFailForm(false);
-                      }}
-                    >
-                      Báo cáo hoàn thành giải cứu
-                    </button>
+                    {activeMission.status === 'ON_SCENE' && (
+                      <button
+                        className="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setShowCompleteForm(true);
+                          setShowFailForm(false);
+                        }}
+                      >
+                        Báo cáo hoàn thành giải cứu
+                      </button>
+                    )}
                     <button
                       className="button secondary"
                       disabled={busy}
@@ -1041,7 +1069,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   </div>
                 )}
 
-                {canManageMission && showCompleteForm && ['EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) && (
+                {canManageMission && showCompleteForm && activeMission.status === 'ON_SCENE' && (
                   <form
                     className="form-stack command-form"
                     noValidate
@@ -1101,7 +1129,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                       </div>
                     )}
                     <p className="account-hint">Nếu chọn tệp, Web sẽ tải minh chứng trước rồi mới ghi nhận hoàn thành. Ảnh tối đa 10 MB; video MP4 tối đa 50 MB.</p>
-                    <button className="button" disabled={busy || Boolean(outcomeNoteError)}>
+                    <button className="button" disabled={busy}>
                       Xác nhận hoàn thành giải cứu
                     </button>
                   </form>
@@ -1134,7 +1162,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                       />
                       {(missionFormAttempted.failed || missionFormTouched.failed) && progressNoteError && <small className="field-error" role="alert">{progressNoteError}</small>}
                     </label>
-                    <button className="button" disabled={busy || Boolean(progressNoteError)}>
+                    <button className="button" disabled={busy}>
                       Xác nhận báo cáo thất bại
                     </button>
                   </form>

@@ -1,9 +1,10 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
 import type { Me } from '../../auth/session';
 import type { components as ResponseComponents } from '../../api/generated/response';
 import { requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { LocationPicker } from '../../maps/LocationPicker';
+import { clearSosDraft, readSosDraft, writeSosDraft, type SosDraft } from './sosDraft';
 
 // Versioned demo catalog: docs/backend/seed/seed-response.sql (2026-10-18).
 // Replace with a public category contract before non-demo deployment.
@@ -42,30 +43,34 @@ export function SosForm({
   onConfirmed?: (receipt: Created) => void;
   onTrack?: (code: string) => void;
 }) {
-  const [mode, setMode] = useState<'SELF' | 'PROXY'>('SELF');
-  const [category, setCategory] = useState('');
-  const [description, setDescription] = useState('');
-  const [people, setPeople] = useState('');
-  const [children, setChildren] = useState('');
-  const [elderly, setElderly] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [beneficiaryPhone, setBeneficiaryPhone] = useState('');
-  const [alternateName, setAlternateName] = useState('');
-  const [alternatePhone, setAlternatePhone] = useState('');
-  const [proxyContactsOpen, setProxyContactsOpen] = useState(false);
-  const [danger, setDanger] = useState(false);
-  const [needsRescue, setNeedsRescue] = useState(true);
-  const [needsRelief, setNeedsRelief] = useState(false);
-  const [longitude, setLongitude] = useState('');
-  const [latitude, setLatitude] = useState('');
+  const [initialDraft] = useState(() => readSosDraft(user?.id));
+  const [restored, setRestored] = useState(Boolean(initialDraft));
+  const [mode, setMode] = useState<'SELF' | 'PROXY'>(initialDraft?.mode ?? 'SELF');
+  const [category, setCategory] = useState(initialDraft?.category ?? '');
+  const [description, setDescription] = useState(initialDraft?.description ?? '');
+  const [people, setPeople] = useState(initialDraft?.people ?? '');
+  const [children, setChildren] = useState(initialDraft?.children ?? '');
+  const [elderly, setElderly] = useState(initialDraft?.elderly ?? '');
+  const [name, setName] = useState(initialDraft?.name ?? '');
+  const [phone, setPhone] = useState(initialDraft?.phone ?? '');
+  const [beneficiaryPhone, setBeneficiaryPhone] = useState(initialDraft?.beneficiaryPhone ?? '');
+  const [alternateName, setAlternateName] = useState(initialDraft?.alternateName ?? '');
+  const [alternatePhone, setAlternatePhone] = useState(initialDraft?.alternatePhone ?? '');
+  const [proxyContactsOpen, setProxyContactsOpen] = useState(Boolean(
+    initialDraft?.beneficiaryPhone || initialDraft?.alternateName || initialDraft?.alternatePhone
+  ));
+  const [danger, setDanger] = useState(initialDraft?.danger ?? false);
+  const [needsRescue, setNeedsRescue] = useState(initialDraft?.needsRescue ?? true);
+  const [needsRelief, setNeedsRelief] = useState(initialDraft?.needsRelief ?? false);
+  const [longitude, setLongitude] = useState(initialDraft?.longitude ?? '');
+  const [latitude, setLatitude] = useState(initialDraft?.latitude ?? '');
   const [source, setSource] = useState<'MANUAL_PIN' | 'GPS'>('MANUAL_PIN');
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [captured, setCaptured] = useState<string | null>(null);
-  const [relationship, setRelationship] = useState('');
-  const [informationSource, setInformationSource] = useState('');
-  const [situationAt, setSituationAt] = useState('');
-  const [contactability, setContactability] = useState('UNKNOWN');
+  const [relationship, setRelationship] = useState(initialDraft?.relationship ?? '');
+  const [informationSource, setInformationSource] = useState(initialDraft?.informationSource ?? '');
+  const [situationAt, setSituationAt] = useState(initialDraft?.situationAt ?? '');
+  const [contactability, setContactability] = useState(initialDraft?.contactability ?? 'UNKNOWN');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [networkError, setNetworkError] = useState(false);
@@ -75,6 +80,35 @@ export function SosForm({
   const [created, setCreated] = useState<Created | null>(null);
   const [ackSecret, setAckSecret] = useState('');
   const pending = useRef<Pending | null>(null);
+
+  useEffect(() => {
+    if (created) return;
+    const draft: SosDraft = {
+      mode, category, description, people, children, elderly, name, phone,
+      beneficiaryPhone, alternateName, alternatePhone, danger, needsRescue, needsRelief,
+      longitude, latitude, relationship, informationSource, situationAt, contactability,
+    };
+    const hasInput = Object.entries(draft).some(([field, value]) =>
+      !['mode', 'danger', 'needsRescue', 'needsRelief', 'contactability'].includes(field) && Boolean(value)) ||
+      mode === 'PROXY' || danger || !needsRescue || needsRelief || contactability !== 'UNKNOWN';
+    if (hasInput) writeSosDraft(user?.id, draft);
+    else clearSosDraft(user?.id);
+  }, [user?.id, created, mode, category, description, people, children, elderly, name, phone,
+    beneficiaryPhone, alternateName, alternatePhone, danger, needsRescue, needsRelief,
+    longitude, latitude, relationship, informationSource, situationAt, contactability]);
+
+  function discardDraft() {
+    clearSosDraft(user?.id);
+    setRestored(false);
+    setMode('SELF'); setCategory(''); setDescription(''); setPeople(''); setChildren('');
+    setElderly(''); setName(''); setPhone(''); setBeneficiaryPhone('');
+    setAlternateName(''); setAlternatePhone(''); setDanger(false); setNeedsRescue(true);
+    setNeedsRelief(false); setLongitude(''); setLatitude(''); setSource('MANUAL_PIN');
+    setAccuracy(null); setCaptured(null); setRelationship(''); setInformationSource('');
+    setSituationAt(''); setContactability('UNKNOWN'); setProxyContactsOpen(false);
+    setError(''); setFieldError(null); setTouched({}); setAttempted(false);
+    pending.current = null;
+  }
 
   function locate() {
     if (!navigator.geolocation) {
@@ -157,7 +191,6 @@ export function SosForm({
     return errors;
   }
   const clientErrors = getClientErrors();
-  const hasInvalidFields = Boolean(fieldError || Object.keys(clientErrors).length);
   function build(): Pending {
     const invalid = (field: string, message: string): never => {
       throw Object.assign(new Error(message), { field });
@@ -229,6 +262,7 @@ export function SosForm({
         idempotencyKey: command.key,
         headers: command.secret ? { 'X-Tracking-Secret': command.secret } : {},
       });
+      clearSosDraft(user?.id);
       setAckSecret(command.secret);
       setCreated(result);
       onConfirmed?.(result);
@@ -299,6 +333,10 @@ export function SosForm({
       pending.current = null;
     }} noValidate>
       <h2>Thông tin yêu cầu hỗ trợ</h2>
+      {restored && <div className="notice warning" role="status">
+        <strong>Đã khôi phục bản nháp chưa gửi.</strong> Kiểm tra lại tình huống và vị trí trước khi gửi.
+        <button type="button" className="button secondary" onClick={discardDraft}>Bỏ bản nháp</button>
+      </div>}
       {user && (
         <fieldset>
           <legend>Người cần hỗ trợ</legend>
@@ -614,7 +652,7 @@ export function SosForm({
             'Bạn có thể thử lại với cùng yêu cầu; ứng dụng giữ khóa gửi lại khi trang còn mở.'}
         </p>
       )}
-      <button type="submit" className="button" disabled={busy || hasInvalidFields}>
+      <button type="submit" className="button" disabled={busy}>
         {busy ? 'Đang gửi…' : 'Gửi yêu cầu SOS'}
       </button>
       <small>

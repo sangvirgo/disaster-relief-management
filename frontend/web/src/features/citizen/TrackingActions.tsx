@@ -267,7 +267,7 @@ export function TrackingActions({
           </div>
           <button
             className="button"
-            disabled={busy || supplementInvalid || !hasSupplementChanges}
+            disabled={busy || !hasSupplementChanges}
           >
             Gửi thông tin bổ sung
           </button>

@@ -96,6 +96,7 @@
 
 .queue-filter-panel > summary:focus-visible { outline: 3px solid #8bb8ff; outline-offset: 3px; }
 .queue-filter-fields { display: grid; gap: 14px; padding: 0 0 14px; }
+.queue-filter-quick { margin: 12px 0 10px; padding: 0; }
 .queue-filter-toolbar { display: flex; justify-content: flex-end; margin-top: 10px; }
 
 .queue-filter-heading {
@@ -273,6 +274,53 @@
 
 .coordinator-layout .queue-row { align-items: flex-start; flex-direction: column; gap: 8px; }
 .coordinator-layout .queue-status-chip { align-self: flex-start; }
+
+.volunteer-record-open { cursor: pointer; }
+.volunteer-record-open:focus-visible { outline: 3px solid #8bb8ff; outline-offset: 2px; }
+.volunteer-team-card { position: relative; align-items: center; }
+.volunteer-team-open { display: block; flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.volunteer-team-open::after { content: ''; position: absolute; inset: 0; }
+.volunteer-team-open:focus-visible, .team-card-add:focus-visible { outline: 3px solid #8bb8ff; outline-offset: 3px; }
+.volunteer-team-open:hover strong { color: var(--color-primary-dark); }
+.volunteer-team-summary { display: block; }
+.team-summary-line { display: block; margin: 4px 0; color: var(--color-text-secondary); font-size: 14px; }
+.team-availability-status { display: inline-flex; align-items: center; gap: 7px; }
+.team-availability-dot { width: 9px; height: 9px; flex: none; border-radius: 50%; background: #94a3b8; box-shadow: 0 0 0 3px #e2e8f0; }
+.team-availability-status.is-ready .team-availability-dot { background: #16a34a; box-shadow: 0 0 0 3px #dcfce7; }
+.team-card-add { position: relative; z-index: 1; flex: none; align-self: center; }
+
+.team-members { border: 1px solid #dbe5f1; border-radius: 18px; padding: 20px; background: #fbfdff; }
+.team-leader-badge { width: fit-content; }
+.detail-grid .team-availability-help { display: block; color: #5c6c82; }
+.team-members-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.team-members-heading h3, .team-member-add h4 { margin: 0 0 6px; }
+.team-members-heading p, .team-member-add p { margin: 0 0 14px; }
+.team-member-list, .team-member-candidates { display: grid; gap: 8px; }
+.team-member-row { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 11px 13px; background: #fff; border: 1px solid #e0e8f2; border-radius: 12px; }
+.team-member-avatar { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; border-radius: 50%; background: #e9f1ff; color: #2256aa; font-weight: 700; }
+.team-member-identity { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.team-member-identity strong, .team-member-identity span { overflow-wrap: anywhere; }
+.team-member-identity span { color: #5c6c82; font-size: .88rem; }
+.team-member-remove, .team-member-add-button { flex: 0 0 auto; }
+.team-member-add { margin-top: 18px; padding-top: 18px; border-top: 1px solid #e0e8f2; }
+.team-member-dialog .team-member-add { margin: 0; padding: 4px 0 0; border-top: 0; }
+.team-member-dialog .team-member-add h4 { margin: 0 80px 10px 0; font-size: 22px; }
+@media (max-width: 420px) { .team-member-dialog .team-member-add h4 { margin: 42px 0 10px; font-size: 20px; } }
+.team-member-search { display: grid; gap: 7px; }
+.team-member-search label { font-weight: 650; }
+.team-member-search-row { display: flex; gap: 10px; }
+.team-member-search-row input { min-width: 0; flex: 1; }
+.team-member-search-row .button { flex: 0 0 auto; }
+.team-member-candidates { margin-top: 12px; }
+@media (max-width: 620px) {
+  .volunteer-team-card { align-items: stretch; flex-direction: column; }
+  .team-card-add { width: 100%; }
+  .team-members { padding: 16px; }
+  .team-member-row { flex-wrap: wrap; }
+  .team-member-row .button { width: 100%; }
+  .team-member-search-row { flex-direction: column; }
+  .team-member-search-row .button { width: 100%; }
+}
 
 .queue-row:hover {
   background-color: var(--color-surface-bg);

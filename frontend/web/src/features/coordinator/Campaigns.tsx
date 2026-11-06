@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import { appendPage } from '../../api/pagination';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { DetailCloseButton } from '../../components/DetailCloseButton';
+import { StatusBadge } from '../../components/StatusBadge';
 import { label, timeLabel } from '../../i18n/labels';
 
 type Campaign = {
@@ -178,7 +179,7 @@ export function Campaigns() {
                   {item.region_code || 'Nhiều khu vực'} · Tạo {timeLabel(item.created_at)}
                 </span>
               </span>
-              <span className="chip">{label(item.status)}</span>
+              <StatusBadge status={item.status} />
             </button>
           ))}
         </div>
@@ -204,7 +205,7 @@ export function Campaigns() {
               <div>
                 <dt>Trạng thái</dt>
                 <dd>
-                  <span className="chip">{label(selected.status)}</span>
+                  <StatusBadge status={selected.status} />
                 </dd>
               </div>
               <div>

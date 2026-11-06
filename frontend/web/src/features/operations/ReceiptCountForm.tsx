@@ -270,7 +270,7 @@ export function ReceiptCountForm({
           {error}
         </p>
       )}
-      <button className="button" disabled={busy || hasInvalidFields}>
+      <button className="button" disabled={busy}>
         {busy ? 'Đang gửi kết quả…' : 'Gửi kiểm đếm để duyệt'}
       </button>
     </form>

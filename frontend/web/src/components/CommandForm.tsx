@@ -8,6 +8,7 @@ export type Field = {
   label: string;
   type?: 'text' | 'number' | 'password' | 'textarea' | 'select' | 'choice-cards' | 'datetime-local' | 'location' | 'reference';
   required?: boolean;
+  requiredWhen?: { field: string; values: string[] };
   min?: number;
   max?: number;
   minLength?: number;
@@ -39,16 +40,23 @@ function pointValue(value: string) {
     ? { longitude, latitude }
     : null;
 }
-function fieldValidationError(field: Field, value: string): string | undefined {
+function isRequired(field: Field, values: Record<string, string>): boolean {
+  return Boolean(field.required || (field.requiredWhen &&
+    field.requiredWhen.values.includes(values[field.requiredWhen.field])));
+}
+function fieldValidationError(field: Field, value: string, values: Record<string, string>): string | undefined {
   const trimmed = value.trim();
   if (field.type === 'location') {
-    return field.required && !pointValue(value)
+    return isRequired(field, values) && !pointValue(value)
       ? `${field.label} là bắt buộc.`
       : undefined;
   }
-  if (field.required && !trimmed)
+  if (isRequired(field, values) && !trimmed)
     return `${field.label} là bắt buộc.`;
   if (!trimmed) return undefined;
+  if (field.type === 'reference' &&
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed))
+    return `${field.label} phải là mã hợp lệ.`;
   if (field.minLength !== undefined && trimmed.length < field.minLength)
     return `${field.label} cần ít nhất ${field.minLength} ký tự.`;
   if (field.maxLength !== undefined && value.length > field.maxLength)
@@ -91,7 +99,7 @@ export function CommandForm({
   );
   const validationErrors = Object.fromEntries(visibleFields.map((field) => [
     field.name,
-    fieldValidationError(field, values[field.name] || ''),
+    fieldValidationError(field, values[field.name] || '', values),
   ]));
   const hasInvalidFields = visibleFields.some(
     (field) => Boolean(fieldErrors[field.name] || validationErrors[field.name])
@@ -195,7 +203,7 @@ export function CommandForm({
         return (
         field.type === 'choice-cards' ? (
           <fieldset key={field.name} className="command-choice-list" aria-invalid={Boolean(inlineError)} aria-describedby={describedBy}>
-            <legend>{field.label}{field.required && <> <span className="required-mark" aria-hidden="true">*</span></>}</legend>
+            <legend>{field.label}{isRequired(field, values) && <> <span className="required-mark" aria-hidden="true">*</span></>}</legend>
             {field.options?.length ? field.options.map((option) => (
               <button
                 type="button"
@@ -215,13 +223,13 @@ export function CommandForm({
         ) : field.type === 'reference' ? (
           <div key={field.name} className="form-stack">
             <label htmlFor={`reference-${field.name}`}>
-              <span>{field.label}{field.required && <> <span className="required-mark" aria-hidden="true"> *</span></>}</span>
+              <span>{field.label}{isRequired(field, values) && <> <span className="required-mark" aria-hidden="true"> *</span></>}</span>
             </label>
             {field.options?.length && !manualFields[field.name] &&
             (!values[field.name] || field.options.some((option) => option.value === values[field.name])) ? (
               <select
                 id={`reference-${field.name}`}
-                required={field.required}
+                required={isRequired(field, values)}
                 aria-invalid={Boolean(inlineError)}
                 aria-describedby={describedBy}
                 value={values[field.name] || ''}
@@ -245,7 +253,7 @@ export function CommandForm({
               <>
                 <input
                   id={`reference-${field.name}`}
-                  required={field.required}
+                  required={isRequired(field, values)}
                   minLength={field.minLength}
                   maxLength={field.maxLength !== undefined ? field.maxLength + 1 : undefined}
                   aria-invalid={Boolean(inlineError)}
@@ -275,7 +283,7 @@ export function CommandForm({
           </div>
         ) : field.type === 'location' ? (
           <div key={field.name} className="form-stack" role="group" aria-invalid={Boolean(inlineError)} aria-describedby={describedBy}>
-            <strong>{field.label}{field.required && <> <span className="required-mark" aria-hidden="true">*</span></>}</strong>
+            <strong>{field.label}{isRequired(field, values) && <> <span className="required-mark" aria-hidden="true">*</span></>}</strong>
             <LocationPicker
               value={pointValue(values[field.name] || '')}
               onSelect={(point) => {
@@ -291,10 +299,10 @@ export function CommandForm({
           </div>
         ) : (
         <label key={field.name}>
-          <span>{field.label}{field.required && <> <span className="required-mark" aria-hidden="true"> *</span></>}</span>
+          <span>{field.label}{isRequired(field, values) && <> <span className="required-mark" aria-hidden="true"> *</span></>}</span>
           {field.type === 'textarea' ? (
             <textarea
-              required={field.required}
+              required={isRequired(field, values)}
               minLength={field.minLength}
               maxLength={field.maxLength !== undefined ? field.maxLength + 1 : undefined}
               aria-invalid={Boolean(inlineError)}
@@ -306,7 +314,7 @@ export function CommandForm({
             />
           ) : field.type === 'select' ? (
             <select
-              required={field.required}
+              required={isRequired(field, values)}
               aria-invalid={Boolean(inlineError)}
               aria-describedby={describedBy}
               value={values[field.name] || ''}
@@ -324,7 +332,7 @@ export function CommandForm({
             </select>
           ) : (
             <input
-              required={field.required}
+              required={isRequired(field, values)}
               type={field.type || 'text'}
               autoComplete={field.type === 'password' ? 'new-password' : 'off'}
               min={field.type === 'number' ? (field.min ?? 1) : undefined}
@@ -361,7 +369,7 @@ export function CommandForm({
           {message}
         </p>
       )}
-      <button className="button" disabled={busy || hasInvalidFields}>
+      <button className="button" disabled={busy}>
         {busy ? 'Đang xử lý…' : spec.title}
       </button>
     </form>

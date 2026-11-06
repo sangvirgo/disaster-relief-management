@@ -111,7 +111,7 @@ export function AsyncRequestForm({
     }
   }
   return (
-    <form className="form-stack command-form" onSubmit={submit}>
+    <form className="form-stack command-form" onSubmit={submit} noValidate>
       <h3>{kind === 'cancel' ? 'Hủy yêu cầu' : 'Kết thúc xử lý yêu cầu'}</h3>
       {!operationId && (
         <>
@@ -155,7 +155,7 @@ export function AsyncRequestForm({
               {touched.basis && basisError && <small className="field-error" id="async-request-basis-error" role="alert">{basisError}</small>}
             </label>
           )}
-          <button className="button" disabled={busy || invalid}>
+          <button className="button" disabled={busy}>
             {busy ? 'Đang gửi lệnh…' : kind === 'cancel' ? 'Xác nhận hủy' : 'Gửi đề nghị kết thúc'}
           </button>
         </>

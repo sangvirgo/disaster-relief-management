@@ -7,6 +7,7 @@ import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
 import { HeatmapPanel } from './HeatmapPanel';
 import { ContactAttemptPanel } from './ContactAttemptPanel';
+import { CoordinatorTeamPositionForm } from './CoordinatorTeamPositionForm';
 import { operationIdFromTimeline, ResolutionOperationPanel } from './ResolutionOperationPanel';
 import { RequestTimeline } from './RequestTimeline';
 import { RequestEvidencePanel } from './RequestEvidencePanel';
@@ -77,7 +78,7 @@ type Detail = QueueItem & {
   campaign_id?: string | null;
   needs_rescue: boolean;
   needs_relief_supplies: boolean;
-  reporter: { name?: string | null; contact_phone?: string | null };
+  reporter: { user_id?: string | null; name?: string | null; contact_phone?: string | null };
   subject: {
     people_affected?: number | null;
     children_count?: number | null;
@@ -92,7 +93,7 @@ type Detail = QueueItem & {
     household_reference_note?: string | null;
   };
   contact_attempts: {
-    items: { id: string; contact_target: string; outcome: string; note?: string | null; attempted_at?: string }[];
+    items: { id: string; contact_target: string; outcome: string; actor_user_id?: string | null; note?: string | null; attempted_at?: string }[];
     more: boolean;
   };
   timeline: { items: Event[]; more: boolean };
@@ -279,6 +280,29 @@ const queueStatuses = [
   ['DUPLICATE', 'Trùng yêu cầu'],
   ['CANCELLED', 'Đã hủy'],
 ] as const;
+const reviewLanes = ['NORMAL', 'RATE_LIMITED_REVIEW', 'PROXY_QUOTA_REVIEW'] as const;
+type QueueView = { status: string; selected: string | null; reviewLane: string; overdue: boolean };
+
+function queueViewKey(userId: string, page: string): string {
+  return `c48:coordinator-queue:${userId}:${page}`;
+}
+
+function readQueueView(userId: string, page: string): QueueView {
+  const fallback: QueueView = { status: stateFilter[page] || '', selected: null, reviewLane: 'NORMAL', overdue: false };
+  try {
+    const stored = JSON.parse(window.sessionStorage.getItem(queueViewKey(userId, page)) || 'null') as Partial<QueueView> | null;
+    if (!stored || typeof stored !== 'object') return fallback;
+    return {
+      status: queueStatuses.some(([value]) => value === stored.status) ? stored.status! : fallback.status,
+      selected: typeof stored.selected === 'string' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(stored.selected)
+        ? stored.selected : null,
+      reviewLane: reviewLanes.some((value) => value === stored.reviewLane) ? stored.reviewLane! : 'NORMAL',
+      overdue: stored.overdue === true,
+    };
+  } catch {
+    return fallback;
+  }
+}
 const title: Record<string, string> = {
   queue: 'Danh sách SOS',
   verify: 'Xác minh yêu cầu',
@@ -330,18 +354,20 @@ function advisoryScoreLabel(score: number | null, level: string | null): string 
   return `${advisoryLevelLabels[level]} · ${score}/100`;
 }
 
-export function Coordinator({ page, initialRequestId }: { page: string; initialRequestId?: string }) {
+export function Coordinator({ page, initialRequestId, currentUserId }: { page: string; initialRequestId?: string; currentUserId: string }) {
+  const restoredView = useRef<QueueView | null>(null);
+  if (!restoredView.current) restoredView.current = readQueueView(currentUserId, page);
   const [queue, setQueue] = useState<Queue | null>(null);
-  const [queueStatus, setQueueStatus] = useState(stateFilter[page] || '');
+  const [queueStatus, setQueueStatus] = useState(restoredView.current.status);
   const [cursor, setCursor] = useState('');
-  const [selected, setSelected] = useState<string | null>(initialRequestId || null);
+  const [selected, setSelected] = useState<string | null>(initialRequestId || restoredView.current.selected);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [candidates, setCandidates] = useState<Candidates | null>(null);
   const [candidateError, setCandidateError] = useState('');
   const [duplicates, setDuplicates] = useState<DuplicateCandidate[]>([]);
   const [duplicateError, setDuplicateError] = useState('');
-  const [reviewLane, setReviewLane] = useState('NORMAL');
-  const [overdue, setOverdue] = useState(false);
+  const [reviewLane, setReviewLane] = useState(restoredView.current.reviewLane);
+  const [overdue, setOverdue] = useState(restoredView.current.overdue);
   const [error, setError] = useState('');
   const [detailError, setDetailError] = useState('');
   const [updateMessage, setUpdateMessage] = useState('');
@@ -381,13 +407,25 @@ export function Coordinator({ page, initialRequestId }: { page: string; initialR
   const refreshReasonRef = useRef<'success' | 'stale' | null>(null);
   const detailPanelRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    setQueueStatus(stateFilter[page] || '');
+    const restored = readQueueView(currentUserId, page);
+    setQueueStatus(restored.status);
     setCursor('');
-    setSelected(initialRequestId || null);
+    setSelected(initialRequestId || restored.selected);
+    setReviewLane(restored.reviewLane);
+    setOverdue(restored.overdue);
     setDetail(null);
     setUpdateMessage('');
     refreshReasonRef.current = null;
-  }, [page, initialRequestId]);
+  }, [page, initialRequestId, currentUserId]);
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(queueViewKey(currentUserId, page), JSON.stringify({
+        status: queueStatus, selected, reviewLane, overdue,
+      } satisfies QueueView));
+    } catch {
+      // The queue remains usable when session storage is unavailable.
+    }
+  }, [currentUserId, page, queueStatus, selected, reviewLane, overdue]);
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') setRevision((value) => value + 1);
@@ -462,7 +500,12 @@ export function Coordinator({ page, initialRequestId }: { page: string; initialR
           refreshReasonRef.current = null;
           setUpdateMessage('');
           setDetail(null);
-          setDetailError(cause instanceof Error ? cause.message : 'Không thể tải lại hồ sơ.');
+          if (cause instanceof ApiError && (cause.status === 403 || cause.status === 404)) {
+            setSelected(null);
+            setDetailError('Hồ sơ đã chọn không còn trong phạm vi được phép xem. Hãy chọn hồ sơ khác.');
+          } else {
+            setDetailError(cause instanceof Error ? cause.message : 'Không thể tải lại hồ sơ.');
+          }
         }
       });
     return () => {
@@ -598,13 +641,7 @@ export function Coordinator({ page, initialRequestId }: { page: string; initialR
             <span aria-hidden="true">↻</span> Cập nhật
           </button>
         </div>
-        <details className="queue-filter-panel">
-          <summary>
-            Bộ lọc · {queueStatuses.find(([status]) => status === queueStatus)?.[1] || 'Tất cả trạng thái'}
-            {reviewLane !== 'NORMAL' ? ' · Hàng rà soát' : ''}
-            {overdue ? ' · Cần chú ý' : ''}
-          </summary>
-          <div className="queue-filter-fields">
+        <div className="queue-filter-fields queue-filter-quick">
             <label className="queue-status-field">
             <span>Trạng thái yêu cầu</span>
             <span className="queue-status-select-wrap">
@@ -656,8 +693,7 @@ export function Coordinator({ page, initialRequestId }: { page: string; initialR
             />
             Chỉ xem yêu cầu cần chú ý
             </label>
-          </div>
-        </details>
+        </div>
         {loading && <p role="status">Đang cập nhật danh sách…</p>}
         {error && (
           <p className="notice error" role="alert">
@@ -1297,6 +1333,8 @@ export function Coordinator({ page, initialRequestId }: { page: string; initialR
               requestId={detail.id}
               status={detail.status}
               version={detail.version}
+              currentUserId={currentUserId}
+              reporterUserId={detail.reporter.user_id}
               initial={detail.contact_attempts}
               onSuccess={done}
               onStale={refreshAfterConflict}
@@ -1591,8 +1629,21 @@ export function Coordinator({ page, initialRequestId }: { page: string; initialR
                     </div>
                   ))}
                   {candidates?.unknown_position.map((candidate) => (
-<p className="notice warning" key={candidate.team.id}>{candidate.team.name}: vị trí đã cũ hoặc chưa có. Đội trưởng cần cập nhật vị trí trước khi được xét giao nhiệm vụ.</p>
-))}
+                    <div className="candidate" key={candidate.team.id}>
+                      <p className="notice warning">
+                        {candidate.team.name}: vị trí đã cũ hoặc chưa có.
+                        {candidate.team.reporting_mode === 'APP'
+                          ? ' Đội trưởng cần cập nhật vị trí trước khi được xét giao nhiệm vụ.'
+                          : ' Điều phối viên có thể báo vị trí đã xác nhận.'}
+                      </p>
+                      {candidate.team.reporting_mode === 'COORDINATOR' &&
+                        <CoordinatorTeamPositionForm
+                          teamId={candidate.team.id}
+                          teamName={candidate.team.name}
+                          onSuccess={() => setDetailRevision((value) => value + 1)}
+                        />}
+                    </div>
+                  ))}
                 </section>
               )}
               {['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(detail.status) && (

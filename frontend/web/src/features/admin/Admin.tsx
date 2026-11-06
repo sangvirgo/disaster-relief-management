@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { appendPage } from '../../api/pagination';
+import { fetchAll } from '../../api/fetchAll';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { DetailSurface } from '../../components/DetailSurface';
 import { label, timeLabel } from '../../i18n/labels';
@@ -56,6 +57,7 @@ export function Admin({ page }: { page: string }) {
   const [revision, setRevision] = useState(0);
   const [auditType, setAuditType] = useState('app_user');
   const [query, setQuery] = useState('');
+  const [organizationOptions, setOrganizationOptions] = useState<{ value: string; label: string }[]>([]);
   const listPath =
     page === 'regions'
       ? '/regions'
@@ -64,6 +66,18 @@ export function Admin({ page }: { page: string }) {
         : page === 'audit'
           ? `/audit-logs?entity_type=${auditType}`
           : '/users';
+  useEffect(() => {
+    if (page !== 'users') return;
+    let live = true;
+    void fetchAll<Row>('identity', '/organizations')
+      .then((organizations) => {
+        if (live) setOrganizationOptions(organizations
+          .filter((organization) => organization.id && organization.status === 'ACTIVE')
+          .map((organization) => ({ value: organization.id!, label: String(organization.name || organization.id) })));
+      })
+      .catch(() => { if (live) setOrganizationOptions([]); });
+    return () => { live = false; };
+  }, [page, revision]);
   useEffect(() => {
     let live = true;
     setLoading(true);
@@ -124,7 +138,8 @@ export function Admin({ page }: { page: string }) {
       { name: 'username', label: 'Tên đăng nhập', required: true },
       { name: 'display_name', label: 'Tên hiển thị', required: true },
       { name: 'temporary_password', label: 'Mật khẩu tạm', type: 'password', required: true, minLength: 10 },
-      { name: 'organization_id', label: 'Mã tổ chức (nếu có)' },
+      { name: 'organization_id', label: 'Tổ chức (nếu có)', type: 'reference', options: organizationOptions,
+        placeholder: 'Dán mã tổ chức nếu không có trong danh sách' },
     ],
   };
   const organizationCreate: CommandSpec = {
