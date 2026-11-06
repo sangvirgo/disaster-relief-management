@@ -22,7 +22,7 @@ export function DetailSurface({ modal, open, onClose, children, label = 'Chi tiá
   if (!open) return null;
   return <dialog ref={ref} className={`record-detail-dialog ${className} ${closing ? 'is-closing' : ''}`}
     aria-label={label} onCancel={(event) => { event.preventDefault(); close(); }}
-    onClick={(event) => { if (event.target === event.currentTarget) close(); }}>
+    onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
     <DetailCloseButton onClick={close} />{children}
   </dialog>;
 }

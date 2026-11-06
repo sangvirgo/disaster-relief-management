@@ -657,6 +657,23 @@ textarea:focus-visible {
   border-top: 0;
 }
 
+.record-clickable {
+  width: 100%;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.record-clickable:hover,
+.record-clickable:focus-visible {
+  background: var(--color-surface-hover, #f2f7ff);
+}
+
 .record strong {
   color: var(--color-text-primary);
   font-size: 15px;

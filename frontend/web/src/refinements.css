@@ -1070,6 +1070,18 @@
   grid-template-columns: minmax(0, 1fr);
 }
 .donation-layout > .card { scroll-margin-top: 76px; }
+.donation-owned-list { grid-column: 1 / -1; }
+.donation-declaration-table { margin: 12px 0 20px; overflow: hidden; border: 1px solid var(--color-surface-border); border-radius: 12px; }
+.donation-declaration-table table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.donation-declaration-table th, .donation-declaration-table td { padding: 12px 16px; text-align: left; overflow-wrap: anywhere; }
+.donation-declaration-table thead { background: #f1f5f9; }
+.donation-declaration-table th:first-child, .donation-declaration-table td:first-child { width: 70%; border-right: 1px solid var(--color-surface-border); }
+.donation-declaration-table tbody tr { border-top: 1px solid var(--color-surface-border); }
+.donation-declaration-table tbody th { font-weight: 500; }
+.donation-recovery > summary { list-style: none; color: #2563eb; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 10px 0; }
+.donation-recovery > summary::-webkit-details-marker { display: none; }
+.donation-recovery > summary::marker { content: ''; }
+.donation-owned-list .record small { display: block; margin-top: 5px; }
 .donation-layout .record-list { grid-template-columns: minmax(0, 1fr); min-width: 0; }
 .donation-drive-card { display: block; padding: 18px; min-width: 0; max-width: 100%; transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
 .donation-drive-card:hover { border-color: #b9d4f4; box-shadow: 0 12px 28px rgba(23, 74, 129, .08); transform: translateY(-2px); }

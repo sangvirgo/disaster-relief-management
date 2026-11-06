@@ -30,6 +30,7 @@ import { CitizenAccount, CitizenRequests, requestStatusTone } from './features/c
 import { clearAllSosDrafts } from './features/citizen/sosDraft';
 import type { components as ResponseComponents } from './api/generated/response';
 import './style.css';
+import { StatusBadge } from './components/StatusBadge';
 
 declare global {
   interface Window {
@@ -202,15 +203,10 @@ function AuthModal({
       setAuthTouched({});
       setAuthAttempted(false);
     }
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
-    }
     if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'hidden';
     }
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
     };
   }, [isOpen, onClose]);
@@ -325,7 +321,6 @@ function AuthModal({
   return (
     <div
       className="modal-backdrop"
-      onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="auth-modal-title"
@@ -969,7 +964,7 @@ function Tracking({
   );
 }
 
-function RecordCard({ item, onOpen }: { item: Record<string, unknown>; onOpen?: () => void }) {
+function RecordCard({ item, onOpen, clickable = false }: { item: Record<string, unknown>; onOpen?: () => void; clickable?: boolean }) {
   const nestedItem =
     item.item && typeof item.item === 'object' ? (item.item as Record<string, unknown>) : null;
   const title =
@@ -989,8 +984,7 @@ function RecordCard({ item, onOpen }: { item: Record<string, unknown>; onOpen?: 
     text(item.address_note);
   const status = text(item.status) || text(item.review_lane);
   const time = item.received_at || item.created_at || item.starts_at || item.generated_at;
-  return (
-    <article className="record">
+  const content = <>
       <div>
         <strong>{title}</strong>
         {subtitle && <p>{subtitle}</p>}
@@ -1014,15 +1008,21 @@ function RecordCard({ item, onOpen }: { item: Record<string, unknown>; onOpen?: 
         {Boolean(time) && <small>{timeLabel(time)}</small>}
       </div>
       <div className="record-actions">
-        {status && <span className="chip">{label(status)}</span>}
-        {onOpen && (
+        {status && <StatusBadge status={status} />}
+        {onOpen && !clickable && (
           <button className="button secondary" onClick={onOpen}>
             Xem chi tiết
           </button>
         )}
       </div>
+    </>;
+  return clickable && onOpen ? (
+    <article className="record record-clickable" role="button" tabIndex={0} onClick={onOpen}
+      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(); } }}
+      aria-label={`Xem chiến dịch ${title.trim()}`} aria-haspopup="dialog">
+      {content}
     </article>
-  );
+  ) : <article className="record">{content}</article>;
 }
 
 function DetailPanel({
@@ -1184,7 +1184,7 @@ function PublicCampaignDialog({ campaign, onClose }: { campaign: Record<string, 
       </div>
       <p className="campaign-dialog-objective">{text(campaign.objective) || 'Chưa có mô tả mục tiêu.'}</p>
       <dl className="fact-list">
-        <div><dt>Trạng thái</dt><dd><span className="chip">{label(campaign.status)}</span></dd></div>
+        <div><dt>Trạng thái</dt><dd><StatusBadge status={text(campaign.status) || ''} /></dd></div>
         <div><dt>Khu vực</dt><dd>{text(campaign.region_name) || 'Chưa ghi khu vực'}</dd></div>
         <div><dt>Bắt đầu</dt><dd>{campaign.starts_at ? timeLabel(campaign.starts_at) : 'Chưa ấn định'}</dd></div>
         <div><dt>Kết thúc</dt><dd>{campaign.ends_at ? timeLabel(campaign.ends_at) : 'Chưa ấn định'}</dd></div>
@@ -1298,9 +1298,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
           <span className="eyebrow">Số liệu trực tiếp</span>
           <h2>{page.path === '/reports/summary' ? 'Tổng quan ứng cứu' : page.id === 'campaigns' ? 'Danh sách chiến dịch' : page.title}</h2>
         </div>
-        <span className="report-period">
-          {page.path === '/reports/summary' ? '7 ngày gần đây' : 'Dữ liệu từ hệ thống'}
-        </span>
+        {page.path === '/reports/summary' && <span className="report-period">7 ngày gần đây</span>}
       </div>
       {page.note && page.path !== '/reports/summary' && <p>{page.note}</p>}
       {page.path === '/reports/summary' && (
@@ -1346,6 +1344,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
                     key={text(item.id) || index}
                     item={item}
                     onOpen={canOpen && item.id ? () => openDetail(item) : undefined}
+                    clickable={page.path === '/public/campaigns'}
                   />
                 ))}
               </div>
