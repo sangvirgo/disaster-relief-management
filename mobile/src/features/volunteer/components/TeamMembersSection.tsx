@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ChevronDown, Plus, RefreshCw, Search, UserMinus, Users, X } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, Plus, RefreshCw, Search, UserMinus, Users, X } from 'lucide-react-native';
 import { ResponseApi } from '../../../api/responseApi';
 import { getApiErrorMessage, isApiErrorCode, MobileApiError } from '../../../api/client';
 import type { TeamMember, TeamMemberCandidate, TeamMembersPage } from '../../../types/api';
@@ -20,6 +20,19 @@ import { THEME } from '../../../constants/theme';
 import type { TeamMembershipRole } from '../utils/teamMembershipRole';
 
 const roleLabels = { LEADER: 'Đội trưởng', MEMBER: 'Thành viên' } as const;
+
+const formatMemberJoinDate = (joinedAt: string): string => {
+  const date = new Date(joinedAt);
+  if (!Number.isFinite(date.getTime())) return 'Chưa có thông tin';
+
+  return date.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 
 interface TeamMembersSectionProps {
   teamId: string;
@@ -43,6 +56,7 @@ export const TeamMembersSection: React.FC<TeamMembersSectionProps> = ({
   const [loadingMoreMembers, setLoadingMoreMembers] = useState(false);
   const [membersError, setMembersError] = useState<string | null>(null);
   const [membersErrorDiagnostic, setMembersErrorDiagnostic] = useState<string | null>(null);
+  const [viewingMember, setViewingMember] = useState<TeamMember | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [query, setQuery] = useState('');
   const [searchRetry, setSearchRetry] = useState(0);
@@ -295,6 +309,10 @@ export const TeamMembersSection: React.FC<TeamMembersSectionProps> = ({
         </TouchableOpacity>
       </View>
 
+      {!loadingMembers && !membersError && members.length > 0 ? (
+        <Text style={styles.memberHint}>Chạm vào thành viên để xem thông tin.</Text>
+      ) : null}
+
       {loadingMembers ? (
         <View style={styles.stateRow}>
           <ActivityIndicator size="small" color={THEME.colors.primary.main} />
@@ -316,16 +334,26 @@ export const TeamMembersSection: React.FC<TeamMembersSectionProps> = ({
             <Text style={styles.stateText}>Đội hiện chưa có thành viên.</Text>
           ) : members.map((member) => (
             <View key={member.user_id} style={styles.memberRow}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{member.display_name.slice(0, 1).toLocaleUpperCase('vi')}</Text>
-              </View>
-              <View style={styles.memberIdentity}>
-                <Text style={styles.memberName} numberOfLines={1}>{member.display_name}</Text>
-                <Text style={styles.memberDate}>Tham gia {new Date(member.joined_at).toLocaleDateString('vi-VN')}</Text>
-              </View>
-              <Text style={[styles.role, member.member_role === 'LEADER' && styles.leaderRole]}>
-                {roleLabels[member.member_role]}
-              </Text>
+              <TouchableOpacity
+                style={styles.memberDetailsButton}
+                onPress={() => setViewingMember(member)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Xem thông tin thành viên ${member.display_name}`}
+                accessibilityHint="Mở vai trò, mã tài khoản và thời điểm tham gia đội."
+              >
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{member.display_name.slice(0, 1).toLocaleUpperCase('vi')}</Text>
+                </View>
+                <View style={styles.memberIdentity}>
+                  <Text style={styles.memberName} numberOfLines={1}>{member.display_name}</Text>
+                  <Text style={styles.memberDate}>Tham gia {new Date(member.joined_at).toLocaleDateString('vi-VN')}</Text>
+                </View>
+                <Text style={[styles.role, member.member_role === 'LEADER' && styles.leaderRole]}>
+                  {roleLabels[member.member_role]}
+                </Text>
+                <ChevronRight size={16} color={THEME.colors.text.muted} />
+              </TouchableOpacity>
               {canManageMembers && member.member_role !== 'LEADER' ? (
                 <TouchableOpacity
                   style={styles.removeButton}
@@ -467,6 +495,52 @@ export const TeamMembersSection: React.FC<TeamMembersSectionProps> = ({
           ) : null}
         </KeyboardAvoidingView>
       </Modal>
+
+      <Modal
+        visible={viewingMember !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewingMember(null)}
+      >
+        <View style={styles.memberDetailOverlay}>
+          {viewingMember ? (
+            <View style={styles.memberDetailCard} accessibilityViewIsModal>
+              <View style={styles.memberDetailHeader}>
+                <Text style={styles.memberDetailTitle}>Thông tin thành viên</Text>
+                <TouchableOpacity
+                  onPress={() => setViewingMember(null)}
+                  style={styles.iconButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Đóng thông tin thành viên"
+                >
+                  <X size={20} color={THEME.colors.text.secondary} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.memberDetailProfile}>
+                <View style={styles.memberDetailAvatar}>
+                  <Text style={styles.memberDetailAvatarText}>
+                    {viewingMember.display_name.slice(0, 1).toLocaleUpperCase('vi')}
+                  </Text>
+                </View>
+                <Text style={styles.memberDetailName}>{viewingMember.display_name}</Text>
+                <Text style={[styles.role, styles.memberDetailRole, viewingMember.member_role === 'LEADER' && styles.leaderRole]}>
+                  {roleLabels[viewingMember.member_role]}
+                </Text>
+              </View>
+
+              <View style={styles.memberDetailField}>
+                <Text style={styles.memberDetailLabel}>Mã tài khoản</Text>
+                <Text style={styles.memberDetailValue}>{viewingMember.user_id}</Text>
+              </View>
+              <View style={styles.memberDetailField}>
+                <Text style={styles.memberDetailLabel}>Tham gia đội lúc</Text>
+                <Text style={styles.memberDetailValue}>{formatMemberJoinDate(viewingMember.joined_at)}</Text>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -488,11 +562,13 @@ const styles = StyleSheet.create({
   stateRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 10 },
   stateBlock: { alignItems: 'flex-start', paddingVertical: 8 },
   stateText: { color: THEME.colors.text.secondary, fontSize: 14, paddingVertical: 10 },
+  memberHint: { color: THEME.colors.text.muted, fontSize: 12, marginTop: -5, marginBottom: 8 },
   errorText: { color: THEME.colors.emergency.dark, fontSize: 14, flex: 1 },
   errorDiagnostic: { color: THEME.colors.text.muted, fontSize: 11, paddingTop: 5 },
   smallAction: { marginTop: 8, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: THEME.colors.primary.bg },
   smallActionText: { color: THEME.colors.primary.dark, fontSize: 13, fontWeight: '700' },
   memberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, borderTopWidth: 1, borderTopColor: THEME.colors.surface.border, gap: 10 },
+  memberDetailsButton: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
   avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: THEME.colors.primary.bg, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: THEME.colors.primary.dark, fontWeight: '800' },
   memberIdentity: { flex: 1, minWidth: 0 },
@@ -519,4 +595,16 @@ const styles = StyleSheet.create({
   radio: { width: 21, height: 21, borderRadius: 11, borderWidth: 2, borderColor: THEME.colors.surface.divider, alignItems: 'center', justifyContent: 'center' },
   radioSelected: { borderColor: THEME.colors.primary.main },
   radioDot: { width: 11, height: 11, borderRadius: 6, backgroundColor: THEME.colors.primary.main },
+  memberDetailOverlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 20, backgroundColor: 'rgba(15, 23, 42, 0.48)' },
+  memberDetailCard: { backgroundColor: THEME.colors.surface.card, borderRadius: 18, padding: 20, borderWidth: 1, borderColor: THEME.colors.surface.border, ...THEME.shadows.sm },
+  memberDetailHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  memberDetailTitle: { flex: 1, color: THEME.colors.text.primary, fontSize: 18, fontWeight: '800' },
+  memberDetailProfile: { alignItems: 'center', paddingVertical: 18, gap: 8 },
+  memberDetailAvatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: THEME.colors.primary.bg, alignItems: 'center', justifyContent: 'center' },
+  memberDetailAvatarText: { color: THEME.colors.primary.dark, fontSize: 22, fontWeight: '800' },
+  memberDetailName: { maxWidth: '100%', color: THEME.colors.text.primary, fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  memberDetailRole: { alignSelf: 'center' },
+  memberDetailField: { padding: 12, borderRadius: 10, backgroundColor: THEME.colors.surface.background, marginTop: 8 },
+  memberDetailLabel: { color: THEME.colors.text.muted, fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  memberDetailValue: { color: THEME.colors.text.primary, fontSize: 13, fontWeight: '700', flexShrink: 1 },
 });

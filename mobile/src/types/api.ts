@@ -133,7 +133,7 @@ export interface RequestTrackingDetail {
   timeline: RequestTimelineEvent[];
   more: boolean;
   cursor?: string;
-  priority_visible: false;
+  priority_visible?: false;
   rejection_reason?: string;
   duplicate_of_code?: string;
   can_supplement: boolean;
@@ -352,10 +352,20 @@ export interface DonationDeclarationPayload {
   }[];
 }
 
+export type DonationDeliveryStatus =
+  | 'DECLARED'
+  | 'COUNTING'
+  | 'PENDING_REVIEW'
+  | 'APPROVED'
+  | 'POSTED'
+  | 'REJECTED'
+  | 'CANCELLED';
+
 export interface DonationTrackingDetail {
   id: string;
   public_code: string;
-  status: 'DECLARED' | 'COUNTING' | 'PENDING_REVIEW' | 'APPROVED' | 'POSTED' | string;
+  status: DonationDeliveryStatus;
+  progress: { status: DonationDeliveryStatus };
   declaration: {
     revision: number | null;
     created_by_kind?: string | null;

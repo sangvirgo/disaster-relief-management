@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -88,6 +88,78 @@ const quantityFieldError = (value: string) => quantityError(value) ||
 const isLoopbackDownloadUrl = (url: string) =>
   /^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::|\/)/i.test(url);
 
+type DriveProgress =
+  | { status: 'loading' }
+  | { status: 'unavailable' }
+  | { status: 'ready'; acceptedByItem: Record<string, string> };
+
+type DriveAvailability = {
+  canAccept: boolean;
+  label: string;
+  alertTitle: string;
+  alertMessage: string;
+};
+
+const parseDriveDate = (value?: string | null): number | undefined => {
+  if (!value) return undefined;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : undefined;
+};
+
+const formatDriveDateTime = (value?: string | null): string | undefined => {
+  const timestamp = parseDriveDate(value);
+  return timestamp === undefined ? undefined : new Date(timestamp).toLocaleString('vi-VN');
+};
+
+const getDriveAvailability = (drive: DonationDrive, now = Date.now()): DriveAvailability => {
+  if ((drive.status as string) !== 'OPEN') {
+    return {
+      canAccept: false,
+      label: 'Đợt tiếp nhận đã đóng',
+      alertTitle: 'Đợt tiếp nhận đã đóng',
+      alertMessage: 'Đợt tiếp nhận này không còn nhận khai báo bàn giao mới.',
+    };
+  }
+
+  const opensAt = parseDriveDate(drive.opens_at);
+  if (opensAt !== undefined && opensAt > now) {
+    const opensAtLabel = formatDriveDateTime(drive.opens_at);
+    return {
+      canAccept: false,
+      label: 'Chưa đến thời gian tiếp nhận',
+      alertTitle: 'Chưa đến thời gian tiếp nhận',
+      alertMessage: `Đợt tiếp nhận bắt đầu lúc ${opensAtLabel}.`,
+    };
+  }
+
+  const closesAt = parseDriveDate(drive.closes_at);
+  if (closesAt !== undefined && closesAt <= now) {
+    const closesAtLabel = formatDriveDateTime(drive.closes_at);
+    return {
+      canAccept: false,
+      label: 'Đã kết thúc thời gian nhận hàng',
+      alertTitle: 'Đợt tiếp nhận đã kết thúc',
+      alertMessage: `Thời gian nhận hàng kết thúc lúc ${closesAtLabel}.`,
+    };
+  }
+
+  if (drive.campaign_status && drive.campaign_status !== 'ACTIVE') {
+    return {
+      canAccept: false,
+      label: 'Chiến dịch đang tạm dừng hoặc đã đóng',
+      alertTitle: 'Đợt tiếp nhận đã dừng',
+      alertMessage: 'Chiến dịch này hiện không nhận khai báo bàn giao mới.',
+    };
+  }
+
+  return {
+    canAccept: true,
+    label: 'Đang tiếp nhận tại kho',
+    alertTitle: '',
+    alertMessage: '',
+  };
+};
+
 export const DonationScreen: React.FC = () => {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
@@ -102,6 +174,8 @@ export const DonationScreen: React.FC = () => {
   const [driveCursor, setDriveCursor] = useState<string | undefined>();
   const [moreDrives, setMoreDrives] = useState<boolean>(false);
   const [loadingMoreDrives, setLoadingMoreDrives] = useState<boolean>(false);
+  const [driveProgress, setDriveProgress] = useState<Record<string, DriveProgress>>({});
+  const driveProgressRequestVersions = useRef<Record<string, number>>({});
 
   // Modal khai báo quyên góp
   const [selectedDrive, setSelectedDrive] = useState<DonationDrive | null>(null);
@@ -162,11 +236,75 @@ export const DonationScreen: React.FC = () => {
     }[]
   >([]);
 
-  const fetchDrives = async (cursor?: string, append = false) => {
+  const loadDriveProgress = useCallback(async (drivesToLoad: DonationDrive[]) => {
+    const uniqueDrives = [...new Map(drivesToLoad.map((drive) => [drive.id, drive])).values()];
+    if (uniqueDrives.length === 0) return;
+
+    const requestVersions: Record<string, number> = {};
+    for (const drive of uniqueDrives) {
+      const nextVersion = (driveProgressRequestVersions.current[drive.id] || 0) + 1;
+      driveProgressRequestVersions.current[drive.id] = nextVersion;
+      requestVersions[drive.id] = nextVersion;
+    }
+
+    setDriveProgress((current) => ({
+      ...current,
+      ...Object.fromEntries(uniqueDrives.map((drive) => [drive.id, { status: 'loading' as const }])),
+    }));
+
+    const results = new Map<string, DriveProgress>();
+    let nextIndex = 0;
+    const worker = async () => {
+      while (nextIndex < uniqueDrives.length) {
+        const drive = uniqueDrives[nextIndex++];
+        if (!drive) return;
+
+        try {
+          const acceptedByItem: Record<string, string> = {};
+          let cursor: string | undefined;
+          let pageCount = 0;
+          while (true) {
+            const report = await LogisticsApi.getPublicDonationReportSummary({
+              drive_id: drive.id,
+              limit: 50,
+              ...(cursor ? { cursor } : {}),
+            });
+            for (const item of report.items) {
+              if (item.item?.id) acceptedByItem[item.item.id] = item.accepted || '0';
+            }
+            if (!report.more) break;
+            if (!report.cursor || report.cursor === cursor || pageCount >= 100) {
+              throw new Error('PUBLIC_DONATION_REPORT_PAGINATION_INVALID');
+            }
+            cursor = report.cursor;
+            pageCount += 1;
+          }
+          results.set(drive.id, { status: 'ready', acceptedByItem });
+        } catch {
+          results.set(drive.id, { status: 'unavailable' });
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(3, uniqueDrives.length) }, () => worker()));
+    setDriveProgress((current) => {
+      const next = { ...current };
+      for (const [driveId, result] of results) {
+        if (driveProgressRequestVersions.current[driveId] === requestVersions[driveId]) {
+          next[driveId] = result;
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  const fetchDrives = useCallback(async (cursor?: string, append = false) => {
     setDrivesError(null);
     try {
       const page = await LogisticsApi.getPublicDonationDrives(50, cursor);
       setDrives((current) => append ? [...current, ...page.items] : page.items);
+      if (!append) setDriveProgress({});
+      void loadDriveProgress(page.items);
       setDriveCursor(page.cursor);
       setMoreDrives(page.more);
     } catch (error) {
@@ -175,12 +313,12 @@ export const DonationScreen: React.FC = () => {
       setLoading(false);
       setLoadingMoreDrives(false);
     }
-  };
+  }, [loadDriveProgress]);
 
-  const loadRecentReceipts = async () => {
+  const loadRecentReceipts = useCallback(async () => {
     const list = await StorageService.getSavedDonationReceipts();
     setRecentReceipts(list);
-  };
+  }, []);
 
   const getReceiptSecret = async (id: string, publicCode: string): Promise<string | undefined> => {
     return (await StorageService.getSecretForDonation(id))
@@ -207,11 +345,12 @@ export const DonationScreen: React.FC = () => {
       }
       setSelectedDrive(knownDrive || { id: pending.driveId, title: pending.driveTitle, status: 'OPEN', items: [] });
     }).catch(() => Alert.alert('Không thể khôi phục lần khai báo', 'Không đọc được bản khai đang chờ trên thiết bị.'));
-  }, []);
+  }, [fetchDrives, loadRecentReceipts]);
 
   const handleOpenDonateModal = (drive: DonationDrive) => {
-    if (drive.campaign_status === 'PAUSED' || drive.campaign_status === 'CLOSED') {
-      Alert.alert('Đợt tiếp nhận đã dừng', 'Đợt quyên góp này hiện không nhận khai báo bàn giao mới.');
+    const availability = getDriveAvailability(drive);
+    if (!availability.canAccept) {
+      Alert.alert(availability.alertTitle, availability.alertMessage);
       return;
     }
     setSelectedDrive(drive);
@@ -303,9 +442,12 @@ export const DonationScreen: React.FC = () => {
 
   const handleSubmitDeclaration = async () => {
     if (!selectedDrive && !pendingDonationCommand) return;
-    if (selectedDrive && (selectedDrive.campaign_status === 'PAUSED' || selectedDrive.campaign_status === 'CLOSED')) {
-      Alert.alert('Đợt tiếp nhận đã dừng', 'Đợt quyên góp này hiện không nhận khai báo bàn giao mới.');
-      return;
+    if (!pendingDonationCommand && selectedDrive) {
+      const availability = getDriveAvailability(selectedDrive);
+      if (!availability.canAccept) {
+        Alert.alert(availability.alertTitle, availability.alertMessage);
+        return;
+      }
     }
     const normalizedPhone = normalizePhone(donorPhone);
     const errors: Record<string, string> = {};
@@ -405,10 +547,24 @@ export const DonationScreen: React.FC = () => {
           : 'Thủ kho sẽ kiểm đếm độc lập khi nhận hàng.',
       });
     } catch (error: any) {
-      const message = error instanceof Error && error.message === 'PENDING_COMMAND_TOO_LARGE'
-        ? 'Bản khai vượt quá dung lượng lưu an toàn. Hãy giảm số dòng khai báo rồi thử lại.'
-        : getApiErrorMessage(error, 'Không thể gửi khai báo. Bản khai và khóa lần gửi được giữ lại để thử lại an toàn.');
-      Alert.alert('Lỗi', message);
+      if (isApiErrorCode(error, 'DRIVE_WINDOW_CLOSED')) {
+        // The backend only stores a successful idempotent command. This conflict means
+        // the declaration was not accepted, so its local retry key can be discarded.
+        await StorageService.clearPendingDonation().catch(() => undefined);
+        setPendingDonationCommand(null);
+        const availability = selectedDrive ? getDriveAvailability(selectedDrive) : null;
+        Alert.alert(
+          availability && !availability.canAccept ? availability.alertTitle : 'Thời gian tiếp nhận đã thay đổi',
+          availability && !availability.canAccept
+            ? `${availability.alertMessage} Khai báo chưa được ghi nhận.`
+            : 'Thời gian tiếp nhận trên hệ thống vừa thay đổi. Khai báo chưa được ghi nhận.',
+        );
+      } else {
+        const message = error instanceof Error && error.message === 'PENDING_COMMAND_TOO_LARGE'
+          ? 'Bản khai vượt quá dung lượng lưu an toàn. Hãy giảm số dòng khai báo rồi thử lại.'
+          : getApiErrorMessage(error, 'Không thể gửi khai báo. Bản khai và khóa lần gửi được giữ lại để thử lại an toàn.');
+        Alert.alert('Lỗi', message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -812,21 +968,26 @@ export const DonationScreen: React.FC = () => {
         return { label: 'Đã duyệt kiểm đếm', color: '#16A34A', bg: '#DCFCE7' };
       case 'POSTED':
         return { label: 'Đã nhập kho chính thức', color: '#059669', bg: '#D1FAE5' };
+      case 'REJECTED':
+        return { label: 'Kiểm đếm chưa được chấp thuận', color: '#DC2626', bg: '#FEF2F2' };
+      case 'CANCELLED':
+        return { label: 'Giao nhận đã hủy', color: '#64748B', bg: '#F1F5F9' };
       default:
         return { label: 'Đang xử lý', color: THEME.colors.text.secondary, bg: '#F1F5F9' };
     }
   };
 
   const renderDriveItem = (item: DonationDrive) => {
-    const canAcceptDonations = item.campaign_status !== 'PAUSED' && item.campaign_status !== 'CLOSED';
+    const availability = getDriveAvailability(item);
+    const progress = driveProgress[item.id];
     return (
       <View key={item.id} style={styles.driveCard}>
         <View style={styles.driveHeader}>
           <HeartHandshake size={24} color={THEME.colors.primary.main} />
           <View style={{ flex: 1, marginLeft: 10 }}>
             <Text style={styles.driveTitle}>{item.title}</Text>
-            <Text style={styles.driveStatus}>
-              {canAcceptDonations ? 'Đang tiếp nhận tại kho' : 'Đợt tiếp nhận đã tạm dừng'}
+            <Text style={[styles.driveStatus, !availability.canAccept && styles.driveStatusUnavailable]}>
+              {availability.label}
             </Text>
           </View>
         </View>
@@ -840,13 +1001,22 @@ export const DonationScreen: React.FC = () => {
           </Text>
         </View>
 
+        {item.opens_at || item.closes_at ? (
+          <View style={styles.driveMetaRow}>
+            <Clock size={16} color={THEME.colors.text.secondary} />
+            <Text style={styles.driveMetaText}>
+              Thời gian nhận: {formatDriveDateTime(item.opens_at) || 'Không giới hạn'} – {formatDriveDateTime(item.closes_at) || 'Không giới hạn'}
+            </Text>
+          </View>
+        ) : null}
+
         {/* Danh mục hàng cứu trợ đang cần & tiến độ tiếp nhận */}
         <View style={styles.itemsSection}>
           <Text style={styles.itemsHeader}>TIẾN ĐỘ TIẾP NHẬN NHU YẾU PHẨM:</Text>
-          {item.items &&
+          {progress?.status === 'ready' && item.items ? (
             item.items.map((it) => {
               const target = it.target_quantity || '0';
-              const accepted = it.accepted_total || '0';
+              const accepted = progress.acceptedByItem[it.item_id] ?? '0';
               const remaining = subtractQuantities(target, accepted);
               const pct = percentageComplete(accepted, target);
               const unit = it.unit_name || 'đơn vị';
@@ -879,7 +1049,7 @@ export const DonationScreen: React.FC = () => {
                     />
                   </View>
 
-                  {/* 3 cột chi tiết: Mục tiêu - Đã quyên góp - Còn thiếu */}
+                  {/* 3 cột chi tiết: Mục tiêu - Đã nhập kho - Còn thiếu */}
                   <View style={styles.itemStatsRow}>
                     <View style={styles.itemStatCol}>
                       <Text style={styles.itemStatLabel}>Mục tiêu</Text>
@@ -889,7 +1059,7 @@ export const DonationScreen: React.FC = () => {
                     </View>
 
                     <View style={styles.itemStatCol}>
-                      <Text style={styles.itemStatLabel}>Đã quyên góp</Text>
+                      <Text style={styles.itemStatLabel}>Đã nhập kho</Text>
                       <Text style={[styles.itemStatValue, styles.itemStatAccepted]}>
                         {formatNumberVN(accepted)} {unit}
                       </Text>
@@ -909,14 +1079,21 @@ export const DonationScreen: React.FC = () => {
                   </View>
                 </View>
               );
-            })}
+            })
+          ) : (
+            <Text style={styles.progressMessage}>
+              {progress?.status === 'unavailable'
+                ? 'Chưa tải được số lượng đã nhập kho. Tiến độ sẽ hiển thị lại khi báo cáo minh bạch có thể truy cập.'
+                : 'Đang tải số lượng hiện vật đã nhập kho…'}
+            </Text>
+          )}
         </View>
 
         <View style={styles.driveActionRow}>
           <TouchableOpacity
-            style={[styles.donateActionBtn, !canAcceptDonations && { opacity: 0.5 }]}
+            style={[styles.donateActionBtn, !availability.canAccept && { opacity: 0.5 }]}
             onPress={() => handleOpenDonateModal(item)}
-            disabled={!canAcceptDonations}
+            disabled={!availability.canAccept}
             activeOpacity={0.85}
           >
             <Plus size={18} color="#FFFFFF" />
@@ -1492,8 +1669,11 @@ export const DonationScreen: React.FC = () => {
             {selectedDrive?.items &&
               selectedDrive.items.map((it) => {
                 const target = it.target_quantity || '0';
-                const accepted = it.accepted_total || '0';
-                const remaining = subtractQuantities(target, accepted);
+                const selectedDriveProgress = driveProgress[selectedDrive.id];
+                const accepted = selectedDriveProgress?.status === 'ready'
+                  ? selectedDriveProgress.acceptedByItem[it.item_id] ?? '0'
+                  : undefined;
+                const remaining = accepted === undefined ? undefined : subtractQuantities(target, accepted);
                 const unit = it.unit_name || 'đơn vị';
 
                 return (
@@ -1504,9 +1684,13 @@ export const DonationScreen: React.FC = () => {
                           {it.item_name || it.name} ({unit})
                         </Text>
                         <Text style={styles.modalItemRemaining}>
-                          {compareQuantities(remaining, '0') > 0
-                            ? `Đang cần thêm: ${formatNumberVN(remaining)} ${unit}`
-                            : `Đã đủ mục tiêu (${formatNumberVN(target)} ${unit})`}
+                          {accepted === undefined
+                            ? selectedDriveProgress?.status === 'unavailable'
+                              ? 'Chưa tải được tiến độ nhập kho; bạn vẫn có thể khai báo hiện vật.'
+                              : 'Đang tải tiến độ nhập kho…'
+                            : compareQuantities(remaining!, '0') > 0
+                              ? `Đã nhập kho: ${formatNumberVN(accepted)} ${unit} · Còn cần: ${formatNumberVN(remaining)} ${unit}`
+                              : `Đã nhập kho: ${formatNumberVN(accepted)} ${unit} · Đã đủ mục tiêu (${formatNumberVN(target)} ${unit})`}
                         </Text>
                       </View>
                       <TextInput
@@ -1880,6 +2064,9 @@ const styles = StyleSheet.create({
     color: THEME.colors.success.main,
     marginTop: 2,
   },
+  driveStatusUnavailable: {
+    color: THEME.colors.emergency.main,
+  },
   driveDesc: {
     fontSize: THEME.typography.fontSizes.xs,
     color: THEME.colors.text.secondary,
@@ -1910,6 +2097,11 @@ const styles = StyleSheet.create({
     color: THEME.colors.text.secondary,
     marginBottom: 8,
     letterSpacing: 0.5,
+  },
+  progressMessage: {
+    fontSize: 11,
+    color: THEME.colors.text.secondary,
+    lineHeight: 17,
   },
   itemProgressCard: {
     backgroundColor: THEME.colors.surface.card,

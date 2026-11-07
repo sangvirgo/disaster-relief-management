@@ -191,9 +191,10 @@ export const EmergencyHomeScreen: React.FC = () => {
           <Text style={styles.bannerTitle}>ĐƯỜNG DÂY NÓNG CỨU NẠN QUỐC GIA</Text>
           <Text style={styles.bannerSubtitle}>
             Nguy kịch tức thời hãy gọi ngay:{' '}
+            <Text style={styles.highlightPhone}>112 (Sự cố, thiên tai)</Text> ·{' '}
             <Text style={styles.highlightPhone}>113 (Công an)</Text> ·{' '}
-            <Text style={styles.highlightPhone}>114 (Cứu nạn)</Text> ·{' '}
-            <Text style={styles.highlightPhone}>115 (Y tế)</Text>
+            <Text style={styles.highlightPhone}>114 (Cứu hỏa)</Text> ·{' '}
+            <Text style={styles.highlightPhone}>115 (Cấp cứu y tế)</Text>
           </Text>
         </View>
       </View>

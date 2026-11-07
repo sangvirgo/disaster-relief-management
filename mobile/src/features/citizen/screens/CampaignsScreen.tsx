@@ -130,6 +130,14 @@ export const CampaignsScreen: React.FC = () => {
             <Text style={styles.bannerDesc}>
               Thông tin mục tiêu, khu vực và thời gian được hiển thị theo dữ liệu chiến dịch đã công bố.
             </Text>
+            <TouchableOpacity
+              style={styles.donationDrivesBtn}
+              onPress={() => router.push('/donations')}
+              activeOpacity={0.8}
+            >
+              <HeartHandshake size={16} color={THEME.colors.primary.main} />
+              <Text style={styles.donationDrivesText}>Xem các đợt tiếp nhận hiện vật</Text>
+            </TouchableOpacity>
           </View>
 
           {campaigns.map((camp) => {
@@ -173,15 +181,6 @@ export const CampaignsScreen: React.FC = () => {
 
                 {/* HÀNG NÚT TÁC VỤ */}
                 <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={styles.donateActionBtn}
-                    onPress={() => router.push('/donations')}
-                    activeOpacity={0.8}
-                  >
-                    <HeartHandshake size={16} color={THEME.colors.primary.main} />
-                    <Text style={styles.donateActionText}>Xem đợt tiếp nhận hiện vật</Text>
-                  </TouchableOpacity>
-
                   <TouchableOpacity
                     style={styles.sosActionBtn}
                     onPress={() => router.push('/create-sos')}
@@ -259,6 +258,24 @@ const styles = StyleSheet.create({
     color: THEME.colors.text.primary,
     lineHeight: 18,
   },
+  donationDrivesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: THEME.colors.primary.bg,
+    borderWidth: 1,
+    borderColor: THEME.colors.primary.border,
+    minHeight: 46,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    marginTop: 12,
+  },
+  donationDrivesText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: THEME.colors.primary.main,
+    marginLeft: 7,
+  },
   campaignCard: {
     backgroundColor: THEME.colors.surface.card,
     borderRadius: 16,
@@ -327,30 +344,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 12,
     gap: 10,
-  },
-  donateActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: THEME.colors.primary.bg,
-    borderWidth: 1,
-    borderColor: THEME.colors.primary.border,
-    minHeight: 48,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  donateActionText: {
-    flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
-    fontSize: 12,
-    fontWeight: '700',
-    color: THEME.colors.primary.main,
-    marginLeft: 6,
-    textAlign: 'center',
-    lineHeight: 16,
   },
   sosActionBtn: {
     flex: 1,

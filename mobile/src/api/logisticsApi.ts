@@ -33,7 +33,7 @@ export const LogisticsApi = {
     payload: DonationDeclarationPayload,
     donationSecret: string,
     idempotencyKey: string
-  ): Promise<{ id: string; public_code: string; status: string }> {
+  ): Promise<{ id: string; public_code: string; status: 'DECLARED'; declaration_revision: number }> {
     const headers: Record<string, string> = {
       'Idempotency-Key': idempotencyKey,
     };

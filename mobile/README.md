@@ -8,7 +8,7 @@
 
 | Màn hình | Mục đích & Nghiệp vụ | Đối tượng sử dụng |
 |---|---|---|
-| **`EmergencyHomeScreen`** | Trang chủ khẩn cấp, nút SOS lớn trung tâm, tra cứu nhanh bằng mã, hướng dẫn đường dây nóng 113/114/115 | Tất cả người dân |
+| **`EmergencyHomeScreen`** | Trang chủ khẩn cấp, nút SOS lớn trung tâm, tra cứu nhanh bằng mã, hướng dẫn đường dây nóng 112/113/114/115 | Tất cả người dân |
 | **`CreateSOSScreen`** | Gửi yêu cầu cứu nạn khẩn cấp tại chỗ (`SELF`), tự động bắt GPS, chọn số người, đánh dấu nguy cơ tính mạng tức thời | Nạn nhân tại hiện trường (Không cần đăng nhập) |
 | **`ProxySOSScreen`** | Báo cứu trợ từ xa cho hộ gia đình người thân (`PROXY`), chọn tọa độ hộ gia đình trên bản đồ, ghi chú liên lạc | Người thân có tài khoản công dân |
 | **`SOSTrackingScreen`** | Tra cứu tiến trình xử lý cứu hộ theo Timeline, xem các cập nhật cũ hơn, bổ sung ghi chú và ảnh/video hiện trường | Người dân đã gửi SOS |
@@ -56,11 +56,10 @@ npx expo start -c
 
 - **Tự động nhận diện (Khi quét Expo Go):** Khi quét mã QR qua Expo Go trong cùng mạng Wi-Fi LAN, ứng dụng tự động trích xuất IP LAN của máy tính từ Metro bundler và kết nối tới `http://<IP_MÁY_TÍNH>:8080/api/v1`.
 - **Cấu hình qua file `.env`:**
-  Sao chép `mobile/.env.example` thành `mobile/.env`, sau đó cập nhật địa chỉ backend nếu cần:
+  Sao chép `mobile/.env.example` thành `mobile/.env`. Expo Go tự lấy địa chỉ LAN của máy tính chạy Metro; chỉ đặt biến sau nếu cần ghi đè, thay `<IP_MAY_TINH>` bằng IPv4 Wi-Fi của máy tính:
   ```env
-  EXPO_PUBLIC_API_BASE_URL=http://10.251.22.32:8080/api/v1
+  EXPO_PUBLIC_API_BASE_URL=http://<IP_MAY_TINH>:8080/api/v1
   ```
-  *(Nếu đổi mạng Wi-Fi, kiểm tra IPv4 của máy tính bằng lệnh `ipconfig` và cập nhật lại IP này).*
 - **Các kịch bản kết nối:**
   - **Điện thoại thật (Cùng mạng Wi-Fi LAN):** `http://<IP_MÁY_TÍNH>:8080/api/v1`.
   - **Android Emulator (Máy ảo Android Studio):** `http://10.0.2.2:8080/api/v1`.

@@ -67,7 +67,7 @@ export const MissionListScreen: React.FC = () => {
   const filteredMissions = missions.filter((m) => {
     if (activeTab === 'OFFERED') return m.status === 'OFFERED';
     if (activeTab === 'ACTIVE') return ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(m.status);
-    return ['COMPLETED', 'FAILED', 'CANCELLED'].includes(m.status);
+    return ['DECLINED', 'COMPLETED', 'FAILED', 'CANCELLED'].includes(m.status);
   });
 
   const renderMissionItem = ({ item }: { item: Mission }) => {
