@@ -7,9 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
-import { useIdTokenAuthRequest } from 'expo-auth-session/providers/google';
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
@@ -20,6 +18,7 @@ import { getApiErrorMessage } from '../../../api/client';
 import { useAuthStore } from '../../../store/authStore';
 import { THEME } from '../../../constants/theme';
 import { isCommonPassword } from '../../../utils/formValidation';
+import { GoogleAuthError, useGoogleAuth } from '../googleAuth';
 import { KeyRound, Lock, Eye, EyeOff, ShieldAlert, CheckCircle2, Link2 } from 'lucide-react-native';
 
 export const ChangePasswordScreen: React.FC = () => {
@@ -54,41 +53,34 @@ export const ChangePasswordScreen: React.FC = () => {
   };
 
   const [googleBusy, setGoogleBusy] = useState(false);
-  const googleClients = {
-    web: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    ios: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    android: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-  };
-  const googleConfigured = Boolean(Platform.select({
-    ios: googleClients.ios,
-    android: googleClients.android,
-    default: googleClients.web,
-  }));
-  const [googleRequest, , promptGoogle] = useIdTokenAuthRequest({
-    webClientId: googleClients.web || 'google-client-id-not-configured',
-    iosClientId: googleClients.ios || 'google-client-id-not-configured',
-    androidClientId: googleClients.android || 'google-client-id-not-configured',
-    selectAccount: true,
-  }, { scheme: 'com.disasterrelief.c48mobile' });
+  const { googleReady, promptGoogle, googleConfigured, isExpoGo } = useGoogleAuth();
 
   const handleLinkGoogle = async () => {
+    if (isExpoGo) {
+      Alert.alert(
+        'Liên kết Google cần bản phát triển',
+        'Hãy cài bản ứng dụng phát triển lên điện thoại rồi thử lại.',
+      );
+      return;
+    }
     if (!googleConfigured) {
-      Alert.alert('Chưa cấu hình Google', 'Cần khai báo Google OAuth Client ID cho nền tảng này trong biến môi trường EXPO_PUBLIC_GOOGLE_*_CLIENT_ID.');
+      Alert.alert('Chưa cấu hình Google', 'Cần khai báo mã ứng dụng Google phù hợp với nền tảng trong mobile/.env.');
       return;
     }
     setGoogleBusy(true);
     try {
       const result = await promptGoogle();
       if (result.type !== 'success') return;
-      const idToken = result.params.id_token;
-      if (!idToken) throw new Error('Google chưa trả về mã định danh an toàn.');
-      await IdentityApi.linkGoogle(idToken);
+      await IdentityApi.linkGoogle(result.idToken);
       if (refreshMe) {
         await refreshMe();
       }
       Alert.alert('Thành công', 'Đã liên kết tài khoản Google an toàn với tài khoản tác chiến của bạn.');
     } catch (err: unknown) {
-      Alert.alert('Liên kết thất bại', getApiErrorMessage(err, 'Không thể liên kết tài khoản Google. Tài khoản này có thể đã được sử dụng bởi người dùng khác.'));
+      const errorMessage = err instanceof GoogleAuthError
+        ? err.message
+        : getApiErrorMessage(err, 'Không thể liên kết tài khoản Google. Tài khoản này có thể đã được sử dụng bởi người dùng khác.');
+      Alert.alert('Liên kết thất bại', errorMessage);
     } finally {
       setGoogleBusy(false);
     }
@@ -304,9 +296,9 @@ export const ChangePasswordScreen: React.FC = () => {
         </Text>
 
         <TouchableOpacity
-          style={[styles.googleButton, (googleBusy || !googleRequest) && styles.submitButtonDisabled]}
+          style={[styles.googleButton, (googleBusy || !googleReady) && styles.submitButtonDisabled]}
           onPress={handleLinkGoogle}
-          disabled={googleBusy || !googleRequest}
+          disabled={googleBusy || !googleReady}
           activeOpacity={0.85}
         >
           {googleBusy ? (
@@ -315,9 +307,11 @@ export const ChangePasswordScreen: React.FC = () => {
             <Text style={styles.googleButtonText}>Liên kết với tài khoản Google</Text>
           )}
         </TouchableOpacity>
-        {!googleConfigured && (
+        {isExpoGo ? (
+          <Text style={styles.googleHint}>Liên kết Google cần bản ứng dụng phát triển; các chức năng khác vẫn dùng được trong Expo Go.</Text>
+        ) : !googleConfigured ? (
           <Text style={styles.googleHint}>Google chưa được cấu hình cho ứng dụng này.</Text>
-        )}
+        ) : null}
       </View>
     </ScreenContainer>
   );

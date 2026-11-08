@@ -207,7 +207,7 @@ GRANT USAGE ON SCHEMA public TO c48_identity_app;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO c48_identity_app;
 GRANT INSERT, UPDATE ON region, organization, app_user, membership, role_grant, session_family, refresh_session, idempotency_record TO c48_identity_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON email_registration TO c48_identity_app; -- ephemeral registration only; no account deletion
-GRANT INSERT ON external_identity TO c48_identity_app;
+GRANT SELECT, INSERT ON external_identity TO c48_identity_app; -- lookup and add identities; no mutation or deletion
 GRANT INSERT ON audit_log TO c48_identity_app;                          -- append-only: no UPDATE, DELETE or TRUNCATE
 GRANT DELETE ON refresh_session, session_family, idempotency_record TO c48_identity_app;   -- retention cleanup only (children before family)
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO c48_identity_app;       -- audit_log identity

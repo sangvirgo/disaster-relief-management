@@ -55,6 +55,7 @@ export class MobileApiError extends Error {
 }
 
 const codeMessages: Record<string, string> = {
+  GOOGLE_ACCOUNT_LINK_REQUIRED: 'Email Google này đã có tài khoản Reliva. Hãy đăng nhập bằng tài khoản hiện có, sau đó vào Cài đặt để liên kết Google.',
   USERNAME_TAKEN: 'Tên đăng nhập này đã có người sử dụng. Vui lòng chọn tên khác.',
   EMAIL_TAKEN: 'Email này đã được sử dụng. Vui lòng đăng nhập hoặc dùng địa chỉ email khác.',
   PASSWORD_WEAK: 'Mật khẩu chưa đủ mạnh. Vui lòng chọn mật khẩu khác theo yêu cầu.',

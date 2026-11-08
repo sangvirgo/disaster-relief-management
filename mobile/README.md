@@ -46,7 +46,13 @@ npx expo start -c
 
 ### Đăng nhập và đăng ký
 
-Đăng ký công dân cần email OTP; đăng nhập Google cần OAuth Client ID phù hợp với nền tảng. Sao chép `mobile/.env.example` thành `mobile/.env`, điền các `EXPO_PUBLIC_GOOGLE_*_CLIENT_ID`, rồi cấu hình cùng các Client ID trong `GOOGLE_CLIENT_IDS` ở `backend/.env`. Có thể bỏ trống các Client ID nếu chỉ dùng đăng nhập bằng tài khoản/mật khẩu. Không đặt OAuth client secret, Gemini API key, SMTP password, JWT private key hoặc pepper vào Mobile.
+Google sign-in uses the native Google Sign-In SDK on Android/iOS and `expo-auth-session` on Web. The app sends the returned ID token to the Identity API for verification. Native Google sign-in requires a development build; Expo Go remains available for the other screens.
+
+Copy `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` to the Web OAuth client ID. This ID is used to request the native ID token and must be allowed by `GOOGLE_CLIENT_IDS` in `backend/.env`. In Google Cloud Console, also create an Android OAuth client for package `com.disasterrelief.c48mobile` with the SHA-1 fingerprint of the development build's signing certificate; its client ID is not passed by the app. For iOS, set `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` to the OAuth client ID for the matching bundle identifier.
+
+After adding/changing native dependencies or OAuth config, rebuild and install with `npx expo run:android`. Subsequent JavaScript-only changes can use `npx expo start --dev-client`.
+
+Client IDs can remain blank when only username/password sign-in is needed. Do not put OAuth client secrets, Gemini API keys, SMTP passwords, JWT private keys, or peppers in the mobile app.
 
 ---
 

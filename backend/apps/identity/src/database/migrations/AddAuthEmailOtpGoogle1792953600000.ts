@@ -36,7 +36,7 @@ export class AddAuthEmailOtpGoogle1792953600000 implements MigrationInterface {
     await queryRunner.query("CREATE INDEX IF NOT EXISTS email_challenge_user_live_idx ON email_verification_challenge (user_id, created_at DESC) WHERE consumed_at IS NULL");
     await queryRunner.query("CREATE INDEX IF NOT EXISTS email_challenge_expiry_idx ON email_verification_challenge (expires_at) WHERE consumed_at IS NULL");
     await queryRunner.query('GRANT INSERT, UPDATE ON email_verification_challenge TO c48_identity_app');
-    await queryRunner.query('GRANT INSERT ON external_identity TO c48_identity_app');
+    await queryRunner.query('GRANT SELECT, INSERT ON external_identity TO c48_identity_app');
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {

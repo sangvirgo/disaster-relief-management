@@ -8,9 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   Image,
-  Platform,
 } from 'react-native';
-import { useIdTokenAuthRequest } from 'expo-auth-session/providers/google';
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
@@ -20,6 +18,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { ResponseApi } from '../../../api/responseApi';
 import { THEME } from '../../../constants/theme';
+import { GoogleAuthError, useGoogleAuth } from '../googleAuth';
 import { User, Lock, ArrowRight, Eye, EyeOff, UserPlus } from 'lucide-react-native';
 
 type MobileActor = 'citizen' | 'team' | 'unsupported' | 'unavailable';
@@ -53,22 +52,7 @@ export const LoginScreen: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Record<string, string | undefined>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
-  const googleClients = {
-    web: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    ios: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    android: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-  };
-  const googleConfigured = Boolean(Platform.select({
-    ios: googleClients.ios,
-    android: googleClients.android,
-    default: googleClients.web,
-  }));
-  const [googleRequest, , promptGoogle] = useIdTokenAuthRequest({
-    webClientId: googleClients.web || 'google-client-id-not-configured',
-    iosClientId: googleClients.ios || 'google-client-id-not-configured',
-    androidClientId: googleClients.android || 'google-client-id-not-configured',
-    selectAccount: true,
-  }, { scheme: 'com.disasterrelief.c48mobile' });
+  const { googleReady, promptGoogle, googleConfigured, isExpoGo } = useGoogleAuth();
 
   const handleLogin = async () => {
     const trimmedUsername = username.trim();
@@ -140,17 +124,22 @@ export const LoginScreen: React.FC = () => {
   };
 
   const handleGoogleLogin = async () => {
+    if (isExpoGo) {
+      Alert.alert(
+        'Đăng nhập Google cần bản phát triển',
+        'Hãy cài bản ứng dụng phát triển lên điện thoại rồi thử lại.',
+      );
+      return;
+    }
     if (!googleConfigured) {
-      Alert.alert('Chưa cấu hình Google', 'Cần khai báo Google OAuth Client ID cho nền tảng này trong biến môi trường EXPO_PUBLIC_GOOGLE_*_CLIENT_ID.');
+      Alert.alert('Chưa cấu hình Google', 'Cần khai báo mã ứng dụng Google phù hợp với nền tảng trong mobile/.env.');
       return;
     }
     setGoogleBusy(true);
     try {
       const result = await promptGoogle();
       if (result.type !== 'success') return;
-      const idToken = result.params.id_token;
-      if (!idToken) throw new Error('Google chưa trả về mã định danh an toàn.');
-      await loginWithGoogle(idToken);
+      await loginWithGoogle(result.idToken);
       const authState = useAuthStore.getState();
       if (authState.user?.must_change_password) {
         router.replace('/change-password');
@@ -173,7 +162,17 @@ export const LoginScreen: React.FC = () => {
         router.replace('/login');
       }
     } catch (err: unknown) {
-      Alert.alert('Đăng nhập Google thất bại', getApiErrorMessage(err, 'Không thể đăng nhập bằng Google. Vui lòng thử lại.'));
+      const errorMessage = err instanceof GoogleAuthError
+        ? err.message
+        : getApiErrorMessage(err, 'Không thể đăng nhập bằng Google. Vui lòng thử lại.');
+      if (isApiErrorCode(err, 'GOOGLE_ACCOUNT_LINK_REQUIRED')) {
+        Alert.alert('Tài khoản Google chưa được liên kết', errorMessage, [
+          { text: 'Đóng', style: 'cancel' },
+          { text: 'Chọn tài khoản khác', onPress: () => { void handleGoogleLogin(); } },
+        ]);
+      } else {
+        Alert.alert('Đăng nhập Google thất bại', errorMessage);
+      }
     } finally {
       setGoogleBusy(false);
     }
@@ -283,14 +282,18 @@ export const LoginScreen: React.FC = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.googleButton, (isLoading || googleBusy || !googleRequest) && styles.loginButtonDisabled]}
+          style={[styles.googleButton, (isLoading || googleBusy || !googleReady) && styles.loginButtonDisabled]}
           onPress={handleGoogleLogin}
-          disabled={isLoading || googleBusy || !googleRequest}
+          disabled={isLoading || googleBusy || !googleReady}
           activeOpacity={0.85}
         >
           {googleBusy ? <ActivityIndicator size="small" color={THEME.colors.text.primary} /> : <Text style={styles.googleButtonText}>Tiếp tục bằng Google</Text>}
         </TouchableOpacity>
-        {!googleConfigured && <Text style={styles.googleHint}>Google chưa được cấu hình cho ứng dụng này.</Text>}
+        {isExpoGo ? (
+          <Text style={styles.googleHint}>Đăng nhập Google cần bản ứng dụng phát triển; các chức năng khác vẫn dùng được trong Expo Go.</Text>
+        ) : !googleConfigured ? (
+          <Text style={styles.googleHint}>Google chưa được cấu hình cho ứng dụng này.</Text>
+        ) : null}
 
         {/* Nút đăng ký tài khoản công dân */}
         <View style={styles.registerPromptBox}>
