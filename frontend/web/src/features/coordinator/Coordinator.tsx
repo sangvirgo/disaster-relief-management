@@ -3,7 +3,7 @@ import { api, ApiError, newCommandKey } from '../../api/client';
 import { appendPage } from '../../api/pagination';
 import { DetailSurface } from '../../components/DetailSurface';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
-import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
+import { label, regionName, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
 import { HeatmapPanel } from './HeatmapPanel';
 import { ContactAttemptPanel } from './ContactAttemptPanel';
@@ -11,6 +11,7 @@ import { CoordinatorTeamPositionForm } from './CoordinatorTeamPositionForm';
 import { operationIdFromTimeline, ResolutionOperationPanel } from './ResolutionOperationPanel';
 import { RequestTimeline } from './RequestTimeline';
 import { RequestEvidencePanel } from './RequestEvidencePanel';
+import { TeamReadinessQueue } from './TeamReadinessQueue';
 
 type QueueItem = {
   id: string;
@@ -46,6 +47,7 @@ type AiPriorityAdvisory = {
 type Queue = { items: QueueItem[]; cursor?: string; more: boolean; generated_at: string };
 type Event = {
   id: string;
+  actor_user_id?: string | null;
   event_type: string;
   occurred_at: string;
   payload?: Record<string, unknown>;
@@ -178,8 +180,57 @@ type DuplicateCandidate = {
   distance_m: number;
 };
 
+function DuplicateComparison({ id, code }: { id: string; code: string }) {
+  const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<Detail | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    setDetail(null);
+    setError('');
+    api<Detail>('response', `/requests/${id}`).then(value => {
+      if (live) setDetail(value);
+    }).catch(cause => {
+      if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải hồ sơ để đối chiếu.');
+    });
+    return () => { live = false; };
+  }, [id, open]);
+  return <div className="form-stack">
+    <button type="button" className="button secondary" aria-expanded={open} onClick={() => setOpen(value => !value)}>
+      {open ? 'Ẩn thông tin đối chiếu' : `Xem hồ sơ ${code} để đối chiếu`}
+    </button>
+    {open && <section aria-label={`Thông tin đối chiếu ${code}`}>
+      {error ? <p className="notice error" role="alert">{error}</p> : !detail ? <p role="status">Đang tải hồ sơ đối chiếu…</p> : <>
+        <p><strong>{detail.tracking_code}</strong> · {requestStatusLabel(detail.status)}</p>
+        <p>{detail.description || 'Chưa có mô tả tình huống.'}</p>
+        <p>{detail.subject.people_affected == null ? 'Chưa rõ số người cần hỗ trợ' : `${detail.subject.people_affected} người cần hỗ trợ`}</p>
+        <p>{detail.declared_danger ? 'Người báo có khai nguy hiểm tính mạng.' : 'Chưa khai báo nguy hiểm tính mạng.'}</p>
+        {detail.subject.location && <p>Vị trí: {detail.subject.location.coordinates[1].toFixed(6)}, {detail.subject.location.coordinates[0].toFixed(6)}</p>}
+        <p>Hai vị trí gần nhau chưa đủ để kết luận cùng một hộ hoặc cùng sự việc.</p>
+      </>}
+    </section>}
+  </div>;
+}
+
+function MissionOutcome({ id }: { id: string }) {
+  const [events, setEvents] = useState<{ reason?: string; outcome_note?: string; to_status?: string; occurred_at?: string }[]>([]);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let live = true;
+    api<{ timeline: { items: typeof events } }>('response', '/missions/' + id)
+      .then((value) => { if (live) setEvents(value.timeline.items); })
+      .catch((cause) => { if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải ghi chú nhiệm vụ.'); });
+    return () => { live = false; };
+  }, [id]);
+  return <>{events.filter((event) => event.reason || event.outcome_note).map((event, index) => <p key={index}>
+    <strong>{label(event.to_status)}:</strong> {event.reason}{event.reason && event.outcome_note ? ' · ' : ''}{event.outcome_note}
+  </p>)}{error && <p role="alert" className="notice error">{error}</p>}</>;
+}
+
 function SosCommandPopup({ spec, onSuccess, onStale }: { spec: CommandSpec; onSuccess: () => void; onStale: () => void }) {
   const [open, setOpen] = useState(false);
+  if (!spec.fields?.length) return <CommandForm spec={spec} onSuccess={onSuccess} onStale={onStale} />;
   return <div className="sos-action-entry">
     <button type="button" className="button" onClick={() => setOpen(true)}>{spec.title}</button>
     <DetailSurface modal open={open} label={spec.title} onClose={() => setOpen(false)}>
@@ -188,8 +239,8 @@ function SosCommandPopup({ spec, onSuccess, onStale }: { spec: CommandSpec; onSu
   </div>;
 }
 
-function CancelRequestPopup({ requestId, version, onCompleted }: {
-  requestId: string; version: number; onCompleted: () => void;
+function CancelRequestPopup({ requestId, version, onCompleted, onStale }: {
+  requestId: string; version: number; onCompleted: () => void; onStale: () => void;
 }) {
   const [open, setOpen] = useState(false);
   return <div className="secondary-command">
@@ -197,7 +248,7 @@ function CancelRequestPopup({ requestId, version, onCompleted }: {
     <DetailSurface modal open={open} label="Hủy yêu cầu" onClose={() => setOpen(false)}>
       <AsyncRequestForm requestId={requestId} version={version} kind="cancel"
         onCompleted={() => { setOpen(false); onCompleted(); }}
-        onStale={() => { setOpen(false); onCompleted(); }} />
+        onStale={() => { setOpen(false); onStale(); }} />
     </DetailSurface>
   </div>;
 }
@@ -208,27 +259,38 @@ function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onS
   const [mission, setMission] = useState<{ status: string; version: number } | null>(null);
   const [reportingMode, setReportingMode] = useState('');
   const [loadError, setLoadError] = useState('');
+  const [teamError, setTeamError] = useState('');
+  const [loadRevision, setLoadRevision] = useState(0);
   useEffect(() => {
     let live = true;
-    Promise.all([
+    // Keep the mounted form during polling; its version key resets stale drafts.
+    Promise.allSettled([
       api<{ status: string; version: number }>('response', `/missions/${missionId}`),
       api<{ reporting_mode: string }>('response', `/teams/${teamId}`),
-    ]).then(([missionValue, teamValue]) => {
-      if (live) { setMission(missionValue); setReportingMode(teamValue.reporting_mode); }
-    }).catch((cause) => {
-      if (live) setLoadError(cause instanceof Error ? cause.message : 'Không thể tải nhiệm vụ.');
+    ]).then(([missionResult, teamResult]) => {
+      if (!live) return;
+      setMission(missionResult.status === 'fulfilled' ? missionResult.value : null);
+      setLoadError(missionResult.status === 'rejected'
+        ? missionResult.reason instanceof Error ? missionResult.reason.message : 'Không thể tải nhiệm vụ.' : '');
+      setReportingMode(teamResult.status === 'fulfilled' ? teamResult.value.reporting_mode : '');
+      setTeamError(teamResult.status === 'rejected'
+        ? teamResult.reason instanceof Error ? teamResult.reason.message : 'Không thể tải đội cứu hộ.' : '');
     });
     return () => { live = false; };
-  }, [missionId, teamId, revision]);
-  if (loadError) return <p className="notice error">{loadError}</p>;
-  if (!mission || !reportingMode) return <p>Đang tải nhiệm vụ…</p>;
+  }, [missionId, teamId, revision, loadRevision]);
+  const retry = <button type="button" className="button secondary" onClick={() => setLoadRevision(value => value + 1)}>Thử tải lại điều khiển nhiệm vụ</button>;
+  if (loadError) return <><p role="alert" className="notice error">Không tải được trạng thái nhiệm vụ: {loadError}</p>{retry}</>;
+  if (!mission) return <p role="status">Đang tải nhiệm vụ…</p>;
+  if (!['OFFERED', 'ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(mission.status)) return <p className="notice">Nhiệm vụ đã chuyển sang {label(mission.status)}. Bấm Cập nhật danh sách SOS để tải lại hồ sơ.</p>;
   const cancel = <SosCommandPopup
     key={`${missionId}-${mission.version}-cancel`}
     spec={{ title: 'Hủy giao nhiệm vụ', service: 'response', path: `/missions/${missionId}/cancel`,
       version: mission.version, warning: 'Xác nhận hủy nhiệm vụ này? Đội sẽ không tiếp tục xử lý nhiệm vụ đã hủy.',
-      fields: [{ name: 'reason', label: 'Lý do hủy nhiệm vụ', type: 'textarea', required: true }] }}
+      fields: [{ name: 'reason', label: 'Lý do hủy nhiệm vụ', type: 'textarea', required: true, maxLength: 2000 }] }}
     onSuccess={onSuccess} onStale={onStale}
   />;
+  if (teamError) return <><p role="alert" className="notice warning">Không tải được chế độ báo cáo của đội: {teamError} Chưa thể ghi tiến độ thay đội.</p>{retry}{cancel}</>;
+  if (!reportingMode) return <p role="status">Đang tải thông tin đội…</p>;
   if (reportingMode !== 'COORDINATOR') return cancel;
   const next = { OFFERED: 'ACCEPTED', ACCEPTED: 'EN_ROUTE', EN_ROUTE: 'ON_SCENE', ON_SCENE: 'COMPLETED' }[mission.status];
   if (!next) return cancel;
@@ -247,9 +309,9 @@ function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onS
         { name: 'recorded_basis', label: 'Cách nhận thông tin', type: 'select', required: true,
           options: [{ value: 'RADIO', label: 'Bộ đàm' }, { value: 'PHONE', label: 'Điện thoại' },
             { value: 'IN_PERSON', label: 'Trao đổi trực tiếp' }, { value: 'OTHER', label: 'Cách khác' }] },
-        { name: 'reported_by', label: 'Người báo từ đội', required: true },
-        { name: 'reason', label: 'Nội dung xác nhận', required: true, type: 'textarea' },
-        { name: 'outcome_note', label: 'Kết quả nhiệm vụ', required: true, type: 'textarea',
+        { name: 'reported_by', label: 'Người báo từ đội', required: true, maxLength: 200 },
+        { name: 'reason', label: 'Nội dung xác nhận', required: true, type: 'textarea', maxLength: 2000 },
+        { name: 'outcome_note', label: 'Kết quả nhiệm vụ', required: true, type: 'textarea', maxLength: 2000,
           visibleWhen: { field: 'to', value: 'COMPLETED' } },
       ],
       build: (values) => ({ to: values.to, recorded_basis: values.recorded_basis, reported_by: values.reported_by,
@@ -395,7 +457,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
         if (live) setCampaignOptions(campaigns
           .filter((campaign) => campaign.status === 'ACTIVE')
           .map((campaign) => ({ value: campaign.id,
-            label: `${campaign.name} · ${campaign.region_code || 'Nhiều khu vực'}`,
+            label: `${campaign.name} · ${campaign.region_code ? regionName(campaign.region_code) : 'Nhiều khu vực'}`,
             regionCode: campaign.region_code })));
       } catch {
         if (live) setCampaignOptions([]);
@@ -405,6 +467,8 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
     return () => { live = false; };
   }, [revision]);
   const refreshReasonRef = useRef<'success' | 'stale' | null>(null);
+  const [compactDetail, setCompactDetail] = useState(() => window.matchMedia('(max-width: 1050px)').matches);
+  useEffect(() => { const media = window.matchMedia('(max-width: 1050px)'); const update = () => setCompactDetail(media.matches); media.addEventListener('change', update); return () => media.removeEventListener('change', update); }, []);
   const detailPanelRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const restored = readQueueView(currentUserId, page);
@@ -610,6 +674,10 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
     }
   }
   const aiFacts = detail?.ai_advisory?.extracted_json?.facts;
+  const aiCountMismatches = detail
+    ? (['people_affected', 'children_count', 'elderly_count'] as const).filter(key =>
+      typeof aiFacts?.[key] === 'number' && aiFacts[key] !== detail.subject[key])
+    : [];
   const aiNeedsMismatch = Boolean(
     detail &&
       ((typeof aiFacts?.needs_rescue === 'boolean' &&
@@ -638,8 +706,9 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
             className="button secondary queue-refresh-button"
             onClick={() => setRevision((value) => value + 1)}
           >
-            <span aria-hidden="true">↻</span> Cập nhật
+            <span aria-hidden="true">↻</span> Cập nhật SOS
           </button>
+          <TeamReadinessQueue refreshRevision={revision} onChanged={() => { setRevision(value => value + 1); setDetailRevision(value => value + 1); }} />
         </div>
         <div className="queue-filter-fields queue-filter-quick">
             <label className="queue-status-field">
@@ -712,14 +781,15 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   type="button"
                   className={`queue-row ${selected === item.id ? 'selected' : ''}`}
                   onClick={() => {
+                    detailPanelRef.current?.closest('.coordinator-detail-surface')?.scrollTo(0, 0);
+                    if (selected === item.id) {
+                      if (detailError) setDetailRevision(value => value + 1);
+                      return;
+                    }
                     setSelected(item.id);
                     setDetail(null);
                     setDetailError('');
                     setUpdateMessage('');
-                    detailPanelRef.current?.scrollTo(0, 0);
-                    if (window.matchMedia('(max-width: 1050px)').matches) {
-                      detailPanelRef.current?.scrollIntoView({ block: 'start' });
-                    }
                   }}
                   key={item.id}
                 >
@@ -772,8 +842,8 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
           </>
         )}
       </section>
-      <section
-        className={`card queue-detail-card${detail && ['SUBMITTED', 'VERIFYING'].includes(detail.status) ? ' verification-detail-card' : ''}`}
+      <DetailSurface className="coordinator-detail-surface" modal={compactDetail} open={Boolean(selected)} label="Hồ sơ yêu cầu" onClose={() => setSelected(null)}><section
+        className={`queue-detail-card${detail && ['SUBMITTED', 'VERIFYING'].includes(detail.status) ? ' verification-detail-card' : ''}`}
         ref={detailPanelRef}
       >
         <h2>Hồ sơ yêu cầu</h2>
@@ -839,7 +909,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                     warning: decision === 'ACCEPT'
                       ? 'Xác nhận thông tin mới đã được đối chiếu và có thể cập nhật vào hồ sơ SOS?'
                       : 'Xác nhận không sử dụng thông tin bổ sung này?',
-                    fields: [{ name: 'reason', label: 'Lý do quyết định', type: 'textarea', required: true }],
+                    fields: [{ name: 'reason', label: 'Lý do quyết định', type: 'textarea', required: true, maxLength: 1000 }],
                     build: (values) => ({ decision, reason: values.reason }),
                   }))}
                 </section>
@@ -927,14 +997,14 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
               <p>
                 <strong>Người cần hỗ trợ</strong>
                 <span className="detail-value">
-                  {detail.subject.people_affected ?? 'Chưa rõ'} người
+                  {detail.subject.people_affected == null ? 'Chưa rõ số người' : `${detail.subject.people_affected} người`}
                 </span>
               </p>
               <p>
                 <strong>Trẻ em / người cao tuổi</strong>
                 <span className="detail-value">
-                  {detail.subject.children_count ?? 0} trẻ em · {detail.subject.elderly_count ?? 0}{' '}
-                  người cao tuổi
+                  {detail.subject.children_count == null ? 'Chưa rõ số trẻ em' : `${detail.subject.children_count} trẻ em`} ·{' '}
+                  {detail.subject.elderly_count == null ? 'Chưa rõ số người cao tuổi' : `${detail.subject.elderly_count} người cao tuổi`}
                 </span>
               </p>
               <p>
@@ -987,7 +1057,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
               <p>
                 <strong>Nguồn thông tin / khả năng liên lạc</strong>
                 <span className="detail-value">
-                  {[detail.subject.information_source, detail.subject.contactability]
+                  {[detail.subject.information_source, detail.subject.contactability ? label(detail.subject.contactability) : null]
                     .filter(Boolean)
                     .join(' · ') || 'Chưa ghi rõ'}
                 </span>
@@ -1209,6 +1279,15 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                         khác với phần người báo đã chọn. Giữ dữ liệu gốc và xác minh trước khi quyết định.
                       </p>
                     )}
+                    {aiCountMismatches.length > 0 && (
+                      <div className="notice warning" role="status">
+                        <strong>Cần đối chiếu số người:</strong>
+                        {aiCountMismatches.map(key => <p key={key}>
+                          {advisoryFactLabels[key]} — hồ sơ: {detail.subject[key] ?? 'Chưa rõ'}; AI: {String(aiFacts?.[key])}.
+                        </p>)}
+                        <p>Số chưa rõ không có nghĩa là 0. Giữ dữ liệu gốc và xác minh trước khi sử dụng số AI ghi nhận.</p>
+                      </div>
+                    )}
                     <p>
                       <strong>Độ tin cậy do AI ước tính:</strong>{' '}
                       {Math.round((detail.ai_advisory.extracted_json?.confidence ?? 0) * 100)}% (chỉ
@@ -1296,6 +1375,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                         {label(mission.status)} · {timeLabel(mission.created_at)}
                         {mission.last_status ? ` · Cập nhật: ${label(mission.last_status)}` : ''}
                       </p>
+                      <MissionOutcome key={mission.id + mission.status} id={mission.id} />
                       {mission.override_reason && (
                         <p>Lý do chọn đội khác đề xuất: {mission.override_reason}</p>
                       )}
@@ -1319,7 +1399,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                               visibleWhen: { field: 'disposition', value: 'REPLACED' },
                               options: detail.mission_history?.items.filter((item) => item.status === 'COMPLETED' && item.id !== mission.id)
                                 .map((item) => ({ value: item.id, label: `${item.team_name} · ${item.id.slice(0, 8)}` })) || [] },
-                            { name: 'reason', label: 'Căn cứ rà soát', type: 'textarea', required: true },
+                            { name: 'reason', label: 'Căn cứ rà soát', type: 'textarea', required: true, maxLength: 2000 },
                           ],
                         })}
                     </div>
@@ -1403,9 +1483,17 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                 })}
               {detail.status === 'VERIFYING' && (
                 <>
+                  {detail.report_mode === 'PROXY' && detail.timeline.items.some(event => event.event_type === 'VERIFICATION_STARTED' && event.actor_user_id === currentUserId) &&
+                    <p className="notice">{detail.timeline.items.some(event => event.event_type === 'CONCURRENCE' && event.actor_user_id && event.actor_user_id !== currentUserId)
+                      ? 'Đã có đồng xác nhận từ điều phối viên khác. Chọn lần đồng xác nhận trong bước Hoàn tất xác minh yêu cầu báo hộ; hệ thống sẽ kiểm tra lại căn cứ trước khi ghi nhận.'
+                      : 'Bạn đã mở xác minh hồ sơ này. Cần điều phối viên khác đối chiếu và đồng xác nhận trước khi bạn hoàn tất xác minh.'}</p>}
+                  {detail.report_mode === 'PROXY' && detail.timeline.items.some(event => event.event_type === 'CONCURRENCE' && event.actor_user_id === currentUserId) &&
+                    <p className="notice">Bạn đã đồng xác nhận hồ sơ này. Điều phối viên khác sẽ thực hiện bước xác minh cuối. Chỉ ghi lại đồng xác nhận khi cần cập nhật nội dung đã đối chiếu.</p>}
                   {detail.report_mode === 'PROXY' &&
+                    !detail.timeline.items.some(event => event.event_type === 'VERIFICATION_STARTED' && event.actor_user_id === currentUserId) &&
                     command({
-                      title: 'Điều phối viên thứ hai xác nhận',
+                      title: detail.timeline.items.some(event => event.event_type === 'CONCURRENCE' && event.actor_user_id === currentUserId)
+                        ? 'Ghi lại đồng xác nhận' : 'Điều phối viên thứ hai xác nhận',
                       service: 'response',
                       path: `/requests/${detail.id}/concur`,
                       version: detail.version,
@@ -1417,6 +1505,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                           label: 'Thông tin bạn đã đối chiếu',
                           type: 'textarea',
                           required: true,
+                          maxLength: 1000,
                         },
                       ],
                     })}
@@ -1434,6 +1523,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                           label: 'Nội dung đã đối chiếu (vị trí, thông tin, hình ảnh)',
                           type: 'textarea',
                           required: true,
+                          maxLength: 1000,
                           placeholder: 'Ví dụ: Đã xác nhận vị trí, tình trạng và số người cần hỗ trợ.',
                         },
                       ],
@@ -1448,7 +1538,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                       }),
                     })}
                   {detail.report_mode === 'PROXY' &&
-                    detail.timeline.items.some((event) => event.event_type === 'CONCURRENCE') &&
+                    detail.timeline.items.some((event) => event.event_type === 'CONCURRENCE' && event.actor_user_id !== currentUserId) &&
                     command({
                       title: 'Hoàn tất xác minh yêu cầu báo hộ',
                       service: 'response',
@@ -1463,7 +1553,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                           type: 'select',
                           required: true,
                           options: detail.timeline.items
-                            .filter((event) => event.event_type === 'CONCURRENCE')
+                            .filter((event) => event.event_type === 'CONCURRENCE' && event.actor_user_id !== currentUserId)
                             .map((event) => ({
                               value: event.id,
                               label: `${timeLabel(event.occurred_at)} · ${event.id.slice(0, 8)}`,
@@ -1474,6 +1564,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                           label: 'Lý do xác minh',
                           type: 'textarea',
                           required: true,
+                          maxLength: 1000,
                         },
                       ],
                       build: (values) => ({
@@ -1501,6 +1592,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                             {label(candidate.category)} · {Math.round(candidate.distance_m)} m ·{' '}
                             {timeLabel(candidate.received_at)}
                           </p>
+                          <DuplicateComparison id={candidate.id} code={candidate.tracking_code || candidate.id.slice(0, 8)} />
                           {command({
                             title: 'Đánh dấu trùng yêu cầu này',
                             service: 'response',
@@ -1513,6 +1605,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                                 label: 'Căn cứ xác nhận trùng',
                                 type: 'textarea',
                                 required: true,
+                                maxLength: 1000,
                               },
                             ],
                             build: (values) => ({
@@ -1531,7 +1624,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                     version: detail.version,
                     warning:
                       'Bạn có chắc muốn từ chối yêu cầu này? Lý do sẽ được lưu trong lịch sử.',
-                    fields: [{ name: 'reason', label: 'Lý do', type: 'textarea', required: true }],
+                    fields: [{ name: 'reason', label: 'Lý do', type: 'textarea', required: true, maxLength: 1000 }],
                   })}
                 </>
               )}
@@ -1560,7 +1653,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                         { value: 'INCOMPLETE_INFO', label: 'Còn thiếu thông tin' },
                       ],
                     },
-                    { name: 'reason', label: 'Lý do quyết định', type: 'textarea', required: true },
+                    { name: 'reason', label: 'Lý do quyết định', type: 'textarea', required: true, maxLength: 1000 },
                   ],
                 })}
               {detail.status === 'TRIAGED' && (
@@ -1601,6 +1694,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                         {candidate.recent_missions_24h} nhiệm vụ/24 giờ ·{' '}
                         {candidate.recent_missions_7d} nhiệm vụ/7 ngày
                       </p>
+                      {detail.mission_history?.items.some((mission) => mission.team_id === candidate.team.id && ['DECLINED', 'FAILED'].includes(mission.status)) && <p className="notice warning">Đội này đã từ chối hoặc chưa hoàn thành nhiệm vụ trong hồ sơ này. Xem lý do trong lịch sử nhiệm vụ trước khi giao lại.</p>}
                       {candidate.recent_history.length > 0 && (
                         <details>
                           <summary>Xem lịch sử 5 nhiệm vụ gần nhất</summary>
@@ -1624,7 +1718,12 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                         path: `/requests/${detail.id}/missions`,
                         version: detail.version,
                         warning: `Xác nhận giao yêu cầu ${detail.tracking_code} cho ${candidate.team.name}?`,
-                        build: () => ({ team_id: candidate.team.id }),
+                        fields: candidate.suggested ? undefined : [{
+                          name: 'override_reason', label: 'Lý do chọn đội khác gợi ý', type: 'textarea', required: true, maxLength: 2000,
+                        }],
+                        build: (values) => ({ team_id: candidate.team.id,
+                          ...(values.override_reason?.trim() ? { override_reason: values.override_reason.trim() } : {}),
+                        }),
                       })}
                     </div>
                   ))}
@@ -1653,19 +1752,16 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   version={detail.version}
                   kind="resolve"
                   onCompleted={done}
-                  onStale={done}
+                  onStale={refreshAfterConflict}
                 />
               )}
               {[
-                'SUBMITTED',
-                'VERIFYING',
-                'VERIFIED',
                 'TRIAGED',
                 'DISPATCHED',
                 'IN_PROGRESS',
               ].includes(detail.status) && (
                 <CancelRequestPopup key={`cancel-${detail.id}-${detail.version}`}
-                  requestId={detail.id} version={detail.version} onCompleted={done} />
+                  requestId={detail.id} version={detail.version} onCompleted={done} onStale={refreshAfterConflict} />
               )}
               {detail.status === 'RESOLVED' &&
                 command({
@@ -1683,13 +1779,13 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   version: detail.version,
                   warning: 'Xác nhận mở chu kỳ xử lý mới cho yêu cầu này?',
                   fields: [
-                    { name: 'reason', label: 'Lý do mở lại', type: 'textarea', required: true },
+                    { name: 'reason', label: 'Lý do mở lại', type: 'textarea', required: true, maxLength: 2000 },
                   ],
                 })}
             </div>
           </>
         )}
-      </section>
+      </section></DetailSurface>
     </div>
   );
 }

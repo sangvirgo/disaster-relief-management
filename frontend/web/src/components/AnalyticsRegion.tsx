@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { regionName } from '../i18n/labels';
 
 type CampaignPage = {
   items: { id: string; name: string; region_code: string | null }[];
@@ -96,7 +97,8 @@ export function AnalyticsRegionField({
   const [draft, setDraft] = useState('');
   const [draftTouched, setDraftTouched] = useState(false);
   const [draftAttempted, setDraftAttempted] = useState(false);
-  const draftError = draft.length > 64 ? 'Mã khu vực không được vượt quá 64 ký tự.' : '';
+  const draftError = draft.trim() && !/^[A-Z0-9_]{2,32}$/.test(draft.trim())
+    ? 'Mã khu vực cần 2–32 ký tự, gồm chữ in hoa, số hoặc dấu gạch dưới.' : '';
   const listed = regions.includes(region);
   return (
     <div className="region-control">
@@ -125,7 +127,7 @@ export function AnalyticsRegionField({
           <option value="">{manual ? 'Đang nhập mã khu vực' : allowAll ? 'Toàn Việt Nam' : 'Chọn khu vực'}</option>
           {regions.map((code) => (
             <option key={code} value={code}>
-              {code}
+              {regionName(code)}
             </option>
           ))}
         </select>
@@ -160,12 +162,12 @@ export function AnalyticsRegionField({
               aria-invalid={Boolean((draftTouched || draftAttempted) && draftError)}
               placeholder="Ví dụ: DEMO_A"
               autoComplete="off"
-              maxLength={65}
+              maxLength={33}
             />
             <button type="submit" className="region-manual-button" disabled={!draft.trim() || Boolean(draftError) || draft.trim() === region}>Áp dụng</button>
           </div>
           {(draftTouched || draftAttempted) && draftError && <small className="field-error" role="alert">{draftError}</small>}
-          {region && !listed && <small>Không có mã này trong danh sách gợi ý. Hãy kiểm tra mã khu vực trước khi dùng số liệu.</small>}
+          {region && !listed && <small>Khu vực này chưa có trong danh sách của tài khoản. Kết quả rỗng có thể do giới hạn quyền xem; hãy xác nhận phạm vi trước khi dùng số liệu.</small>}
         </form>
       )}
       {regions.length > 0 && (
@@ -180,7 +182,7 @@ export function AnalyticsRegionField({
                 onChange(code);
               }}
             >
-              {code}
+              {regionName(code)}
             </button>
           ))}
         </div>

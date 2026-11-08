@@ -31,6 +31,7 @@ import { clearAllSosDrafts } from './features/citizen/sosDraft';
 import type { components as ResponseComponents } from './api/generated/response';
 import './style.css';
 import { StatusBadge } from './components/StatusBadge';
+import { DetailSurface } from './components/DetailSurface';
 
 declare global {
   interface Window {
@@ -145,6 +146,7 @@ function AuthModal({
   const [challengeId, setChallengeId] = useState('');
   const [otp, setOtp] = useState('');
   const googleButton = useRef<HTMLDivElement>(null);
+  const authCard = useRef<HTMLDivElement>(null);
   const authCallbacks = useRef({ onReady, onClose });
   authCallbacks.current = { onReady, onClose };
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -210,6 +212,38 @@ function AuthModal({
       document.body.style.overflow = '';
     };
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const card = authCard.current;
+    card?.querySelector<HTMLButtonElement>('button')?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        authCallbacks.current.onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !card) return;
+      const controls = Array.from(card.querySelectorAll<HTMLElement>(
+        'button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],iframe,[tabindex]:not([tabindex="-1"])'
+      )).filter(control => control.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (!first || !last) return;
+      const outside = !card.contains(document.activeElement);
+      if (event.shiftKey && (document.activeElement === first || outside)) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || outside)) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      if (opener?.isConnected) opener.focus();
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || mode !== 'login' || !googleClientId || !googleButton.current) return;
@@ -325,7 +359,7 @@ function AuthModal({
       aria-modal="true"
       aria-labelledby="auth-modal-title"
     >
-      <div className="modal-card auth-modal-card" onClick={(e) => e.stopPropagation()}>
+      <div ref={authCard} className="modal-card auth-modal-card" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close-button" onClick={onClose} aria-label="Đóng cửa sổ">
           ✕
         </button>
@@ -560,6 +594,8 @@ function AuthModal({
             className="text-button"
             onClick={() => {
               setMode(mode === 'login' ? 'register' : 'login');
+              setUsername('');
+              setPassword('');
               setShowPassword(false);
               setMessage('');
               setAuthErrors({});
@@ -1530,7 +1566,7 @@ function App() {
     try {
       for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
         const key = window.sessionStorage.key(index);
-        if (key?.startsWith('c48:coordinator-queue:')) window.sessionStorage.removeItem(key);
+        if (key?.startsWith('c48:coordinator-queue:') || key?.startsWith('c48:citizen-tracking:')) window.sessionStorage.removeItem(key);
       }
     } catch {
       // Session cleanup still completes if browser storage is unavailable.
@@ -1560,6 +1596,11 @@ function App() {
     setWorkspace(route.workspace);
     setPageId(route.page);
     writeRoute(route.workspace, route.page, value, 'replace');
+    try {
+      const saved = !preferRoleDefault && route.workspace === 'citizen' && route.page === 'track'
+        ? sessionStorage.getItem(`c48:citizen-tracking:${value.id}`) || '' : '';
+      setSelectedTrackingCode(/^[A-Z0-9]{10}$/.test(saved) ? saved : '');
+    } catch { setSelectedTrackingCode(''); }
     if (pendingUrl && requested?.workspace === route.workspace && requested.page === route.page) {
       const url = new URL(window.location.href);
       for (const key of ['step', 'view']) {
@@ -1732,7 +1773,10 @@ function App() {
 
   function changePage(id: string) {
     pendingRouteRef.current = null;
-    if (id === 'track') setSelectedTrackingCode('');
+    if (id === 'track') {
+      setSelectedTrackingCode('');
+      if (user) { try { sessionStorage.removeItem(`c48:citizen-tracking:${user.id}`); } catch {} }
+    }
     setSelectedMissionId('');
     setSelectedRequestId('');
     setPageId(id);
@@ -1744,6 +1788,7 @@ function App() {
   function trackOwnedRequest(code: string) {
     pendingRouteRef.current = null;
     setSelectedTrackingCode(code);
+    if (user) { try { sessionStorage.setItem(`c48:citizen-tracking:${user.id}`, code); } catch {} }
     setPageId('track');
     writeRoute('citizen', 'track', user);
     setMenuOpen(false);
@@ -1768,7 +1813,7 @@ function App() {
 
   return (
     <div className="shell">
-      <aside className={`sidebar ${menuOpen ? 'open' : ''}`} aria-label="Điều hướng chính">
+      <aside id="primary-navigation" className={`sidebar ${menuOpen ? 'open' : ''}`} aria-label="Điều hướng chính">
         <div className="sidebar-content">
           <div className="brand">
             <span className="brand-mark">
@@ -1817,6 +1862,8 @@ function App() {
               className="menu-button"
               onClick={() => setMenuOpen(!menuOpen)}
               aria-label={menuOpen ? 'Đóng trình đơn' : 'Mở trình đơn'}
+              aria-expanded={menuOpen}
+              aria-controls="primary-navigation"
             >
               ☰
             </button>
@@ -1979,29 +2026,15 @@ function App() {
         }}
       />
       {showPasswordModal && user && (
-        <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Đổi mật khẩu"
-          onClick={() => setShowPasswordModal(false)}
-        >
-          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
-            <button
-              className="modal-close-button"
-              aria-label="Đóng cửa sổ"
-              onClick={() => setShowPasswordModal(false)}
-            >
-              ✕
-            </button>
+        <DetailSurface modal open label="Đổi mật khẩu" className="password-change-dialog"
+          onClose={() => setShowPasswordModal(false)}>
             <PasswordChange
               onChanged={(updatedUser) => {
                 setUser(updatedUser);
                 setShowPasswordModal(false);
               }}
             />
-          </div>
-        </div>
+        </DetailSurface>
       )}
     </div>
   );

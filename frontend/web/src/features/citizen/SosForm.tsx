@@ -43,6 +43,11 @@ export function SosForm({
   onConfirmed?: (receipt: Created) => void;
   onTrack?: (code: string) => void;
 }) {
+  const [copyMessage, setCopyMessage] = useState('');
+  async function copyReceipt(value: string) {
+    try { await navigator.clipboard.writeText(value); setCopyMessage('Đã sao chép. Hãy lưu ở nơi riêng tư.'); }
+    catch { setCopyMessage('Không sao chép được. Hãy chọn và sao chép mã bằng tay.'); }
+  }
   const [initialDraft] = useState(() => readSosDraft(user?.id));
   const [restored, setRestored] = useState(Boolean(initialDraft));
   const [mode, setMode] = useState<'SELF' | 'PROXY'>(initialDraft?.mode ?? 'SELF');
@@ -80,6 +85,8 @@ export function SosForm({
   const [created, setCreated] = useState<Created | null>(null);
   const [ackSecret, setAckSecret] = useState('');
   const pending = useRef<Pending | null>(null);
+  const locationAttempt = useRef(0);
+  useEffect(() => () => { locationAttempt.current += 1; }, []);
 
   useEffect(() => {
     if (created) return;
@@ -98,6 +105,7 @@ export function SosForm({
     longitude, latitude, relationship, informationSource, situationAt, contactability]);
 
   function discardDraft() {
+    locationAttempt.current += 1;
     clearSosDraft(user?.id);
     setRestored(false);
     setMode('SELF'); setCategory(''); setDescription(''); setPeople(''); setChildren('');
@@ -111,6 +119,7 @@ export function SosForm({
   }
 
   function locate() {
+    const attempt = ++locationAttempt.current;
     if (!navigator.geolocation) {
       setError('Trình duyệt không hỗ trợ xác định vị trí. Hãy nhập tọa độ vị trí cần hỗ trợ.');
       return;
@@ -118,6 +127,7 @@ export function SosForm({
     setError('');
     navigator.geolocation.getCurrentPosition(
       ({ coords, timestamp }) => {
+        if (attempt !== locationAttempt.current) return;
         setTouched((current) => ({ ...current, location: true }));
         setLongitude(String(coords.longitude));
         setLatitude(String(coords.latitude));
@@ -129,11 +139,12 @@ export function SosForm({
         setNetworkError(false);
         pending.current = null;
       },
-      () => setError('Không thể lấy vị trí. Hãy nhập tọa độ vị trí cần hỗ trợ.'),
+      () => { if (attempt === locationAttempt.current) setError('Không thể lấy vị trí. Hãy nhập tọa độ vị trí cần hỗ trợ.'); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }
   function changeCoordinates(setter: (value: string) => void, value: string) {
+    locationAttempt.current += 1;
     setter(value);
     setSource('MANUAL_PIN');
     setAccuracy(null);
@@ -141,6 +152,7 @@ export function SosForm({
     pending.current = null;
   }
   function chooseMapPoint(point: { longitude: number; latitude: number } | null) {
+    locationAttempt.current += 1;
     setTouched((current) => ({ ...current, location: true }));
     setLongitude(point ? String(point.longitude) : '');
     setLatitude(point ? String(point.latitude) : '');
@@ -295,6 +307,7 @@ export function SosForm({
         <h2>Yêu cầu đã được tiếp nhận</h2>
         <p>
           Mã theo dõi: <strong>{created.tracking_code}</strong>
+          <button type="button" className="button secondary" onClick={() => copyReceipt(created.tracking_code)}>Sao chép mã theo dõi</button>
         </p>
         <p>
           Trạng thái: {requestStatusLabel(created.status)} · Thời điểm: {timeLabel(created.received_at)}
@@ -303,6 +316,7 @@ export function SosForm({
           <div className="notice warning">
             <strong>Lưu mã bảo mật này ngay:</strong>
             <div className="secret">{ackSecret}</div>
+            <button type="button" className="button secondary" onClick={() => copyReceipt(ackSecret)}>Sao chép mã bảo mật</button>
             <p>
               Mã chỉ hiển thị trong lần này. Hãy giữ riêng tư để tra cứu và bổ sung thông tin. Ứng
               dụng không lưu mã trên trình duyệt.
@@ -313,6 +327,7 @@ export function SosForm({
           Điều phối viên sẽ xác minh và quyết định ưu tiên. Nếu đang nguy hiểm, hãy gọi 113, 114
           hoặc 115.
         </p>
+        {copyMessage && <p role="status">{copyMessage}</p>}
         {user && onTrack && (
           <button type="button" className="button" onClick={() => onTrack(created.tracking_code)}>
             Theo dõi tiến độ
@@ -357,6 +372,10 @@ export function SosForm({
               checked={mode === 'PROXY'}
               onChange={() => {
                 setMode('PROXY');
+                locationAttempt.current += 1;
+                if (source === 'GPS') {
+                  setLongitude(''); setLatitude(''); setAccuracy(null); setCaptured(null); setSource('MANUAL_PIN');
+                }
                 pending.current = null;
               }}
             />{' '}
@@ -531,9 +550,9 @@ export function SosForm({
       </label>
       <div className="location-heading" id="sos-location">
         <h3>Vị trí cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></h3>
-        <button type="button" className="button secondary" onClick={locate}>
+        {mode === 'SELF' && <button type="button" className="button secondary" onClick={locate}>
           Dùng vị trí hiện tại
-        </button>
+        </button>}
       </div>
       {fieldMessage('location')}
       <LocationPicker

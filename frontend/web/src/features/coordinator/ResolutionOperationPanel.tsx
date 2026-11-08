@@ -64,7 +64,8 @@ export function ResolutionOperationPanel({
           if (timer !== undefined) window.clearInterval(timer);
           if (!finished.current) {
             finished.current = true;
-            onChanged();
+            if (result.state === 'ABORTED') onStale();
+            else onChanged();
           }
         }
       } catch (cause) {
@@ -79,7 +80,7 @@ export function ResolutionOperationPanel({
       active = false;
       if (timer !== undefined) window.clearInterval(timer);
     };
-  }, [operationId, onChanged]);
+  }, [operationId, onChanged, onStale]);
 
   const open = operation && ['PENDING', 'ABORTING'].includes(operation.state);
   return (

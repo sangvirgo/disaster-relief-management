@@ -390,6 +390,8 @@
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
+  max-width: 100%;
   min-height: 78px;
   padding: 15px;
   border: 1px solid #cbd7e7;
@@ -413,6 +415,7 @@
   overflow: hidden;
 }
 .tracking-file-icon {
+  flex: 0 0 40px;
   display: grid;
   place-items: center;
   width: 40px;
@@ -425,6 +428,7 @@
 }
 .tracking-file-picker strong,
 .tracking-file-picker small { display: block; }
+.tracking-file-picker > span:last-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .tracking-file-picker small { color: var(--color-text-secondary); font-weight: 400; margin-top: 3px; }
 .mission-status-offered { background: #fff7e7; border-color: #f5ce77; color: #8b5800; }
 .mission-status-accepted { background: #eef2ff; border-color: #b8c2ff; color: #3730a3; }
@@ -605,6 +609,48 @@
   display: block;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* Notices are full-width prose, not label/value rows. */
+.detail-grid > .notice {
+  display: block;
+  padding: 12px 14px;
+}
+
+.distribution-detail-panel { --detail-inset: 24px; scroll-padding-top: 112px; }
+.distribution-detail-panel.record-detail-dialog { --detail-inset: 28px; }
+.distribution-detail-panel .detail-surface-header {
+  position: sticky;
+  top: calc(-1 * var(--detail-inset));
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: var(--detail-inset) var(--detail-inset) 14px;
+  margin: calc(-1 * var(--detail-inset)) calc(-1 * var(--detail-inset)) 14px;
+  border-bottom: 1px solid var(--color-surface-border);
+  background: var(--color-surface-card);
+}
+.distribution-detail-panel .detail-surface-header h2 { margin: 0; flex: 1; min-width: 0; font-size: 22px; }
+.distribution-detail-panel .detail-surface-header .detail-close-button { position: static; flex: none; }
+.distribution-detail-panel .command-form,
+.distribution-detail-panel .command-form label { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.distribution-detail-panel .command-form :is(input, select, textarea) { min-width: 0; max-width: 100%; }
+@media (max-width: 680px) {
+  .distribution-detail-panel.record-detail-dialog { --detail-inset: 20px; }
+  .distribution-detail-panel .detail-surface-header h2 { font-size: 18px; }
+}
+
+@media (min-width: 1181px) {
+  .distribution-detail-panel.detail-panel-card {
+    position: sticky;
+    top: 16px;
+    max-height: calc(100dvh - 96px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+  }
 }
 
 .region-control {
@@ -1066,9 +1112,26 @@
     column-gap: 12px;
   }
 }
+@media (max-width: 600px) {
+  .detail-grid p {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 5px;
+  }
+}
 .donation-layout {
   grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  max-width: 1000px;
+  margin-inline: auto;
 }
+.donation-history-empty { padding: 16px; border: 1px dashed var(--color-surface-divider); border-radius: 12px; background: #f8fafc; }
+.donation-history-empty p:first-child { margin-top: 0; }
+.donation-history-empty .button { max-width: 100%; white-space: normal; }
+.donation-lookup-code { padding: 14px; margin: 16px 0; border: 1px solid #cbdced; border-radius: 12px; background: #f5f9ff; }
+.donation-lookup-code label { display: grid; gap: 8px; min-width: 0; }
+.donation-lookup-code input { width: 100%; min-width: 0; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; }
+.donation-lookup-code p { margin: 10px 0; }
+.donation-lookup-code .button { max-width: 100%; white-space: normal; }
 .donation-layout > .card { scroll-margin-top: 76px; }
 .donation-owned-list { grid-column: 1 / -1; }
 .donation-declaration-table { margin: 12px 0 20px; overflow: hidden; border: 1px solid var(--color-surface-border); border-radius: 12px; }
@@ -1078,6 +1141,13 @@
 .donation-declaration-table th:first-child, .donation-declaration-table td:first-child { width: 70%; border-right: 1px solid var(--color-surface-border); }
 .donation-declaration-table tbody tr { border-top: 1px solid var(--color-surface-border); }
 .donation-declaration-table tbody th { font-weight: 500; }
+.donation-tracking-dialog { overflow-wrap: anywhere; }
+@media (max-width: 520px) {
+  .donation-tracking-dialog .donation-declaration-table th,
+  .donation-tracking-dialog .donation-declaration-table td { padding: 10px 8px; }
+  .donation-tracking-dialog .donation-declaration-table th:first-child,
+  .donation-tracking-dialog .donation-declaration-table td:first-child { width: 60%; }
+}
 .donation-recovery > summary { list-style: none; color: #2563eb; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 10px 0; }
 .donation-recovery > summary::-webkit-details-marker { display: none; }
 .donation-recovery > summary::marker { content: ''; }
@@ -1150,11 +1220,6 @@
   flex-shrink: 0;
 }
 
-@media (min-width: 1320px) {
-  .donation-layout:has(> .card:nth-child(2)) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
 
 .action-confirm-dialog {
   width: min(430px, calc(100vw - 32px));
@@ -1292,3 +1357,28 @@
 @media (prefers-reduced-motion: reduce) { .operations-detail-transition { animation: none; } }
 .sos-action-entry { padding: 16px 0; border-top: 1px solid var(--color-surface-border); }
 .report-heatmap > .card { border: 0; padding: 0; box-shadow: none; background: transparent; }
+.team-readiness-list {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.team-readiness-list > .candidate,
+.team-readiness-form,
+.team-readiness-form form,
+.team-readiness-form label,
+.team-readiness-form input,
+.team-readiness-form select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.password-change-dialog { max-width: 560px; }
+.password-change-dialog > .auth-card {
+  max-width: none;
+  margin: 0;
+  padding: 48px 0 0;
+  border: 0;
+  box-shadow: none;
+}

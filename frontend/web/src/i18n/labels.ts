@@ -36,6 +36,8 @@ export const statusLabels: Record<string, string> = {
   FIRE: 'Hỏa hoạn',
   MEDICAL: 'Y tế',
   UNKNOWN: 'Chưa rõ',
+  REACHABLE: 'Có thể liên hệ',
+  UNREACHABLE: 'Không thể liên hệ',
   LANDSLIDE: 'Sạt lở đất',
   STORM: 'Bão, gió lốc',
   TRAPPED: 'Người bị mắc kẹt',
@@ -114,6 +116,8 @@ export const statusLabels: Record<string, string> = {
   ORGANIZATION_DEACTIVATED: 'Ngừng hoạt động tổ chức',
   REGION_CREATED: 'Tạo khu vực',
   REGION_UPDATED: 'Cập nhật khu vực',
+  REGION_DEACTIVATED: 'Ngừng hoạt động khu vực',
+  CONCURRENCE: 'Điều phối viên khác đã đồng xác nhận',
   MEMBERSHIP_ADDED: 'Thêm thành viên tổ chức',
   MEMBERSHIP_REMOVED: 'Xóa thành viên tổ chức',
   RESCUE: 'Cứu hộ tại hiện trường',
@@ -132,6 +136,8 @@ export const statusLabels: Record<string, string> = {
   REQUEST_TRIAGED: 'Đã xác định mức ưu tiên',
   REQUEST_REJECTED: 'Yêu cầu đã bị từ chối',
   REQUEST_RESOLVED: 'Yêu cầu đã được xử lý',
+  REQUEST_CANCELLED: 'Yêu cầu đã được hủy',
+  CANCELLATION_INTENT_CREATED: 'Đang xác nhận hủy yêu cầu',
   REQUEST_CLOSED: 'Yêu cầu đã được đóng',
   REQUEST_DUPLICATED: 'Yêu cầu trùng với một yêu cầu khác',
   DUPLICATE_ORPHANED: 'Yêu cầu trùng đã được xử lý riêng',
@@ -167,3 +173,11 @@ export const timeLabel = (value: unknown): string =>
   typeof value === 'string' && !Number.isNaN(Date.parse(value))
     ? new Date(value).toLocaleString('vi-VN')
     : label(value);
+export const dateLabel = (value: unknown): string =>
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? value.split('-').reverse().join('/')
+    : label(value);
+// Names from the versioned demo region catalog; preserve unknown region identifiers.
+export function regionName(code: string): string {
+  return ({ DEMO_A: 'Khu vực Nam (demo)', DEMO_B: 'Khu vực Trung (demo)', DEMO_C: 'Khu vực Bắc (demo)' } as Record<string, string>)[code] || code;
+}

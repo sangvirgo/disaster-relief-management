@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { DetailCloseButton } from './DetailCloseButton';
 
-export function DetailSurface({ modal, open, onClose, children, label = 'Chi tiết biên nhận', className = '' }: {
-  label?: string; className?: string; modal: boolean; open: boolean; onClose: () => void; children: ReactNode;
+export function DetailSurface({ modal, open, onClose, children, label = 'Chi tiết biên nhận', className = '', heading }: {
+  label?: string; className?: string; heading?: string; modal: boolean; open: boolean; onClose: () => void; children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -16,13 +16,19 @@ export function DetailSurface({ modal, open, onClose, children, label = 'Chi ti�
     setClosing(true);
     timer.current = setTimeout(() => { ref.current?.close(); onClose(); }, 180);
   }
+  const header = open && (heading ? <div className="detail-surface-header"><h2>{heading}</h2><DetailCloseButton onClick={close} /></div> : <DetailCloseButton onClick={close} />);
   if (!modal) return <section className={`card detail-panel-card ${open ? 'is-open' : ''} ${className}`}>
-    {open && <DetailCloseButton onClick={close} />}{children}
+    {header}{children}
   </section>;
   if (!open) return null;
   return <dialog ref={ref} className={`record-detail-dialog ${className} ${closing ? 'is-closing' : ''}`}
-    aria-label={label} onCancel={(event) => { event.preventDefault(); close(); }}
+    aria-label={label} onCancel={(event) => {
+      if (event.target !== event.currentTarget) return;
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+    }}
     onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-    <DetailCloseButton onClick={close} />{children}
+    {header}{children}
   </dialog>;
 }

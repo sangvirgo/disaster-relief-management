@@ -11,7 +11,12 @@ export type Field = {
   requiredWhen?: { field: string; values: string[] };
   min?: number;
   max?: number;
+  scaleFor?: (values: Record<string, string>) => number | undefined;
+  visibleFor?: (values: Record<string, string>) => boolean;
+  maxFor?: (values: Record<string, string>) => number | undefined;
   minLength?: number;
+  pattern?: RegExp;
+  patternMessage?: string;
   maxLength?: number;
   integer?: boolean;
   options?: { value: string; label: string }[];
@@ -30,7 +35,7 @@ export interface CommandSpec {
   fields?: Field[];
   version?: number;
   warning?: string;
-  build?: (values: Record<string, string>) => Record<string, unknown>;
+  build?: (values: Record<string, string>) => Record<string, unknown> | Promise<Record<string, unknown>>;
 }
 const sentenceLabel = (value: string) =>
   value.charAt(0).toLocaleLowerCase('vi-VN') + value.slice(1);
@@ -54,6 +59,9 @@ function fieldValidationError(field: Field, value: string, values: Record<string
   if (isRequired(field, values) && !trimmed)
     return `${field.label} là bắt buộc.`;
   if (!trimmed) return undefined;
+  if (field.pattern && !field.pattern.test(trimmed)) return field.patternMessage || `${field.label} chưa hợp lệ.`;
+  if (field.type === 'select' && field.optionsFor && !field.optionsFor(values).some((option) => option.value === trimmed))
+    return 'Lựa chọn không còn phù hợp. Hãy chọn lại ' + sentenceLabel(field.label) + '.';
   if (field.type === 'reference' &&
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed))
     return `${field.label} phải là mã hợp lệ.`;
@@ -61,13 +69,16 @@ function fieldValidationError(field: Field, value: string, values: Record<string
     return `${field.label} cần ít nhất ${field.minLength} ký tự.`;
   if (field.maxLength !== undefined && value.length > field.maxLength)
     return `${field.label} không được quá ${field.maxLength} ký tự.`;
+  if (field.type === 'datetime-local' && field.name === 'occurred_at' && (!Number.isFinite(new Date(trimmed).getTime()) || new Date(trimmed).getTime() > Date.now())) return 'Thời điểm thực tế phải hợp lệ và không nằm trong tương lai.';
   if (field.type === 'number') {
     const number = Number(trimmed);
-    const min = field.min ?? 1;
+    const scale = field.scaleFor?.(values);
+    if (scale !== undefined && (!/^\d+(?:\.\d+)?$/.test(trimmed) || (trimmed.split('.')[1]?.replace(/0+$/, '').length || 0) > scale)) return scale === 0 ? `${field.label} phải là số nguyên theo đơn vị vật phẩm.` : `${field.label} chỉ được có tối đa ${scale} chữ số thập phân.`;
+    const min = field.min ?? (scale === undefined ? 1 : 10 ** -scale);
     if (!Number.isFinite(number)) return `${field.label} phải là số hợp lệ.`;
     if (number < min) return `${field.label} phải từ ${min} trở lên.`;
-    if (field.max !== undefined && number > field.max)
-      return `${field.label} không được vượt quá ${field.max}.`;
+    const max = field.maxFor?.(values) ?? field.max;
+    if (max !== undefined && number > max) return `${field.label} không được vượt quá ${max}.`;
     if ((field.integer || field.name === 'work_cycle') && !Number.isInteger(number))
       return `${field.label} phải là số nguyên.`;
   }
@@ -79,7 +90,7 @@ export function CommandForm({
   onStale,
 }: {
   spec: CommandSpec;
-  onSuccess: () => void;
+  onSuccess: (result?: unknown) => void;
   onStale?: () => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>(() =>
@@ -95,7 +106,7 @@ export function CommandForm({
   const formId = useId();
   const pending = useRef<{ scope: string; key: string; body: Record<string, unknown> } | null>(null);
   const visibleFields = (spec.fields || []).filter(
-    (field) => !field.visibleWhen || values[field.visibleWhen.field] === field.visibleWhen.value
+    (field) => (!field.visibleFor || field.visibleFor(values)) && (!field.visibleWhen || values[field.visibleWhen.field] === field.visibleWhen.value)
   );
   const validationErrors = Object.fromEntries(visibleFields.map((field) => [
     field.name,
@@ -152,21 +163,21 @@ export function CommandForm({
           Object.entries(values).filter(([name, value]) => {
             const field = spec.fields?.find((candidate) => candidate.name === name);
             return value.trim() !== '' &&
-              (!field?.visibleWhen || values[field.visibleWhen.field] === field.visibleWhen.value);
+              (!field?.visibleFor || field.visibleFor(values)) && (!field?.visibleWhen || values[field.visibleWhen.field] === field.visibleWhen.value);
           })
         );
-        const body = spec.build ? spec.build(values) : visibleValues;
+        const body = spec.build ? await spec.build(values) : visibleValues;
         if (spec.version !== undefined) body.expected_version = spec.version;
         pending.current = { scope, key: newCommandKey(), body };
       }
-      await api(spec.service, spec.path, {
+      const result = await api(spec.service, spec.path, {
         method: spec.method || 'POST',
         body: pending.current.body,
         idempotencyKey: pending.current.key,
       });
       pending.current = null;
       setMessage('Thao tác đã được máy chủ xác nhận.');
-      onSuccess();
+      onSuccess(result);
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Thao tác chưa được xác nhận.');
       if (cause instanceof ApiError && Object.keys(cause.fieldErrors).length) {
@@ -200,6 +211,7 @@ export function CommandForm({
       {visibleFields.map((field) => {
         const inlineError = errorFor(field);
         const describedBy = inlineError ? errorId(field) : undefined;
+        const scale = field.scaleFor?.(values);
         return (
         field.type === 'choice-cards' ? (
           <fieldset key={field.name} className="command-choice-list" aria-invalid={Boolean(inlineError)} aria-describedby={describedBy}>
@@ -229,6 +241,7 @@ export function CommandForm({
             (!values[field.name] || field.options.some((option) => option.value === values[field.name])) ? (
               <select
                 id={`reference-${field.name}`}
+                aria-label={field.label}
                 required={isRequired(field, values)}
                 aria-invalid={Boolean(inlineError)}
                 aria-describedby={describedBy}
@@ -253,6 +266,7 @@ export function CommandForm({
               <>
                 <input
                   id={`reference-${field.name}`}
+                  aria-label={field.label}
                   required={isRequired(field, values)}
                   minLength={field.minLength}
                   maxLength={field.maxLength !== undefined ? field.maxLength + 1 : undefined}
@@ -302,6 +316,7 @@ export function CommandForm({
           <span>{field.label}{isRequired(field, values) && <> <span className="required-mark" aria-hidden="true"> *</span></>}</span>
           {field.type === 'textarea' ? (
             <textarea
+              aria-label={field.label}
               required={isRequired(field, values)}
               minLength={field.minLength}
               maxLength={field.maxLength !== undefined ? field.maxLength + 1 : undefined}
@@ -314,6 +329,7 @@ export function CommandForm({
             />
           ) : field.type === 'select' ? (
             <select
+              aria-label={field.label}
               required={isRequired(field, values)}
               aria-invalid={Boolean(inlineError)}
               aria-describedby={describedBy}
@@ -332,16 +348,17 @@ export function CommandForm({
             </select>
           ) : (
             <input
+              aria-label={field.label}
               required={isRequired(field, values)}
               type={field.type || 'text'}
               autoComplete={field.type === 'password' ? 'new-password' : 'off'}
-              min={field.type === 'number' ? (field.min ?? 1) : undefined}
-              max={field.type === 'number' ? field.max : undefined}
+              min={field.type === 'number' ? (field.min ?? (scale === undefined ? 1 : 10 ** -scale)) : undefined}
+              max={field.type === 'number' ? (field.maxFor?.(values) ?? field.max) : undefined}
               step={
                 field.type === 'number'
                   ? field.integer || field.name === 'work_cycle'
                     ? '1'
-                    : 'any'
+                    : scale === undefined ? 'any' : 10 ** -scale
                   : undefined
               }
               minLength={field.minLength}

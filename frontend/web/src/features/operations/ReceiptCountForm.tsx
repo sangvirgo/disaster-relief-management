@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
 
-type Item = { id: string; name: string; unit_name: string; scale: number };
+type Item = { id: string; name: string; unit: { display_name: string; scale: number } };
 type Line = {
   item_id: string;
   counted_quantity: string;
@@ -21,17 +21,21 @@ const empty = (): Line => ({
   condition_note: '',
   expiry_date: '',
 });
+const normalizeQuantity = (value?: string) => value?.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+
 type Existing = { lines?: Partial<Line>[] } | null;
 
 export function ReceiptCountForm({
   receiptId,
   version,
   existing,
+  heldRelease = false,
   onSuccess,
 }: {
   receiptId: string;
   version: number;
   existing: Existing;
+  heldRelease?: boolean;
   onSuccess: () => void;
 }) {
   const [items, setItems] = useState<Item[]>([]);
@@ -39,10 +43,10 @@ export function ReceiptCountForm({
     existing?.lines?.length
       ? existing.lines.map((line) => ({
           item_id: line.item_id || '',
-          counted_quantity: line.counted_quantity || '',
-          accepted_quantity: line.accepted_quantity || '',
-          held_quantity: line.held_quantity || '0',
-          rejected_quantity: line.rejected_quantity || '0',
+          counted_quantity: normalizeQuantity(line.counted_quantity) || '',
+          accepted_quantity: normalizeQuantity(line.accepted_quantity) || '',
+          held_quantity: normalizeQuantity(line.held_quantity) || '0',
+          rejected_quantity: normalizeQuantity(line.rejected_quantity) || '0',
           condition_note: line.condition_note || '',
           expiry_date: line.expiry_date || '',
         }))
@@ -66,6 +70,11 @@ export function ReceiptCountForm({
     else if (seenItems.has(line.item_id.trim())) fieldErrors[itemKey] = 'Mỗi vật phẩm chỉ được xuất hiện một lần.';
     if (line.item_id.trim()) seenItems.add(line.item_id.trim());
     const item = items.find((candidate) => candidate.id === line.item_id);
+    const previous = existing?.lines?.[index];
+    if (heldRelease && previous && Number(line.accepted_quantity) < Number(previous.accepted_quantity || 0))
+      fieldErrors[`${index}.accepted_quantity`] = 'Không được giảm phần đã tiếp nhận ở phiếu đã ghi sổ.';
+    if (heldRelease && previous && Number(line.held_quantity) > Number(previous.held_quantity || 0))
+      fieldErrors[`${index}.held_quantity`] = 'Chỉ được chuyển phần tạm giữ sang tiếp nhận; không được tăng số tạm giữ.';
     for (const [field, title] of [
       ['counted_quantity', 'Số đã đếm'],
       ['accepted_quantity', 'Số tiếp nhận'],
@@ -76,8 +85,8 @@ export function ReceiptCountForm({
       const errorKey = `${index}.${field}`;
       if (!quantity) fieldErrors[errorKey] = `${title} là bắt buộc.`;
       else if (!/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(quantity)) fieldErrors[errorKey] = `${title} phải là số không âm.`;
-      else if (item && (quantity.split('.')[1]?.length || 0) > item.scale)
-        fieldErrors[errorKey] = `${title} chỉ được có tối đa ${item.scale} chữ số thập phân.`;
+      else if (item && (quantity.split('.')[1]?.length || 0) > item.unit.scale)
+        fieldErrors[errorKey] = item.unit.scale === 0 ? `${title} phải là số nguyên theo đơn vị ${item.unit.display_name}.` : `${title} chỉ được có tối đa ${item.unit.scale} chữ số thập phân.`;
     }
     if (line.condition_note.length > 1000)
       fieldErrors[`${index}.condition_note`] = 'Ghi chú tình trạng không được vượt quá 1.000 ký tự.';
@@ -87,6 +96,8 @@ export function ReceiptCountForm({
       fieldErrors[`${index}.counted_quantity`] = 'Số đã đếm phải bằng số tiếp nhận cộng số tạm giữ và số từ chối.';
   }
   if (note.length > 1000) fieldErrors.note = 'Ghi chú chung không được vượt quá 1.000 ký tự.';
+  if (heldRelease && !lines.some((line, index) => Number(line.accepted_quantity) > Number(existing?.lines?.[index]?.accepted_quantity || 0)))
+    fieldErrors.note = 'Cần chuyển ít nhất một phần hàng tạm giữ sang tiếp nhận trước khi gửi duyệt bổ sung.';
   const hasInvalidFields = Object.keys(fieldErrors).length > 0;
   function showFieldError(field: string, value: string) {
     return attempted || touched[field] || Boolean(value);
@@ -140,10 +151,9 @@ export function ReceiptCountForm({
   }
   return (
     <form className="form-stack command-form" onSubmit={submit} noValidate>
-      <h3>Gửi kết quả kiểm đếm</h3>
+      <h3>{heldRelease ? 'Kiểm tra lại hàng tạm giữ' : 'Gửi kết quả kiểm đếm'}</h3>
       <p>
-        Ghi số lượng thực tế cho từng vật phẩm. Có thể thêm vật phẩm ngoài bản khai; người khác sẽ
-        duyệt độc lập.
+        {heldRelease ? 'Giữ nguyên vật phẩm, số đã đếm và số từ chối. Chỉ tăng phần tiếp nhận và giảm tương ứng phần tạm giữ; người khác phải duyệt độc lập trước khi nhập bổ sung.' : 'Ghi số lượng thực tế cho từng vật phẩm. Có thể thêm vật phẩm ngoài bản khai; người khác sẽ duyệt độc lập.'}
       </p>
       {itemsError && (
         <p className="notice error" role="alert">
@@ -156,13 +166,14 @@ export function ReceiptCountForm({
           <label>
             Chọn vật phẩm
             <select
+              disabled={heldRelease}
               value={items.some((item) => item.id === line.item_id) ? line.item_id : ''}
               onChange={(event) => edit(index, 'item_id', event.target.value)}
             >
               <option value="">Nhập mã bên dưới hoặc chọn danh mục</option>
               {items.map((item) => (
                 <option value={item.id} key={item.id}>
-                  {item.name} · {item.unit_name}
+                  {item.name} · {item.unit.display_name}
                 </option>
               ))}
             </select>
@@ -171,6 +182,7 @@ export function ReceiptCountForm({
             <span>Mã vật phẩm <span className="required-mark" aria-hidden="true">*</span></span>
             <input
               required
+              readOnly={heldRelease}
               maxLength={37}
               aria-invalid={Boolean(showFieldError(`${index}.item_id`, line.item_id) && fieldErrors[`${index}.item_id`])}
               value={line.item_id}
@@ -194,6 +206,7 @@ export function ReceiptCountForm({
                 <input
                   required
                   type="number"
+                  readOnly={heldRelease && ['counted_quantity', 'rejected_quantity'].includes(field)}
                   min="0"
                   step="any"
                   aria-invalid={Boolean(showFieldError(`${index}.${field}`, line[field]) && fieldErrors[`${index}.${field}`])}
@@ -224,7 +237,7 @@ export function ReceiptCountForm({
               onChange={(event) => edit(index, 'expiry_date', event.target.value)}
             />
           </label>
-          {lines.length > 1 && (
+          {!heldRelease && lines.length > 1 && (
             <button
               className="button secondary"
               type="button"
@@ -238,7 +251,7 @@ export function ReceiptCountForm({
           )}
         </fieldset>
       ))}
-      {lines.length < 50 && (
+      {!heldRelease && lines.length < 50 && (
         <button
           className="button secondary"
           type="button"

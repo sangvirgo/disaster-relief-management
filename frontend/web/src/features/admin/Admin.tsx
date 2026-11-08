@@ -23,6 +23,7 @@ type Detail = Row & {
     scope_type: string;
     organization_id: string | null;
     region_code: string | null;
+    campaign_id?: string | null;
     revoked_at: string | null;
   }[];
   memberships?: unknown[];
@@ -57,7 +58,10 @@ export function Admin({ page }: { page: string }) {
   const [revision, setRevision] = useState(0);
   const [auditType, setAuditType] = useState('app_user');
   const [query, setQuery] = useState('');
+  const searchTerm = query.trim();
+  const queryError = page === 'users' && searchTerm.length > 64 ? 'Từ khóa tìm kiếm không được vượt quá 64 ký tự.' : '';
   const [organizationOptions, setOrganizationOptions] = useState<{ value: string; label: string }[]>([]);
+  const [regionOptions, setRegionOptions] = useState<{ value: string; label: string }[]>([]);
   const listPath =
     page === 'regions'
       ? '/regions'
@@ -69,6 +73,10 @@ export function Admin({ page }: { page: string }) {
   useEffect(() => {
     if (page !== 'users') return;
     let live = true;
+    void fetchAll<Row>('identity', '/regions').then((regions) => {
+      if (live) setRegionOptions(regions.filter(region => region.code && region.status === 'ACTIVE')
+        .map(region => ({ value: region.code!, label: String(region.name || region.code) })));
+    }).catch(() => { if (live) setRegionOptions([]); });
     void fetchAll<Row>('identity', '/organizations')
       .then((organizations) => {
         if (live) setOrganizationOptions(organizations
@@ -82,9 +90,14 @@ export function Admin({ page }: { page: string }) {
     let live = true;
     setLoading(true);
     setError('');
+    if (!cursor) { setItems([]); setNext(null); }
+    if (queryError) {
+      setLoading(false);
+      return;
+    }
     const params = new URLSearchParams();
     if (cursor) params.set('cursor', cursor);
-    if (query && listPath === '/users') params.set('query', query);
+    if (searchTerm && listPath === '/users') params.set('query', searchTerm);
     const path = listPath + (params.size ? `${listPath.includes('?') ? '&' : '?'}${params}` : '');
     api<Page>('identity', path)
       .then((value) => {
@@ -104,7 +117,7 @@ export function Admin({ page }: { page: string }) {
     return () => {
       live = false;
     };
-  }, [listPath, cursor, query, revision]);
+  }, [listPath, cursor, searchTerm, queryError, revision]);
   useEffect(() => {
     if (!selected) return;
     if (!['users', 'grants', 'overview'].includes(page)) {
@@ -135,7 +148,9 @@ export function Admin({ page }: { page: string }) {
     service: 'identity',
     path: '/users',
     fields: [
-      { name: 'username', label: 'Tên đăng nhập', required: true },
+      { name: 'username', label: 'Tên đăng nhập', required: true, minLength: 3, maxLength: 64,
+        pattern: /^[A-Za-z0-9._-]{3,64}$/,
+        patternMessage: 'Tên đăng nhập cần 3–64 ký tự, chỉ gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.' },
       { name: 'display_name', label: 'Tên hiển thị', required: true },
       { name: 'temporary_password', label: 'Mật khẩu tạm', type: 'password', required: true, minLength: 10 },
       { name: 'organization_id', label: 'Tổ chức (nếu có)', type: 'reference', options: organizationOptions,
@@ -165,8 +180,9 @@ export function Admin({ page }: { page: string }) {
     service: 'identity',
     path: '/regions',
     fields: [
-      { name: 'code', label: 'Mã khu vực', required: true },
-      { name: 'name', label: 'Tên khu vực', required: true },
+      { name: 'code', label: 'Mã khu vực', required: true, pattern: /^[A-Z0-9_]{2,32}$/,
+        patternMessage: 'Mã khu vực cần 2–32 ký tự, chỉ gồm chữ in hoa, số hoặc dấu gạch dưới.', maxLength: 32 },
+      { name: 'name', label: 'Tên khu vực', required: true, maxLength: 120 },
     ],
   };
   const createTitle = page === 'users' ? 'Thêm người dùng' : page === 'organizations' ? 'Thêm tổ chức' : 'Thêm khu vực';
@@ -212,6 +228,10 @@ export function Admin({ page }: { page: string }) {
           <label className="filter">
             Tìm theo tiền tố tên
             <input
+              aria-label="Tìm theo tiền tố tên"
+              maxLength={65}
+              aria-invalid={Boolean(queryError)}
+              aria-describedby={queryError ? 'admin-search-error' : undefined}
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
@@ -219,6 +239,7 @@ export function Admin({ page }: { page: string }) {
               }}
               placeholder="Tên đăng nhập hoặc tên hiển thị"
             />
+            {queryError && <small className="field-error" id="admin-search-error" role="alert">{queryError}</small>}
           </label>
         )}
         {loading && <p role="status">Đang tải…</p>}
@@ -227,7 +248,7 @@ export function Admin({ page }: { page: string }) {
             {error}
           </p>
         )}
-        {!loading && !items.length && !error && <div className="empty">{page === 'audit' ? 'Chưa có thay đổi nào thuộc loại đã chọn.' : 'Chưa có dữ liệu để hiển thị.'}</div>}
+        {!loading && !items.length && !error && !queryError && <div className="empty">{page === 'audit' ? 'Chưa có thay đổi nào thuộc loại đã chọn.' : 'Chưa có dữ liệu để hiển thị.'}</div>}
         <div className={`record-list ${page === 'audit' ? '' : 'admin-record-list'}`}>
           {items.map((item, index) => {
             const canOpen = ['users', 'grants', 'overview', 'organizations', 'regions'].includes(page) && Boolean(item.id || item.code);
@@ -308,7 +329,10 @@ export function Admin({ page }: { page: string }) {
                     <div className="candidate" key={grant.id}>
                       <p>
                         {label(grant.role_code)} · {label(grant.scope_type)}{' '}
-                        {grant.region_code || ''} {grant.revoked_at ? '(đã thu hồi)' : ''}
+                        {grant.organization_id && <> · {organizationOptions.find(option => option.value === grant.organization_id)?.label || grant.organization_id}</>}
+                        {grant.region_code && <> · {regionOptions.find(option => option.value === grant.region_code)?.label || grant.region_code}</>}
+                        {grant.campaign_id && <> · Chiến dịch {grant.campaign_id}</>}
+                        {grant.revoked_at ? ' (đã thu hồi)' : ''}
                       </p>
                       {page === 'users' && !grant.revoked_at && (
                         <CommandForm
@@ -323,6 +347,7 @@ export function Admin({ page }: { page: string }) {
                                 label: 'Lý do thu hồi',
                                 type: 'textarea',
                                 required: true,
+                                maxLength: 500,
                               },
                             ],
                           }}
@@ -345,7 +370,7 @@ export function Admin({ page }: { page: string }) {
                     path: `/users/${detail.id}/disable`,
                     version: detail.version,
                     warning: `Vô hiệu hóa tài khoản ${detail.username}? Các phiên sẽ bị thu hồi.`,
-                    fields: [{ name: 'reason', label: 'Lý do', type: 'textarea', required: true }],
+                    fields: [{ name: 'reason', label: 'Lý do', type: 'textarea', required: true, maxLength: 500 }],
                   }}
                   onSuccess={success}
                 />
@@ -358,7 +383,7 @@ export function Admin({ page }: { page: string }) {
                     path: `/users/${detail.id}/enable`,
                     version: detail.version,
                     warning: `Kích hoạt tài khoản ${detail.username}?`,
-                    fields: [{ name: 'reason', label: 'Lý do', type: 'textarea', required: true }],
+                    fields: [{ name: 'reason', label: 'Lý do', type: 'textarea', required: true, maxLength: 500 }],
                   }}
                   onSuccess={success}
                 />
@@ -379,7 +404,7 @@ export function Admin({ page }: { page: string }) {
                         required: true,
                         minLength: 10,
                       },
-                      { name: 'reason', label: 'Lý do', type: 'textarea', required: true },
+                      { name: 'reason', label: 'Lý do', type: 'textarea', required: true, maxLength: 500 },
                     ],
                   }}
                   onSuccess={success}
@@ -393,7 +418,7 @@ export function Admin({ page }: { page: string }) {
                     path: `/organizations/${detail.id}/deactivate`,
                     version: detail.version,
                     warning: `Ngừng hoạt động tổ chức ${detail.name}?`,
-                    fields: [{ name: 'reason', label: 'Lý do', type: 'textarea', required: true }],
+                    fields: [{ name: 'reason', label: 'Lý do', type: 'textarea', required: true, maxLength: 500 }],
                   }}
                   onSuccess={success}
                 />
@@ -440,10 +465,11 @@ export function Admin({ page }: { page: string }) {
                         ).map((value) => ({ value, label: label(value) })),
                         resetOnChange: ['organization_id', 'region_code', 'campaign_id'],
                       },
-                      { name: 'organization_id', label: 'Mã tổ chức', required: true, visibleWhen: { field: 'scope_type', value: 'ORGANIZATION' } },
-                      { name: 'region_code', label: 'Mã khu vực', required: true, visibleWhen: { field: 'scope_type', value: 'REGION' } },
-                      { name: 'campaign_id', label: 'Mã chiến dịch', required: true, visibleWhen: { field: 'scope_type', value: 'CAMPAIGN' } },
-                      { name: 'reason', label: 'Lý do', type: 'textarea', required: true },
+                      { name: 'organization_id', label: 'Tổ chức', type: 'reference', options: organizationOptions, required: true,
+                        visibleFor: values => ['ORGANIZATION', 'REGION', 'CAMPAIGN'].includes(values.scope_type), resetOnChange: ['campaign_id'] },
+                      { name: 'region_code', label: 'Khu vực', type: 'select', options: regionOptions, required: true, visibleWhen: { field: 'scope_type', value: 'REGION' } },
+                      { name: 'campaign_id', label: 'Chiến dịch', type: 'reference', required: true, visibleWhen: { field: 'scope_type', value: 'CAMPAIGN' }, placeholder: 'Dán mã chiến dịch do quản lý chiến dịch cung cấp' },
+                      { name: 'reason', label: 'Lý do', type: 'textarea', required: true, maxLength: 500 },
                     ],
                   }}
                   onSuccess={success}
