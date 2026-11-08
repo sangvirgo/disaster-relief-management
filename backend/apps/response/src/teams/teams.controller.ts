@@ -3,7 +3,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
-import { AddTeamMemberDto, CreateTeamDto, SetTeamPositionDto, TeamMemberCandidatesQueryDto, TeamMembersPageQueryDto, TeamPageQueryDto, TransferTeamLeaderDto, UpdateTeamDto } from './teams.dto';
+import { AddTeamMemberDto, ConfirmTeamReadinessDto, CreateTeamDto, SetTeamPositionDto, TeamMemberCandidatesQueryDto, TeamMembersPageQueryDto, TeamPageQueryDto, TransferTeamLeaderDto, UpdateTeamDto } from './teams.dto';
 import { TeamsService } from './teams.service';
 import { noStore, requireIdempotencyKey as key, markIdempotentReplay as replayHeader } from '@c48/technical/http/response-headers';
 
@@ -52,6 +52,21 @@ export class TeamsController {
   ) {
     noStore(response);
     const result = await this.teams.update(id, dto, key(request), request);
+    replayHeader(response, result.replay);
+    return result.value;
+  }
+
+  @Post('teams/:id/ready')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async ready(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Body() dto: ConfirmTeamReadinessDto,
+    @Req() request: TeamRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.teams.ready(id, dto, key(request), request);
     replayHeader(response, result.replay);
     return result.value;
   }

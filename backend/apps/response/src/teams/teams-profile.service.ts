@@ -6,7 +6,7 @@ import { AppError } from '@c48/technical/errors/errors';
 import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { hasPermission } from '@c48/identity-contracts/permissions';
 import { ReporterSessionService, ReporterSession } from '../requests/reporter-session';
-import { CreateTeamDto, UpdateTeamDto } from './teams.dto';
+import { ConfirmTeamReadinessDto, CreateTeamDto, UpdateTeamDto } from './teams.dto';
 import { teamView, TeamRow, validateExpectedVersion } from './teams.helpers';
 import { TeamsQueriesService } from './teams-queries.service';
 
@@ -32,6 +32,7 @@ function auditState(team: TeamRow): Record<string, unknown> {
     kind: team.team_kind,
     reporting_mode: team.reporting_mode,
     availability: team.availability,
+    readiness_required: team.readiness_required,
     status: team.status,
     version: Number(team.version),
     skills: team.skills ?? [],
@@ -159,6 +160,76 @@ export class TeamsProfileService {
         return teamView(team);
       },
     });
+  }
+
+  async ready(teamId: string, dto: ConfirmTeamReadinessDto, key: string, request: TeamCommandRequest): Promise<IdempotentResult<Record<string, unknown>>> {
+    const session = await this.sessions.require(request);
+    return this.idempotency.execute(this.dataSource, {
+      scopeKey: `response.team:${teamId}:${session.userId}`,
+      command: 'response.teams.ready', key,
+      requestHash: canonicalRequestHash({ team_id: teamId, actor_user_id: session.userId, dto }),
+      execute: async (manager) => {
+        const row = await this.queries.findTeam(manager, teamId, true);
+        if (!row) throw new AppError('NOT_FOUND', { status: 404 });
+        await this.assertReadinessActor(manager, row, session, dto);
+        validateExpectedVersion(Number(row.version), dto.expected_version);
+        if (row.status !== 'ACTIVE') {
+          throw new AppError('TEAM_NOT_ELIGIBLE', { status: 409, details: { reason: 'INACTIVE' } });
+        }
+        const active = await manager.query(
+          `SELECT 1 FROM mission WHERE team_id=$1 AND status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE') LIMIT 1`,
+          [teamId],
+        ) as unknown[];
+        if (active.length) throw new AppError('TEAM_BUSY', { status: 409 });
+        // Reject old field reports even when the caller just fetched the current team version.
+        const [time] = await manager.query(
+          `SELECT ($2::timestamptz <= clock_timestamp() AND NOT EXISTS (
+             SELECT 1 FROM mission_event e JOIN mission m ON m.id=e.mission_id
+              WHERE m.team_id=$1 AND e.to_status='CANCELLED'
+                AND e.from_status IN ('ACCEPTED','EN_ROUTE','ON_SCENE') AND e.recorded_at > $2::timestamptz
+           )) AS valid`, [teamId, dto.occurred_at],
+        ) as Array<{ valid: boolean }>;
+        if (!time?.valid) throw new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: {
+          occurred_at: ['Thời điểm xác nhận phải sau lần hủy nhiệm vụ đang hoạt động gần nhất và không nằm trong tương lai.'],
+        } });
+        const [updated] = await manager.query(
+          `UPDATE rescue_team SET availability='AVAILABLE',readiness_required=false,version=version+1
+            WHERE id=$1 AND version=$2 RETURNING id`, [teamId, dto.expected_version],
+        ) as [Array<{ id: string }>, number];
+        if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409 });
+        const next = await this.queries.findTeam(manager, teamId);
+        if (!next) throw new AppError('INTERNAL_ERROR', { status: 500 });
+        await this.audit(manager, session.userId, 'TEAM_READINESS_CONFIRMED', teamId, auditState(row), {
+          ...auditState(next), confirmation_basis: dto.confirmation_basis,
+          reported_by: dto.confirmation_basis === 'SELF' ? session.userId : dto.reported_by!.trim(), occurred_at: dto.occurred_at,
+        });
+        return { status: 200, value: teamView(next), resource: { type: 'rescue_team', id: teamId } };
+      },
+      replay: async (manager, resource) => {
+        if (resource?.type !== 'rescue_team') throw new AppError('INTERNAL_ERROR', { status: 500 });
+        const row = await this.queries.findTeam(manager, resource.id);
+        if (!row) throw new AppError('NOT_FOUND', { status: 404 });
+        await this.assertReadinessActor(manager, row, session, dto);
+        return teamView(row);
+      },
+    });
+  }
+
+  private async assertReadinessActor(manager: EntityManager, team: TeamRow, session: ReporterSession, dto: ConfirmTeamReadinessDto): Promise<void> {
+    if (dto.confirmation_basis === 'SELF') {
+      const leaders = team.reporting_mode === 'APP' ? await manager.query(
+        `SELECT 1 FROM team_member WHERE team_id=$1 AND user_id=$2 AND member_role='LEADER' AND left_at IS NULL FOR SHARE`,
+        [team.id, session.userId],
+      ) as unknown[] : [];
+      if (!leaders.length) throw new AppError('FORBIDDEN', { status: 403 });
+    } else {
+      if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
+        organizationId: team.organization_id, regionCode: team.operating_region_code,
+      })) throw new AppError('FORBIDDEN', { status: 403 });
+      if (!dto.reported_by?.trim()) throw new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: {
+        reported_by: ['Vui lòng ghi người từ đội đã xác nhận sẵn sàng.'],
+      } });
+    }
   }
 
   private async assertRegion(regionCode: string): Promise<void> {

@@ -34,6 +34,7 @@ const teamViewSchema = object({
   kind: { type: 'string', enum: ['VOLUNTEER', 'MILITARY', 'GOVERNMENT', 'OTHER'] },
   reporting_mode: { type: 'string', enum: ['APP', 'COORDINATOR'] },
   availability: { type: 'string', enum: ['AVAILABLE', 'UNAVAILABLE'] },
+  readiness_required: boolean(),
   status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] },
   skills: array(text),
   position: { anyOf: [
@@ -46,7 +47,7 @@ const teamViewSchema = object({
     }, ['age_s', 'accuracy_m', 'source']),
   ] },
   version,
-}, ['id', 'name', 'kind', 'reporting_mode', 'availability', 'status', 'skills', 'position', 'version']);
+}, ['id', 'name', 'kind', 'reporting_mode', 'availability', 'readiness_required', 'status', 'skills', 'position', 'version']);
 const teamPageSchema = object({ items: array(teamViewSchema), more: boolean(), cursor: text });
 const idempotentCommandResponseHeaders = {
   'Cache-Control': { $ref: '#/components/headers/CacheControlNoStore' },
@@ -268,6 +269,12 @@ const responseDetails = {
   },
   responseTeamsUpdate: {
     request: request(object({ expected_version: version, name: text, skill_codes: array(text), availability: text }, ['expected_version'])),
+    response: response(teamViewSchema),
+  },
+  responseTeamsReady: {
+    summary: 'Explicitly confirm field readiness after active mission cancellation.',
+    description: 'An active APP leader uses SELF; a scoped TEAM_MANAGE_ANY caller records RADIO/PHONE/IN_PERSON/OTHER with reported_by. Requires the current team version, no active mission, and a confirmation time after the last active cancellation and not in the future. Atomically clears readiness_required, sets AVAILABLE, and records audit evidence. Generic PATCH does not clear the latch.',
+    request: request(object({ expected_version: version, confirmation_basis: { type: 'string', enum: ['SELF', 'RADIO', 'PHONE', 'IN_PERSON', 'OTHER'] }, reported_by: { type: 'string', maxLength: 200 }, occurred_at: dateTime }, ['expected_version', 'confirmation_basis', 'occurred_at'])),
     response: response(teamViewSchema),
   },
   responseTeamsListMembers: {

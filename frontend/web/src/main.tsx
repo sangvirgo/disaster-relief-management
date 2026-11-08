@@ -30,6 +30,8 @@ import { CitizenAccount, CitizenRequests, requestStatusTone } from './features/c
 import { clearAllSosDrafts } from './features/citizen/sosDraft';
 import type { components as ResponseComponents } from './api/generated/response';
 import './style.css';
+import { StatusBadge } from './components/StatusBadge';
+import { DetailSurface } from './components/DetailSurface';
 
 declare global {
   interface Window {
@@ -144,6 +146,7 @@ function AuthModal({
   const [challengeId, setChallengeId] = useState('');
   const [otp, setOtp] = useState('');
   const googleButton = useRef<HTMLDivElement>(null);
+  const authCard = useRef<HTMLDivElement>(null);
   const authCallbacks = useRef({ onReady, onClose });
   authCallbacks.current = { onReady, onClose };
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -202,18 +205,45 @@ function AuthModal({
       setAuthTouched({});
       setAuthAttempted(false);
     }
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
-    }
     if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'hidden';
     }
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
     };
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const card = authCard.current;
+    card?.querySelector<HTMLButtonElement>('button')?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        authCallbacks.current.onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !card) return;
+      const controls = Array.from(card.querySelectorAll<HTMLElement>(
+        'button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],iframe,[tabindex]:not([tabindex="-1"])'
+      )).filter(control => control.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (!first || !last) return;
+      const outside = !card.contains(document.activeElement);
+      if (event.shiftKey && (document.activeElement === first || outside)) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || outside)) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      if (opener?.isConnected) opener.focus();
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || mode !== 'login' || !googleClientId || !googleButton.current) return;
@@ -325,12 +355,11 @@ function AuthModal({
   return (
     <div
       className="modal-backdrop"
-      onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="auth-modal-title"
     >
-      <div className="modal-card auth-modal-card" onClick={(e) => e.stopPropagation()}>
+      <div ref={authCard} className="modal-card auth-modal-card" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close-button" onClick={onClose} aria-label="Đóng cửa sổ">
           ✕
         </button>
@@ -565,6 +594,8 @@ function AuthModal({
             className="text-button"
             onClick={() => {
               setMode(mode === 'login' ? 'register' : 'login');
+              setUsername('');
+              setPassword('');
               setShowPassword(false);
               setMessage('');
               setAuthErrors({});
@@ -969,7 +1000,7 @@ function Tracking({
   );
 }
 
-function RecordCard({ item, onOpen }: { item: Record<string, unknown>; onOpen?: () => void }) {
+function RecordCard({ item, onOpen, clickable = false }: { item: Record<string, unknown>; onOpen?: () => void; clickable?: boolean }) {
   const nestedItem =
     item.item && typeof item.item === 'object' ? (item.item as Record<string, unknown>) : null;
   const title =
@@ -989,8 +1020,7 @@ function RecordCard({ item, onOpen }: { item: Record<string, unknown>; onOpen?: 
     text(item.address_note);
   const status = text(item.status) || text(item.review_lane);
   const time = item.received_at || item.created_at || item.starts_at || item.generated_at;
-  return (
-    <article className="record">
+  const content = <>
       <div>
         <strong>{title}</strong>
         {subtitle && <p>{subtitle}</p>}
@@ -1014,15 +1044,21 @@ function RecordCard({ item, onOpen }: { item: Record<string, unknown>; onOpen?: 
         {Boolean(time) && <small>{timeLabel(time)}</small>}
       </div>
       <div className="record-actions">
-        {status && <span className="chip">{label(status)}</span>}
-        {onOpen && (
+        {status && <StatusBadge status={status} />}
+        {onOpen && !clickable && (
           <button className="button secondary" onClick={onOpen}>
             Xem chi tiết
           </button>
         )}
       </div>
+    </>;
+  return clickable && onOpen ? (
+    <article className="record record-clickable" role="button" tabIndex={0} onClick={onOpen}
+      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(); } }}
+      aria-label={`Xem chiến dịch ${title.trim()}`} aria-haspopup="dialog">
+      {content}
     </article>
-  );
+  ) : <article className="record">{content}</article>;
 }
 
 function DetailPanel({
@@ -1184,7 +1220,7 @@ function PublicCampaignDialog({ campaign, onClose }: { campaign: Record<string, 
       </div>
       <p className="campaign-dialog-objective">{text(campaign.objective) || 'Chưa có mô tả mục tiêu.'}</p>
       <dl className="fact-list">
-        <div><dt>Trạng thái</dt><dd><span className="chip">{label(campaign.status)}</span></dd></div>
+        <div><dt>Trạng thái</dt><dd><StatusBadge status={text(campaign.status) || ''} /></dd></div>
         <div><dt>Khu vực</dt><dd>{text(campaign.region_name) || 'Chưa ghi khu vực'}</dd></div>
         <div><dt>Bắt đầu</dt><dd>{campaign.starts_at ? timeLabel(campaign.starts_at) : 'Chưa ấn định'}</dd></div>
         <div><dt>Kết thúc</dt><dd>{campaign.ends_at ? timeLabel(campaign.ends_at) : 'Chưa ấn định'}</dd></div>
@@ -1298,9 +1334,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
           <span className="eyebrow">Số liệu trực tiếp</span>
           <h2>{page.path === '/reports/summary' ? 'Tổng quan ứng cứu' : page.id === 'campaigns' ? 'Danh sách chiến dịch' : page.title}</h2>
         </div>
-        <span className="report-period">
-          {page.path === '/reports/summary' ? '7 ngày gần đây' : 'Dữ liệu từ hệ thống'}
-        </span>
+        {page.path === '/reports/summary' && <span className="report-period">7 ngày gần đây</span>}
       </div>
       {page.note && page.path !== '/reports/summary' && <p>{page.note}</p>}
       {page.path === '/reports/summary' && (
@@ -1346,6 +1380,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
                     key={text(item.id) || index}
                     item={item}
                     onOpen={canOpen && item.id ? () => openDetail(item) : undefined}
+                    clickable={page.path === '/public/campaigns'}
                   />
                 ))}
               </div>
@@ -1531,7 +1566,7 @@ function App() {
     try {
       for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
         const key = window.sessionStorage.key(index);
-        if (key?.startsWith('c48:coordinator-queue:')) window.sessionStorage.removeItem(key);
+        if (key?.startsWith('c48:coordinator-queue:') || key?.startsWith('c48:citizen-tracking:')) window.sessionStorage.removeItem(key);
       }
     } catch {
       // Session cleanup still completes if browser storage is unavailable.
@@ -1561,6 +1596,11 @@ function App() {
     setWorkspace(route.workspace);
     setPageId(route.page);
     writeRoute(route.workspace, route.page, value, 'replace');
+    try {
+      const saved = !preferRoleDefault && route.workspace === 'citizen' && route.page === 'track'
+        ? sessionStorage.getItem(`c48:citizen-tracking:${value.id}`) || '' : '';
+      setSelectedTrackingCode(/^[A-Z0-9]{10}$/.test(saved) ? saved : '');
+    } catch { setSelectedTrackingCode(''); }
     if (pendingUrl && requested?.workspace === route.workspace && requested.page === route.page) {
       const url = new URL(window.location.href);
       for (const key of ['step', 'view']) {
@@ -1733,7 +1773,10 @@ function App() {
 
   function changePage(id: string) {
     pendingRouteRef.current = null;
-    if (id === 'track') setSelectedTrackingCode('');
+    if (id === 'track') {
+      setSelectedTrackingCode('');
+      if (user) { try { sessionStorage.removeItem(`c48:citizen-tracking:${user.id}`); } catch {} }
+    }
     setSelectedMissionId('');
     setSelectedRequestId('');
     setPageId(id);
@@ -1745,6 +1788,7 @@ function App() {
   function trackOwnedRequest(code: string) {
     pendingRouteRef.current = null;
     setSelectedTrackingCode(code);
+    if (user) { try { sessionStorage.setItem(`c48:citizen-tracking:${user.id}`, code); } catch {} }
     setPageId('track');
     writeRoute('citizen', 'track', user);
     setMenuOpen(false);
@@ -1769,7 +1813,7 @@ function App() {
 
   return (
     <div className="shell">
-      <aside className={`sidebar ${menuOpen ? 'open' : ''}`} aria-label="Điều hướng chính">
+      <aside id="primary-navigation" className={`sidebar ${menuOpen ? 'open' : ''}`} aria-label="Điều hướng chính">
         <div className="sidebar-content">
           <div className="brand">
             <span className="brand-mark">
@@ -1818,6 +1862,8 @@ function App() {
               className="menu-button"
               onClick={() => setMenuOpen(!menuOpen)}
               aria-label={menuOpen ? 'Đóng trình đơn' : 'Mở trình đơn'}
+              aria-expanded={menuOpen}
+              aria-controls="primary-navigation"
             >
               ☰
             </button>
@@ -1980,29 +2026,15 @@ function App() {
         }}
       />
       {showPasswordModal && user && (
-        <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Đổi mật khẩu"
-          onClick={() => setShowPasswordModal(false)}
-        >
-          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
-            <button
-              className="modal-close-button"
-              aria-label="Đóng cửa sổ"
-              onClick={() => setShowPasswordModal(false)}
-            >
-              ✕
-            </button>
+        <DetailSurface modal open label="Đổi mật khẩu" className="password-change-dialog"
+          onClose={() => setShowPasswordModal(false)}>
             <PasswordChange
               onChanged={(updatedUser) => {
                 setUser(updatedUser);
                 setShowPasswordModal(false);
               }}
             />
-          </div>
-        </div>
+        </DetailSurface>
       )}
     </div>
   );

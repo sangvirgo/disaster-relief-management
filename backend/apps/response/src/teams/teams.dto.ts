@@ -77,6 +77,20 @@ export class UpdateTeamDto {
   declare availability?: 'AVAILABLE' | 'UNAVAILABLE';
 }
 
+export class ConfirmTeamReadinessDto {
+  @Type(() => Number) @IsInt() @Min(1)
+  expected_version!: number;
+
+  @IsIn(['SELF', 'RADIO', 'PHONE', 'IN_PERSON', 'OTHER'])
+  confirmation_basis!: 'SELF' | 'RADIO' | 'PHONE' | 'IN_PERSON' | 'OTHER';
+
+  @IsOptional() @IsString() @MaxLength(200) @Matches(/\S/u)
+  declare reported_by?: string;
+
+  @IsDateString({ strict: true, strictSeparator: true }) @Matches(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/u)
+  occurred_at!: string;
+}
+
 export class AddTeamMemberDto {
   @IsUUID('all')
   user_id!: string;

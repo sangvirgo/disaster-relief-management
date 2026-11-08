@@ -155,8 +155,9 @@ export function LocationPicker({
     const map = L.map(leafletContainerRef.current, {
       center: initialCenter,
       zoom: initialZoom,
-      zoomControl: true,
+      zoomControl: false,
     });
+    L.control.zoom({ zoomInTitle: 'Phóng to', zoomOutTitle: 'Thu nhỏ' }).addTo(map);
     leafletMapRef.current = map;
 
     setTileError(false);
@@ -169,7 +170,7 @@ export function LocationPicker({
       tiles.on('tileload', () => setTileError(false));
       tiles.addTo(map);
     } else {
-      const vectorLayer = maplibreGL({ style: mapStyleUrl }).addTo(map);
+      const vectorLayer = maplibreGL({ style: mapStyleUrl, locale: { 'Map.Title': 'Bản đồ' } }).addTo(map);
       const vectorMap = vectorLayer.getMaplibreMap();
       vectorMap.on('load', () => setTileError(false));
       vectorMap.on('error', () => setTileError(true));

@@ -657,6 +657,23 @@ textarea:focus-visible {
   border-top: 0;
 }
 
+.record-clickable {
+  width: 100%;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.record-clickable:hover,
+.record-clickable:focus-visible {
+  background: var(--color-surface-hover, #f2f7ff);
+}
+
 .record strong {
   color: var(--color-text-primary);
   font-size: 15px;
@@ -892,6 +909,7 @@ textarea:focus-visible {
     z-index: 100;
     overflow-y: auto;
     transform: translateX(-100%);
+    visibility: hidden;
     transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
   }
@@ -902,6 +920,7 @@ textarea:focus-visible {
   }
   .sidebar.open {
     transform: translateX(0);
+    visibility: visible;
   }
   .menu-button {
     display: grid;

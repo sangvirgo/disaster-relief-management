@@ -47,7 +47,8 @@ export function AsyncRequestForm({
           if (['COMPLETED', 'ABORTED'].includes(result.state) && !terminalHandled.current) {
             terminalHandled.current = true;
             key.current = null;
-            onCompleted();
+            if (result.state === 'ABORTED' && onStale) onStale();
+            else onCompleted();
           }
         }
       } catch (cause) {
@@ -63,7 +64,7 @@ export function AsyncRequestForm({
       active = false;
       window.clearInterval(timer);
     };
-  }, [operationId, state, onCompleted]);
+  }, [operationId, state, onCompleted, onStale]);
   async function submit(event: FormEvent) {
     event.preventDefault();
     setTouched({ reason: true, basis: true });
@@ -100,6 +101,12 @@ export function AsyncRequestForm({
       setState(result.state);
       terminalHandled.current = false;
       setMessage('Máy chủ đã nhận lệnh xử lý. Đang kiểm tra kết quả cuối cùng.');
+      if (['COMPLETED', 'ABORTED'].includes(result.state)) {
+        terminalHandled.current = true;
+        key.current = null;
+        if (result.state === 'ABORTED' && onStale) onStale();
+        else onCompleted();
+      }
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Lệnh chưa được xác nhận.');
       if (cause instanceof ApiError && ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'].includes(cause.code)) {

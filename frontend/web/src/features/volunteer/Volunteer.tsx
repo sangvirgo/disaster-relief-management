@@ -3,6 +3,7 @@ import { api, ApiError, newCommandKey, upload } from '../../api/client';
 import { appendPage } from '../../api/pagination';
 import { fetchAll } from '../../api/fetchAll';
 import { label, timeLabel } from '../../i18n/labels';
+import { evidenceFileError as missionEvidenceError } from '../../i18n/evidence';
 import type { components as ResponseComponents } from '../../api/generated/response';
 import { googleMapsDirectionsUrl } from '../../maps/googleMaps';
 import { LocationPicker, type Point } from '../../maps/LocationPicker';
@@ -11,6 +12,7 @@ import { DetailSurface } from '../../components/DetailSurface';
 import { useUrlView } from '../../app/useUrlView';
 import { noticeViews } from '../../app/routeViews';
 import { TeamMembers } from './TeamMembers';
+import { TeamReadinessForm } from './TeamReadinessForm';
 
 type Mission = ResponseComponents['schemas']['MissionView'];
 type MissionDetail = ResponseComponents['schemas']['MissionDetail'];
@@ -22,6 +24,7 @@ type Team = {
   kind: string;
   reporting_mode: string;
   availability: string;
+  readiness_required?: boolean;
   status: string;
   skills: string[];
   position: null | {
@@ -52,15 +55,6 @@ function positionAge(ageSeconds: number): string {
   return `${Math.round(ageSeconds / 86400)} ngày`;
 }
 
-function missionEvidenceError(file: File): string | null {
-  if (!['image/jpeg', 'image/png', 'video/mp4'].includes(file.type))
-    return 'Chỉ chọn ảnh JPEG, PNG hoặc video MP4.';
-  const limit = file.type === 'video/mp4' ? 50 : 10;
-  if (file.size > limit * 1024 * 1024)
-    return `${file.type === 'video/mp4' ? 'Video' : 'Ảnh'} phải có dung lượng không quá ${limit} MB.`;
-  return null;
-}
-
 export function Notices({ onOpenMission, onOpenRequest }: {
   onOpenMission?: (missionId: string) => void;
   onOpenRequest?: (requestId: string) => void;
@@ -72,9 +66,13 @@ export function Notices({ onOpenMission, onOpenRequest }: {
   const [next, setNext] = useState('');
   const [error, setError] = useState('');
   const [filter, setFilter] = useUrlView('view', noticeViews, 'all');
+  const activeFilter = useRef(filter);
+  activeFilter.current = filter;
   const [revision, setRevision] = useState(0);
   const [markingAll, setMarkingAll] = useState(false);
   const [markAllMessage, setMarkAllMessage] = useState('');
+  const pendingReads = useRef(new Set<string>());
+  const [readingIds, setReadingIds] = useState<string[]>([]);
 
   useEffect(() => {
     let live = true;
@@ -105,15 +103,24 @@ export function Notices({ onOpenMission, onOpenRequest }: {
   }, [cursor, filter, revision]);
 
   async function markRead(id: string) {
+    if (pendingReads.current.has(id)) return;
+    pendingReads.current.add(id);
+    setReadingIds(current => [...current, id]);
     setError('');
     try {
-      await api('response', `/notices/${id}/read`, {
+      const result = await api<{ id: string; read_at: string }>('response', `/notices/${id}/read`, {
         method: 'POST',
         idempotencyKey: newCommandKey(),
       });
-      setRevision((value) => value + 1);
+      setItems(current => activeFilter.current === 'unread'
+        ? current.filter(item => item.id !== result.id)
+        : current.map(item => item.id === result.id ? { ...item, read_at: result.read_at } : item));
+      setSelectedNotice(current => current?.id === result.id ? { ...current, read_at: result.read_at } : current);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Không thể đánh dấu đã đọc.');
+    } finally {
+      pendingReads.current.delete(id);
+      setReadingIds(current => current.filter(value => value !== id));
     }
   }
 
@@ -146,12 +153,13 @@ export function Notices({ onOpenMission, onOpenRequest }: {
       <div className="section-header">
         <h2>Thông báo của tôi</h2>
         <div className="notice-header-actions">
-        <button type="button" className="button secondary" onClick={markAllRead} disabled={markingAll}>
+        <button type="button" className="button secondary" onClick={markAllRead} disabled={loading || markingAll || readingIds.length > 0}>
           {markingAll ? 'Đang đánh dấu…' : 'Đánh dấu tất cả đã đọc'}
         </button>
         <div className="tabs">
           <button
             className={filter === 'all' ? 'active' : ''}
+            disabled={markingAll || readingIds.length > 0}
             onClick={() => {
               setFilter('all');
               setCursor('');
@@ -161,6 +169,7 @@ export function Notices({ onOpenMission, onOpenRequest }: {
           </button>
           <button
             className={filter === 'unread' ? 'active' : ''}
+            disabled={markingAll || readingIds.length > 0}
             onClick={() => {
               setFilter('unread');
               setCursor('');
@@ -187,6 +196,8 @@ export function Notices({ onOpenMission, onOpenRequest }: {
             <button className="notice-record-open" type="button" onClick={() => setSelectedNotice(item)}
               aria-label={`Xem chi tiết: ${noticeNames[item.notice_type] || 'Có cập nhật mới'}`}>
               <strong>{noticeNames[item.notice_type] || 'Có cập nhật mới'}</strong>
+              {typeof item.payload.request_id === 'string' && <p>Hồ sơ SOS · {item.payload.request_id.slice(0, 8)}</p>}
+              {typeof item.payload.mission_id === 'string' && <p>Nhiệm vụ · {item.payload.mission_id.slice(0, 8)}</p>}
               <p>{timeLabel(item.created_at)}</p>
               <small>{item.read_at ? `Đã đọc lúc ${timeLabel(item.read_at)}` : 'Chưa đọc'}</small>
             </button>
@@ -195,7 +206,7 @@ export function Notices({ onOpenMission, onOpenRequest }: {
                 <button className="button secondary" type="button"
                   onClick={() => onOpenMission(item.payload.mission_id as string)}>Xem nhiệm vụ</button>}
               {!item.read_at && (
-                <button className="button secondary" onClick={() => markRead(item.id)} disabled={markingAll}>
+                <button className="button secondary" onClick={() => markRead(item.id)} disabled={loading || markingAll || readingIds.includes(item.id)}>
                   Đánh dấu đã đọc
                 </button>
               )}
@@ -209,6 +220,8 @@ export function Notices({ onOpenMission, onOpenRequest }: {
           <span className="eyebrow">THÔNG BÁO</span>
           <h2>{noticeNames[selectedNotice.notice_type] || 'Có cập nhật mới'}</h2>
           <p className="muted">Nhận lúc {timeLabel(selectedNotice.created_at)}</p>
+          {selectedNotice.read_at && <p role="status">Đã đọc lúc {timeLabel(selectedNotice.read_at)}</p>}
+          {error && <p role="alert" className="notice error">{error}</p>}
           <p>{selectedNotice.notice_type.startsWith('MISSION')
             ? 'Nhiệm vụ của đội có cập nhật. Mở nhiệm vụ để xem tình huống và tiến độ mới nhất.'
             : selectedNotice.notice_type.startsWith('REQUEST')
@@ -224,12 +237,13 @@ export function Notices({ onOpenMission, onOpenRequest }: {
             {onOpenMission && typeof selectedNotice.payload.mission_id === 'string' &&
               <button className="button" type="button" onClick={() => onOpenMission(selectedNotice.payload.mission_id as string)}>Mở nhiệm vụ</button>}
             {!selectedNotice.read_at && <button className="button secondary" type="button"
-              onClick={() => { void markRead(selectedNotice.id); setSelectedNotice(null); }}>Đánh dấu đã đọc</button>}
+              disabled={markingAll || readingIds.includes(selectedNotice.id)}
+              onClick={() => { void markRead(selectedNotice.id); }}>Đánh dấu đã đọc</button>}
           </div>
         </div>}
       </DetailSurface>
       {next && (
-        <button className="button secondary" onClick={() => setCursor(next)}>
+        <button className="button secondary" disabled={loading || markingAll || readingIds.length > 0} onClick={() => setCursor(next)}>
           Xem thêm
         </button>
       )}
@@ -251,8 +265,11 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
 
   // Selected mission and detailed state
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
+  const [missionSelectionRevision, setMissionSelectionRevision] = useState(0);
   const [missionDetail, setMissionDetail] = useState<MissionDetail | null>(null);
   const missionCardRef = useRef<HTMLElement | null>(null);
+  const missionListRef = useRef<HTMLElement | null>(null);
+  const missionHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const [missionLoading, setMissionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -266,25 +283,64 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
   const [missionFormAttempted, setMissionFormAttempted] = useState<Record<string, boolean>>({});
   const declineReasonError = !declineReason.trim() ? 'Lý do từ chối nhiệm vụ là bắt buộc.'
     : declineReason.length > 2000 ? 'Lý do từ chối không được vượt quá 2.000 ký tự.' : '';
-  const outcomeNoteError = !outcomeNote.trim() ? 'Ghi chú kết quả cứu nạn là bắt buộc.'
+  const outcomeNoteError = !outcomeNote.trim() ? 'Ghi chú kết quả nhiệm vụ là bắt buộc.'
     : outcomeNote.length > 2000 ? 'Ghi chú kết quả không được vượt quá 2.000 ký tự.' : '';
   const progressNoteError = !progressNote.trim() ? 'Lý do không thể tiếp cận hoặc thất bại là bắt buộc.'
     : progressNote.length > 2000 ? 'Lý do không được vượt quá 2.000 ký tự.' : '';
   const [showCompleteForm, setShowCompleteForm] = useState(false);
   const [showFailForm, setShowFailForm] = useState(false);
+  useEffect(() => {
+    setDeclineReason('');
+    setMissionFormTouched({});
+    setMissionFormAttempted({});
+  }, [selectedMission?.id, missionSelectionRevision]);
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [completionFile, setCompletionFile] = useState<File | null>(null);
   const [completionPreviewUrl, setCompletionPreviewUrl] = useState('');
   const [evidenceUrls, setEvidenceUrls] = useState<Record<string, string>>({});
 
+  const [teamActivityLoaded, setTeamActivityLoaded] = useState(false);
+  const [teamActivityError, setTeamActivityError] = useState('');
+  const [busyTeamIds, setBusyTeamIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!isTeam) return;
+    setTeamActivityLoaded(false);
+    setTeamActivityError('');
+    let live = true;
+    fetchAll<Mission>('response', '/missions/mine').then((missions) => {
+      if (live) { setTeamActivityLoaded(true); setBusyTeamIds(new Set(missions.filter((mission) => ['OFFERED', 'ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(mission.status)).map((mission) => mission.team.id))); }
+    }).catch(() => { if (live) {
+      setBusyTeamIds(new Set());
+      setTeamActivityError('Chưa kiểm tra được nhiệm vụ của đội. Bấm Cập nhật để thử lại trước khi xác nhận sẵn sàng.');
+    } });
+    return () => { live = false; };
+  }, [isTeam, revision]);
   // Team management state
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [teamSelectionRevision, setTeamSelectionRevision] = useState(0);
+  const [teamLoading, setTeamLoading] = useState(false);
   const [canManageTeam, setCanManageTeam] = useState(false);
   const [manageableTeamIds, setManageableTeamIds] = useState<Set<string>>(new Set());
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [teamPoint, setTeamPoint] = useState<Point | null>(null);
   const [teamAccuracy, setTeamAccuracy] = useState<number | null>(null);
   const [teamMessage, setTeamMessage] = useState('');
+
+  useEffect(() => {
+    if (!isTeam || !selectedTeam?.id) return;
+    const teamId = selectedTeam.id;
+    let live = true;
+    setTeamLoading(true);
+    api<Team>('response', `/teams/${teamId}`).then((team) => {
+      if (live) setSelectedTeam(current => current?.id === teamId ? { ...current, ...team } : current);
+    }).catch((cause) => {
+      if (live) {
+        setCanManageTeam(false);
+        setTeamMessage(cause instanceof Error ? cause.message : 'Không thể tải trạng thái mới nhất của đội.');
+      }
+    }).finally(() => { if (live) setTeamLoading(false); });
+    return () => { live = false; };
+  }, [isTeam, selectedTeam?.id, revision, teamSelectionRevision]);
 
   const commandKeyRef = useRef<string | null>(null);
   const completionUploadKeyRef = useRef<{ file: File; key: string } | null>(null);
@@ -381,12 +437,13 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
     return () => {
       live = false;
     };
-  }, [selectedMission?.id, revision]);
+  }, [selectedMission?.id, revision, missionSelectionRevision]);
 
   useEffect(() => {
-    if (initialMissionId && missionDetail?.id === initialMissionId)
-      missionCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [initialMissionId, missionDetail?.id]);
+    if (isTeam || !selectedMission?.id || (initialMissionId !== selectedMission.id && !window.matchMedia('(max-width: 1180px)').matches)) return;
+    missionCardRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' });
+    missionHeadingRef.current?.focus({ preventScroll: true });
+  }, [isTeam, selectedMission?.id, initialMissionId, missionSelectionRevision]);
 
   function refreshAll() {
     setRevision((val) => val + 1);
@@ -394,6 +451,9 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
     setShowDeclineForm(false);
     setShowCompleteForm(false);
     setShowFailForm(false);
+    setDeclineReason('');
+    setMissionFormTouched({});
+    setMissionFormAttempted({});
     setProgressNote('');
     setOutcomeNote('');
     setEvidenceFile(null);
@@ -405,6 +465,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
 
   function selectMission(mission: Mission) {
     setSelectedMission(mission);
+    setMissionSelectionRevision(value => value + 1);
     setMissionDetail(null);
     setActionMessage('');
     setShowDeclineForm(false);
@@ -422,7 +483,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
 
   // --- Mission Actions ---
   async function acceptMission(mission: Mission | MissionDetail) {
-    if (!(await confirmAction('Xác nhận tiếp nhận nhiệm vụ cứu hộ này?'))) return;
+    if (!(await confirmAction('Xác nhận tiếp nhận nhiệm vụ này?'))) return;
     setBusy(true);
     setActionMessage('');
     try {
@@ -532,7 +593,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
       await upload('response', `/missions/${missionId}/evidence`, evidenceFile, {
         idempotencyKey: commandKeyRef.current,
       });
-      setActionMessage('Đã tải minh chứng hiện trường giải cứu lên hệ thống thành công.');
+      setActionMessage('Đã tải minh chứng nhiệm vụ lên hệ thống thành công.');
       setEvidenceFile(null);
       refreshAll();
     } catch (cause) {
@@ -574,7 +635,10 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
       setTeamMessage(`${team.name} đã chuyển sang ${label(nextAvailability)}.`);
       refreshAll();
     } catch (cause) {
-      setTeamMessage(cause instanceof Error ? cause.message : 'Không thể cập nhật trạng thái đội.');
+      setTeamMessage(cause instanceof ApiError && cause.code === 'TEAM_NOT_ELIGIBLE' && nextAvailability === 'AVAILABLE'
+        ? 'Đội chưa thể chuyển sang sẵn sàng. Hãy kiểm tra nhiệm vụ đang hoạt động hoặc yêu cầu xác nhận lại sau khi nhiệm vụ bị hủy. Nếu không còn nhiệm vụ mà vẫn bị chặn, cần người phụ trách hệ thống kiểm tra trạng thái đội; tải lại trang không tự gỡ được khóa này.'
+        : cause instanceof Error ? cause.message : 'Không thể cập nhật trạng thái đội.');
+      refreshAll();
     } finally {
       setBusy(false);
     }
@@ -627,15 +691,33 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
     }
   }
 
+  const [missionFilter, setMissionFilter] = useState('all');
+  const matchesMissionFilter = (mission: Pick<Mission, 'status'>, filter: string) => filter === 'all' || (filter === 'new'
+    ? mission.status === 'OFFERED' : filter === 'active'
+      ? ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(mission.status)
+      : ['COMPLETED', 'FAILED', 'DECLINED', 'CANCELLED'].includes(mission.status));
+  const visibleMissions = (items as Mission[]).filter(mission => matchesMissionFilter(mission, missionFilter));
+  function changeMissionFilter(value: string) {
+    setMissionFilter(value);
+    const current = missionDetail || selectedMission;
+    if (current && !matchesMissionFilter(current, value)) {
+      setSelectedMission(null);
+      setMissionDetail(null);
+      setActionMessage('');
+      setCompletionFile(null);
+      setEvidenceFile(null);
+    }
+  }
   const activeMission = missionDetail || selectedMission;
   const canManageMission = activeMission?.can_manage_mission === true;
   const directionsUrl = activeMission && googleMapsDirectionsUrl(activeMission.location);
 
   return (
-    <div className="grid-two">
+    <div className={`grid-two ${isTeam ? '' : 'volunteer-missions-layout'}`}>
       {/* Cột trái: Danh sách Nhiệm vụ hoặc Đội */}
-      <section className="card">
-        <h2>{isTeam ? 'Đội của tôi' : 'Nhiệm vụ và tiến độ'}</h2>
+      <section className={`card ${isTeam ? '' : 'mission-list-panel'}`} ref={missionListRef}>
+        <div className="section-header"><h2>{isTeam ? 'Đội của tôi' : 'Nhiệm vụ và tiến độ'}</h2><button type="button" className="button secondary" disabled={loading || busy} onClick={() => { setCursor(''); refreshAll(); }}>Cập nhật</button></div>
+        {!isTeam && <p className="mission-list-intro">Chọn nhiệm vụ để xem tình huống và cập nhật tiến độ.</p>}
         {error && (
           <p role="alert" className="notice error">
             {error}
@@ -646,7 +728,12 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
           <div className="empty">Chưa có dữ liệu trong phạm vi của bạn.</div>
         )}
 
-        <div className="record-list">
+        {!isTeam && <div className="mission-filters" role="group" aria-label="Lọc nhiệm vụ">
+          {[['all', 'Tất cả'], ['new', 'Mới nhận'], ['active', 'Đang thực hiện'], ['history', 'Lịch sử']].map(([value, text]) =>
+            <button type="button" className="button secondary" aria-pressed={missionFilter === value} disabled={busy} key={value} onClick={() => changeMissionFilter(value)}>{text}</button>)}
+        </div>}
+        {!isTeam && !loading && !error && items.length > 0 && !visibleMissions.length && <p>Chưa có nhiệm vụ trong nhóm này trên các trang đã tải. Hãy tải thêm nếu còn dữ liệu.</p>}
+        <div className={`record-list ${isTeam ? '' : 'mission-record-list'}`}>
           {isTeam
             ? (items as Team[]).map((team) => (
                 <article
@@ -656,13 +743,15 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   <button type="button" className="volunteer-team-open" aria-label={`Xem đội ${team.name}`} onClick={() => {
                     setCanManageTeam(false);
                     setSelectedTeam(team);
+                    setTeamSelectionRevision(value => value + 1);
+                    setAddMemberOpen(false);
                     setTeamPoint(null);
                     setTeamMessage('');
                   }}>
                   <span className="volunteer-team-summary">
                     <strong>{team.name}</strong>
                     <span className="team-summary-line">
-                      {label(team.kind)} · <span className={`chip team-availability-status ${team.availability === 'AVAILABLE' && team.status === 'ACTIVE' ? 'is-ready' : ''}`}><span className="team-availability-dot" aria-hidden="true" />{label(team.availability)}</span>
+                      {label(team.kind)} · <span className={`chip team-availability-status ${team.availability === 'AVAILABLE' && team.status === 'ACTIVE' && teamActivityLoaded && !busyTeamIds.has(team.id) ? 'is-ready' : ''}`}><span className="team-availability-dot" aria-hidden="true" />{!teamActivityLoaded ? 'Chưa cập nhật nhiệm vụ' : busyTeamIds.has(team.id) ? 'Đang có nhiệm vụ' : label(team.availability)}</span>
                     </span>
                     <span className="team-summary-line">
                       Kỹ năng: {team.skills.length ? team.skills.map(label).join(', ') : 'Chưa có'}
@@ -677,18 +766,20 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   {manageableTeamIds.has(team.id) && <button type="button" className="button secondary team-card-add" onClick={() => {
                     setCanManageTeam(false);
                     setSelectedTeam(team);
+                    setTeamSelectionRevision(value => value + 1);
                     setTeamPoint(null);
                     setTeamMessage('');
                     setAddMemberOpen(true);
                   }}>Thêm thành viên</button>}
                 </article>
               ))
-            : (items as Mission[]).map((mission) => (
+            : visibleMissions.map((mission) => (
                 <article
                   className={`record volunteer-record-open ${selectedMission?.id === mission.id ? 'selected' : ''}`}
                   key={mission.id}
                   role="button"
                   tabIndex={0}
+                  aria-pressed={selectedMission?.id === mission.id}
                   aria-label={`Xem nhiệm vụ của ${mission.team.name}, ${label(mission.status)}, tạo lúc ${timeLabel(mission.created_at)}`}
                   onKeyDown={(event) => {
                     if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -697,18 +788,20 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   }}
                   onClick={() => selectMission(mission)}
                 >
-                  <div>
-                    <strong>{mission.team.name}</strong>
-                    <p>
-                      {label(mission.category)} ·{' '}
-                      <span className={`chip mission-status mission-status-${mission.status.toLowerCase()}`}>{label(mission.status)}</span>
-                    </p>
+                  <div className="mission-record-heading">
+                    <div><small className="mission-record-reference">Mã nhiệm vụ · {mission.id.slice(0, 8)}</small><strong>{label(mission.category)}</strong></div>
+                    <span className={`chip mission-status mission-status-${mission.status.toLowerCase()}`}>{label(mission.status)}</span>
+                  </div>
+                  <p className="mission-record-team">{mission.team.name}</p>
                     {mission.declared_danger && (
                       <p className="notice warning">Có nguy hiểm tính mạng</p>
                     )}
-                    <small>{timeLabel(mission.created_at)}</small>
+                  <p className="mission-record-description">{mission.description || 'Chưa có mô tả tình huống.'}</p>
+                  <div className="mission-record-meta">
+                    <span>{mission.people_affected == null ? 'Chưa rõ số người' : `${mission.people_affected} người cần hỗ trợ`}</span>
+                    <time dateTime={mission.created_at}>Giao lúc {timeLabel(mission.created_at)}</time>
                   </div>
-                  <span className="button secondary" aria-hidden="true">Xem nhiệm vụ</span>
+                  <span className="mission-record-action" aria-hidden="true">{selectedMission?.id === mission.id ? 'Đang xem chi tiết' : 'Xem nhiệm vụ'} <span>→</span></span>
                 </article>
               ))}
         </div>
@@ -746,12 +839,16 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     </span>
                   </p>
                   <p>
-                    <strong>Tính khả dụng</strong>
+                    <strong>Trạng thái khai báo</strong>
                     <span className="detail-value">
                       {label(selectedTeam.availability)}
                     </span>
                   </p>
-                  <p className="muted team-availability-help">Đội sẵn sàng nhận việc khi không có nhiệm vụ đang thực hiện.</p>
+                  <p>
+                    <strong>Tình trạng nhiệm vụ</strong>
+                    <span className="detail-value">{!teamActivityLoaded ? 'Chưa cập nhật được nhiệm vụ' : busyTeamIds.has(selectedTeam.id) ? 'Đang có nhiệm vụ' : 'Không có nhiệm vụ đang hoạt động'}</span>
+                  </p>
+                  <p className="muted team-availability-help">Để nhận nhiệm vụ, đội cần đang sẵn sàng, không có nhiệm vụ đang hoạt động và có vị trí đủ mới. Điều phối viên còn kiểm tra khu vực và kỹ năng phù hợp.</p>
                   <p>
                     <strong>Chế độ báo cáo</strong>
                     <span className="detail-value">
@@ -772,12 +869,13 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   </p>
                 </div>
 
-                <TeamMembers key={selectedTeam.id} teamId={selectedTeam.id} onManageChange={setCanManageTeam} addOpen={addMemberOpen} onCloseAdd={() => setAddMemberOpen(false)} />
+                <TeamMembers key={`${selectedTeam.id}-${teamSelectionRevision}`} teamId={selectedTeam.id} onManageChange={setCanManageTeam} addOpen={addMemberOpen} onCloseAdd={() => setAddMemberOpen(false)} />
 
-                {canManageTeam && <div className="action-grid">
+                {selectedTeam.readiness_required && <p className="notice warning" role="status">Đội cần xác nhận sẵn sàng trở lại sau khi nhiệm vụ đang hoạt động bị hủy.</p>}
+                {canManageTeam && selectedTeam.status === 'ACTIVE' && selectedTeam.availability === 'AVAILABLE' && <div className="action-grid">
                   <button
                     className={`button ${selectedTeam.availability === 'AVAILABLE' ? 'secondary' : ''}`}
-                    disabled={busy}
+                    disabled={busy || teamLoading}
                     onClick={() => toggleTeamAvailability(selectedTeam)}
                   >
                     {selectedTeam.availability === 'AVAILABLE'
@@ -785,6 +883,17 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                       : 'Chuyển sang Sẵn sàng hoạt động'}
                   </button>
                 </div>}
+
+                {canManageTeam && selectedTeam.status === 'ACTIVE' && selectedTeam.availability !== 'AVAILABLE' && (
+                  teamActivityError ? <p className="notice error" role="alert">{teamActivityError}</p>
+                    : !teamActivityLoaded ? <p role="status">Đang kiểm tra nhiệm vụ của đội trước khi xác nhận sẵn sàng…</p>
+                    : busyTeamIds.has(selectedTeam.id) ? <p className="notice warning">Đội còn nhiệm vụ đang hoạt động hoặc chờ nhận. Hãy xử lý nhiệm vụ đó trước khi xác nhận sẵn sàng.</p>
+                      : !teamLoading && <TeamReadinessForm key={`${selectedTeam.id}-${selectedTeam.version}`}
+                        teamId={selectedTeam.id} teamName={selectedTeam.name} version={selectedTeam.version}
+                        recorded={selectedTeam.reporting_mode === 'COORDINATOR'}
+                        onSuccess={() => { setTeamMessage('Đã xác nhận đội sẵn sàng.'); refreshAll(); }}
+                        onStale={refreshAll} />
+                )}
 
                 {canManageTeam && selectedTeam.reporting_mode === 'APP' && selectedTeam.status === 'ACTIVE' && <>
                 <hr />
@@ -834,18 +943,23 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     Lưu vị trí mới lên hệ thống
                   </button>
                 )}
+                </>}
                 {teamMessage && (
                   <p className="notice" role="status">
                     {teamMessage}
                   </p>
                 )}
-                </>}
               </div>
             )}
           </>
         ) : (
           <>
-            <h2>Chi tiết nhiệm vụ cứu nạn</h2>
+            <div className="mission-detail-heading"><h2 ref={missionHeadingRef} tabIndex={-1}>Chi tiết nhiệm vụ</h2>
+              {activeMission && <button type="button" className="button secondary mission-back-to-list" onClick={() => {
+                const selected = missionListRef.current?.querySelector<HTMLElement>('.volunteer-record-open[aria-pressed="true"]');
+                if (selected) selected.focus(); else missionListRef.current?.scrollIntoView({ block: 'start' });
+              }}>← Danh sách nhiệm vụ</button>}
+            </div>
             {!activeMission && (
               <div className="empty">
                 Chọn một nhiệm vụ để xem thông tin và tiến độ.
@@ -864,7 +978,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   <p>
                     <strong>Trạng thái</strong>
                     <span className="detail-value">
-                      <span className="chip">{label(activeMission.status)}</span>
+                      <span className={`chip mission-status mission-status-${activeMission.status.toLowerCase()}`}>{label(activeMission.status)}</span>
                     </span>
                   </p>
                   <p>
@@ -874,7 +988,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     </span>
                   </p>
                   <p>
-                    <strong>Số người cần cứu</strong>
+                    <strong>Số người cần hỗ trợ</strong>
                     <span className="detail-value">
                       {activeMission.people_affected ?? 'Chưa rõ'}
                     </span>
@@ -883,12 +997,6 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     <strong>Thời điểm giao</strong>
                     <span className="detail-value">
                       {timeLabel(activeMission.created_at)}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Phiên bản</strong>
-                    <span className="detail-value">
-                      {activeMission.version}
                     </span>
                   </p>
                 </div>
@@ -999,6 +1107,8 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                         required
                         maxLength={2001}
                         aria-invalid={Boolean((missionFormAttempted.decline || missionFormTouched.decline) && declineReasonError)}
+                        aria-label="Lý do từ chối nhiệm vụ"
+                        aria-describedby={(missionFormAttempted.decline || missionFormTouched.decline) && declineReasonError ? 'mission-decline-reason-error' : undefined}
                         value={declineReason}
                         onChange={(e) => {
                           setDeclineReason(e.target.value);
@@ -1007,7 +1117,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                         onBlur={() => setMissionFormTouched((current) => ({ ...current, decline: true }))}
                         placeholder="Nhập lý do (ví dụ: đang bận cứu nạn ca khác, thiếu phương tiện chuyên dụng...)"
                       />
-                      {(missionFormAttempted.decline || missionFormTouched.decline) && declineReasonError && <small className="field-error" role="alert">{declineReasonError}</small>}
+                      {(missionFormAttempted.decline || missionFormTouched.decline) && declineReasonError && <small id="mission-decline-reason-error" className="field-error" role="alert">{declineReasonError}</small>}
                     </label>
                     <button className="button" disabled={busy}>
                       Xác nhận từ chối
@@ -1053,7 +1163,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                           setShowFailForm(false);
                         }}
                       >
-                        Báo cáo hoàn thành giải cứu
+                        Báo cáo hoàn thành nhiệm vụ
                       </button>
                     )}
                     <button
@@ -1081,26 +1191,30 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     }}
                   >
                     <label>
-                      <span>Ghi chú kết quả cứu nạn (bắt buộc): <span className="required-mark" aria-hidden="true">*</span></span>
+                      <span>Ghi chú kết quả nhiệm vụ (bắt buộc): <span className="required-mark" aria-hidden="true">*</span></span>
                       <textarea
                         required
                         maxLength={2001}
                         aria-invalid={Boolean((missionFormAttempted.outcome || missionFormTouched.outcome) && outcomeNoteError)}
+                        aria-label="Ghi chú kết quả nhiệm vụ"
+                        aria-describedby={(missionFormAttempted.outcome || missionFormTouched.outcome) && outcomeNoteError ? 'mission-outcome-note-error' : undefined}
                         value={outcomeNote}
                         onChange={(e) => {
                           setOutcomeNote(e.target.value);
                           setMissionFormTouched((current) => ({ ...current, outcome: true }));
                         }}
                         onBlur={() => setMissionFormTouched((current) => ({ ...current, outcome: true }))}
-                        placeholder="Mô tả kết quả (số người đã giải cứu an toàn, tình trạng sức khỏe, nơi chuyển đến...)"
+                        placeholder="Mô tả kết quả hỗ trợ, số người hoặc vật tư đã bàn giao, và tình hình sau xử lý..."
                       />
-                      {(missionFormAttempted.outcome || missionFormTouched.outcome) && outcomeNoteError && <small className="field-error" role="alert">{outcomeNoteError}</small>}
+                      {(missionFormAttempted.outcome || missionFormTouched.outcome) && outcomeNoteError && <small id="mission-outcome-note-error" className="field-error" role="alert">{outcomeNoteError}</small>}
                     </label>
                     <label className="tracking-file-picker">
                       <input
                         ref={completionFileInputRef}
                         type="file"
                         accept="image/jpeg,image/png,video/mp4"
+                        aria-invalid={Boolean(completionFile && missionEvidenceError(completionFile))}
+                        aria-describedby={completionFile && missionEvidenceError(completionFile) ? 'mission-completion-file-error' : undefined}
                         onChange={(event) => {
                           const file = event.target.files?.[0] || null;
                           setCompletionFile(file);
@@ -1128,9 +1242,10 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                         }}>Bỏ tệp</button>
                       </div>
                     )}
+                    {completionFile && missionEvidenceError(completionFile) && <small className="field-error" id="mission-completion-file-error" role="alert">{missionEvidenceError(completionFile)}</small>}
                     <p className="account-hint">Nếu chọn tệp, Web sẽ tải minh chứng trước rồi mới ghi nhận hoàn thành. Ảnh tối đa 10 MB; video MP4 tối đa 50 MB.</p>
-                    <button className="button" disabled={busy}>
-                      Xác nhận hoàn thành giải cứu
+                    <button className="button" disabled={busy || Boolean(completionFile && missionEvidenceError(completionFile))}>
+                      Xác nhận hoàn thành nhiệm vụ
                     </button>
                   </form>
                 )}
@@ -1152,6 +1267,8 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                         required
                         maxLength={2001}
                         aria-invalid={Boolean((missionFormAttempted.failed || missionFormTouched.failed) && progressNoteError)}
+                        aria-label="Lý do không thể tiếp cận hoặc thất bại"
+                        aria-describedby={(missionFormAttempted.failed || missionFormTouched.failed) && progressNoteError ? 'mission-failure-reason-error' : undefined}
                         value={progressNote}
                         onChange={(e) => {
                           setProgressNote(e.target.value);
@@ -1160,7 +1277,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                         onBlur={() => setMissionFormTouched((current) => ({ ...current, failed: true }))}
                         placeholder="Mô tả trở ngại (nước lũ chảy quá xiết, sạt lở chia cắt đường bộ, không tìm thấy người...)"
                       />
-                      {(missionFormAttempted.failed || missionFormTouched.failed) && progressNoteError && <small className="field-error" role="alert">{progressNoteError}</small>}
+                      {(missionFormAttempted.failed || missionFormTouched.failed) && progressNoteError && <small id="mission-failure-reason-error" className="field-error" role="alert">{progressNoteError}</small>}
                     </label>
                     <button className="button" disabled={busy}>
                       Xác nhận báo cáo thất bại
@@ -1169,7 +1286,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                 )}
 
                 {/* 5. Tải ảnh minh chứng hiện trường giải cứu lên MinIO */}
-                {canManageMission && ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE', 'COMPLETED'].includes(
+                {canManageMission && ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(
                   activeMission.status
                 ) && (
                   <form
@@ -1178,7 +1295,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   >
                     <h4>Tải minh chứng hiện trường</h4>
                     <p>
-                      Hình ảnh giải cứu, tình hình nước ngập hoặc tài liệu hiện trường (JPEG, PNG,
+                      Ảnh hoặc video về tiến độ, bàn giao vật tư hay hiện trường (JPEG, PNG,
                       MP4).
                     </p>
                     <label className="tracking-file-picker">
@@ -1186,7 +1303,9 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                         type="file"
                         required
                         accept="image/jpeg,image/png,video/mp4"
-                        onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)}
+                        aria-invalid={Boolean(evidenceFile && missionEvidenceError(evidenceFile))}
+                        aria-describedby={evidenceFile && missionEvidenceError(evidenceFile) ? 'mission-evidence-file-error' : undefined}
+                        onChange={(e) => { setEvidenceFile(e.target.files?.[0] || null); setActionMessage(''); }}
                       />
                       <span className="tracking-file-icon" aria-hidden="true">↑</span>
                       <span>
@@ -1194,8 +1313,9 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                         <small>JPEG, PNG hoặc MP4</small>
                       </span>
                     </label>
-                    <button className="button secondary" disabled={busy || !evidenceFile}>
-                      {busy ? 'Đang tải minh chứng…' : 'Tải minh chứng lên'}
+                    {evidenceFile && missionEvidenceError(evidenceFile) && <small className="field-error" id="mission-evidence-file-error" role="alert">{missionEvidenceError(evidenceFile)}</small>}
+                    <button className="button secondary" disabled={busy || !evidenceFile || Boolean(missionEvidenceError(evidenceFile))}>
+                      {busy ? 'Đang xử lý…' : 'Tải minh chứng lên'}
                     </button>
                   </form>
                 )}

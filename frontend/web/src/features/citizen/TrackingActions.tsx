@@ -1,6 +1,7 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
 import { label, timeLabel } from '../../i18n/labels';
+import { evidenceFileError } from '../../i18n/evidence';
 import type { components as ResponseComponents } from '../../api/generated/response';
 import { LocationPicker, type Point } from '../../maps/LocationPicker';
 import { confirmAction } from '../../components/confirmAction';
@@ -33,8 +34,10 @@ export function TrackingActions({
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [gpsCapturedAt, setGpsCapturedAt] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const fileError = file ? evidenceFileError(file) : null;
   const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [downloadUrls, setDownloadUrls] = useState<Record<string, string>>({});
+  const [downloadingId, setDownloadingId] = useState('');
   const [events, setEvents] = useState<Event[]>([]);
   const [cursor, setCursor] = useState<string | null>(tracking.cursor || null);
   const [message, setMessage] = useState('');
@@ -44,6 +47,8 @@ export function TrackingActions({
   const supplementKey = useRef<string | null>(null);
   const fileKey = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const locationAttempt = useRef(0);
+  useEffect(() => () => { locationAttempt.current++; }, []);
   const descriptionError = description.length > 2000 ? 'Mô tả mới không được vượt quá 2.000 ký tự.' : '';
   const peopleError = people && (!Number.isInteger(Number(people)) || Number(people) < 1 || Number(people) > 10000)
     ? 'Số người cần hỗ trợ phải là số nguyên từ 1 đến 10.000.' : '';
@@ -82,6 +87,7 @@ export function TrackingActions({
       setDescription('');
       setPeople('');
       setDanger(false);
+      locationAttempt.current++;
       setSupplementPoint(null);
       setGpsAccuracy(null);
       setGpsCapturedAt(null);
@@ -100,25 +106,28 @@ export function TrackingActions({
     }
   }
   function locateSupplement() {
+    const attempt = ++locationAttempt.current;
     if (!navigator.geolocation) {
       setMessage('Trình duyệt không hỗ trợ xác định vị trí.');
       return;
     }
     navigator.geolocation.getCurrentPosition(
       ({ coords, timestamp }) => {
+        if (attempt !== locationAttempt.current) return;
         setSupplementPoint({ longitude: coords.longitude, latitude: coords.latitude });
         setGpsAccuracy(coords.accuracy);
         setGpsCapturedAt(new Date(timestamp).toISOString());
         supplementKey.current = null;
         setMessage('Đã lấy vị trí hiện tại. Hãy kiểm tra trước khi gửi.');
       },
-      () => setMessage('Không thể lấy vị trí hiện tại. Hãy thử tìm trên bản đồ.'),
+      () => { if (attempt === locationAttempt.current) setMessage('Không thể lấy vị trí hiện tại. Hãy thử tìm trên bản đồ.'); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }
   async function attach(event: FormEvent) {
     event.preventDefault();
     if (!file) return;
+    if (fileError) { setMessage(fileError); return; }
     setMessage('');
     setBusy(true);
     try {
@@ -142,13 +151,18 @@ export function TrackingActions({
     }
   }
   async function download(id: string) {
+    setDownloadingId(id);
+    setMessage('');
     try {
       const result = await api<{ url: string }>('response', `/evidence/${id}/download`, {
         headers: headers(code, secret),
       });
       setDownloadUrls((current) => ({ ...current, [id]: result.url }));
+      setMessage('Đã có liên kết riêng tư. Nhấn Mở tệp để xem minh chứng.');
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'Không thể mở tệp minh chứng.');
+    } finally {
+      setDownloadingId('');
     }
   }
   async function claim() {
@@ -246,12 +260,14 @@ export function TrackingActions({
           <div>
             <strong>Cập nhật vị trí cần hỗ trợ (nếu đã thay đổi)</strong>
             <p>Vị trí mới sẽ được điều phối viên xem xét trước khi áp dụng.</p>
+            <p>Chỉ dùng vị trí hiện tại khi bạn đang ở nơi cần hỗ trợ. Nếu báo hộ từ xa, hãy chọn vị trí của người cần hỗ trợ trên bản đồ.</p>
             <button type="button" className="button secondary" onClick={locateSupplement}>
               Dùng vị trí hiện tại
             </button>
             <LocationPicker
               value={supplementPoint}
               onSelect={(point) => {
+                locationAttempt.current++;
                 setSupplementPoint(point);
                 setGpsAccuracy(null);
                 setGpsCapturedAt(null);
@@ -279,16 +295,21 @@ export function TrackingActions({
         <h3>Ảnh và video hiện trường</h3>
         <p>{tracking.can_supplement
           ? 'Chỉ điều phối viên và người có quyền theo dõi SOS được xem các tệp này.'
-          : 'Yêu cầu đã kết thúc nên không thể gửi thêm tệp minh chứng.'}</p>
+          : ['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED'].includes(tracking.status)
+            ? 'Yêu cầu đã kết thúc nên không thể gửi thêm tệp minh chứng.'
+            : 'Yêu cầu hiện chưa cho phép gửi thêm tệp minh chứng. Hãy kiểm tra trạng thái hoặc liên hệ điều phối viên.'}</p>
         {tracking.can_supplement && <form className="form-stack" onSubmit={attach}>
           <label className="tracking-file-picker">
             <input
               ref={fileInputRef}
               type="file"
               accept="image/jpeg,image/png,video/mp4"
+              aria-invalid={Boolean(fileError)}
+              aria-describedby={fileError ? 'sos-evidence-file-error' : undefined}
               onChange={(event) => {
                 setFile(event.target.files?.[0] || null);
                 fileKey.current = null;
+                setMessage('');
               }}
             />
             <span className="tracking-file-icon" aria-hidden="true">↑</span>
@@ -297,8 +318,9 @@ export function TrackingActions({
               <small>JPEG, PNG hoặc MP4</small>
             </span>
           </label>
+          {fileError && <small className="field-error" id="sos-evidence-file-error" role="alert">{fileError}</small>}
           <div className="tracking-evidence-actions">
-            <button className="button" disabled={busy || !file}>Tải minh chứng lên</button>
+            <button className="button" disabled={busy || !file || Boolean(fileError)}>Tải minh chứng lên</button>
           </div>
         </form>}
       </div>
@@ -318,8 +340,8 @@ export function TrackingActions({
                   {Math.ceil(item.size_bytes / 1024)} KB
                 </span>
                 <span>
-                  <button className="button secondary" onClick={() => download(item.id)}>
-                    Lấy liên kết riêng tư
+                  <button className="button secondary" disabled={downloadingId === item.id} onClick={() => download(item.id)}>
+                    {downloadingId === item.id ? 'Đang lấy liên kết…' : 'Lấy liên kết riêng tư'}
                   </button>
                   {downloadUrls[item.id] && (
                     <a

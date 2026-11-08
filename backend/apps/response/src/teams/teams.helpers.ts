@@ -36,6 +36,7 @@ export function teamView(row: TeamRow, includeCoordinates = false): Record<strin
     kind: row.team_kind,
     reporting_mode: row.reporting_mode,
     availability: row.availability,
+    readiness_required: row.readiness_required,
     status: row.status,
     skills: row.skills ?? [],
     position,

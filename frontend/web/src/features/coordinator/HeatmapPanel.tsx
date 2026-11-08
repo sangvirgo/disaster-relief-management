@@ -82,6 +82,17 @@ function cellPopup(count: number, resolution: number, cells = 1): HTMLElement {
   return content;
 }
 
+function bindMapButton(marker: L.Marker, name: string): void {
+  marker.getElement()?.setAttribute('aria-label', name);
+  // Replace Leaflet popup's Enter-only keypress to avoid toggling twice.
+  marker.off('keypress');
+  marker.on('keydown', (event: L.LeafletKeyboardEvent) => {
+    if (event.originalEvent.key !== 'Enter' && event.originalEvent.key !== ' ') return;
+    L.DomEvent.stop(event.originalEvent);
+    marker.fire('click');
+  });
+}
+
 function HeatmapCanvas({
   cells,
   selected,
@@ -106,7 +117,13 @@ function HeatmapCanvas({
     if (!elementRef.current) return;
     const map = L.map(elementRef.current, {
       center: [16.1, 107.7], zoom: 5, minZoom: 4, maxZoom: 18,
-      zoomControl: true, scrollWheelZoom: true,
+      zoomControl: false, scrollWheelZoom: true,
+    });
+    L.control.zoom({ zoomInTitle: 'Phóng to', zoomOutTitle: 'Thu nhỏ' }).addTo(map);
+    map.on('popupopen', (event: L.PopupEvent) => {
+      const closeButton = event.popup.getElement()?.querySelector('.leaflet-popup-close-button');
+      closeButton?.setAttribute('aria-label', 'Đóng thông tin mật độ SOS');
+      closeButton?.setAttribute('title', 'Đóng thông tin mật độ SOS');
     });
     mapRef.current = map;
     let resizeBaseMap = () => {};
@@ -116,7 +133,7 @@ function HeatmapCanvas({
         .on('tileload', () => setTileError(false))
         .addTo(map);
     } else {
-      const vectorLayer = maplibreGL({ style: mapStyleUrl }).addTo(map);
+      const vectorLayer = maplibreGL({ style: mapStyleUrl, locale: { 'Map.Title': 'Bản đồ' } }).addTo(map);
       resizeBaseMap = () => vectorLayer.getMaplibreMap().resize();
       vectorLayer.getMaplibreMap().on('error', () => setTileError(true));
       vectorLayer.getMaplibreMap().on('load', () => setTileError(false));
@@ -197,6 +214,7 @@ function HeatmapCanvas({
               iconAnchor: [radius, radius],
             }),
           }).addTo(dots);
+          bindMapButton(dot, `${cluster.count} SOS trong cụm; phóng gần để xem mật độ`);
           dot.bindTooltip(`${cluster.count} SOS trong cụm hiển thị · nhấn để xem mật độ`);
           dot.on('click', () => map.setView(
             [cluster.latitude, cluster.longitude], map.getZoom() < 8 ? 8 : 12, { animate: true }
@@ -276,9 +294,13 @@ function HeatmapCanvas({
           }
         }
         for (const pin of pinClusters) {
-          L.marker(pin.position, { icon: cellPinIcon, zIndexOffset: 100 })
-            .bindPopup(cellPopup(pin.count, resolutionForZoom(zoom), pin.cells), { className: 'heatmap-cell-popup' })
-            .addTo(dots);
+          const marker = L.marker(pin.position, { icon: cellPinIcon, zIndexOffset: 100 }).addTo(dots);
+          // A popup attached to the marker closes when moveend redraws that marker.
+          marker.on('click', () => L.popup({ className: 'heatmap-cell-popup' })
+            .setLatLng(pin.position)
+            .setContent(cellPopup(pin.count, resolutionForZoom(zoom), pin.cells))
+            .openOn(map!));
+          bindMapButton(marker, `${pin.count} SOS trong ${pin.cells} ô gần nhau; xem mật độ`);
         }
       }
     }
@@ -301,6 +323,7 @@ function HeatmapCanvas({
     map.on('click', showCellCount);
     redraw();
     return () => {
+      map.closePopup();
       map.off('zoomend moveend resize', redraw);
       map.off('click', showCellCount);
     };
@@ -315,9 +338,11 @@ function HeatmapCanvas({
     const position: L.LatLngTuple = [selected.latitude, selected.longitude];
     const label = document.createElement('span');
     label.textContent = `SOS ${selected.trackingCode}`;
-    L.marker(position, { icon: selectedPinIcon, zIndexOffset: 1000 })
+    const marker = L.marker(position, { icon: selectedPinIcon, zIndexOffset: 1000, keyboard: false })
       .bindTooltip(label)
       .addTo(markerLayer);
+    marker.getElement()?.setAttribute('role', 'img');
+    marker.getElement()?.setAttribute('aria-label', `Vị trí SOS ${selected.trackingCode} đang chọn`);
     map.setView(position, Math.max(map.getZoom(), 14), { animate: false });
     map.invalidateSize();
   }, [selected?.id, selected?.latitude, selected?.longitude]);

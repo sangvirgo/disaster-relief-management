@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
 import { appendPage } from '../../api/pagination';
 import { roles, type Me } from '../../auth/session';
 import { CommandForm, type CommandSpec, type Field } from '../../components/CommandForm';
-import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
+import { dateLabel, label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { formatQuantity } from '../../i18n/quantity';
+import { HandoffDetail } from './HandoffDetail';
 import { ReceiptCountForm } from './ReceiptCountForm';
+import { operationRecordKey } from './recordKey';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { DetailSurface } from '../../components/DetailSurface';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -58,6 +60,10 @@ const headings: Record<string, string> = {
 const string = (value: unknown) => (typeof value === 'string' ? value : '');
 const number = (value: unknown) => (typeof value === 'number' ? value : undefined);
 const quantity = formatQuantity;
+function quantityWithUnit(item: Row, value: unknown, fallbackUnit = ''): string {
+  const unit = string((item.unit as Row | undefined)?.display_name) || string(item.unit_name) || fallbackUnit || string(item.unit_code);
+  return `${quantity(value)}\u00a0${unit || '(chưa rõ đơn vị)'}`;
+}
 const distributionPages = new Set(['distribution', 'handoff']);
 function recordTitle(page: string, item: Row): string {
   if (distributionPages.has(page))
@@ -75,33 +81,53 @@ function recordTitle(page: string, item: Row): string {
     'Bản ghi'
   );
 }
-function distributionItems(item: Row): string {
+function distributionItems(item: Row, itemUnits: ReferenceOptions[string] = []): string {
   const lines = Array.isArray(item.lines) ? (item.lines as Row[]) : [];
   if (!lines.length) return 'Chưa có vật phẩm';
   const first = lines[0];
   const name = string(first.item_name) || 'Vật phẩm';
-  return `${name} · ${quantity(first.quantity)}${lines.length > 1 ? ` · +${lines.length - 1} vật phẩm` : ''}`;
+  return `${name} · ${quantityWithUnit(first, first.quantity, itemUnits.find(unit => unit.value === first.item_id)?.label)}${lines.length > 1 ? ` · +${lines.length - 1} vật phẩm` : ''}`;
 }
 const fields = (entries: [string, string, boolean?][]) =>
   entries.map(([name, title, required]) => ({ name, label: title, required }));
 
 export function Operations({ page, user }: { page: string; user: Me }) {
   const rights = roles(user);
+  const [compact, setCompact] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
+  useEffect(() => { const media = window.matchMedia('(max-width: 1023px)'); const update = () => setCompact(media.matches); media.addEventListener('change', update); return () => media.removeEventListener('change', update); }, []);
+  const [stackedDistribution, setStackedDistribution] = useState(() => window.matchMedia('(max-width: 1180px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1180px)');
+    const update = () => setStackedDistribution(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
   const [asset, setAsset] = useUrlView('view', assetViews, 'relief-points');
   const [reviewTab, setReviewTab] = useUrlView('view', reviewViews, 'receipts');
   const [report, setReport] = useUrlView('view', reportViews, 'stock-summary');
   const [warehouse, setWarehouse] = useState('');
   const [region, setRegion] = useState('');
+  const initialReportFilters = useRef({ warehouse: false, region: false });
   const [items, setItems] = useState<Row[]>([]);
   const [cursor, setCursor] = useState('');
+  const [pageSize, setPageSize] = useState(50);
   const [next, setNext] = useState<string | null>(null);
   const [generatedAt, setGeneratedAt] = useState('');
   const [selected, setSelected] = useState<Row | null>(null);
+  const [lastHandoff, setLastHandoff] = useState<{ distributionId: string; id: string } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
+  // Keep request filters stable through loading/result renders and pagination.
+  const reportPeriod = useMemo(() => {
+    const to = Date.now();
+    return { from: new Date(to - 30 * 86_400_000).toISOString(), to: new Date(to).toISOString() };
+  }, [report, region, revision]);
+  const [commitments, setCommitments] = useState<Row[]>([]);
+  const [commitmentsError, setCommitmentsError] = useState('');
+  const [commitmentsLoading, setCommitmentsLoading] = useState(false);
   const [references, setReferences] = useState<ReferenceOptions>({});
   useEffect(() => {
     const cached = referenceCache.get(user.id);
@@ -127,8 +153,12 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       results.forEach((result, index) => {
         if (result.status !== 'fulfilled') return;
         const key = sources[index][0];
+        if (key === 'items') options.itemScales = result.value.filter(item => item.id && Number.isInteger(Number((item.unit as Row | undefined)?.scale)))
+          .map(item => ({ value: item.id!, label: String((item.unit as Row).scale) }));
+        if (key === 'items') options.itemUnits = result.value.filter(item => item.id && string((item.unit as Row | undefined)?.display_name))
+          .map(item => ({ value: item.id!, label: string((item.unit as Row).display_name) }));
         options[key] = result.value
-          .filter((item) => (item.id || item.code) && (!['campaigns', 'organizations', 'regions'].includes(key) || item.status === 'ACTIVE'))
+          .filter((item) => (key !== 'requests' || ['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(string(item.status))) && (item.id || item.code) && (!['campaigns', 'organizations', 'regions', 'reliefPoints', 'warehouses', 'vehicles', 'items'].includes(key) || item.status === 'ACTIVE'))
           .map((item) => ({
             value: key === 'regions' ? string(item.code) : item.id!,
             label: key === 'requests'
@@ -149,7 +179,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           for (const drive of driveResult.value) {
             const warehouseId = string(drive.intake_warehouse_id);
             if (warehouseId && !byWarehouse.has(warehouseId)) {
-              byWarehouse.set(warehouseId, `Kho của đợt “${string(drive.title) || 'quyên góp'}”`);
+              byWarehouse.set(warehouseId, `Kho tiếp nhận · …${warehouseId.slice(-8)}`);
             }
           }
           options.warehouses = [...byWarehouse].map(([value, label]) => ({ value, label }));
@@ -160,6 +190,33 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     });
     return () => { live = false; };
   }, [revision, user.id]);
+  useEffect(() => {
+    if (page !== 'distribution' && page !== 'needs') return;
+    if (!rights.has('OPERATIONS_MANAGER') && !rights.has('COORDINATOR')) return;
+    let live = true;
+    setCommitmentsLoading(true);
+    setCommitmentsError('');
+    const load = async () => {
+      const needs = await fetchAll<Row>('logistics', '/needs');
+      const eligible = needs.filter((need) => need.status !== 'CANCELLED' && Number(need.committed_reserved) > 0);
+      const all: Row[] = [];
+      for (let start = 0; start < eligible.length; start += 4) {
+        const batches = await Promise.all(eligible.slice(start, start + 4).map(async (need) => {
+          const contributions = await fetchAll<Row>('logistics', '/needs/' + need.id + '/contributions');
+          return contributions.filter((item) => Number(item.reserved_remaining) > 0).map((item) => ({
+            ...item, need_id: need.id, request_id: need.request_id,
+            item_id: (need.item as Row)?.id, item_name: (need.item as Row)?.name,
+            unit_name: (need.unit as Row)?.display_name, unit_scale: (need.unit as Row)?.scale,
+          }));
+        }));
+        all.push(...batches.flat());
+      }
+      if (live) setCommitments(all);
+    };
+    void load().catch((cause) => { if (live) { setCommitments([]); setCommitmentsError(cause instanceof Error ? cause.message : 'Không thể tải cam kết xuất kho.'); } })
+      .finally(() => { if (live) setCommitmentsLoading(false); });
+    return () => { live = false; };
+  }, [page, revision, user.id]);
   const organizationOptions = references.organizations?.length
     ? references.organizations
     : [...new Set(user.grants.map((grant) => grant.organization_id).filter((id): id is string => Boolean(id)))]
@@ -169,9 +226,15 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     : [...new Set(user.grants.map((grant) => grant.region_code).filter((code): code is string => Boolean(code)))]
       .map((code) => ({ value: code, label: code }));
   useEffect(() => {
-    if (!warehouse && warehouseOptions.length) setWarehouse(warehouseOptions[0].value);
-    if (!region && regionOptions.length) setRegion(regionOptions[0].value);
-  }, [references, warehouse, region]);
+    if (!initialReportFilters.current.warehouse && warehouseOptions.length) {
+      initialReportFilters.current.warehouse = true;
+      setWarehouse(warehouseOptions[0].value);
+    }
+    if (!initialReportFilters.current.region && regionOptions.length) {
+      initialReportFilters.current.region = true;
+      setRegion(regionOptions[0].value);
+    }
+  }, [references]);
   for (const item of items) {
     const id = string(item.warehouse_id);
     if (id && !warehouseOptions.some((option) => option.value === id))
@@ -180,6 +243,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const warehouseName = (id: unknown) =>
     warehouseOptions.find((warehouse) => warehouse.value === id)?.label ||
     (typeof id === 'string' ? `Kho mã …${id.slice(-8)}` : 'Chưa rõ kho');
+  const lineQuantity = (item: Row, value: unknown) => quantityWithUnit(item, value, references.itemUnits?.find(unit => unit.value === item.item_id)?.label);
   const referenceField = (
     name: string,
     title: string,
@@ -204,13 +268,14 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           ? '/donation-disputes'
           : routes[page];
   const params = new URLSearchParams();
+  if (page === 'stock' || page === 'reports') params.set('limit', String(pageSize));
   if (cursor) params.set('cursor', cursor);
   if (page === 'reports' && report === 'reconciliation' && warehouse)
     params.set('warehouse_id', warehouse);
   if (page === 'reports' && report === 'fulfillment' && region) {
     params.set('region_code', region);
-    params.set('from', new Date(Date.now() - 30 * 86_400_000).toISOString());
-    params.set('to', new Date().toISOString());
+    params.set('from', reportPeriod.from);
+    params.set('to', reportPeriod.to);
   }
   const path = route + (params.size ? `?${params}` : '');
   const ready = !(
@@ -220,18 +285,26 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   useEffect(() => {
     if (!route || !ready) {
       setItems([]);
+      setNext(null);
+      setGeneratedAt('');
+      setSelected(null);
+      setError('');
       setLoading(false);
       return;
     }
     let live = true;
     setLoading(true);
     setError('');
+    if (!cursor) setItems([]);
     api<List>('logistics', path)
       .then((value) => {
         if (live) {
           setItems((current) => cursor
-            ? appendPage(current, value.items || [], (item) => String(item.id))
+            ? appendPage(current, value.items || [], operationRecordKey)
             : value.items || []);
+          setSelected(current => current
+            ? value.items?.find(item => operationRecordKey(item) === operationRecordKey(current)) || (cursor ? current : null)
+            : null);
           setNext(value.next_cursor || (value.more ? value.cursor || null : null));
           setGeneratedAt(value.generated_at || '');
         }
@@ -260,7 +333,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           : ''
         : (page === 'distribution' || page === 'handoff') && selected.id
           ? `/distributions/${selected.id}`
-          : '';
+          : page === 'assets' && asset === 'relief-points' && selected.id
+            ? `/relief-points/${selected.id}`
+            : '';
     if (!detailPath) {
       setDetail(selected);
       return;
@@ -275,7 +350,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     return () => {
       live = false;
     };
-  }, [selected, revision, page, reviewTab]);
+  }, [selected, revision, page, reviewTab, asset]);
   function done() {
     setSelected(null);
     setDetail(null);
@@ -284,12 +359,24 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   }
   function command(spec: CommandSpec) {
     return (
-      <CommandForm key={spec.path + String(spec.version ?? '')} spec={spec} onSuccess={done} />
+      <CommandForm key={spec.path + String(spec.version ?? '')} spec={spec} onSuccess={(result) => { const record = result as Row | undefined; if (spec.path.endsWith('/handoffs') && record?.id && selected?.id) { setLastHandoff({ distributionId: selected.id, id: record.id }); setRevision((value) => value + 1); } else done(); }} onStale={() => setRevision((value) => value + 1)} />
     );
   }
   const id = detail?.id;
   const version = number(detail?.version);
   const status = string(detail?.delivery_status || detail?.status);
+  const stockDetail = page === 'stock' || (page === 'reports' && report === 'stock-summary');
+  const needScale = number((detail?.unit as Row | undefined)?.scale);
+  const needStep = 10 ** -(needScale ?? 0);
+  const needMinimum = Math.max(needStep, Number(detail?.delivered || 0) + Number(detail?.committed_reserved || 0) + Number(detail?.issued_unsettled || 0));
+  const needUncommitted = Number(detail?.requested || 0) - Number(detail?.delivered || 0) - Number(detail?.committed_reserved || 0) - Number(detail?.issued_unsettled || 0);
+  const assetRegionField: Field = {
+    name: 'region_code', label: 'Mã khu vực', required: true,
+    ...(regionOptions.length ? { type: 'select' as const, label: 'Khu vực', options: regionOptions } : {}),
+    placeholder: 'Ví dụ: DEMO_A (khu vực Nam)', maxLength: 32,
+    pattern: /^[A-Z0-9_]{2,32}$/,
+    patternMessage: 'Mã khu vực cần 2–32 ký tự, chỉ gồm chữ in hoa, số hoặc dấu gạch dưới.',
+  };
   const receiptId =
     page === 'intake' || (page === 'review' && reviewTab === 'receipts')
       ? string(selected?.receipt_id)
@@ -307,7 +394,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       referenceField('intake_warehouse_id', 'Kho tiếp nhận', 'warehouses', true),
       referenceField('campaign_id', 'Chiến dịch (nếu có)', 'campaigns'),
       referenceField('item_id', 'Vật phẩm', 'items', true),
-      { name: 'target_quantity', label: 'Số lượng mục tiêu', type: 'number', required: true },
+      { name: 'target_quantity', label: 'Số lượng mục tiêu', type: 'number', required: true,
+        scaleFor: (values) => { const unit = references.itemScales?.find(item => item.value === values.item_id); return unit ? Number(unit.label) : undefined; } },
     ],
     build: (values) => ({
       title: values.title,
@@ -324,15 +412,17 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     fields: [
       referenceField('request_id', 'Yêu cầu SOS', 'requests', true),
       referenceField('item_id', 'Vật phẩm', 'items', true),
-      { name: 'work_cycle', label: 'Chu kỳ xử lý', type: 'number', required: true },
-      { name: 'quantity', label: 'Số lượng cần', type: 'number', required: true },
+      ...(!rights.has('COORDINATOR') ? [{ name: 'work_cycle', label: 'Chu kỳ xử lý do điều phối viên cung cấp', type: 'number' as const, required: true }] : []),
+      { name: 'quantity', label: 'Số lượng cần', type: 'number', required: true,
+        scaleFor: (values) => { const unit = references.itemScales?.find(item => item.value === values.item_id); return unit ? Number(unit.label) : undefined; } },
     ],
-    build: (values) => ({
-      request_id: values.request_id,
-      work_cycle: Number(values.work_cycle),
-      item_id: values.item_id,
-      quantity: values.quantity,
-    }),
+    build: async (values) => {
+      const request = rights.has('COORDINATOR') ? await api<Row>('response', '/requests/' + values.request_id) : null;
+      if (request && !['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(string(request.status))) throw new Error('SOS chưa được xác minh hoặc đã kết thúc; không thể tạo nhu cầu mới.');
+      const workCycle = request ? Number(request.work_cycle) : Number(values.work_cycle);
+      if (!Number.isInteger(workCycle) || workCycle < 1) throw new Error('Không lấy được chu kỳ xử lý hiện tại. Hãy cập nhật hồ sơ SOS rồi thử lại.');
+      return { request_id: values.request_id, work_cycle: workCycle, item_id: values.item_id, quantity: values.quantity };
+    },
   };
   const canCreatePage =
     (page === 'drives' && (rights.has('CAMPAIGN_MANAGER') || rights.has('OPERATIONS_MANAGER'))) ||
@@ -346,12 +436,13 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   useEffect(() => { setShowCreate(false); }, [page, asset]);
   return (
     <div
-      className={`coordinator-layout ${!selected ? 'operations-list-only' : ''} ${page === 'review' ? 'operations-review-layout' : ''} ${page === 'stock' || (page === 'reports' && report === 'stock-summary') ? 'operations-table-layout' : ''}`}
+      className={`coordinator-layout ${page === 'intake' ? 'operations-intake-layout' : ''} ${!selected ? 'operations-list-only' : ''} ${page === 'review' ? 'operations-review-layout' : ''} ${page === 'stock' || (page === 'reports' && report === 'stock-summary') ? 'operations-table-layout' : ''}`}
     >
       <section className="card">
         <div className="section-header list-action-header">
           <h2>{headings[page]}</h2>
-          {canCreatePage && <button type="button" className="button primary list-create-button" onClick={() => setShowCreate(true)}>{createTitle}</button>}
+          <button type="button" className="button secondary" disabled={loading} onClick={() => { setCursor(''); setRevision((value) => value + 1); }}>Cập nhật</button>
+          {canCreatePage && <button type="button" className="button primary list-create-button" onClick={() => { setSelected(null); setDetail(null); setShowCreate(true); }}>{createTitle}</button>}
         </div>
         {page === 'assets' && (
           <div className="tabs">
@@ -431,6 +522,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   onChange={(event) => {
                     setWarehouse(event.target.value);
                     setCursor('');
+                    setSelected(null);
+                    setDetail(null);
                   }}
                 >
                   <option value="">Chọn kho</option>
@@ -446,6 +539,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   onChange={(event) => {
                     setRegion(event.target.value);
                     setCursor('');
+                    setSelected(null);
+                    setDetail(null);
                   }}
                 >
                   <option value="">Chọn khu vực</option>
@@ -455,6 +550,17 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             )}
           </>
         )}
+        {(page === 'stock' || page === 'reports') && <label className="filter">
+          Số dòng mỗi lần tải
+          <select value={pageSize} onChange={event => {
+            setPageSize(Number(event.target.value));
+            setCursor('');
+            setSelected(null);
+            setDetail(null);
+          }}>
+            {[10, 25, 50].map(size => <option key={size} value={size}>{size} dòng</option>)}
+          </select>
+        </label>}
         {!ready && <p>Chọn kho hoặc khu vực để tải báo cáo theo phạm vi được cấp quyền.</p>}
         {loading && <p role="status">Đang tải dữ liệu…</p>}
         {error && (
@@ -482,10 +588,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item, index) => (
+                  {items.map((item) => (
                     <tr
-                      key={string(item.id || item.balance_id) || index}
-                      className={selected === item ? 'selected' : ''}
+                      key={operationRecordKey(item)}
+                      className={selected && operationRecordKey(selected) === operationRecordKey(item) ? 'selected' : ''}
                     >
                       <th scope="row">
                         <button
@@ -522,17 +628,17 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           </>
         ) : (
           <div className="record-list">
-            {items.map((item, index) => (
+            {items.map((item) => (
               <button
                 type="button"
-                className={`queue-row ${selected === item ? 'selected' : ''}`}
-                key={item.id || index}
+                className={`queue-row ${selected && operationRecordKey(selected) === operationRecordKey(item) ? 'selected' : ''}`}
+                key={operationRecordKey(item)}
                 onClick={() => setSelected(item)}
               >
                 <span>
                   <strong>{recordTitle(page, item)}</strong>
                   {distributionPages.has(page) && (
-                    <small>Phiếu phân phối · {distributionItems(item)}</small>
+                    <small>Phiếu phân phối · {distributionItems(item, references.itemUnits)}</small>
                   )}
                   {page === 'intake' && (
                     <small>
@@ -559,8 +665,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   )}
                   {item.requested != null && (
                     <small>
-                      Cần: {quantity(item.requested)} · Đã giao: {quantity(item.delivered)} · Còn
-                      thiếu: {quantity(item.outstanding)}
+                      Cần: {quantityWithUnit(item, item.requested)} · Đã giao: {quantityWithUnit(item, item.delivered)} · Còn
+                      thiếu: {quantityWithUnit(item, item.outstanding)}
                     </small>
                   )}
                   {item.active_requested != null && (
@@ -583,23 +689,48 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           </div>
         )}
         {next && (
-          <button className="button secondary" onClick={() => setCursor(next)}>
+          <button className="button secondary" disabled={loading} onClick={() => setCursor(next)}>
             Xem thêm
           </button>
         )}
       </section>
-      {(selected || showCreate) && <DetailSurface key={selected?.id || 'create'} className="operations-detail-transition" modal={page === 'review' || showCreate} open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? 'Chi tiết bản ghi' : createTitle}>
-        {!showCreate && <h2>
+      {page === 'distribution' && commitmentsError && <p role="alert" className="notice error">{commitmentsError} Hãy tải lại trước khi lập phiếu hỗ trợ SOS.</p>}
+      {(selected || showCreate) && <DetailSurface key={selected?.id || 'create'} className={`operations-detail-transition ${distributionPages.has(page) && !showCreate ? 'distribution-detail-panel' : ''}`} heading={selected && distributionPages.has(page) ? 'Chi tiết phiếu phân phối' : undefined} modal={page === 'review' || showCreate || (['intake', 'assets'].includes(page) && compact) || (distributionPages.has(page) && stackedDistribution)} open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? distributionPages.has(page) ? 'Chi tiết phiếu phân phối' : 'Chi tiết bản ghi' : createTitle}>
+        {!showCreate && !distributionPages.has(page) && <h2>
           {selected
-            ? page === 'stock'
+            ? page === 'assets'
+              ? asset === 'vehicles' ? 'Chi tiết phương tiện' : asset === 'warehouses' ? 'Chi tiết kho' : 'Chi tiết điểm cứu trợ'
+              : stockDetail
               ? 'Chi tiết tồn kho'
               : 'Chi tiết và thao tác'
             : createTitle}
         </h2>}
         {selected && !detail && <p role="status">Đang tải chi tiết…</p>}
+            {distributionPages.has(page) && selected?.id && <HandoffDetail key={selected.id + (lastHandoff?.distributionId === selected.id ? lastHandoff.id : '')} distributionId={selected.id} initialId={lastHandoff?.distributionId === selected.id ? lastHandoff.id : undefined} canReview={rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER')} userId={user.id} onChanged={() => setRevision((value) => value + 1)} />}
         {detail && (
           <>
             <div className="detail-grid">
+              {page === 'drives' && <>
+                <p><strong>Tên đợt quyên góp</strong><span className="detail-value">{string(detail.title) || 'Chưa có tên'}</span></p>
+                <p><strong>Mô tả</strong><span className="detail-value">{string(detail.description) || 'Chưa có mô tả'}</span></p>
+                <p><strong>Chiến dịch liên kết</strong><span className="detail-value">{detail.campaign_id ? references.campaigns?.find(item => item.value === detail.campaign_id)?.label || `Chiến dịch mã …${string(detail.campaign_id).slice(-8)}` : 'Không liên kết chiến dịch'}{detail.campaign_id && detail.campaign_status ? ` · ${label(detail.campaign_status)}` : ''}</span></p>
+                <p><strong>Thời gian dự kiến</strong><span className="detail-value">Mở: {detail.opens_at ? timeLabel(detail.opens_at) : 'Chưa đặt'} · Đóng: {detail.closes_at ? timeLabel(detail.closes_at) : 'Chưa đặt'}</span></p>
+              </>}
+              {page === 'assets' && <>
+                {asset !== 'vehicles' && <p><strong>{asset === 'warehouses' ? 'Tên kho' : 'Tên điểm cứu trợ'}</strong><span className="detail-value">{string(detail.name) || 'Chưa có tên'}</span></p>}
+                <p><strong>Tổ chức</strong><span className="detail-value">{organizationOptions.find(option => option.value === detail.organization_id)?.label || string(detail.organization_id) || 'Chưa có thông tin'}</span></p>
+                <p><strong>Khu vực</strong><span className="detail-value">{regionOptions.find(option => option.value === detail.region_code)?.label || string(detail.region_code) || 'Chưa có thông tin'}</span></p>
+                {asset === 'vehicles' && <>
+                  <p><strong>Loại phương tiện</strong><span className="detail-value">{string(detail.vehicle_type) || 'Chưa có thông tin'}</span></p>
+                  <p><strong>Sức chứa</strong><span className="detail-value">{detail.capacity == null ? 'Chưa khai báo' : `${quantity(detail.capacity)} ${label(detail.capacity_unit)}`}</span></p>
+                </>}
+                {['address_note', 'contact_note', 'operating_note'].map(field => string(detail[field]) && <p key={field}><strong>{{ address_note: 'Ghi chú địa chỉ', contact_note: 'Thông tin liên hệ', operating_note: 'Hướng dẫn hoạt động' }[field]}</strong><span className="detail-value">{string(detail[field])}</span></p>)}
+                {asset !== 'vehicles' && <p><strong>Vị trí</strong><span className="detail-value">{(() => {
+                  const coordinates = (detail.location as { coordinates?: unknown[] } | null)?.coordinates;
+                  return coordinates?.length === 2 && coordinates.every(value => typeof value === 'number' && Number.isFinite(value))
+                    ? `Vĩ độ ${coordinates[1]} · Kinh độ ${coordinates[0]}` : 'Chưa khai báo vị trí';
+                })()}</span></p>}
+              </>}
               {page === 'review' && reviewTab === 'disputes' && (
                 <>
                   <p>
@@ -618,18 +749,18 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   )}
                 </>
               )}
-              {page === 'stock' && (
+              {(stockDetail || page === 'reports') && (
                 <>
                   <p>
                     <strong>Vật phẩm</strong>
                     <span className="detail-value">
-                      {string(detail.item_name) || 'Chưa có tên'}
+                      {string(detail.item_name) || string((detail.item as Row | undefined)?.name) || 'Chưa có tên'}
                     </span>
                   </p>
                   <p>
                     <strong>Đơn vị</strong>
                     <span className="detail-value">
-                      {string(detail.unit) || string(detail.unit_code) || 'Chưa có'}
+                      {string(detail.unit) || string((detail.unit as Row | undefined)?.display_name) || string(detail.unit_code) || 'Chưa có'}
                     </span>
                   </p>
                 </>
@@ -642,6 +773,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   </span>
                 </p>
               )}
+              {distributionPages.has(page) && status === 'DISPATCHED' && <p className="notice">Phiếu tự đối soát khi hết hàng đang vận chuyển, hàng tại điểm và không còn thất thoát chờ duyệt.</p>}
+              {page === 'needs' && <><p><strong>Yêu cầu SOS</strong><span className="detail-value">{references.requests?.find((item) => item.value === detail.request_id)?.label || string(detail.request_id)}</span></p><p><strong>Nhu cầu</strong><span className="detail-value">{quantityWithUnit(detail, detail.requested)} · Đã giao {quantityWithUnit(detail, detail.delivered)}</span></p></>}
               {distributionPages.has(page) && Boolean(detail.purpose) && (
                 <p>
                   <strong>Mục đích phân phối</strong>
@@ -705,7 +838,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   </span>
                 </p>
               )}
-              {page === 'stock' && detail.on_hand != null && (
+              {stockDetail && detail.on_hand != null && (
                 <>
                   <p>
                     <strong>Tồn thực tế</strong>
@@ -727,7 +860,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   </p>
                 </>
               )}
-              {page !== 'stock' && detail.on_hand != null && (
+              {!stockDetail && detail.on_hand != null && (
                 <p>
                   <strong>Tồn khả dụng</strong>
                   <span className="detail-value">
@@ -755,11 +888,19 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 <p>
                   <strong>Đã giao</strong>
                   <span className="detail-value">
-                    {quantity(detail.delivered)}
+                    {page === 'needs' ? quantityWithUnit(detail, detail.delivered) : quantity(detail.delivered)}
                   </span>
                 </p>
               )}
             </div>
+            {page === 'drives' && <section aria-label="Vật phẩm cần tiếp nhận">
+              <h3>Vật phẩm cần tiếp nhận</h3>
+              {Array.isArray(detail.items) && detail.items.length > 0 ? (detail.items as Row[]).map((item, index) => <article className="candidate" key={string(item.item_id) || index}>
+                <strong>{string(item.item_name) || 'Vật phẩm chưa có tên'}</strong>
+                <p>Mục tiêu: {quantityWithUnit(item, item.target_quantity)}</p>
+                {string(item.acceptance_note) && <p>Hướng dẫn tiếp nhận: {string(item.acceptance_note)}</p>}
+              </article>) : <p className="empty">Chưa có thông tin vật phẩm cần tiếp nhận. Hãy cập nhật trước khi mở đợt.</p>}
+            </section>}
             {Array.isArray(detail.lines) && (
               <div>
                 <h3>Vật phẩm và số lượng</h3>
@@ -767,24 +908,48 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   <div className="candidate" key={string(line.id) || index}>
                     <strong>{string(line.item_name) || string(line.item_id) || 'Vật phẩm'}</strong>
                     <p>
-                      Số lượng: {quantity(line.quantity)} · Đã giao: {quantity(line.handed_out)} ·
-                      Đang vận chuyển: {quantity(line.in_transit)} · Tại điểm:{' '}
-                      {quantity(line.at_point)}
+                      Số lượng: {lineQuantity(line, line.quantity)} · Đã giao: {lineQuantity(line, line.handed_out)} ·
+                      Đang vận chuyển: {lineQuantity(line, line.in_transit)} · Tại điểm:{' '}
+                      {lineQuantity(line, line.at_point)} · Đã hoàn: {lineQuantity(line, line.returned)} · Hao hụt đã duyệt: {lineQuantity(line, line.lost)}
+                      {Number(line.pending_loss_count) > 0 && ' · Có thất thoát chờ duyệt'}
                     </p>
                   </div>
                 ))}
               </div>
             )}
+            {Boolean((detail.review as Row | undefined)?.reason) && <div className="notice warning">
+              <strong>{(detail.review as Row).decision === 'REQUEST_RECOUNT' ? 'Cần kiểm đếm lại' : 'Kết quả duyệt kiểm đếm'}</strong>
+              <p>{string((detail.review as Row).reason)}</p>
+            </div>}
+            {page === 'needs' && <section><h3>Cam kết xuất kho hiện có</h3>
+              {commitmentsLoading && <p role="status">Đang tải cam kết…</p>}
+              {commitmentsError && <p role="alert" className="notice error">{commitmentsError}</p>}
+              {commitments.filter((item) => item.need_id === id).map((item) => <div className="candidate" key={item.id}>
+                <strong>{string(item.warehouse_name)}</strong>
+                <p>Còn có thể xuất: {quantity(item.reserved_remaining)} {string(item.unit_name)}</p>
+                <p>Mã cam kết: {item.id}</p>
+              </div>)}
+              {!commitmentsLoading && !commitmentsError && !commitments.some((item) => item.need_id === id) && <p>Chưa có cam kết còn số lượng để xuất kho.</p>}
+            </section>}
+            {page === 'reports' && report === 'reconciliation' && <section><h3>Đối soát {string((detail.item as Row)?.name)}</h3>
+              <table><thead><tr><th>Chỉ tiêu</th><th>Số lượng ({string((detail.unit as Row)?.display_name)})</th></tr></thead><tbody>
+                {Object.entries({ intake_accepted: 'Đã tiếp nhận', posted_movements: 'Tồn theo sổ', posted_reserved_movements: 'Giữ chỗ theo sổ', reserved: 'Đang giữ chỗ', issued_in_transit: 'Đang vận chuyển', at_point: 'Tại điểm cứu trợ', delivered: 'Đã giao', returned: 'Đã hoàn trả', lost: 'Hao hụt' }).map(([key, title]) => <tr key={key}><th>{title}</th><td>{quantity(detail[key])}</td></tr>)}
+              </tbody></table><p>{Object.values((detail.flags as Row) || {}).some(Boolean) ? 'Có chênh lệch cần rà soát giữa sổ kho và các cam kết.' : 'Chưa ghi nhận chênh lệch đối soát.'}</p>
+            </section>}
             {count && (
               <div className="candidate">
+                {status === 'POSTED' && !detail.review && <p className="notice warning" role="status">Phiếu đã ghi sổ trước đó. Lần kiểm đếm bổ sung này đang chờ duyệt độc lập; số tiếp nhận mới chưa được cộng vào tồn kho.</p>}
                 <h3>Kết quả kiểm đếm lần {quantity(count.revision)}</h3>
+                {Boolean(count.note) && <p><strong>Ghi chú kiểm đếm:</strong> {string(count.note)}</p>}
                 {Array.isArray(count.lines) &&
                   (count.lines as Row[]).map((line, index) => (
                     <p key={index}>
-                      {string(line.item_name) || string(line.item_id)}: khai{' '}
-                      {quantity(line.declared_quantity)}, đếm {quantity(line.counted_quantity)},
-                      nhận {quantity(line.accepted_quantity)}, giữ {quantity(line.held_quantity)},
-                      từ chối {quantity(line.rejected_quantity)}
+                      {string(line.item_name) || string(line.item_id)}: khai báo{' '}
+                      {lineQuantity(line, line.declared_quantity)}, kiểm đếm {lineQuantity(line, line.counted_quantity)},
+                      tiếp nhận {lineQuantity(line, line.accepted_quantity)}, tạm giữ {lineQuantity(line, line.held_quantity)},
+                      từ chối {lineQuantity(line, line.rejected_quantity)}
+                      {Boolean(line.condition_note) && <> · Tình trạng: {string(line.condition_note)}</>}
+                      {Boolean(line.expiry_date) && <> · Hạn sử dụng: {dateLabel(line.expiry_date)}</>}
                     </p>
                   ))}
               </div>
@@ -883,11 +1048,13 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 receiptId &&
                 version != null &&
                 rights.has('INTAKE_STAFF') &&
-                status !== 'POSTED' && (
+                !['REJECTED', 'CANCELLED'].includes(status) &&
+                (status !== 'POSTED' || (Array.isArray(count?.lines) && (count.lines as Row[]).some(line => Number(line.held_quantity) > 0))) && (
                   <ReceiptCountForm
                     key={receiptId + version}
                     receiptId={receiptId}
                     version={version}
+                    heldRelease={status === 'POSTED'}
                     existing={
                       count as {
                         lines?: {
@@ -902,14 +1069,17 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     onSuccess={done}
                   />
                 )}
+              {page === 'intake' && receiptId && ['REJECTED', 'CANCELLED'].includes(status) && (
+                <p className="notice">Đóng góp đã {status === 'REJECTED' ? 'bị từ chối' : 'hủy'}, không thể gửi kiểm đếm mới hoặc ghi sổ.</p>
+              )}
               {page === 'review' &&
                 receiptId &&
                 count &&
                 version != null &&
-                ['PENDING_REVIEW', 'APPROVED'].includes(status) &&
+                (['PENDING_REVIEW', 'APPROVED'].includes(status) || (status === 'POSTED' && !detail.review)) &&
                 rights.has('REVIEWER') && (
                   <>
-                    {status === 'PENDING_REVIEW' && command({
+                    {(status === 'PENDING_REVIEW' || status === 'POSTED') && command({
                       title: 'Duyệt kiểm đếm',
                       service: 'logistics',
                       path: `/donation-receipts/${receiptId}/review`,
@@ -926,7 +1096,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                             ['REQUEST_RECOUNT', 'Yêu cầu đếm lại'],
                           ].map(([value, title]) => ({ value, label: title })),
                         },
-                        { name: 'reason', label: 'Lý do', type: 'textarea', required: true },
+                        { name: 'reason', label: 'Lý do', type: 'textarea', required: true, maxLength: 1000 },
                       ],
                       build: (values) => ({
                         count_revision: count.revision,
@@ -946,6 +1116,15 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       })}
                   </>
                 )}
+              {page === 'review' && receiptId && status === 'POSTED' && count && Number(count.revision) > 1 &&
+                (detail.review as Row | null)?.decision === 'APPROVE' && rights.has('REVIEWER') &&
+                command({
+                  title: 'Nhập kho phần hàng được duyệt bổ sung', service: 'logistics',
+                  path: `/donation-receipts/${receiptId}/release-held`, version,
+                  fields: [{ name: 'reason', label: 'Lý do nhập bổ sung', type: 'textarea', required: true, maxLength: 1000 }],
+                  build: values => ({ count_revision: count.revision, declaration_revision: count.declaration_revision, reason: values.reason }),
+                  warning: 'Chỉ xác nhận khi lần kiểm đếm hiện tại đã chuyển hàng tạm giữ sang tiếp nhận và được duyệt độc lập. Phần đã ghi sổ không được cộng lại.',
+                })}
               {page === 'review' &&
                 reviewTab === 'disputes' &&
                 id &&
@@ -961,6 +1140,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       label: 'Kết quả và căn cứ xử lý',
                       type: 'textarea',
                       required: true,
+                      maxLength: 2000,
                     },
                   ],
                   warning: 'Xác nhận kết quả xử lý khiếu nại? Người đóng góp sẽ được thông báo.',
@@ -972,7 +1152,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 status !== 'CANCELLED' && (
                   <>
                     {command({
-                      title: 'Điều chỉnh số lượng cần',
+                      title: 'Tăng số lượng cần',
                       service: 'logistics',
                       path: `/needs/${id}/increase`,
                       version,
@@ -982,12 +1162,14 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                           label: 'Tổng số lượng mới',
                           type: 'number',
                           required: true,
+                          min: Number(detail.requested) + needStep,
+                          scaleFor: () => { const scale = (detail.unit as Row | undefined)?.scale; return scale == null ? undefined : Number(scale); },
                         },
                         { name: 'reason', label: 'Lý do', type: 'textarea', required: true },
                       ],
                       build: (values) => ({ quantity: values.quantity, reason: values.reason }),
                     })}
-                    {command({
+                    {status !== 'FULFILLED' && needMinimum < Number(detail.requested) && command({
                       title: 'Giảm số lượng cần',
                       service: 'logistics',
                       path: `/needs/${id}/reduce`,
@@ -998,13 +1180,16 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                           label: 'Tổng số lượng mới',
                           type: 'number',
                           required: true,
+                          min: needMinimum,
+                          max: Number(detail.requested) - needStep,
+                          scaleFor: () => { const scale = (detail.unit as Row | undefined)?.scale; return scale == null ? undefined : Number(scale); },
                         },
                         { name: 'reason', label: 'Lý do', type: 'textarea', required: true },
                       ],
                       build: (values) => ({ quantity: values.quantity, reason: values.reason }),
                       warning: 'Xác nhận giảm nhu cầu theo số lượng còn đủ điều kiện?',
                     })}
-                    {command({
+                    {status !== 'FULFILLED' && command({
                       title: 'Hủy phần nhu cầu còn lại',
                       service: 'logistics',
                       path: `/needs/${id}/cancel`,
@@ -1014,14 +1199,17 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       ],
                       warning: 'Xác nhận hủy phần nhu cầu chưa được giao?',
                     })}
-                    {rights.has('OPERATIONS_MANAGER') &&
+                    {status !== 'FULFILLED' && needUncommitted <= 0 && <p className="notice">Số lượng còn lại đã được giữ hoặc đang giao; chưa thể cam kết thêm hay giảm xuống dưới phần đã phân bổ.</p>}
+                    {status !== 'FULFILLED' && needUncommitted > 0 && rights.has('OPERATIONS_MANAGER') &&
                       command({
                         title: 'Cam kết xuất kho',
                         service: 'logistics',
                         path: `/needs/${id}/commitments`,
                         fields: [
                           referenceField('warehouse_id', 'Kho xuất hàng', 'warehouses', true),
-                          { name: 'quantity', label: 'Số lượng', type: 'number', required: true },
+                          { name: 'quantity', label: 'Số lượng', type: 'number', required: true,
+                            max: needUncommitted,
+                            scaleFor: () => { const scale = (detail.unit as Row | undefined)?.scale; return scale == null ? undefined : Number(scale); } },
                         ],
                         build: (values) => ({
                           warehouse_id: values.warehouse_id,
@@ -1081,7 +1269,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       version,
                       warning: 'Xác nhận hủy phiếu phân phối trước khi xuất kho?',
                     })}
-                  {status === 'DISPATCHED' &&
+                  {status === 'DISPATCHED' && Array.isArray(detail.lines) && (detail.lines as Row[]).every((line) => Number(line.in_transit) === 0 && Number(line.at_point) === 0 && Number(line.pending_loss_count) === 0) &&
                     (rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER')) &&
                     command({
                       title: 'Đối soát phiếu',
@@ -1131,22 +1319,25 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       required: true,
                       options: (detail.lines as Row[]).map((line) => ({
                         value: string(line.id),
-                        label: `${string(line.item_name) || string(line.item_id)} · ${quantity(line.quantity)}`,
+                        label: `${string(line.item_name) || string(line.item_id)} · ${lineQuantity(line, line.quantity)}`,
                       })),
                     },
-                    { name: 'quantity', label: 'Số lượng thực tế', type: 'number', required: true },
+                    { name: 'quantity', label: 'Số lượng thực tế', type: 'number', required: true,
+                      scaleFor: (values) => Number(((detail.lines as Row[]).find((line) => line.id === values.distribution_line_id)?.unit as Row)?.scale ?? 3),
+                      maxFor: (values) => { const line = (detail.lines as Row[]).find((line) => line.id === values.distribution_line_id); return line ? Number(values.handoff_kind === 'HOUSEHOLD_HANDOUT' || (['RETURN', 'LOSS'].includes(values.handoff_kind) && values.source_stage === 'AT_POINT') ? line.at_point : line.in_transit) : undefined; },
+                    },
                     {
                       name: 'source_stage',
-                      label: 'Nguồn vật tư (khi hoàn hoặc thất thoát)',
-                      type: 'select',
+                      label: 'Nguồn vật tư',
+                      type: 'select', required: true, visibleFor: (values) => ['RETURN', 'LOSS'].includes(values.handoff_kind),
                       options: [
                         ['IN_TRANSIT', 'Đang vận chuyển'],
-                        ['AT_POINT', 'Tại điểm cứu trợ'],
+                        ...(detail.relief_point_id ? [['AT_POINT', 'Tại điểm cứu trợ']] : []),
                       ].map(([value, title]) => ({ value, label: title })),
                     },
                     {
                       name: 'receiver_label',
-                      label: 'Người hoặc đơn vị nhận (không nhập khi thất thoát)',
+                      label: 'Người hoặc đơn vị nhận', visibleFor: (values) => values.handoff_kind !== 'LOSS',
                       requiredWhen: {
                         field: 'handoff_kind',
                         values: ['DIRECT_HOUSEHOLD', 'POINT_RECEIPT', 'HOUSEHOLD_HANDOUT', 'RETURN'],
@@ -1209,26 +1400,20 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               asset === 'vehicles'
                 ? [
                     referenceField('organization_id', 'Tổ chức', 'organizations', true),
-                    ...fields([
-                    ['region_code', 'Mã khu vực', true],
-                    ['identifier', 'Biển số hoặc mã xe', true],
-                    ['vehicle_type', 'Loại phương tiện', true],
-                    ]),
+                    assetRegionField,
+                    { name: 'identifier', label: 'Biển số hoặc mã xe', required: true, maxLength: 100 },
+                    { name: 'vehicle_type', label: 'Loại phương tiện', required: true, maxLength: 80 },
                   ]
                 : asset === 'warehouses'
                   ? [
                       referenceField('organization_id', 'Tổ chức', 'organizations', true),
-                      ...fields([
-                      ['region_code', 'Mã khu vực', true],
-                      ['name', 'Tên kho', true],
-                      ]),
+                      assetRegionField,
+                      { name: 'name', label: 'Tên kho', required: true, maxLength: 200 },
                     ]
                   : [
                       referenceField('organization_id', 'Tổ chức', 'organizations', true),
-                      ...fields([
-                        ['region_code', 'Mã khu vực', true],
-                        ['name', 'Tên điểm cứu trợ', true],
-                      ]),
+                      assetRegionField,
+                      { name: 'name', label: 'Tên điểm cứu trợ', required: true, maxLength: 200 },
                       { name: 'location', label: 'Địa chỉ hoặc vị trí trên bản đồ', type: 'location', required: true },
                     ],
             build:
@@ -1254,8 +1439,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             service: 'logistics',
             path: '/distributions',
             fields: [
-              referenceField('warehouse_id', 'Kho xuất hàng', 'warehouses', true),
-              referenceField('item_id', 'Vật phẩm', 'items', true),
+              { ...referenceField('warehouse_id', 'Kho xuất hàng', 'warehouses', true), resetOnChange: ['commitment_id'] },
+              { ...referenceField('item_id', 'Vật phẩm', 'items', true), resetOnChange: ['commitment_id'] },
               {
                 name: 'purpose',
                 label: 'Mục đích',
@@ -1267,8 +1452,13 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   ['POINT_REPLENISHMENT', 'Bổ sung tại điểm cứu trợ'],
                 ].map(([value, title]) => ({ value, label: title })),
               },
-              { name: 'quantity', label: 'Số lượng', type: 'number', required: true },
-              { ...referenceField('commitment_id', 'Mã cam kết hỗ trợ SOS', 'commitments'), visibleWhen: { field: 'purpose', value: 'REQUEST_AID' } },
+              { name: 'quantity', label: 'Số lượng', type: 'number', required: true, scaleFor: (values) => { const chosen = commitments.find((item) => item.id === values.commitment_id); const scale = references.itemScales?.find(item => item.value === values.item_id); return chosen ? Number(chosen.unit_scale) : scale ? Number(scale.label) : undefined; }, maxFor: (values) => values.purpose === 'REQUEST_AID' && values.commitment_id ? (commitments.some((item) => item.id === values.commitment_id) ? Number(commitments.find((item) => item.id === values.commitment_id)!.reserved_remaining) : undefined) : undefined },
+              { name: 'commitment_id', label: rights.has('OPERATIONS_MANAGER') ? 'Cam kết hỗ trợ SOS' : 'Mã cam kết do quản lý vận hành cung cấp', type: rights.has('OPERATIONS_MANAGER') ? 'select' : 'reference', required: true,
+                visibleWhen: { field: 'purpose', value: 'REQUEST_AID' },
+                emptyLabel: commitmentsLoading ? 'Đang tải cam kết…' : 'Chọn cam kết của kho và vật phẩm',
+                optionsFor: (values) => commitments.filter((item) => item.warehouse_id === values.warehouse_id && item.item_id === values.item_id)
+                  .map((item) => ({ value: item.id!, label: string(item.item_name) + ' · còn ' + quantity(item.reserved_remaining) + ' ' + string(item.unit_name) + ' · ' + string(item.warehouse_name) + ' · SOS …' + string(item.request_id).slice(-8) })),
+              },
               { ...referenceField('campaign_id', 'Chiến dịch', 'campaigns', true), visibleWhen: { field: 'purpose', value: 'CAMPAIGN_DISTRIBUTION' } },
               { ...referenceField('relief_point_id', 'Điểm cứu trợ', 'reliefPoints', true), visibleWhen: { field: 'purpose', value: 'POINT_REPLENISHMENT' } },
               referenceField('vehicle_id', 'Phương tiện (nếu có)', 'vehicles'),

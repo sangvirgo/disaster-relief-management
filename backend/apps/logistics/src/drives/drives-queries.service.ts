@@ -170,6 +170,7 @@ export class DriveQueriesService {
          LEFT JOIN donation_delivery dd ON dd.drive_id=di.drive_id
          LEFT JOIN donation_receipt r ON r.delivery_id=dd.id
          LEFT JOIN stock_movement sm ON sm.receipt_id=r.id AND sm.movement_type IN ('RECEIPT','RECEIPT_HELD_RELEASE')
+           AND EXISTS (SELECT 1 FROM stock_balance sb WHERE sb.id=sm.balance_id AND sb.item_id=di.item_id)
         WHERE di.drive_id=ANY($1::uuid[])
         GROUP BY di.drive_id,di.item_id,i.name,t.display_name,u.code,u.display_name,u.scale,di.target_quantity,di.acceptance_note
         ORDER BY di.drive_id,i.name,di.item_id`,

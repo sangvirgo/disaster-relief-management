@@ -4,7 +4,7 @@ import { appendPage } from '../../api/pagination';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { DetailCloseButton } from '../../components/DetailCloseButton';
 import { StatusBadge } from '../../components/StatusBadge';
-import { label, timeLabel } from '../../i18n/labels';
+import { label, regionName, timeLabel } from '../../i18n/labels';
 
 type Campaign = {
   id: string;
@@ -61,6 +61,7 @@ export function Campaigns() {
       .then((value) => {
         if (live) {
           setItems((current) => cursor ? appendPage(current, value.items, (item) => item.id) : value.items);
+          setSelected(current => current ? value.items.find(item => item.id === current.id) || (cursor ? current : null) : null);
           setNext(value.more ? value.cursor || '' : '');
         }
       })
@@ -76,7 +77,12 @@ export function Campaigns() {
   }, [cursor, revision]);
   function done() {
     setSelected(null);
+    setCursor('');
     setRevision((value) => value + 1);
+  }
+  function changeStatusFilter(value: string) {
+    setStatusFilter(value);
+    setSelected(current => current && value !== 'ALL' && current.status !== value ? null : current);
   }
   const create: CommandSpec = {
     title: 'Tạo chiến dịch',
@@ -134,14 +140,15 @@ export function Campaigns() {
             <span className="eyebrow">Điều phối cứu trợ</span>
             <h2>Danh sách chiến dịch</h2>
           </div>
-          <span className="chip">{items.length} chiến dịch trên trang</span>
+          <span className="chip">Đã tải {items.length} chiến dịch</span>
         </div>
         <p>Chọn chiến dịch để xem mục tiêu, thời gian và thao tác được cấp quyền.</p>
         <div className="campaign-filters" role="group" aria-label="Lọc chiến dịch theo trạng thái">
           <button
             type="button"
             className={statusFilter === 'ALL' ? 'active' : ''}
-            onClick={() => setStatusFilter('ALL')}
+            aria-pressed={statusFilter === 'ALL'}
+            onClick={() => changeStatusFilter('ALL')}
           >
             Tất cả
           </button>
@@ -150,7 +157,8 @@ export function Campaigns() {
               type="button"
               key={status}
               className={statusFilter === status ? 'active' : ''}
-              onClick={() => setStatusFilter(status)}
+              aria-pressed={statusFilter === status}
+              onClick={() => changeStatusFilter(status)}
             >
               {label(status)}
             </button>
@@ -176,7 +184,7 @@ export function Campaigns() {
                 <strong>{item.name}</strong>
                 <small>{item.objective || 'Chưa có mô tả mục tiêu.'}</small>
                 <span>
-                  {item.region_code || 'Nhiều khu vực'} · Tạo {timeLabel(item.created_at)}
+                  {item.region_code ? regionName(item.region_code) : 'Nhiều khu vực'} · Tạo {timeLabel(item.created_at)}
                 </span>
               </span>
               <StatusBadge status={item.status} />
@@ -187,7 +195,7 @@ export function Campaigns() {
           <div className="empty">Không có chiến dịch ở trạng thái này trên trang hiện tại.</div>
         )}
         {next && (
-          <button className="button secondary" onClick={() => setCursor(next)}>
+          <button className="button secondary" disabled={loading} onClick={() => setCursor(next)}>
             Xem thêm
           </button>
         )}
@@ -210,7 +218,7 @@ export function Campaigns() {
               </div>
               <div>
                 <dt>Khu vực</dt>
-                <dd>{selected.region_code || 'Nhiều khu vực'}</dd>
+                <dd>{selected.region_code ? regionName(selected.region_code) : 'Nhiều khu vực'}</dd>
               </div>
               <div>
                 <dt>Bắt đầu</dt>

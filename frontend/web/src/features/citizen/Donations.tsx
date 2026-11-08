@@ -2,11 +2,14 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
 import { label } from '../../i18n/labels';
-import { formatQuantity } from '../../i18n/quantity';
+import { formatQuantity, quantityFitsScale, remainingQuantity } from '../../i18n/quantity';
+import { evidenceFileError as donationEvidenceError } from '../../i18n/evidence';
 import type { Me } from '../../auth/session';
 import { confirmAction } from '../../components/confirmAction';
 import { useUrlView } from '../../app/useUrlView';
 import { donationViews } from '../../app/routeViews';
+import { StatusBadge } from '../../components/StatusBadge';
+import { DetailSurface } from '../../components/DetailSurface';
 
 type DriveItem = {
   item_id: string;
@@ -28,14 +31,19 @@ type Drive = {
   generated_at?: string;
 };
 type Declaration = { id: string; public_code: string; status: string };
+type OwnedDonation = { id: string; public_code: string; status: string; created_at: string; drive_title: string; has_count_result: boolean };
 type Tracking = {
   id: string;
   public_code: string;
   status: string;
   declaration?: { lines: { item_id: string; item_name: string; unit_name: string; declared_quantity: string }[] };
   receipt?: {
+    id: string;
+    count_revision: number;
     lines: {
       item_id: string;
+      item_name: string;
+      unit_name: string;
       declared_quantity: string | null;
       counted_quantity: string;
       accepted_quantity: string;
@@ -52,6 +60,24 @@ function secret32(): string {
     .replaceAll('+', '-')
     .replaceAll('/', '_')
     .replaceAll('=', '');
+}
+
+function DonationLookupCode({ id }: { id: string }) {
+  const [message, setMessage] = useState('');
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(id);
+      setMessage('Đã sao chép định danh bản khai.');
+    } catch {
+      setMessage('Chưa sao chép được. Hãy chọn và sao chép định danh trong ô bên trên.');
+    }
+  }
+  return <div className="donation-lookup-code">
+    <label><strong>Định danh bản khai</strong><input aria-label="Định danh để lưu và tra cứu" readOnly value={id} onFocus={event => event.currentTarget.select()} /></label>
+    <p>Giữ định danh này để tra cứu trên trình duyệt hoặc thiết bị khác.</p>
+    <button type="button" className="button secondary" onClick={() => void copy()}>Sao chép định danh</button>
+    {message && <p role="status">{message}</p>}
+  </div>;
 }
 
 export function Donations({ user }: { user: Me | null }) {
@@ -74,10 +100,16 @@ export function Donations({ user }: { user: Me | null }) {
   const [created, setCreated] = useState<Declaration | null>(null);
   const [createdSecret, setCreatedSecret] = useState('');
   const [trackId, setTrackId] = useState('');
+  const trackIdInput = useRef<HTMLInputElement>(null);
   const [trackSecret, setTrackSecret] = useState('');
   const [tracking, setTracking] = useState<Tracking | null>(null);
+  const [trackingFor, setTrackingFor] = useState<string | null>(null);
+  const [ownedDonations, setOwnedDonations] = useState<OwnedDonation[]>([]);
+  const [ownedFor, setOwnedFor] = useState<string | null>(null);
+  const [ownedLoading, setOwnedLoading] = useState(false);
+  const [ownedError, setOwnedError] = useState('');
+  const [ownedRevision, setOwnedRevision] = useState(0);
   const selectedCardRef = useRef<HTMLDivElement | null>(null);
-  const trackingCardRef = useRef<HTMLElement | null>(null);
   const [verifiedSecret, setVerifiedSecret] = useState('');
   const lookupVersion = useRef(0);
   const [disputeReason, setDisputeReason] = useState('');
@@ -100,6 +132,8 @@ export function Donations({ user }: { user: Me | null }) {
   const [recoveryAttempted, setRecoveryAttempted] = useState(false);
   const [disputeTouched, setDisputeTouched] = useState(false);
   const [disputeAttempted, setDisputeAttempted] = useState(false);
+  const evidenceError = file ? donationEvidenceError(file) : null;
+  const createdEvidenceError = createdFile ? donationEvidenceError(createdFile) : null;
   const declarationErrors: Record<string, string> = {};
   if (!donorName.trim()) declarationErrors.donorName = 'Họ tên người đóng góp là bắt buộc.';
   else if (donorName.length > 200) declarationErrors.donorName = 'Họ tên không được vượt quá 200 ký tự.';
@@ -115,7 +149,9 @@ export function Donations({ user }: { user: Me | null }) {
     if (!/^\d+(?:\.\d+)?$/.test(value) || Number(value) < 0)
       declarationErrors[`quantity:${item.item_id}`] = 'Số lượng phải là số không âm.';
     else if ((value.split('.')[1]?.length || 0) > item.scale)
-      declarationErrors[`quantity:${item.item_id}`] = `Số lượng chỉ được có tối đa ${item.scale} chữ số thập phân.`;
+      declarationErrors[`quantity:${item.item_id}`] = item.scale === 0
+        ? 'Vật phẩm này cần số lượng nguyên, ví dụ 1 hoặc 2.'
+        : `Số lượng chỉ được có tối đa ${item.scale} chữ số thập phân.`;
   }
   const declarationInvalid = Boolean(Object.keys(declarationErrors).length || !hasPositiveQuantity);
   const donationTrackIdError = !trackId.trim() ? 'Định danh bản khai là bắt buộc.'
@@ -145,6 +181,7 @@ export function Donations({ user }: { user: Me | null }) {
     setTrackSecret('');
     setVerifiedSecret('');
     setTracking(null);
+    setTrackingFor(null);
     setCreated(null);
     setCreatedSecret('');
     setShowCreatedTracking(false);
@@ -152,8 +189,47 @@ export function Donations({ user }: { user: Me | null }) {
     setTrackingTouched({});
     setError('');
   }, [accountKey]);
+  useEffect(() => {
+    let live = true;
+    if (!user) { setOwnedDonations([]); setOwnedFor(null); setOwnedError(''); setOwnedLoading(false); return; }
+    setOwnedDonations([]);
+    setOwnedFor(accountKey);
+    setOwnedError('');
+    setOwnedLoading(true);
+    const refresh = async () => {
+      const saved: unknown = JSON.parse(localStorage.getItem('reliva.donation-history.' + accountKey) || '[]');
+      const records: OwnedDonation[] = Array.isArray(saved) ? saved.filter((item): item is OwnedDonation => Boolean(item && typeof item.id === 'string' && typeof item.public_code === 'string' && typeof item.status === 'string' && typeof item.created_at === 'string')).slice(0, 10) : [];
+      if (live) setOwnedDonations(records);
+      if (view !== 'donation') return;
+      const results = await Promise.allSettled(records.map(async (record) => {
+        const current = await api<Tracking>('logistics', '/public/donations/' + encodeURIComponent(record.id));
+        return { ...record, status: current.status, has_count_result: Boolean(current.receipt) };
+      }));
+      if (!live) return;
+      const updated = results.map((result, index) => result.status === 'fulfilled' ? result.value : records[index]);
+      setOwnedDonations(updated);
+      localStorage.setItem('reliva.donation-history.' + accountKey, JSON.stringify(updated));
+      if (results.some((result) => result.status === 'rejected')) setOwnedError('Một số phiếu chưa cập nhật được; trạng thái đang hiển thị là lần lưu gần nhất. Hãy thử cập nhật lại.');
+    };
+    void refresh().catch(() => { if (live) setOwnedError('Không đọc được lịch sử trên trình duyệt này. Bạn vẫn có thể tra cứu bằng định danh.'); })
+      .finally(() => { if (live) setOwnedLoading(false); });
+    return () => { live = false; };
+  }, [accountKey, ownedRevision, view]);
+  function rememberDonation(value: Declaration, driveTitle?: string, hasCountResult = false) {
+    if (!user) return;
+    try {
+      const key = `reliva.donation-history.${accountKey}`;
+      const parsed: unknown = JSON.parse(localStorage.getItem(key) || '[]');
+      const old = Array.isArray(parsed) ? parsed.filter((item) => item && typeof item.id === 'string') : [];
+      const previous = old.find((item) => item.id === value.id);
+      const record: OwnedDonation = { ...value, drive_title: driveTitle || previous?.drive_title || 'Phiếu quyên góp',
+        created_at: previous?.created_at || new Date().toISOString(), has_count_result: hasCountResult };
+      localStorage.setItem(key, JSON.stringify([record, ...old.filter((item) => item.id !== value.id)].slice(0, 10)));
+      setOwnedRevision((current) => current + 1);
+    } catch { setOwnedError('Không lưu được lịch sử trên trình duyệt này. Hãy giữ định danh phiếu để tra cứu lại.'); }
+  }
   const nav = <div className="donation-nav" role="group" aria-label="Mục đóng góp">
-    <button type="button" className={`button ${view === 'drives' ? '' : 'secondary'}`} onClick={() => { setView('drives'); setShowCreatedTracking(false); setError(''); }}>Đợt quyên góp</button>
+    <button type="button" className={`button ${view === 'drives' ? '' : 'secondary'}`} onClick={() => { setView('drives'); setShowCreatedTracking(false); setCreated(null); setShowDeclaration(false); setQuantities({}); setError(''); }}>Đợt quyên góp</button>
     <button type="button" className={`button ${view === 'donation' ? '' : 'secondary'}`} onClick={() => { setView('donation'); setError(''); }}>Theo dõi đóng góp</button>
   </div>;
   useEffect(() => {
@@ -165,12 +241,11 @@ export function Donations({ user }: { user: Me | null }) {
   useEffect(() => {
     if (selected && !showDeclaration) selectedCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [selected, showDeclaration]);
-  useEffect(() => {
-    if (tracking) trackingCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [tracking]);
   async function attachCreated(event: FormEvent) {
     event.preventDefault();
     if (!created || !createdFile) return;
+    const validationError = donationEvidenceError(createdFile);
+    if (validationError) { setCreatedUploadMessage(validationError); return; }
     setLoading(true);
     setCreatedUploadMessage('');
     try {
@@ -266,6 +341,8 @@ export function Donations({ user }: { user: Me | null }) {
         }
       );
       setCreated(result);
+      rememberDonation(result, selected.title);
+      if (user) setOwnedRevision((current) => current + 1);
       setCreatedSecret(command.secret);
       pending.current = null;
     } catch (cause) {
@@ -290,10 +367,16 @@ export function Donations({ user }: { user: Me | null }) {
       if (version === lookupVersion.current) {
         setVerifiedSecret(secret);
         setTracking(result);
+        if (!secret) rememberDonation(result, undefined, Boolean(result.receipt));
+        setTrackingFor(accountKey);
       }
     } catch (cause) {
-      if (version === lookupVersion.current)
-        setError(cause instanceof Error ? cause.message : 'Không thể tra cứu đóng góp.');
+      if (version === lookupVersion.current) {
+        const ownerHelp = cause instanceof ApiError && cause.code === 'DONATION_SECRET_INVALID' && user && !secret;
+        setError(ownerHelp
+          ? `Không thể mở phiếu bằng tài khoản hiện tại. Hãy đăng nhập tài khoản đã khai, hoặc nhập mã bảo mật nếu khai với tư cách khách.${cause.correlationId ? ` Mã tham chiếu lỗi: ${cause.correlationId}.` : ''}`
+          : cause instanceof Error ? cause.message : 'Không thể tra cứu đóng góp.');
+      }
     } finally {
       if (version === lookupVersion.current) setLoading(false);
     }
@@ -308,6 +391,7 @@ export function Donations({ user }: { user: Me | null }) {
     lookupVersion.current += 1;
     setLoading(false);
     setTracking(null);
+    setTrackingFor(null);
     setVerifiedSecret('');
     setError('');
     setActionMessage('');
@@ -354,6 +438,8 @@ export function Donations({ user }: { user: Me | null }) {
   async function attach(event: FormEvent) {
     event.preventDefault();
     if (!tracking || !file) return;
+    const validationError = donationEvidenceError(file);
+    if (validationError) { setActionMessage(validationError); return; }
     setLoading(true);
     setActionMessage('');
     try {
@@ -402,6 +488,8 @@ export function Donations({ user }: { user: Me | null }) {
       setTrackSecret('');
       setVerifiedSecret('');
       setActionMessage('Bản khai đã được gắn với tài khoản của bạn.');
+      rememberDonation(tracking, undefined, Boolean(tracking.receipt));
+      setOwnedRevision((current) => current + 1);
     } catch (cause) {
       setActionMessage(cause instanceof Error ? cause.message : 'Chưa gắn được bản khai.');
     } finally {
@@ -429,6 +517,7 @@ export function Donations({ user }: { user: Me | null }) {
       setRecoveryMessage(
         'Bản khai đã được gắn với tài khoản. Hãy tra cứu bằng định danh bản khai.'
       );
+      setOwnedRevision((current) => current + 1);
     } catch (cause) {
       setRecoveryMessage(cause instanceof Error ? cause.message : 'Chưa khôi phục được bản khai.');
     } finally {
@@ -439,13 +528,30 @@ export function Donations({ user }: { user: Me | null }) {
     return (
       <>{nav}
       <div className="grid-two donation-layout">
+        {user && <section className="card donation-owned-list">
+          <div className="section-header"><h2>Phiếu đã lưu trên trình duyệt này</h2><button type="button" className="button secondary" disabled={ownedLoading || !ownedDonations.length} onClick={() => setOwnedRevision((value) => value + 1)}>Cập nhật phiếu đã lưu</button></div>
+          <p>Tối đa 10 phiếu bạn đã tạo hoặc tra cứu bằng tài khoản này. Danh sách không tự đồng bộ các phiếu từ trình duyệt hoặc thiết bị khác. Bấm một phiếu để lấy trạng thái mới nhất.</p>
+          {ownedLoading && <p role="status">Đang tải đóng góp của bạn…</p>}
+          {ownedError && <p className="notice error" role="alert">{ownedError}</p>}
+          {!ownedLoading && !ownedError && ownedFor === accountKey && !ownedDonations.length && <div className="donation-history-empty"><p>Chưa lưu phiếu nào ở đây. Tài khoản vẫn có thể có đóng góp trên hệ thống.</p><button type="button" className="button secondary" onClick={() => trackIdInput.current?.focus()}>Tra cứu phiếu đã có</button></div>}
+          <div className="record-list">
+            {(ownedFor === accountKey ? ownedDonations : []).map((donation) => <button type="button" key={donation.id}
+              className="record record-clickable" aria-label={`Xem phiếu quyên góp ${donation.public_code}`}
+              onClick={() => { setTrackId(donation.id); setTrackSecret(''); void lookupDonation(donation.id, ''); }}>
+              <span><strong>{donation.drive_title}</strong><small>Phiếu {donation.public_code} · Lưu lần đầu trên trình duyệt: {new Date(donation.created_at).toLocaleString('vi-VN')}</small></span>
+              <span className="record-actions"><StatusBadge status={donation.status} /><small>{donation.has_count_result ? 'Đã có kết quả kiểm đếm' : 'Chờ kết quả kiểm đếm'}</small></span>
+            </button>)}
+          </div>
+        </section>}
         <section className="card">
           <h2>Tra cứu đóng góp</h2>
-          <p>Nhập định danh bản khai và mã bảo mật riêng tư. Mã bảo mật không nằm trong URL.</p>
+          <p>{user ? 'Mở trực tiếp phiếu đã lưu ở trên, hoặc nhập định danh bản khai chưa lưu. Không cần mã bảo mật nếu bạn đăng nhập đúng tài khoản đã khai. Phiếu khai với tư cách khách cần thêm mã bảo mật.' : 'Nhập định danh bản khai và mã bảo mật riêng tư. Mã bảo mật không nằm trong URL.'}</p>
           <form className="form-stack" onSubmit={track} noValidate>
             <label>
               <span>Định danh bản khai <span className="required-mark" aria-hidden="true">*</span></span>
               <input
+                ref={trackIdInput}
+                aria-label="Định danh bản khai"
                 required
                 disabled={loading}
                 maxLength={37}
@@ -458,13 +564,17 @@ export function Donations({ user }: { user: Me | null }) {
                 }}
                 onBlur={() => setTrackingTouched((current) => ({ ...current, trackId: true }))}
                 autoComplete="off"
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                aria-describedby="donation-lookup-id-hint"
               />
+              <small id="donation-lookup-id-hint">Dùng định danh được cấp sau khi gửi bản khai, khác với mã phiếu ngắn.</small>
               {(trackingAttempted || trackingTouched.trackId) && donationTrackIdError && <small className="field-error" role="alert">{donationTrackIdError}</small>}
             </label>
             <label>
               <span>Mã bảo mật (nếu khai với tư cách khách){!user && <> <span className="required-mark" aria-hidden="true">*</span></>}</span>
               <input
                 type="password"
+                name="donation-secret"
                 disabled={loading}
                 required={!user}
                 maxLength={44}
@@ -476,7 +586,7 @@ export function Donations({ user }: { user: Me | null }) {
                   invalidateTracking();
                 }}
                 onBlur={() => setTrackingTouched((current) => ({ ...current, trackSecret: true }))}
-                autoComplete="off"
+                autoComplete="one-time-code"
               />
               {(trackingAttempted || trackingTouched.trackSecret) && donationTrackSecretError && <small className="field-error" role="alert">{donationTrackSecretError}</small>}
             </label>
@@ -498,6 +608,7 @@ export function Donations({ user }: { user: Me | null }) {
               <label>
                 <span>Mã bản khai công khai <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
+                  name="donation-public-code"
                   required
                   maxLength={17}
                   aria-invalid={Boolean((recoveryAttempted || recoveryTouched.publicCode) && donationRecoveryPublicError)}
@@ -515,6 +626,7 @@ export function Donations({ user }: { user: Me | null }) {
               <label>
                 <span>Mã khôi phục một lần <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
+                  name="donation-recovery-code"
                   required
                   maxLength={44}
                   aria-invalid={Boolean((recoveryAttempted || recoveryTouched.code) && donationRecoveryCodeError)}
@@ -525,7 +637,7 @@ export function Donations({ user }: { user: Me | null }) {
                     recoveryKey.current = null;
                   }}
                   onBlur={() => setRecoveryTouched((current) => ({ ...current, code: true }))}
-                  autoComplete="off"
+                  autoComplete="one-time-code"
                 />
                 {(recoveryAttempted || recoveryTouched.code) && donationRecoveryCodeError && <small className="field-error" role="alert">{donationRecoveryCodeError}</small>}
               </label>
@@ -541,27 +653,40 @@ export function Donations({ user }: { user: Me | null }) {
             </details>
           )}
         </section>
-        {tracking && (
-          <section className="card" ref={trackingCardRef}>
-            <h2>Đóng góp {tracking.public_code}</h2>
-            <span className="chip">{label(tracking.status)}</span>
+        {tracking && trackingFor === accountKey && (
+          <DetailSurface modal open label="Chi tiết phiếu quyên góp" className="donation-tracking-dialog" onClose={invalidateTracking}>
+            <h2>Đóng góp</h2>
+            <p>Mã phiếu: <strong>{tracking.public_code}</strong></p>
+            <StatusBadge status={tracking.status} />
+            <DonationLookupCode key={tracking.id} id={tracking.id} />
             <h3>Đã khai báo</h3>
-            {tracking.declaration?.lines.map((line, i) => (
-              <p key={i}>
-                {line.item_name}: {formatQuantity(line.declared_quantity)} {line.unit_name}
-              </p>
-            ))}
+            <div className="donation-declaration-table">
+              <table>
+                <thead><tr><th scope="col">Tên vật phẩm</th><th scope="col">Số lượng</th></tr></thead>
+                <tbody>
+                  {tracking.declaration?.lines.map((line) => (
+                    <tr key={line.item_id}>
+                      <th scope="row">{line.item_name}</th>
+                      <td>{formatQuantity(line.declared_quantity)} {line.unit_name}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {tracking.receipt ? (
               <>
-                <h3>Kết quả kiểm đếm và duyệt</h3>
+                <h3>Phiếu tiếp nhận và kết quả kiểm đếm</h3>
+                <p>Mã phiếu: {tracking.public_code} · Lần kiểm đếm: {tracking.receipt.count_revision}</p>
                 {tracking.receipt.lines.map((line, i) => {
-                  const item = tracking.declaration?.lines.find((declared) => declared.item_id === line.item_id);
+                  const declared = tracking.declaration?.lines.find((item) => item.item_id === line.item_id);
+                  const itemName = line.item_name || declared?.item_name || `Vật phẩm ${i + 1}`;
+                  const unitName = line.unit_name || declared?.unit_name || '';
                   return (
                     <p key={`${line.item_id}-${i}`}>
-                      {item?.item_name || `Vật phẩm ${i + 1}`}: đã đếm {formatQuantity(line.counted_quantity)}, tiếp nhận{' '}
-                      {formatQuantity(line.accepted_quantity)}, tạm giữ{' '}
-                      {formatQuantity(line.held_quantity)}, từ chối{' '}
-                      {formatQuantity(line.rejected_quantity)}
+                      {itemName}: đã đếm {formatQuantity(line.counted_quantity)} {unitName}, tiếp nhận{' '}
+                      {formatQuantity(line.accepted_quantity)} {unitName}, tạm giữ{' '}
+                      {formatQuantity(line.held_quantity)} {unitName}, từ chối{' '}
+                      {formatQuantity(line.rejected_quantity)} {unitName}
                     </p>
                   );
                 })}
@@ -609,13 +734,17 @@ export function Donations({ user }: { user: Me | null }) {
                   type="file"
                   required
                   accept="image/jpeg,image/png,video/mp4"
+                  aria-invalid={Boolean(evidenceError)}
+                  aria-describedby={evidenceError ? 'donation-evidence-error' : undefined}
                   onChange={(event) => {
                     setFile(event.target.files?.[0] || null);
                     uploadKey.current = null;
+                    setActionMessage('');
                   }}
                 />
               </label>
-              <button className="button donation-action" disabled={loading || !file}>
+              {evidenceError && <small className="field-error" id="donation-evidence-error" role="alert">{evidenceError}</small>}
+              <button className="button donation-action" disabled={loading || !file || Boolean(evidenceError)}>
                 Tải minh chứng lên
               </button>
             </form>
@@ -629,7 +758,7 @@ export function Donations({ user }: { user: Me | null }) {
                 {actionMessage}
               </p>
             )}
-          </section>
+          </DetailSurface>
         )}
       </div>
       </>
@@ -640,8 +769,9 @@ export function Donations({ user }: { user: Me | null }) {
       <section className="card confirmation" role="status">
         <h2>Đã nhận bản khai vật phẩm</h2>
         <p>
-          Mã bản khai: <strong>{created.public_code}</strong>
+          Mã phiếu: <strong>{created.public_code}</strong>
         </p>
+        <DonationLookupCode key={created.id} id={created.id} />
         <p>
           Định danh để tra cứu: <strong className="secret">{created.id}</strong>
         </p>
@@ -669,10 +799,13 @@ export function Donations({ user }: { user: Me | null }) {
               type="file"
               required
               accept="image/jpeg,image/png,video/mp4"
-              onChange={(e) => setCreatedFile(e.target.files?.[0] || null)}
+              aria-invalid={Boolean(createdEvidenceError)}
+              aria-describedby={createdEvidenceError ? 'created-donation-evidence-error' : undefined}
+              onChange={(e) => { setCreatedFile(e.target.files?.[0] || null); setCreatedUploadMessage(''); }}
             />
           </label>
-          <button className="button donation-action" disabled={loading || !createdFile}>
+          {createdEvidenceError && <small className="field-error" id="created-donation-evidence-error" role="alert">{createdEvidenceError}</small>}
+          <button className="button donation-action" disabled={loading || !createdFile || Boolean(createdEvidenceError)}>
             Tải ảnh kiện hàng lên
           </button>
           {createdUploadMessage && (
@@ -739,18 +872,21 @@ export function Donations({ user }: { user: Me | null }) {
               {selected?.id === drive.id && (
                 <div className="donation-drive-detail" ref={selectedCardRef}>
                   <p>{selected.intake_location?.address_note}</p>
+                  {selected.items.some(item => !quantityFitsScale(item.target_quantity, item.scale) || !quantityFitsScale(item.accepted_total, item.scale)) &&
+                    <p className="notice warning" role="status">Một số số liệu tiếp nhận chưa phù hợp với đơn vị vật phẩm. Các dòng này cần được kiểm tra trước khi xác định số lượng còn cần; vui lòng xác nhận với điểm tiếp nhận.</p>}
                   <p className="table-swipe-hint">Vuốt ngang bảng để xem đầy đủ các cột.</p>
                   <div className="stock-table-scroll">
                     <table className="stock-table donation-item-table">
                       <thead><tr><th scope="col">Vật phẩm</th><th scope="col" className="numeric">Mục tiêu</th><th scope="col" className="numeric">Đã tiếp nhận</th><th scope="col" className="numeric">Còn cần</th></tr></thead>
                       <tbody>
                         {selected.items.map((item) => {
-                          const remaining = Math.max(0, Number(item.target_quantity) - Number(item.accepted_total));
+                          const compatible = quantityFitsScale(item.target_quantity, item.scale) && quantityFitsScale(item.accepted_total, item.scale);
+                          const remaining = compatible ? remainingQuantity(item.target_quantity, item.accepted_total) : null;
                           return <tr key={item.item_id}>
                             <th scope="row"><strong>{item.item_name}</strong>{item.acceptance_note && <small>{item.acceptance_note}</small>}</th>
                             <td className="numeric" data-label="Mục tiêu">{formatQuantity(item.target_quantity)} {item.unit_name}</td>
-                            <td className="numeric" data-label="Đã tiếp nhận"><span className="available-value">{formatQuantity(item.accepted_total)} {item.unit_name}</span></td>
-                            <td className="numeric" data-label="Còn cần">{formatQuantity(remaining.toFixed(item.scale))} {item.unit_name}</td>
+                            <td className="numeric" data-label="Đã tiếp nhận"><span className="available-value">{formatQuantity(item.accepted_total)} {item.unit_name}</span>{!compatible && <small>Cần kiểm tra số liệu</small>}</td>
+                            <td className="numeric" data-label="Còn cần">{remaining === null ? 'Chưa xác định' : `${formatQuantity(remaining)} ${item.unit_name}`}</td>
                           </tr>;
                         })}
                       </tbody>
