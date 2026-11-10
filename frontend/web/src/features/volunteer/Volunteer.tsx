@@ -10,7 +10,7 @@ import { LocationPicker, type Point } from '../../maps/LocationPicker';
 import { confirmAction } from '../../components/confirmAction';
 import { DetailSurface } from '../../components/DetailSurface';
 import { useUrlView } from '../../app/useUrlView';
-import { noticeViews } from '../../app/routeViews';
+import { missionViews, noticeViews } from '../../app/routeViews';
 import { TeamMembers } from './TeamMembers';
 import { TeamReadinessForm } from './TeamReadinessForm';
 
@@ -225,7 +225,9 @@ export function Notices({ onOpenMission, onOpenRequest }: {
           <p>{selectedNotice.notice_type.startsWith('MISSION')
             ? 'Nhiệm vụ của đội có cập nhật. Mở nhiệm vụ để xem tình huống và tiến độ mới nhất.'
             : selectedNotice.notice_type.startsWith('REQUEST')
-              ? 'Yêu cầu SOS có cập nhật. Hãy kiểm tra hồ sơ và trạng thái mới nhất trong mục Xử lý SOS.'
+              ? onOpenRequest
+                ? 'Yêu cầu SOS có cập nhật. Mở hồ sơ SOS để xem trạng thái mới nhất.'
+                : 'Yêu cầu SOS có cập nhật. Nếu đây là yêu cầu bạn đã gửi, chọn vai trò Người dân rồi mở Theo dõi SOS để xem tiến độ.'
               : 'Có cập nhật về hoạt động cứu trợ của bạn.'}</p>
           {typeof selectedNotice.payload.request_id === 'string' &&
             <p className="notice-reference">Mã hồ sơ SOS: <code>{selectedNotice.payload.request_id}</code></p>}
@@ -251,8 +253,8 @@ export function Notices({ onOpenMission, onOpenRequest }: {
   );
 }
 
-export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingMessage = '', onToggleSharing }: {
-  page: string; initialMissionId?: string; sharingTeamId?: string; sharingMessage?: string;
+export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId = '', sharingMessage = '', onToggleSharing }: {
+  page: string; currentUserId: string; initialMissionId?: string; sharingTeamId?: string; sharingMessage?: string;
   onToggleSharing?: (teamId: string) => void;
 }) {
   const isTeam = page === 'team';
@@ -265,6 +267,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
 
   // Selected mission and detailed state
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
+  const selectionKey = `reliva:mission-selection:${currentUserId}`;
   const [missionSelectionRevision, setMissionSelectionRevision] = useState(0);
   const [missionDetail, setMissionDetail] = useState<MissionDetail | null>(null);
   const missionCardRef = useRef<HTMLElement | null>(null);
@@ -347,15 +350,26 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
   const completionFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (!initialMissionId || isTeam) return;
+    if (isTeam) return;
+    let missionId = initialMissionId;
+    try { missionId ||= window.sessionStorage.getItem(selectionKey) || undefined; } catch { /* Storage may be unavailable. */ }
+    if (!missionId) return;
     let live = true;
-    api<MissionDetail>('response', `/missions/${encodeURIComponent(initialMissionId)}`)
+    api<MissionDetail>('response', `/missions/${encodeURIComponent(missionId)}`)
       .then((mission) => { if (live) setSelectedMission(mission); })
       .catch((cause) => {
-        if (live) setError(cause instanceof Error ? cause.message : 'Không thể mở nhiệm vụ từ thông báo.');
+        if (live) {
+          try { window.sessionStorage.removeItem(selectionKey); } catch { /* Storage may be unavailable. */ }
+          setError(cause instanceof Error ? cause.message : 'Không thể mở nhiệm vụ đã chọn.');
+        }
       });
     return () => { live = false; };
-  }, [initialMissionId, isTeam]);
+  }, [initialMissionId, isTeam, selectionKey]);
+
+  useEffect(() => {
+    if (!selectedMission) return;
+    try { window.sessionStorage.setItem(selectionKey, selectedMission.id); } catch { /* Selection still works without storage. */ }
+  }, [selectedMission?.id, selectionKey]);
 
   useEffect(() => {
     if (!completionFile || !completionFile.type.startsWith('image/')) return;
@@ -389,7 +403,12 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
         }
       })
       .catch((cause) => {
-        if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải dữ liệu.');
+        if (live) {
+          const message = cause instanceof Error ? cause.message : 'Không thể tải dữ liệu.';
+          setError(!isTeam && cause instanceof ApiError && cause.code === 'FORBIDDEN'
+            ? `${message} Để xem nhiệm vụ, tài khoản cần được thêm vào đội cứu hộ. Nếu bạn vừa được cấp vai trò Tình nguyện viên, hãy nhờ người quản lý đội kiểm tra tư cách thành viên, sau đó bấm Cập nhật.`
+            : message);
+        }
       })
       .finally(() => {
         if (live) setLoading(false);
@@ -691,22 +710,28 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
     }
   }
 
-  const [missionFilter, setMissionFilter] = useState('all');
+  const [missionFilter, setMissionFilter] = useUrlView('view', missionViews, 'all');
   const matchesMissionFilter = (mission: Pick<Mission, 'status'>, filter: string) => filter === 'all' || (filter === 'new'
     ? mission.status === 'OFFERED' : filter === 'active'
       ? ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(mission.status)
       : ['COMPLETED', 'FAILED', 'DECLINED', 'CANCELLED'].includes(mission.status));
   const visibleMissions = (items as Mission[]).filter(mission => matchesMissionFilter(mission, missionFilter));
-  function changeMissionFilter(value: string) {
-    setMissionFilter(value);
+  const previousMissionFilter = useRef(missionFilter);
+  useEffect(() => {
+    if (previousMissionFilter.current === missionFilter) return;
+    previousMissionFilter.current = missionFilter;
     const current = missionDetail || selectedMission;
-    if (current && !matchesMissionFilter(current, value)) {
+    if (current && !matchesMissionFilter(current, missionFilter)) {
+      try { window.sessionStorage.removeItem(selectionKey); } catch { /* Storage may be unavailable. */ }
       setSelectedMission(null);
       setMissionDetail(null);
       setActionMessage('');
       setCompletionFile(null);
       setEvidenceFile(null);
     }
+  }, [missionFilter, missionDetail, selectedMission]);
+  function changeMissionFilter(value: typeof missionViews[number]) {
+    setMissionFilter(value);
   }
   const activeMission = missionDetail || selectedMission;
   const canManageMission = activeMission?.can_manage_mission === true;
@@ -717,7 +742,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
       {/* Cột trái: Danh sách Nhiệm vụ hoặc Đội */}
       <section className={`card ${isTeam ? '' : 'mission-list-panel'}`} ref={missionListRef}>
         <div className="section-header"><h2>{isTeam ? 'Đội của tôi' : 'Nhiệm vụ và tiến độ'}</h2><button type="button" className="button secondary" disabled={loading || busy} onClick={() => { setCursor(''); refreshAll(); }}>Cập nhật</button></div>
-        {!isTeam && <p className="mission-list-intro">Chọn nhiệm vụ để xem tình huống và cập nhật tiến độ.</p>}
+        {!isTeam && <p className="mission-list-intro">Chọn nhiệm vụ để xem tình huống và tiến độ xử lý.</p>}
         {error && (
           <p role="alert" className="notice error">
             {error}
@@ -729,7 +754,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
         )}
 
         {!isTeam && <div className="mission-filters" role="group" aria-label="Lọc nhiệm vụ">
-          {[['all', 'Tất cả'], ['new', 'Mới nhận'], ['active', 'Đang thực hiện'], ['history', 'Lịch sử']].map(([value, text]) =>
+          {([['all', 'Tất cả'], ['new', 'Mới nhận'], ['active', 'Đang thực hiện'], ['history', 'Lịch sử']] as const).map(([value, text]) =>
             <button type="button" className="button secondary" aria-pressed={missionFilter === value} disabled={busy} key={value} onClick={() => changeMissionFilter(value)}>{text}</button>)}
         </div>}
         {!isTeam && !loading && !error && items.length > 0 && !visibleMissions.length && <p>Chưa có nhiệm vụ trong nhóm này trên các trang đã tải. Hãy tải thêm nếu còn dữ liệu.</p>}
@@ -789,7 +814,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   onClick={() => selectMission(mission)}
                 >
                   <div className="mission-record-heading">
-                    <div><small className="mission-record-reference">Mã nhiệm vụ · {mission.id.slice(0, 8)}</small><strong>{label(mission.category)}</strong></div>
+                    <div><small className="mission-record-reference" title={mission.id}>Mã nhiệm vụ · …{mission.id.slice(-12)}</small><strong>{label(mission.category)}</strong></div>
                     <span className={`chip mission-status mission-status-${mission.status.toLowerCase()}`}>{label(mission.status)}</span>
                   </div>
                   <p className="mission-record-team">{mission.team.name}</p>
@@ -839,7 +864,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     </span>
                   </p>
                   <p>
-                    <strong>Trạng thái khai báo</strong>
+                    <strong>Khả năng nhận nhiệm vụ</strong>
                     <span className="detail-value">
                       {label(selectedTeam.availability)}
                     </span>
@@ -858,7 +883,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   <p>
                     <strong>Trạng thái</strong>
                     <span className="detail-value">
-                      {label(selectedTeam.status)}
+                      {selectedTeam.status === 'ACTIVE' ? 'Hồ sơ đang được sử dụng' : label(selectedTeam.status)}
                     </span>
                   </p>
                   <p>
@@ -1063,13 +1088,17 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   </div>
                 ) : (
                   <p className="notice">
-                    Nhiệm vụ này chưa có tọa độ được cấp quyền để mở chỉ đường.
+                    Chưa nhận được tọa độ hiện trường từ hệ thống. Hãy bấm Cập nhật để thử lại; nếu vẫn thiếu, báo điều phối viên bổ sung vị trí trước khi di chuyển.
                   </p>
                 )}
 
                 <hr />
-                <h3>{canManageMission ? 'Thao tác điều hành nhiệm vụ' : 'Theo dõi nhiệm vụ'}</h3>
-                {!canManageMission && (
+                {['OFFERED', 'ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) ? (
+                  <h3>{canManageMission ? 'Thao tác điều hành nhiệm vụ' : 'Theo dõi nhiệm vụ'}</h3>
+                ) : (
+                  <p className="notice">Nhiệm vụ đã kết thúc. Bạn có thể xem lại kết quả và lịch sử bên dưới.</p>
+                )}
+                {!canManageMission && ['OFFERED', 'ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) && (
                   <p className="notice">
                     Bạn có thể xem nhiệm vụ và minh chứng. Đội trưởng phụ trách tiếp nhận, cập nhật tiến độ và báo cáo kết quả.
                   </p>

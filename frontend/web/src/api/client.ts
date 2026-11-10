@@ -83,6 +83,10 @@ function serverError(
 }
 
 const messages: Record<string, string> = {
+  GOOGLE_ACCOUNT_LINK_REQUIRED: 'Email này đã có tài khoản Reliva. Đăng nhập bằng tên đăng nhập và mật khẩu Reliva hiện có, rồi mở trình đơn tài khoản → Xem hồ sơ → Bảo mật và liên kết Google.',
+  SESSION_REAUTH_REQUIRED: 'Để liên kết Google, hãy đăng xuất rồi đăng nhập lại tài khoản Reliva hiện có. Sau đó mở Xem hồ sơ → Bảo mật và liên kết Google trong vòng 15 phút.',
+  GOOGLE_IDENTITY_IN_USE: 'Google vừa chọn đã liên kết với một tài khoản Reliva khác. Hãy chọn đúng Google của bạn hoặc đăng nhập bằng Google đó để sử dụng tài khoản đã liên kết.',
+  GOOGLE_ALREADY_LINKED: 'Tài khoản Reliva này đã liên kết với một Google khác. Không thể thay thế liên kết bằng thao tác này.',
   UNAUTHENTICATED: 'Bạn cần đăng nhập để tiếp tục.',
   SESSION_EXPIRED: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
   REFRESH_REUSED: 'Phiên đăng nhập không còn an toàn. Vui lòng đăng nhập lại.',
@@ -98,12 +102,13 @@ const messages: Record<string, string> = {
   SELF_APPROVAL_FORBIDDEN: 'Bạn không thể tự duyệt bản ghi do mình lập hoặc kiểm đếm.',
   APPROVAL_STALE: 'Bản kiểm đếm đã thay đổi. Vui lòng tải lại trước khi duyệt.',
   STATE_TRANSITION_INVALID: 'Trạng thái hiện tại không cho phép thao tác này.',
+  CYCLE_SEALED: 'Đợt xử lý SOS này đã kết thúc nên không thể thay đổi nhu cầu hoặc cam kết vật tư. Nếu phát sinh nhu cầu mới, cần điều phối viên mở lại hồ sơ SOS và ghi nhận nhu cầu cho đợt xử lý mới.',
   RESOLUTION_BLOCKED: 'Chưa thể kết thúc SOS. Hãy kiểm tra nhiệm vụ đang giao, kết quả cứu hộ và việc bàn giao vật tư trong hồ sơ.',
   RESOLUTION_BASIS_INVALID: 'Căn cứ kết thúc chưa phù hợp với kết quả nhiệm vụ hoặc vật tư hiện tại.',
   IDENTITY_UNAVAILABLE: 'Dịch vụ tài khoản tạm thời không khả dụng. Vui lòng thử lại.',
   PASSWORD_WEAK:
     'Mật khẩu chưa đủ mạnh. Mật khẩu phải từ 10 ký tự, khác tên tài khoản và không dùng mật khẩu phổ biến (như password123, 1234567890...).',
-  INVALID_CREDENTIALS: 'Tên đăng nhập hoặc mật khẩu không đúng. Vui lòng kiểm tra lại.',
+  INVALID_CREDENTIALS: 'Không thể xác thực tài khoản. Vui lòng kiểm tra thông tin đăng nhập; nếu thông tin đã đúng, hãy nhờ quản trị viên kiểm tra trạng thái tài khoản.',
 };
 let csrfToken: string | null = null;
 let refreshPromise: Promise<void> | null = null;
@@ -174,6 +179,7 @@ export interface RequestOptions {
   headers?: Record<string, string>;
   idempotencyKey?: string;
   retryAuth?: boolean;
+  retryCsrf?: boolean;
   credentials?: RequestCredentials;
 }
 export async function api<T>(
@@ -221,6 +227,10 @@ export async function api<T>(
   }
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as ErrorEnvelope;
+    if (payload.code === 'CSRF_INVALID' && method !== 'GET' && credentials !== 'omit' && options.retryCsrf !== false) {
+      await csrf();
+      return api<T>(service, path, { ...options, retryCsrf: false });
+    }
     const error = serverError(
       service,
       response.status,
@@ -244,7 +254,8 @@ export async function upload<T>(
     idempotencyKey: string;
     credentials?: RequestCredentials;
   },
-  retryAuth = true
+  retryAuth = true,
+  retryCsrf = true
 ): Promise<T> {
   const credentials = options.credentials || 'include';
   if (credentials !== 'omit' && !csrfToken) await csrf();
@@ -273,7 +284,7 @@ export async function upload<T>(
   if (response.status === 401 && retryAuth && credentials !== 'omit') {
     try {
       await refresh();
-      return upload<T>(service, path, file, options, false);
+      return upload<T>(service, path, file, options, false, retryCsrf);
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === 'REFRESH_RACE') throw cause;
       if (cause instanceof ApiError) notifyExpiredSession(cause);
@@ -281,6 +292,10 @@ export async function upload<T>(
   }
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as ErrorEnvelope;
+    if (payload.code === 'CSRF_INVALID' && credentials !== 'omit' && retryCsrf) {
+      await csrf();
+      return upload<T>(service, path, file, options, retryAuth, false);
+    }
     const error = serverError(
       service,
       response.status,

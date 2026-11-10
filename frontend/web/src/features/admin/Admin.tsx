@@ -5,6 +5,8 @@ import { fetchAll } from '../../api/fetchAll';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { DetailSurface } from '../../components/DetailSurface';
 import { label, timeLabel } from '../../i18n/labels';
+import { useUrlView } from '../../app/useUrlView';
+import { auditTypes } from '../../app/routeViews';
 
 type Row = Record<string, unknown> & {
   id?: string;
@@ -56,7 +58,8 @@ export function Admin({ page }: { page: string }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [auditType, setAuditType] = useState('app_user');
+  const [auditType, setAuditType] = useUrlView('audit_type', auditTypes, 'app_user');
+  useEffect(() => { setCursor(''); }, [auditType]);
   const [query, setQuery] = useState('');
   const searchTerm = query.trim();
   const queryError = page === 'users' && searchTerm.length > 64 ? 'Từ khóa tìm kiếm không được vượt quá 64 ký tự.' : '';
@@ -138,7 +141,6 @@ export function Admin({ page }: { page: string }) {
     };
   }, [selected, revision, page, items]);
   function success() {
-    setSelected(null);
     setShowCreate(false);
     setDetail(null);
     setRevision((value) => value + 1);
@@ -213,7 +215,7 @@ export function Admin({ page }: { page: string }) {
             <select
               value={auditType}
               onChange={(event) => {
-                setAuditType(event.target.value);
+                setAuditType(event.target.value as typeof auditTypes[number]);
                 setCursor('');
               }}
             >
@@ -442,7 +444,14 @@ export function Admin({ page }: { page: string }) {
                     title: 'Cấp quyền',
                     service: 'identity',
                     path: `/users/${detail.id}/grants`,
-                    warning: `Cấp quyền cho ${detail.username}? Phiên hiện tại của người này sẽ bị thu hồi.`,
+                    warningFor: (values) => {
+                      const scopeDetails = [
+                        values.organization_id && (organizationOptions.find(option => option.value === values.organization_id)?.label || values.organization_id),
+                        values.region_code && (regionOptions.find(option => option.value === values.region_code)?.label || values.region_code),
+                        values.campaign_id && `Chiến dịch ${values.campaign_id}`,
+                      ].filter(Boolean).join(' · ');
+                      return `Cấp quyền ${label(values.role_code)} · ${label(values.scope_type)}${scopeDetails ? ` · ${scopeDetails}` : ''} cho ${detail.username}? Phiên hiện tại của người này sẽ bị thu hồi.`;
+                    },
                     fields: [
                       {
                         name: 'role_code',

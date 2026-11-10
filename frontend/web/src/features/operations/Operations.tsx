@@ -91,6 +91,17 @@ function distributionItems(item: Row, itemUnits: ReferenceOptions[string] = []):
 const fields = (entries: [string, string, boolean?][]) =>
   entries.map(([name, title, required]) => ({ name, label: title, required }));
 
+function readReportFilters(userId: string): { warehouse?: string; region?: string; pageSize?: number } {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(`operations-filters:${userId}`) || '{}');
+    return {
+      warehouse: typeof saved?.warehouse === 'string' ? saved.warehouse : '',
+      region: typeof saved?.region === 'string' ? saved.region : '',
+      pageSize: [10, 25, 50].includes(saved?.pageSize) ? saved.pageSize : 50,
+    };
+  } catch { return {}; }
+}
+
 export function Operations({ page, user }: { page: string; user: Me }) {
   const rights = roles(user);
   const [compact, setCompact] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
@@ -105,12 +116,16 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const [asset, setAsset] = useUrlView('view', assetViews, 'relief-points');
   const [reviewTab, setReviewTab] = useUrlView('view', reviewViews, 'receipts');
   const [report, setReport] = useUrlView('view', reportViews, 'stock-summary');
-  const [warehouse, setWarehouse] = useState('');
-  const [region, setRegion] = useState('');
+  const [warehouse, setWarehouse] = useState(() => readReportFilters(user.id).warehouse || '');
+  const [region, setRegion] = useState(() => readReportFilters(user.id).region || '');
   const initialReportFilters = useRef({ warehouse: false, region: false });
   const [items, setItems] = useState<Row[]>([]);
   const [cursor, setCursor] = useState('');
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(() => readReportFilters(user.id).pageSize || 50);
+  useEffect(() => {
+    try { sessionStorage.setItem(`operations-filters:${user.id}`, JSON.stringify({ warehouse, region, pageSize })); }
+    catch { /* Filtering remains available when browser storage is disabled. */ }
+  }, [user.id, warehouse, region, pageSize]);
   const [next, setNext] = useState<string | null>(null);
   const [generatedAt, setGeneratedAt] = useState('');
   const [selected, setSelected] = useState<Row | null>(null);
@@ -153,6 +168,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       results.forEach((result, index) => {
         if (result.status !== 'fulfilled') return;
         const key = sources[index][0];
+        if (key === 'campaigns') options.campaignNames = result.value.filter(item => item.id)
+          .map(item => ({ value: item.id!, label: string(item.name) || string(item.title) || `Chiến dịch mã …${item.id!.slice(-8)}` }));
+        if (key === 'campaigns') options.campaignStatuses = result.value.filter(item => item.id && item.status)
+          .map(item => ({ value: item.id!, label: string(item.status) }));
         if (key === 'items') options.itemScales = result.value.filter(item => item.id && Number.isInteger(Number((item.unit as Row | undefined)?.scale)))
           .map(item => ({ value: item.id!, label: String((item.unit as Row).scale) }));
         if (key === 'items') options.itemUnits = result.value.filter(item => item.id && string((item.unit as Row | undefined)?.display_name))
@@ -228,11 +247,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   useEffect(() => {
     if (!initialReportFilters.current.warehouse && warehouseOptions.length) {
       initialReportFilters.current.warehouse = true;
-      setWarehouse(warehouseOptions[0].value);
+      if (!warehouseOptions.some(option => option.value === warehouse)) setWarehouse(warehouseOptions[0].value);
     }
     if (!initialReportFilters.current.region && regionOptions.length) {
       initialReportFilters.current.region = true;
-      setRegion(regionOptions[0].value);
+      if (!regionOptions.some(option => option.value === region)) setRegion(regionOptions[0].value);
     }
   }, [references]);
   for (const item of items) {
@@ -352,7 +371,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     };
   }, [selected, revision, page, reviewTab, asset]);
   function done() {
-    setSelected(null);
+    // Keep workflow records open so staff can follow the next processing step.
+    const keepDetail = ((page === 'intake' || page === 'review') && selected?.receipt_id)
+      || ((distributionPages.has(page) || page === 'assets' || page === 'drives' || page === 'needs' || (page === 'review' && reviewTab === 'disputes')) && selected?.id);
+    if (!keepDetail) setSelected(null);
     setDetail(null);
     setShowCreate(false);
     setRevision((value) => value + 1);
@@ -440,7 +462,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     >
       <section className="card">
         <div className="section-header list-action-header">
-          <h2>{headings[page]}</h2>
+          <h2>{page === 'review' && reviewTab === 'disputes' ? 'Xử lý khiếu nại' : headings[page]}</h2>
           <button type="button" className="button secondary" disabled={loading} onClick={() => { setCursor(''); setRevision((value) => value + 1); }}>Cập nhật</button>
           {canCreatePage && <button type="button" className="button primary list-create-button" onClick={() => { setSelected(null); setDetail(null); setShowCreate(true); }}>{createTitle}</button>}
         </div>
@@ -671,14 +693,14 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   )}
                   {item.active_requested != null && (
                     <small>
-                      Nhu cầu hiện hành: {quantity(item.active_requested)} · Đã giao:{' '}
-                      {quantity(item.delivered)} · Còn thiếu: {quantity(item.active_outstanding)}
+                      Nhu cầu hiện hành: {quantityWithUnit(item, item.active_requested)} · Đã giao:{' '}
+                      {quantityWithUnit(item, item.delivered)} · Còn thiếu: {quantityWithUnit(item, item.active_outstanding)}
                     </small>
                   )}
                   {item.posted_movements != null && (
                     <small>
-                      Nhập đã ghi sổ: {quantity(item.intake_accepted)} · Đang vận chuyển:{' '}
-                      {quantity(item.issued_in_transit)} · Tại điểm: {quantity(item.at_point)}
+                      Nhập đã ghi sổ: {quantityWithUnit(item, item.intake_accepted)} · Đang vận chuyển:{' '}
+                      {quantityWithUnit(item, item.issued_in_transit)} · Tại điểm: {quantityWithUnit(item, item.at_point)}
                     </small>
                   )}
                   {item.receipt_id && <small>Đã lập biên nhận</small>}
@@ -713,7 +735,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               {page === 'drives' && <>
                 <p><strong>Tên đợt quyên góp</strong><span className="detail-value">{string(detail.title) || 'Chưa có tên'}</span></p>
                 <p><strong>Mô tả</strong><span className="detail-value">{string(detail.description) || 'Chưa có mô tả'}</span></p>
-                <p><strong>Chiến dịch liên kết</strong><span className="detail-value">{detail.campaign_id ? references.campaigns?.find(item => item.value === detail.campaign_id)?.label || `Chiến dịch mã …${string(detail.campaign_id).slice(-8)}` : 'Không liên kết chiến dịch'}{detail.campaign_id && detail.campaign_status ? ` · ${label(detail.campaign_status)}` : ''}</span></p>
+                <p><strong>Chiến dịch liên kết</strong><span className="detail-value">{detail.campaign_id ? references.campaignNames?.find(item => item.value === detail.campaign_id)?.label || `Chiến dịch mã …${string(detail.campaign_id).slice(-8)}` : 'Không liên kết chiến dịch'}{detail.campaign_id ? (() => {
+                  const currentStatus = references.campaignStatuses?.find(item => item.value === detail.campaign_id)?.label;
+                  return currentStatus ? ` · ${label(currentStatus)}` : detail.campaign_status ? ` · Trạng thái được ghi nhận gần nhất: ${label(detail.campaign_status)}` : '';
+                })() : ''}</span></p>
                 <p><strong>Thời gian dự kiến</strong><span className="detail-value">Mở: {detail.opens_at ? timeLabel(detail.opens_at) : 'Chưa đặt'} · Đóng: {detail.closes_at ? timeLabel(detail.closes_at) : 'Chưa đặt'}</span></p>
               </>}
               {page === 'assets' && <>
@@ -765,6 +790,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   </p>
                 </>
               )}
+              {page === 'reports' && report === 'fulfillment' && <>
+                <p><strong>Nhu cầu hiện hành</strong><span className="detail-value">{quantityWithUnit(detail, detail.active_requested)}</span></p>
+                <p><strong>Còn thiếu hiện hành</strong><span className="detail-value">{quantityWithUnit(detail, detail.active_outstanding)}</span></p>
+                {detail.status === 'CANCELLED' && <p className="notice">Nhu cầu đã hủy không còn được tính vào lượng cần đáp ứng hiện hành. Số đã giao vẫn được giữ lại để đối chiếu lịch sử.</p>}
+              </>}
               {page === 'assets' && asset === 'vehicles' && Boolean(detail.identifier) && (
                 <p>
                   <strong>Biển số hoặc mã xe</strong>
@@ -826,7 +856,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 <p>
                   <strong>Kho</strong>
                   <span className="detail-value">
-                    {warehouseName(detail.warehouse_id)}
+                    {string(detail.warehouse_name) || warehouseName(detail.warehouse_id)}
                   </span>
                 </p>
               )}
@@ -941,17 +971,38 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 {status === 'POSTED' && !detail.review && <p className="notice warning" role="status">Phiếu đã ghi sổ trước đó. Lần kiểm đếm bổ sung này đang chờ duyệt độc lập; số tiếp nhận mới chưa được cộng vào tồn kho.</p>}
                 <h3>Kết quả kiểm đếm lần {quantity(count.revision)}</h3>
                 {Boolean(count.note) && <p><strong>Ghi chú kiểm đếm:</strong> {string(count.note)}</p>}
-                {Array.isArray(count.lines) &&
-                  (count.lines as Row[]).map((line, index) => (
-                    <p key={index}>
-                      {string(line.item_name) || string(line.item_id)}: khai báo{' '}
-                      {lineQuantity(line, line.declared_quantity)}, kiểm đếm {lineQuantity(line, line.counted_quantity)},
-                      tiếp nhận {lineQuantity(line, line.accepted_quantity)}, tạm giữ {lineQuantity(line, line.held_quantity)},
-                      từ chối {lineQuantity(line, line.rejected_quantity)}
-                      {Boolean(line.condition_note) && <> · Tình trạng: {string(line.condition_note)}</>}
-                      {Boolean(line.expiry_date) && <> · Hạn sử dụng: {dateLabel(line.expiry_date)}</>}
-                    </p>
-                  ))}
+                {Array.isArray(count.lines) && count.lines.length > 0 ? (
+                  <>
+                    <p className="receipt-count-scroll-hint">Cuộn ngang bảng để xem đủ các cột số lượng.</p>
+                    <div className="stock-table-scroll receipt-count-scroll" role="region" aria-label="Bảng kết quả kiểm đếm vật phẩm" tabIndex={0}>
+                      <table className="stock-table receipt-count-table">
+                        <caption>Số lượng từng vật phẩm trong lần kiểm đếm {quantity(count.revision)}</caption>
+                        <thead><tr>
+                          <th scope="col">Vật phẩm</th>
+                          <th scope="col" className="numeric">Khai báo</th>
+                          <th scope="col" className="numeric">Kiểm đếm</th>
+                          <th scope="col" className="numeric">Tiếp nhận</th>
+                          <th scope="col" className="numeric">Tạm giữ</th>
+                          <th scope="col" className="numeric">Từ chối</th>
+                        </tr></thead>
+                        <tbody>{(count.lines as Row[]).map((line, index) => (
+                          <tr key={string(line.item_id) || index}>
+                            <th scope="row">
+                              {string(line.item_name) || string(line.item_id)}
+                              {Boolean(line.condition_note) && <small>Tình trạng: {string(line.condition_note)}</small>}
+                              {Boolean(line.expiry_date) && <small>Hạn sử dụng: {dateLabel(line.expiry_date)}</small>}
+                            </th>
+                            <td className="numeric">{lineQuantity(line, line.declared_quantity)}</td>
+                            <td className="numeric">{lineQuantity(line, line.counted_quantity)}</td>
+                            <td className="numeric">{lineQuantity(line, line.accepted_quantity)}</td>
+                            <td className="numeric">{lineQuantity(line, line.held_quantity)}</td>
+                            <td className="numeric">{lineQuantity(line, line.rejected_quantity)}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                  </>
+                ) : <p>Chưa có dòng vật phẩm trong lần kiểm đếm này.</p>}
               </div>
             )}
             <div className="action-grid">
@@ -1220,6 +1271,12 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 )}
               {['distribution', 'handoff'].includes(page) && id && version != null && (
                 <>
+                  {status === 'DRAFT' && detail.preparer_user_id === user.id &&
+                    <p className="notice">Phiếu đang chờ người có quyền duyệt khác người lập phiếu kiểm tra và phê duyệt.</p>}
+                  {status === 'APPROVED' && detail.approver_user_id === user.id &&
+                    <p className="notice">Phiếu đã được duyệt. Nhân viên tiếp nhận hoặc phân phối khác người duyệt cần xác nhận xuất kho.</p>}
+                  {status === 'DISPATCHED' && detail.dispatch_actor_user_id === user.id &&
+                    <p className="notice">Bạn đã xác nhận xuất kho. Việc nhận hàng hoặc hoàn kho cần được một nhân viên khác ghi nhận để đối soát độc lập.</p>}
                   {status === 'DRAFT' &&
                     detail.preparer_user_id !== user.id &&
                     (rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER')) &&

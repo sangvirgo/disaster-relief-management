@@ -56,6 +56,11 @@ export async function logout(): Promise<void> {
     invalidateCsrf();
   }
 }
+export const linkGoogle = (id_token: string) =>
+  api<{ linked: true }>('identity', '/auth/google/link', {
+    method: 'POST',
+    body: { id_token },
+  });
 export async function changePassword(current_password: string, new_password: string): Promise<Me> {
   await api<void>('identity', '/auth/change-password', {
     method: 'POST',

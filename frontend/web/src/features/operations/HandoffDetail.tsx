@@ -62,11 +62,14 @@ export function HandoffDetail({ distributionId, initialId, canReview, userId, on
       {detail.receiver_label && <p>Người nhận: {detail.receiver_label}</p>}
       <p>Số lượng: {detail.lines.map((line) => formatQuantity(line.quantity) + ' ' + ({ CAI: 'cái', KG: 'kg', LIT: 'lít', THUNG: 'thùng', BO: 'bộ', GOI: 'gói' }[line.unit_code] || line.unit_code)).join('; ')}</p>
       {detail.review && <p>Lý do quyết định: {detail.review.reason}</p>}
+      {detail.status === 'REJECTED' && <p className="notice">Báo cáo này không được tính vào hao hụt. Đối chiếu số hàng đang vận chuyển và tại điểm trong phiếu để tiếp tục bàn giao hoặc hoàn kho nếu còn hàng.</p>}
       {detail.status === 'PENDING_LOSS' && <p className="notice">Thất thoát chưa làm giảm số hàng đang giữ cho đến khi được người khác duyệt.</p>}
       {detail.status === 'PENDING_LOSS' && canReview && detail.recorder_user_id !== userId && <CommandForm key={detail.id + revision} spec={{
         title: 'Duyệt báo cáo thất thoát', service: 'logistics', path: `/distributions/${distributionId}/handoffs/${detail.id}/review-loss`, version: 1,
         fields: [{ name: 'decision', label: 'Quyết định', type: 'select', required: true, options: [{value:'APPROVE', label:'Chấp nhận thất thoát'}, {value:'REJECT', label:'Từ chối báo cáo'}] }, {name:'reason', label:'Lý do quyết định', type:'textarea', required:true, maxLength:1000}],
-        warning: 'Xác nhận quyết định độc lập? Chấp nhận thất thoát sẽ cập nhật số lượng đối soát.',
+        warningFor: values => values.decision === 'REJECT'
+          ? 'Xác nhận từ chối báo cáo thất thoát? Số lượng trong báo cáo này sẽ không được tính vào hao hụt.'
+          : 'Xác nhận chấp nhận báo cáo thất thoát? Số hao hụt được duyệt sẽ trừ khỏi lượng hàng đang giữ và cập nhật đối soát.',
       }} onSuccess={() => { setRevision((value) => value + 1); onChanged(); }} onStale={() => { setRevision((value) => value + 1); onChanged(); }} />}
     </>}
   </section>;

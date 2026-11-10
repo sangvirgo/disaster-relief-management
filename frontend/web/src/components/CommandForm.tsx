@@ -35,6 +35,7 @@ export interface CommandSpec {
   fields?: Field[];
   version?: number;
   warning?: string;
+  warningFor?: (values: Record<string, string>) => string;
   build?: (values: Record<string, string>) => Record<string, unknown> | Promise<Record<string, unknown>>;
 }
 const sentenceLabel = (value: string) =>
@@ -151,7 +152,8 @@ export function CommandForm({
       setMessage('Hãy kiểm tra các trường được đánh dấu.');
       return;
     }
-    if (spec.warning && !(await confirmAction(spec.warning))) return;
+    const warning = spec.warningFor?.(values) ?? spec.warning;
+    if (warning && !(await confirmAction(warning))) return;
     setBusy(true);
     setMessage('');
     setFieldErrors({});

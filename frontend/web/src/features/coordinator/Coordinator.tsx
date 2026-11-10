@@ -74,7 +74,9 @@ function supplementValue(value: unknown): string {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : 'Xem chi tiết trong hồ sơ';
 }
 type Detail = QueueItem & {
+  canonical?: { id: string; tracking_code: string; status: string } | null;
   version: number;
+  work_cycle?: number;
   description?: string | null;
   report_mode: string;
   campaign_id?: string | null;
@@ -887,8 +889,25 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                     Đối chiếu vị trí, tình trạng và minh chứng nếu có. Ghi rõ điều đã kiểm tra trước khi xác nhận SOS.
                   </p>
                 )}
+                <a href="#request-actions">Đi đến thao tác xử lý ↓</a>
                 <a href="#request-full-detail">Xem toàn bộ hồ sơ và lịch sử ↓</a>
               </div>
+            )}
+            {!['SUBMITTED', 'VERIFYING'].includes(detail.status) && (
+              <section className="verification-summary">
+                <h3>{detail.tracking_code} · {requestStatusLabel(detail.status)}</h3>
+                {detail.status === 'DUPLICATE' && (detail.canonical ? (
+                  <>
+                    <p>Hồ sơ gốc: {detail.canonical.tracking_code} · {requestStatusLabel(detail.canonical.status)}. Theo dõi việc xử lý tại hồ sơ gốc.</p>
+                    <button type="button" className="button secondary" onClick={() => {
+                      setUpdateMessage('');
+                      setSelected(detail.canonical!.id);
+                    }}>Mở hồ sơ gốc {detail.canonical.tracking_code}</button>
+                  </>
+                ) : <p>Không có thông tin hồ sơ gốc trong phạm vi truy cập hiện tại.</p>)}
+                {!['DUPLICATE', 'REJECTED', 'CANCELLED'].includes(detail.status) && <a href="#request-actions">Đi đến thao tác xử lý ↓</a>}
+                <a href="#request-full-detail">Xem toàn bộ hồ sơ và lịch sử ↓</a>
+              </section>
             )}
             {pendingSupplements.map((event) => {
               const facts = event.payload?.reported_facts;
@@ -1070,6 +1089,10 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   </span>
                 </p>
               )}
+              {detail.work_cycle != null && <p>
+                <strong>Chu kỳ xử lý hiện tại</strong>
+                <span className="detail-value">{detail.work_cycle}</span>
+              </p>}
               <p>
                 <strong>Phiên bản</strong>
                 <span className="detail-value">
@@ -1439,7 +1462,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                 <button type="button" className="button secondary" onClick={refreshAfterConflict}>Tải lại hồ sơ</button>
               </section>
             ))}
-            <div className="action-grid">
+            <div className="action-grid" id="request-actions" tabIndex={-1}>
               {!['RESOLVING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
                 secondaryCommand({
                   title: 'Ghi nhận chuyển cơ quan chức năng',
@@ -1660,7 +1683,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                 <section>
                   <h3>Đội có thể giao nhiệm vụ</h3>
                   {detail.mission_history?.items.some((mission) => mission.status === 'COMPLETED') && (
-                    <p className="notice">Đã có nhiệm vụ hoàn thành. Chỉ giao thêm đội nếu yêu cầu còn việc cần xử lý; nếu đã hoàn tất, hãy kết thúc yêu cầu bên dưới.</p>
+                    <p className="notice">Lịch sử có nhiệm vụ đã hoàn thành. Nếu SOS được mở lại, kết quả từ chu kỳ cũ không thay thế kết quả của chu kỳ hiện tại. Hãy kiểm tra việc còn cần xử lý trước khi giao đội hoặc đề nghị kết thúc.</p>
                   )}
                   <p>Xem khoảng cách, vị trí cập nhật và số nhiệm vụ gần đây trước khi chọn đội.</p>
                   <p>
@@ -1673,11 +1696,18 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                     </p>
                   )}
                   {!candidates && !candidateError && <p role="status">Đang tải đội phù hợp…</p>}
-                  {candidates?.items.length === 0 && (
+                  {candidates?.items.length === 0 && !detail.region_code && (
+                    <p role="status" className="notice warning">
+                      SOS chưa được xác định khu vực phụ trách nên hệ thống chưa thể tìm đội phù hợp.
+                      Hãy kiểm tra vị trí SOS và nhờ quản trị viên kiểm tra phạm vi khu vực trên hệ thống.
+                      Chỉ cập nhật vị trí đội sẽ không giải quyết được trường hợp này.
+                    </p>
+                  )}
+                  {candidates?.items.length === 0 && detail.region_code && (
                     <p role="status" className="notice warning">
                       Chưa có đội đủ điều kiện. Vị trí đội phải được cập nhật trong 30 phút gần nhất.
                       Với đội do điều phối viên báo cáo, hãy cập nhật vị trí bên dưới; với đội dùng ứng dụng,
-                      nhờ đội trưởng cập nhật. Đội đang bận, sai khu vực hoặc thiếu kỹ năng cũng không xuất hiện.
+                      nhờ đội trưởng cập nhật. Đội đang bận, khác tổ chức phụ trách SOS, khác khu vực hoặc thiếu kỹ năng cũng không xuất hiện.
                     </p>
                   )}
                   {candidates?.items.map((candidate) => (

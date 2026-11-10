@@ -26,11 +26,20 @@ type Drive = {
   description?: string | null;
   status: string;
   campaign_status?: string | null;
+  opens_at?: string | null;
+  closes_at?: string | null;
   items: DriveItem[];
   intake_location?: { warehouse_name?: string; address_note?: string | null };
   generated_at?: string;
 };
 type Declaration = { id: string; public_code: string; status: string };
+function driveUnavailable(drive: Drive): string {
+  if (drive.status !== 'OPEN') return 'Đợt quyên góp hiện không nhận bản khai.';
+  if (drive.campaign_status && drive.campaign_status !== 'ACTIVE') return 'Chiến dịch hiện không tiếp nhận đóng góp.';
+  if (drive.opens_at && Date.parse(drive.opens_at) > Date.now()) return 'Chưa đến thời gian nhận vật phẩm.';
+  if (drive.closes_at && Date.parse(drive.closes_at) <= Date.now()) return 'Đã hết thời gian nhận vật phẩm.';
+  return '';
+}
 type OwnedDonation = { id: string; public_code: string; status: string; created_at: string; drive_title: string; has_count_result: boolean };
 type Tracking = {
   id: string;
@@ -114,6 +123,9 @@ export function Donations({ user }: { user: Me | null }) {
   const lookupVersion = useRef(0);
   const [disputeReason, setDisputeReason] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [uploadedEvidence, setUploadedEvidence] = useState<{ id: string; donationId: string; name: string; owner: string | null }[]>([]);
+  const [evidenceLink, setEvidenceLink] = useState<{ id: string; url: string } | null>(null);
+  useEffect(() => { setEvidenceLink(null); }, [tracking?.id, user?.id]);
   const [actionMessage, setActionMessage] = useState('');
   const disputeKey = useRef<string | null>(null);
   const uploadKey = useRef<string | null>(null);
@@ -313,6 +325,8 @@ export function Donations({ user }: { user: Me | null }) {
     if (!selected) return;
     setDeclarationAttempted(true);
     setError('');
+    const unavailable = driveUnavailable(selected);
+    if (unavailable) { setError(unavailable); return; }
     if (declarationInvalid) return;
     setLoading(true);
     try {
@@ -444,7 +458,7 @@ export function Donations({ user }: { user: Me | null }) {
     setActionMessage('');
     try {
       uploadKey.current ||= newCommandKey();
-      await upload(
+      const result = await upload<{ id: string; state: string }>(
         'logistics',
         `/public/donations/${encodeURIComponent(tracking.id)}/evidence`,
         file,
@@ -454,6 +468,10 @@ export function Donations({ user }: { user: Me | null }) {
           credentials: guestCredentials,
         }
       );
+      if (result.state === 'READY') {
+        setUploadedEvidence(current => [...current.filter(item => item.id !== result.id),
+          { id: result.id, donationId: tracking.id, name: file.name, owner: user?.id || null }]);
+      }
       uploadKey.current = null;
       setFile(null);
       setActionMessage('Máy chủ đã tiếp nhận tệp minh chứng.');
@@ -466,6 +484,19 @@ export function Donations({ user }: { user: Me | null }) {
     } finally {
       setLoading(false);
     }
+  }
+  async function prepareEvidenceDownload(id: string) {
+    setLoading(true);
+    setEvidenceLink(null);
+    setActionMessage('');
+    try {
+      const result = await api<{ url: string }>('logistics', `/evidence/${encodeURIComponent(id)}/download`, {
+        headers: verifiedSecret ? { 'X-Donation-Secret': verifiedSecret } : {}, credentials: guestCredentials,
+      });
+      setEvidenceLink({ id, url: result.url });
+    } catch (cause) {
+      setActionMessage(cause instanceof Error ? cause.message : 'Chưa mở được tệp minh chứng.');
+    } finally { setLoading(false); }
   }
   async function claim() {
     if (
@@ -677,19 +708,26 @@ export function Donations({ user }: { user: Me | null }) {
               <>
                 <h3>Phiếu tiếp nhận và kết quả kiểm đếm</h3>
                 <p>Mã phiếu: {tracking.public_code} · Lần kiểm đếm: {tracking.receipt.count_revision}</p>
-                {tracking.receipt.lines.map((line, i) => {
+                <p className="receipt-count-scroll-hint">Cuộn ngang bảng để xem đủ các cột số lượng.</p>
+                <div className="stock-table-scroll receipt-count-scroll" role="region" aria-label="Kết quả kiểm đếm đóng góp" tabIndex={0}>
+                <table className="stock-table receipt-count-table">
+                  <caption>Số lượng vật phẩm · lần kiểm đếm {tracking.receipt.count_revision}</caption>
+                  <thead><tr><th scope="col">Vật phẩm</th><th scope="col">Khai báo</th><th scope="col">Kiểm đếm</th><th scope="col">Tiếp nhận</th><th scope="col">Tạm giữ</th><th scope="col">Từ chối</th></tr></thead>
+                  <tbody>{tracking.receipt.lines.map((line, i) => {
                   const declared = tracking.declaration?.lines.find((item) => item.item_id === line.item_id);
                   const itemName = line.item_name || declared?.item_name || `Vật phẩm ${i + 1}`;
                   const unitName = line.unit_name || declared?.unit_name || '';
                   return (
-                    <p key={`${line.item_id}-${i}`}>
-                      {itemName}: đã đếm {formatQuantity(line.counted_quantity)} {unitName}, tiếp nhận{' '}
-                      {formatQuantity(line.accepted_quantity)} {unitName}, tạm giữ{' '}
-                      {formatQuantity(line.held_quantity)} {unitName}, từ chối{' '}
-                      {formatQuantity(line.rejected_quantity)} {unitName}
-                    </p>
+                    <tr key={`${line.item_id}-${i}`}>
+                      <th scope="row">{itemName}</th>
+                      <td className="numeric">{formatQuantity(line.declared_quantity)} {unitName}</td>
+                      <td className="numeric">{formatQuantity(line.counted_quantity)} {unitName}</td>
+                      <td className="numeric">{formatQuantity(line.accepted_quantity)} {unitName}</td>
+                      <td className="numeric">{formatQuantity(line.held_quantity)} {unitName}</td>
+                      <td className="numeric">{formatQuantity(line.rejected_quantity)} {unitName}</td>
+                    </tr>
                   );
-                })}
+                })}</tbody></table></div>
               </>
             ) : (
               <p>Chưa có biên nhận kiểm đếm. Bản khai chưa làm tăng tồn kho.</p>
@@ -748,6 +786,15 @@ export function Donations({ user }: { user: Me | null }) {
                 Tải minh chứng lên
               </button>
             </form>
+            {uploadedEvidence.some(item => item.donationId === tracking.id && item.owner === (user?.id || null)) && <section>
+              <h3>Tệp vừa tải trong phiên này</h3>
+              <p>Danh sách này không gồm tệp từ phiên trước và sẽ mất khi tải lại trang. Tệp đã được tiếp nhận vẫn lưu trên hệ thống.</p>
+              {uploadedEvidence.filter(item => item.donationId === tracking.id && item.owner === (user?.id || null)).map(item => <div key={item.id}>
+                <p style={{ overflowWrap: 'anywhere' }}>{item.name}</p>
+                <button type="button" className="button secondary" disabled={loading} onClick={() => void prepareEvidenceDownload(item.id)}>Lấy liên kết mở tệp {item.name}</button>
+                {evidenceLink?.id === item.id && <p><a href={evidenceLink.url} target="_blank" rel="noopener noreferrer">Mở tệp trong tab mới</a> · Liên kết có thời hạn; lấy lại liên kết nếu đã hết hạn.</p>}
+              </div>)}
+            </section>}
             {user && verifiedSecret && (
               <button className="button secondary" onClick={claim} disabled={loading}>
                 Gắn bản khai với tài khoản
@@ -839,7 +886,7 @@ export function Donations({ user }: { user: Me | null }) {
         onClick={() => selected?.id === drive.id ? setSelected(null) : choose(drive.id)}>
         {selected?.id === drive.id ? 'Ẩn vật phẩm' : 'Xem vật phẩm'}
       </button>
-      <button type="button" className="button" onClick={() => choose(drive.id, true)}>
+      <button type="button" className="button" disabled={Boolean(driveUnavailable(drive))} onClick={() => choose(drive.id, true)}>
         Khai báo vật phẩm
       </button>
     </div>
@@ -848,7 +895,7 @@ export function Donations({ user }: { user: Me | null }) {
     <>{nav}
     <div className="donation-layout">
       <section className="card">
-        <h2>Đợt quyên góp đang mở</h2>
+        <h2>Các đợt quyên góp</h2>
         {loading && <p role="status">Đang tải…</p>}
         {error && (
           <p className="notice error" role="alert">
@@ -866,6 +913,9 @@ export function Donations({ user }: { user: Me | null }) {
                   <strong>{drive.title}</strong>
                   <p>{drive.description}</p>
                   <small>Điểm tiếp nhận: {drive.intake_location?.warehouse_name}</small>
+                  {drive.opens_at && <p>Bắt đầu nhận: {new Date(drive.opens_at).toLocaleString('vi-VN')}</p>}
+                  {drive.closes_at && <p>Hạn nhận: {new Date(drive.closes_at).toLocaleString('vi-VN')}</p>}
+                  {driveUnavailable(drive) && <p className="notice warning">{driveUnavailable(drive)}</p>}
                 </div>
                 {selected?.id !== drive.id && driveActions(drive)}
               </div>
@@ -976,8 +1026,7 @@ export function Donations({ user }: { user: Me | null }) {
                 className="button"
                 disabled={
                   loading ||
-                  declarationInvalid ||
-                  (selected.campaign_status != null && selected.campaign_status !== 'ACTIVE')
+                  Boolean(driveUnavailable(selected))
                 }
               >
                 Gửi bản khai vật phẩm

@@ -8,8 +8,14 @@ type CampaignPage = {
   cursor?: string;
 };
 
-export function useAnalyticsRegion(enabled = true, includeRequestRegions = false, autoSelect = true) {
-  const [region, setRegion] = useState('');
+export function useAnalyticsRegion(enabled = true, includeRequestRegions = false, autoSelect = true, storageKey?: string) {
+  const [region, setRegion] = useState(() => {
+    try { return storageKey ? window.sessionStorage.getItem(storageKey) || '' : ''; } catch { return ''; }
+  });
+  useEffect(() => {
+    if (!storageKey) return;
+    try { window.sessionStorage.setItem(storageKey, region); } catch { /* Filtering still works without storage. */ }
+  }, [region, storageKey]);
   const [regions, setRegions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -118,13 +124,14 @@ export function AnalyticsRegionField({
         <select
           id={id}
           disabled={manual}
-          value={(listed || (allowAll && !region)) && !manual ? region : ''}
+          value={!manual ? region : ''}
           onChange={(event) => {
             setManual(false);
             onChange(event.target.value);
           }}
         >
           <option value="">{manual ? 'Đang nhập mã khu vực' : allowAll ? 'Toàn Việt Nam' : 'Chọn khu vực'}</option>
+          {region && !listed && <option value={region}>{regionName(region)} · mã đã nhập</option>}
           {regions.map((code) => (
             <option key={code} value={code}>
               {regionName(code)}
@@ -167,9 +174,9 @@ export function AnalyticsRegionField({
             <button type="submit" className="region-manual-button" disabled={!draft.trim() || Boolean(draftError) || draft.trim() === region}>Áp dụng</button>
           </div>
           {(draftTouched || draftAttempted) && draftError && <small className="field-error" role="alert">{draftError}</small>}
-          {region && !listed && <small>Khu vực này chưa có trong danh sách của tài khoản. Kết quả rỗng có thể do giới hạn quyền xem; hãy xác nhận phạm vi trước khi dùng số liệu.</small>}
         </form>
       )}
+      {region && !listed && <small>Khu vực này chưa có trong danh sách của tài khoản. Kết quả rỗng có thể do giới hạn quyền xem; hãy xác nhận phạm vi trước khi dùng số liệu.</small>}
       {regions.length > 0 && (
         <div className="region-shortcuts" role="group" aria-label="Khu vực thường dùng">
           {regions.slice(0, 4).map((code) => (

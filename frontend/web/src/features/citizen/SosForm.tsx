@@ -197,6 +197,10 @@ export function SosForm({
       if (!informationSource.trim()) errors.informationSource = 'Nguồn thông tin là bắt buộc.';
       else if (informationSource.length > 500) errors.informationSource = 'Nguồn thông tin không được vượt quá 500 ký tự.';
       if (!situationAt) errors.situationAt = 'Thời điểm biết tình hình là bắt buộc.';
+      else if (!Number.isFinite(new Date(situationAt).getTime()))
+        errors.situationAt = 'Thời điểm biết tình hình không hợp lệ.';
+      else if (new Date(situationAt).getTime() > Date.now())
+        errors.situationAt = 'Thời điểm biết tình hình không được ở trong tương lai.';
       if (alternateName.length > 200) errors.alternateName = 'Tên người liên hệ thay thế không được vượt quá 200 ký tự.';
       if (alternatePhone.trim() && !alternateName.trim()) errors.alternateName = 'Tên người liên hệ thay thế là bắt buộc.';
     }

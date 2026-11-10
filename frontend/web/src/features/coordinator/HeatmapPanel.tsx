@@ -7,7 +7,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { api } from '../../api/client';
 import type { components } from '../../api/generated/response';
-import { timeLabel } from '../../i18n/labels';
+import { requestStatusLabel, timeLabel } from '../../i18n/labels';
 
 setWorkerUrl(workerUrl);
 
@@ -450,9 +450,10 @@ export function HeatmapPanel({
       </div>}
       <div className="heatmap-context" role="status">
         <span className="heatmap-context-dot" aria-hidden="true" />
-        <strong>{layer === 'unverified' ? 'SOS chưa xác minh' : 'SOS đã xác minh'}</strong>
+        <strong>Lớp mật độ: {layer === 'unverified' ? 'SOS chưa xác minh' : 'SOS đã xác minh'}</strong>
         <span>trong 7 ngày gần đây</span>
       </div>
+      {selected?.status && <p className="muted">SOS đang chọn: {selected.trackingCode} · {requestStatusLabel(selected.status)}. Ghim vị trí được hiển thị riêng với lớp mật độ.</p>}
       {showMap && <button type="button" className="button secondary heatmap-refresh" disabled={loading}
         onClick={() => setRefresh((value) => value + 1)}>Cập nhật SOS trên bản đồ</button>}
       {!showMap && <p>Chọn khu vực để xem bản đồ nhiệt.</p>}

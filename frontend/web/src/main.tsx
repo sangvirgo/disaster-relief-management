@@ -23,7 +23,7 @@ import {
   type Workspace,
 } from './app/catalog';
 import { useUrlView } from './app/useUrlView';
-import { assetViews, donationViews, intakeSteps, noticeViews, reportViews, reviewViews } from './app/routeViews';
+import { assetViews, donationViews, intakeSteps, missionViews, noticeViews, reportViews, reviewViews } from './app/routeViews';
 import { label, requestStatusLabel, timeLabel } from './i18n/labels';
 import { AnalyticsRegionField, useAnalyticsRegion } from './components/AnalyticsRegion';
 import { CitizenAccount, CitizenRequests, requestStatusTone } from './features/citizen/CitizenAccount';
@@ -72,7 +72,7 @@ const OperationsDashboard = React.lazy(() => import('./features/operations/Dashb
 
 function IntakeReview({ user }: { user: Me }) {
   const canReview = roles(user).has('REVIEWER');
-  const [step, setStep] = useUrlView('step', intakeSteps, 'intake');
+  const [step, setStep] = useUrlView('step', intakeSteps, canReview && !roles(user).has('INTAKE_STAFF') ? 'review' : 'intake');
   function changeStep(next: 'intake' | 'review') {
     if (next === step) return;
     setStep(next);
@@ -150,6 +150,8 @@ function AuthModal({
   const authCallbacks = useRef({ onReady, onClose });
   authCallbacks.current = { onReady, onClose };
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const [googleReady, setGoogleReady] = useState(false);
+  const [googleLoadError, setGoogleLoadError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -248,12 +250,18 @@ function AuthModal({
   useEffect(() => {
     if (!isOpen || mode !== 'login' || !googleClientId || !googleButton.current) return;
     let cancelled = false;
+    setGoogleReady(false);
+    setGoogleLoadError('');
+    const loadFailed = () => {
+      if (!cancelled) setGoogleLoadError('Chưa tải được Google. Kiểm tra kết nối rồi tải lại trang, hoặc dùng tài khoản Reliva để đăng nhập.');
+    };
+    let script = document.querySelector<HTMLScriptElement>('script[data-c48-google="true"]');
     const renderButton = () => {
       if (cancelled || !window.google || !googleButton.current) return;
       window.google.accounts.id.initialize({
         client_id: googleClientId,
         callback: (credential) => {
-          if (!credential.credential) return;
+          if (cancelled || !credential.credential) return;
           setBusy(true);
           setMessage('');
           void googleLogin(credential.credential)
@@ -276,10 +284,11 @@ function AuthModal({
         locale: 'vi',
         width: Math.min(400, Math.floor(googleButton.current.getBoundingClientRect().width)),
       });
+      setGoogleReady(true);
+      setGoogleLoadError('');
     };
     if (window.google) renderButton();
     else {
-      let script = document.querySelector<HTMLScriptElement>('script[data-c48-google="true"]');
       if (!script) {
         script = document.createElement('script');
         script.src = 'https://accounts.google.com/gsi/client';
@@ -289,9 +298,14 @@ function AuthModal({
         document.head.appendChild(script);
       }
       script.addEventListener('load', renderButton, { once: true });
+      script.addEventListener('error', loadFailed, { once: true });
     }
+    const timeout = window.setTimeout(() => { if (!window.google) loadFailed(); }, 15000);
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
+      script?.removeEventListener('load', renderButton);
+      script?.removeEventListener('error', loadFailed);
     };
   }, [googleClientId, isOpen, mode]);
 
@@ -568,6 +582,8 @@ function AuthModal({
         {mode === 'login' && googleClientId && (
           <div className="google-auth-wrap">
             <span className="auth-divider">hoặc tiếp tục với</span>
+            {!googleReady && !googleLoadError && <p role="status">Đang tải nút đăng nhập Google…</p>}
+            {googleLoadError && <p className="notice warning" role="alert">{googleLoadError}</p>}
             <div
               className="google-auth-button"
               ref={googleButton}
@@ -656,6 +672,14 @@ function PasswordChange({
           : 'Nhập mật khẩu hiện tại và mật khẩu mới để bảo vệ tài khoản của bạn.'}
       </p>
 
+      {!forced && (
+        <p className="notice">
+          Biểu mẫu này chỉ đổi mật khẩu Reliva. Không nhập mật khẩu Google tại đây.
+          Nếu bạn chỉ đăng nhập bằng Google và chưa có mật khẩu Reliva, hãy tiếp tục dùng
+          nút Đăng nhập bằng Google; biểu mẫu này không tạo mật khẩu Reliva mới cho bạn.
+        </p>
+      )}
+
       <div className="notice" style={{ fontSize: 13, marginBottom: 14 }}>
         💡 <strong>Quy chuẩn mật khẩu mới:</strong> Tối thiểu 10 ký tự, khác tên đăng nhập và khác
         mật khẩu hiện tại (Ví dụ: <code>MatKhauRieng!2026</code>).
@@ -676,7 +700,7 @@ function PasswordChange({
             }}
             onBlur={() => setTouched((current) => ({ ...current, oldPassword: true }))}
             autoComplete="current-password"
-            placeholder="Nhập mật khẩu bạn vừa dùng để đăng nhập"
+            placeholder="Nhập mật khẩu Reliva hiện tại"
           />
           {touched.oldPassword && oldPasswordError && <small className="field-error" role="alert">{oldPasswordError}</small>}
         </label>
@@ -974,6 +998,12 @@ function Tracking({
             {requestStatusLabel(data.status)}
           </span>
           <p>Tiếp nhận lúc: {timeLabel(data.received_at)}</p>
+          {data.status === 'DUPLICATE' && data.duplicate_of_code && (
+            <p className="notice">Yêu cầu này trùng với hồ sơ {data.duplicate_of_code}. Nếu hồ sơ gốc thuộc tài khoản của bạn, hãy quay lại danh sách để xem tiến độ hồ sơ đó.</p>
+          )}
+          {data.status === 'REJECTED' && data.rejection_reason && (
+            <p className="notice">Lý do từ chối: {data.rejection_reason}</p>
+          )}
           <div className="timeline">
             {data.timeline.map((entry, index) => {
               return (
@@ -1236,7 +1266,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
     regions,
     loading: regionLoading,
     error: regionError,
-  } = useAnalyticsRegion(page.path === '/reports/summary', true, false);
+  } = useAnalyticsRegion(page.path === '/reports/summary', true, false, user ? `reliva:response-region:${user.id}` : undefined);
   const [data, setData] = useState<DataPage | null>(null);
   const [error, setError] = useState('');
   const [forbidden, setForbidden] = useState(false);
@@ -1511,10 +1541,11 @@ function permittedRoute(user: Me | null, requested: ReturnType<typeof routeFromU
 function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me | null) {
   const allowedViews: readonly string[] = workspace === 'citizen' && page === 'drives' ? donationViews
     : (workspace === 'volunteer' || workspace === 'coordinator') && page === 'notices' ? noticeViews
+    : workspace === 'volunteer' && page === 'missions' ? missionViews
     : workspace === 'operations' && page === 'assets' ? assetViews
     : workspace === 'operations' && page === 'reports' ? reportViews
     : workspace === 'operations' && page === 'intake' && roles(user).has('REVIEWER')
-      && url.searchParams.get('step') === 'review' ? reviewViews : [];
+      && (url.searchParams.get('step') === 'review' || (!url.searchParams.has('step') && !roles(user).has('INTAKE_STAFF'))) ? reviewViews : [];
   if (!allowedViews.includes(url.searchParams.get('view') || '')) url.searchParams.delete('view');
   if (!(workspace === 'operations' && page === 'intake' && roles(user).has('REVIEWER')
     && (intakeSteps as readonly string[]).includes(url.searchParams.get('step') || ''))) url.searchParams.delete('step');
@@ -1526,6 +1557,7 @@ function writeRoute(workspace: Workspace, page: string, user: Me | null, mode: '
   url.searchParams.set('workspace', workspace);
   url.searchParams.set('page', page);
   if (changed) {
+    url.hash = '';
     url.searchParams.delete('view');
     url.searchParams.delete('step');
   } else {
@@ -1990,7 +2022,7 @@ function App() {
                   selected.id === 'campaigns' ? (
                   <Campaigns key={workspace} />
                 ) : workspace === 'volunteer' ? (
-                  <Volunteer key={`${selected.id}:${selectedMissionId}`} page={selected.id} initialMissionId={selectedMissionId}
+                  <Volunteer key={`${selected.id}:${selectedMissionId}`} page={selected.id} currentUserId={user!.id} initialMissionId={selectedMissionId}
                     sharingTeamId={sharingTeamId} sharingMessage={sharingMessage}
                     onToggleSharing={(teamId) => { setSharingTeamId((current) => current === teamId ? '' : teamId); setSharingMessage(''); }} />
                 ) : workspace === 'operations' && selected.id === 'overview' ? (

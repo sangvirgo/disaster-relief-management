@@ -24,6 +24,7 @@ export function Campaigns() {
   const [next, setNext] = useState('');
   const [selected, setSelected] = useState<Campaign | null>(null);
   const [error, setError] = useState('');
+  const [conflictNotice, setConflictNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -76,7 +77,6 @@ export function Campaigns() {
     };
   }, [cursor, revision]);
   function done() {
-    setSelected(null);
     setCursor('');
     setRevision((value) => value + 1);
   }
@@ -129,7 +129,11 @@ export function Campaigns() {
             ? [{ name: 'reason', label: 'Lý do', type: 'textarea', required: true }]
             : [],
         }}
-        onSuccess={done}
+        onSuccess={() => { setConflictNotice(''); done(); }}
+        onStale={() => {
+          setConflictNotice('Dữ liệu đã thay đổi ở phiên làm việc khác. Hãy kiểm tra trạng thái mới trước khi thao tác tiếp.');
+          done();
+        }}
       />
     );
   return (
@@ -143,6 +147,8 @@ export function Campaigns() {
           <span className="chip">Đã tải {items.length} chiến dịch</span>
         </div>
         <p>Chọn chiến dịch để xem mục tiêu, thời gian và thao tác được cấp quyền.</p>
+        <button type="button" className="button secondary" disabled={loading} onClick={done}>Cập nhật</button>
+        {conflictNotice && <p className="notice warning" role="status">{conflictNotice}</p>}
         <div className="campaign-filters" role="group" aria-label="Lọc chiến dịch theo trạng thái">
           <button
             type="button"
@@ -177,7 +183,7 @@ export function Campaigns() {
           {visibleItems.map((item) => (
             <button
               className={`campaign-card ${selected?.id === item.id ? 'selected' : ''}`}
-              onClick={() => setSelected(item)}
+              onClick={() => { setConflictNotice(''); setSelected(item); }}
               key={item.id}
             >
               <span className="campaign-card-main">
