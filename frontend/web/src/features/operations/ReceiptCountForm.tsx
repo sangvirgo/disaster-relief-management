@@ -3,6 +3,7 @@ import { api, newCommandKey } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
 
 type Item = { id: string; name: string; unit: { display_name: string; scale: number } };
+type Drive = { items: { item_id: string; item_name: string; unit_name: string; scale: number }[] };
 type Line = {
   item_id: string;
   counted_quantity: string;
@@ -23,22 +24,30 @@ const empty = (): Line => ({
 });
 const normalizeQuantity = (value?: string) => value?.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
 
-type Existing = { lines?: Partial<Line>[] } | null;
+type Existing = { lines?: (Partial<Line> & { item_name?: string; unit_name?: string; unit_scale?: number | string })[] } | null;
 
 export function ReceiptCountForm({
   receiptId,
+  driveId,
+  driveTitle,
   version,
   existing,
   heldRelease = false,
   onSuccess,
 }: {
   receiptId: string;
+  driveId: string;
+  driveTitle: string;
   version: number;
   existing: Existing;
   heldRelease?: boolean;
   onSuccess: () => void;
 }) {
-  const [items, setItems] = useState<Item[]>([]);
+  const [driveItems, setDriveItems] = useState<Item[]>([]);
+  const [catalogItems, setCatalogItems] = useState<Item[]>([]);
+  const [allowUnexpected, setAllowUnexpected] = useState(false);
+  const [driveLoading, setDriveLoading] = useState(true);
+  const [driveRevision, setDriveRevision] = useState(0);
   const [lines, setLines] = useState<Line[]>(
     existing?.lines?.length
       ? existing.lines.map((line) => ({
@@ -59,6 +68,13 @@ export function ReceiptCountForm({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [attempted, setAttempted] = useState(false);
   const key = useRef<string | null>(null);
+  const existingItems: Item[] = (existing?.lines || []).filter(line => line.item_id).map(line => ({
+    id: line.item_id!, name: line.item_name || line.item_id!,
+    unit: { display_name: line.unit_name || '', scale: Number(line.unit_scale ?? 0) },
+  }));
+  const visibleCatalog = catalogItems.filter(item => allowUnexpected || lines.some(line => line.item_id === item.id));
+  const items = [...driveItems, ...existingItems.filter(item => !driveItems.some(driveItem => driveItem.id === item.id)),
+    ...visibleCatalog.filter(item => !driveItems.some(driveItem => driveItem.id === item.id) && !existingItems.some(existingItem => existingItem.id === item.id))];
   const fieldErrors: Record<string, string> = {};
   const seenItems = new Set<string>();
   for (const [index, line] of lines.entries()) {
@@ -103,12 +119,27 @@ export function ReceiptCountForm({
     return attempted || touched[field] || Boolean(value);
   }
   useEffect(() => {
+    let live = true;
+    setDriveLoading(true);
+    fetchAll<Drive & { id: string }>('logistics', '/donation-drives')
+      .then(drives => { if (!live) return; const drive = drives.find(candidate => candidate.id === driveId);
+        if (!drive) throw new Error('Không tìm thấy đợt quyên góp của biên nhận trong phạm vi được cấp quyền.');
+        setDriveItems(drive.items.map(item => ({
+        id: item.item_id, name: item.item_name,
+        unit: { display_name: item.unit_name, scale: Number(item.scale) },
+      }))); })
+      .catch(cause => { if (live) setItemsError(cause instanceof Error ? cause.message : 'Không tải được vật phẩm của đợt quyên góp.'); })
+      .finally(() => { if (live) setDriveLoading(false); });
+    return () => { live = false; };
+  }, [driveId, driveRevision]);
+  useEffect(() => {
+    if (!allowUnexpected) return;
+    let live = true;
     fetchAll<Item>('logistics', '/items?status=ACTIVE')
-      .then(setItems)
-      .catch((cause) =>
-        setItemsError(cause instanceof Error ? cause.message : 'Không thể tải danh mục vật phẩm.')
-      );
-  }, []);
+      .then(value => { if (live) setCatalogItems(value); })
+      .catch(cause => { if (live) setItemsError(cause instanceof Error ? cause.message : 'Không tải được danh mục vật phẩm.'); });
+    return () => { live = false; };
+  }, [allowUnexpected]);
   function edit(index: number, field: keyof Line, value: string) {
     setLines((current) =>
       current.map((line, position) => (position === index ? { ...line, [field]: value } : line))
@@ -153,32 +184,38 @@ export function ReceiptCountForm({
     <form className="form-stack command-form" onSubmit={submit} noValidate>
       <h3>{heldRelease ? 'Kiểm tra lại hàng tạm giữ' : 'Gửi kết quả kiểm đếm'}</h3>
       <p>
-        {heldRelease ? 'Giữ nguyên vật phẩm, số đã đếm và số từ chối. Chỉ tăng phần tiếp nhận và giảm tương ứng phần tạm giữ; người khác phải duyệt độc lập trước khi nhập bổ sung.' : 'Ghi số lượng thực tế cho từng vật phẩm. Có thể thêm vật phẩm ngoài bản khai; người khác sẽ duyệt độc lập.'}
+        {heldRelease ? 'Giữ nguyên vật phẩm, số đã đếm và số từ chối. Chỉ tăng phần tiếp nhận và giảm tương ứng phần tạm giữ; người khác phải duyệt độc lập trước khi nhập bổ sung.' : `Chọn vật phẩm thuộc đợt “${driveTitle || 'quyên góp'}” và ghi số lượng thực tế. Người khác sẽ duyệt độc lập.`}
       </p>
+      {driveLoading && <p role="status">Đang tải vật phẩm của đợt quyên góp…</p>}
       {itemsError && (
         <p className="notice error" role="alert">
-          Danh mục vật phẩm: {itemsError} Bạn vẫn có thể nhập mã vật phẩm.
+          {itemsError}
         </p>
       )}
+      {!driveLoading && !driveItems.length && <button className="button secondary" type="button" onClick={() => { setItemsError(''); setDriveRevision(current => current + 1); }}>Tải lại vật phẩm của đợt</button>}
+      {!heldRelease && <button className="button secondary" type="button" aria-expanded={allowUnexpected} onClick={() => { setAllowUnexpected(current => !current); setItemsError(''); }}>
+        {allowUnexpected ? 'Ẩn vật phẩm ngoài đợt' : 'Có vật phẩm thực tế ngoài đợt quyên góp?'}
+      </button>}
+      {allowUnexpected && !heldRelease && <p className="notice warning">Chỉ chọn vật phẩm ngoài đợt khi hàng thực tế được bàn giao khác danh sách của đợt. Dòng này sẽ được đánh dấu để người duyệt rà soát.</p>}
       {lines.map((line, index) => (
         <fieldset className="candidate count-line" key={index}>
           <legend>Vật phẩm {index + 1}</legend>
           <label>
-            Chọn vật phẩm
+            Vật phẩm trong đợt quyên góp
             <select
               disabled={heldRelease}
               value={items.some((item) => item.id === line.item_id) ? line.item_id : ''}
               onChange={(event) => edit(index, 'item_id', event.target.value)}
             >
-              <option value="">Nhập mã bên dưới hoặc chọn danh mục</option>
+              <option value="">Chọn vật phẩm</option>
               {items.map((item) => (
                 <option value={item.id} key={item.id}>
-                  {item.name} · {item.unit.display_name}
+                  {item.name} · {item.unit.display_name}{!driveItems.some(driveItem => driveItem.id === item.id) ? ' · ngoài đợt' : ''}
                 </option>
               ))}
             </select>
           </label>
-          <label>
+          {(allowUnexpected || heldRelease) && <label>
             <span>Mã vật phẩm <span className="required-mark" aria-hidden="true">*</span></span>
             <input
               required
@@ -191,7 +228,8 @@ export function ReceiptCountForm({
               placeholder="Mã vật phẩm trong danh mục"
             />
             {showFieldError(`${index}.item_id`, line.item_id) && fieldErrors[`${index}.item_id`] && <small className="field-error" role="alert">{fieldErrors[`${index}.item_id`]}</small>}
-          </label>
+          </label>}
+          {!allowUnexpected && !heldRelease && showFieldError(`${index}.item_id`, line.item_id) && fieldErrors[`${index}.item_id`] && <small className="field-error" role="alert">{fieldErrors[`${index}.item_id`]}</small>}
           <div className="form-grid">
             {(
               [
@@ -283,7 +321,7 @@ export function ReceiptCountForm({
           {error}
         </p>
       )}
-      <button className="button" disabled={busy}>
+      <button className="button" disabled={busy || driveLoading || !driveItems.length}>
         {busy ? 'Đang gửi kết quả…' : 'Gửi kiểm đếm để duyệt'}
       </button>
     </form>

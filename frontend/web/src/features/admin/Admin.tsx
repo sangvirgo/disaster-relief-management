@@ -55,6 +55,14 @@ export function Admin({ page }: { page: string }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [detail, setDetail] = useState<Detail | null>(null);
+  const [userAction, setUserAction] = useState<'disable' | 'enable' | 'reset' | 'revoke' | null>(null);
+  const [revokeGrantId, setRevokeGrantId] = useState('');
+  useEffect(() => { setUserAction(null); setRevokeGrantId(''); }, [selected]);
+  useEffect(() => {
+    if (!userAction) return;
+    const frame = requestAnimationFrame(() => document.querySelector<HTMLElement>('.admin-user-actions')?.scrollIntoView({ block: 'nearest' }));
+    return () => cancelAnimationFrame(frame);
+  }, [userAction]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -143,6 +151,8 @@ export function Admin({ page }: { page: string }) {
   function success() {
     setShowCreate(false);
     setDetail(null);
+    setUserAction(null);
+    setRevokeGrantId('');
     setRevision((value) => value + 1);
   }
   const userCreate: CommandSpec = {
@@ -195,7 +205,7 @@ export function Admin({ page }: { page: string }) {
         <div className="section-header list-action-header">
           <h2>
             {page === 'audit'
-              ? 'Lịch sử thay đổi'
+              ? 'Lịch sử thao tác'
               : page === 'regions'
                 ? 'Danh sách khu vực'
                 : page === 'organizations'
@@ -295,21 +305,28 @@ export function Admin({ page }: { page: string }) {
           </button>
         )}
       </section>
-      <DetailSurface modal open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? 'Chi tiết bản ghi' : createTitle} className={showCreate && page === 'users' ? 'admin-create-dialog' : ''}>
+      <DetailSurface modal open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); setUserAction(null); setRevokeGrantId(''); }} label={selected ? 'Chi tiết bản ghi' : createTitle} className={showCreate && page === 'users' ? 'admin-create-dialog' : ''}>
         {showCreate && page === 'users' && (
           <div className="admin-create-brand">
             <span className="auth-logo-frame"><img src="/reliva-logo.png" alt="" /></span>
             <span className="admin-create-brand-copy"><strong>Reliva</strong><small>QUẢN TRỊ NGƯỜI DÙNG</small></span>
           </div>
         )}
-        {selected && <h2>
+        {selected && <div className="admin-detail-heading"><h2>
           {selected
-            ? page === 'users' ? 'Chi tiết người dùng' : page === 'organizations' ? 'Chi tiết tổ chức' : 'Chi tiết khu vực'
+            ? ['users', 'grants', 'overview'].includes(page) ? 'Chi tiết người dùng' : page === 'organizations' ? 'Chi tiết tổ chức' : 'Chi tiết khu vực'
             : page === 'users' ? 'Thêm người dùng'
               : page === 'organizations' ? 'Thêm tổ chức'
                 : page === 'regions' ? 'Thêm khu vực'
                   : 'Thông tin quản trị'}
-        </h2>}
+        </h2>{['users', 'grants', 'overview'].includes(page) && detail && <details className="admin-action-menu" key={detail.id}>
+          <summary aria-label="Tác vụ người dùng" title="Tác vụ người dùng">⋯</summary>
+          <div className="admin-action-options">
+            <button type="button" onClick={event => { setUserAction(detail.status === 'ACTIVE' ? 'disable' : 'enable'); setRevokeGrantId(''); event.currentTarget.closest('details')?.removeAttribute('open'); }}>{detail.status === 'ACTIVE' ? 'Vô hiệu hóa người dùng' : 'Kích hoạt người dùng'}</button>
+            {page === 'users' && <button type="button" onClick={event => { setUserAction('reset'); setRevokeGrantId(''); event.currentTarget.closest('details')?.removeAttribute('open'); }}>Đặt lại mật khẩu tạm</button>}
+            {page === 'users' && <button type="button" disabled={!detail.grants?.some(grant => !grant.revoked_at)} onClick={event => { setUserAction('revoke'); setRevokeGrantId(''); event.currentTarget.closest('details')?.removeAttribute('open'); }}>Thu hồi quyền</button>}
+          </div>
+        </details>}</div>}
         {selected && !detail && <p role="status">Đang tải chi tiết…</p>}
         {detail && (
           <>
@@ -336,26 +353,6 @@ export function Admin({ page }: { page: string }) {
                         {grant.campaign_id && <> · Chiến dịch {grant.campaign_id}</>}
                         {grant.revoked_at ? ' (đã thu hồi)' : ''}
                       </p>
-                      {page === 'users' && !grant.revoked_at && (
-                        <CommandForm
-                          spec={{
-                            title: 'Thu hồi quyền',
-                            service: 'identity',
-                            path: `/grants/${grant.id}/revoke`,
-                            warning: `Thu hồi quyền ${label(grant.role_code)} của ${detail.username}?`,
-                            fields: [
-                              {
-                                name: 'reason',
-                                label: 'Lý do thu hồi',
-                                type: 'textarea',
-                                required: true,
-                                maxLength: 500,
-                              },
-                            ],
-                          }}
-                          onSuccess={success}
-                        />
-                      )}
                     </div>
                   ))
                 ) : (
@@ -363,8 +360,9 @@ export function Admin({ page }: { page: string }) {
                 )}
               </>
             )}
-            <div className="action-grid">
-              {['users', 'grants', 'overview'].includes(page) && detail.status === 'ACTIVE' && (
+            <div className="action-grid admin-user-actions">
+              {page === 'users' && userAction === 'revoke' && <div className="admin-selected-action"><label>Quyền cần thu hồi<select value={revokeGrantId} onChange={event => setRevokeGrantId(event.target.value)}><option value="">Chọn quyền</option>{detail.grants?.filter(grant => !grant.revoked_at).map(grant => <option key={grant.id} value={grant.id}>{label(grant.role_code)} · {label(grant.scope_type)}{grant.region_code ? ` · ${grant.region_code}` : ''}</option>)}</select></label>{revokeGrantId && <CommandForm key={revokeGrantId} spec={{ title: 'Thu hồi quyền', service: 'identity', path: `/grants/${revokeGrantId}/revoke`, warning: `Thu hồi quyền này của ${detail.username}?`, fields: [{ name: 'reason', label: 'Lý do thu hồi', type: 'textarea', required: true, maxLength: 500 }] }} onSuccess={success} />}</div>}
+              {['users', 'grants', 'overview'].includes(page) && userAction === 'disable' && detail.status === 'ACTIVE' && (
                 <CommandForm
                   spec={{
                     title: 'Vô hiệu hóa người dùng',
@@ -377,7 +375,7 @@ export function Admin({ page }: { page: string }) {
                   onSuccess={success}
                 />
               )}
-              {['users', 'grants', 'overview'].includes(page) && detail.status === 'DISABLED' && (
+              {['users', 'grants', 'overview'].includes(page) && userAction === 'enable' && detail.status === 'DISABLED' && (
                 <CommandForm
                   spec={{
                     title: 'Kích hoạt người dùng',
@@ -390,7 +388,7 @@ export function Admin({ page }: { page: string }) {
                   onSuccess={success}
                 />
               )}
-              {page === 'users' && (
+              {page === 'users' && userAction === 'reset' && (
                 <CommandForm
                   spec={{
                     title: 'Đặt lại mật khẩu tạm',

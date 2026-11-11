@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
 import { appendPage } from '../../api/pagination';
 import { DetailSurface } from '../../components/DetailSurface';
+import { PriorityBadge } from '../../components/PriorityBadge';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { label, regionName, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
@@ -165,6 +166,69 @@ type Candidate = {
   suggested: boolean;
 };
 type Candidates = { items: Candidate[]; unknown_position: Candidate[] };
+
+type ScopedTeam = {
+  id: string;
+  name: string;
+  status: string;
+  availability: string;
+  readiness_required: boolean;
+  skills: string[];
+  position: { age_s: number } | null;
+};
+
+// Versioned demo prerequisites: docs/backend/seed/seed-response.sql.
+const requiredDemoSkills: Record<string, string[]> = {
+  FLOOD: ['BOAT'], TRAPPED: ['BOAT'], MEDICAL: ['FIRST_AID'], LANDSLIDE: ['CLIMBING'],
+};
+
+function TeamEligibilityDetails({ regionCode, category, revision }: {
+  regionCode: string; category: string; revision: number;
+}) {
+  const [teams, setTeams] = useState<ScopedTeam[] | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let live = true;
+    setTeams(null);
+    setError('');
+    async function load() {
+      try {
+        const found: ScopedTeam[] = [];
+        let cursor = '';
+        do {
+          const query = new URLSearchParams({ region_code: regionCode, limit: '100' });
+          if (cursor) query.set('cursor', cursor);
+          const page = await api<{ items: ScopedTeam[]; more: boolean; cursor?: string }>('response', `/teams?${query}`);
+          found.push(...page.items);
+          cursor = page.more ? page.cursor || '' : '';
+        } while (cursor);
+        if (live) setTeams(found);
+      } catch {
+        if (live) setError('Chưa tải được tình trạng từng đội. Hãy kiểm tra danh sách đội và thử cập nhật SOS.');
+      }
+    }
+    void load();
+    return () => { live = false; };
+  }, [regionCode, revision]);
+  const requiredSkills = requiredDemoSkills[category] || [];
+  return <div className="team-eligibility-details">
+    {requiredSkills.length > 0 && <p><strong>{label(category)}</strong> cần kỹ năng {requiredSkills.map(label).join(', ')}.</p>}
+    {error && <p role="alert">{error}</p>}
+    {!teams && !error && <p role="status">Đang kiểm tra tình trạng các đội trong khu vực…</p>}
+    {teams?.length === 0 && <p>Chưa có đội nào trong khu vực mà tài khoản này được phép xem.</p>}
+    {teams?.map((team) => {
+      const reasons = [
+        ...(team.status !== 'ACTIVE' ? ['Đội ngừng hoạt động'] : []),
+        ...(team.availability !== 'AVAILABLE' ? ['Đội chưa sẵn sàng'] : []),
+        ...(team.readiness_required ? ['Cần xác nhận sẵn sàng lại'] : []),
+        ...requiredSkills.filter((skill) => !team.skills.includes(skill)).map((skill) => `Thiếu kỹ năng ${label(skill)}`),
+        ...(!team.position ? ['Chưa có vị trí đội'] : team.position.age_s > 1800 ? ['Vị trí đã quá 30 phút'] : []),
+      ];
+      return <p key={team.id}><strong>{team.name}:</strong> {reasons.join(' · ') || 'Kỹ năng và thời gian vị trí phù hợp; hãy kiểm tra khoảng cách tối đa 10 km hoặc nhiệm vụ đội đang nhận.'}</p>;
+    })}
+    <p className="muted">Kỹ năng chỉ nên cập nhật sau khi xác nhận năng lực thực tế của đội. Vị trí phải được gửi lại trong 30 phút gần nhất.</p>
+  </div>;
+}
 
 function NearbyAddress({ coordinates }: { coordinates?: [number, number] }) {
   const longitude = coordinates?.[0];
@@ -440,6 +504,10 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
   const [detailRevision, setDetailRevision] = useState(0);
+  const [completedMissionCycle, setCompletedMissionCycle] = useState<{
+    requestId: string; missionId: string; cycle: number | null; error: boolean
+  } | null>(null);
+  const [showAdditionalDispatch, setShowAdditionalDispatch] = useState(false);
   const [campaignOptions, setCampaignOptions] = useState<{
     value: string; label: string; regionCode: string | null
   }[]>([]);
@@ -500,19 +568,39 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
   }, []);
   const hasActiveMissions = Boolean(detail?.active_missions?.items.length);
   useEffect(() => {
-    if (!selected || !hasActiveMissions) return;
+    if (!selected) return;
     const refreshActiveMissionDetail = () => {
       if (document.visibilityState === 'visible') setDetailRevision((value) => value + 1);
     };
-    const timer = window.setInterval(refreshActiveMissionDetail, 5000);
+    const timer = hasActiveMissions ? window.setInterval(refreshActiveMissionDetail, 5000) : null;
     window.addEventListener('focus', refreshActiveMissionDetail);
     document.addEventListener('visibilitychange', refreshActiveMissionDetail);
     return () => {
-      window.clearInterval(timer);
+      if (timer !== null) window.clearInterval(timer);
       window.removeEventListener('focus', refreshActiveMissionDetail);
       document.removeEventListener('visibilitychange', refreshActiveMissionDetail);
     };
   }, [selected, hasActiveMissions]);
+  const latestCompletedMissionId = detail?.id === selected && ['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(detail.status)
+    ? detail.mission_history?.items.find((mission) => mission.status === 'COMPLETED')?.id
+    : undefined;
+  useEffect(() => {
+    setShowAdditionalDispatch(false);
+  }, [selected, detail?.work_cycle, latestCompletedMissionId]);
+  useEffect(() => {
+    if (!selected || !latestCompletedMissionId) return;
+    let live = true;
+    api<{ work_cycle: number }>('response', `/missions/${latestCompletedMissionId}`)
+      .then((mission) => {
+        if (live) setCompletedMissionCycle({ requestId: selected, missionId: latestCompletedMissionId,
+          cycle: mission.work_cycle, error: false });
+      })
+      .catch(() => {
+        if (live) setCompletedMissionCycle({ requestId: selected, missionId: latestCompletedMissionId,
+          cycle: null, error: true });
+      });
+    return () => { live = false; };
+  }, [selected, latestCompletedMissionId]);
   useEffect(() => {
     let live = true;
     setLoading(true);
@@ -697,6 +785,12 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
   const pendingOperationId = detail?.status === 'RESOLVING'
     ? operationIdFromTimeline(detail.timeline.items)
     : undefined;
+  const completionCheck = latestCompletedMissionId && completedMissionCycle?.requestId === selected &&
+    completedMissionCycle.missionId === latestCompletedMissionId ? completedMissionCycle : null;
+  const completedInCurrentCycle = Boolean(detail && completionCheck &&
+    completionCheck.cycle === detail.work_cycle);
+  const showTeamCandidates = !latestCompletedMissionId ||
+    (completionCheck && !completionCheck.error && (!completedInCurrentCycle || showAdditionalDispatch));
   return (
     <div className="coordinator-layout">
       <section className="card">
@@ -831,7 +925,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   </span>
                   <span className="chip queue-status-chip" data-status={item.status}>
                     {requestStatusLabel(item.status)}
-                    {item.priority ? ` · ${item.priority}` : ''}
+                    {item.priority && <PriorityBadge priority={item.priority as 'P1' | 'P2' | 'P3' | 'P4'} />}
                   </span>
                 </button>
               ))}
@@ -1002,7 +1096,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
               <p>
                 <strong>Ưu tiên</strong>
                 <span className="detail-value">
-                  {detail.priority || 'Chưa quyết định'}
+                  {detail.priority ? <PriorityBadge priority={detail.priority as 'P1' | 'P2' | 'P3' | 'P4'} /> : 'Chưa quyết định'}
                 </span>
               </p>
               <p>
@@ -1367,6 +1461,10 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                 )}
               </section>
             )}
+            {completedInCurrentCycle && Boolean(detail.active_missions?.items.length) &&
+              <p className="notice warning" role="status">
+                SOS này đã có nhiệm vụ hoàn thành nhưng vẫn còn nhiệm vụ đang giao. Hãy đối chiếu nhu cầu còn lại và trạng thái đội bên dưới. Nếu lần giao thêm là nhầm, dùng “Hủy giao nhiệm vụ” cho nhiệm vụ đang chờ trước khi kết thúc SOS.
+              </p>}
             {detail.active_missions && detail.active_missions.items.length > 0 && (
               <section>
                 <h3>Nhiệm vụ đang giao ({detail.active_missions.items.length})</h3>
@@ -1681,10 +1779,18 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                 })}
               {detail.status === 'TRIAGED' && (
                 <section>
+                  {latestCompletedMissionId && !completionCheck && <p role="status">Đang đối chiếu nhiệm vụ đã hoàn thành với chu kỳ xử lý hiện tại…</p>}
+                  {completionCheck?.error && <p className="notice warning" role="alert">Chưa đối chiếu được nhiệm vụ đã hoàn thành. Hãy bấm “Cập nhật SOS” trước khi giao thêm đội.</p>}
+                  {completedInCurrentCycle && <div className="notice">
+                    <strong>Đội đã hoàn thành nhiệm vụ trong chu kỳ này.</strong>
+                    <p>Kết quả đã được ghi nhận. Điều phối viên cần kiểm tra minh chứng và kết thúc xử lý SOS nếu nhu cầu đã được đáp ứng.</p>
+                    <a href="#resolve-request">Đi đến bước kết thúc xử lý ↓</a>
+                    <div><button type="button" className="button secondary" onClick={() => setShowAdditionalDispatch((value) => !value)}>
+                      {showAdditionalDispatch ? 'Ẩn lựa chọn giao thêm đội' : 'Vẫn cần giao thêm đội'}
+                    </button></div>
+                  </div>}
+                  {showTeamCandidates && <>
                   <h3>Đội có thể giao nhiệm vụ</h3>
-                  {detail.mission_history?.items.some((mission) => mission.status === 'COMPLETED') && (
-                    <p className="notice">Lịch sử có nhiệm vụ đã hoàn thành. Nếu SOS được mở lại, kết quả từ chu kỳ cũ không thay thế kết quả của chu kỳ hiện tại. Hãy kiểm tra việc còn cần xử lý trước khi giao đội hoặc đề nghị kết thúc.</p>
-                  )}
                   <p>Xem khoảng cách, vị trí cập nhật và số nhiệm vụ gần đây trước khi chọn đội.</p>
                   <p>
                     Gợi ý cân bằng dựa trên nhiệm vụ 24 giờ và 7 ngày của các đội gần nhất. Đội đang
@@ -1705,11 +1811,11 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   )}
                   {candidates?.items.length === 0 && detail.region_code && (
                     <p role="status" className="notice warning">
-                      Chưa có đội đủ điều kiện. Vị trí đội phải được cập nhật trong 30 phút gần nhất.
-                      Với đội do điều phối viên báo cáo, hãy cập nhật vị trí bên dưới; với đội dùng ứng dụng,
-                      nhờ đội trưởng cập nhật. Đội đang bận, khác tổ chức phụ trách SOS, khác khu vực hoặc thiếu kỹ năng cũng không xuất hiện.
+                      Chưa có đội đủ điều kiện. Xem tình trạng từng đội trong khu vực bên dưới để biết điều kiện cần bổ sung.
                     </p>
                   )}
+                  {candidates?.items.length === 0 && detail.region_code &&
+                    <TeamEligibilityDetails regionCode={detail.region_code} category={detail.category} revision={revision} />}
                   {candidates?.items.map((candidate) => (
                     <div className="candidate" key={candidate.team.id}>
                       <strong>{candidate.team.name}</strong>
@@ -1773,17 +1879,18 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                         />}
                     </div>
                   ))}
+                  </>}
                 </section>
               )}
               {['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(detail.status) && (
-                <AsyncRequestForm
+                <div id="resolve-request"><AsyncRequestForm
                   key={`resolve-${detail.id}-${detail.version}`}
                   requestId={detail.id}
                   version={detail.version}
                   kind="resolve"
                   onCompleted={done}
                   onStale={refreshAfterConflict}
-                />
+                /></div>
               )}
               {[
                 'TRIAGED',

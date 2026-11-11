@@ -8,6 +8,7 @@ import { dateLabel, label, requestStatusLabel, timeLabel } from '../../i18n/labe
 import { formatQuantity } from '../../i18n/quantity';
 import { HandoffDetail } from './HandoffDetail';
 import { ReceiptCountForm } from './ReceiptCountForm';
+import { DriveCreateForm } from './DriveCreateForm';
 import { operationRecordKey } from './recordKey';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { DetailSurface } from '../../components/DetailSurface';
@@ -288,6 +289,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           : routes[page];
   const params = new URLSearchParams();
   if (page === 'stock' || page === 'reports') params.set('limit', String(pageSize));
+  if ((page === 'stock' || (page === 'reports' && report === 'stock-summary')) && warehouse)
+    params.set('warehouse_id', warehouse);
   if (cursor) params.set('cursor', cursor);
   if (page === 'reports' && report === 'reconciliation' && warehouse)
     params.set('warehouse_id', warehouse);
@@ -404,29 +407,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       ? string(selected?.receipt_id)
       : '';
   const count = detail?.count as Row | null | undefined;
-  const driveCreate: CommandSpec = {
-    title: 'Tạo đợt quyên góp',
-    service: 'logistics',
-    path: '/donation-drives',
-    fields: [
-      ...fields([
-        ['title', 'Tên đợt quyên góp', true],
-        ['description', 'Mô tả', true],
-      ]),
-      referenceField('intake_warehouse_id', 'Kho tiếp nhận', 'warehouses', true),
-      referenceField('campaign_id', 'Chiến dịch (nếu có)', 'campaigns'),
-      referenceField('item_id', 'Vật phẩm', 'items', true),
-      { name: 'target_quantity', label: 'Số lượng mục tiêu', type: 'number', required: true,
-        scaleFor: (values) => { const unit = references.itemScales?.find(item => item.value === values.item_id); return unit ? Number(unit.label) : undefined; } },
-    ],
-    build: (values) => ({
-      title: values.title,
-      description: values.description,
-      intake_warehouse_id: values.intake_warehouse_id,
-      ...(values.campaign_id ? { campaign_id: values.campaign_id } : {}),
-      items: [{ item_id: values.item_id, target_quantity: values.target_quantity }],
-    }),
-  };
   const needCreate: CommandSpec = {
     title: 'Ghi nhận nhu cầu',
     service: 'logistics',
@@ -572,6 +552,16 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             )}
           </>
         )}
+        {(page === 'stock' || (page === 'reports' && report === 'stock-summary')) && <label className="filter">
+          Kho cần xem tồn
+          <select value={warehouse} onChange={(event) => {
+            setWarehouse(event.target.value);
+            setCursor(''); setSelected(null); setDetail(null);
+          }}>
+            <option value="">Tất cả kho được cấp quyền</option>
+            {warehouseOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>}
         {(page === 'stock' || page === 'reports') && <label className="filter">
           Số dòng mỗi lần tải
           <select value={pageSize} onChange={event => {
@@ -717,7 +707,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         )}
       </section>
       {page === 'distribution' && commitmentsError && <p role="alert" className="notice error">{commitmentsError} Hãy tải lại trước khi lập phiếu hỗ trợ SOS.</p>}
-      {(selected || showCreate) && <DetailSurface key={selected?.id || 'create'} className={`operations-detail-transition ${distributionPages.has(page) && !showCreate ? 'distribution-detail-panel' : ''}`} heading={selected && distributionPages.has(page) ? 'Chi tiết phiếu phân phối' : undefined} modal={page === 'review' || showCreate || (['intake', 'assets'].includes(page) && compact) || (distributionPages.has(page) && stackedDistribution)} open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? distributionPages.has(page) ? 'Chi tiết phiếu phân phối' : 'Chi tiết bản ghi' : createTitle}>
+      {(selected || showCreate) && <DetailSurface key={selected?.id || 'create'} className={`operations-detail-transition ${distributionPages.has(page) && !showCreate ? 'distribution-detail-panel' : ''}`} heading={selected && distributionPages.has(page) ? 'Chi tiết phiếu phân phối' : undefined} modal={page === 'review' || showCreate || (['intake', 'assets'].includes(page) && compact) || (distributionPages.has(page) && stackedDistribution)} explicitCloseOnly={page === 'review'} open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? distributionPages.has(page) ? 'Chi tiết phiếu phân phối' : 'Chi tiết bản ghi' : createTitle}>
         {!showCreate && !distributionPages.has(page) && <h2>
           {selected
             ? page === 'assets'
@@ -989,6 +979,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                           <tr key={string(line.item_id) || index}>
                             <th scope="row">
                               {string(line.item_name) || string(line.item_id)}
+                              {Array.isArray(line.flags) && line.flags.includes('UNEXPECTED_ITEM') && <small className="receipt-unexpected-item">Ngoài bản khai · cần rà soát</small>}
                               {Boolean(line.condition_note) && <small>Tình trạng: {string(line.condition_note)}</small>}
                               {Boolean(line.expiry_date) && <small>Hạn sử dụng: {dateLabel(line.expiry_date)}</small>}
                             </th>
@@ -1104,6 +1095,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   <ReceiptCountForm
                     key={receiptId + version}
                     receiptId={receiptId}
+                    driveId={string(detail.drive_id)}
+                    driveTitle={string(detail.drive_title)}
                     version={version}
                     heldRelease={status === 'POSTED'}
                     existing={
@@ -1436,7 +1429,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         {!selected &&
           page === 'drives' &&
           (rights.has('CAMPAIGN_MANAGER') || rights.has('OPERATIONS_MANAGER')) &&
-          command(driveCreate)}
+          <DriveCreateForm warehouses={warehouseOptions} campaigns={references.campaigns || []} items={references.items || []} itemScales={references.itemScales || []} onSuccess={done} />}
         {!selected &&
           page === 'needs' &&
           (rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR')) &&

@@ -172,7 +172,10 @@ try {
         ('00000000-0000-4000-8000-000000000115'::uuid, 'vol_member3', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000002'::uuid, true),
         ('00000000-0000-4000-8000-000000000116'::uuid, 'vol_leader4', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000002'::uuid, true),
         ('00000000-0000-4000-8000-000000000117'::uuid, 'vol_member4', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000002'::uuid, true),
-        ('00000000-0000-4000-8000-000000000118'::uuid, 'coord_seed', 'COORDINATOR', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, true)
+        ('00000000-0000-4000-8000-000000000118'::uuid, 'coord_seed', 'COORDINATOR', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, true),
+        ('00000000-0000-4000-8000-000000000120'::uuid, 'vol_climb_north1', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, true),
+        ('00000000-0000-4000-8000-000000000121'::uuid, 'vol_climb_north2', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, true),
+        ('00000000-0000-4000-8000-000000000122'::uuid, 'vol_climb_north3', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, true)
       )
       SELECT
         (SELECT count(*)::int
@@ -193,7 +196,7 @@ try {
             (id = '00000000-0000-4000-8000-000000000002' AND name = 'Hội tình nguyện miền Nam (demo)' AND organization_kind = 'VOLUNTEER'))) AS organizations_ready
     `);
     const identityReady = identityPrerequisites.rows[0];
-    if (identityReady.users_ready !== 7 || identityReady.regions_ready !== 3 || identityReady.organizations_ready !== 2) {
+    if (identityReady.users_ready !== 10 || identityReady.regions_ready !== 3 || identityReady.organizations_ready !== 2) {
       throw new Error('Demo fixture ID or scope conflicts in Identity; dependent Response and Logistics fixtures were not seeded.');
     }
     const creators = await clients.get('identity').query(

@@ -8,7 +8,10 @@ INSERT INTO app_user (id, username, display_name, email, email_verified_at, pass
   ('00000000-0000-4000-8000-000000000116', 'vol_leader4', 'Đội trưởng tình nguyện 4 (demo)', 'vol_leader4+' || substr(md5('00000000-0000-4000-8000-000000000116'), 1, 10) || '@example.test', now(), :'seed_password_hash', 'ACTIVE', true),
   ('00000000-0000-4000-8000-000000000117', 'vol_member4', 'Tình nguyện viên 4 (demo)', 'vol_member4+' || substr(md5('00000000-0000-4000-8000-000000000117'), 1, 10) || '@example.test', now(), :'seed_password_hash', 'ACTIVE', true),
   ('00000000-0000-4000-8000-000000000118', 'coord_seed', 'Điều phối viên bổ sung (demo)', 'coord_seed+' || substr(md5('00000000-0000-4000-8000-000000000118'), 1, 10) || '@example.test', now(), :'seed_password_hash', 'ACTIVE', true),
-  ('00000000-0000-4000-8000-000000000119', 'vol_leader_seed', 'Đội trưởng cứu hộ Bắc (demo)', 'vol_leader_seed+' || substr(md5('00000000-0000-4000-8000-000000000119'), 1, 10) || '@example.test', now(), :'seed_password_hash', 'ACTIVE', true)
+  ('00000000-0000-4000-8000-000000000119', 'vol_leader_seed', 'Đội trưởng cứu hộ Bắc (demo)', 'vol_leader_seed+' || substr(md5('00000000-0000-4000-8000-000000000119'), 1, 10) || '@example.test', now(), :'seed_password_hash', 'ACTIVE', true),
+  ('00000000-0000-4000-8000-000000000120', 'vol_climb_north1', 'Đội trưởng cứu hộ địa hình Bắc 1 (demo)', 'vol_climb_north1+' || substr(md5('00000000-0000-4000-8000-000000000120'), 1, 10) || '@example.test', now(), :'seed_password_hash', 'ACTIVE', true),
+  ('00000000-0000-4000-8000-000000000121', 'vol_climb_north2', 'Đội trưởng cứu hộ địa hình Bắc 2 (demo)', 'vol_climb_north2+' || substr(md5('00000000-0000-4000-8000-000000000121'), 1, 10) || '@example.test', now(), :'seed_password_hash', 'ACTIVE', true),
+  ('00000000-0000-4000-8000-000000000122', 'vol_climb_north3', 'Đội trưởng cứu hộ đa năng Bắc (demo)', 'vol_climb_north3+' || substr(md5('00000000-0000-4000-8000-000000000122'), 1, 10) || '@example.test', now(), :'seed_password_hash', 'ACTIVE', true)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO membership (user_id, organization_id)
@@ -20,7 +23,10 @@ SELECT u.id, o.id
     ('00000000-0000-4000-8000-000000000116'::uuid, 'vol_leader4', '00000000-0000-4000-8000-000000000002'::uuid, 'Hội tình nguyện miền Nam (demo)'),
     ('00000000-0000-4000-8000-000000000117'::uuid, 'vol_member4', '00000000-0000-4000-8000-000000000002'::uuid, 'Hội tình nguyện miền Nam (demo)'),
     ('00000000-0000-4000-8000-000000000118'::uuid, 'coord_seed', '00000000-0000-4000-8000-000000000001'::uuid, 'Trung tâm điều phối C48 (demo)'),
-    ('00000000-0000-4000-8000-000000000119'::uuid, 'vol_leader_seed', '00000000-0000-4000-8000-000000000001'::uuid, 'Trung tâm điều phối C48 (demo)')
+    ('00000000-0000-4000-8000-000000000119'::uuid, 'vol_leader_seed', '00000000-0000-4000-8000-000000000001'::uuid, 'Trung tâm điều phối C48 (demo)'),
+    ('00000000-0000-4000-8000-000000000120'::uuid, 'vol_climb_north1', '00000000-0000-4000-8000-000000000001'::uuid, 'Trung tâm điều phối C48 (demo)'),
+    ('00000000-0000-4000-8000-000000000121'::uuid, 'vol_climb_north2', '00000000-0000-4000-8000-000000000001'::uuid, 'Trung tâm điều phối C48 (demo)'),
+    ('00000000-0000-4000-8000-000000000122'::uuid, 'vol_climb_north3', '00000000-0000-4000-8000-000000000001'::uuid, 'Trung tâm điều phối C48 (demo)')
   ) AS fixture(user_id, username, organization_id, organization_name)
   JOIN app_user u ON u.id = fixture.user_id AND u.username::text = fixture.username
   JOIN organization o ON o.id = fixture.organization_id AND o.name = fixture.organization_name
@@ -37,7 +43,10 @@ SELECT u.id, fixture.role_code, fixture.scope_type, fixture.organization_id, NUL
     ('00000000-0000-4000-8000-000000000116'::uuid, 'vol_leader4', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000002'::uuid, 'Hội tình nguyện miền Nam (demo)'),
     ('00000000-0000-4000-8000-000000000117'::uuid, 'vol_member4', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000002'::uuid, 'Hội tình nguyện miền Nam (demo)'),
     ('00000000-0000-4000-8000-000000000118'::uuid, 'coord_seed', 'COORDINATOR', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, 'Trung tâm điều phối C48 (demo)'),
-    ('00000000-0000-4000-8000-000000000119'::uuid, 'vol_leader_seed', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, 'Trung tâm điều phối C48 (demo)')
+    ('00000000-0000-4000-8000-000000000119'::uuid, 'vol_leader_seed', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, 'Trung tâm điều phối C48 (demo)'),
+    ('00000000-0000-4000-8000-000000000120'::uuid, 'vol_climb_north1', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, 'Trung tâm điều phối C48 (demo)'),
+    ('00000000-0000-4000-8000-000000000121'::uuid, 'vol_climb_north2', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, 'Trung tâm điều phối C48 (demo)'),
+    ('00000000-0000-4000-8000-000000000122'::uuid, 'vol_climb_north3', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, 'Trung tâm điều phối C48 (demo)')
   ) AS fixture(user_id, username, role_code, scope_type, organization_id, organization_name)
   JOIN app_user u ON u.id = fixture.user_id AND u.username::text = fixture.username
   LEFT JOIN organization o ON o.id = fixture.organization_id AND o.name = fixture.organization_name

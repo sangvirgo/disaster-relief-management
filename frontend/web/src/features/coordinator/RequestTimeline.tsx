@@ -67,8 +67,7 @@ export function RequestTimeline({ requestId, initial }: { requestId: string; ini
         <div className="timeline">
           {events.map((event) => (
             <article className="timeline-item" key={event.id}>
-              <strong>{label(event.event_type)}</strong> · {timeLabel(event.occurred_at)}
-              {event.reason && <p>{event.reason}</p>}
+              <div className="timeline-event-heading"><strong>{label(event.event_type)}</strong><time dateTime={event.occurred_at}>· {timeLabel(event.occurred_at)}</time>{event.reason && <span className="timeline-event-reason">· {event.reason}</span>}</div>
             </article>
           ))}
         </div>

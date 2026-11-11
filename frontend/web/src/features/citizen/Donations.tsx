@@ -10,6 +10,7 @@ import { useUrlView } from '../../app/useUrlView';
 import { donationViews } from '../../app/routeViews';
 import { StatusBadge } from '../../components/StatusBadge';
 import { DetailSurface } from '../../components/DetailSurface';
+import { SuccessBanner } from '../../components/SuccessBanner';
 
 type DriveItem = {
   item_id: string;
@@ -123,6 +124,7 @@ export function Donations({ user }: { user: Me | null }) {
   const lookupVersion = useRef(0);
   const [disputeReason, setDisputeReason] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const evidenceInput = useRef<HTMLInputElement>(null);
   const [uploadedEvidence, setUploadedEvidence] = useState<{ id: string; donationId: string; name: string; owner: string | null }[]>([]);
   const [evidenceLink, setEvidenceLink] = useState<{ id: string; url: string } | null>(null);
   useEffect(() => { setEvidenceLink(null); }, [tracking?.id, user?.id]);
@@ -135,6 +137,7 @@ export function Donations({ user }: { user: Me | null }) {
   const recoveryKey = useRef<string | null>(null);
   const [createdFile, setCreatedFile] = useState<File | null>(null);
   const [createdUploadMessage, setCreatedUploadMessage] = useState('');
+  const createdFileInput = useRef<HTMLInputElement>(null);
   const pending = useRef<Pending | null>(null);
   const [declarationTouched, setDeclarationTouched] = useState<Record<string, boolean>>({});
   const [declarationAttempted, setDeclarationAttempted] = useState(false);
@@ -273,6 +276,7 @@ export function Donations({ user }: { user: Me | null }) {
         }
       );
       setCreatedFile(null);
+      if (createdFileInput.current) createdFileInput.current.value = '';
       setCreatedUploadMessage('Đã tải ảnh kiện hàng lên thành công.');
     } catch (cause) {
       setCreatedUploadMessage(
@@ -475,6 +479,7 @@ export function Donations({ user }: { user: Me | null }) {
       }
       uploadKey.current = null;
       setFile(null);
+      if (evidenceInput.current) evidenceInput.current.value = '';
       setActionMessage('Máy chủ đã tiếp nhận tệp minh chứng.');
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === 'STORAGE_UNAVAILABLE')
@@ -562,15 +567,15 @@ export function Donations({ user }: { user: Me | null }) {
       <div className="grid-two donation-layout">
         {user && <section className="card donation-owned-list">
           <div className="section-header"><h2>Phiếu quyên góp của tôi</h2><button type="button" className="button secondary" disabled={ownedLoading} onClick={() => setOwnedRevision((value) => value + 1)}>Cập nhật danh sách</button></div>
-          <p>Tối đa 10 phiếu bạn đã tạo hoặc tra cứu bằng tài khoản này. Danh sách không tự đồng bộ các phiếu từ trình duyệt hoặc thiết bị khác. Bấm một phiếu để lấy trạng thái mới nhất.</p>
+          <p>Danh sách phiếu gắn với tài khoản của bạn trên hệ thống. Bấm một phiếu để xem trạng thái mới nhất.</p>
           {ownedLoading && <p role="status">Đang tải đóng góp của bạn…</p>}
           {ownedError && <p className="notice error" role="alert">{ownedError}</p>}
-          {!ownedLoading && !ownedError && ownedFor === accountKey && !ownedDonations.length && <div className="donation-history-empty"><p>Chưa lưu phiếu nào ở đây. Tài khoản vẫn có thể có đóng góp trên hệ thống.</p><button type="button" className="button secondary" onClick={() => trackIdInput.current?.focus()}>Tra cứu phiếu đã có</button></div>}
+          {!ownedLoading && !ownedError && ownedFor === accountKey && !ownedDonations.length && <div className="donation-history-empty"><p>Chưa có phiếu quyên góp nào gắn với tài khoản này.</p><button type="button" className="button secondary" onClick={() => trackIdInput.current?.focus()}>Tra cứu phiếu đã có</button></div>}
           <div className="record-list">
             {(ownedFor === accountKey ? ownedDonations : []).map((donation) => <button type="button" key={donation.id}
               className="record record-clickable" aria-label={`Xem phiếu quyên góp ${donation.public_code}`}
               onClick={() => { setTrackId(donation.id); setTrackSecret(''); void lookupDonation(donation.id, ''); }}>
-              <span><strong>{donation.drive_title}</strong><small>Phiếu {donation.public_code} · Lưu lần đầu trên trình duyệt: {new Date(donation.created_at).toLocaleString('vi-VN')}</small></span>
+              <span><strong>{donation.drive_title}</strong><small>Phiếu {donation.public_code} · Tạo lúc {new Date(donation.created_at).toLocaleString('vi-VN')}</small></span>
               <span className="record-actions"><StatusBadge status={donation.status} /><small>{donation.has_count_result ? 'Đã có kết quả kiểm đếm' : 'Chờ kết quả kiểm đếm'}</small></span>
             </button>)}
           </div>
@@ -771,6 +776,7 @@ export function Donations({ user }: { user: Me | null }) {
                 <input
                   className="donation-file-input"
                   type="file"
+                  ref={evidenceInput}
                   required
                   accept="image/jpeg,image/png,video/mp4"
                   aria-invalid={Boolean(evidenceError)}
@@ -845,6 +851,7 @@ export function Donations({ user }: { user: Me | null }) {
             <input
               className="donation-file-input"
               type="file"
+              ref={createdFileInput}
               required
               accept="image/jpeg,image/png,video/mp4"
               aria-invalid={Boolean(createdEvidenceError)}
@@ -857,9 +864,9 @@ export function Donations({ user }: { user: Me | null }) {
             Tải ảnh kiện hàng lên
           </button>
           {createdUploadMessage && (
-            <p className="notice" role="status">
-              {createdUploadMessage}
-            </p>
+            createdUploadMessage.startsWith('Đã tải')
+              ? <SuccessBanner title="Tải ảnh kiện hàng thành công" description="Ảnh đã được đính kèm vào phiếu khai báo của bạn." />
+              : <p className="notice error" role="alert">{createdUploadMessage}</p>
           )}
         </form>
         <div style={{ marginTop: '1rem' }}>

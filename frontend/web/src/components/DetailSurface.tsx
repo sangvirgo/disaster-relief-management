@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { DetailCloseButton } from './DetailCloseButton';
 
-export function DetailSurface({ modal, open, onClose, children, label = 'Chi tiết biên nhận', className = '', heading }: {
-  label?: string; className?: string; heading?: string; modal: boolean; open: boolean; onClose: () => void; children: ReactNode;
+export function DetailSurface({ modal, open, onClose, children, label = 'Chi tiết biên nhận', className = '', heading, explicitCloseOnly = false }: {
+  label?: string; className?: string; heading?: string; modal: boolean; open: boolean; onClose: () => void; children: ReactNode; explicitCloseOnly?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -26,9 +26,9 @@ export function DetailSurface({ modal, open, onClose, children, label = 'Chi ti�
       if (event.target !== event.currentTarget) return;
       event.preventDefault();
       event.stopPropagation();
-      close();
+      if (!explicitCloseOnly) close();
     }}
-    onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
+    onMouseDown={(event) => { if (!explicitCloseOnly && event.target === event.currentTarget) close(); }}>
     {header}{children}
   </dialog>;
 }

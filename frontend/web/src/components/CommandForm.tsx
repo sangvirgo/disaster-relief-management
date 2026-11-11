@@ -46,6 +46,13 @@ function pointValue(value: string) {
     ? { longitude, latitude }
     : null;
 }
+function requestValuesFor(fields: Field[] | undefined, values: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(values).map(([name, value]) => {
+    const type = fields?.find((field) => field.name === name)?.type;
+    return [name, type === 'textarea' || type === 'text' || type === undefined
+      ? value.trim().normalize('NFC') : value];
+  }));
+}
 function isRequired(field: Field, values: Record<string, string>): boolean {
   return Boolean(field.required || (field.requiredWhen &&
     field.requiredWhen.values.includes(values[field.requiredWhen.field])));
@@ -161,14 +168,15 @@ export function CommandForm({
       const scope = `${spec.service}:${spec.method || 'POST'}:${spec.path}:${spec.version ?? ''}`;
       if (pending.current?.scope !== scope) pending.current = null;
       if (!pending.current) {
+        const submittedValues = requestValuesFor(spec.fields, values);
         const visibleValues = Object.fromEntries(
-          Object.entries(values).filter(([name, value]) => {
+          Object.entries(submittedValues).filter(([name, value]) => {
             const field = spec.fields?.find((candidate) => candidate.name === name);
             return value.trim() !== '' &&
-              (!field?.visibleFor || field.visibleFor(values)) && (!field?.visibleWhen || values[field.visibleWhen.field] === field.visibleWhen.value);
+              (!field?.visibleFor || field.visibleFor(values)) && (!field?.visibleWhen || submittedValues[field.visibleWhen.field] === field.visibleWhen.value);
           })
         );
-        const body = spec.build ? await spec.build(values) : visibleValues;
+        const body = spec.build ? await spec.build(submittedValues) : visibleValues;
         if (spec.version !== undefined) body.expected_version = spec.version;
         pending.current = { scope, key: newCommandKey(), body };
       }

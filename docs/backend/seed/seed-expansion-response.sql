@@ -111,6 +111,54 @@ SELECT team.id, ST_SetSRID(ST_MakePoint(fixture.longitude, fixture.latitude), 43
  WHERE true
 ON CONFLICT DO NOTHING;
 
+-- Three additional APP-led north-region teams for the terrain-rescue demo.
+-- Positions are initial synthetic fixtures; leaders must refresh them after 30 minutes.
+INSERT INTO rescue_team (id, organization_id, operating_region_code, name, team_kind, reporting_mode,
+                         readiness_required, affiliation_verified_at, affiliation_verified_by, availability) VALUES
+  ('00000000-0000-4000-8000-0000000000af', '00000000-0000-4000-8000-000000000001', 'DEMO_C',
+   'Đội cứu hộ địa hình Bắc 1 (demo)', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
+  ('00000000-0000-4000-8000-0000000000b0', '00000000-0000-4000-8000-000000000001', 'DEMO_C',
+   'Đội cứu hộ địa hình Bắc 2 (demo)', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
+  ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-000000000001', 'DEMO_C',
+   'Đội cứu hộ đa năng Bắc (demo)', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO team_member (team_id, user_id, member_role)
+SELECT t.id, fixture.leader_id, 'LEADER'
+  FROM (VALUES
+    ('00000000-0000-4000-8000-0000000000af'::uuid, 'Đội cứu hộ địa hình Bắc 1 (demo)', '00000000-0000-4000-8000-000000000120'::uuid),
+    ('00000000-0000-4000-8000-0000000000b0'::uuid, 'Đội cứu hộ địa hình Bắc 2 (demo)', '00000000-0000-4000-8000-000000000121'::uuid),
+    ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc (demo)', '00000000-0000-4000-8000-000000000122'::uuid)
+  ) AS fixture(team_id, team_name, leader_id)
+  JOIN rescue_team t ON t.id=fixture.team_id AND t.name=fixture.team_name
+    AND t.organization_id='00000000-0000-4000-8000-000000000001' AND t.operating_region_code='DEMO_C'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO team_skill (team_id, skill_code)
+SELECT t.id, fixture.skill_code
+  FROM (VALUES
+    ('00000000-0000-4000-8000-0000000000af'::uuid, 'Đội cứu hộ địa hình Bắc 1 (demo)', 'CLIMBING'),
+    ('00000000-0000-4000-8000-0000000000b0'::uuid, 'Đội cứu hộ địa hình Bắc 2 (demo)', 'CLIMBING'),
+    ('00000000-0000-4000-8000-0000000000b0'::uuid, 'Đội cứu hộ địa hình Bắc 2 (demo)', 'FIRST_AID'),
+    ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc (demo)', 'CLIMBING'),
+    ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc (demo)', 'BOAT')
+  ) AS fixture(team_id, team_name, skill_code)
+  JOIN rescue_team t ON t.id=fixture.team_id AND t.name=fixture.team_name
+    AND t.organization_id='00000000-0000-4000-8000-000000000001' AND t.operating_region_code='DEMO_C'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO team_position (team_id, location, accuracy_m, captured_at, source, set_by_user_id)
+SELECT t.id, ST_SetSRID(ST_MakePoint(fixture.longitude, fixture.latitude), 4326)::geography,
+       NULL, now() - interval '2 minutes', 'COORDINATOR_REPORTED', '00000000-0000-4000-8000-000000000118'
+  FROM (VALUES
+    ('00000000-0000-4000-8000-0000000000af'::uuid, 'Đội cứu hộ địa hình Bắc 1 (demo)', 105.8450::float8, 21.0280::float8),
+    ('00000000-0000-4000-8000-0000000000b0'::uuid, 'Đội cứu hộ địa hình Bắc 2 (demo)', 105.8550::float8, 21.0150::float8),
+    ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc (demo)', 105.8500::float8, 21.0350::float8)
+  ) AS fixture(team_id, team_name, longitude, latitude)
+  JOIN rescue_team t ON t.id=fixture.team_id AND t.name=fixture.team_name
+    AND t.organization_id='00000000-0000-4000-8000-000000000001' AND t.operating_region_code='DEMO_C'
+ON CONFLICT DO NOTHING;
+
 INSERT INTO assistance_request (id, tracking_code, tracking_secret_hash, campaign_id, incident_category_code, report_mode,
                                 reporter_user_id, reporter_name, reporter_contact_phone, description, organization_id,
                                 region_code, status, verifying_since, received_at)

@@ -89,10 +89,10 @@ export function AsyncRequestForm({
           idempotencyKey: key.current,
           body:
             kind === 'cancel'
-              ? { expected_version: version, reason: reason.trim() }
+              ? { expected_version: version, reason: reason.trim().normalize('NFC') }
               : {
                   expected_version: version,
-                  resolution_reason: reason.trim(),
+                  resolution_reason: reason.trim().normalize('NFC'),
                   outcome_basis: basis,
                 },
         }

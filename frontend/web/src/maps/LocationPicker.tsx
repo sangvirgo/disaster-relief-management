@@ -89,6 +89,19 @@ function samePoint(a: Point, b: Point) {
   );
 }
 
+function nearbyAddress(value: unknown): string | null {
+  if (!value || typeof value !== 'object' || !('features' in value)) return null;
+  const features = value.features;
+  if (!Array.isArray(features)) return null;
+  const properties = features[0]?.properties as Record<string, unknown> | undefined;
+  if (!properties || properties.countrycode !== 'VN') return null;
+  const part = (key: string) => typeof properties[key] === 'string' ? String(properties[key]).trim() : '';
+  const street = [part('housenumber'), part('street')].filter(Boolean).join(' ');
+  const parts = [street, street ? '' : part('name'), part('locality'), part('district'),
+    part('city'), part('county'), part('state'), part('country')].filter(Boolean);
+  return [...new Set(parts)].join(', ') || null;
+}
+
 export function LocationPicker({
   value,
   onSelect,
@@ -122,6 +135,9 @@ export function LocationPicker({
   const [searching, setSearching] = useState(false);
   const [suggestions, setSuggestions] = useState<SearchPlace[]>([]);
   const searchAbortRef = useRef<AbortController | null>(null);
+  const addressAbortRef = useRef<AbortController | null>(null);
+  const addressTimerRef = useRef<number | null>(null);
+  const addressCacheRef = useRef(new Map<string, string>());
   const searchOnTypingRef = useRef(false);
   const [selectedAddress, setSelectedAddress] = useState('');
   const [draftPoint, setDraftPoint] = useState<Point | null>(null);
@@ -132,16 +148,48 @@ export function LocationPicker({
 
   function lookupAddress(point: Point, confirmed = false) {
     searchOnTypingRef.current = false;
+    addressAbortRef.current?.abort();
+    if (addressTimerRef.current !== null) window.clearTimeout(addressTimerRef.current);
     const original = chosenSearchRef.current;
     if (original && samePoint(original.point, point)) {
       setSearchQuery(original.label);
       setSelectedAddress(`${confirmed ? 'Đã xác nhận' : 'Địa chỉ gần ghim'}: ${original.label}`);
       return;
     }
-    const label = `Tọa độ ${pointLabel(point)}`;
-    setSearchQuery(label);
-    setSelectedAddress(`${confirmed ? 'Đã xác nhận' : 'Vị trí ghim'}: ${label}`);
+    const key = `${point.latitude.toFixed(5)},${point.longitude.toFixed(5)}`;
+    const cached = addressCacheRef.current.get(key);
+    const prefix = confirmed ? 'Đã xác nhận · địa chỉ gần đúng' : 'Địa chỉ gần ghim';
+    if (cached) {
+      setSearchQuery(cached);
+      setSelectedAddress(`${prefix}: ${cached}`);
+      return;
+    }
+    setSearchQuery('Đang tìm địa chỉ gần ghim…');
+    setSelectedAddress('Đang tìm địa chỉ gần vị trí ghim…');
+    const controller = new AbortController();
+    addressAbortRef.current = controller;
+    addressTimerRef.current = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`https://photon.komoot.io/reverse?lon=${encodeURIComponent(point.longitude)}&lat=${encodeURIComponent(point.latitude)}&limit=1`, { signal: controller.signal });
+        if (!response.ok) throw new Error('ADDRESS_LOOKUP_FAILED');
+        const address = nearbyAddress(await response.json());
+        if (controller.signal.aborted) return;
+        if (address) addressCacheRef.current.set(key, address);
+        setSearchQuery(address || 'Chưa tìm được địa chỉ gần ghim');
+        setSelectedAddress(address ? `${prefix}: ${address}` : 'Chưa tìm được địa chỉ gần ghim. Hãy đối chiếu trực tiếp trên bản đồ.');
+      } catch {
+        if (!controller.signal.aborted) {
+          setSearchQuery('Chưa tra được địa chỉ gần ghim');
+          setSelectedAddress('Chưa tra được địa chỉ gần ghim. Hãy đối chiếu trực tiếp trên bản đồ.');
+        }
+      }
+    }, 350);
   }
+
+  useEffect(() => () => {
+    addressAbortRef.current?.abort();
+    if (addressTimerRef.current !== null) window.clearTimeout(addressTimerRef.current);
+  }, [open, mapEngine]);
 
   // The pin is fixed over the map center. Moving the map changes the draft point.
   useEffect(() => {
@@ -178,7 +226,7 @@ export function LocationPicker({
 
     if (value) {
       setDraftPoint(value);
-      setSelectedAddress('Đã có vị trí. Kéo bản đồ nếu cần chỉnh lại.');
+      lookupAddress(value, true);
     }
 
     let frame = 0;
@@ -272,12 +320,15 @@ export function LocationPicker({
           mapTypeControl: false,
         });
         googleMapRef.current = map;
+        if (value) {
+          setDraftPoint(value);
+          lookupAddress(value, true);
+        }
 
         let userMovedMap = false;
         moveStartListener = map.addListener('dragstart', () => { userMovedMap = true; setMoving(true); });
         moveListener = map.addListener('center_changed', () => {
           if (suppressMoveRef.current || !userMovedMap) return;
-          userMovedMap = false;
           const center = map.getCenter();
           if (!center) return;
           const point = { latitude: center.lat(), longitude: center.lng() };
@@ -290,7 +341,8 @@ export function LocationPicker({
         });
         moveEndListener = map.addListener('idle', () => {
           setMoving(false);
-          if (suppressMoveRef.current) return;
+          if (suppressMoveRef.current || !userMovedMap) return;
+          userMovedMap = false;
           const center = map.getCenter();
           if (center) lookupAddress({ latitude: center.lat(), longitude: center.lng() });
         });
@@ -510,6 +562,8 @@ export function LocationPicker({
                 value={searchQuery}
                 onChange={(e) => {
                   searchOnTypingRef.current = true;
+                  addressAbortRef.current?.abort();
+                  if (addressTimerRef.current !== null) window.clearTimeout(addressTimerRef.current);
                   searchAbortRef.current?.abort();
                   searchAbortRef.current = null;
                   setSearching(false);

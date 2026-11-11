@@ -4,6 +4,7 @@ import { appendPage } from '../../api/pagination';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { DetailCloseButton } from '../../components/DetailCloseButton';
 import { StatusBadge } from '../../components/StatusBadge';
+import { SuccessBanner } from '../../components/SuccessBanner';
 import { label, regionName, timeLabel } from '../../i18n/labels';
 
 type Campaign = {
@@ -30,6 +31,12 @@ export function Campaigns() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [regions, setRegions] = useState<Region[]>([]);
   const [regionError, setRegionError] = useState('');
+  const [createdName, setCreatedName] = useState('');
+  useEffect(() => {
+    if (!createdName) return;
+    const timer = window.setTimeout(() => setCreatedName(''), 8000);
+    return () => window.clearTimeout(timer);
+  }, [createdName]);
   useEffect(() => {
     let live = true;
     async function loadRegions() {
@@ -139,6 +146,7 @@ export function Campaigns() {
   return (
     <div className="campaign-layout">
       <section className="card campaign-list-panel">
+        {createdName && <div className="campaign-success-toast"><SuccessBanner title="Đã tạo chiến dịch thành công" description={`Chiến dịch “${createdName}” đã được lưu. Bạn có thể chọn trong danh sách để kích hoạt.`} /></div>}
         <div className="section-header">
           <div>
             <span className="eyebrow">Điều phối cứu trợ</span>
@@ -254,7 +262,7 @@ export function Campaigns() {
         ) : (
           <>
             {regionError && <p className="notice warning" role="status">{regionError}</p>}
-            <CommandForm spec={create} onSuccess={done} />
+            <CommandForm key={revision} spec={create} onSuccess={(result) => { setCreatedName((result as Campaign | undefined)?.name || 'mới'); done(); }} />
           </>
         )}
       </section>

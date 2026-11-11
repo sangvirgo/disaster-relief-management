@@ -127,7 +127,7 @@ export const pages: Record<Workspace, Page[]> = {
     { id: 'regions', title: 'Khu vực', icon: 'regions', service: 'identity', path: '/regions' },
     {
       id: 'audit',
-      title: 'Nhật ký kiểm toán',
+      title: 'Lịch sử thao tác',
       icon: 'audit',
       note: 'Xem lịch sử thay đổi người dùng, quyền truy cập, tổ chức và khu vực.',
     },

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
 import type { Me } from '../../auth/session';
+import { me } from '../../auth/session';
 import type { components as ResponseComponents } from '../../api/generated/response';
 import { requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { LocationPicker } from '../../maps/LocationPicker';
@@ -121,7 +122,7 @@ export function SosForm({
   function locate() {
     const attempt = ++locationAttempt.current;
     if (!navigator.geolocation) {
-      setError('Trình duyệt không hỗ trợ xác định vị trí. Hãy nhập tọa độ vị trí cần hỗ trợ.');
+      setError('Trình duyệt không hỗ trợ xác định vị trí. Hãy chọn vị trí cần hỗ trợ trên bản đồ.');
       return;
     }
     setError('');
@@ -139,17 +140,9 @@ export function SosForm({
         setNetworkError(false);
         pending.current = null;
       },
-      () => { if (attempt === locationAttempt.current) setError('Không thể lấy vị trí. Hãy nhập tọa độ vị trí cần hỗ trợ.'); },
+      () => { if (attempt === locationAttempt.current) setError('Không thể lấy vị trí. Hãy chọn vị trí cần hỗ trợ trên bản đồ.'); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  }
-  function changeCoordinates(setter: (value: string) => void, value: string) {
-    locationAttempt.current += 1;
-    setter(value);
-    setSource('MANUAL_PIN');
-    setAccuracy(null);
-    setCaptured(null);
-    pending.current = null;
   }
   function chooseMapPoint(point: { longitude: number; latitude: number } | null) {
     locationAttempt.current += 1;
@@ -272,6 +265,15 @@ export function SosForm({
     try {
       const command = pending.current || build();
       pending.current = command;
+      // A web session can expire while the citizen is filling in the form.
+      // Response otherwise sees an anonymous SELF request without a guest secret
+      // and returns TRACKING_SECRET_INVALID, which obscures the real problem.
+      if (user) {
+        const activeUser = await me();
+        if (activeUser.id !== user.id) {
+          throw new Error('Tài khoản đăng nhập đã thay đổi. Vui lòng tải lại trang và kiểm tra yêu cầu trước khi gửi.');
+        }
+      }
       const result = await api<Created>('response', command.path, {
         method: 'POST',
         body: command.body,
@@ -290,7 +292,11 @@ export function SosForm({
         requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-sos-field="${cause.field}"]`)?.focus());
       } else {
         setNetworkError(cause instanceof ApiError && cause.code === 'NETWORK_UNAVAILABLE');
-        setError(cause instanceof Error ? cause.message : 'Chưa gửi được yêu cầu. Vui lòng thử lại.');
+        setError(cause instanceof ApiError && cause.code === 'TRACKING_SECRET_INVALID'
+          ? user
+            ? 'Phiên đăng nhập có thể đã hết hạn. Vui lòng đăng nhập lại rồi gửi yêu cầu.'
+            : 'Mã bảo mật gửi SOS chưa hợp lệ. Vui lòng tải lại trang rồi gửi lại.'
+          : cause instanceof Error ? cause.message : 'Chưa gửi được yêu cầu. Vui lòng thử lại.');
       }
     } finally {
       setBusy(false);
@@ -306,16 +312,10 @@ export function SosForm({
     fieldError?.field === field || Boolean((attempted || touched[field]) && clientErrors[field]);
   if (created)
     return (
-      <section className="card confirmation" role="status">
-        <span className="eyebrow">Đã gửi thành công</span>
-        <h2>Yêu cầu đã được tiếp nhận</h2>
-        <p>
-          Mã theo dõi: <strong>{created.tracking_code}</strong>
-          <button type="button" className="button secondary" onClick={() => copyReceipt(created.tracking_code)}>Sao chép mã theo dõi</button>
-        </p>
-        <p>
-          Trạng thái: {requestStatusLabel(created.status)} · Thời điểm: {timeLabel(created.received_at)}
-        </p>
+      <section className="card confirmation sos-confirmation" role="status">
+        <div className="sos-confirmation-heading"><span className="sos-confirmation-icon" aria-hidden="true">✓</span><div><span className="eyebrow">Đã gửi thành công</span><h2>Yêu cầu đã được tiếp nhận</h2></div></div>
+        <div className="sos-tracking-receipt"><div><span>Mã theo dõi</span><strong>{created.tracking_code}</strong></div><button type="button" className="button secondary" onClick={() => copyReceipt(created.tracking_code)}>Sao chép mã</button></div>
+        <p className="sos-confirmation-meta"><span>Trạng thái: <strong>{requestStatusLabel(created.status)}</strong></span><span>Tiếp nhận lúc {timeLabel(created.received_at)}</span></p>
         {ackSecret && (
           <div className="notice warning">
             <strong>Lưu mã bảo mật này ngay:</strong>
@@ -567,42 +567,7 @@ export function SosForm({
         }
         onSelect={chooseMapPoint}
       />
-      <details className="sos-coordinate-details">
-        <summary>Chi tiết tọa độ {longitude && latitude ? `· ${Number(latitude).toFixed(5)}, ${Number(longitude).toFixed(5)}` : '· có thể nhập thủ công'}</summary>
-        <p className="muted">Tọa độ đã xác nhận trên bản đồ là vị trí dùng để gửi SOS; địa chỉ tìm được chỉ mang tính gần đúng.</p>
-      <div className="form-grid">
-        <label>
-          <span>Kinh độ <span className="required-mark" aria-hidden="true">*</span></span>
-          <input
-            data-sos-field="location"
-            aria-invalid={fieldInvalid('location')}
-            type="number"
-            step="any"
-            min="-180"
-            max="180"
-            required
-            value={longitude}
-            onChange={(e) => changeCoordinates(setLongitude, e.target.value)}
-            placeholder="Ví dụ: 106.70"
-          />
-        </label>
-        <label>
-          <span>Vĩ độ <span className="required-mark" aria-hidden="true">*</span></span>
-          <input
-            data-sos-field="location"
-            aria-invalid={fieldInvalid('location')}
-            type="number"
-            step="any"
-            min="-90"
-            max="90"
-            required
-            value={latitude}
-            onChange={(e) => changeCoordinates(setLatitude, e.target.value)}
-            placeholder="Ví dụ: 10.77"
-          />
-        </label>
-      </div>
-      </details>
+      {longitude && latitude && <p className="sos-selected-coordinates">Vị trí đã chọn: {Number(latitude).toFixed(5)}, {Number(longitude).toFixed(5)}</p>}
       {mode === 'PROXY' && (
         <>
           <div className="notice warning">

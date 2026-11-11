@@ -1840,7 +1840,14 @@ function App() {
   }
 
   if (sessionState === 'loading') {
-    return <div className="session-loading" role="status">Đang kiểm tra phiên đăng nhập…</div>;
+    return <div className="session-loading" role="status" aria-label="Đang mở Reliva">
+      <div className="session-loading-card">
+        <img src="/reliva-logo.png" alt="" aria-hidden="true" />
+        <strong>Reliva</strong>
+        <span>Chung tay cứu trợ thiên tai</span>
+        <div className="session-loading-progress" aria-hidden="true"><span /></div>
+      </div>
+    </div>;
   }
 
   return (
@@ -1948,7 +1955,7 @@ function App() {
           </div>
         </div>}
 
-        <main className={`content ${workspace === 'citizen' && selected.id === 'sos' ? 'content--sos' : ''}`}>
+        <main className={`content ${workspace === 'citizen' && selected.id === 'sos' ? 'content--sos' : ''} ${selected.id === 'track' ? 'content--tracking' : ''}`}>
           <ContentErrorBoundary key={`${user?.id || 'guest'}:${workspace}:${selected.id}`}>
           <React.Suspense fallback={<div className="card" role="status">Đang tải nội dung…</div>}>
           <div className="heading">

@@ -1250,6 +1250,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                           setCompletionPreviewUrl('');
                           completionUploadKeyRef.current = null;
                           setActionMessage(file ? missionEvidenceError(file) || '' : '');
+                          event.currentTarget.blur();
                         }}
                       />
                       <span className="tracking-file-icon" aria-hidden="true">↑</span>
