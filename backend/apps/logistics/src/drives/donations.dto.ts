@@ -70,3 +70,27 @@ export class DonationPageQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
   limit?: number;
 }
+
+export class MyDonationPageQueryDto {
+  @IsOptional() @IsIn(['DECLARED', 'COUNTING', 'PENDING_REVIEW', 'APPROVED', 'POSTED', 'REJECTED', 'CANCELLED'])
+  status?: string;
+
+  @IsOptional() @IsString() @MaxLength(2048)
+  cursor?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit?: number;
+}
+
+export class GuestDonationLookupItemDto {
+  @IsUUID('all')
+  id!: string;
+
+  @IsString() @Matches(/^[A-Za-z0-9_-]{43,128}$/u)
+  secret!: string;
+}
+
+export class GuestDonationLookupDto {
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @ValidateNested({ each: true }) @Type(() => GuestDonationLookupItemDto)
+  items!: GuestDonationLookupItemDto[];
+}

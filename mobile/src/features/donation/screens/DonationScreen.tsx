@@ -318,7 +318,26 @@ export const DonationScreen: React.FC = () => {
   const loadRecentReceipts = useCallback(async () => {
     const list = await StorageService.getSavedDonationReceipts();
     setRecentReceipts(list);
-  }, []);
+    if (!isAuthenticated) return;
+    try {
+      const mine = await LogisticsApi.getMyDonations(50);
+      setRecentReceipts((current) => {
+        const known = new Set(mine.items.map((item) => item.id));
+        return [
+          ...mine.items.map((item) => ({
+            id: item.id,
+            public_code: item.public_code,
+            drive_title: item.drive_title,
+            created_at: item.created_at,
+            evidence: current.find((receipt) => receipt.id === item.id)?.evidence,
+          })),
+          ...current.filter((receipt) => !known.has(receipt.id)),
+        ];
+      });
+    } catch {
+      // Giữ danh sách đã lưu trên thiết bị khi chưa tải được từ máy chủ.
+    }
+  }, [isAuthenticated]);
 
   const getReceiptSecret = async (id: string, publicCode: string): Promise<string | undefined> => {
     return (await StorageService.getSecretForDonation(id))

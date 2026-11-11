@@ -87,4 +87,40 @@ describe('Logistics donor tracking queries', () => {
 
     await expect(service.track(deliveryId, secret, request())).rejects.toMatchObject({ code: 'DONATION_SECRET_INVALID', status: 400 });
   });
+
+  it('lists only the signed-in donor\'s own deliveries without donor contacts', async () => {
+    const query = jest.fn(async (_sql: string, _parameters?: unknown[]) => [{
+      id: deliveryId, drive_id: '22222222-2222-4222-8222-222222222222', drive_title: 'Đợt 1', public_code: 'ABCDEFGH',
+      status: 'DECLARED', version: 1, created_at: new Date('2026-11-01T00:00:00Z'), has_count_result: false,
+      cursor_at: '2026-11-01T00:00:00.000000Z',
+    }]);
+    const sessions = { require: jest.fn(async () => ({ userId: 'user-1', grants: [] })) };
+    const service = new DonationsQueriesService({ query } as never, sessions as never, config);
+
+    const result = await service.listMine({}, request());
+
+    expect(query.mock.calls[0]?.[1]).toEqual(['user-1', 51]);
+    expect(result).toMatchObject({ items: [{ id: deliveryId, drive_title: 'Đợt 1', has_count_result: false }], more: false });
+    expect(JSON.stringify(result)).not.toContain('donor_phone');
+    expect(JSON.stringify(result)).not.toContain('cursor_at');
+  });
+
+  it('returns guest deliveries only for ids whose own secret verifies', async () => {
+    const otherId = '66666666-6666-4666-8666-666666666666';
+    const query = jest.fn(async () => [{
+      id: deliveryId, drive_id: 'd', drive_title: 'Đợt 1', public_code: 'ABCDEFGH', status: 'DECLARED', version: 1,
+      created_at: new Date('2026-11-01T00:00:00Z'), has_count_result: false,
+      capability_hash: hashPurposeBoundSecret(secret, 'donation-delivery', config.peppers, 'v1'),
+    }, {
+      id: otherId, drive_id: 'd', drive_title: 'Đợt 1', public_code: 'JKMNPQRS', status: 'DECLARED', version: 1,
+      created_at: new Date('2026-11-02T00:00:00Z'), has_count_result: false,
+      capability_hash: hashPurposeBoundSecret(Buffer.alloc(32, 9).toString('base64url'), 'donation-delivery', config.peppers, 'v1'),
+    }]);
+    const service = new DonationsQueriesService({ query } as never, { require: jest.fn() } as never, config);
+
+    const result = await service.lookupGuest({ items: [{ id: deliveryId, secret }, { id: otherId, secret }] });
+
+    expect(result).toMatchObject({ items: [{ id: deliveryId }], unavailable: [otherId] });
+    expect(JSON.stringify(result)).not.toContain('capability_hash');
+  });
 });

@@ -42,6 +42,17 @@ export interface ApiErrorEnvelope {
   correlation_id?: string;
 }
 
+export interface DonationSummary {
+  id: string;
+  drive_id: string;
+  drive_title: string;
+  public_code: string;
+  status: string;
+  version: number;
+  created_at: string;
+  has_count_result: boolean;
+}
+
 export interface CollectionPage<T> {
   items: T[];
   more: boolean;

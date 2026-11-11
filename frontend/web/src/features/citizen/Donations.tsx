@@ -213,15 +213,16 @@ export function Donations({ user }: { user: Me | null }) {
       const records: OwnedDonation[] = Array.isArray(saved) ? saved.filter((item): item is OwnedDonation => Boolean(item && typeof item.id === 'string' && typeof item.public_code === 'string' && typeof item.status === 'string' && typeof item.created_at === 'string')).slice(0, 10) : [];
       if (live) setOwnedDonations(records);
       if (view !== 'donation') return;
-      const results = await Promise.allSettled(records.map(async (record) => {
-        const current = await api<Tracking>('logistics', '/public/donations/' + encodeURIComponent(record.id));
-        return { ...record, status: current.status, has_count_result: Boolean(current.receipt) };
-      }));
-      if (!live) return;
-      const updated = results.map((result, index) => result.status === 'fulfilled' ? result.value : records[index]);
-      setOwnedDonations(updated);
-      localStorage.setItem('reliva.donation-history.' + accountKey, JSON.stringify(updated));
-      if (results.some((result) => result.status === 'rejected')) setOwnedError('Một số phiếu chưa cập nhật được; trạng thái đang hiển thị là lần lưu gần nhất. Hãy thử cập nhật lại.');
+      try {
+        const page = await api<{ items: OwnedDonation[] }>('logistics', '/public/donations/mine?limit=50');
+        if (!live) return;
+        const updated = page.items.map((item) => ({ id: item.id, public_code: item.public_code, status: item.status,
+          created_at: item.created_at, drive_title: item.drive_title || 'Phiếu quyên góp', has_count_result: Boolean(item.has_count_result) }));
+        setOwnedDonations(updated);
+        localStorage.setItem('reliva.donation-history.' + accountKey, JSON.stringify(updated.slice(0, 10)));
+      } catch {
+        if (live) setOwnedError('Chưa tải được danh sách phiếu từ máy chủ; đang hiển thị lần lưu gần nhất trên trình duyệt. Hãy thử cập nhật lại.');
+      }
     };
     void refresh().catch(() => { if (live) setOwnedError('Không đọc được lịch sử trên trình duyệt này. Bạn vẫn có thể tra cứu bằng định danh.'); })
       .finally(() => { if (live) setOwnedLoading(false); });
@@ -560,7 +561,7 @@ export function Donations({ user }: { user: Me | null }) {
       <>{nav}
       <div className="grid-two donation-layout">
         {user && <section className="card donation-owned-list">
-          <div className="section-header"><h2>Phiếu đã lưu trên trình duyệt này</h2><button type="button" className="button secondary" disabled={ownedLoading || !ownedDonations.length} onClick={() => setOwnedRevision((value) => value + 1)}>Cập nhật phiếu đã lưu</button></div>
+          <div className="section-header"><h2>Phiếu quyên góp của tôi</h2><button type="button" className="button secondary" disabled={ownedLoading} onClick={() => setOwnedRevision((value) => value + 1)}>Cập nhật danh sách</button></div>
           <p>Tối đa 10 phiếu bạn đã tạo hoặc tra cứu bằng tài khoản này. Danh sách không tự đồng bộ các phiếu từ trình duyệt hoặc thiết bị khác. Bấm một phiếu để lấy trạng thái mới nhất.</p>
           {ownedLoading && <p role="status">Đang tải đóng góp của bạn…</p>}
           {ownedError && <p className="notice error" role="alert">{ownedError}</p>}

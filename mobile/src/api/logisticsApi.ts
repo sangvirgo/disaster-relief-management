@@ -8,6 +8,7 @@ import {
   PublicDonationReportSummary,
   EvidenceDownload,
   CollectionPage,
+  DonationSummary,
 } from '../types/api';
 import { generateUUID } from '../utils/secureStore';
 
@@ -101,6 +102,23 @@ export const LogisticsApi = {
       `/logistics/public/donations/${donationId}/claim`,
       {},
       { headers }
+    );
+    return response.data;
+  },
+
+  // Danh sách phiếu quyên góp của tài khoản đã đăng nhập (GET /logistics/public/donations/mine)
+  async getMyDonations(limit = 50, cursor?: string): Promise<CollectionPage<DonationSummary>> {
+    const response = await apiClient.get<CollectionPage<DonationSummary>>('/logistics/public/donations/mine', {
+      params: { limit, cursor },
+    });
+    return response.data;
+  },
+
+  // Tra cứu hàng loạt phiếu của khách bằng cặp (id, mã bí mật) (POST /logistics/public/donations/lookup)
+  async lookupGuestDonations(items: { id: string; secret: string }[]): Promise<{ items: DonationSummary[]; unavailable: string[] }> {
+    const response = await apiClient.post<{ items: DonationSummary[]; unavailable: string[] }>(
+      '/logistics/public/donations/lookup',
+      { items },
     );
     return response.data;
   },
