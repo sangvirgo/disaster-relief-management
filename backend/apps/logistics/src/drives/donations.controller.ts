@@ -5,7 +5,7 @@ import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import {
   CreateDonationDeliveryDto, DeclarationRevisionDto, DonationRecoveryIssueDto, DonationRecoveryRedeemDto,
-  OpenDonationDisputeDto,
+  GuestDonationLookupDto, MyDonationPageQueryDto, OpenDonationDisputeDto,
 } from './donations.dto';
 import { DonationCommandRequest, DonationsService } from './donations.service';
 import { DonationsQueriesService } from './donations-queries.service';
@@ -65,6 +65,19 @@ export class DonationsController {
     const result = await this.donations.createDelivery(driveId, dto, secret, request);
     replay(response, result.replay);
     return result.value;
+  }
+
+  @Get('public/donations/mine')
+  listMine(@Query() query: MyDonationPageQueryDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.queries.listMine(query, request);
+  }
+
+  @Post('public/donations/lookup')
+  @HttpCode(HttpStatus.OK)
+  lookupGuest(@Body() dto: GuestDonationLookupDto, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.queries.lookupGuest(dto);
   }
 
   @Get('public/donations/:id')
