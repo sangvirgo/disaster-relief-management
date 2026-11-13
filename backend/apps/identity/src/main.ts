@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
-import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, loadErrorCatalog, PinoNestLogger, validateEnvironment } from '@c48/technical';
+import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, loadErrorCatalog, PinoNestLogger, validateEnvironment, validationExceptionFactory } from '@c48/technical';
 import { setupOpenApiDocs } from '@c48/technical/openapi-docs';
 import { AppModule } from './app.module';
 import { loadIdentityAuthConfig } from './auth/auth-security';
@@ -17,7 +17,7 @@ async function bootstrap(): Promise<void> {
     next();
   });
   app.useGlobalFilters(new ApiExceptionFilter(loadErrorCatalog(), 'identity'));
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, exceptionFactory: validationExceptionFactory }));
   app.enableCors({
     origin: [...authConfig.webOrigins],
     credentials: true,

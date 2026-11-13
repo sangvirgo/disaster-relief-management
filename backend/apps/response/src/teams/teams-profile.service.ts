@@ -63,7 +63,7 @@ export class TeamsProfileService {
     }
 
     await this.assertRegion(dto.operating_region_code);
-    const skillCodes = [...dto.skill_codes].sort();
+    const skillCodes = [...(dto.skill_codes ?? [])].sort();
     await this.assertSkills(skillCodes);
     if (dto.leader_user_id) await this.assertEligibleLeader(dto.leader_user_id, dto.organization_id);
 
