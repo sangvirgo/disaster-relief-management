@@ -57,6 +57,7 @@ Throttling (Nginx + app): login 5 / minute per IP+username, 30 / minute per IP; 
 | `POST /organizations/{id}/members` (Idem) | `{ user_id }` → `201` · `POST /organizations/{id}/members/{user_id}/remove` → `204` | Removing a member revokes the member's live grants scoped to this organization and all session families in the same transaction; each grant revocation and membership change is audited. |
 | `POST /regions` (Idem) · `POST /regions/{code}/deactivate` | `{ code, name }` | `SYSTEM`-scope admin |
 | `GET /audit-logs?entity_type=&entity_id=&cursor=` | → paged audit rows | `entity_type` is required; `AUDIT_READ`; no password/token/secret ever stored |
+| `GET /dashboard/admin` | → account/access snapshot | `USER_MANAGE` (system admin). Users by status, pending email verification, must-change-password, active in 24 h, active users per role, organizations per kind, 10 latest audit actions (action/entity type/time only). `no-store`. |
 
 Every admin write inserts an `audit_log` row (actor, action, entity, before/after, reason, correlation id) in the same transaction.
 

@@ -7,6 +7,7 @@ import { AddAuthEmailOtpGoogle1792953600000 } from './database/migrations/AddAut
 import { GrantExternalIdentitySelect1794144543000 } from './database/migrations/GrantExternalIdentitySelect1794144543000';
 import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
+import { IdentityDashboardModule } from './dashboard/dashboard.module';
 import { GrantsModule } from './grants/grants.module';
 import { InternalModule } from './internal/internal.module';
 import { OrganizationsModule } from './organizations/organizations.module';
@@ -23,6 +24,7 @@ import { UsersModule } from './users/users.module';
     GrantsModule,
     RegionsModule,
     AuditModule,
+    IdentityDashboardModule,
     InternalModule,
   ],
 })

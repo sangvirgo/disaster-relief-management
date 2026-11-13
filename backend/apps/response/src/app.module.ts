@@ -18,6 +18,8 @@ import { MissionsModule } from './missions/missions.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { MapModule } from './map/map.module';
 import { ReportsModule } from './reports/reports.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { WeatherModule } from './weather/weather.module';
 import { NoticesModule } from './notices/notices.module';
 import { RequestResolutionModule } from './resolution/request-resolution.module';
 import { AiAdvisoryService } from './ai/ai-advisory.service';
@@ -35,6 +37,8 @@ import { AiAdvisoryService } from './ai/ai-advisory.service';
     CampaignsModule,
     MapModule,
     ReportsModule,
+    DashboardModule,
+    WeatherModule,
     NoticesModule,
     RequestResolutionModule,
   ],

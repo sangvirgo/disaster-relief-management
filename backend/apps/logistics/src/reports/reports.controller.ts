@@ -7,6 +7,8 @@ import {
 } from './reports.dto';
 import { ReconciliationReportService } from './reconciliation-report.service';
 import { StockReportService } from './stock-report.service';
+import { DriveSuggestionsService } from './drive-suggestions.service';
+import { OperationsDashboardService } from './operations-dashboard.service';
 import { noStore } from '@c48/technical/http/response-headers';
 
 @Controller()
@@ -16,7 +18,21 @@ export class ReportsController {
     private readonly fulfillment: FulfillmentReportService,
     private readonly donations: DonationReportService,
     private readonly reconciliation: ReconciliationReportService,
+    private readonly driveSuggestions: DriveSuggestionsService,
+    private readonly operationsDashboard: OperationsDashboardService,
   ) {}
+
+  @Get('dashboard/operations')
+  operations(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.operationsDashboard.overview(request);
+  }
+
+  @Get('reports/drive-suggestions')
+  suggestDrives(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.driveSuggestions.suggestions(request);
+  }
 
   @Get('reports/stock-summary')
   stockSummary(

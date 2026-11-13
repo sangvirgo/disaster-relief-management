@@ -40,33 +40,33 @@ ON CONFLICT DO NOTHING;
 INSERT INTO rescue_team (id, organization_id, operating_region_code, name, team_kind, reporting_mode, external_contact_note,
                          readiness_required, affiliation_verified_at, affiliation_verified_by, availability) VALUES
   ('00000000-0000-4000-8000-0000000000a9', '00000000-0000-4000-8000-000000000002', 'DEMO_C',
-   'Đội xuồng cứu hộ Demo C', 'VOLUNTEER', 'APP', NULL, false, now() - interval '2 days',
+   'Đội xuồng cứu hộ Bắc (demo)', 'VOLUNTEER', 'APP', NULL, false, now() - interval '2 days',
    '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-000000000002', 'DEMO_A',
-   'Đội sơ cứu lưu động Demo A', 'VOLUNTEER', 'APP', NULL, false, now() - interval '2 days',
+   'Đội sơ cứu lưu động Nam (demo)', 'VOLUNTEER', 'APP', NULL, false, now() - interval '2 days',
    '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000ab', '00000000-0000-4000-8000-000000000001', 'DEMO_B',
-   'Đội hỗ trợ cơ động Demo B', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập Demo B.', false,
+   'Đội hỗ trợ cơ động Trung (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập.', false,
    now() - interval '2 days', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000ac', '00000000-0000-4000-8000-000000000001', 'DEMO_C',
-   'Đội y tế cộng đồng Demo C', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập Demo C.', false,
+   'Đội y tế cộng đồng Bắc (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập.', false,
    now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000ad', '00000000-0000-4000-8000-000000000001', 'DEMO_A',
-   'Đội xuồng cứu hộ Demo A', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội xuồng giả lập Demo A.', false,
+   'Đội xuồng cứu hộ Nam (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội xuồng giả lập.', false,
    now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000ae', '00000000-0000-4000-8000-000000000001', 'DEMO_C',
-   'Đội cứu hộ Bắc Demo', 'VOLUNTEER', 'APP', NULL, false,
+   'Đội cứu hộ cơ động Bắc (demo)', 'VOLUNTEER', 'APP', NULL, false,
    now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO team_member (team_id, user_id, member_role)
 SELECT team.id, fixture.user_id, fixture.member_role
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Demo C', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000114'::uuid, 'LEADER'),
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Demo C', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000115'::uuid, 'MEMBER'),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Demo A', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_A', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000116'::uuid, 'LEADER'),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Demo A', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_A', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000117'::uuid, 'MEMBER'),
-    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ Bắc Demo', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000119'::uuid, 'LEADER')
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000114'::uuid, 'LEADER'),
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000115'::uuid, 'MEMBER'),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_A', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000116'::uuid, 'LEADER'),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_A', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000117'::uuid, 'MEMBER'),
+    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000119'::uuid, 'LEADER')
   ) AS fixture(team_id, team_name, organization_id, region_code, team_kind, reporting_mode, user_id, member_role)
   JOIN rescue_team team ON team.id = fixture.team_id AND team.name = fixture.team_name
                        AND team.organization_id = fixture.organization_id AND team.operating_region_code = fixture.region_code
@@ -77,16 +77,16 @@ ON CONFLICT DO NOTHING;
 INSERT INTO team_skill (team_id, skill_code)
 SELECT team.id, fixture.skill_code
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Demo C', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', 'BOAT'),
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Demo C', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', 'FIRST_AID'),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Demo A', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_A', 'VOLUNTEER', 'APP', 'FIRST_AID'),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Demo A', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_A', 'VOLUNTEER', 'APP', 'TRUCK_DRIVER'),
-    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Demo B', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_B', 'GOVERNMENT', 'COORDINATOR', 'RADIO'),
-    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Demo B', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_B', 'GOVERNMENT', 'COORDINATOR', 'TRUCK_DRIVER'),
-    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Demo C', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'GOVERNMENT', 'COORDINATOR', 'FIRST_AID'),
-    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Demo C', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'GOVERNMENT', 'COORDINATOR', 'CLIMBING'),
-    ('00000000-0000-4000-8000-0000000000ad'::uuid, 'Đội xuồng cứu hộ Demo A', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_A', 'GOVERNMENT', 'COORDINATOR', 'BOAT'),
-    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ Bắc Demo', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', 'BOAT')
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', 'BOAT'),
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', 'FIRST_AID'),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_A', 'VOLUNTEER', 'APP', 'FIRST_AID'),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_A', 'VOLUNTEER', 'APP', 'TRUCK_DRIVER'),
+    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_B', 'GOVERNMENT', 'COORDINATOR', 'RADIO'),
+    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_B', 'GOVERNMENT', 'COORDINATOR', 'TRUCK_DRIVER'),
+    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'GOVERNMENT', 'COORDINATOR', 'FIRST_AID'),
+    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'GOVERNMENT', 'COORDINATOR', 'CLIMBING'),
+    ('00000000-0000-4000-8000-0000000000ad'::uuid, 'Đội xuồng cứu hộ Nam (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_A', 'GOVERNMENT', 'COORDINATOR', 'BOAT'),
+    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', 'BOAT')
   ) AS fixture(team_id, team_name, organization_id, region_code, team_kind, reporting_mode, skill_code)
   JOIN rescue_team team ON team.id = fixture.team_id AND team.name = fixture.team_name
                        AND team.organization_id = fixture.organization_id AND team.operating_region_code = fixture.region_code
@@ -98,12 +98,12 @@ INSERT INTO team_position (team_id, location, accuracy_m, captured_at, source, s
 SELECT team.id, ST_SetSRID(ST_MakePoint(fixture.longitude, fixture.latitude), 4326)::geography,
        NULL, now() - interval '5 minutes', 'COORDINATOR_REPORTED', '00000000-0000-4000-8000-000000000118'
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Demo C', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', 105.8500::float8, 21.0300::float8),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Demo A', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_A', 'VOLUNTEER', 'APP', 106.7000::float8, 10.7800::float8),
-    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Demo B', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_B', 'GOVERNMENT', 'COORDINATOR', 107.6000::float8, 16.0700::float8),
-    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Demo C', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'GOVERNMENT', 'COORDINATOR', 105.8700::float8, 21.0500::float8),
-    ('00000000-0000-4000-8000-0000000000ad'::uuid, 'Đội xuồng cứu hộ Demo A', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_A', 'GOVERNMENT', 'COORDINATOR', 106.7000::float8, 10.7800::float8),
-    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ Bắc Demo', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', 105.8600::float8, 21.0400::float8)
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', 105.8500::float8, 21.0300::float8),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'DEMO_A', 'VOLUNTEER', 'APP', 106.7000::float8, 10.7800::float8),
+    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_B', 'GOVERNMENT', 'COORDINATOR', 107.6000::float8, 16.0700::float8),
+    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'GOVERNMENT', 'COORDINATOR', 105.8700::float8, 21.0500::float8),
+    ('00000000-0000-4000-8000-0000000000ad'::uuid, 'Đội xuồng cứu hộ Nam (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_A', 'GOVERNMENT', 'COORDINATOR', 106.7000::float8, 10.7800::float8),
+    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'DEMO_C', 'VOLUNTEER', 'APP', 105.8600::float8, 21.0400::float8)
   ) AS fixture(team_id, team_name, organization_id, region_code, team_kind, reporting_mode, longitude, latitude)
   JOIN rescue_team team ON team.id = fixture.team_id AND team.name = fixture.team_name
                        AND team.organization_id = fixture.organization_id AND team.operating_region_code = fixture.region_code

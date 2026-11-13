@@ -59,8 +59,8 @@ export class CreateTeamDto {
   @IsOptional() @IsString() @MaxLength(1_000) @Matches(/\S/u)
   declare external_contact_note?: string;
 
-  @IsArray() @ArrayMaxSize(50) @ArrayUnique() @Matches(skillCodePattern, { each: true })
-  skill_codes!: string[];
+  @IsOptional() @IsArray() @ArrayMaxSize(50) @ArrayUnique() @Matches(skillCodePattern, { each: true })
+  declare skill_codes?: string[];
 }
 
 export class UpdateTeamDto {

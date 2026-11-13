@@ -403,9 +403,10 @@ SELECT pg_temp.must('R12 resolved without seal or Logistics admission, completed
 SELECT pg_temp.must('capacity-one: every team has at most one active mission and exactly 2 are active',
   (SELECT coalesce(max(c), 0) FROM (SELECT count(*) c FROM mission WHERE status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE') GROUP BY team_id) x) = 1
   AND (SELECT count(*) FROM mission WHERE status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE')) = 2);
-SELECT pg_temp.must('teams: 15 teams, mixed kinds/modes, stale position, no position, readiness latch',
-  (SELECT count(*) FROM rescue_team) = 15
-  AND (SELECT count(*) FROM rescue_team WHERE reporting_mode = 'COORDINATOR' AND external_contact_note IS NOT NULL) = 7
+SELECT pg_temp.must('teams: 8 base teams (expansion adds more), mixed kinds/modes, stale position, no position, readiness latch',
+  (SELECT count(*) FROM rescue_team) >= 8
+  AND (SELECT count(*) FROM rescue_team WHERE reporting_mode = 'COORDINATOR' AND external_contact_note IS NOT NULL
+         AND id IN (pg_temp.u('a3'), pg_temp.u('a4'), pg_temp.u('a6'), pg_temp.u('a7'), pg_temp.u('a8'))) = 5
   AND (SELECT count(*) FROM team_position WHERE captured_at < now() - interval '30 minutes') = 1
   AND NOT EXISTS (SELECT 1 FROM team_position WHERE team_id = pg_temp.u('a4'))
   AND NOT EXISTS (SELECT 1 FROM team_member WHERE team_id IN (pg_temp.u('a3'), pg_temp.u('a4')))
