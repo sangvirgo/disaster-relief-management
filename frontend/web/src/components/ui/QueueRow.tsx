@@ -31,10 +31,12 @@ export function QueueRow({
       <span className="ui-queue-row__content">
         <strong title={title}>{title}</strong>
         <small title={meta}>{meta}</small>
-        {details && <span className="ui-queue-row__details">{details}</span>}
+        <span className="ui-queue-row__foot">
+          <span className="ui-queue-row__status">{status}</span>
+          {details}
+          {time && <time className="ui-queue-row__time">{time}</time>}
+        </span>
       </span>
-      <span className="ui-queue-row__status">{status}</span>
-      {time && <time className="ui-queue-row__time">{time}</time>}
       <svg
         className="ui-queue-row__chevron"
         viewBox="0 0 16 16"

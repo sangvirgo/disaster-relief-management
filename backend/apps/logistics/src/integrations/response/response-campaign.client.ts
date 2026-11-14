@@ -15,7 +15,6 @@ export interface ResponseCampaign {
   id: string;
   status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'CLOSED';
   organization_id: string;
-  region_code: string | null;
   version: number;
 }
 
@@ -60,7 +59,6 @@ export class LogisticsResponseCampaignClient implements OnModuleDestroy {
     const value = result.body as Record<string, unknown>;
     if (value.id !== id || !['DRAFT', 'ACTIVE', 'PAUSED', 'CLOSED'].includes(String(value.status)) ||
         typeof value.organization_id !== 'string' ||
-        !(value.region_code === null || typeof value.region_code === 'string') ||
         !Number.isInteger(value.version)) throw unavailable();
     return value as unknown as ResponseCampaign;
   }

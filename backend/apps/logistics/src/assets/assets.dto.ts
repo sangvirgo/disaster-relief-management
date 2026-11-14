@@ -3,7 +3,6 @@ import {
   ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested,
 } from 'class-validator';
 
-const regionCode = /^[A-Z0-9_]{2,32}$/u;
 const decimalQuantity = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/u;
 
 export class AssetPageQueryDto {
@@ -28,9 +27,6 @@ export class AssetPointDto {
 abstract class AssetCreateDto {
   @IsUUID('all')
   organization_id!: string;
-
-  @IsString() @Matches(regionCode)
-  region_code!: string;
 }
 
 export class CreateWarehouseDto extends AssetCreateDto {

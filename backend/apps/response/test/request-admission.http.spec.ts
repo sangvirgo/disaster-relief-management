@@ -32,7 +32,6 @@ describe('POST /internal/requests/:id/cycles/:work_cycle/admit HTTP', () => {
     version: 5,
     status: 'TRIAGED',
     organization_id: '22222222-2222-4222-8222-222222222222',
-    region_code: 'NORTH',
     campaign_id: null,
   }));
 

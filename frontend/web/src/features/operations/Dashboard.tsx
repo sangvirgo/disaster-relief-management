@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { label, timeLabel } from '../../i18n/labels';
 import { formatQuantity } from '../../i18n/quantity';
-import { AnalyticsRegionField, useAnalyticsRegion } from '../../components/AnalyticsRegion';
 import { fetchAll } from '../../api/fetchAll';
 
 type ResponseSummary = {
@@ -25,20 +24,12 @@ type Stock = {
   more?: boolean;
 };
 export function OperationsDashboard() {
-  const {
-    region,
-    setRegion,
-    regions,
-    loading: regionLoading,
-    error: regionError,
-  } = useAnalyticsRegion();
   const [response, setResponse] = useState<ResponseSummary | null>(null);
   const [stock, setStock] = useState<Stock | null>(null);
   const [warehouseNames, setWarehouseNames] = useState<Record<string, string>>({});
   const [responseError, setResponseError] = useState('');
   const [stockError, setStockError] = useState('');
   useEffect(() => {
-    if (!region) return;
     let live = true;
     setResponse(null);
     setResponseError('');
@@ -46,7 +37,7 @@ export function OperationsDashboard() {
     const to = new Date().toISOString();
     api<ResponseSummary>(
       'response',
-      `/reports/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&region_code=${encodeURIComponent(region)}`
+      `/reports/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
     )
       .then((value) => {
         if (live) setResponse(value);
@@ -60,7 +51,7 @@ export function OperationsDashboard() {
     return () => {
       live = false;
     };
-  }, [region]);
+  }, []);
   useEffect(() => {
     let live = true;
     void fetchAll<{ id: string; name: string }>('logistics', '/warehouses')
@@ -90,16 +81,9 @@ export function OperationsDashboard() {
             <span className="eyebrow">Tổng quan ứng cứu</span>
             <h2>Ứng cứu trong 7 ngày</h2>
           </div>
-          <span className="report-period">Theo khu vực</span>
+          <span className="report-period">Trong phạm vi được cấp quyền</span>
         </div>
-        <AnalyticsRegionField region={region} onChange={setRegion} regions={regions} />
-        {regionError && (
-          <p className="notice error" role="alert">
-            {regionError}
-          </p>
-        )}
-        {!region && !regionLoading && <p>Chọn hoặc nhập mã khu vực để xem tình hình ứng cứu.</p>}
-        {region && !response && !responseError && <p role="status">Đang tải tình hình ứng cứu…</p>}
+        {!response && !responseError && <p role="status">Đang tải tình hình ứng cứu…</p>}
         {responseError && (
           <p className="notice error" role="alert">
             {responseError}

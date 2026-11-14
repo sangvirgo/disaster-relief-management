@@ -1,13 +1,10 @@
 import { Controller, Get, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { Type } from 'class-transformer';
-import { IsBooleanString, IsNumber, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
+import { IsBooleanString, IsNumber, IsOptional, Max, Min } from 'class-validator';
 import { WeatherService } from './weather.service';
 
 export class WeatherAlertsQueryDto {
-  @IsOptional() @IsString() @Matches(/^[A-Z0-9_]{2,32}$/u)
-  declare region_code?: string;
-
   @IsOptional() @IsBooleanString()
   declare active_only?: string;
 }
@@ -29,7 +26,7 @@ export class WeatherController {
   @Get('weather/alerts')
   alerts(@Query() query: WeatherAlertsQueryDto, @Res({ passthrough: true }) response: Response) {
     response.setHeader('Cache-Control', 'public, max-age=300');
-    return this.weather.alerts(query.region_code, query.active_only === 'true');
+    return this.weather.alerts(query.active_only === 'true');
   }
 
   /** Public: forecast, alerts and hourly rain/gust series for the caller's chosen point. */

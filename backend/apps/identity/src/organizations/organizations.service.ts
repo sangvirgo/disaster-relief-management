@@ -155,7 +155,7 @@ export class OrganizationsService {
         const rows = await manager.query('SELECT status FROM membership WHERE user_id = $1 AND organization_id = $2 FOR UPDATE', [userId, organizationId]) as Array<{ status: string }>;
         if (rows[0]?.status !== 'ACTIVE') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         const grants = await manager.query(
-          `SELECT id, role_code, scope_type, organization_id, region_code, campaign_id, created_at
+          `SELECT id, role_code, scope_type, organization_id, campaign_id, created_at
              FROM role_grant WHERE user_id = $1 AND organization_id = $2 AND revoked_at IS NULL FOR UPDATE`,
           [userId, organizationId],
         ) as Array<Record<string, unknown>>;

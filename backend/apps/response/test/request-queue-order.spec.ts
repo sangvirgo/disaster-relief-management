@@ -8,7 +8,7 @@ const userId = '00000000-0000-4000-8000-000000000002';
 const grants = [{
   role_code: 'COORDINATOR', scope_type: 'ORGANIZATION',
   organization_id: '00000000-0000-4000-8000-000000000003',
-  region_code: null, campaign_id: null,
+  campaign_id: null,
 }] as const;
 
 function makeService() {

@@ -14,7 +14,6 @@ export interface WeatherAlert {
 export interface WeatherLocation {
   id: string;
   name: string;
-  region_code: string;
   latitude: number;
   longitude: number;
 }
@@ -59,23 +58,23 @@ export interface WeatherSnapshot {
   locations: WeatherLocationForecast[];
 }
 
-/** Key towns for each demo region (public coordinates of provincial centres only). */
+/** Key towns in the demo coverage area (public coordinates of provincial centres only). */
 export const WEATHER_LOCATIONS: readonly WeatherLocation[] = [
-  { id: 'hcm', name: 'TP. Hồ Chí Minh', region_code: 'DEMO_A', latitude: 10.7769, longitude: 106.7009 },
-  { id: 'can-tho', name: 'Cần Thơ', region_code: 'DEMO_A', latitude: 10.0452, longitude: 105.7469 },
-  { id: 'ca-mau', name: 'Cà Mau', region_code: 'DEMO_A', latitude: 9.176, longitude: 105.15 },
-  { id: 'vung-tau', name: 'Vũng Tàu', region_code: 'DEMO_A', latitude: 10.4114, longitude: 107.1362 },
-  { id: 'da-nang', name: 'Đà Nẵng', region_code: 'DEMO_B', latitude: 16.0544, longitude: 108.2022 },
-  { id: 'hue', name: 'Huế', region_code: 'DEMO_B', latitude: 16.4637, longitude: 107.5909 },
-  { id: 'vinh', name: 'Vinh, Nghệ An', region_code: 'DEMO_B', latitude: 18.678, longitude: 105.681 },
-  { id: 'quang-ngai', name: 'Quảng Ngãi', region_code: 'DEMO_B', latitude: 15.1214, longitude: 108.8044 },
-  { id: 'nha-trang', name: 'Nha Trang, Khánh Hòa', region_code: 'DEMO_B', latitude: 12.238, longitude: 109.196 },
-  { id: 'ha-noi', name: 'Hà Nội', region_code: 'DEMO_C', latitude: 21.0285, longitude: 105.8542 },
-  { id: 'hai-phong', name: 'Hải Phòng', region_code: 'DEMO_C', latitude: 20.8449, longitude: 106.6881 },
-  { id: 'ha-long', name: 'Hạ Long, Quảng Ninh', region_code: 'DEMO_C', latitude: 20.9507, longitude: 107.0734 },
-  { id: 'sa-pa', name: 'Sa Pa, Lào Cai', region_code: 'DEMO_C', latitude: 22.337, longitude: 103.844 },
-  { id: 'ha-giang', name: 'Hà Giang', region_code: 'DEMO_C', latitude: 22.824, longitude: 104.984 },
-  { id: 'dien-bien', name: 'Điện Biên', region_code: 'DEMO_C', latitude: 21.386, longitude: 103.02 },
+  { id: 'hcm', name: 'TP. Hồ Chí Minh', latitude: 10.7769, longitude: 106.7009 },
+  { id: 'can-tho', name: 'Cần Thơ', latitude: 10.0452, longitude: 105.7469 },
+  { id: 'ca-mau', name: 'Cà Mau', latitude: 9.176, longitude: 105.15 },
+  { id: 'vung-tau', name: 'Vũng Tàu', latitude: 10.4114, longitude: 107.1362 },
+  { id: 'da-nang', name: 'Đà Nẵng', latitude: 16.0544, longitude: 108.2022 },
+  { id: 'hue', name: 'Huế', latitude: 16.4637, longitude: 107.5909 },
+  { id: 'vinh', name: 'Vinh, Nghệ An', latitude: 18.678, longitude: 105.681 },
+  { id: 'quang-ngai', name: 'Quảng Ngãi', latitude: 15.1214, longitude: 108.8044 },
+  { id: 'nha-trang', name: 'Nha Trang, Khánh Hòa', latitude: 12.238, longitude: 109.196 },
+  { id: 'ha-noi', name: 'Hà Nội', latitude: 21.0285, longitude: 105.8542 },
+  { id: 'hai-phong', name: 'Hải Phòng', latitude: 20.8449, longitude: 106.6881 },
+  { id: 'ha-long', name: 'Hạ Long, Quảng Ninh', latitude: 20.9507, longitude: 107.0734 },
+  { id: 'sa-pa', name: 'Sa Pa, Lào Cai', latitude: 22.337, longitude: 103.844 },
+  { id: 'ha-giang', name: 'Hà Giang', latitude: 22.824, longitude: 104.984 },
+  { id: 'dien-bien', name: 'Điện Biên', latitude: 21.386, longitude: 103.02 },
 ];
 
 const HORIZON_HOURS = 24;
@@ -175,11 +174,10 @@ export class WeatherService {
   private readonly pointCache = new Map<string, { at: number; forecast: WeatherPointForecast }>();
   private readonly pointInflight = new Map<string, Promise<WeatherPointForecast>>();
 
-  /** Public alerts, optionally limited to one region. Serves the cached forecast for 30 minutes. */
-  async alerts(regionCode?: string, onlyActive = false): Promise<WeatherSnapshot> {
+  /** Public alerts. Serves the cached forecast for 30 minutes. */
+  async alerts(onlyActive = false): Promise<WeatherSnapshot> {
     const snapshot = await this.snapshot();
     const locations = snapshot.locations
-      .filter((location) => !regionCode || location.region_code === regionCode)
       .filter((location) => !onlyActive || location.alerts.length > 0);
     return { ...snapshot, locations, alert_count: locations.reduce((sum, location) => sum + location.alerts.length, 0) };
   }

@@ -111,7 +111,7 @@ describe('RequestResolutionRecoveryService', () => {
       id: intentId, request_id: requestId, work_cycle: 2, kind: 'RESOLUTION', state: 'PENDING',
       actor_user_id: actorId, expected_request_version: 9, previous_status: 'TRIAGED', reason: 'Hoàn tất',
       request_status: 'RESOLVING', request_version: 9, logistics_admitted_at: new Date(),
-      organization_id: organizationId, region_code: 'DEMO_A', campaign_id: null,
+      organization_id: organizationId, campaign_id: null,
       reporter_user_id: null, outcome_basis: 'RESCUE_COMPLETED',
     };
     const manager = {
@@ -152,7 +152,7 @@ describe('RequestResolutionRecoveryService', () => {
     const logistics = { seal: jest.fn(async () => undefined), freeze: jest.fn(), unseal: jest.fn() };
     const sessions = { requestCoordinatorGrants: jest.fn(async () => [{
       user_id: actorId, role_code: 'COORDINATOR', scope_type: 'ORGANIZATION',
-      organization_id: organizationId, region_code: null, campaign_id: null,
+      organization_id: organizationId, campaign_id: null,
     }]) };
     const finalizer = new RequestResolutionFinalizer(dataSource as never, logistics as never, sessions as never);
     const recovery = new RequestResolutionRecoveryService(dataSource as never, finalizer);

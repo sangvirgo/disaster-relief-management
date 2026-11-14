@@ -21,8 +21,8 @@ const request = {} as Request;
 const key = '00000000-0000-4000-8000-000000000006';
 
 function fixture(grants: ReporterSession['grants'] = [{
-  role_code: 'COORDINATOR', scope_type: 'REGION', organization_id: organizationId,
-  region_code: 'NORTH', campaign_id: null,
+  role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId,
+  campaign_id: null,
 }], replayResource?: { type: string; id: string }) {
   const managerQuery = jest.fn<(...args: unknown[]) => Promise<unknown[]>>();
   const manager = { query: managerQuery } as unknown as EntityManager;
@@ -46,13 +46,13 @@ function fixture(grants: ReporterSession['grants'] = [{
 }
 
 function activeCampaign(overrides: Record<string, unknown> = {}) {
-  return { id: campaignId, status: 'ACTIVE', organization_id: organizationId, region_code: 'NORTH', ...overrides };
+  return { id: campaignId, status: 'ACTIVE', organization_id: organizationId, ...overrides };
 }
 
 function unlockedRequest(overrides: Record<string, unknown> = {}) {
   return {
     id: requestId, status: 'VERIFIED', version: 4, organization_id: organizationId,
-    region_code: 'NORTH', campaign_id: null, attribution_locked_at: null, ...overrides,
+    campaign_id: null, attribution_locked_at: null, ...overrides,
   };
 }
 
@@ -73,12 +73,12 @@ describe('RequestCampaignAssociationService', () => {
     managerQuery.mockResolvedValueOnce([{ campaign_id: null }])
       .mockResolvedValueOnce([activeCampaign()])
       .mockResolvedValueOnce([unlockedRequest()])
-      .mockResolvedValueOnce([[{ id: requestId, status: 'VERIFIED', version: 5, region_code: 'NORTH', campaign_id: campaignId }], 1])
+      .mockResolvedValueOnce([[{ id: requestId, status: 'VERIFIED', version: 5, campaign_id: campaignId }], 1])
       .mockResolvedValueOnce([{ id: eventId }]);
 
     const result = await service.attach(requestId, { campaign_id: campaignId, expected_version: 4 }, key, request);
 
-    expect(result.value).toEqual({ id: requestId, status: 'VERIFIED', version: 5, region_code: 'NORTH', campaign_id: campaignId });
+    expect(result.value).toEqual({ id: requestId, status: 'VERIFIED', version: 5, campaign_id: campaignId });
     expect(idempotency.execute).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       command: 'response.requests.attach-campaign',
     }));
@@ -96,7 +96,7 @@ describe('RequestCampaignAssociationService', () => {
   it('requires permission for both the current and target campaign when moving attribution', async () => {
     const { service, managerQuery } = fixture([{
       role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', organization_id: organizationId,
-      region_code: 'NORTH', campaign_id: campaignId,
+      campaign_id: campaignId,
     }]);
     managerQuery.mockResolvedValueOnce([{ campaign_id: sourceCampaignId }])
       .mockResolvedValueOnce([activeCampaign()])
@@ -119,10 +119,10 @@ describe('RequestCampaignAssociationService', () => {
     expect(managerQuery).toHaveBeenCalledTimes(3);
   });
 
-  it('rejects cross-organization or cross-region campaign association', async () => {
+  it('rejects cross-organization campaign association', async () => {
     const { service, managerQuery } = fixture();
     managerQuery.mockResolvedValueOnce([{ campaign_id: null }])
-      .mockResolvedValueOnce([activeCampaign({ region_code: 'SOUTH' })])
+      .mockResolvedValueOnce([activeCampaign({ organization_id: '99999999-9999-4999-8999-999999999999' })])
       .mockResolvedValueOnce([unlockedRequest()]);
 
     await expect(service.attach(requestId, { campaign_id: campaignId, expected_version: 4 }, key, request))
@@ -146,12 +146,12 @@ describe('RequestCampaignAssociationService', () => {
     managerQuery.mockResolvedValueOnce([{ campaign_id: campaignId }])
       .mockResolvedValueOnce([activeCampaign()])
       .mockResolvedValueOnce([unlockedRequest({ campaign_id: campaignId })])
-      .mockResolvedValueOnce([[{ id: requestId, status: 'VERIFIED', version: 5, region_code: 'NORTH', campaign_id: null }], 1])
+      .mockResolvedValueOnce([[{ id: requestId, status: 'VERIFIED', version: 5, campaign_id: null }], 1])
       .mockResolvedValueOnce([{ id: eventId }]);
 
     const result = await service.detach(requestId, { expected_version: 4 }, key, request);
 
-    expect(result.value).toEqual({ id: requestId, status: 'VERIFIED', version: 5, region_code: 'NORTH', campaign_id: null });
+    expect(result.value).toEqual({ id: requestId, status: 'VERIFIED', version: 5, campaign_id: null });
     expect(managerQuery.mock.calls[0]?.[0]).toContain('SELECT campaign_id FROM assistance_request');
     expect(managerQuery.mock.calls[1]?.[0]).toContain('FROM campaign WHERE id=$1 FOR SHARE');
     expect(managerQuery.mock.calls[2]?.[0]).toContain('FROM assistance_request WHERE id=$1 FOR UPDATE');
@@ -184,7 +184,7 @@ describe('RequestCampaignAssociationService', () => {
         event_type: 'CAMPAIGN_ATTACHED', payload: { campaign_id: campaignId },
       }])
       .mockResolvedValueOnce([{
-        id: requestId, status: 'VERIFIED', version: 5, region_code: 'NORTH', campaign_id: currentCampaignId,
+        id: requestId, status: 'VERIFIED', version: 5, campaign_id: currentCampaignId,
         priority: 'P2', priority_basis: 'COMPLETE', verification_revision: 1, canonical_request_id: null,
       }]);
 
@@ -229,7 +229,7 @@ describe('RequestCampaignAssociationService', () => {
         event_type: 'CAMPAIGN_ATTACHED', payload: { campaign_id: campaignId },
       }])
       .mockResolvedValueOnce([{
-        id: requestId, status: 'VERIFIED', version: 5, region_code: 'NORTH', campaign_id: currentCampaignId,
+        id: requestId, status: 'VERIFIED', version: 5, campaign_id: currentCampaignId,
         priority: 'P2', priority_basis: 'COMPLETE', verification_revision: 1, canonical_request_id: null,
       }]);
 
@@ -255,7 +255,7 @@ describe('RequestCampaignAssociationService', () => {
         event_type: 'CAMPAIGN_DETACHED', payload: { previous_campaign_id: campaignId, campaign_id: null },
       }])
       .mockResolvedValueOnce([{
-        id: requestId, status: 'VERIFIED', version: 5, region_code: 'NORTH', campaign_id: null,
+        id: requestId, status: 'VERIFIED', version: 5, campaign_id: null,
         priority: 'P2', priority_basis: 'COMPLETE', verification_revision: 1, canonical_request_id: null,
       }]);
 

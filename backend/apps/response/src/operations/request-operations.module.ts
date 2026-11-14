@@ -7,6 +7,7 @@ import { RequestOperationsOverdueSchedulerService } from './request-operations.o
 import { RequestOperationsPersistenceService } from './request-operations.persistence.service';
 import { RequestOperationsQueriesService } from './request-operations.queries.service';
 import { RequestOperationsCommandRunner } from './request-operations.command-runner.service';
+import { RequestOperationsFastTrackService } from './request-operations.fast-track.service';
 import { RequestOperationsTriageService } from './request-operations.triage.service';
 import { RequestOperationsDedupReferralService } from './request-operations.dedup-referral.service';
 import { RequestOperationsVerificationService } from './request-operations.verification.service';
@@ -29,6 +30,7 @@ import { RequestOperationsAiAdvisoryService } from './request-operations.ai-advi
     RequestOperationsQueriesService,
     RequestOperationsCommandRunner,
     RequestOperationsTriageService,
+    RequestOperationsFastTrackService,
     RequestOperationsDedupReferralService,
     RequestOperationsVerificationService,
     RequestOperationsSupplementReviewService,

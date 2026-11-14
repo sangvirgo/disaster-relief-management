@@ -22,24 +22,21 @@ SELECT assert_that('failed evidence cleanup is retryable',
   EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='evidence_metadata' AND column_name='cleanup_completed_at') AND
   to_regclass('public.evidence_cleanup_pending_idx') IS NOT NULL);
 
-INSERT INTO region_boundary VALUES ('R1', ST_Multi(ST_GeomFromText('POLYGON((106 10,107 10,107 11,106 11,106 10))',4326)));
-SELECT expect_fail('invalid (bowtie) region polygon', $$INSERT INTO region_boundary VALUES ('BAD', ST_Multi(ST_GeomFromText('POLYGON((0 0,1 1,1 0,0 1,0 0))',4326)))$$);
 -- fixture seed (data, not DDL): UNKNOWN category with no required skills
 INSERT INTO incident_category VALUES ('FLOOD','Ngập lụt'),('UNKNOWN','Chưa rõ');
 INSERT INTO skill VALUES ('BOAT','Xuồng');
 INSERT INTO incident_category_skill VALUES ('FLOOD','BOAT');
 SELECT expect_err('category skill unknown skill', $$INSERT INTO incident_category_skill VALUES ('FLOOD','NOPE')$$, '23503', 'incident_category_skill_skill_code_fkey');
 SELECT expect_err('category skill duplicate pair', $$INSERT INTO incident_category_skill VALUES ('FLOOD','BOAT')$$, '23505', 'incident_category_skill_pkey');
-INSERT INTO rescue_team (id,organization_id,operating_region_code,name,team_kind) VALUES
- ('00000000-0000-0000-0000-0000000000a1',gen_random_uuid(),'R1','Đội A','VOLUNTEER');
-SELECT expect_fail('unknown region code on team', $$INSERT INTO rescue_team (organization_id,operating_region_code,name,team_kind) VALUES (gen_random_uuid(),'ZZ','Đội B','VOLUNTEER')$$);
+INSERT INTO rescue_team (id,organization_id,name,team_kind) VALUES
+ ('00000000-0000-0000-0000-0000000000a1',gen_random_uuid(),'Đội A','VOLUNTEER');
 
 -- team reporting mode
-SELECT expect_err('reporting_mode value', $$INSERT INTO rescue_team (organization_id,operating_region_code,name,team_kind,reporting_mode) VALUES (gen_random_uuid(),'R1','Đội X','VOLUNTEER','RADIO')$$, '23514', 'rescue_team_reporting_mode_check');
-SELECT expect_err('COORDINATOR team without contact note (NULL)', $$INSERT INTO rescue_team (organization_id,operating_region_code,name,team_kind,reporting_mode) VALUES (gen_random_uuid(),'R1','Đội C','GOVERNMENT','COORDINATOR')$$, '23514', 'coordinator_needs_contact');
-SELECT expect_err('COORDINATOR team with blank contact note', $$INSERT INTO rescue_team (organization_id,operating_region_code,name,team_kind,reporting_mode,external_contact_note) VALUES (gen_random_uuid(),'R1','Đội C','GOVERNMENT','COORDINATOR','   ')$$, '23514', 'coordinator_needs_contact');
-INSERT INTO rescue_team (id,organization_id,operating_region_code,name,team_kind,reporting_mode,external_contact_note) VALUES
- ('00000000-0000-0000-0000-0000000000a2',gen_random_uuid(),'R1','Đội QS','MILITARY','COORDINATOR','Chỉ huy: 0900111222');   -- accepted with zero members
+SELECT expect_err('reporting_mode value', $$INSERT INTO rescue_team (organization_id,name,team_kind,reporting_mode) VALUES (gen_random_uuid(),'Đội X','VOLUNTEER','RADIO')$$, '23514', 'rescue_team_reporting_mode_check');
+SELECT expect_err('COORDINATOR team without contact note (NULL)', $$INSERT INTO rescue_team (organization_id,name,team_kind,reporting_mode) VALUES (gen_random_uuid(),'Đội C','GOVERNMENT','COORDINATOR')$$, '23514', 'coordinator_needs_contact');
+SELECT expect_err('COORDINATOR team with blank contact note', $$INSERT INTO rescue_team (organization_id,name,team_kind,reporting_mode,external_contact_note) VALUES (gen_random_uuid(),'Đội C','GOVERNMENT','COORDINATOR','   ')$$, '23514', 'coordinator_needs_contact');
+INSERT INTO rescue_team (id,organization_id,name,team_kind,reporting_mode,external_contact_note) VALUES
+ ('00000000-0000-0000-0000-0000000000a2',gen_random_uuid(),'Đội QS','MILITARY','COORDINATOR','Chỉ huy: 0900111222');   -- accepted with zero members
 SELECT assert_that('COORDINATOR team accepted with zero members, readiness_required defaults false', (SELECT count(*) FROM team_member WHERE team_id='00000000-0000-0000-0000-0000000000a2')=0 AND (SELECT readiness_required FROM rescue_team WHERE id='00000000-0000-0000-0000-0000000000a2')=false);
 
 -- request intake: optional phone/headcount

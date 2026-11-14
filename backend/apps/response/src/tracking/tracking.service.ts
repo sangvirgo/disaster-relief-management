@@ -165,14 +165,6 @@ export class TrackingService {
         const nextElderly = Object.hasOwn(dto, 'elderly_count') ? dto.elderly_count ?? null : before.elderly_count as number | null;
         if (nextPeople != null && (nextChildren ?? 0) + (nextElderly ?? 0) > nextPeople) throw invalidField('children_count', 'VULNERABLE_COUNT_EXCEEDS_TOTAL');
         const previouslyReported = previouslyReportedFacts(dto, row, before);
-        const regionRows = dto.location && !verified
-          ? await manager.query(
-            `SELECT min(region_code) AS region_code FROM region_boundary
-              WHERE ST_Covers(geom, ST_SetSRID(ST_MakePoint($1, $2), 4326))
-              HAVING count(*) = 1`,
-            dto.location.coordinates,
-          ) as Array<{ region_code: string }>
-          : [];
         const payload: Record<string, unknown> = {
           public_text_code: 'SUPPLEMENT_RECEIVED',
           reported_facts: dto,
@@ -182,7 +174,7 @@ export class TrackingService {
         };
         const requestChange = verified
           ? { sets: [] as string[], values: [row.id, dto.expected_version] as unknown[] }
-          : unverifiedRequestAssignments(dto, mode, row.id, regionRows[0]?.region_code ?? null);
+          : unverifiedRequestAssignments(dto, mode, row.id);
         requestChange.sets.push('version=version+1');
         const [requestUpdates] = await manager.query(
           `UPDATE assistance_request SET ${requestChange.sets.join(',')} WHERE id=$1 AND version=$2 RETURNING status,version,tracking_code`,
@@ -472,7 +464,7 @@ export class TrackingService {
   private async staffRequest(manager: EntityManager, requestId: string, session: ReporterSession, lock: boolean): Promise<ReporterRequestRow> {
     const rows = await manager.query(
       `SELECT id,tracking_code,tracking_secret_hash,reporter_user_id,status,version,review_lane,received_at,
-              organization_id,region_code,campaign_id,description,reporter_declared_danger
+              organization_id,campaign_id,description,reporter_declared_danger
          FROM assistance_request WHERE id=$1${lock ? ' FOR UPDATE' : ''}`,
       [requestId],
     ) as ReporterRequestRow[];

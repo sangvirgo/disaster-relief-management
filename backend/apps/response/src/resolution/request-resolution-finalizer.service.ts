@@ -21,7 +21,6 @@ type IntentSnapshot = {
   request_version: number;
   abort_reason?: string | null;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
   reporter_user_id: string | null;
   logistics_admitted_at: Date | string | null;
@@ -46,7 +45,7 @@ export class RequestResolutionFinalizer {
     const rows = await this.dataSource.query(
       `SELECT i.id,i.request_id,i.work_cycle,i.kind,i.state,i.actor_user_id,i.expected_request_version,
               i.previous_status,i.reason,r.status AS request_status,r.version AS request_version,
-              r.organization_id,r.region_code,r.campaign_id,r.reporter_user_id,r.logistics_admitted_at,
+              r.organization_id,r.campaign_id,r.reporter_user_id,r.logistics_admitted_at,
               (SELECT e.payload->>'outcome_basis' FROM request_event e
                 WHERE e.request_id=i.request_id AND e.event_type='RESOLUTION_INTENT_CREATED'
                   AND e.payload->>'intent_id'=i.id::text ORDER BY e.occurred_at DESC,e.id DESC LIMIT 1) AS outcome_basis
@@ -159,7 +158,7 @@ export class RequestResolutionFinalizer {
     const rows = await this.dataSource.query(
       `SELECT i.id,i.request_id,i.work_cycle,i.kind,i.state,i.actor_user_id,i.expected_request_version,
               i.previous_status,i.reason,r.status AS request_status,r.version AS request_version,
-              r.organization_id,r.region_code,r.campaign_id,r.reporter_user_id,r.logistics_admitted_at,NULL::text AS outcome_basis,
+              r.organization_id,r.campaign_id,r.reporter_user_id,r.logistics_admitted_at,NULL::text AS outcome_basis,
               (SELECT e.reason FROM request_event e WHERE e.request_id=i.request_id
                 AND e.event_type=CASE WHEN i.kind='RESOLUTION' THEN 'RESOLUTION_ABORT_REQUESTED' ELSE 'CANCELLATION_ABORT_REQUESTED' END
                 AND e.payload->>'operation_id'=i.id::text ORDER BY e.occurred_at DESC,e.id DESC LIMIT 1) AS abort_reason
@@ -227,13 +226,11 @@ export class RequestResolutionFinalizer {
       role_code: grant.role_code,
       scope_type: grant.scope_type,
       organization_id: grant.organization_id,
-      region_code: grant.region_code,
       campaign_id: grant.campaign_id,
     }));
     const permission: Permission = intent.kind === 'CANCELLATION' ? 'REQUEST_CANCEL' : 'REQUEST_RESOLVE';
     return hasPermission(actorGrants, permission, {
       organizationId: intent.organization_id,
-      regionCode: intent.region_code,
       campaignId: intent.campaign_id,
     });
   }

@@ -7,7 +7,6 @@ export type CampaignAction = 'activate' | 'pause' | 'resume' | 'close';
 export interface CampaignRow extends Record<string, unknown> {
   id: string;
   organization_id: string;
-  region_code: string | null;
   name: string;
   objective: string | null;
   status: CampaignStatus;
@@ -22,7 +21,6 @@ export function campaignView(row: CampaignRow): Record<string, unknown> {
   return {
     id: row.id,
     organization_id: row.organization_id,
-    region_code: row.region_code,
     name: row.name,
     objective: row.objective,
     status: row.status,
@@ -33,12 +31,11 @@ export function campaignView(row: CampaignRow): Record<string, unknown> {
   };
 }
 
-export function publicCampaignView(row: CampaignRow, regionName: string | null): Record<string, unknown> {
+export function publicCampaignView(row: CampaignRow): Record<string, unknown> {
   return {
     id: row.id,
     title: row.name,
     objective: row.objective,
-    region_name: regionName,
     starts_at: iso(row.starts_at),
     ends_at: iso(row.ends_at),
     status: row.status,
@@ -65,11 +62,6 @@ export function campaignScopePredicate(grants: readonly Grant[], permission: Per
     if (grant.scope_type === 'ORGANIZATION' && hasPermission([grant], permission, { organizationId })) {
       values.push(organizationId);
       branches.add(`organization_id = $${values.length}`);
-    } else if (grant.scope_type === 'REGION' && grant.region_code && hasPermission([grant], permission, {
-      organizationId, regionCode: grant.region_code,
-    })) {
-      values.push(organizationId, grant.region_code);
-      branches.add(`(organization_id = $${values.length - 1} AND region_code = $${values.length})`);
     } else if (grant.scope_type === 'CAMPAIGN' && grant.campaign_id && hasPermission([grant], permission, {
       organizationId, campaignId: grant.campaign_id,
     })) {

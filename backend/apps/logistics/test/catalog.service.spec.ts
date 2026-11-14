@@ -58,11 +58,9 @@ describe('Logistics catalog permissions', () => {
       role_code: 'OPERATIONS_MANAGER',
       scope_type: 'ORGANIZATION',
       organization_id: '22222222-2222-4222-8222-222222222222',
-      region_code: null,
       campaign_id: null,
     } as const;
     expect(hasCatalogManageGrant([organizationGrant])).toBe(true);
-    expect(hasCatalogManageGrant([{ ...organizationGrant, scope_type: 'REGION', region_code: 'R01' }])).toBe(false);
     expect(hasCatalogManageGrant([{ ...organizationGrant, scope_type: 'SYSTEM', organization_id: null }])).toBe(false);
     expect(hasCatalogManageGrant([{ ...organizationGrant, role_code: 'ADMIN' }])).toBe(false);
   });

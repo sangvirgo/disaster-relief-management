@@ -6,9 +6,9 @@ import { AiAdvisoryReviewDto } from './request-operations.dto';
 import { RequestOperationsAiAdvisoryService } from './request-operations.ai-advisory.service';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import {
-  AuthorityReferralDto, ContactAttemptDto, ConcurRequestDto, CorrectRegionDto, DuplicateRequestDto,
+  AuthorityReferralDto, ContactAttemptDto, ConcurRequestDto, DuplicateRequestDto,
   AttachCampaignDto, RejectRequestDto, RequestQueueQueryDto, RequestOperationPageDto, RequestVersionDto, TeamCandidatesQueryDto,
-  SupplementReviewDto, TriageRequestDto, VerifyRequestDto,
+  SupplementReviewDto, TriageRequestDto, VerifyRequestDto, FastTrackRequestDto,
 } from './request-operations.dto';
 import { RequestOperationsService } from './request-operations.service';
 import { noStore, requireIdempotencyKey as key, markIdempotentReplay as replay } from '@c48/technical/http/response-headers';
@@ -23,12 +23,6 @@ export class RequestOperationsController {
   async queue(@Query() query: RequestQueueQueryDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     noStore(response);
     return this.operations.queue(query, request);
-  }
-
-  @Get('requests/unassigned')
-  async unassigned(@Query() query: RequestOperationPageDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    noStore(response);
-    return this.operations.unassigned(query, request);
   }
 
   @Get('requests/:id/duplicate-candidates')
@@ -91,6 +85,21 @@ export class RequestOperationsController {
   ) {
     noStore(response);
     const result = await this.aiAdvisory.review(id, advisoryId, dto, key(request), request);
+    replay(response, result.replay);
+    return result.value;
+  }
+
+  @Post('requests/:id/ai-advisories')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async requestAiAssessment(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Body() dto: RequestVersionDto,
+    @Req() request: OperationRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.aiAdvisory.requestAssessment(id, dto, key(request), request);
     replay(response, result.replay);
     return result.value;
   }
@@ -181,22 +190,22 @@ export class RequestOperationsController {
     return result.value;
   }
 
+  @Post('requests/:id/fast-track')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async fastTrack(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Body() dto: FastTrackRequestDto, @Req() request: OperationRequest, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    const result = await this.operations.fastTrack(id, dto, key(request), request);
+    replay(response, result.replay);
+    return result.value;
+  }
+
   @Post('requests/:id/authority-referrals')
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(IdempotencyKeyInterceptor)
   async authorityReferral(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Body() dto: AuthorityReferralDto, @Req() request: OperationRequest, @Res({ passthrough: true }) response: Response) {
     noStore(response);
     const result = await this.operations.authorityReferral(id, dto, key(request), request);
-    replay(response, result.replay);
-    return result.value;
-  }
-
-  @Post('requests/:id/correct-region')
-  @HttpCode(HttpStatus.OK)
-  @UseInterceptors(IdempotencyKeyInterceptor)
-  async correctRegion(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Body() dto: CorrectRegionDto, @Req() request: OperationRequest, @Res({ passthrough: true }) response: Response) {
-    noStore(response);
-    const result = await this.operations.correctRegion(id, dto, key(request), request);
     replay(response, result.replay);
     return result.value;
   }

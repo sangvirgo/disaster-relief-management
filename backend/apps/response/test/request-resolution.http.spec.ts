@@ -22,7 +22,7 @@ describe('RequestResolutionController HTTP', () => {
     internalOperation: jest.fn(async () => ({
       id: operationId, kind: 'RESOLUTION', state: 'PENDING', request_id: requestId, work_cycle: 2,
       request_status: 'RESOLVING', organization_id: '70000000-0000-4000-8000-000000000001',
-      region_code: 'DEMO_A', campaign_id: null, outcome_basis: 'RESCUE_COMPLETED',
+      campaign_id: null, outcome_basis: 'RESCUE_COMPLETED',
     })),
   };
   const lifecycle = {

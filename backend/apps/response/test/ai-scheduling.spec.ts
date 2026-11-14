@@ -64,7 +64,7 @@ describe('reporter advisory scheduling', () => {
 
   it('enqueues a new input revision when the coordinator reopens a work cycle', async () => {
     const requestId = 'request';
-    const row = { id: requestId, status: 'CLOSED', version: 4, work_cycle: 1, organization_id: 'organization', region_code: null, campaign_id: null, reporter_user_id: null };
+    const row = { id: requestId, status: 'CLOSED', version: 4, work_cycle: 1, organization_id: 'organization', campaign_id: null, reporter_user_id: null };
     const facts = { version: 5, workCycle: 2, incidentCategoryCode: 'FLOOD', description: 'Nước dâng cao.', needsRescue: true };
     const query = jest.fn(async (sql: string): Promise<unknown[]> => {
       if (sql.includes('SELECT r.version')) return [facts];

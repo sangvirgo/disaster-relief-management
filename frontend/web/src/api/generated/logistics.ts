@@ -1588,6 +1588,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/drive-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * ReportsController.suggestDrives
+         * @description Route exported from backend/apps/logistics/src/reports/reports.controller.ts#ReportsController.suggestDrives. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        get: operations["logisticsReportsSuggestDrives"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * ReportsController.operations
+         * @description Route exported from backend/apps/logistics/src/reports/reports.controller.ts#ReportsController.operations. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        get: operations["logisticsReportsOperations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5400,7 +5440,6 @@ export interface operations {
                         work_cycle: number;
                         /** Format: uuid */
                         organization_id: string;
-                        region_code: string;
                         campaign_id: string | null;
                         /** Format: uuid */
                         item_id: string;
@@ -5502,7 +5541,6 @@ export interface operations {
                         work_cycle?: number;
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string;
                         campaign_id?: string | null;
                         /** Format: uuid */
                         item_id?: string;
@@ -5765,7 +5803,6 @@ export interface operations {
                         work_cycle?: number;
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string;
                         campaign_id?: string | null;
                         /** Format: uuid */
                         item_id?: string;
@@ -5868,7 +5905,6 @@ export interface operations {
                         work_cycle?: number;
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string;
                         campaign_id?: string | null;
                         /** Format: uuid */
                         item_id?: string;
@@ -6646,7 +6682,6 @@ export interface operations {
                             id?: string;
                             /** Format: uuid */
                             organization_id?: string;
-                            region_code?: string;
                             /** @enum {string} */
                             status?: "ACTIVE" | "INACTIVE";
                             version?: number;
@@ -6705,7 +6740,6 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     organization_id: string;
-                    region_code: string;
                     name: string;
                     contact_note?: string;
                     operating_note?: string;
@@ -6729,7 +6763,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -6797,7 +6830,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string;
                         status?: string;
                         version?: number;
                         /** Format: date-time */
@@ -6869,7 +6901,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -6943,7 +6974,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -6992,8 +7022,7 @@ export interface operations {
     logisticsReportsFulfillmentSummary: {
         parameters: {
             query: {
-                campaign_id?: string;
-                region_code?: string;
+                campaign_id: string;
                 from: string;
                 to: string;
                 cursor?: string;
@@ -7020,7 +7049,6 @@ export interface operations {
                             /** Format: uuid */
                             cycle_id?: string;
                             work_cycle?: number;
-                            region_code?: string | null;
                             campaign_id?: string | null;
                             item?: {
                                 /** Format: uuid */
@@ -7827,7 +7855,6 @@ export interface operations {
                             id?: string;
                             /** Format: uuid */
                             organization_id?: string;
-                            region_code?: string;
                             /** @enum {string} */
                             status?: "ACTIVE" | "INACTIVE";
                             version?: number;
@@ -7884,7 +7911,6 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     organization_id: string;
-                    region_code: string;
                     identifier: string;
                     vehicle_type: string;
                     capacity?: string | null;
@@ -7904,7 +7930,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -7978,7 +8003,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -8048,7 +8072,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -8115,7 +8138,6 @@ export interface operations {
                             id?: string;
                             /** Format: uuid */
                             organization_id?: string;
-                            region_code?: string;
                             /** @enum {string} */
                             status?: "ACTIVE" | "INACTIVE";
                             version?: number;
@@ -8175,7 +8197,6 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     organization_id: string;
-                    region_code: string;
                     name: string;
                     address_note?: string;
                     location?: {
@@ -8199,7 +8220,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -8272,7 +8292,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -8346,7 +8365,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -9145,6 +9163,78 @@ export interface operations {
         };
     };
     logisticsDonationsListMine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/04-logistics-api.md for the documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsReportsSuggestDrives: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/04-logistics-api.md for the documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsReportsOperations: {
         parameters: {
             query?: never;
             header?: never;

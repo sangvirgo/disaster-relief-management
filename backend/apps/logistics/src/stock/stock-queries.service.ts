@@ -12,7 +12,6 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}
 
 interface WarehouseRow {
   organization_id: string;
-  region_code: string;
 }
 
 function filterHash(route: string, userId: string, grants: unknown[], filters: Record<string, unknown>): Record<string, unknown> {
@@ -62,7 +61,7 @@ export class StockQueriesService {
     const limit = query.limit ?? 50;
     values.push(limit + 1);
     const rows = await this.dataSource.query(
-      `SELECT b.id AS balance_id,b.warehouse_id,b.item_id,w.organization_id,w.region_code,
+      `SELECT b.id AS balance_id,b.warehouse_id,b.item_id,w.organization_id,
               i.name AS item_name,it.display_name AS item_type,un.code AS unit_code,un.display_name AS unit,
               un.scale,b.on_hand::text AS on_hand,b.reserved::text AS reserved,(b.on_hand-b.reserved)::text AS available
          FROM stock_balance b JOIN warehouse w ON w.id=b.warehouse_id
@@ -70,7 +69,7 @@ export class StockQueriesService {
         WHERE ${conditions.join(' AND ')} ORDER BY b.id ASC LIMIT $${values.length}`,
       values,
     ) as Array<Record<string, unknown> & { balance_id: string }>;
-    const items = rows.slice(0, limit).map(({ organization_id: _organizationId, region_code: _regionCode, ...row }) => row);
+    const items = rows.slice(0, limit).map(({ organization_id: _organizationId, ...row }) => row);
     const last = rows[limit - 1];
     return {
       items,
@@ -82,11 +81,11 @@ export class StockQueriesService {
   async movements(balanceId: string, query: StockPageQueryDto, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     const balanceRows = await this.dataSource.query(
-      `SELECT b.id,w.organization_id,w.region_code FROM stock_balance b JOIN warehouse w ON w.id=b.warehouse_id WHERE b.id=$1`,
+      `SELECT b.id,w.organization_id FROM stock_balance b JOIN warehouse w ON w.id=b.warehouse_id WHERE b.id=$1`,
       [balanceId],
     ) as Array<{ id: string } & WarehouseRow>;
     const balance = balanceRows[0];
-    if (!balance || !hasWarehouseScope(session.grants, balance.organization_id, balance.region_code)) {
+    if (!balance || !hasWarehouseScope(session.grants, balance.organization_id)) {
       throw new AppError('NOT_FOUND', { status: 404 });
     }
     const filters = filterHash('logistics.stock.movements', session.userId, session.grants, { balance_id: balanceId });

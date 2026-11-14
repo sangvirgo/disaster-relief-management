@@ -35,6 +35,8 @@ export interface CommandSpec {
   fields?: Field[];
   version?: number;
   warning?: string;
+  /** Hide the heading when the surrounding UI already names the action. */
+  hideTitle?: boolean;
   warningFor?: (values: Record<string, string>) => string;
   build?: (values: Record<string, string>) => Record<string, unknown> | Promise<Record<string, unknown>>;
 }
@@ -198,9 +200,7 @@ export function CommandForm({
               (name) => name === field.name || name.endsWith(`.${field.name}`)
             )
           )
-            errors[field.name] = field.name === 'region_code' && spec.path === '/campaigns'
-              ? 'Khu vực này chưa được cấu hình cho điều phối. Hãy chọn khu vực khác hoặc không gắn khu vực.'
-              : `Vui lòng kiểm tra ${sentenceLabel(field.label)}.`;
+            errors[field.name] = `Vui lòng kiểm tra ${sentenceLabel(field.label)}.`;
         }
         setFieldErrors(errors);
       }
@@ -217,7 +217,7 @@ export function CommandForm({
   }
   return (
     <form className="form-stack command-form" onSubmit={submit} autoComplete="off" noValidate>
-      <h3>{spec.title}</h3>
+      {!spec.hideTitle && <h3>{spec.title}</h3>}
       {visibleFields.map((field) => {
         const inlineError = errorFor(field);
         const describedBy = inlineError ? errorId(field) : undefined;
@@ -239,7 +239,7 @@ export function CommandForm({
                 <span>{option.label}</span>
                 <span className="command-choice-indicator" aria-hidden="true">{values[field.name] === option.value ? '✓' : ''}</span>
               </button>
-            )) : <p className="empty">Chưa có chiến dịch đang hoạt động phù hợp với khu vực này.</p>}
+            )) : <p className="empty">Chưa có chiến dịch đang hoạt động phù hợp.</p>}
             {inlineError && <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>}
           </fieldset>
         ) : field.type === 'reference' ? (

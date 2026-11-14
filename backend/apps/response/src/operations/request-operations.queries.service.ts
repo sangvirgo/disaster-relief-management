@@ -4,9 +4,9 @@ import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
 import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
-import { riskAttentionLevel, scoreRequestRisk } from '../ai/ai-risk';
-import type { RiskFacts } from '../ai/ai-risk';
 import { aiPriorityAdvisory, currentAiAdvisory } from '../ai/ai-priority-advisory';
+import { assessFastTrack, hasPossibleDuplicate, ruleAdvisory as priorityAdvisory } from './request-operations.fast-track';
+import { hasPendingSupplement } from './request-operations.verification.helpers';
 import { ReporterSessionService } from '../requests/reporter-session';
 import type { ReporterSession } from '../requests/reporter-session';
 import type { RequestOperationPageDto, RequestQueueQueryDto } from './request-operations.dto';
@@ -32,18 +32,6 @@ type ScoredQueueRow = QueueRow & {
   ai_review_status: string | null;
 };
 
-function priorityAdvisory(facts: RiskFacts): Record<string, unknown> {
-  const risk = scoreRequestRisk(facts);
-  return {
-    outcome: risk.score === null ? 'INSUFFICIENT_DATA' : 'SUGGESTION',
-    score: risk.score,
-    level: riskAttentionLevel(risk.score),
-    reason_codes: risk.reasonCodes,
-    source: 'BACKEND_RULES',
-    rules_version: 'v3',
-  };
-}
-
 function countOrNull(value: unknown): number | null {
   return value == null ? null : Number(value);
 }
@@ -68,7 +56,6 @@ export class RequestOperationsQueriesService {
     const add = (clause: (index: number) => string, value: unknown) => { values.push(value); conditions.push(clause(values.length)); };
     if (!(query.overdue === 'true' && query.review_lane === undefined)) add((index) => `r.review_lane=$${index}`, query.review_lane ?? 'NORMAL');
     if (query.status) add((index) => `r.status=$${index}`, query.status);
-    if (query.region_code) add((index) => `r.region_code=$${index}`, query.region_code);
     if (query.priority) add((index) => `r.priority=$${index}`, query.priority);
     if (query.category) add((index) => `r.incident_category_code=$${index}`, query.category);
     if (query.from) add((index) => `r.received_at >= $${index}::timestamptz`, query.from);
@@ -87,9 +74,9 @@ export class RequestOperationsQueriesService {
     conditions.push(`($${values.length - 1}::timestamptz IS NULL OR (r.received_at,r.id)<($${values.length - 1}::timestamptz,$${values.length}::uuid))`);
     values.push(limit + 1);
     const rows = await this.dataSource.query(
-      `SELECT r.id,r.tracking_code,r.status,r.priority,r.review_lane,r.incident_category_code AS category,
+      `SELECT r.id,r.tracking_code,r.status,r.priority,r.review_lane,r.report_mode,r.incident_category_code AS category,
               r.description,r.needs_rescue,r.needs_relief_supplies,r.work_cycle,
-              s.people_affected,s.children_count,s.elderly_count,r.region_code,r.received_at,
+              s.people_affected,s.children_count,s.elderly_count,r.received_at,
               to_char(r.received_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_received_at,
               r.reporter_declared_danger AS declared_danger,${overdue} AS overdue,
               CASE WHEN r.reporter_contact_phone IS NULL THEN NULL ELSE '******'||right(r.reporter_contact_phone,4) END AS reporter_contact_phone,
@@ -120,17 +107,25 @@ export class RequestOperationsQueriesService {
         needsRescue: row.needs_rescue,
         needsReliefSupplies: row.needs_relief_supplies,
       };
+      const ruleView = priorityAdvisory(facts);
+      const aiView = aiPriorityAdvisory(currentAiAdvisory(row.ai_status ? {
+        model: row.ai_model, input_hash: row.ai_input_hash, request_version: row.ai_request_version,
+        status: row.ai_status,
+        extracted_json: row.ai_extracted_json,
+        review_status: row.ai_review_status,
+      } : undefined, facts, Number(row.work_cycle)));
       return {
         id: row.id, tracking_code: row.tracking_code, status: row.status, priority: row.priority,
         review_lane: row.review_lane, category: row.category, people_affected: row.people_affected,
-        region_code: row.region_code, received_at: toIso(row.received_at), declared_danger: row.declared_danger,
-        priority_advisory: priorityAdvisory(facts),
-        ai_priority_advisory: aiPriorityAdvisory(currentAiAdvisory(row.ai_status ? {
-          model: row.ai_model, input_hash: row.ai_input_hash, request_version: row.ai_request_version,
-          status: row.ai_status,
-          extracted_json: row.ai_extracted_json,
-          review_status: row.ai_review_status,
-        } : undefined, facts, Number(row.work_cycle))),
+        received_at: toIso(row.received_at), declared_danger: row.declared_danger,
+        priority_advisory: ruleView,
+        ai_priority_advisory: aiView,
+        fast_track: assessFastTrack({
+          status: row.status, reportMode: row.report_mode, reviewLane: row.review_lane,
+          proxyFlagCount: (row.proxy_activity_flags ?? []).length, peopleAffected: countOrNull(row.people_affected),
+          declaredDanger: row.declared_danger,
+          ruleAdvisory: ruleView, aiAdvisory: aiView,
+        }),
         overdue: row.overdue, reporter_contact_phone: row.reporter_contact_phone,
         approx_location: { longitude: Number(row.longitude), latitude: Number(row.latitude) },
         staff_flags: row.proxy_activity_flags ?? [],
@@ -141,32 +136,6 @@ export class RequestOperationsQueriesService {
       items, more,
       ...(next ? { cursor: encodeKeysetCursor([next.cursor_received_at], next.id, filters) } : {}),
       generated_at: new Date().toISOString(),
-    };
-  }
-
-  async unassigned(query: RequestOperationPageDto, request: Request): Promise<Record<string, unknown>> {
-    const session = await this.sessions.require(request);
-    const filters = filtersHash(session.grants, session.userId, query, 'unassigned');
-    const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
-    const values: unknown[] = [];
-    const scope = scopeSql(session.grants, 'REQUEST_UNASSIGNED_QUEUE', values, 'r', true);
-    values.push(cursor?.sort[0] ?? null, cursor?.id ?? null, (query.limit ?? 50) + 1);
-    const rows = await this.dataSource.query(
-      `SELECT r.id,r.tracking_code,r.status,r.review_lane,r.incident_category_code AS category,
-              s.people_affected,r.received_at,to_char(r.received_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_received_at
-         FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
-        WHERE ${scope} AND r.region_code IS NULL AND r.status NOT IN ('REJECTED','DUPLICATE','CANCELLED','CLOSED')
-          AND ($${values.length - 2}::timestamptz IS NULL OR (r.received_at,r.id)>($${values.length - 2}::timestamptz,$${values.length - 1}::uuid))
-        ORDER BY r.received_at,r.id LIMIT $${values.length}`,
-      values,
-    ) as Array<QueueRow>;
-    const limit = query.limit ?? 50;
-    const more = rows.length > limit;
-    const page = rows.slice(0, limit);
-    const next = more && page.length ? page[page.length - 1]! : undefined;
-    return {
-      items: page.map((row) => ({ id: row.id, tracking_code: row.tracking_code, status: row.status, review_lane: row.review_lane, category: row.category, people_affected: row.people_affected, received_at: toIso(row.received_at) })),
-      more, ...(next ? { cursor: encodeKeysetCursor([next.cursor_received_at], next.id, filters) } : {}),
     };
   }
 
@@ -221,6 +190,7 @@ export class RequestOperationsQueriesService {
     };
     const requestPriorityAdvisory = priorityAdvisory(assessmentFacts);
     const advisory = currentAiAdvisory(advisoryRows[0], assessmentFacts, Number(row.work_cycle));
+    const aiView = aiPriorityAdvisory(advisory);
     const safeEvents = await this.restrictEvents(eventPage.items, session);
     const flagViews = safeEvents.filter((event) => event.event_type === 'PROXY_ACTIVITY_FLAG').map((event) => ({
       event_id: event.id, occurred_at: event.occurred_at,
@@ -235,11 +205,18 @@ export class RequestOperationsQueriesService {
       status: row.status, version: Number(row.version), work_cycle: Number(row.work_cycle),
       priority: row.priority, priority_basis: row.priority_basis, review_lane: row.review_lane,
       category: row.incident_category_code, description: row.description,
-      region_code: row.region_code, campaign_id: row.campaign_id, received_at: toIso(row.received_at),
+      campaign_id: row.campaign_id, received_at: toIso(row.received_at),
       declared_danger: row.reporter_declared_danger,
       needs_rescue: row.needs_rescue, needs_relief_supplies: row.needs_relief_supplies,
       priority_advisory: requestPriorityAdvisory,
-      ai_priority_advisory: aiPriorityAdvisory(advisory),
+      ai_priority_advisory: aiView,
+      fast_track: assessFastTrack({
+        status: row.status, reportMode: row.report_mode, reviewLane: row.review_lane,
+        proxyFlagCount: Array.isArray(flagViews[0]?.flags) ? (flagViews[0]!.flags as unknown[]).length : 0, peopleAffected: countOrNull(subject.people_affected), declaredDanger: row.reporter_declared_danger,
+        ruleAdvisory: requestPriorityAdvisory, aiAdvisory: aiView,
+        pendingSupplement: await hasPendingSupplement(this.dataSource, row.id),
+        possibleDuplicate: await hasPossibleDuplicate(this.dataSource, row.id),
+      }),
       reporter: { user_id: row.reporter_user_id, name: row.reporter_name, contact_phone: row.reporter_contact_phone },
       subject: {
         people_affected: subject.people_affected,
@@ -370,12 +347,12 @@ export class RequestOperationsQueriesService {
 
   private async scopedRequestSummary(requestId: string, session: ReporterSession): Promise<Array<Record<string, unknown>>> {
     const rows = await this.dataSource.query(
-      `SELECT id,tracking_code,status,region_code,campaign_id,organization_id FROM assistance_request WHERE id=$1`, [requestId],
-    ) as Array<Record<string, unknown> & { organization_id: string; region_code: string | null; campaign_id: string | null }>;
+      `SELECT id,tracking_code,status,campaign_id,organization_id FROM assistance_request WHERE id=$1`, [requestId],
+    ) as Array<Record<string, unknown> & { organization_id: string; campaign_id: string | null }>;
     const row = rows[0];
     if (!row) return [];
     if (!canAccessRequest(session, 'REQUEST_DETAIL_READ', row)) return [];
-    return [{ id: row.id, tracking_code: row.tracking_code, status: row.status, region_code: row.region_code, campaign_id: row.campaign_id }];
+    return [{ id: row.id, tracking_code: row.tracking_code, status: row.status, campaign_id: row.campaign_id }];
   }
 
   private async staffEvents(

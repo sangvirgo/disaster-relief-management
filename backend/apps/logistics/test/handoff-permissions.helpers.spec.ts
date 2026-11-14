@@ -1,7 +1,7 @@
 import type { Grant } from '@c48/identity-contracts/permissions';
 import { requireHandoffPermission } from '../src/distributions/handoff-permissions.helpers';
 
-const distribution = { organization_id: 'organization-1', warehouse_region_code: 'REGION_1' };
+const distribution = { organization_id: 'organization-1' };
 const scopedCoordinator: Grant[] = [
   { role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: 'organization-1' },
 ];

@@ -172,8 +172,6 @@ try {
   assert.equal(staleCookieTrack.status, 200, JSON.stringify(staleCookieTrack.value));
 
   const supplementKey = key();
-  const initialRegion = await responseDb.query('SELECT region_code FROM assistance_request WHERE id=$1', [claimRequest.id]);
-  assert.equal(initialRegion.rows[0].region_code, 'R1');
   const supplementBody = {
     expected_version: 1, description: 'Nước đã dâng thêm.', reporter_declared_danger: true,
     location: { type: 'Point', coordinates: [120.5, 10.5], source: 'MANUAL_PIN' },
@@ -182,8 +180,6 @@ try {
   const supplement = await call(responseUrl, `requests/${claimRequest.id}/supplements`, { method: 'POST', body: supplementBody, headers: supplementHeaders });
   assert.equal(supplement.status, 201, JSON.stringify(supplement.value));
   assert.equal(supplement.value.version, 2);
-  const correctedRegion = await responseDb.query('SELECT region_code FROM assistance_request WHERE id=$1', [claimRequest.id]);
-  assert.equal(correctedRegion.rows[0].region_code, null, 'a corrected point outside every region must leave the request unassigned');
   assert.equal(supplement.headers.get('cache-control'), 'no-store');
   const supplementReplay = await call(responseUrl, `requests/${claimRequest.id}/supplements`, { method: 'POST', body: supplementBody, headers: supplementHeaders });
   assert.equal(supplementReplay.status, 201);

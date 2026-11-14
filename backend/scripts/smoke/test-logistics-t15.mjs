@@ -13,7 +13,6 @@ const responseDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATA
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
 const organizationId = requiredEnv('DEMO_INTAKE_ORGANIZATION_ID');
 const suffix = randomBytes(5).toString('hex').toUpperCase();
-const regionCode = `T15_${suffix}`;
 const categoryCode = `T15_FLOOD_${suffix}`;
 let identityIp = 20 + randomBytes(1)[0] % 200;
 let requestIp = 120;
@@ -232,13 +231,7 @@ try {
     `INSERT INTO organization (id,name,organization_kind)
      VALUES ($1,'T15 test organization','COORDINATION') ON CONFLICT (id) DO NOTHING`, [organizationId],
   );
-  await identityDb.query('INSERT INTO region (code,name) VALUES ($1,$2)', [regionCode, 'Khu vực kiểm thử T15']);
   await responseDb.query('INSERT INTO incident_category (code,display_name) VALUES ($1,$2)', [categoryCode, 'Lũ lụt']);
-  await responseDb.query(
-    `INSERT INTO region_boundary (region_code,geom) VALUES
-      ($1,ST_Multi(ST_GeomFromText('POLYGON((-121 -21,-119 -21,-119 -19,-121 -19,-121 -21))',4326)))`,
-    [regionCode],
-  );
 
   const staff = await registerAndLogin('staff', ['COORDINATOR', 'OPERATIONS_MANAGER']);
   const approver = await cloneAndLogin('approver', ['COORDINATOR', 'REVIEWER'], staff);
@@ -262,12 +255,11 @@ try {
   });
   expectSuccess(item, 201);
   const warehouse = await command(logisticsUrl, 'warehouses', staff, {
-    organization_id: organizationId, region_code: regionCode, name: `Kho phân phối T15 ${suffix}`,
+    organization_id: organizationId, name: `Kho phân phối T15 ${suffix}`,
   });
   expectSuccess(warehouse, 201);
   const lowCapacityVehicle = await command(logisticsUrl, 'vehicles', staff, {
     organization_id: organizationId,
-    region_code: regionCode,
     identifier: `T15-${suffix}`,
     vehicle_type: 'Xe tải kiểm thử',
     capacity: '1.00',
@@ -282,7 +274,6 @@ try {
   expectSuccess(opening, 201);
   const reliefPoint = await command(logisticsUrl, 'relief-points', staff, {
     organization_id: organizationId,
-    region_code: regionCode,
     name: `Điểm cứu trợ T15 ${suffix}`,
     location: { type: 'Point', coordinates: [107.6, 16.0] },
   });

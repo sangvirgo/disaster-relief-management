@@ -362,22 +362,29 @@ async function main() {
     const now = new Date();
     const to = now.toISOString();
     const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1_000).toISOString();
-    const warehouses = await logisticsDb.query(
-      `SELECT w.id,w.organization_id,w.region_code,
-              (SELECT count(*)::int FROM stock_balance b WHERE b.warehouse_id=w.id) AS balance_count,
-              (SELECT count(*)::int
-                 FROM relief_need n
-                 JOIN fulfillment_cycle c ON c.id=n.cycle_id
-                WHERE c.organization_id=w.organization_id AND c.region_code=w.region_code
-                  AND n.created_at >= $1::timestamptz AND n.created_at < $2::timestamptz) AS fulfillment_need_count
-         FROM warehouse w
-        WHERE w.region_code IS NOT NULL
-          AND EXISTS (SELECT 1 FROM stock_balance b WHERE b.warehouse_id=w.id)
-        ORDER BY fulfillment_need_count DESC,balance_count DESC,w.id LIMIT 1`,
+    const fulfillmentTargets = await logisticsDb.query(
+      `SELECT c.organization_id,c.campaign_id,count(n.id)::int AS fulfillment_need_count
+         FROM relief_need n
+         JOIN fulfillment_cycle c ON c.id=n.cycle_id
+        WHERE c.campaign_id IS NOT NULL
+          AND n.created_at >= $1::timestamptz AND n.created_at < $2::timestamptz
+        GROUP BY c.organization_id,c.campaign_id
+        ORDER BY fulfillment_need_count DESC,c.campaign_id LIMIT 1`,
       [from, to],
     );
+    const fulfillmentTarget = fulfillmentTargets.rows[0];
+    assert.ok(Number(fulfillmentTarget?.fulfillment_need_count) > 0, 'T17 smoke requires a recent fulfillment need in a campaign');
+    const warehouses = await logisticsDb.query(
+      `SELECT w.id,w.organization_id,
+              (SELECT count(*)::int FROM stock_balance b WHERE b.warehouse_id=w.id) AS balance_count
+         FROM warehouse w
+        WHERE w.organization_id=$1
+          AND EXISTS (SELECT 1 FROM stock_balance b WHERE b.warehouse_id=w.id)
+        ORDER BY balance_count DESC,w.id LIMIT 1`,
+      [fulfillmentTarget.organization_id],
+    );
     const warehouse = warehouses.rows[0];
-    assert.ok(Number(warehouse?.fulfillment_need_count) > 0, 'T17 smoke requires a recent fulfillment need in a warehouse region');
+    assert.ok(warehouse, 'T17 smoke requires a warehouse with stock balances in the fulfillment organization');
     const organizationId = warehouse.organization_id;
     const reportWarehouseCandidates = await logisticsDb.query(
       `SELECT w.id,w.organization_id,count(b.id)::int AS balance_count
@@ -594,7 +601,7 @@ async function main() {
 
     const fulfillmentLimit = 5;
     const fulfillmentOracle = await logisticsDb.query(
-      `SELECT n.id AS need_id,c.request_id,c.id AS cycle_id,c.work_cycle,c.region_code,c.campaign_id,
+      `SELECT n.id AS need_id,c.request_id,c.id AS cycle_id,c.work_cycle,c.campaign_id,
               n.item_id,i.name AS item_name,un.code AS unit_code,un.display_name AS unit_name,un.scale AS unit_scale,
               n.original_quantity::text AS original,
               GREATEST(n.original_quantity-n.requested_quantity,0)::text AS reduced,
@@ -609,18 +616,18 @@ async function main() {
          JOIN item i ON i.id=n.item_id
          JOIN unit un ON un.code=i.unit_code
          LEFT JOIN commitment cm ON cm.relief_need_id=n.id
-        WHERE c.organization_id=$1 AND c.region_code=$2
+        WHERE c.organization_id=$1 AND c.campaign_id=$2::uuid
           AND n.created_at >= $3::timestamptz AND n.created_at < $4::timestamptz
         GROUP BY n.id,c.id,i.id,un.code
         ORDER BY n.id ASC`,
-      [warehouse.organization_id, warehouse.region_code, from, to],
+      [fulfillmentTarget.organization_id, fulfillmentTarget.campaign_id, from, to],
     );
     let fulfillmentOffset = 0;
     let fulfillmentCursor;
     const fulfillmentCursors = new Set();
     do {
       const query = new URLSearchParams({
-        region_code: warehouse.region_code, from, to, limit: String(fulfillmentLimit),
+        campaign_id: fulfillmentTarget.campaign_id, from, to, limit: String(fulfillmentLimit),
       });
       if (fulfillmentCursor) query.set('cursor', fulfillmentCursor);
       const fulfillment = await call(logisticsUrl, `reports/fulfillment?${query}`, { actor });
@@ -637,12 +644,11 @@ async function main() {
 
     const responseReport = await call(
       responseUrl,
-      `reports/summary?region_code=${encodeURIComponent(warehouse.region_code)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      `reports/summary?campaign_id=${fulfillmentTarget.campaign_id}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
       { actor },
     );
     expectSuccess(responseReport);
     assert.equal(typeof responseReport.value.generated_at, 'string');
-    assert.equal(responseReport.value.filters.region_code, warehouse.region_code);
 
     const publicSummaryPath = `public/donation-reports/summary?warehouse_id=${warehouse.id}&limit=5`;
     const publicSummary = await call(logisticsUrl, publicSummaryPath);
@@ -665,7 +671,7 @@ async function main() {
 
     const invalidWindow = await call(
       logisticsUrl,
-      `reports/fulfillment?region_code=${encodeURIComponent(warehouse.region_code)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(new Date(now.getTime() + 367 * 24 * 60 * 60 * 1_000).toISOString())}`,
+      `reports/fulfillment?campaign_id=${fulfillmentTarget.campaign_id}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(new Date(now.getTime() + 367 * 24 * 60 * 60 * 1_000).toISOString())}`,
       { actor },
     );
     expectVietnameseError(invalidWindow, 400, 'VALIDATION_FAILED');

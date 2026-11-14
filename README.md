@@ -87,7 +87,7 @@ All user-facing copy is in **Vietnamese**, in line with the project's language p
 - Location keeps its source, accuracy, capture time, and server receive time as distinct values.
 - **Verification workflow**: decision and reason, duplicate-candidate review, official priority.
 - **Mission assignment** to eligible teams. Teams accept or decline, post progress, and report results into the request timeline.
-- **Scoped operational maps and queues** limited by organization, region, or assigned resource, with no public personal details.
+- **Scoped operational maps and queues** limited by organization, campaign, or assigned resource, with no public personal details.
 
 ### Relief and logistics
 - Campaigns, supply needs, commitments, warehouses, vehicles, and relief points.
@@ -129,7 +129,7 @@ Reliva uses **three domain services**. Each NestJS service owns its database, cr
 
 | Service | Owns |
 |---|---|
-| **Identity** | Accounts, authentication, organizations, regions, memberships, scoped grants, sessions. |
+| **Identity** | Accounts, authentication, organizations, memberships, scoped grants, sessions. |
 | **Response** | SOS requests, affected-person and location records, verification history, teams, missions, campaigns, notifications. |
 | **Logistics** | Supply catalog, warehouses, drives, donor declarations, counts and reviews, stock ledger, needs, commitments, distributions, handoffs. |
 
@@ -153,7 +153,7 @@ More diagrams: [system overview](docs/diagrams/c48-system-overview.svg) · [cont
 ## Data protection and integrity
 
 - Locations use WGS84 (SRID 4326), with GeoJSON ordered longitude then latitude.
-- Exact locations, phone numbers, files, queues, exports, and notifications are scoped to authorized roles and regions.
+- Exact locations, phone numbers, files, queues, exports, and notifications are scoped to authorized roles and organizations.
 - Buckets are private. Every download is authorized against its owning request, mission, or distribution.
 - Machine-readable contracts (paths, field names, error codes, enums) stay stable and English. Clients branch on codes, never on Vietnamese message text.
 - Use synthetic names, contacts, locations, and files for development and demos.

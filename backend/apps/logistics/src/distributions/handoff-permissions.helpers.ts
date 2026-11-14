@@ -6,25 +6,25 @@ import type { DistributionContext } from './distributions.read';
 import type { DistributionHandoffKind } from './distributions.helpers';
 
 export type HandoffPermission = 'HANDOFF_RECORD' | 'LOSS_APPROVE' | 'RETURN';
-type DistributionScope = Pick<DistributionContext, 'organization_id' | 'warehouse_region_code'>;
+type DistributionScope = Pick<DistributionContext, 'organization_id'>;
 
 export function requireHandoffPermission(
   grants: readonly Grant[],
   permission: HandoffPermission,
   distribution: DistributionScope,
 ): void {
-  const { organization_id: organizationId, warehouse_region_code: regionCode } = distribution;
-  if (!hasWarehouseScope(grants, organizationId, regionCode)) throw new AppError('NOT_FOUND', { status: 404 });
+  const { organization_id: organizationId } = distribution;
+  if (!hasWarehouseScope(grants, organizationId)) throw new AppError('NOT_FOUND', { status: 404 });
 
   if (permission === 'RETURN') {
-    const target = { organizationId, regionCode };
+    const target = { organizationId };
     if (!hasPermission(grants, 'DONATION_INTAKE', target) && !hasPermission(grants, 'DISTRIBUTION_DISPATCH', target)) {
       throw new AppError('FORBIDDEN', { status: 403 });
     }
     return;
   }
 
-  requireWarehousePermission(grants, permission, organizationId, regionCode);
+  requireWarehousePermission(grants, permission, organizationId);
 }
 
 export function requireHandoffReadPermission(
@@ -32,10 +32,10 @@ export function requireHandoffReadPermission(
   handoffKind: DistributionHandoffKind,
   distribution: DistributionScope,
 ): void {
-  const { organization_id: organizationId, warehouse_region_code: regionCode } = distribution;
-  if (!hasWarehouseScope(grants, organizationId, regionCode)) throw new AppError('NOT_FOUND', { status: 404 });
+  const { organization_id: organizationId } = distribution;
+  if (!hasWarehouseScope(grants, organizationId)) throw new AppError('NOT_FOUND', { status: 404 });
 
-  const target = { organizationId, regionCode };
+  const target = { organizationId };
   const required: readonly Permission[] = handoffKind === 'RETURN'
     ? ['DONATION_INTAKE', 'DISTRIBUTION_DISPATCH']
     : handoffKind === 'LOSS'

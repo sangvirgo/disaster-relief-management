@@ -16,7 +16,7 @@ Quản trị viên không mặc nhiên được xem chi tiết SOS, nạn nhân 
 | Tình nguyện viên/Đội cứu hộ | Tổng quan nhiệm vụ; danh sách và chi tiết nhiệm vụ; nhận/từ chối; cập nhật hành trình/kết quả; bằng chứng; hồ sơ đội, thành viên, kỹ năng, trạng thái và vị trí | Nhận việc đúng quyền trưởng đội, cập nhật tiến độ, gửi bằng chứng | Response teams, missions, evidence, notices |
 | Điều phối viên | Hàng đợi SOS; chi tiết/xác minh; trùng lặp và liên hệ; quyết định ưu tiên; so sánh đội; giao nhiệm vụ; bản đồ; theo dõi nhiệm vụ; chiến dịch; báo cáo | Xác minh, chọn P1–P4 có lý do, giao đội, xử lý việc quá hạn, giải quyết yêu cầu | Response operations, teams, missions, map, campaigns, reports, resolution |
 | Quản lý vận hành | Tổng quan nhu cầu/vật phẩm; đợt quyên góp; hàng chờ tiếp nhận; kiểm đếm; duyệt độc lập; kho/vật phẩm/điểm cứu trợ/xe; nhu cầu và cam kết; phiếu phân phối; bàn giao; đối soát; báo cáo | Mở đợt, đếm và duyệt theo quyền riêng, giữ sổ kho chính xác, xuất và bàn giao có chứng cứ | Logistics drives, receipts, catalog, assets, stock, needs, distributions, handoffs, reports; Response campaigns |
-| Quản trị viên | Người dùng; tổ chức; thành viên/grant; khu vực; nhật ký kiểm toán | Cấp/thu hồi quyền và giám sát truy cập | Identity users, organizations, grants, regions, audit; Logistics audit theo quyền ADMIN |
+| Quản trị viên | Người dùng; tổ chức; thành viên/grant; nhật ký kiểm toán | Cấp/thu hồi quyền và giám sát truy cập | Identity users, organizations, grants, audit; Logistics audit theo quyền ADMIN |
 
 ## 3. Luồng SOS của Người dân
 

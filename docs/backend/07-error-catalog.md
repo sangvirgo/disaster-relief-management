@@ -66,6 +66,7 @@ Every error the API can return has one row here. The implementation loads this t
 | `VERIFICATION_BASIS_REQUIRED` | 400 | Response | Vui lòng chọn cơ sở xác minh. |
 | `NO_CONTACT_ATTEMPT` | 409 | Response | Cần một lần liên hệ người báo tin thành công do điều phối viên khác ghi nhận để cấp lại mã tra cứu. |
 | `SECOND_COORDINATOR_REQUIRED` | 409 | Response | Cần một điều phối viên khác xác nhận đồng thuận. |
+| `FAST_TRACK_NOT_ELIGIBLE` | 409 | Response | Yêu cầu này cần được rà soát đầy đủ, chưa thể xử lý nhanh theo gợi ý. |
 | `REJECT_THRESHOLD_NOT_MET` | 409 | Response | Chưa đủ số lần liên hệ để từ chối vì không liên lạc được. |
 | `REQUEST_NOT_VERIFIED` | 409 | Response | Yêu cầu chưa được xác minh. |
 | `CANONICAL_INVALID` | 409 | Response | Yêu cầu gốc được chọn không hợp lệ. |
@@ -84,7 +85,7 @@ Every error the API can return has one row here. The implementation loads this t
 | `CAMPAIGN_NOT_ACTIVE` | 409 | Response / Logistics | Chiến dịch hiện không hoạt động. |
 | `CAMPAIGN_PAUSED` | 409 | Response / Logistics | Chiến dịch đang tạm dừng. |
 | `CAMPAIGN_HAS_OPEN_REQUESTS` | 409 | Response | Còn yêu cầu chưa kết thúc thuộc chiến dịch này. |
-| `TOO_MANY_CELLS` | 400 | Response | Khu vực hoặc khoảng thời gian quá lớn. Vui lòng thu hẹp bộ lọc. |
+| `TOO_MANY_CELLS` | 400 | Response | Vùng bản đồ hoặc khoảng thời gian quá lớn. Vui lòng thu hẹp bộ lọc. |
 | **Logistics — catalog / stock** | | | |
 | `ITEM_NAME_TAKEN` | 409 | Logistics | Tên mặt hàng đã tồn tại. |
 | `VEHICLE_IDENTIFIER_TAKEN` | 409 | Logistics | Biển số hoặc mã phương tiện đã tồn tại. |
@@ -133,7 +134,6 @@ Notes: `REQUEST_STATE_INVALID` and `IDEMPOTENCY_IN_PROGRESS` from earlier drafts
 
 | code | HTTP | Owner | Vietnamese message |
 |---|---|---|---|
-| `REGION_REQUIRED` | 409 | Response | Cần xác định khu vực của yêu cầu trước khi giao nhiệm vụ. |
 | `ATTRIBUTION_LOCK_IN_USE` | 409 | Response | Chưa thể gỡ khóa vì chu kỳ đã có nhiệm vụ hoặc nhu cầu vật tư. |
 | `PENDING_SUPPLEMENT_REVIEW` | 409 | Response | Còn thông tin bổ sung chưa được xem xét. |
 | `RESOLUTION_BASIS_INVALID` | 409 | Response | Cơ sở xác nhận hoàn tất không phù hợp với tình trạng hiện tại. |

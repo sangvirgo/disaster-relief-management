@@ -95,7 +95,7 @@ export class UsersService {
           WHERE m.user_id = $1 ORDER BY o.created_at DESC, o.id DESC`, [id],
       ) as Promise<Array<Record<string, unknown>>>,
       this.dataSource.query(
-        `SELECT id, role_code, scope_type, organization_id, region_code, campaign_id, created_at, revoked_at
+        `SELECT id, role_code, scope_type, organization_id, campaign_id, created_at, revoked_at
            FROM role_grant WHERE user_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC, id DESC`, [id],
       ) as Promise<Array<Record<string, unknown>>>,
     ]);

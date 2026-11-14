@@ -13,7 +13,6 @@ Roles are a **code catalog** (`role_grant.role_code` CHECK in [identity.sql](sch
 | `REQUEST_CREATE_PROXY` (needs live session) | ● | ● | ● | ● | ● | ● | ● | ● | ● |
 | `REQUEST_QUEUE_READ`, `REQUEST_DETAIL_READ`, `TEAM_READ`, `MISSION_OVERDUE_READ`, `CAMPAIGN_READ` |  |  | ● |  |  |  |  |  |  |
 | `REQUEST_VERIFY`, `REQUEST_TRIAGE`, `REQUEST_CANCEL`, `REQUEST_REOPEN`, `REQUEST_RESOLVE` |  |  | ● |  |  |  |  |  |  |
-| `REQUEST_UNASSIGNED_QUEUE` (org-wide scope only) |  |  | ● |  |  |  |  |  |  |
 | `MISSION_ASSIGN`, `MISSION_RECORD_ON_BEHALF`, `TEAM_MANAGE_ANY`, `TEAM_POSITION_SET_ANY` |  |  | ● |  |  |  |  |  |  |
 | `MAP_READ` (heatmap, grouped queue) |  |  | ● |  | ● |  |  |  |  |
 | `CAMPAIGN_READ` (also granted independently to managers) |  |  | ● | ● | ● |  |  |  |  |
@@ -35,17 +34,16 @@ Roles are a **code catalog** (`role_grant.role_code` CHECK in [identity.sql](sch
 
 ○ = only when the grant row carries the explicit extra permission `DONATION_REVIEW` (stored as an additional `role_grant` with role `REVIEWER`; there is no implicit review right for managers or intake staff). ADMIN has **no** request/victim/donor detail permission.
 
-Role/scope pairs are enforced by the `role_scope` CHECK in `identity.sql`: ADMIN only `SYSTEM`; CITIZEN/VOLUNTEER `SYSTEM` or `ORGANIZATION`; every staff role `ORGANIZATION`, `REGION` or `CAMPAIGN` (never `SYSTEM`). Self-grant is refused by the service. `GET` endpoints with no row above need only a valid session plus object scope (e.g. own notices, own team).
+Role/scope pairs are enforced by the `role_scope` CHECK in `identity.sql`: ADMIN only `SYSTEM`; CITIZEN/VOLUNTEER `SYSTEM` or `ORGANIZATION`; every staff role `ORGANIZATION` or `CAMPAIGN` (never `SYSTEM`). Self-grant is refused by the service. `GET` endpoints with no row above need only a valid session plus object scope (e.g. own notices, own team).
 
 ## 2. Scope matching
 
-A grant is `(role, scope_type, organization, region?, campaign?)`.
+A grant is `(role, scope_type, organization, campaign?)`.
 
 1. Alternative grants combine with **OR**; within one grant, action ∧ owning organization ∧ selected scope combine with **AND**.
-2. `ORGANIZATION` scope covers all regions/campaigns of that organization; `REGION` covers requests/assets with that `region_code`; `CAMPAIGN` covers objects whose `campaign_id` matches. `SYSTEM` is an explicit, named-action exception, never implied by ADMIN.
-3. Region and campaign grants always carry the parent organization — geographic overlap never crosses organizations.
-4. `REQUEST_UNASSIGNED_QUEUE` and region correction require `ORGANIZATION` or `SYSTEM` scope; REGION/CAMPAIGN grants cannot read `region_code IS NULL` rows.
-5. Region/campaign values in a grant are validated through the owning catalog/API at grant time.
+2. `ORGANIZATION` scope covers all campaigns, requests and assets of that organization; `CAMPAIGN` covers objects whose `campaign_id` matches. `SYSTEM` is an explicit, named-action exception, never implied by ADMIN.
+3. Campaign grants always carry the parent organization; no grant crosses organizations.
+4. Campaign values in a grant are validated through the owning API at grant time.
 
 ## 3. Object-level rules (checked in addition to permission)
 

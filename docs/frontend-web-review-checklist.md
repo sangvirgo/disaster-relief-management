@@ -18,8 +18,6 @@ How to verify an item: open `contracts/openapi/<service>.json`, find the path, t
 | `GET/POST /requests/{id}/contact-attempts` | Log and read contact attempts with the reporter | Coordinator request detail | High |
 | `GET /requests/{id}/verification-candidates` | Candidates for independent verification | Coordinator detail (verify step) | High |
 | `POST /requests/{id}/authority-referrals` | Refer request to an authority | Coordinator detail | High |
-| `POST /requests/{id}/correct-region` | Correct the request region | Coordinator detail | Medium |
-| `GET /requests/unassigned` | Queue of requests with no team | Coordinator queue | High |
 | `GET /missions/overdue-offers` | Offers not answered in time | Coordinator queue | Medium |
 | `POST /missions/{id}/fail` | Mark a mission failed | Volunteer mission detail | High |
 | `POST /missions/{id}/review-failure` | Coordinator review of a failed mission | Coordinator | High |
@@ -37,7 +35,6 @@ How to verify an item: open `contracts/openapi/<service>.json`, find the path, t
 |---|---|---|
 | `POST /organizations/{id}/members` and `.../members/{userId}/remove` | Add or remove organization members | Medium |
 | `POST /auth/google/link` | Link a Google account | Low |
-| `POST /regions/{code}/deactivate` | Needs a `version`, which the region list does not expose | Medium (known contract gap) |
 
 ### 1.3 Logistics (optional capability; keep the demo short)
 

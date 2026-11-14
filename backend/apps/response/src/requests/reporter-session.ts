@@ -26,9 +26,8 @@ export interface ReporterSession {
 export interface RequestCoordinatorGrant {
   user_id: string;
   role_code: 'COORDINATOR' | 'OPERATIONS_MANAGER';
-  scope_type: 'ORGANIZATION' | 'REGION' | 'CAMPAIGN';
+  scope_type: 'ORGANIZATION' | 'CAMPAIGN';
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
 }
 
@@ -123,43 +122,12 @@ export class ReporterSessionService implements OnModuleDestroy {
       const value = item as Record<string, unknown>;
       return typeof value.user_id === 'string' && uuidPattern.test(value.user_id) &&
         (value.role_code === 'COORDINATOR' || value.role_code === 'OPERATIONS_MANAGER') &&
-        ['ORGANIZATION', 'REGION', 'CAMPAIGN'].includes(String(value.scope_type)) &&
+        ['ORGANIZATION', 'CAMPAIGN'].includes(String(value.scope_type)) &&
         value.organization_id === organizationId &&
-        (value.region_code === null || typeof value.region_code === 'string') &&
         (value.campaign_id === null || (typeof value.campaign_id === 'string' && uuidPattern.test(value.campaign_id)));
     });
     if (!valid) throw unavailable();
     return items as RequestCoordinatorGrant[];
-  }
-
-  async lookupRegionNames(codes: string[]): Promise<Map<string, string>> {
-    const requested = [...new Set(codes)];
-    if (!requested.length) return new Map();
-
-    const token = await this.serviceTokens.get();
-    let result;
-    try {
-      result = await this.client.post<unknown>('/api/v1/identity/internal/regions:lookup', { codes: requested }, {
-        headers: { authorization: `Bearer ${token}` },
-      });
-    } catch (error) {
-      if (error instanceof AppError) throw error;
-      throw unavailable();
-    }
-    if (result.status !== 200 || !result.body || typeof result.body !== 'object') throw unavailable();
-    const items = (result.body as Record<string, unknown>).items;
-    if (!Array.isArray(items)) throw unavailable();
-
-    const requestedCodes = new Set(requested);
-    const names = new Map<string, string>();
-    for (const item of items) {
-      if (!item || typeof item !== 'object' || Array.isArray(item)) throw unavailable();
-      const region = item as Record<string, unknown>;
-      if (typeof region.code !== 'string' || !requestedCodes.has(region.code) ||
-          typeof region.name !== 'string' || !region.name.trim() || names.has(region.code)) throw unavailable();
-      names.set(region.code, region.name);
-    }
-    return names;
   }
 
   async teamLeaderEligibility(userId: string, organizationId: string): Promise<TeamLeaderEligibility> {

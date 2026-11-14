@@ -18,7 +18,6 @@ type NeedChangeDto = AdjustNeedQuantityDto | CancelNeedDto;
 interface CycleRow {
   id: string;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
   state: 'OPEN' | 'FROZEN' | 'SEALED';
 }
@@ -80,7 +79,7 @@ async function needCycleId(manager: Pick<EntityManager, 'query'>, needId: string
 
 async function lockCycle(manager: Pick<EntityManager, 'query'>, cycleId: string): Promise<CycleRow> {
   const rows = await manager.query(
-    `SELECT id,organization_id,region_code,campaign_id,state
+    `SELECT id,organization_id,campaign_id,state
        FROM fulfillment_cycle WHERE id=$1 FOR UPDATE`,
     [cycleId],
   ) as CycleRow[];
@@ -90,7 +89,7 @@ async function lockCycle(manager: Pick<EntityManager, 'query'>, cycleId: string)
 
 async function lockNeed(manager: Pick<EntityManager, 'query'>, needId: string, cycleId: string): Promise<NeedRow> {
   const rows = await manager.query(
-    `SELECT n.id,n.cycle_id,c.request_id,c.work_cycle,c.organization_id,c.region_code,c.campaign_id,
+    `SELECT n.id,n.cycle_id,c.request_id,c.work_cycle,c.organization_id,c.campaign_id,
             n.item_id,i.name AS item_name,u.code AS unit_code,u.display_name AS unit_name,u.scale AS unit_scale,
             n.original_quantity::text,n.requested_quantity::text,n.cancelled_remaining::text,
             n.designated_point_id,n.status,n.version,n.created_at
@@ -197,10 +196,10 @@ export class NeedCommandsService {
     const session = await this.sessions.require(request);
     const idempotencyKey = needCommandKey(request);
     const scopeRows = await this.dataSource.query(
-      `SELECT c.organization_id,c.region_code,c.campaign_id
+      `SELECT c.organization_id,c.campaign_id
          FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id WHERE n.id=$1`,
       [id],
-    ) as Array<Pick<CycleRow, 'organization_id' | 'region_code' | 'campaign_id'>>;
+    ) as Array<Pick<CycleRow, 'organization_id' | 'campaign_id'>>;
     if (!scopeRows[0]) throw new AppError('NOT_FOUND', { status: 404 });
     requireNeedManage(session.grants, scopeRows[0]);
 
@@ -230,7 +229,7 @@ export class NeedCommandsService {
       replay: async (manager, resource: ResourceRef | null) => {
         if (resource?.type !== 'relief_need') throw new AppError('INTERNAL_ERROR', { status: 500 });
         const value = await readNeed(manager, resource.id);
-        requireNeedManage(session.grants, value as Pick<NeedRow, 'organization_id' | 'region_code' | 'campaign_id'>);
+        requireNeedManage(session.grants, value as Pick<NeedRow, 'organization_id' | 'campaign_id'>);
         return value;
       },
     });

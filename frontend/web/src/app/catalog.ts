@@ -50,7 +50,7 @@ export const pages: Record<Workspace, Page[]> = {
     { id: 'dashboard', title: 'Thống kê', icon: 'report' },
     {
       id: 'reports', title: 'Tổng quan và bản đồ', icon: 'report', service: 'response',
-      path: '/reports/summary', note: 'Tình hình SOS, nhiệm vụ và bản đồ nhiệt theo khu vực.',
+      path: '/reports/summary', note: 'Tình hình SOS, nhiệm vụ và bản đồ nhiệt.',
     },
     { id: 'queue', title: 'Xử lý SOS', icon: 'queue', service: 'response', path: '/requests' },
     { id: 'teams', title: 'Đội cứu hộ', icon: 'team', service: 'response', path: '/teams' },
@@ -128,12 +128,11 @@ export const pages: Record<Workspace, Page[]> = {
       service: 'identity',
       path: '/organizations',
     },
-    { id: 'regions', title: 'Khu vực', icon: 'regions', service: 'identity', path: '/regions' },
     {
       id: 'audit',
       title: 'Lịch sử thao tác',
       icon: 'audit',
-      note: 'Xem lịch sử thay đổi người dùng, quyền truy cập, tổ chức và khu vực.',
+      note: 'Xem lịch sử thay đổi người dùng, quyền truy cập và tổ chức.',
     },
   ],
 };

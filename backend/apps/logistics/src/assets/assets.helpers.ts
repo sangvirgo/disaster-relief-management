@@ -14,7 +14,6 @@ export const assetTables: Record<AssetKind, string> = {
 export interface AssetRow {
   id: string;
   organization_id: string;
-  region_code: string;
   name?: string;
   identifier?: string;
   vehicle_type?: string;
@@ -31,8 +30,8 @@ export interface AssetRow {
   created_at: Date | string;
 }
 
-export function requireAssetManage(session: AuthenticatedLogisticsSession, organizationId: string, regionCode: string): void {
-  if (!hasPermission(session.grants, 'ASSET_MANAGE', { organizationId, regionCode })) {
+export function requireAssetManage(session: AuthenticatedLogisticsSession, organizationId: string): void {
+  if (!hasPermission(session.grants, 'ASSET_MANAGE', { organizationId })) {
     throw new AppError('FORBIDDEN', { status: 403 });
   }
 }
@@ -40,13 +39,7 @@ export function requireAssetManage(session: AuthenticatedLogisticsSession, organ
 export function requireAnyAssetManage(session: AuthenticatedLogisticsSession): void {
   const allowed = session.grants.some((grant) => {
     if (!grant.organization_id) return false;
-    if (grant.scope_type === 'ORGANIZATION') {
-      return hasPermission([grant], 'ASSET_MANAGE', { organizationId: grant.organization_id, regionCode: '__scope_check__' });
-    }
-    if (grant.scope_type === 'REGION' && grant.region_code) {
-      return hasPermission([grant], 'ASSET_MANAGE', { organizationId: grant.organization_id, regionCode: grant.region_code });
-    }
-    return false;
+    return hasPermission([grant], 'ASSET_MANAGE', { organizationId: grant.organization_id });
   });
   if (!allowed) throw new AppError('FORBIDDEN', { status: 403 });
 }
@@ -65,14 +58,14 @@ export function assetSelect(kind: AssetKind, includePrivate: boolean): string {
     ? 'NULL::float8 AS longitude, NULL::float8 AS latitude'
     : 'ST_X(location::geometry)::float8 AS longitude, ST_Y(location::geometry)::float8 AS latitude';
   if (kind === 'warehouse') {
-    return `SELECT id,organization_id,region_code,name,${includePrivate ? 'address_note' : 'NULL::text AS address_note'},
+    return `SELECT id,organization_id,name,${includePrivate ? 'address_note' : 'NULL::text AS address_note'},
                    location_public,status,version,created_at,${location} FROM warehouse`;
   }
   if (kind === 'relief_point') {
-    return `SELECT id,organization_id,region_code,name,${includePrivate ? 'contact_note,operating_note' : 'NULL::text AS contact_note,NULL::text AS operating_note'},
+    return `SELECT id,organization_id,name,${includePrivate ? 'contact_note,operating_note' : 'NULL::text AS contact_note,NULL::text AS operating_note'},
                    status,version,created_at,${location} FROM relief_point`;
   }
-  return `SELECT id,organization_id,region_code,identifier,vehicle_type,capacity::text AS capacity,capacity_unit,
+  return `SELECT id,organization_id,identifier,vehicle_type,capacity::text AS capacity,capacity_unit,
                  status,version,created_at,${location} FROM vehicle`;
 }
 
@@ -80,7 +73,6 @@ export function assetView(kind: AssetKind, row: AssetRow, includePrivate: boolea
   const result: Record<string, unknown> = {
     id: row.id,
     organization_id: row.organization_id,
-    region_code: row.region_code,
     status: row.status,
     version: Number(row.version),
     created_at: new Date(row.created_at).toISOString(),
@@ -112,7 +104,6 @@ export function assetAuditState(kind: AssetKind, row: AssetRow): Record<string, 
   const state: Record<string, unknown> = {
     id: row.id,
     organization_id: row.organization_id,
-    region_code: row.region_code,
     status: row.status,
     version: Number(row.version),
   };

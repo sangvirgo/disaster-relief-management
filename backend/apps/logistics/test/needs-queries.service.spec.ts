@@ -12,10 +12,10 @@ const organizationId = '44444444-4444-4444-8444-444444444444';
 describe('NeedsQueriesService', () => {
   it('returns a scoped fulfillment board with derived totals and bounded contributions', async () => {
     const query = jest.fn()
-      .mockResolvedValueOnce([{ id: cycleId, request_id: requestId, work_cycle: 2, organization_id: organizationId, region_code: 'HN', campaign_id: null, state: 'OPEN' }])
+      .mockResolvedValueOnce([{ id: cycleId, request_id: requestId, work_cycle: 2, organization_id: organizationId, campaign_id: null, state: 'OPEN' }])
       .mockResolvedValueOnce([{
         id: needId, cycle_id: cycleId, request_id: requestId, work_cycle: 2, organization_id: organizationId,
-        region_code: 'HN', campaign_id: null, item_id: '55555555-5555-4555-8555-555555555555', item_name: 'Nước sạch',
+        campaign_id: null, item_id: '55555555-5555-4555-8555-555555555555', item_name: 'Nước sạch',
         unit_code: 'BOTTLE', unit_name: 'Chai', unit_scale: 0, original: '10.000', requested: '10.000',
         committed_reserved: '4.000', issued_unsettled: '2.000', delivered: '3.000', returned: '1.000', lost: '0.000',
         cancelled_remaining: null, status: 'PARTIALLY_FULFILLED', created_at: '2026-10-13T00:00:00.000Z',
@@ -31,7 +31,7 @@ describe('NeedsQueriesService', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: '88888888-8888-4888-8888-888888888888', identityHeaders: {},
-        grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId, region_code: null, campaign_id: null }],
+        grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId, campaign_id: null }],
       })),
     } as unknown as LogisticsSessionService;
     const service = new NeedsQueriesService(dataSource, sessions);
@@ -85,7 +85,7 @@ describe('NeedsQueriesService', () => {
       { require: jest.fn(async () => ({
         userId: needId,
         identityHeaders: {},
-        grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId, region_code: null, campaign_id: null }],
+        grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId, campaign_id: null }],
       })) } as unknown as LogisticsSessionService,
     );
 
@@ -102,7 +102,7 @@ describe('NeedsQueriesService', () => {
     const cursorTime = '2026-10-13T00:00:00.000123Z';
     const row = {
       id: needId, cycle_id: cycleId, request_id: requestId, work_cycle: 2, organization_id: organizationId,
-      region_code: 'HN', campaign_id: null, item_id: '55555555-5555-4555-8555-555555555555', item_name: 'Nước sạch',
+      campaign_id: null, item_id: '55555555-5555-4555-8555-555555555555', item_name: 'Nước sạch',
       unit_code: 'BOTTLE', unit_name: 'Chai', unit_scale: 0, original: '10.000', requested: '10.000',
       committed_reserved: '0.000', issued_unsettled: '0.000', delivered: '0.000', returned: '0.000', lost: '0.000',
       cancelled_remaining: null, status: 'OPEN', version: 1, created_at: cursorTime, cursor_created_at: cursorTime,
@@ -113,7 +113,7 @@ describe('NeedsQueriesService', () => {
       { require: jest.fn(async () => ({
         userId: needId,
         identityHeaders: {},
-        grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId, region_code: null, campaign_id: null }],
+        grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId, campaign_id: null }],
       })) } as unknown as LogisticsSessionService,
     );
 
@@ -134,16 +134,16 @@ describe('NeedsQueriesService', () => {
       created_at: '2026-10-13T00:00:00.000123Z', cursor_created_at: '2026-10-13T00:00:00.000123Z',
     };
     const query = jest.fn()
-      .mockResolvedValueOnce([{ id: needId, organization_id: organizationId, region_code: 'HN', campaign_id: null, unit_scale: 2 }])
+      .mockResolvedValueOnce([{ id: needId, organization_id: organizationId, campaign_id: null, unit_scale: 2 }])
       .mockResolvedValueOnce([first, { ...first, id: '99999999-9999-4999-8999-999999999999' }])
-      .mockResolvedValueOnce([{ id: needId, organization_id: organizationId, region_code: 'HN', campaign_id: null, unit_scale: 2 }])
+      .mockResolvedValueOnce([{ id: needId, organization_id: organizationId, campaign_id: null, unit_scale: 2 }])
       .mockResolvedValueOnce([]);
     const service = new NeedsQueriesService(
       { query } as unknown as DataSource,
       { require: jest.fn(async () => ({
         userId: needId,
         identityHeaders: {},
-        grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId, region_code: null, campaign_id: null }],
+        grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId, campaign_id: null }],
       })) } as unknown as LogisticsSessionService,
     );
 

@@ -242,7 +242,7 @@ export interface paths {
         put?: never;
         /**
          * Grant a scoped role
-         * @description Requires GRANT_MANAGE. Self-grants are forbidden. Region and campaign scopes are checked against their owning service before writing.
+         * @description Requires GRANT_MANAGE. Self-grants are forbidden. Campaign scopes are checked against their owning service before writing.
          */
         post: operations["createIdentityUserGrant"];
         delete?: never;
@@ -346,41 +346,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/regions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List region catalog */
-        get: operations["listIdentityRegions"];
-        put?: never;
-        /** Add a region to the catalog */
-        post: operations["createIdentityRegion"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/regions/{code}/deactivate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Deactivate a region */
-        post: operations["deactivateIdentityRegion"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/audit-logs": {
         parameters: {
             query?: never;
@@ -452,26 +417,6 @@ export interface paths {
          * @description Restricted to Response and Logistics service tokens. Callers must derive IDs from records they own and enforce that ownership before calling; Identity cannot verify relationships held only in another service database. Each caller integration must test this boundary. Batches contain at most 100 IDs, unknown Identity users are omitted, lookup logs the count only, and responses include Cache-Control: no-store.
          */
         post: operations["lookupIdentityUsers"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/regions:lookup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Resolve region display names for Response campaigns
-         * @description Restricted to a valid Response service token. Unknown codes are omitted. Response includes Cache-Control: no-store.
-         */
-        post: operations["lookupIdentityRegions"];
         delete?: never;
         options?: never;
         head?: never;
@@ -658,6 +603,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard/admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * IdentityDashboardController.admin
+         * @description Route exported from backend/apps/identity/src/dashboard/dashboard.controller.ts#IdentityDashboardController.admin. Detailed request, response, and error contract: docs/backend/02-identity-api.md. This export does not infer payload schemas.
+         */
+        get: operations["identityIdentityDashboardAdmin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -746,7 +711,6 @@ export interface components {
             scope_type: string;
             /** Format: uuid */
             organization_id?: string | null;
-            region_code?: string | null;
             /** Format: uuid */
             campaign_id?: string | null;
         };
@@ -807,10 +771,9 @@ export interface components {
             user_id: string;
             role_code: string;
             /** @enum {string} */
-            scope_type: "SYSTEM" | "ORGANIZATION" | "REGION" | "CAMPAIGN";
+            scope_type: "SYSTEM" | "ORGANIZATION" | "CAMPAIGN";
             /** Format: uuid */
             organization_id: string | null;
-            region_code: string | null;
             /** Format: uuid */
             campaign_id: string | null;
             /** Format: date-time */
@@ -826,10 +789,9 @@ export interface components {
             /** @enum {string} */
             role_code: "CITIZEN" | "VOLUNTEER" | "COORDINATOR" | "CAMPAIGN_MANAGER" | "OPERATIONS_MANAGER" | "INTAKE_STAFF" | "REVIEWER" | "DISTRIBUTION_STAFF" | "ADMIN";
             /** @enum {string} */
-            scope_type: "SYSTEM" | "ORGANIZATION" | "REGION" | "CAMPAIGN";
+            scope_type: "SYSTEM" | "ORGANIZATION" | "CAMPAIGN";
             /** Format: uuid */
             organization_id?: string;
-            region_code?: string;
             /** Format: uuid */
             campaign_id?: string;
             reason: string;
@@ -865,27 +827,6 @@ export interface components {
             organization_id: string;
             /** @enum {string} */
             status: "ACTIVE";
-        };
-        CreateRegionRequest: {
-            code: string;
-            name: string;
-        };
-        Region: {
-            code: string;
-            name: string;
-            /** @enum {string} */
-            status: "ACTIVE" | "INACTIVE";
-            version: number;
-        };
-        RegionPage: {
-            items: {
-                code: string;
-                name: string;
-                /** @enum {string} */
-                status: "ACTIVE" | "INACTIVE";
-                version: number;
-            }[];
-            next_cursor: string | null;
         };
         AuditRecord: {
             id: string;
@@ -938,12 +879,6 @@ export interface components {
                 display_name: string;
             }[];
         };
-        RegionLookupResponse: {
-            items: {
-                code: string;
-                name: string;
-            }[];
-        };
         InternalOrganization: {
             /** Format: uuid */
             id: string;
@@ -961,10 +896,9 @@ export interface components {
             /** @enum {string} */
             role_code: "COORDINATOR" | "OPERATIONS_MANAGER";
             /** @enum {string} */
-            scope_type: "ORGANIZATION" | "REGION" | "CAMPAIGN";
+            scope_type: "ORGANIZATION" | "CAMPAIGN";
             /** Format: uuid */
             organization_id: string;
-            region_code?: string | null;
             /** Format: uuid */
             campaign_id?: string | null;
         };
@@ -995,7 +929,6 @@ export interface components {
         GrantId: string;
         OrganizationId: string;
         MemberUserId: string;
-        RegionCode: string;
     };
     requestBodies: never;
     headers: {
@@ -2209,169 +2142,6 @@ export interface operations {
             409: components["responses"]["Error"];
         };
     };
-    listIdentityRegions: {
-        parameters: {
-            query?: {
-                cursor?: components["parameters"]["Cursor"];
-                limit?: components["parameters"]["Limit"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Region page. */
-            200: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegionPage"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            401: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    createIdentityRegion: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateRegionRequest"];
-            };
-        };
-        responses: {
-            /** @description Region created. */
-            201: {
-                headers: {
-                    "Idempotent-Replay": components["headers"]["IdempotentReplay"];
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Region"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            400: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            401: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            403: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            409: components["responses"]["Error"];
-        };
-    };
-    deactivateIdentityRegion: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                code: components["parameters"]["RegionCode"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VersionedReason"];
-            };
-        };
-        responses: {
-            /** @description Region deactivated. */
-            200: {
-                headers: {
-                    "Idempotent-Replay": components["headers"]["IdempotentReplay"];
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Region"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            401: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            403: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            404: components["responses"]["Error"];
-            409: components["responses"]["Error"];
-        };
-    };
     listIdentityAuditLogs: {
         parameters: {
             query: {
@@ -2561,54 +2331,6 @@ export interface operations {
             /** @description Documented error response; clients branch on the stable code. */
             403: {
                 headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    lookupIdentityRegions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    codes: string[];
-                };
-            };
-        };
-        responses: {
-            /** @description Unknown region codes are omitted. */
-            200: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegionLookupResponse"];
-                };
-            };
-            400: components["responses"]["Error"];
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            401: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            403: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -3163,6 +2885,42 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    identityIdentityDashboardAdmin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/02-identity-api.md for the documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Documented error response; clients branch on the stable code. */
             401: {

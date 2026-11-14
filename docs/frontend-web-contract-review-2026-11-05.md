@@ -15,14 +15,14 @@ The priority was the SOS lifecycle: intake and tracking, human verification, pri
 | Async request operation | After reload in `RESOLVING`, the Web did not poll or recover the pending operation. Operation creation events store the identifier as `intent_id`; later adoption/abort events store it as `operation_id`. | The coordinator finds either event shape, polls `GET /operations/{operationId}`, and exposes the backend's adopt/abort commands with the current request version. Both `COMPLETED` and `ABORTED` results refresh the request. |
 | Staff event history | The request detail projection returns only the newest 50 events, and the Web omitted event reasons and did not expose the older-event cursor. | Added older-event paging and displays the stored staff reason alongside each event. |
 | Request evidence review | The coordinator showed READY metadata but did not offer access to the file, even though the backend provides an authorized, short-lived URL from `GET /evidence/{id}/download`. | Added “get view link” and “open file” actions. The Web does not persist signed URLs outside the current page state; backend authorization is checked when requesting each URL. |
-| Documentation | The README described team-leader and region-version capabilities as missing although the current Web already consumes `can_manage_mission` and the region detail version. | Updated the capability matrix and next-slice list to match current code and project scope. |
+| Documentation | The README described team-leader capabilities as missing although the current Web already consumes `can_manage_mission`. | Updated the capability matrix and next-slice list to match current code and project scope. |
 
 ## Current workflow alignment
 
 - **Citizen SOS and tracking:** Web uses the existing public intake/tracking contracts, confirmed coordinates, server acknowledgement, private evidence flows, and account/capability tracking. Categories remain the versioned demo seed because there is no public category-list route.
 - **Coordinator:** The Web supports the main human-controlled state transitions and now exposes contact recording, full paged staff history, request evidence links, and recovery for an in-flight resolution/cancellation operation. AI output stays advisory and human review remains required.
 - **Volunteer:** Mission/team access is scoped by the API; leader-only commands use the backend-provided `can_manage_mission` flag. The API still enforces permissions.
-- **Admin:** Region deactivation sends the version from region detail. User, organization, region, grant, and audit actions use the existing admin routes.
+- **Admin:** User, organization, grant, and audit actions use the existing admin routes.
 - **Operations and reports:** Main campaign, intake/review, distribution, handoff creation, and scoped report flows are present. These remain supporting workflows and are intentionally not expanded into exhaustive logistics management in this slice.
 
 ## Known contract gaps and limits

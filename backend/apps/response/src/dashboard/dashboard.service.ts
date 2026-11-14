@@ -57,7 +57,7 @@ export class DashboardService {
     const [requestRows, missionRows, teamRows, recentRows] = await Promise.all([
       this.dataSource.query(`
         WITH scoped AS MATERIALIZED (
-          SELECT r.id, r.status, r.priority, r.region_code, r.incident_category_code AS category, r.received_at,
+          SELECT r.id, r.status, r.priority, r.incident_category_code AS category, r.received_at,
                  r.reporter_declared_danger AS danger
             FROM assistance_request r WHERE ${rq.where}
         ), open_requests AS (SELECT * FROM scoped WHERE status NOT IN ${CLOSED})
@@ -65,7 +65,6 @@ export class DashboardService {
           (SELECT COALESCE(jsonb_object_agg(status, c), '{}') FROM (SELECT status, COUNT(*)::int c FROM open_requests GROUP BY 1) x) AS open_by_status,
           (SELECT COALESCE(jsonb_object_agg(priority, c), '{}') FROM (SELECT priority, COUNT(*)::int c FROM open_requests WHERE priority IS NOT NULL GROUP BY 1) x) AS open_by_priority,
           (SELECT COALESCE(jsonb_object_agg(category, c), '{}') FROM (SELECT category, COUNT(*)::int c FROM open_requests GROUP BY 1) x) AS open_by_category,
-          (SELECT COALESCE(jsonb_object_agg(region, c), '{}') FROM (SELECT COALESCE(region_code, 'UNASSIGNED') region, COUNT(*)::int c FROM open_requests GROUP BY 1) x) AS open_by_region,
           (SELECT COUNT(*)::int FROM scoped WHERE received_at >= now() - interval '24 hours') AS received_24h,
           (SELECT COUNT(*)::int FROM scoped WHERE status = 'RESOLVED') AS resolved_total,
           (SELECT COUNT(*)::int FROM open_requests WHERE status IN ('SUBMITTED','VERIFYING')
@@ -85,7 +84,7 @@ export class DashboardService {
         [...mq.values, offerOverdue]),
       this.dataSource.query(`
         WITH teams AS (
-          SELECT t.id, t.organization_id, t.operating_region_code AS region_code, t.availability, t.readiness_required
+          SELECT t.id, t.organization_id, t.availability, t.readiness_required
             FROM rescue_team t WHERE t.status = 'ACTIVE'
         ), scoped AS (SELECT * FROM teams t WHERE ${tq.where})
         SELECT COUNT(*)::int AS total,
@@ -98,7 +97,7 @@ export class DashboardService {
           FROM scoped`,
         [...tq.values, positionFresh]),
       this.dataSource.query(`
-        SELECT r.id, r.status, r.priority, r.region_code, r.incident_category_code AS category, r.received_at
+        SELECT r.id, r.status, r.priority, r.incident_category_code AS category, r.received_at
           FROM assistance_request r
          WHERE ${cq.where} AND r.status NOT IN ${CLOSED}
          ORDER BY r.received_at DESC LIMIT 8`,
@@ -115,7 +114,6 @@ export class DashboardService {
         open_by_status: openByStatus,
         open_by_priority: toMap(rqRow.open_by_priority),
         open_by_category: toMap(rqRow.open_by_category),
-        open_by_region: toMap(rqRow.open_by_region),
         received_last_24h: n(rqRow.received_24h),
         resolved_total: n(rqRow.resolved_total),
         verification_overdue: n(rqRow.verification_overdue),
@@ -134,7 +132,7 @@ export class DashboardService {
         team_position_fresh_minutes: positionFresh,
       },
       recent_open_requests: (recentRows as Record<string, unknown>[]).map((row) => ({
-        id: row.id, status: row.status, priority: row.priority ?? null, region_code: row.region_code ?? null,
+        id: row.id, status: row.status, priority: row.priority ?? null,
         category: row.category, received_at: row.received_at,
       })),
       generated_at: new Date().toISOString(),

@@ -191,13 +191,13 @@ export class RequestOperationsVerificationService {
     return this.commandRunner.runCommand(requestId, session, key, 'response.requests.reject', dto,
       async (manager) => {
         const lockedRows = new Map<string, Pick<OperationRequestRow,
-          'id' | 'reporter_user_id' | 'status' | 'version' | 'organization_id' | 'region_code' | 'campaign_id' | 'canonical_request_id'>>();
+          'id' | 'reporter_user_id' | 'status' | 'version' | 'organization_id' | 'campaign_id' | 'canonical_request_id'>>();
         for (const id of [...new Set([requestId, ...knownChildren.map((child) => child.id)])].sort()) {
           const rows = await manager.query(
-            `SELECT id,reporter_user_id,status,version,organization_id,region_code,campaign_id,canonical_request_id
+            `SELECT id,reporter_user_id,status,version,organization_id,campaign_id,canonical_request_id
                FROM assistance_request WHERE id=$1 FOR UPDATE`, [id],
           ) as Array<Pick<OperationRequestRow,
-            'id' | 'reporter_user_id' | 'status' | 'version' | 'organization_id' | 'region_code' | 'campaign_id' | 'canonical_request_id'>>;
+            'id' | 'reporter_user_id' | 'status' | 'version' | 'organization_id' | 'campaign_id' | 'canonical_request_id'>>;
           if (rows[0]) lockedRows.set(id, rows[0]);
         }
         const row = lockedRows.get(requestId);
@@ -274,11 +274,11 @@ export class RequestOperationsVerificationService {
         const events = await manager.query(
           `SELECT orphan.request_id AS id,orphan.to_status AS status,
                   (orphan.payload->>'resulting_version')::int AS version,
-                  child.organization_id,child.region_code,child.campaign_id
+                  child.organization_id,child.child.campaign_id
              FROM request_event orphan JOIN assistance_request child ON child.id=orphan.request_id
             WHERE orphan.event_type='DUPLICATE_ORPHANED' AND orphan.payload->>'rejection_decision_id'=$1
             ORDER BY orphan.occurred_at,orphan.id`, [rows[0].id],
-        ) as Array<{ id: string; status: string; version: number; organization_id: string; region_code: string | null; campaign_id: string | null }>;
+        ) as Array<{ id: string; status: string; version: number; organization_id: string; campaign_id: string | null }>;
         const visible = events.filter((child) => canAccessRequest(session, 'REQUEST_DETAIL_READ', child));
         return { ...current, decision_id: rows[0].id, orphaned_duplicates: { items: visible.slice(0, 20).map(({ id, status, version }) => ({ id, status, version })), more: visible.length > 20 } };
       },

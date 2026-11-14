@@ -22,18 +22,9 @@ CREATE TABLE incident_category_skill (
   skill_code    text NOT NULL REFERENCES skill(code),
   PRIMARY KEY (category_code, skill_code)
 );
--- region codes are owned by Identity; Response owns the geometry used to derive a request's region
-CREATE TABLE region_boundary (
-  region_code text PRIMARY KEY,
-  geom        geometry(MultiPolygon, 4326) NOT NULL CHECK (ST_IsValid(geom))   -- overlap between regions is checked by the seed test
-);
-COMMENT ON TABLE region_boundary IS 'Seed dataset, version and licence are recorded in the seed README, not per row.';
-CREATE INDEX region_boundary_geom_gix ON region_boundary USING gist (geom);
-
 CREATE TABLE campaign (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL,
-  region_code     text REFERENCES region_boundary(region_code),
   name            text NOT NULL CHECK (is_clean_text(name)),
   objective       text,
   status          text NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','ACTIVE','PAUSED','CLOSED')),
@@ -60,7 +51,6 @@ CREATE TABLE assistance_request (
   source_ip_hash          text,                                  -- salted hash, for abuse analysis only
   description             text CHECK (char_length(description) <= 2000),
   organization_id         uuid NOT NULL,                         -- server-assigned intake organization
-  region_code             text REFERENCES region_boundary(region_code),   -- NULL => explicit unassigned queue
   status                  request_status NOT NULL DEFAULT 'SUBMITTED',
   verifying_since         timestamptz,                           -- set on entering VERIFYING; overdue is measured from here
   review_lane             text NOT NULL DEFAULT 'NORMAL' CHECK (review_lane IN ('NORMAL','RATE_LIMITED_REVIEW','PROXY_QUOTA_REVIEW')),
@@ -96,8 +86,6 @@ CREATE UNIQUE INDEX request_secret_uq ON assistance_request (tracking_secret_has
 -- Coordinator queue = walk an ordered index and filter (measured 0.04-0.4 ms at 200k rows vs 12-16 ms for the old status-first partial index).
 -- Every keyset list orders by (received_at, id): the id tiebreaker makes the cursor seekable.
 CREATE INDEX request_org_fifo_idx ON assistance_request (organization_id, received_at, id);
-CREATE INDEX request_org_region_fifo_idx ON assistance_request (organization_id, region_code, received_at, id);
-CREATE INDEX request_unassigned_idx ON assistance_request (organization_id, received_at, id) WHERE region_code IS NULL AND status NOT IN ('REJECTED','DUPLICATE','CANCELLED','CLOSED');
 -- Attention list: SUBMITTED/VERIFYING (alert + overdue scans, all lanes) plus open reports whose reporter declared danger. Predicate must equal the query.
 CREATE INDEX request_attention_idx ON assistance_request (organization_id, received_at, id)
   WHERE status IN ('SUBMITTED','VERIFYING')
@@ -216,7 +204,6 @@ CREATE UNIQUE INDEX resolution_intent_one_open_uq ON resolution_intent (request_
 CREATE TABLE rescue_team (
   id                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id          uuid NOT NULL,
-  operating_region_code    text NOT NULL REFERENCES region_boundary(region_code),
   name                     text NOT NULL CHECK (is_clean_text(name)),
   team_kind                text NOT NULL CHECK (team_kind IN ('VOLUNTEER','MILITARY','GOVERNMENT','OTHER')),
   reporting_mode           text NOT NULL DEFAULT 'APP' CHECK (reporting_mode IN ('APP','COORDINATOR')),
@@ -417,7 +404,7 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE CREATE ON SCHEMA public FROM c48_response_app;
 GRANT USAGE ON SCHEMA public TO c48_response_app;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO c48_response_app;
--- mutable tables: INSERT + UPDATE (catalogs and region_boundary are seed data owned by the migration role: SELECT only)
+-- mutable tables: INSERT + UPDATE (catalogs are seed data owned by the migration role: SELECT only)
 GRANT INSERT, UPDATE ON campaign, assistance_request, request_subject, resolution_intent, rescue_team, team_member, team_skill, team_position,
   mission, evidence_metadata, notice, idempotency_record, capability_recovery, ai_advisory, ai_daily_usage TO c48_response_app;
 -- append-only tables (same list as the trigger block above): INSERT only, no UPDATE, DELETE or TRUNCATE

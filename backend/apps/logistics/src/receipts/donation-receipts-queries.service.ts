@@ -57,7 +57,7 @@ export class DonationReceiptsQueriesService {
   async receipt(id: string, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     const receipt = await readReceiptView(this.dataSource, id);
-    assertReceiptRead(session.grants, receipt.organization_id, receipt.region_code);
+    assertReceiptRead(session.grants, receipt.organization_id);
     return { ...receipt.value, generated_at: new Date().toISOString() };
   }
 
@@ -93,10 +93,10 @@ export class DonationReceiptsQueriesService {
 
 }
 
-function assertReceiptRead(grants: readonly Grant[], organizationId: string, regionCode: string): void {
-  if (!hasWarehouseScope(grants, organizationId, regionCode)) throw new AppError('NOT_FOUND', { status: 404 });
-  if (!hasPermission(grants, 'DONATION_INTAKE', { organizationId, regionCode }) &&
-      !hasPermission(grants, 'DONATION_REVIEW', { organizationId, regionCode })) {
+function assertReceiptRead(grants: readonly Grant[], organizationId: string): void {
+  if (!hasWarehouseScope(grants, organizationId)) throw new AppError('NOT_FOUND', { status: 404 });
+  if (!hasPermission(grants, 'DONATION_INTAKE', { organizationId }) &&
+      !hasPermission(grants, 'DONATION_REVIEW', { organizationId })) {
     throw new AppError('FORBIDDEN', { status: 403 });
   }
 }

@@ -21,11 +21,11 @@ const coordinatorGrant: Grant = {
 };
 const admission = {
   request_id: requestId, work_cycle: 2, version: 5, status: 'TRIAGED',
-  organization_id: organizationId, region_code: 'NORTH', campaign_id: null,
+  organization_id: organizationId, campaign_id: null,
 };
 const needRow = {
   id: needId, cycle_id: cycleId, request_id: requestId, work_cycle: 2,
-  organization_id: organizationId, region_code: 'NORTH', campaign_id: null,
+  organization_id: organizationId, campaign_id: null,
   item_id: itemId, item_name: 'Nước uống', unit_code: 'L', unit_name: 'Lít',
   original_quantity: '3', requested_quantity: '3', cancelled_remaining: null,
   designated_point_id: null, status: 'OPEN', version: 1,
@@ -35,7 +35,7 @@ const needRow = {
 function setup(overrides: Partial<{
   cycleState: string;
   itemStatus: string;
-  point: { id: string; organization_id: string; region_code: string; status: string } | null;
+  point: { id: string; organization_id: string; status: string } | null;
   grants: Grant[];
   admissionError: Error;
   existingReplay: boolean;
@@ -44,7 +44,7 @@ function setup(overrides: Partial<{
   const order: string[] = [];
   const cycle = {
     id: cycleId, request_id: requestId, work_cycle: 2, organization_id: organizationId,
-    region_code: 'NORTH', campaign_id: null, state: overrides.cycleState ?? 'OPEN',
+    campaign_id: null, state: overrides.cycleState ?? 'OPEN',
   };
   const manager = {
     query: jest.fn(async (sql: string, values?: unknown[]) => {
@@ -119,11 +119,11 @@ describe('NeedsService.create', () => {
     expect(response.admit).toHaveBeenCalledWith(requestId, 2, { authorization: 'Bearer identity.signed.actor' });
     expect(result.value).toMatchObject({
       id: needId, request_id: requestId, work_cycle: 2, organization_id: organizationId,
-      region_code: 'NORTH', campaign_id: null, item_id: itemId, original_quantity: '3',
+      campaign_id: null, item_id: itemId, original_quantity: '3',
       requested_quantity: '3', delivery_target_kind: 'FINAL_RECIPIENT', status: 'OPEN', version: 1,
     });
     const cycleInsert = calls.find(({ sql }) => sql.includes('INSERT INTO fulfillment_cycle'));
-    expect(cycleInsert?.values).toEqual([requestId, 2, organizationId, null, 'NORTH']);
+    expect(cycleInsert?.values).toEqual([requestId, 2, organizationId, null]);
     expect(calls.some(({ sql }) => sql.includes('INSERT INTO stock_movement'))).toBe(false);
     expect(idempotency.execute).toHaveBeenCalledTimes(1);
   });
@@ -197,23 +197,11 @@ describe('NeedsService.create', () => {
   it('requires an active relief point in the request organization and scoped need grant', async () => {
     const pointId = '99999999-9999-4999-8999-999999999999';
     const { service, calls } = setup({ point: {
-      id: pointId, organization_id: '88888888-8888-4888-8888-888888888888', region_code: 'NORTH', status: 'ACTIVE',
+      id: pointId, organization_id: '88888888-8888-4888-8888-888888888888', status: 'ACTIVE',
     } });
 
     await expect(service.create({ ...dto, designated_point_id: pointId, reason: 'Giao tại điểm.' }, request))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 });
-    expect(calls.some(({ sql }) => sql.includes('INSERT INTO relief_need'))).toBe(false);
-  });
-
-  it('requires a scoped grant for the relief point region', async () => {
-    const pointId = '99999999-9999-4999-8999-999999999999';
-    const { service, calls } = setup({
-      point: { id: pointId, organization_id: organizationId, region_code: 'SOUTH', status: 'ACTIVE' },
-      grants: [{ role_code: 'COORDINATOR', scope_type: 'REGION', organization_id: organizationId, region_code: 'NORTH' }],
-    });
-
-    await expect(service.create({ ...dto, designated_point_id: pointId, reason: 'Giao tại điểm.' }, request))
-      .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
     expect(calls.some(({ sql }) => sql.includes('INSERT INTO relief_need'))).toBe(false);
   });
 

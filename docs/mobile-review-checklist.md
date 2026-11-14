@@ -19,7 +19,7 @@ Mobile calls 11 of 25 Identity, 27 of 72 Response, and 10 of 71 Logistics routes
 | `POST /missions/{id}/cancel` | Staff | Web-only; confirm | Low |
 | `GET /requests/{id}` and `GET /requests/{id}/events` | Citizen | Confirm that the tracking and my-requests screens use the owner projection and not only the public tracking route | Check |
 
-Already wired and worth a quick regression pass: register, login, logout, Google sign-in and link, email resend and verify, change password, `/me`, regions, create SOS, proxy SOS, track, claim, recover, supplements, evidence upload/download, notices and read, public campaigns, skills, teams (list, detail, position, members, member candidates), missions (mine, detail, accept, decline, transition, evidence), request report, donation drives, deliveries, declarations, disputes, claim, recover, evidence, donation summary.
+Already wired and worth a quick regression pass: register, login, logout, Google sign-in and link, email resend and verify, change password, `/me`, create SOS, proxy SOS, track, claim, recover, supplements, evidence upload/download, notices and read, public campaigns, skills, teams (list, detail, position, members, member candidates), missions (mine, detail, accept, decline, transition, evidence), request report, donation drives, deliveries, declarations, disputes, claim, recover, evidence, donation summary.
 
 ## 2. Contract and data-shape checks
 

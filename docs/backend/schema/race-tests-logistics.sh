@@ -20,7 +20,7 @@ ORG=$(U 1); WH=$(U 2); ITEM=$(U 3)
 q <<SQL
 INSERT INTO item_type VALUES ('FOOD','Lương thực'); INSERT INTO unit VALUES ('PIECE','cái',0);
 INSERT INTO item (id,item_type_code,unit_code,name) VALUES ('$ITEM','FOOD','PIECE','Mì gói');
-INSERT INTO warehouse (id,organization_id,region_code,name) VALUES ('$WH','$ORG','R1','Kho 1');
+INSERT INTO warehouse (id,organization_id,name) VALUES ('$WH','$ORG','Kho 1');
 INSERT INTO fulfillment_cycle (id,request_id,work_cycle,organization_id) VALUES ('$(U 10)',gen_random_uuid(),1,'$ORG');
 INSERT INTO relief_need (id,cycle_id,item_id,original_quantity,requested_quantity) VALUES ('$(U 11)','$(U 10)','$ITEM',50,50);
 INSERT INTO commitment (id,relief_need_id,item_id,warehouse_id,quantity,created_by_user_id) VALUES ('$(U 12)','$(U 11)','$ITEM','$WH',50,gen_random_uuid());

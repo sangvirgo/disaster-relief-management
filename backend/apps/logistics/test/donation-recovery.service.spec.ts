@@ -8,7 +8,7 @@ const key = '55555555-5555-4555-8555-555555555555';
 const secret = Buffer.alloc(32, 7).toString('base64url');
 const config = { peppers: { v1: 'test-donation-secret-pepper-that-is-long-enough' }, currentPepperVersion: 'v1' };
 const delivery = {
-  id: deliveryId, public_code: 'ABCDEFGH', organization_id: userId, region_code: 'R1',
+  id: deliveryId, public_code: 'ABCDEFGH', organization_id: userId,
   donor_user_id: null, capability_hash: 'v1:old-capability-hash', status: 'DECLARED', version: 3,
 };
 

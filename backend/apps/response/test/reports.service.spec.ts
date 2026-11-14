@@ -27,7 +27,8 @@ function setup(row: unknown = {
 }
 
 describe('ReportsService summary', () => {
-  it('requires a region or campaign filter before querying', async () => {
+
+  it('requires a campaign filter before querying', async () => {
     const { service, query } = setup();
 
     await expect(service.summary({ from, to }, {} as Request)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
@@ -45,10 +46,10 @@ describe('ReportsService summary', () => {
   it('returns scoped counts, medians, and mission totals without request data', async () => {
     const { service, query } = setup();
 
-    const result = await service.summary({ from, to, region_code: 'VN01' }, {} as Request);
+    const result = await service.summary({ from, to, campaign_id: '00000000-0000-4000-8000-000000000003' }, {} as Request);
 
     expect(result).toMatchObject({
-      filters: { from, to, campaign_id: null, region_code: 'VN01' },
+      filters: { from, to, campaign_id: '00000000-0000-4000-8000-000000000003' },
       status_counts: { VERIFIED: 2 },
       priority_counts: { P1: 1 },
       median_seconds: { receipt_to_verification: 3.5, receipt_to_assignment: null },

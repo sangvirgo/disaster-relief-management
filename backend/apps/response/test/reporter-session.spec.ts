@@ -113,43 +113,6 @@ describe('Response optional reporter session', () => {
     service.onModuleDestroy();
   });
 
-  it('deduplicates region lookups and returns only names for requested codes', async () => {
-    const client = { post: jest.fn(async (path: string) => path.endsWith('/internal/token')
-      ? { status: 200, body: { access_token: 'identity-token', expires_in: 300 } }
-      : { status: 200, body: { items: [{ code: 'HCM', name: 'Thành phố Hồ Chí Minh' }] } }) as unknown as jest.Mock, close: jest.fn() };
-    const service = new ReporterSessionService({
-      identityBaseUrl: 'http://127.0.0.1:1', clientId: 'c48-response-test',
-      clientSecret: 'test-client-secret-not-for-deployment-0001', timeoutMs: 100,
-    }, intakeConfig, client as never);
-
-
-    await expect(service.lookupRegionNames(['HCM', 'HCM', 'UNKNOWN'])).resolves.toEqual(
-      new Map([['HCM', 'Thành phố Hồ Chí Minh']]),
-    );
-    expect(client.post).toHaveBeenNthCalledWith(1, '/api/v1/identity/internal/token', {
-      client_id: 'c48-response-test',
-      client_secret: 'test-client-secret-not-for-deployment-0001',
-      audience: 'identity',
-    });
-    expect(client.post).toHaveBeenNthCalledWith(2, '/api/v1/identity/internal/regions:lookup', {
-      codes: ['HCM', 'UNKNOWN'],
-    }, { headers: { authorization: 'Bearer identity-token' } });
-    service.onModuleDestroy();
-  });
-
-  it('does not call Identity for an empty region lookup', async () => {
-    const client = { post: jest.fn() as unknown as jest.Mock, close: jest.fn() };
-    const service = new ReporterSessionService({
-      identityBaseUrl: 'http://127.0.0.1:1', clientId: 'c48-response-test',
-      clientSecret: 'test-client-secret-not-for-deployment-0001', timeoutMs: 100,
-    }, intakeConfig, client as never);
-
-
-    await expect(service.lookupRegionNames([])).resolves.toEqual(new Map());
-    expect(client.post).not.toHaveBeenCalled();
-    service.onModuleDestroy();
-  });
-
   it('caches service tokens independently for each audience', async () => {
     const client = { post: jest.fn(async (_path: string, body: { audience?: string }) => ({
       status: 200,
@@ -181,37 +144,5 @@ describe('Response optional reporter session', () => {
     service.onModuleDestroy();
   });
 
-  it.each([
-    ['missing items', {}],
-    ['malformed row', { items: [{ code: 'HCM', name: null }] }],
-    ['unrequested code', { items: [{ code: 'OTHER', name: 'Other' }] }],
-    ['duplicate code', { items: [{ code: 'HCM', name: 'One' }, { code: 'HCM', name: 'Two' }] }],
-  ])('fails closed when the region lookup response has %s', async (_caseName, body) => {
-    const client = { post: jest.fn(async (path: string) => path.endsWith('/internal/token')
-      ? { status: 200, body: { access_token: 'identity-token', expires_in: 300 } }
-      : { status: 200, body }) as unknown as jest.Mock, close: jest.fn() };
-    const service = new ReporterSessionService({
-      identityBaseUrl: 'http://127.0.0.1:1', clientId: 'c48-response-test',
-      clientSecret: 'test-client-secret-not-for-deployment-0001', timeoutMs: 100,
-    }, intakeConfig, client as never);
 
-
-    await expect(service.lookupRegionNames(['HCM'])).rejects.toMatchObject({ code: 'IDENTITY_UNAVAILABLE' });
-    service.onModuleDestroy();
-  });
-
-  it('maps Identity lookup outages to IDENTITY_UNAVAILABLE', async () => {
-    const client = { post: jest.fn(async (path: string) => {
-      if (path.endsWith('/internal/token')) return { status: 200, body: { access_token: 'identity-token', expires_in: 300 } };
-      throw new Error('Identity offline');
-    }) as unknown as jest.Mock, close: jest.fn() };
-    const service = new ReporterSessionService({
-      identityBaseUrl: 'http://127.0.0.1:1', clientId: 'c48-response-test',
-      clientSecret: 'test-client-secret-not-for-deployment-0001', timeoutMs: 100,
-    }, intakeConfig, client as never);
-
-
-    await expect(service.lookupRegionNames(['HCM'])).rejects.toMatchObject({ code: 'IDENTITY_UNAVAILABLE' });
-    service.onModuleDestroy();
-  });
 });

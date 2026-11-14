@@ -8,7 +8,7 @@ const requestId = '11111111-1111-4111-8111-111111111111';
 const organizationId = '22222222-2222-4222-8222-222222222222';
 const responseValue = {
   request_id: requestId, work_cycle: 2, version: 5, status: 'TRIAGED',
-  organization_id: organizationId, region_code: 'NORTH', campaign_id: null,
+  organization_id: organizationId, campaign_id: null,
 };
 
 function setup(result: ServiceResponse = { status: 200, headers: {}, body: responseValue }) {

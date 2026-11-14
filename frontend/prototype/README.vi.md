@@ -22,7 +22,7 @@ Canvas còn một bản thử nghiệm Mobile cũ từ vòng trước; bản đ�
 | Đội cứu hộ | 5 | Tổng quan, nhiệm vụ, cập nhật tiến độ, hồ sơ và vị trí đội, thông báo | [Tổng quan](https://p.superdesign.dev/draft/490aa10b-5406-4399-8687-fe294de10f93) |
 | Điều phối viên | 8 | Hàng đợi SOS, xác minh, quyết định ưu tiên, chọn đội, bản đồ/nhiệm vụ, thông báo, chiến dịch, báo cáo | [Hàng đợi SOS](https://p.superdesign.dev/draft/947aa3ad-53a8-4682-80de-594eeefcf01c) |
 | Quản lý vận hành | 10 | Tổng quan, đợt quyên góp, tiếp nhận, duyệt biên nhận, kho, điểm/phương tiện, nhu cầu/cam kết, phân phối, bàn giao, đối soát/báo cáo | [Tổng quan](https://p.superdesign.dev/draft/823263e9-5fff-4af9-a6ad-6af876e23c5a) |
-| Quản trị viên | 6 | Tổng quan, người dùng, tổ chức/thành viên, phân quyền, khu vực, nhật ký kiểm toán | [Người dùng](https://p.superdesign.dev/draft/360252a5-9a38-40f1-963c-38ca739a8c19) |
+| Quản trị viên | 5 | Tổng quan, người dùng, tổ chức/thành viên, phân quyền, nhật ký kiểm toán | [Người dùng](https://p.superdesign.dev/draft/360252a5-9a38-40f1-963c-38ca739a8c19) |
 
 ## Ranh giới backend cần giữ khi triển khai
 

@@ -20,7 +20,6 @@ interface NeedQueryRow extends Record<string, unknown> {
   request_id: string;
   work_cycle: number | string;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
   item_id: string;
   item_name: string;
@@ -48,7 +47,6 @@ interface CycleRow {
   request_id: string;
   work_cycle: number | string;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
   state: string;
 }
@@ -94,15 +92,11 @@ function scopeSql(grants: readonly Grant[], values: unknown[], alias: string): s
       continue;
     }
     if (!grant.organization_id) continue;
-    if (grant.scope_type === 'ORGANIZATION' && !grant.region_code && !grant.campaign_id) {
-      if (!hasPermission([grant], permission, { organizationId: grant.organization_id, regionCode: '__scope_check__' })) continue;
+    if (grant.scope_type === 'ORGANIZATION' && !grant.campaign_id) {
+      if (!hasPermission([grant], permission, { organizationId: grant.organization_id })) continue;
       values.push(grant.organization_id);
       branches.add(`${alias}.organization_id=$${values.length}`);
-    } else if (grant.scope_type === 'REGION' && grant.region_code && !grant.campaign_id) {
-      if (!hasPermission([grant], permission, { organizationId: grant.organization_id, regionCode: grant.region_code })) continue;
-      values.push(grant.organization_id, grant.region_code);
-      branches.add(`(${alias}.organization_id=$${values.length - 1} AND ${alias}.region_code=$${values.length})`);
-    } else if (grant.scope_type === 'CAMPAIGN' && grant.campaign_id && !grant.region_code) {
+    } else if (grant.scope_type === 'CAMPAIGN' && grant.campaign_id) {
       if (!hasPermission([grant], permission, { organizationId: grant.organization_id, campaignId: grant.campaign_id })) continue;
       values.push(grant.organization_id, grant.campaign_id);
       branches.add(`(${alias}.organization_id=$${values.length - 1} AND ${alias}.campaign_id=$${values.length})`);
@@ -114,7 +108,7 @@ function scopeSql(grants: readonly Grant[], values: unknown[], alias: string): s
 
 function needTotalsQuery(includeContributions = false): string {
   return `
-  SELECT n.id,n.cycle_id,c.request_id,c.work_cycle,c.organization_id,c.region_code,c.campaign_id,
+  SELECT n.id,n.cycle_id,c.request_id,c.work_cycle,c.organization_id,c.campaign_id,
          n.item_id,i.name AS item_name,u.code AS unit_code,u.display_name AS unit_name,u.scale AS unit_scale,
          n.original_quantity::text AS original,n.requested_quantity::text AS requested,
          COALESCE(sum(cm.quantity-cm.released_quantity-cm.issued_quantity),0)::text AS committed_reserved,
@@ -263,7 +257,7 @@ export class NeedsQueriesService {
       conditions.push(`c.work_cycle=$${values.length}`);
     }
     const cycles = await this.dataSource.query(
-      `SELECT c.id,c.request_id,c.work_cycle,c.organization_id,c.region_code,c.campaign_id,c.state
+      `SELECT c.id,c.request_id,c.work_cycle,c.organization_id,c.campaign_id,c.state
          FROM fulfillment_cycle c WHERE ${conditions.join(' AND ')}
         ORDER BY c.work_cycle DESC,c.id DESC LIMIT 1`,
       values,
@@ -296,12 +290,12 @@ export class NeedsQueriesService {
     const accessValues: unknown[] = [needId];
     const accessScope = scopeSql(session.grants, accessValues, 'c');
     const access = await this.dataSource.query(
-      `SELECT n.id,c.organization_id,c.region_code,c.campaign_id,u.scale AS unit_scale
+      `SELECT n.id,c.organization_id,c.campaign_id,u.scale AS unit_scale
          FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id
          JOIN item i ON i.id=n.item_id JOIN unit u ON u.code=i.unit_code
         WHERE n.id=$1 AND ${accessScope}`,
       accessValues,
-    ) as Array<{ id: string; organization_id: string; region_code: string | null; campaign_id: string | null; unit_scale: number | string }>;
+    ) as Array<{ id: string; organization_id: string; campaign_id: string | null; unit_scale: number | string }>;
     const need = access[0];
     if (!need) throw new AppError('NOT_FOUND', { status: 404 });
 

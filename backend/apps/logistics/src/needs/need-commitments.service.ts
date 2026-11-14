@@ -19,7 +19,6 @@ interface NeedContext {
   status: 'OPEN' | 'PARTIALLY_FULFILLED' | 'FULFILLED' | 'CANCELLED';
   requested_quantity: string;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
   unit_scale: number | string;
 }
@@ -27,7 +26,6 @@ interface NeedContext {
 interface CycleRow {
   id: string;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
   state: 'OPEN' | 'FROZEN' | 'SEALED';
 }
@@ -35,7 +33,6 @@ interface CycleRow {
 interface WarehouseRow {
   id: string;
   organization_id: string;
-  region_code: string;
   status: 'ACTIVE' | 'INACTIVE';
 }
 
@@ -64,7 +61,7 @@ interface BalanceRow {
 async function loadNeedContext(source: Pick<DataSource | EntityManager, 'query'>, id: string): Promise<NeedContext> {
   const rows = await source.query(
     `SELECT n.id,n.cycle_id,n.item_id,n.status,n.requested_quantity::text,
-            c.organization_id,c.region_code,c.campaign_id,u.scale AS unit_scale
+            c.organization_id,c.campaign_id,u.scale AS unit_scale
        FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id
        JOIN item i ON i.id=n.item_id JOIN unit u ON u.code=i.unit_code WHERE n.id=$1`,
     [id],
@@ -75,7 +72,7 @@ async function loadNeedContext(source: Pick<DataSource | EntityManager, 'query'>
 
 async function loadWarehouse(source: Pick<DataSource | EntityManager, 'query'>, id: string): Promise<WarehouseRow> {
   const rows = await source.query(
-    'SELECT id,organization_id,region_code,status FROM warehouse WHERE id=$1',
+    'SELECT id,organization_id,status FROM warehouse WHERE id=$1',
     [id],
   ) as WarehouseRow[];
   if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
@@ -84,7 +81,7 @@ async function loadWarehouse(source: Pick<DataSource | EntityManager, 'query'>, 
 
 async function lockCycle(manager: Pick<EntityManager, 'query'>, cycleId: string): Promise<CycleRow> {
   const rows = await manager.query(
-    `SELECT id,organization_id,region_code,campaign_id,state
+    `SELECT id,organization_id,campaign_id,state
        FROM fulfillment_cycle WHERE id=$1 FOR UPDATE`,
     [cycleId],
   ) as CycleRow[];
@@ -95,7 +92,7 @@ async function lockCycle(manager: Pick<EntityManager, 'query'>, cycleId: string)
 async function lockNeed(manager: Pick<EntityManager, 'query'>, needId: string, cycleId: string): Promise<NeedContext> {
   const rows = await manager.query(
     `SELECT n.id,n.cycle_id,n.item_id,n.status,n.requested_quantity::text,
-            c.organization_id,c.region_code,c.campaign_id,u.scale AS unit_scale
+            c.organization_id,c.campaign_id,u.scale AS unit_scale
        FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id
        JOIN item i ON i.id=n.item_id JOIN unit u ON u.code=i.unit_code
       WHERE n.id=$1 AND n.cycle_id=$2 FOR UPDATE OF n`,
@@ -122,7 +119,7 @@ async function readCommitmentContext(
     `SELECT cm.id,cm.relief_need_id,cm.item_id,cm.warehouse_id,cm.quantity::text,
             cm.released_quantity::text,cm.issued_quantity::text,cm.delivered_quantity::text,
             cm.returned_quantity::text,cm.lost_quantity::text,cm.version,
-            n.cycle_id,n.status,n.requested_quantity::text,c.organization_id,c.region_code,c.campaign_id,
+            n.cycle_id,n.status,n.requested_quantity::text,c.organization_id,c.campaign_id,
             u.scale AS unit_scale
        FROM commitment cm JOIN relief_need n ON n.id=cm.relief_need_id
        JOIN fulfillment_cycle c ON c.id=n.cycle_id
@@ -138,7 +135,7 @@ function assertWarehouseScope(
   warehouse: WarehouseRow,
   organizationId: string,
 ): void {
-  requireWarehousePermission(grants, 'COMMITMENT_MANAGE', warehouse.organization_id, warehouse.region_code);
+  requireWarehousePermission(grants, 'COMMITMENT_MANAGE', warehouse.organization_id);
   if (warehouse.organization_id !== organizationId) throw new AppError('VALIDATION_FAILED', { status: 400 });
 }
 

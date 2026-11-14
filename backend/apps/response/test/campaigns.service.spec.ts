@@ -26,7 +26,6 @@ function fixture(grants: ReporterSession['grants'] = []) {
   const dataSource = { query: dataSourceQuery } as unknown as DataSource;
   const sessions = {
     require: jest.fn<(...args: unknown[]) => Promise<ReporterSession>>().mockResolvedValue(session(grants)),
-    lookupRegionNames: jest.fn<(codes: string[]) => Promise<Map<string, string>>>().mockResolvedValue(new Map<string, string>()),
   } as unknown as ReporterSessionService;
   const managerQuery = jest.fn<(...args: unknown[]) => Promise<unknown[]>>();
   const manager = { query: managerQuery } as unknown as EntityManager;
@@ -40,50 +39,20 @@ function fixture(grants: ReporterSession['grants'] = []) {
 }
 
 describe('CampaignsService', () => {
-  it('derives organization from the single grant matching the requested region', async () => {
-    const { service, dataSourceQuery, managerQuery } = fixture([{
-      role_code: 'COORDINATOR', scope_type: 'REGION', organization_id: organizationA,
-      region_code: 'NORTH', campaign_id: null,
-    }]);
-    const row = {
-      id: campaignId, organization_id: organizationA, region_code: 'NORTH', name: 'Cứu trợ', objective: null,
-      status: 'DRAFT', starts_at: null, ends_at: null, version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'),
-    };
-    dataSourceQuery.mockResolvedValueOnce([{ '?column?': 1 }]);
-    managerQuery.mockResolvedValueOnce([row]).mockResolvedValueOnce([]);
-
-    const result = await service.create({ name: 'Cứu trợ', region_code: 'NORTH' }, idemKey, request);
-
-    expect(result.value).toMatchObject({ organization_id: organizationA, region_code: 'NORTH' });
-    expect(managerQuery.mock.calls[0]?.[1]).toEqual([
-      organizationA, 'NORTH', 'Cứu trợ', null, null, null, userId,
-    ]);
-  });
 
   it('rejects campaign creation when zero or multiple organizations match', async () => {
     for (const grants of [
       [],
       [
-        { role_code: 'COORDINATOR', scope_type: 'REGION', organization_id: organizationA, region_code: 'NORTH', campaign_id: null },
-        { role_code: 'COORDINATOR', scope_type: 'REGION', organization_id: organizationB, region_code: 'NORTH', campaign_id: null },
+        { role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationA, campaign_id: null },
+        { role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationB, campaign_id: null },
       ] as ReporterSession['grants'],
     ]) {
       const { service, idempotency } = fixture(grants);
-      await expect(service.create({ name: 'Cứu trợ', region_code: 'NORTH' }, idemKey, request))
+      await expect(service.create({ name: 'Cứu trợ' }, idemKey, request))
         .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
       expect(idempotency.execute).not.toHaveBeenCalled();
     }
-  });
-
-  it('does not treat a region-scoped grant as organization-wide when region is omitted', async () => {
-    const { service, idempotency } = fixture([{
-      role_code: 'COORDINATOR', scope_type: 'REGION', organization_id: organizationA,
-      region_code: 'NORTH', campaign_id: null,
-    }]);
-
-    await expect(service.create({ name: 'Cứu trợ' }, idemKey, request))
-      .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
-    expect(idempotency.execute).not.toHaveBeenCalled();
   });
 
   it('allows only the documented lifecycle edges and keeps CLOSED terminal', () => {
@@ -104,7 +73,7 @@ describe('CampaignsService', () => {
     const values: unknown[] = [];
     const predicate = campaignScopePredicate([{
       role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', organization_id: organizationA,
-      region_code: null, campaign_id: campaignId,
+      campaign_id: campaignId,
     }], 'CAMPAIGN_READ', values);
 
     expect(values).toEqual([organizationA, campaignId]);
@@ -113,7 +82,7 @@ describe('CampaignsService', () => {
 
   it('rejects organization_id as an extra create-body field and accepts nullable contract fields', async () => {
     const valid = plainToInstance(CampaignCreateDto, {
-      name: 'Cứu trợ', objective: null, region_code: null, starts_at: null, ends_at: null,
+      name: 'Cứu trợ', objective: null, starts_at: null, ends_at: null,
     });
     expect(await validate(valid as object, { whitelist: true, forbidNonWhitelisted: true })).toHaveLength(0);
 
@@ -123,41 +92,13 @@ describe('CampaignsService', () => {
     );
   });
 
-  it('returns only the public allowlist and uses null when Identity has no region name', async () => {
-    const { service, dataSourceQuery, sessions } = fixture();
-    dataSourceQuery.mockResolvedValueOnce([{
-      id: campaignId, name: 'Cứu trợ', objective: null, region_code: 'NORTH', status: 'ACTIVE',
-      starts_at: null, ends_at: null, cursor_created_at: '2026-01-01T00:00:00.000000Z',
-    }]);
-
-    const page = await service.publicList({});
-
-    expect(sessions.lookupRegionNames).toHaveBeenCalledWith(['NORTH']);
-    expect(page.items[0]).toEqual({
-      id: campaignId, title: 'Cứu trợ', objective: null, region_name: null,
-      starts_at: null, ends_at: null, status: 'ACTIVE',
-    });
-  });
-
-  it('fails closed when Identity cannot resolve public campaign region names', async () => {
-    const { service, dataSourceQuery, sessions } = fixture();
-    dataSourceQuery.mockResolvedValueOnce([{
-      id: campaignId, name: 'Cứu trợ', objective: null, region_code: 'NORTH', status: 'ACTIVE',
-      starts_at: null, ends_at: null, cursor_created_at: '2026-01-01T00:00:00.000000Z',
-    }]);
-    (sessions.lookupRegionNames as jest.MockedFunction<(codes: string[]) => Promise<Map<string, string>>>)
-      .mockRejectedValueOnce(new AppError('IDENTITY_UNAVAILABLE', { status: 503 }));
-
-    await expect(service.publicList({})).rejects.toMatchObject({ code: 'IDENTITY_UNAVAILABLE', status: 503 });
-  });
-
   it('locks the campaign before rejecting close while canonical requests remain open', async () => {
     const { service, managerQuery } = fixture([{
       role_code: 'CAMPAIGN_MANAGER', scope_type: 'ORGANIZATION', organization_id: organizationA,
-      region_code: null, campaign_id: null,
+      campaign_id: null,
     }]);
     managerQuery.mockResolvedValueOnce([{
-      id: campaignId, organization_id: organizationA, region_code: null, name: 'Cứu trợ', objective: null,
+      id: campaignId, organization_id: organizationA, name: 'Cứu trợ', objective: null,
       status: 'ACTIVE', starts_at: null, ends_at: null, version: 3, created_at: new Date('2026-01-01T00:00:00.000Z'),
     }]).mockResolvedValueOnce([{ '?column?': 1 }]);
 
@@ -172,10 +113,10 @@ describe('CampaignsService', () => {
   it('reads the returned campaign row from TypeORM UPDATE results when transitioning status', async () => {
     const { service, managerQuery } = fixture([{
       role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationA,
-      region_code: null, campaign_id: null,
+      campaign_id: null,
     }]);
     const campaign = {
-      id: campaignId, organization_id: organizationA, region_code: null, name: 'Cứu trợ', objective: null,
+      id: campaignId, organization_id: organizationA, name: 'Cứu trợ', objective: null,
       status: 'DRAFT', starts_at: null, ends_at: null, version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'),
     };
     const activated = { ...campaign, status: 'ACTIVE', version: 2 };
@@ -190,10 +131,10 @@ describe('CampaignsService', () => {
   it('reads the returned campaign row from TypeORM UPDATE results when patching a draft', async () => {
     const { service, managerQuery } = fixture([{
       role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationA,
-      region_code: null, campaign_id: null,
+      campaign_id: null,
     }]);
     const campaign = {
-      id: campaignId, organization_id: organizationA, region_code: null, name: 'Cứu trợ', objective: null,
+      id: campaignId, organization_id: organizationA, name: 'Cứu trợ', objective: null,
       status: 'DRAFT', starts_at: null, ends_at: null, version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'),
     };
     const patched = { ...campaign, objective: 'Hỗ trợ người dân', version: 2 };
@@ -205,32 +146,15 @@ describe('CampaignsService', () => {
     expect(managerQuery.mock.calls[1]?.[0]).toContain('UPDATE campaign');
   });
 
-  it('does not allow a region-scoped manager to move a draft campaign outside that region', async () => {
-    const { service, managerQuery } = fixture([{
-      role_code: 'COORDINATOR', scope_type: 'REGION', organization_id: organizationA,
-      region_code: 'NORTH', campaign_id: null,
-    }]);
-    managerQuery.mockResolvedValueOnce([{
-      id: campaignId, organization_id: organizationA, region_code: 'NORTH', name: 'Cứu trợ', objective: null,
-      status: 'DRAFT', starts_at: null, ends_at: null, version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'),
-    }]).mockResolvedValueOnce([{ '?column?': 1 }]).mockResolvedValueOnce([{
-      id: campaignId, organization_id: organizationA, region_code: 'SOUTH', name: 'Cứu trợ', objective: null,
-      status: 'DRAFT', starts_at: null, ends_at: null, version: 2, created_at: new Date('2026-01-01T00:00:00.000Z'),
-    }]).mockResolvedValueOnce([]);
-
-    await expect(service.patch(campaignId, { expected_version: 1, region_code: 'SOUTH' }, idemKey, request))
-      .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
-  });
-
   it('returns the exact internal allowlist projection', async () => {
     const { service, dataSourceQuery } = fixture();
     dataSourceQuery.mockResolvedValueOnce([{
-      id: campaignId, organization_id: organizationA, region_code: 'NORTH', name: 'Cứu trợ', objective: 'Đồ ăn',
+      id: campaignId, organization_id: organizationA, name: 'Cứu trợ', objective: 'Đồ ăn',
       status: 'ACTIVE', starts_at: null, ends_at: null, version: '7', created_at: new Date('2026-01-01T00:00:00.000Z'),
     }]);
 
     expect(await service.internal(campaignId)).toEqual({
-      id: campaignId, status: 'ACTIVE', organization_id: organizationA, region_code: 'NORTH', version: 7,
+      id: campaignId, status: 'ACTIVE', organization_id: organizationA, version: 7,
     });
   });
 });

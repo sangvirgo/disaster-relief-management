@@ -17,7 +17,6 @@ export interface OperationRequestRow {
   received_at: Date | string;
   verifying_since: Date | string | null;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
   description: string | null;
   incident_category_code: string;
@@ -37,9 +36,9 @@ export interface QueueRow {
   status: string;
   priority: string | null;
   review_lane: string;
+  report_mode: string;
   category: string;
   people_affected: number | null;
-  region_code: string | null;
   received_at: Date | string;
   cursor_received_at: string;
   declared_danger: boolean;

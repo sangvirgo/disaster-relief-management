@@ -15,7 +15,6 @@ const database = new Client({ connectionString: databaseUrl });
 const userIds = [];
 const familyIds = [];
 const createdIds = [];
-const regionCodes = [];
 const keys = [];
 let ipSequence = 1;
 const adminPassword = `Admin field account ${randomBytes(6).toString('hex')}!`;
@@ -158,38 +157,6 @@ try {
   });
   expectError(duplicateGrant, 409, 'GRANT_EXISTS');
 
-  const regionCode = `T${randomBytes(3).toString('hex').toUpperCase()}`;
-  regionCodes.push(regionCode);
-  const region = await call('/regions', {
-    method: 'POST', token: adminToken, body: { code: regionCode, name: 'Khu vực thử nghiệm' },
-    headers: { 'Idempotency-Key': idem() },
-  });
-  assert.equal(region.status, 201, JSON.stringify(region.body));
-  const lookedUpRegion = await call('/internal/regions:lookup', {
-    method: 'POST', token: serviceToken.body.access_token, body: { codes: [regionCode, 'UNKNOWN_REGION'] },
-  });
-  assert.equal(lookedUpRegion.status, 200, JSON.stringify(lookedUpRegion.body));
-  assert.deepEqual(lookedUpRegion.body.items, [{ code: regionCode, name: 'Khu vực thử nghiệm' }]);
-  assert.equal(lookedUpRegion.headers.get('cache-control'), 'no-store');
-  const unauthenticatedRegionLookup = await call('/internal/regions:lookup', {
-    method: 'POST', body: { codes: [regionCode] },
-  });
-  expectError(unauthenticatedRegionLookup, 401, 'UNAUTHENTICATED');
-  const invalidRegionLookup = await call('/internal/regions:lookup', {
-    method: 'POST', token: serviceToken.body.access_token, body: { codes: ['x'.repeat(81)] },
-  });
-  expectError(invalidRegionLookup, 400, 'VALIDATION_FAILED');
-  assert.equal(invalidRegionLookup.headers.get('cache-control'), 'no-store');
-  const regionList = await call('/regions?limit=100', { token: adminToken });
-  assert.ok(regionList.body.items.some((item) => item.code === regionCode));
-  const regionGrant = await call(`/users/${userId}/grants`, {
-    method: 'POST', token: adminToken,
-    body: { role_code: 'COORDINATOR', scope_type: 'REGION', organization_id: organizationId, region_code: regionCode, reason: 'Phạm vi khu vực thử nghiệm' },
-    headers: { 'Idempotency-Key': idem() },
-  });
-  assert.equal(regionGrant.status, 201, JSON.stringify(regionGrant.body));
-  assert.equal(regionGrant.body.region_code, regionCode);
-
   const staffLogin = await call('/auth/login', {
     method: 'POST', body: { username: userPayload.username, password: temporaryPassword, client_kind: 'NATIVE' },
     headers: { 'X-Forwarded-For': nextIp() },
@@ -280,12 +247,6 @@ try {
     headers: { 'Idempotency-Key': idem() },
   });
   assert.equal(organizationDeactivate.status, 200, JSON.stringify(organizationDeactivate.body));
-  const regionDeactivate = await call(`/regions/${regionCode}/deactivate`, {
-    method: 'POST', token: adminToken, body: { expected_version: 1, reason: 'Đóng khu vực thử nghiệm' },
-    headers: { 'Idempotency-Key': idem() },
-  });
-  assert.equal(regionDeactivate.status, 200, JSON.stringify(regionDeactivate.body));
-
   const lastAdmin = await call(`/users/${adminId}/disable`, {
     method: 'POST', token: adminToken,
     body: { expected_version: 1, reason: 'Kiểm tra quản trị viên cuối cùng' },
@@ -375,7 +336,7 @@ try {
     id: userId, display_name: 'Nhân viên cứu trợ',
   }]);
 
-  console.log('PASS Identity admin, region/user service lookups, and authorization checks on PostgreSQL');
+  console.log('PASS Identity admin, user service lookups, and authorization checks on PostgreSQL');
 } finally {
   if (familyIds.length) await database.query('DELETE FROM refresh_session WHERE family_id = ANY($1::uuid[])', [familyIds]).catch(() => undefined);
   if (userIds.length) {
@@ -387,7 +348,6 @@ try {
   if (createdIds.length) {
     await database.query('DELETE FROM organization WHERE id = ANY($1::uuid[])', [createdIds]).catch(() => undefined);
   }
-  if (regionCodes.length) await database.query('DELETE FROM region WHERE code = ANY($1::text[])', [regionCodes]).catch(() => undefined);
   if (keys.length) await database.query('DELETE FROM idempotency_record WHERE idempotency_key = ANY($1::uuid[])', [keys]).catch(() => undefined);
   await database.end();
 }

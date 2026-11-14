@@ -23,7 +23,6 @@ interface DeliveryRow {
   id: string;
   drive_id: string;
   organization_id: string;
-  region_code: string;
   public_code: string;
   donor_user_id: string | null;
   donor_name: string;
@@ -371,7 +370,7 @@ export class DonationsService {
       execute: async (manager) => {
         const rows = await manager.query(
           `SELECT id,drive_id,organization_id,public_code,donor_user_id,donor_name,donor_phone,
-                  capability_hash,status,version,w.region_code
+                  capability_hash,status,version
              FROM donation_delivery dd JOIN donation_drive d ON d.id=dd.drive_id
              JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE dd.id=$1 FOR UPDATE OF dd`,
           [deliveryId],
@@ -441,7 +440,7 @@ export class DonationsService {
   ): Promise<DeliveryRow> {
     const rows = await query.query(
       `SELECT dd.id,dd.drive_id,dd.organization_id,dd.public_code,dd.donor_user_id,dd.donor_name,dd.donor_phone,
-              dd.capability_hash,dd.status,dd.version,w.region_code,d.opens_at,d.closes_at,d.campaign_status
+              dd.capability_hash,dd.status,dd.version,d.opens_at,d.closes_at,d.campaign_status
          FROM donation_delivery dd JOIN donation_drive d ON d.id=dd.drive_id
          JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE dd.id=$1${forUpdate ? ' FOR UPDATE OF dd' : ''}`,
       [id],

@@ -15,7 +15,7 @@ describe('RequestFailureReviewService', () => {
       statements.push(sql);
       if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
         id: requestId, status: 'IN_PROGRESS', version: 9, work_cycle: 3, organization_id: organizationId,
-        region_code: 'DEMO_A', campaign_id: null,
+        campaign_id: null,
       }];
       if (sql.includes('SELECT request_id FROM mission WHERE id=$1')) return [{ request_id: requestId }];
       if (sql.includes('FROM mission WHERE id=$1 FOR UPDATE')) return [{
@@ -29,7 +29,7 @@ describe('RequestFailureReviewService', () => {
     const dataSource = { query: jest.fn(async () => [{
       id: missionId, request_id: requestId, work_cycle: 3, status: 'FAILED', version: 4,
       request_status: 'IN_PROGRESS', request_version: 9, request_work_cycle: 3,
-      organization_id: organizationId, region_code: 'DEMO_A', campaign_id: null,
+      organization_id: organizationId, campaign_id: null,
     }]) };
     const idempotency = { execute: jest.fn(async (_source: unknown, command: IdempotentCommand<Record<string, unknown>>) => {
       const outcome = await command.execute(manager as never);

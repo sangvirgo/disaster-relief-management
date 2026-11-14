@@ -24,7 +24,6 @@ interface MissionRow extends Record<string, unknown> {
   created_at: Date | string;
   cursor_created_at: string;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
   approved_facts: unknown;
   member_role?: 'LEADER' | 'MEMBER';
@@ -78,7 +77,7 @@ export class MissionsQueriesService {
     const rows = await this.dataSource.query(
       `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,t.status AS team_status,t.reporting_mode AS team_reporting_mode,m.work_cycle,m.status,m.mission_kind,m.version,m.created_at,
               to_char(m.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
-              r.organization_id,r.region_code,r.campaign_id,e.payload->'approved_facts' AS approved_facts,
+              r.organization_id,r.campaign_id,e.payload->'approved_facts' AS approved_facts,
               tm.member_role
          FROM mission m JOIN rescue_team t ON t.id=m.team_id
          JOIN assistance_request r ON r.id=m.request_id
@@ -152,14 +151,14 @@ export class MissionsQueriesService {
     const rows = await this.dataSource.query(
       `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,m.status,m.mission_kind,m.version,m.created_at,
               to_char(m.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
-              r.region_code,r.campaign_id
+              r.campaign_id
          FROM mission m JOIN assistance_request r ON r.id=m.request_id JOIN rescue_team t ON t.id=m.team_id
         WHERE m.status='OFFERED' AND m.created_at<=statement_timestamp()-($1::int*interval '1 minute')
           AND ${scope}
           AND ($${cursorTime}::timestamptz IS NULL OR (m.created_at,m.id)>($${cursorTime}::timestamptz,$${cursorId}::uuid))
         ORDER BY m.created_at,m.id LIMIT $${limitIndex}`,
       values,
-    ) as Array<MissionRow & { region_code: string | null; campaign_id: string | null }>;
+    ) as Array<MissionRow & { campaign_id: string | null }>;
     const limit = query.limit ?? 50;
     const more = rows.length > limit;
     const page = rows.slice(0, limit);
@@ -168,7 +167,6 @@ export class MissionsQueriesService {
       items: page.map((row) => ({
         id: row.id, request_id: row.request_id, team: { id: row.team_id, name: row.team_name },
         status: row.status, version: Number(row.version), created_at: toIso(row.created_at),
-        region_code: row.region_code,
       })),
       more,
       ...(next ? { cursor: encodeKeysetCursor([next.cursor_created_at], next.id, filters) } : {}),
@@ -179,7 +177,7 @@ export class MissionsQueriesService {
     const rows = await queryable.query(
       `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,t.status AS team_status,t.reporting_mode AS team_reporting_mode,m.work_cycle,m.status,m.mission_kind,m.version,m.created_at,
               to_char(m.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
-              r.organization_id,r.region_code,r.campaign_id,e.payload->'approved_facts' AS approved_facts
+              r.organization_id,r.campaign_id,e.payload->'approved_facts' AS approved_facts
          FROM mission m JOIN rescue_team t ON t.id=m.team_id
          JOIN assistance_request r ON r.id=m.request_id
          JOIN request_event e ON e.id=m.verification_revision AND e.request_id=m.request_id

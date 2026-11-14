@@ -1,4 +1,4 @@
--- C48 Identity service — SYNTHETIC DEMO SEED (regions, organizations, users, memberships, grants).
+-- C48 Identity service — SYNTHETIC DEMO SEED (organizations, users, memberships, grants).
 -- Target: an EMPTY database that already has docs/backend/schema/identity.sql applied.
 -- Load:   psql -v ON_ERROR_STOP=1 -v seed_password_hash='<argon2id hash made by the app>' -f seed-identity.sql
 --
@@ -30,9 +30,8 @@
 --  ...00000000010e  vol_member1     VOLUNTEER          ORGANIZATION ORG_VOLUNTEER    Tình nguyện viên 1 (demo)
 --  ...00000000010f  citizen1        CITIZEN            SYSTEM                        Người dân 1 (demo)
 --  ...000000000110  citizen2        CITIZEN            SYSTEM                        Người dân 2 (demo)
---  ...000000000111  coord_regional  COORDINATOR        REGION DEMO_A (ORG_COORD)     Điều phối viên khu vực Nam (demo)
--- Regions: DEMO_A 'Khu vực Nam (demo)', DEMO_B 'Khu vực Trung (demo)'.
--- Memberships: staff and coord_regional -> ORG_COORD; vol_* -> ORG_VOLUNTEER; admin and citizens have none.
+--  ...000000000111  coord_extra     COORDINATOR        ORGANIZATION ORG_COORD        Điều phối viên bổ sung (demo)
+-- Memberships: staff and coord_extra -> ORG_COORD; vol_* -> ORG_VOLUNTEER; admin and citizens have none.
 
 \if :{?seed_password_hash}
 \else
@@ -70,7 +69,7 @@ FROM (VALUES
   ('10e', 'vol_member1',    'Tình nguyện viên 1 (demo)'),
   ('10f', 'citizen1',       'Người dân 1 (demo)'),
   ('110', 'citizen2',       'Người dân 2 (demo)'),
-  ('111', 'coord_regional', 'Điều phối viên khu vực Nam (demo)')
+  ('111', 'coord_extra', 'Điều phối viên bổ sung (demo)')
 ) AS v(suffix, username, display_name)
 ON CONFLICT DO NOTHING;
 
@@ -83,10 +82,9 @@ SELECT pg_temp.u(s), pg_temp.u('2') FROM unnest(ARRAY['10c','10d','10e']) AS s
 ON CONFLICT DO NOTHING;
 
 -- role grants (one live grant per user/role/scope; the unique index is partial so re-runs are guarded by the NOT EXISTS)
-INSERT INTO role_grant (user_id, role_code, scope_type, organization_id, region_code)
+INSERT INTO role_grant (user_id, role_code, scope_type, organization_id)
 SELECT pg_temp.u(g.suffix), g.role_code, g.scope_type,
-       CASE g.scope_type WHEN 'SYSTEM' THEN NULL WHEN 'ORGANIZATION' THEN pg_temp.u(g.org) WHEN 'REGION' THEN pg_temp.u(g.org) END,
-       CASE g.scope_type WHEN 'REGION' THEN 'DEMO_A' END
+       CASE g.scope_type WHEN 'SYSTEM' THEN NULL WHEN 'ORGANIZATION' THEN pg_temp.u(g.org) END
 FROM (VALUES
   ('101', 'ADMIN',              'SYSTEM',       NULL),
   ('102', 'COORDINATOR',        'ORGANIZATION', '1'),
@@ -104,7 +102,7 @@ FROM (VALUES
   ('10e', 'VOLUNTEER',          'ORGANIZATION', '2'),
   ('10f', 'CITIZEN',            'SYSTEM',       NULL),
   ('110', 'CITIZEN',            'SYSTEM',       NULL),
-  ('111', 'COORDINATOR',        'REGION',       '1')
+  ('111', 'COORDINATOR',        'ORGANIZATION',       '1')
 ) AS g(suffix, role_code, scope_type, org)
 WHERE NOT EXISTS (SELECT 1 FROM role_grant r WHERE r.user_id = pg_temp.u(g.suffix) AND r.role_code = g.role_code AND r.revoked_at IS NULL);
 

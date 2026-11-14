@@ -38,8 +38,8 @@ SELECT u.id, o.id
  WHERE true
 ON CONFLICT DO NOTHING;
 
-INSERT INTO role_grant (user_id, role_code, scope_type, organization_id, region_code)
-SELECT u.id, fixture.role_code, fixture.scope_type, fixture.organization_id, NULL
+INSERT INTO role_grant (user_id, role_code, scope_type, organization_id)
+SELECT u.id, fixture.role_code, fixture.scope_type, fixture.organization_id
   FROM (VALUES
     ('00000000-0000-4000-8000-000000000112'::uuid, 'ops_seed', 'OPERATIONS_MANAGER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, 'Trung tâm điều phối C48 (demo)'),
     ('00000000-0000-4000-8000-000000000113'::uuid, 'citizen3', 'CITIZEN', 'SYSTEM', NULL::uuid, NULL::text),

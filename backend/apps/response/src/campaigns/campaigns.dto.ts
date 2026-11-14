@@ -3,8 +3,6 @@ import {
   IsDateString, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf,
 } from 'class-validator';
 
-const regionCodePattern = /^[A-Z0-9_]{2,32}$/u;
-
 export class CampaignPageQueryDto {
   @IsOptional() @IsString() @MaxLength(2_000)
   declare cursor?: string;
@@ -19,9 +17,6 @@ export class CampaignCreateDto {
 
   @IsOptional() @IsString()
   declare objective?: string | null;
-
-  @IsOptional() @IsString() @Matches(regionCodePattern)
-  declare region_code?: string | null;
 
   @IsOptional() @IsDateString()
   declare starts_at?: string | null;
@@ -39,9 +34,6 @@ export class CampaignPatchDto {
 
   @IsOptional() @IsString()
   declare objective?: string | null;
-
-  @IsOptional() @IsString() @Matches(regionCodePattern)
-  declare region_code?: string | null;
 
   @IsOptional() @IsDateString()
   declare starts_at?: string | null;

@@ -93,12 +93,12 @@ function distributionItems(item: Row, itemUnits: ReferenceOptions[string] = []):
 const fields = (entries: [string, string, boolean?][]) =>
   entries.map(([name, title, required]) => ({ name, label: title, required }));
 
-function readReportFilters(userId: string): { warehouse?: string; region?: string; pageSize?: number } {
+function readReportFilters(userId: string): { warehouse?: string; campaign?: string; pageSize?: number } {
   try {
     const saved = JSON.parse(sessionStorage.getItem(`operations-filters:${userId}`) || '{}');
     return {
       warehouse: typeof saved?.warehouse === 'string' ? saved.warehouse : '',
-      region: typeof saved?.region === 'string' ? saved.region : '',
+      campaign: typeof saved?.campaign === 'string' ? saved.campaign : '',
       pageSize: [10, 25, 50].includes(saved?.pageSize) ? saved.pageSize : 50,
     };
   } catch { return {}; }
@@ -119,15 +119,15 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const [reviewTab, setReviewTab] = useUrlView('view', reviewViews, 'receipts');
   const [report, setReport] = useUrlView('view', reportViews, 'stock-summary');
   const [warehouse, setWarehouse] = useState(() => readReportFilters(user.id).warehouse || '');
-  const [region, setRegion] = useState(() => readReportFilters(user.id).region || '');
-  const initialReportFilters = useRef({ warehouse: false, region: false });
+  const [campaign, setCampaign] = useState(() => readReportFilters(user.id).campaign || '');
+  const initialReportFilters = useRef({ warehouse: false });
   const [items, setItems] = useState<Row[]>([]);
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [pageSize, setPageSize] = useState(() => readReportFilters(user.id).pageSize || 50);
   useEffect(() => {
-    try { sessionStorage.setItem(`operations-filters:${user.id}`, JSON.stringify({ warehouse, region, pageSize })); }
+    try { sessionStorage.setItem(`operations-filters:${user.id}`, JSON.stringify({ warehouse, campaign, pageSize })); }
     catch { /* Filtering remains available when browser storage is disabled. */ }
-  }, [user.id, warehouse, region, pageSize]);
+  }, [user.id, warehouse, campaign, pageSize]);
   const [next, setNext] = useState<string | null>(null);
   const [generatedAt, setGeneratedAt] = useState('');
   const [selected, setSelected] = useState<Row | null>(null);
@@ -141,7 +141,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const reportPeriod = useMemo(() => {
     const to = Date.now();
     return { from: new Date(to - 30 * 86_400_000).toISOString(), to: new Date(to).toISOString() };
-  }, [report, region, revision]);
+  }, [report, campaign, revision]);
   const [commitments, setCommitments] = useState<Row[]>([]);
   const [commitmentsError, setCommitmentsError] = useState('');
   const [commitmentsLoading, setCommitmentsLoading] = useState(false);
@@ -155,7 +155,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     let live = true;
     const sources = [
       ['organizations', 'identity', '/organizations'],
-      ['regions', 'identity', '/regions'],
       ['warehouses', 'logistics', '/warehouses'],
       ['drives', 'logistics', '/donation-drives'],
       ['items', 'logistics', '/items'],
@@ -179,13 +178,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         if (key === 'items') options.itemUnits = result.value.filter(item => item.id && string((item.unit as Row | undefined)?.display_name))
           .map(item => ({ value: item.id!, label: string((item.unit as Row).display_name) }));
         options[key] = result.value
-          .filter((item) => (key !== 'requests' || ['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(string(item.status))) && (item.id || item.code) && (!['campaigns', 'organizations', 'regions', 'reliefPoints', 'warehouses', 'vehicles', 'items'].includes(key) || item.status === 'ACTIVE'))
+          .filter((item) => (key !== 'requests' || ['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(string(item.status))) && (item.id || item.code) && (!['campaigns', 'organizations', 'reliefPoints', 'warehouses', 'vehicles', 'items'].includes(key) || item.status === 'ACTIVE'))
           .map((item) => ({
-            value: key === 'regions' ? string(item.code) : item.id!,
+            value: item.id!,
             label: key === 'requests'
               ? `SOS ${string(item.tracking_code) || item.id!.slice(0, 8)} · ${requestStatusLabel(string(item.status))}`
-              : key === 'regions'
-                ? string(item.name) ? `${string(item.name)} (${string(item.code)})` : string(item.code)
               : string(item.name) || string(item.title) || string(item.identifier) ||
                 string(item.item_name) || `Mã …${item.id!.slice(-8)}`,
           }));
@@ -243,17 +240,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     : [...new Set(user.grants.map((grant) => grant.organization_id).filter((id): id is string => Boolean(id)))]
         .map((id) => ({ value: id, label: `Tổ chức trong quyền của tôi · …${id.slice(-8)}` }));
   const warehouseOptions = [...(references.warehouses || [])];
-  const regionOptions = references.regions?.length ? references.regions
-    : [...new Set(user.grants.map((grant) => grant.region_code).filter((code): code is string => Boolean(code)))]
-      .map((code) => ({ value: code, label: code }));
+  const campaignOptions = references.campaignNames || [];
   useEffect(() => {
     if (!initialReportFilters.current.warehouse && warehouseOptions.length) {
       initialReportFilters.current.warehouse = true;
       if (!warehouseOptions.some(option => option.value === warehouse)) setWarehouse(warehouseOptions[0].value);
-    }
-    if (!initialReportFilters.current.region && regionOptions.length) {
-      initialReportFilters.current.region = true;
-      if (!regionOptions.some(option => option.value === region)) setRegion(regionOptions[0].value);
     }
   }, [references]);
   for (const item of items) {
@@ -295,15 +286,15 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   if (cursor) params.set('cursor', cursor);
   if (page === 'reports' && report === 'reconciliation' && warehouse)
     params.set('warehouse_id', warehouse);
-  if (page === 'reports' && report === 'fulfillment' && region) {
-    params.set('region_code', region);
+  if (page === 'reports' && report === 'fulfillment' && campaign) {
+    params.set('campaign_id', campaign);
     params.set('from', reportPeriod.from);
     params.set('to', reportPeriod.to);
   }
   const path = route + (params.size ? `?${params}` : '');
   const ready = !(
     page === 'reports' &&
-    ((report === 'reconciliation' && !warehouse) || (report === 'fulfillment' && !region))
+    ((report === 'reconciliation' && !warehouse) || (report === 'fulfillment' && !campaign))
   );
   useEffect(() => {
     if (!route || !ready) {
@@ -394,13 +385,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const needStep = 10 ** -(needScale ?? 0);
   const needMinimum = Math.max(needStep, Number(detail?.delivered || 0) + Number(detail?.committed_reserved || 0) + Number(detail?.issued_unsettled || 0));
   const needUncommitted = Number(detail?.requested || 0) - Number(detail?.delivered || 0) - Number(detail?.committed_reserved || 0) - Number(detail?.issued_unsettled || 0);
-  const assetRegionField: Field = {
-    name: 'region_code', label: 'Mã khu vực', required: true,
-    ...(regionOptions.length ? { type: 'select' as const, label: 'Khu vực', options: regionOptions } : {}),
-    placeholder: 'Ví dụ: DEMO_A (khu vực Nam)', maxLength: 32,
-    pattern: /^[A-Z0-9_]{2,32}$/,
-    patternMessage: 'Mã khu vực cần 2–32 ký tự, chỉ gồm chữ in hoa, số hoặc dấu gạch dưới.',
-  };
   const receiptId =
     page === 'intake' || (page === 'review' && reviewTab === 'receipts')
       ? string(selected?.receipt_id)
@@ -534,18 +518,18 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             )}
             {report === 'fulfillment' && (
               <label className="filter">
-                Khu vực trong 30 ngày gần đây
+                Chiến dịch trong 30 ngày gần đây
                 <select
-                  value={region}
+                  value={campaign}
                   onChange={(event) => {
-                    setRegion(event.target.value);
+                    setCampaign(event.target.value);
                     setCursor('');
                     setSelected(null);
                     setDetail(null);
                   }}
                 >
-                  <option value="">Chọn khu vực</option>
-                  {regionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  <option value="">Chọn chiến dịch</option>
+                  {campaignOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
             )}
@@ -572,7 +556,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             {[10, 25, 50].map(size => <option key={size} value={size}>{size} dòng</option>)}
           </select>
         </label>}
-        {!ready && <p>Chọn kho hoặc khu vực để tải báo cáo theo phạm vi được cấp quyền.</p>}
+        {!ready && <p>Chọn kho hoặc chiến dịch để tải báo cáo theo phạm vi được cấp quyền.</p>}
         {loading && <p role="status">Đang tải dữ liệu…</p>}
         {error && (
           <p className="notice error" role="alert">
@@ -666,7 +650,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       : ''}
                     {item.created_at
                       ? timeLabel(item.created_at)
-                      : string(item.warehouse_name) || string(item.region_code)}
+                      : string(item.warehouse_name)}
                   </small>
                   {item.on_hand != null && (
                     <small>
@@ -729,7 +713,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               {page === 'assets' && <>
                 {asset !== 'vehicles' && <p><strong>{asset === 'warehouses' ? 'Tên kho' : 'Tên điểm cứu trợ'}</strong><span className="detail-value">{string(detail.name) || 'Chưa có tên'}</span></p>}
                 <p><strong>Tổ chức</strong><span className="detail-value">{organizationOptions.find(option => option.value === detail.organization_id)?.label || string(detail.organization_id) || 'Chưa có thông tin'}</span></p>
-                <p><strong>Khu vực</strong><span className="detail-value">{regionOptions.find(option => option.value === detail.region_code)?.label || string(detail.region_code) || 'Chưa có thông tin'}</span></p>
                 {asset === 'vehicles' && <>
                   <p><strong>Loại phương tiện</strong><span className="detail-value">{string(detail.vehicle_type) || 'Chưa có thông tin'}</span></p>
                   <p><strong>Sức chứa</strong><span className="detail-value">{detail.capacity == null ? 'Chưa khai báo' : `${quantity(detail.capacity)} ${label(detail.capacity_unit)}`}</span></p>
@@ -1445,19 +1428,16 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               asset === 'vehicles'
                 ? [
                     referenceField('organization_id', 'Tổ chức', 'organizations', true),
-                    assetRegionField,
                     { name: 'identifier', label: 'Biển số hoặc mã xe', required: true, maxLength: 100 },
                     { name: 'vehicle_type', label: 'Loại phương tiện', required: true, maxLength: 80 },
                   ]
                 : asset === 'warehouses'
                   ? [
                       referenceField('organization_id', 'Tổ chức', 'organizations', true),
-                      assetRegionField,
                       { name: 'name', label: 'Tên kho', required: true, maxLength: 200 },
                     ]
                   : [
                       referenceField('organization_id', 'Tổ chức', 'organizations', true),
-                      assetRegionField,
                       { name: 'name', label: 'Tên điểm cứu trợ', required: true, maxLength: 200 },
                       { name: 'location', label: 'Địa chỉ hoặc vị trí trên bản đồ', type: 'location', required: true },
                     ],
@@ -1465,7 +1445,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               asset === 'relief-points'
                 ? (values) => ({
                     organization_id: values.organization_id,
-                    region_code: values.region_code,
                     name: values.name,
                     location: {
                       type: 'Point',
@@ -1528,7 +1507,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         )}
         {!selected && ['overview', 'stock', 'reports'].includes(page) && (
           <p>
-            Chọn một dòng để xem số liệu trả về trong phạm vi kho hoặc khu vực được cấp quyền. Số
+            Chọn một dòng để xem số liệu trả về trong phạm vi kho hoặc chiến dịch được cấp quyền. Số
             lượng được giữ theo từng đơn vị vật phẩm.
           </p>
         )}

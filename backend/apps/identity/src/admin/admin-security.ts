@@ -31,7 +31,7 @@ export class IdentityPermissionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AdminRequest>();
     if (!request.auth) throw new AppError('UNAUTHENTICATED', { status: 401 });
     const grants = await this.dataSource.query(
-      `SELECT role_code, scope_type, organization_id, region_code, campaign_id
+      `SELECT role_code, scope_type, organization_id, campaign_id
          FROM role_grant WHERE user_id = $1 AND revoked_at IS NULL`,
       [request.auth.userId],
     ) as Grant[];

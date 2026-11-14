@@ -32,7 +32,6 @@ interface RequestRow {
   status: string;
   version: number;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
   incident_category_code: string;
   priority: string | null;
@@ -48,8 +47,6 @@ interface RequestRow {
 interface TeamRow {
   id: string;
   organization_id: string;
-  operating_region_code: string;
-  nationwide_coverage: boolean;
   reporting_mode: 'APP' | 'COORDINATOR';
   availability: 'AVAILABLE' | 'UNAVAILABLE';
   status: 'ACTIVE' | 'INACTIVE';
@@ -148,20 +145,19 @@ export class MissionsCommandsService {
   ): Promise<IdempotentOutcome<MissionCommandView>> {
     const row = await this.lockRequest(manager, requestId, session, 'MISSION_ASSIGN', true);
     checkVersion(Number(row.version), dto.expected_version);
-    if (!row.region_code) throw new AppError('REGION_REQUIRED', { status: 409 });
     if (!['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(row.status) || !row.priority || !row.priority_basis || !row.verification_revision) {
       throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
     }
 
     const teamRows = await manager.query(
-      `SELECT id,organization_id,operating_region_code,nationwide_coverage,reporting_mode,availability,status,readiness_required,external_contact_note
+      `SELECT id,organization_id,reporting_mode,availability,status,readiness_required,external_contact_note
          FROM rescue_team WHERE id=$1 FOR SHARE`, [dto.team_id],
     ) as TeamRow[];
     const team = teamRows[0];
     if (!team) throw new AppError('NOT_FOUND', { status: 404 });
     if (team.status !== 'ACTIVE') throw this.teamNotEligible('INACTIVE');
     if (team.availability !== 'AVAILABLE' || team.readiness_required) throw this.teamNotEligible('UNAVAILABLE');
-    if (team.organization_id !== row.organization_id || (!team.nationwide_coverage && team.operating_region_code !== row.region_code)) throw this.teamNotEligible('SCOPE_MISMATCH');
+    if (team.organization_id !== row.organization_id) throw this.teamNotEligible('SCOPE_MISMATCH');
     if (team.reporting_mode === 'COORDINATOR' && !team.external_contact_note?.trim()) throw new AppError('TEAM_NOT_ELIGIBLE', { status: 409 });
 
     const missingSkills = await manager.query(
@@ -266,7 +262,7 @@ export class MissionsCommandsService {
     const request = await this.lockRequest(manager, requestId, session, permission, change.command === 'accept');
     if (protectedRequestStatuses.includes(request.status)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
     const teams = await manager.query(
-      `SELECT id,organization_id,operating_region_code,reporting_mode,availability,status,readiness_required,external_contact_note
+      `SELECT id,organization_id,reporting_mode,availability,status,readiness_required,external_contact_note
          FROM rescue_team WHERE id=$1 FOR SHARE`, [teamId],
     ) as TeamRow[];
     const team = teams[0];
@@ -337,7 +333,7 @@ export class MissionsCommandsService {
       }
     }
     const rows = await manager.query(
-      `SELECT id,status,version,organization_id,region_code,campaign_id,incident_category_code,priority,priority_basis,needs_rescue,needs_relief_supplies,
+      `SELECT id,status,version,organization_id,campaign_id,incident_category_code,priority,priority_basis,needs_rescue,needs_relief_supplies,
               work_cycle,verification_revision,attribution_locked_at,reporter_user_id
          FROM assistance_request WHERE id=$1 FOR UPDATE`,
       [requestId],

@@ -3,10 +3,10 @@ import type { Request } from 'express';
 import { AppError } from '@c48/technical/errors/errors';
 import type { IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { ReporterSessionService } from '../requests/reporter-session';
-import { AuthorityReferralDto, CorrectRegionDto, DuplicateRequestDto } from './request-operations.dto';
+import { AuthorityReferralDto, DuplicateRequestDto } from './request-operations.dto';
 import { RequestOperationsCommandRunner } from './request-operations.command-runner.service';
 import { RequestOperationsPersistenceService } from './request-operations.persistence.service';
-import { blockedCanonicalStatuses, checkVersion, cleanText, hasOrganizationPermission, terminalStatuses, unverifiedStatuses } from './request-operations.helpers';
+import { blockedCanonicalStatuses, checkVersion, cleanText, terminalStatuses, unverifiedStatuses } from './request-operations.helpers';
 import type { OperationRequestRow } from './request-operations.types';
 import { assertRequestPermission, canAccessRequest } from '../requests/request-scope';
 
@@ -28,7 +28,7 @@ export class RequestOperationsDedupReferralService {
         for (const id of ids) {
           const rows = await manager.query(
             `SELECT id,tracking_code,reporter_user_id,reporter_name,reporter_contact_phone,report_mode,status,version,
-                    review_lane,received_at,verifying_since,organization_id,region_code,campaign_id,description,
+                    review_lane,received_at,verifying_since,organization_id,campaign_id,description,
                     reporter_declared_danger,priority,priority_basis,work_cycle,canonical_request_id,incident_category_code
                FROM assistance_request WHERE id=$1 FOR UPDATE`, [id],
           ) as OperationRequestRow[];
@@ -91,30 +91,6 @@ export class RequestOperationsDedupReferralService {
         if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
         return { ...(await this.persistence.currentRequestValue(manager, requestId)), event_id: rows[0].id };
       },
-    );
-  }
-
-  async correctRegion(requestId: string, dto: CorrectRegionDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
-    const session = await this.sessions.require(request);
-    const reason = cleanText(dto.reason, true)!;
-    return this.commandRunner.runCommand(requestId, session, key, 'response.requests.correct-region', dto,
-      async (manager) => {
-        const row = await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_UNASSIGNED_QUEUE', true);
-        if (!hasOrganizationPermission(session, 'REQUEST_UNASSIGNED_QUEUE', row.organization_id)) throw new AppError('FORBIDDEN', { status: 403 });
-        checkVersion(Number(row.version), dto.expected_version);
-        if (row.attribution_locked_at) throw new AppError('ATTRIBUTION_LOCKED', { status: 409 });
-        const regions = await manager.query('SELECT 1 FROM region_boundary WHERE region_code=$1', [dto.region_code]) as unknown[];
-        if (!regions.length) throw new AppError('VALIDATION_FAILED', { status: 400 });
-        if (row.region_code === dto.region_code) return { status: 200, value: { id: row.id, region_code: row.region_code, version: Number(row.version) }, resource: { type: 'assistance_request', id: row.id } };
-        const [updated] = await manager.query(
-          'UPDATE assistance_request SET region_code=$3,version=version+1 WHERE id=$1 AND version=$2 RETURNING region_code,version',
-          [row.id, dto.expected_version, dto.region_code],
-        ) as [Array<{ region_code: string; version: number }>, number];
-        if (!updated[0]) checkVersion(Number(row.version), dto.expected_version);
-        await this.persistence.insertEvent(manager, row.id, session.userId, 'REGION_CORRECTED', 'STAFF', row.status, row.status, reason, { previous_region_code: row.region_code, region_code: updated[0]!.region_code });
-        return { status: 200, value: { id: row.id, region_code: updated[0]!.region_code, version: Number(updated[0]!.version) }, resource: { type: 'assistance_request', id: row.id } };
-      },
-      (manager) => this.persistence.currentRequestValue(manager, requestId),
     );
   }
 }

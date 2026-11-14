@@ -17,7 +17,6 @@ import { THEME } from '../../../constants/theme';
 import { getApiErrorMessage } from '../../../api/client';
 import {
   Flag,
-  MapPin,
   Calendar,
   HeartHandshake,
   AlertTriangle,
@@ -109,7 +108,7 @@ export const CampaignsScreen: React.FC = () => {
           <Text style={styles.emptyTitle}>Chưa tải được chiến dịch</Text>
           <Text style={styles.emptySubtitle}>{errorMsg}</Text>
           <TouchableOpacity onPress={() => fetchCampaigns()} style={styles.refreshBtn} accessibilityLabel="Thử tải lại chiến dịch">
-            <Text style={styles.regionText}>Thử lại</Text>
+            <Text style={styles.actionText}>Thử lại</Text>
           </TouchableOpacity>
         </View>
       ) : campaigns.length === 0 ? (
@@ -128,7 +127,7 @@ export const CampaignsScreen: React.FC = () => {
           <View style={styles.bannerBox}>
             <Text style={styles.bannerTitle}>CHIẾN DỊCH CỨU NẠN & TIẾP TẾ TOÀN DÂN</Text>
             <Text style={styles.bannerDesc}>
-              Thông tin mục tiêu, khu vực và thời gian được hiển thị theo dữ liệu chiến dịch đã công bố.
+              Thông tin mục tiêu và thời gian được hiển thị theo dữ liệu chiến dịch đã công bố.
             </Text>
             <TouchableOpacity
               style={styles.donationDrivesBtn}
@@ -152,12 +151,6 @@ export const CampaignsScreen: React.FC = () => {
                   </View>
                   <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={styles.campaignTitle}>{camp.title}</Text>
-                    {camp.region_name ? (
-                      <View style={styles.regionRow}>
-                        <MapPin size={14} color={THEME.colors.text.secondary} />
-                        <Text style={styles.regionText}>Khu vực: {camp.region_name}</Text>
-                      </View>
-                    ) : null}
                   </View>
                   <View style={[styles.badge, { backgroundColor: badge.bg }]}>
                     <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
@@ -195,7 +188,7 @@ export const CampaignsScreen: React.FC = () => {
           })}
           {more ? (
             <TouchableOpacity style={styles.refreshBtn} onPress={loadMore} disabled={loadingMore} accessibilityLabel="Tải thêm chiến dịch">
-              <Text style={styles.regionText}>{loadingMore ? 'Đang tải…' : 'Tải thêm chiến dịch'}</Text>
+              <Text style={styles.actionText}>{loadingMore ?'Đang tải…' : 'Tải thêm chiến dịch'}</Text>
             </TouchableOpacity>
           ) : null}
         </ScrollView>
@@ -302,12 +295,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: THEME.colors.text.primary,
   },
-  regionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  regionText: {
+  actionText: {
     fontSize: 11,
     color: THEME.colors.text.secondary,
     marginLeft: 4,

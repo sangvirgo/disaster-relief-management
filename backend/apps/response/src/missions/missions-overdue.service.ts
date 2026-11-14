@@ -10,7 +10,6 @@ interface OverdueMissionRow {
   id: string;
   version: number;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
 }
 
@@ -42,7 +41,7 @@ export class MissionsOverdueService implements OnModuleInit, OnModuleDestroy {
     let rows: OverdueMissionRow[] = [];
     const ran = await this.jobs.runOnce('response.missions.overdue.scan', async (manager) => {
       rows = await manager.query(
-        `SELECT m.id,m.version,r.organization_id,r.region_code,r.campaign_id
+        `SELECT m.id,m.version,r.organization_id,r.campaign_id
            FROM mission m JOIN assistance_request r ON r.id=m.request_id
           WHERE m.status='OFFERED'
             AND m.created_at<=statement_timestamp()-($1::int*interval '1 minute')

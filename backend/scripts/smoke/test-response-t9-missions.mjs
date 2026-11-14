@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 
 export async function runMissionSmoke({
-  responseDb, responseUrl, reporter, coordinator, otherRegionCoordinator, overdueReader, appTeam, coordinatorTeam, organizationId, regionCode, call, key, assertVietnameseError,
+  responseDb, responseUrl, reporter, coordinator, otherCoordinator, overdueReader, appTeam, coordinatorTeam, organizationId, call, key, assertVietnameseError,
 }) {
   await responseDb.query(
     "INSERT INTO incident_category (code,display_name) VALUES ('T9_MISSION','Yêu cầu kiểm thử nhiệm vụ') ON CONFLICT (code) DO NOTHING",
@@ -17,7 +17,7 @@ export async function runMissionSmoke({
   const request = await call(responseUrl, 'requests', {
     method: 'POST',
     body: {
-      incident_category_code: 'T9_MISSION', description: 'Cần hỗ trợ tại khu vực kiểm thử.', people_affected: 1,
+      incident_category_code: 'T9_MISSION', description: 'Cần hỗ trợ tại điểm kiểm thử.', people_affected: 1,
       reporter_name: 'Người báo tin T9', reporter_contact_phone: '+84912345678', reporter_declared_danger: false,
       location: { type: 'Point', coordinates: [104.5, 14.5], source: 'GPS', accuracy_m: 5, captured_at: new Date().toISOString() },
     },
@@ -26,9 +26,9 @@ export async function runMissionSmoke({
   assert.equal(request.status, 201, JSON.stringify(request.value));
 
   const approvedFacts = {
-    report_mode: 'SELF', incident_category_code: 'T9_MISSION', description: 'Cần hỗ trợ tại khu vực kiểm thử.',
+    report_mode: 'SELF', incident_category_code: 'T9_MISSION', description: 'Cần hỗ trợ tại điểm kiểm thử.',
     reporter_name: 'Người báo tin T9', reporter_contact_phone: '+84912345678', reporter_declared_danger: false,
-    region_code: regionCode, campaign_id: null, people_affected: 1,
+    campaign_id: null, people_affected: 1,
     location: { type: 'Point', coordinates: [104.5, 14.5], source: 'GPS', accuracy_m: 5, captured_at: new Date().toISOString() },
   };
   const [verified] = (await responseDb.query(
@@ -47,9 +47,9 @@ export async function runMissionSmoke({
   );
   await responseDb.query(
     `UPDATE assistance_request
-        SET region_code=$3,status='TRIAGED',priority='P2',priority_basis='COMPLETE',
+        SET status='TRIAGED',priority='P2',priority_basis='COMPLETE',
             verification_revision=$2,version=3
-      WHERE id=$1`, [request.value.id, verified.id, regionCode],
+      WHERE id=$1`, [request.value.id, verified.id],
   );
 
   const body = { expected_version: 3, team_id: appTeam.value.id, override_reason: 'Đội được chọn trong kiểm thử.' };
@@ -86,11 +86,11 @@ export async function runMissionSmoke({
   assert.equal(stored.rows[0].request_status, 'DISPATCHED');
 
   const outOfScopeDetail = await call(responseUrl, `missions/${offered.value.id}`, {
-    headers: { Authorization: `Bearer ${otherRegionCoordinator.token}` },
+    headers: { Authorization: `Bearer ${otherCoordinator.token}` },
   });
   assertVietnameseError(outOfScopeDetail, 403, 'FORBIDDEN');
   const outOfScopeMine = await call(responseUrl, 'missions/mine?limit=10', {
-    headers: { Authorization: `Bearer ${otherRegionCoordinator.token}` },
+    headers: { Authorization: `Bearer ${otherCoordinator.token}` },
   });
   assertVietnameseError(outOfScopeMine, 403, 'FORBIDDEN');
 
@@ -110,7 +110,7 @@ export async function runMissionSmoke({
   const deniedEvidenceResponse = await fetch(`${responseUrl}/missions/${offered.value.id}/evidence`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${otherRegionCoordinator.token}`, 'Idempotency-Key': key(),
+      Authorization: `Bearer ${otherCoordinator.token}`, 'Idempotency-Key': key(),
       'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Content-Length': String(multipart.length),
     },
     body: multipart,
@@ -203,7 +203,7 @@ export async function runMissionSmoke({
   const completedRequest = await responseDb.query('SELECT status FROM assistance_request WHERE id=$1', [request.value.id]);
   assert.equal(completedRequest.rows[0].status, 'TRIAGED', 'mission completion must not resolve the request');
 
-  const context = { responseDb, responseUrl, reporter, coordinator, regionCode, call, key };
+  const context = { responseDb, responseUrl, reporter, coordinator, call, key };
   const pendingSupplementRequest = await createTriagedRequest(context, 'có thông tin bổ sung đang chờ duyệt');
   const trackingCode = await responseDb.query('SELECT tracking_code FROM assistance_request WHERE id=$1', [pendingSupplementRequest.id]);
   const supplement = await call(responseUrl, `requests/${pendingSupplementRequest.id}/supplements`, {
@@ -286,7 +286,7 @@ export async function runMissionSmoke({
   assert.equal(overdue.status, 200, JSON.stringify(overdue.value));
   assert.ok(overdue.value.items.some((item) => item.id === raceMission.id));
   const outOfScopeOverdue = await call(responseUrl, 'missions/overdue-offers?limit=10', {
-    headers: { Authorization: `Bearer ${otherRegionCoordinator.token}` },
+    headers: { Authorization: `Bearer ${otherCoordinator.token}` },
   });
   assert.equal(outOfScopeOverdue.status, 200, JSON.stringify(outOfScopeOverdue.value));
   assert.deepEqual(outOfScopeOverdue.value.items, [], 'out-of-scope coordinators cannot see overdue missions');
@@ -321,7 +321,7 @@ export async function runMissionSmoke({
   assert.equal(afterOfferedCancel.rows[0].readiness_required, false);
 
   const campaign = await call(responseUrl, 'campaigns', {
-    method: 'POST', body: { name: `T9 lock campaign ${key()}`, region_code: regionCode },
+    method: 'POST', body: { name: `T9 lock campaign ${key()}` },
     headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
   });
   assert.equal(campaign.status, 201, JSON.stringify(campaign.value));
@@ -717,7 +717,7 @@ export async function runMissionSmoke({
       expected_version: 1, to: 'DECLINED', recorded_basis: 'PHONE', reported_by: 'Chỉ huy đội',
       reason: 'Đội báo không thể nhận nhiệm vụ.', occurred_at: new Date().toISOString(),
     },
-    headers: { Authorization: `Bearer ${otherRegionCoordinator.token}`, 'Idempotency-Key': key() },
+    headers: { Authorization: `Bearer ${otherCoordinator.token}`, 'Idempotency-Key': key() },
   });
   assertVietnameseError(outOfScopeRecord, 403, 'FORBIDDEN');
   const recordedDecline = await call(responseUrl, `missions/${coordinatorOffer.value.id}/record-on-behalf`, {
@@ -805,7 +805,7 @@ async function waitForLockWaiterBlockedBy(db, blockerPid, label, pendingCommands
   return waitForLockWaiters(db, blockerPid, 1, label, pendingCommands);
 }
 
-async function createTriagedRequest({ responseDb, responseUrl, reporter, coordinator, regionCode, call, key }, label) {
+async function createTriagedRequest({ responseDb, responseUrl, reporter, coordinator, call, key }, label) {
   const description = `Cần hỗ trợ trong kiểm thử T9 ${label}.`;
   const created = await call(responseUrl, 'requests', {
     method: 'POST',
@@ -820,7 +820,7 @@ async function createTriagedRequest({ responseDb, responseUrl, reporter, coordin
   const approvedFacts = {
     report_mode: 'SELF', incident_category_code: 'T9_MISSION', description,
     reporter_name: 'Người báo tin T9', reporter_contact_phone: '+84912345678', reporter_declared_danger: false,
-    region_code: regionCode, campaign_id: null, people_affected: 1,
+    campaign_id: null, people_affected: 1,
     location: { type: 'Point', coordinates: [104.5, 14.5], source: 'GPS', accuracy_m: 5, captured_at: new Date().toISOString() },
   };
   const verified = await responseDb.query(
@@ -838,8 +838,8 @@ async function createTriagedRequest({ responseDb, responseUrl, reporter, coordin
     [created.value.id, coordinator.id, JSON.stringify({ priority: 'P2', priority_basis: 'COMPLETE' })],
   );
   await responseDb.query(
-    `UPDATE assistance_request SET region_code=$3,status='TRIAGED',priority='P2',priority_basis='COMPLETE',
-            verification_revision=$2,version=3 WHERE id=$1`, [created.value.id, verified.rows[0].id, regionCode],
+    `UPDATE assistance_request SET status='TRIAGED',priority='P2',priority_basis='COMPLETE',
+            verification_revision=$2,version=3 WHERE id=$1`, [created.value.id, verified.rows[0].id],
   );
   return { id: created.value.id, revisionId: verified.rows[0].id };
 }

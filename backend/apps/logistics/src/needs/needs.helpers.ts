@@ -5,7 +5,7 @@ import { hasPermission, Grant } from '@c48/identity-contracts/permissions';
 import { ResponseAdmission } from './response-admission.client';
 
 export type NeedCommandRequest = Request & { idempotencyKey?: string };
-export type NeedScope = Pick<ResponseAdmission, 'organization_id' | 'region_code' | 'campaign_id'>;
+export type NeedScope = Pick<ResponseAdmission, 'organization_id' | 'campaign_id'>;
 
 export interface NeedRow extends Record<string, unknown>, NeedScope {
   id: string;
@@ -37,7 +37,6 @@ export function needCommandKey(request: NeedCommandRequest): string {
 export function requireNeedManage(grants: readonly Grant[], scope: NeedScope): void {
   if (!hasPermission(grants, 'NEED_MANAGE', {
     organizationId: scope.organization_id,
-    regionCode: scope.region_code,
     campaignId: scope.campaign_id,
   })) throw new AppError('FORBIDDEN', { status: 403 });
 }
@@ -50,7 +49,6 @@ export function needValue(row: NeedRow): Record<string, unknown> {
     request_id: row.request_id,
     work_cycle: Number(row.work_cycle),
     organization_id: row.organization_id,
-    region_code: row.region_code,
     campaign_id: row.campaign_id,
     item_id: row.item_id,
     item: {
@@ -71,7 +69,7 @@ export function needValue(row: NeedRow): Record<string, unknown> {
 
 export async function readNeed(manager: Pick<EntityManager, 'query'>, id: string): Promise<Record<string, unknown>> {
   const rows = await manager.query(
-    `SELECT n.id,n.cycle_id,c.request_id,c.work_cycle,c.organization_id,c.region_code,c.campaign_id,
+    `SELECT n.id,n.cycle_id,c.request_id,c.work_cycle,c.organization_id,c.campaign_id,
             n.item_id,i.name AS item_name,u.code AS unit_code,u.display_name AS unit_name,u.scale AS unit_scale,
             n.original_quantity::text,n.requested_quantity::text,n.cancelled_remaining::text,
             n.designated_point_id,n.status,n.version,n.created_at

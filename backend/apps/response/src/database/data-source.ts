@@ -12,5 +12,6 @@ import { AllowAiAdvisoryRetryAttempts1793117000000 } from './migrations/AllowAiA
 import { AddAiAdvisoryClaimToken1793122000000 } from './migrations/AddAiAdvisoryClaimToken1793122000000';
 import { ExtendDemoCentralCoverage1794441600000 } from './migrations/ExtendDemoCentralCoverage1794441600000';
 import { AddNationwideTeamCoverage1794528000000 } from './migrations/AddNationwideTeamCoverage1794528000000';
+import { RemoveRegionCoverage1794700800000 } from './migrations/RemoveRegionCoverage1794700800000';
 
-export default new DataSource(postgresOptions([InitialResponse1710000000000, AddRequestSourceIpIndex1710000000001, AddEvidenceUploadIpQuota1710000000002, AddSosFactsAndMissionKind1792953600000, AddAiAdvisory1792953600001, GrantAiAdvisoryRead1792953600002, AllowAiAdvisoryRetries1793116235000, AllowAiAdvisoryRetryAttempts1793117000000, AddAiAdvisoryClaimToken1793122000000, ExtendDemoCentralCoverage1794441600000, AddNationwideTeamCoverage1794528000000], 'response'));
+export default new DataSource(postgresOptions([InitialResponse1710000000000, AddRequestSourceIpIndex1710000000001, AddEvidenceUploadIpQuota1710000000002, AddSosFactsAndMissionKind1792953600000, AddAiAdvisory1792953600001, GrantAiAdvisoryRead1792953600002, AllowAiAdvisoryRetries1793116235000, AllowAiAdvisoryRetryAttempts1793117000000, AddAiAdvisoryClaimToken1793122000000, ExtendDemoCentralCoverage1794441600000, AddNationwideTeamCoverage1794528000000, RemoveRegionCoverage1794700800000], 'response'));

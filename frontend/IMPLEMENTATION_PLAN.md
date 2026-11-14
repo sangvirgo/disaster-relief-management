@@ -50,7 +50,7 @@ Generate TypeScript types from the checked OpenAPI snapshots using a pinned, cur
 | Volunteer | Overview, missions, progress, team, notices | Response `/missions/mine`, `/missions/{id}*`, `/teams*`, `/notices*` | Leader-only accept/decline/transition; authorized team details, position age, evidence |
 | Coordinator | Queue, verify, triage, assign, map, notices, campaigns, reports | Response `/requests*`, `/missions*`, `/map/heatmap`, `/campaigns*`, `/reports/summary` | Scoped queue, manual verification and P1–P4, candidate comparison, explicit dispatch, operation polling |
 | Operations | Overview, drives, intake, review, stock, assets, needs, distribution, handoff, reports | Logistics drives, receipts, stock, catalog/assets, needs/commitments, distributions/handoffs/reports; Response campaigns | Permission-specific actions, independent review, posted stock, partial fulfillment and custody history |
-| Admin | Overview, users, organizations, grants, regions, audit | Identity `/users*`, `/organizations*`, `/grants*`, `/regions*`, `/audit-logs`; authorized Logistics audit | Scoped management, reason/version confirmations, no implicit victim/donor detail access |
+| Admin | Overview, users, organizations, grants, audit | Identity `/users*`, `/organizations*`, `/grants*`, `/audit-logs`; authorized Logistics audit | Scoped management, reason/version confirmations, no implicit victim/donor detail access |
 
 The 38 prototype pages are screen families, not one-to-one API operations. Implement supporting list/detail dialogs and conditional states when the contract requires them. The prototype's numbers and examples must be replaced with real server data or honest empty states.
 
@@ -68,7 +68,7 @@ The 38 prototype pages are screen families, not one-to-one API operations. Imple
 ### Phase B — Citizen SOS
 
 1. Implement SELF intake for guest and account owner. For guest, create the tracking capability as specified by the Response contract, keep it out of URLs and analytics, and present one-time save guidance. Never log it.
-2. Implement PROXY only with a live signed-in session; keep reporter and household contact/location separate. The household pin is authoritative for region derivation; preserve coordinate order `[longitude, latitude]`, `source`, accuracy, and capture time.
+2. Implement PROXY only with a live signed-in session; keep reporter and household contact/location separate. Preserve coordinate order `[longitude, latitude]`, `source`, accuracy, and capture time.
 3. Implement form review, idempotent submit, truthful acknowledgment, private tracking, reporter-visible timeline, permitted supplements, and evidence upload/download.
 4. Use a stable incident-category list only after confirming an exposed catalog or a documented, versioned demo catalog. The current OpenAPI snapshot has no public category route; do not silently invent backend values.
 

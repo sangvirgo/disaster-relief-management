@@ -36,12 +36,12 @@ interface HandoffLineRow extends DistributionHandoffLineContext {
 function requireScope(
   grants: Parameters<typeof hasWarehouseScope>[0],
   permission: 'DISTRIBUTION_REVIEW' | 'DISTRIBUTION_DISPATCH' | 'HANDOFF_RECORD' | 'LOSS_APPROVE',
-  distribution: Pick<DistributionContext, 'organization_id' | 'warehouse_region_code'>,
+  distribution: Pick<DistributionContext, 'organization_id'>,
 ): void {
-  if (!hasWarehouseScope(grants, distribution.organization_id, distribution.warehouse_region_code)) {
+  if (!hasWarehouseScope(grants, distribution.organization_id)) {
     throw new AppError('NOT_FOUND', { status: 404 });
   }
-  requireWarehousePermission(grants, permission, distribution.organization_id, distribution.warehouse_region_code);
+  requireWarehousePermission(grants, permission, distribution.organization_id);
 }
 
 function auditState(distribution: DistributionContext): Record<string, unknown> {

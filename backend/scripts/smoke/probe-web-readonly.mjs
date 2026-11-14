@@ -5,7 +5,7 @@ const password = process.env.C48_PROBE_PASSWORD;
 if (!password) throw new Error('C48_PROBE_PASSWORD is required');
 const to = new Date();
 const from = new Date(to.getTime() - 7 * 24 * 60 * 60 * 1000);
-const windowQuery = `?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}&region_code=DEMO_A`;
+const windowQuery = `?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`;
 
 const cases = [
   ['identity', '/me'],

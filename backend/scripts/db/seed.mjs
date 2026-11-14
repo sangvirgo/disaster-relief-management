@@ -184,19 +184,15 @@ try {
                           AND u.status = 'ACTIVE'
            JOIN role_grant g ON g.user_id = f.user_id AND g.role_code = f.role_code AND g.scope_type = f.scope_type
                             AND g.organization_id IS NOT DISTINCT FROM f.organization_id
-                            AND g.region_code IS NULL AND g.campaign_id IS NULL AND g.revoked_at IS NULL
+                            AND g.campaign_id IS NULL AND g.revoked_at IS NULL
            LEFT JOIN membership m ON m.user_id = f.user_id AND m.organization_id = f.organization_id AND m.status = 'ACTIVE'
           WHERE NOT f.requires_membership OR m.user_id IS NOT NULL) AS users_ready,
-        (SELECT count(*)::int FROM region WHERE status = 'ACTIVE' AND (
-            (code = 'DEMO_A' AND name = 'Khu vực Nam (demo)') OR
-            (code = 'DEMO_B' AND name = 'Khu vực Trung (demo)') OR
-            (code = 'DEMO_C' AND name = 'Khu vực Bắc (demo)'))) AS regions_ready,
         (SELECT count(*)::int FROM organization WHERE status = 'ACTIVE' AND (
             (id = '00000000-0000-4000-8000-000000000001' AND name = 'Trung tâm điều phối C48 (demo)' AND organization_kind = 'COORDINATION') OR
             (id = '00000000-0000-4000-8000-000000000002' AND name = 'Hội tình nguyện miền Nam (demo)' AND organization_kind = 'VOLUNTEER'))) AS organizations_ready
     `);
     const identityReady = identityPrerequisites.rows[0];
-    if (identityReady.users_ready !== 10 || identityReady.regions_ready !== 3 || identityReady.organizations_ready !== 2) {
+    if (identityReady.users_ready !== 10 || identityReady.organizations_ready !== 2) {
       throw new Error('Demo fixture ID or scope conflicts in Identity; dependent Response and Logistics fixtures were not seeded.');
     }
     const creators = await clients.get('identity').query(
@@ -208,8 +204,7 @@ try {
       `SELECT 1 FROM campaign
         WHERE id = '00000000-0000-4000-8000-0000000000c3'
           AND organization_id = '00000000-0000-4000-8000-000000000001'
-          AND region_code = 'DEMO_A'
-          AND name = 'Hỗ trợ khẩn cấp khu vực Nam'
+          AND name = 'Hỗ trợ khẩn cấp Nam'
           AND status = 'ACTIVE'`,
     );
     if (logisticsCampaign.rowCount !== 1) {

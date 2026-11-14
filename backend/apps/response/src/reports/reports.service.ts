@@ -39,7 +39,6 @@ export class ReportsService {
       `r.received_at < $${values.push(filters.to)}`,
       scope,
     ];
-    if (filters.region_code) clauses.push(`r.region_code=$${values.push(filters.region_code)}`);
     if (filters.campaign_id) clauses.push(`r.campaign_id=$${values.push(filters.campaign_id)}::uuid`);
     const overdueMinutes = values.push(this.config.offerOverdueMinutes);
     const key = analyticsCacheKey(session.userId, session.grants, { ...filters });

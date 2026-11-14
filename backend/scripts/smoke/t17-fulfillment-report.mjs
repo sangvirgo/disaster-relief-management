@@ -6,7 +6,6 @@ function reportItem(row) {
     request_id: row.request_id,
     cycle_id: row.cycle_id,
     work_cycle: Number(row.work_cycle),
-    region_code: row.region_code,
     campaign_id: row.campaign_id,
     item: { id: row.item_id, name: row.item_name },
     unit: { code: row.unit_code, display_name: row.unit_name, scale: Number(row.unit_scale) },

@@ -23,7 +23,6 @@ function setup(overrides: Partial<{
     work_cycle: overrides.workCycle ?? 2,
     version: overrides.version ?? 4,
     organization_id: organizationId,
-    region_code: 'NORTH',
     campaign_id: null,
     attribution_locked_at: overrides.lockedAt ?? null,
     logistics_admitted_at: overrides.admittedAt ?? null,
@@ -49,7 +48,7 @@ function setup(overrides: Partial<{
       userId: actorId,
       grants: overrides.grants ?? [{
         role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId,
-        region_code: null, campaign_id: null,
+        campaign_id: null,
       }],
     }),
   };
@@ -65,7 +64,6 @@ describe('RequestAdmissionService', () => {
       work_cycle: 2,
       status: 'TRIAGED',
       organization_id: organizationId,
-      region_code: 'NORTH',
       campaign_id: null,
       version: 5,
     });
@@ -81,7 +79,7 @@ describe('RequestAdmissionService', () => {
 
     await expect(service.admit(requestId, 2, {} as Request)).resolves.toMatchObject({
       work_cycle: 2, status: 'IN_PROGRESS', version: 8,
-      organization_id: organizationId, region_code: 'NORTH', campaign_id: null,
+      organization_id: organizationId, campaign_id: null,
     });
 
     expect(calls).toHaveLength(2);

@@ -8,7 +8,6 @@ export interface DateWindowFilters {
   from: string;
   to: string;
   campaign_id: string | null;
-  region_code: string | null;
 }
 
 export function dateWindowFilters(
@@ -29,10 +28,9 @@ export function dateWindowFilters(
     throw invalidQuery();
   }
 
-  const regionCode = optionalText(query.region_code, 80);
   const campaignId = optionalUuid(query.campaign_id);
-  if (!regionCode && !campaignId) throw invalidQuery();
-  return { from, to, campaign_id: campaignId, region_code: regionCode };
+  if (!campaignId) throw invalidQuery();
+  return { from, to, campaign_id: campaignId };
 }
 
 export function optionalText(value: unknown, maxLength: number): string | null {
@@ -54,11 +52,10 @@ export function analyticsCacheKey(
   grants: readonly Grant[],
   filters: Record<string, unknown>,
 ): string {
-  const normalizedGrants = grants.map(({ role_code, scope_type, organization_id, region_code, campaign_id }) => ({
+  const normalizedGrants = grants.map(({ role_code, scope_type, organization_id, campaign_id }) => ({
     role_code,
     scope_type,
     organization_id,
-    region_code: region_code ?? null,
     campaign_id: campaign_id ?? null,
   })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
   return JSON.stringify([userId, normalizedGrants, filters]);

@@ -17,7 +17,6 @@ interface RequestRow {
   version: number;
   work_cycle: number;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
   reporter_user_id: string | null;
   logistics_admitted_at: Date | string | null;
@@ -32,7 +31,6 @@ interface OperationRow {
   request_status: string;
   request_version: number;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
 }
 
@@ -53,7 +51,7 @@ export class RequestResolutionLifecycleService {
     const session = await this.sessions.require(request);
     const reason = cleanText(dto.reason, true)!;
     const preflightRows = await this.dataSource.query(
-      `SELECT id,status,version,work_cycle,organization_id,region_code,campaign_id,reporter_user_id,logistics_admitted_at
+      `SELECT id,status,version,work_cycle,organization_id,campaign_id,reporter_user_id,logistics_admitted_at
          FROM assistance_request WHERE id=$1`, [requestId],
     ) as RequestRow[];
     const preflight = preflightRows[0];
@@ -190,7 +188,7 @@ export class RequestResolutionLifecycleService {
   private async findOpenOperation(requestId: string): Promise<OperationRow> {
     const rows = await this.dataSource.query(
       `SELECT i.id,i.request_id,i.kind,i.state,i.version,i.work_cycle,r.status AS request_status,r.version AS request_version,
-              r.organization_id,r.region_code,r.campaign_id
+              r.organization_id,r.campaign_id
          FROM resolution_intent i JOIN assistance_request r ON r.id=i.request_id
         WHERE i.request_id=$1 AND i.state IN ('PENDING','ABORTING')`, [requestId],
     ) as OperationRow[];
@@ -201,7 +199,7 @@ export class RequestResolutionLifecycleService {
   private async findOperation(operationId: string): Promise<OperationRow> {
     const rows = await this.dataSource.query(
       `SELECT i.id,i.request_id,i.kind,i.state,i.version,i.work_cycle,r.status AS request_status,r.version AS request_version,
-              r.organization_id,r.region_code,r.campaign_id
+              r.organization_id,r.campaign_id
          FROM resolution_intent i JOIN assistance_request r ON r.id=i.request_id WHERE i.id=$1`, [operationId],
     ) as OperationRow[];
     if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
@@ -217,7 +215,7 @@ export class RequestResolutionLifecycleService {
     if (!requestRows.length) throw new AppError('NOT_FOUND', { status: 404 });
     const rows = await manager.query(
       `SELECT i.id,i.request_id,i.kind,i.state,i.version,i.work_cycle,r.status AS request_status,r.version AS request_version,
-              r.organization_id,r.region_code,r.campaign_id
+              r.organization_id,r.campaign_id
          FROM assistance_request r JOIN resolution_intent i ON i.request_id=r.id
         WHERE i.id=$1 FOR UPDATE OF i`, [operationId],
     ) as OperationRow[];
@@ -229,7 +227,7 @@ export class RequestResolutionLifecycleService {
     manager: EntityManager, requestId: string, expectedVersion: number, reason: string, session: ReporterSession,
   ): Promise<IdempotentOutcome<Record<string, unknown>>> {
     const rows = await manager.query(
-      `SELECT id,status,version,work_cycle,organization_id,region_code,campaign_id,reporter_user_id,logistics_admitted_at
+      `SELECT id,status,version,work_cycle,organization_id,campaign_id,reporter_user_id,logistics_admitted_at
          FROM assistance_request WHERE id=$1 FOR UPDATE`, [requestId],
     ) as RequestRow[];
     const row = rows[0];
@@ -263,7 +261,7 @@ export class RequestResolutionLifecycleService {
   private async operationValue(manager: EntityManager, operationId: string, session: ReporterSession, permission: 'REQUEST_CANCEL' | 'REQUEST_RESOLVE'): Promise<OperationRow> {
     const rows = await manager.query(
       `SELECT i.id,i.request_id,i.kind,i.state,i.version,i.work_cycle,r.status AS request_status,r.version AS request_version,
-              r.organization_id,r.region_code,r.campaign_id
+              r.organization_id,r.campaign_id
          FROM resolution_intent i JOIN assistance_request r ON r.id=i.request_id WHERE i.id=$1`, [operationId],
     ) as OperationRow[];
     const row = rows[0];
@@ -275,7 +273,7 @@ export class RequestResolutionLifecycleService {
 
   private assertPermission(
     session: ReporterSession,
-    row: Pick<RequestRow, 'organization_id' | 'region_code' | 'campaign_id'>,
+    row: Pick<RequestRow, 'organization_id' | 'campaign_id'>,
     permission: 'REQUEST_CANCEL' | 'REQUEST_RESOLVE',
   ): void {
     assertRequestPermission(session, permission, row);

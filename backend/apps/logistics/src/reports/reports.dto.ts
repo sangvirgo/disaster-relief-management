@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
+import { IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 export class ReportPageQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
@@ -15,11 +15,8 @@ export class StockSummaryQueryDto extends ReportPageQueryDto {
 }
 
 export class FulfillmentReportQueryDto extends ReportPageQueryDto {
-  @IsOptional() @IsUUID('all')
-  campaign_id?: string;
-
-  @IsOptional() @IsString() @MaxLength(32) @Matches(/^[A-Za-z0-9_-]+$/u)
-  region_code?: string;
+  @IsUUID('all')
+  campaign_id!: string;
 
   @IsDateString()
   from!: string;

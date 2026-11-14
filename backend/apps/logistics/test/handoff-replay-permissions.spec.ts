@@ -12,7 +12,6 @@ const distribution = {
   id: 'distribution-1',
   warehouse_id: 'warehouse-1',
   organization_id: 'organization-1',
-  warehouse_region_code: 'REGION_1',
   warehouse_status: 'ACTIVE',
   relief_point_id: null,
   relief_point_status: null,

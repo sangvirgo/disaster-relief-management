@@ -14,7 +14,7 @@ INSERT INTO unit VALUES ('PIECE','cái',0);
 INSERT INTO item (id,item_type_code,unit_code,name)
   SELECT md5('item'||g)::uuid,'FOOD','PIECE','Mặt hàng '||g FROM generate_series(1,150) g;
 -- 5 organizations x 4 warehouses
-INSERT INTO warehouse (id,organization_id,region_code,name,status)
+INSERT INTO warehouse (id,organization_id,name,status)
   SELECT md5('wh'||g)::uuid, md5('org'||(g%5))::uuid, 'R'||(g%7), 'Kho '||g, 'ACTIVE' FROM generate_series(0,19) g;
 INSERT INTO stock_balance (id,warehouse_id,item_id)
   SELECT md5('bal'||w||'-'||i)::uuid, md5('wh'||w)::uuid, md5('item'||i)::uuid FROM generate_series(0,19) w, generate_series(1,150) i;

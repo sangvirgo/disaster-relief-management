@@ -33,10 +33,10 @@ Before: `400 VALIDATION_FAILED` with no hint which field failed. Now:
 ## 2. Team creation (`POST /response/teams`)
 
 - `skill_codes` is now **optional** (default `[]`). It was the cause of the generic 400 when a client omitted it.
-- Required: `name`, `organization_id`, `operating_region_code`, `team_kind` (`VOLUNTEER|MILITARY|GOVERNMENT|OTHER`), `reporting_mode` (`APP|COORDINATOR`).
+- Required: `name`, `organization_id`, `team_kind` (`VOLUNTEER|MILITARY|GOVERNMENT|OTHER`), `reporting_mode` (`APP|COORDINATOR`).
 - `reporting_mode=APP` requires `leader_user_id` (active volunteer member of that organization who is not already on a team) else `409 LEADER_REQUIRED`. `COORDINATOR` requires `external_contact_note` else `400`.
-- Permission `TEAM_MANAGE_ANY`: coordinators (scoped to their organization/region) and, since the later team-setup change, system administrators (any organization; admins still cannot assign missions or read SOS details).
-- `nationwide_coverage` (boolean, default false) lets a team be offered for SOS in any region of its organization; `operating_region_code` and `nationwide_coverage` can be changed with `PATCH /teams/{id}` (version-checked; `409 TEAM_BUSY` while the team has an active mission).
+- Permission `TEAM_MANAGE_ANY`: coordinators (scoped to their organization) and, since the later team-setup change, system administrators (any organization; admins still cannot assign missions or read SOS details).
+- Team fields can be changed with `PATCH /teams/{id}` (version-checked; `409 TEAM_BUSY` while the team has an active mission).
 - The web app has a team-creation form (`TeamSetupForms.tsx`) that shows `field_errors` next to inputs.
 - Requires header `Idempotency-Key: <uuid>`; reuse the key only for a retry of the same submission.
 
@@ -45,7 +45,7 @@ Before: `400 VALIDATION_FAILED` with no hint which field failed. Now:
 Pick one landing "Thống kê" page per workspace. Section 6 lists which role sees which call. Every number below is a count; no personal data is returned.
 
 ### 3.1 `GET /response/dashboard/overview` – coordinator and admin
-Scope: coordinator = own organization/region grants; admin and others with `REPORT_READ` = per their grants (admin: system-wide). 403 when the user has no `REPORT_READ`.
+Scope: coordinator = own organization grants; admin and others with `REPORT_READ` = per their grants (admin: system-wide). 403 when the user has no `REPORT_READ`.
 
 ```json
 {
@@ -54,7 +54,6 @@ Scope: coordinator = own organization/region grants; admin and others with `REPO
     "open_by_status": {"SUBMITTED": 13, "VERIFYING": 5, "VERIFIED": 1, "TRIAGED": 1, "DISPATCHED": 1, "IN_PROGRESS": 1},
     "open_by_priority": {"P1": 1, "P2": 1, "P3": 1},
     "open_by_category": {"FLOOD": 6, "STORM": 3, "…": 0},
-    "open_by_region": {"DEMO_A": 13, "UNASSIGNED": 1},
     "received_last_24h": 24,
     "resolved_total": 1,
     "verification_overdue": 15,
@@ -64,13 +63,13 @@ Scope: coordinator = own organization/region grants; admin and others with `REPO
   "missions": {"active_by_status": {"OFFERED": 1, "ACCEPTED": 1}, "overdue_offers": 1},
   "teams": {"total": 13, "available": 13, "unavailable": 0, "awaiting_readiness": 0, "on_mission": 1, "position_missing_or_stale": 2},
   "thresholds": {"verification_overdue_minutes": 15, "offer_overdue_minutes": 10, "team_position_fresh_minutes": 30},
-  "recent_open_requests": [{"id": "uuid", "status": "SUBMITTED", "priority": null, "region_code": "DEMO_A", "category": "UNKNOWN", "received_at": "ISO"}],
+  "recent_open_requests": [{"id": "uuid", "status": "SUBMITTED", "priority": null, "category": "UNKNOWN", "received_at": "ISO"}],
   "generated_at": "ISO"
 }
 ```
-Open = not `RESOLVED|REJECTED|DUPLICATE|CANCELLED`. Missing `priority`/`region_code` are `null`; the map objects only contain keys with at least one row (render zeros yourself). `recent_open_requests[].id` can deep-link to the existing request detail view (needs `REQUEST_DETAIL_READ`, which ops managers lack: only link for coordinators).
+Open = not `RESOLVED|REJECTED|DUPLICATE|CANCELLED`. Missing `priority` is `null`; the map objects only contain keys with at least one row (render zeros yourself). `recent_open_requests[].id` can deep-link to the existing request detail view (needs `REQUEST_DETAIL_READ`, which ops managers lack: only link for coordinators).
 
-Suggested tiles: SOS đang mở, Quá hạn xác minh (warning), Khai báo nguy hiểm đang chờ (warning), Chờ giao đội, Nhiệm vụ đang chạy (+ `overdue_offers`), Đội sẵn sàng `available/total`, Đội thiếu vị trí mới (warning). Then breakdown grids for status/priority/category/region/mission status and the recent list.
+Suggested tiles: SOS đang mở, Quá hạn xác minh (warning), Khai báo nguy hiểm đang chờ (warning), Chờ giao đội, Nhiệm vụ đang chạy (+ `overdue_offers`), Đội sẵn sàng `available/total`, Đội thiếu vị trí mới (warning). Then breakdown grids for status/priority/category/mission status and the recent list.
 
 ### 3.2 Removed: citizen and volunteer dashboards
 The planned `GET /response/dashboard/mine` and `GET /response/dashboard/team` were dropped: citizens and volunteers have no statistics page. Do not call them.
@@ -105,7 +104,7 @@ The admin page should combine this with `GET /response/dashboard/overview` (syst
 
 ## 4. Weather alerts (`GET /response/weather/alerts`) – public
 
-Query: `region_code` (e.g. `DEMO_B`, pattern `[A-Z0-9_]{2,32}`), `active_only=true` (only locations that have alerts). No login needed, safe for citizens and guests.
+Query: `active_only=true` (only locations that have alerts). No login needed, safe for citizens and guests.
 
 ```json
 {
@@ -114,14 +113,14 @@ Query: `region_code` (e.g. `DEMO_B`, pattern `[A-Z0-9_]{2,32}`), `active_only=tr
   "disclaimer": "Đây là dự báo mô hình tham khảo, không thay thế cảnh báo chính thức của Trung tâm Dự báo khí tượng thủy văn quốc gia và chính quyền địa phương.",
   "horizon_hours": 24, "fetched_at": "ISO", "stale": false, "alert_count": 1,
   "locations": [{
-    "id": "ca-mau", "name": "Cà Mau", "region_code": "DEMO_A", "latitude": 9.176, "longitude": 105.15,
+    "id": "ca-mau", "name": "Cà Mau", "latitude": 9.176, "longitude": 105.15,
     "rain_24h_mm": 5.5, "peak_rain_1h_mm": 2.1, "max_gust_kmh": 29.5,
     "alerts": [{"code": "THUNDERSTORM", "level": "WATCH", "message": "Có dông, sét, …", "value": null}],
     "hourly": {"time": ["2026-11-14T14:00", "…"], "rain_mm": [0.2, 0], "gust_kmh": [29.5, 31]}
   }]
 }
 ```
-- 15 fixed provincial centres (3 regions). `alerts` is sorted most severe first. `code`: `HEAVY_RAIN | STRONG_WIND | THUNDERSTORM`. `level`: `WATCH` (lưu ý) < `WARNING` (cảnh báo) < `SEVERE` (nguy hiểm). `value` is mm for rain, km/h for wind, `null` for thunderstorm.
+- 15 fixed provincial centres. `alerts` is sorted most severe first. `code`: `HEAVY_RAIN | STRONG_WIND | THUNDERSTORM`. `level`: `WATCH` (lưu ý) < `WARNING` (cảnh báo) < `SEVERE` (nguy hiểm). `value` is mm for rain, km/h for wind, `null` for thunderstorm.
 - Thresholds: rain 24 h ≥ 50 / 100 / 200 mm (or ≥ 30 mm in one hour → WATCH); gust ≥ 50 / 62 / 89 km/h; thunderstorm weather codes ≥ 95.
 - `message` is already Vietnamese and safe to display as-is. `stale: true` means the provider failed and the last good result is returned: show "Dữ liệu có thể đã cũ". If the provider never succeeded: `503 RESPONSE_UNAVAILABLE`: show "Chưa tải được cảnh báo thời tiết" and keep the rest of the page working.
 - **Always show `disclaimer` and `attribution`** wherever alerts appear (Open-Meteo licence requires attribution).
@@ -129,7 +128,7 @@ Query: `region_code` (e.g. `DEMO_B`, pattern `[A-Z0-9_]{2,32}`), `active_only=tr
 - Cached 30 min on the server, `Cache-Control: public, max-age=300` for browsers.
 
 ### 4.1 Forecast for one point: `GET /response/weather/at?latitude=&longitude=` (public)
-Returns the same fields as one location above (no `id`/`name`/`region_code`) plus `latitude`, `longitude` (echo), `source`, `attribution`, `disclaimer`, `horizon_hours`, `fetched_at`, `stale`. Latitude must be 7.5–24.5 and longitude 101.5–112, otherwise `400 VALIDATION_FAILED` (show "vị trí nằm ngoài vùng có dự báo"). `503 RESPONSE_UNAVAILABLE` when the provider is down and nothing is cached. Privacy: the backend snaps coordinates to a 0.1° cell (~11 km) before calling Open-Meteo and caches per cell for 30 min.
+Returns the same fields as one location above (no `id`/`name`) plus `latitude`, `longitude` (echo), `source`, `attribution`, `disclaimer`, `horizon_hours`, `fetched_at`, `stale`. Latitude must be 7.5–24.5 and longitude 101.5–112, otherwise `400 VALIDATION_FAILED` (show "vị trí nằm ngoài vùng có dự báo"). `503 RESPONSE_UNAVAILABLE` when the provider is down and nothing is cached. Privacy: the backend snaps coordinates to a 0.1° cell (~11 km) before calling Open-Meteo and caches per cell for 30 min.
 
 Used by the citizen SOS form: the banner no longer shows national city alerts (it could not know where the user is). It shows weather only for the position the person confirmed on the form, with the 24 h rain/gust chart, and a neutral hint while no position is chosen.
 
@@ -144,19 +143,19 @@ Needs `REPORT_READ` in scope (operations manager, coordinator, admin; others 403
 
 ```json
 {
-  "open_drives": [{"id": "uuid", "title": "…", "region_code": "DEMO_A", "closes_at": "ISO|null"}],
+  "open_drives": [{"id": "uuid", "title": "…", "closes_at": "ISO|null"}],
   "suggestions": [{
-    "code": "STOCK_OUT", "severity": "URGENT", "region_code": "DEMO_B",
-    "item_ids": ["uuid"], "message": "Đã hết hàng tại khu vực Trung: Nước đóng chai, … Chưa có đợt tiếp nhận đang mở cho các mặt hàng này, nên cân nhắc tạo đợt quyên góp."
+    "code": "STOCK_OUT", "severity": "URGENT",
+    "item_ids": ["uuid"], "message": "Đã hết hàng: Nước đóng chai, … Chưa có đợt tiếp nhận đang mở cho các mặt hàng này, nên cân nhắc tạo đợt quyên góp."
   }],
   "weather_available": true,
   "thresholds": {"stock_low_units": 50},
   "generated_at": "ISO"
 }
 ```
-- `code`: `STOCK_OUT` (available ≤ 0), `STOCK_SHORTFALL` (open needs exceed available), `STOCK_LOW` (≤ threshold), `WEATHER_NO_DRIVE` (a region has a `WARNING/SEVERE` weather alert and no open drive; `item_ids` empty), `NO_OPEN_DRIVE` (nothing to flag and no open drive; `region_code` null).
+- `code`: `STOCK_OUT` (available ≤ 0), `STOCK_SHORTFALL` (open needs exceed available), `STOCK_LOW` (≤ threshold), `WEATHER_NO_DRIVE` (a `WARNING/SEVERE` weather alert exists and no open drive is listed; `item_ids` empty), `NO_OPEN_DRIVE` (nothing to flag and no open drive).
 - `severity`: `URGENT` (red) > `WARNING` (orange) > `INFO` (neutral). Already sorted most severe first.
-- Items already covered by an open drive in the same region are not flagged. Region is that of the drive's intake warehouse.
+- Items already covered by an open drive in the same organization are not flagged.
 - `weather_available=false` means the weather lookup failed; stock advice is still valid, show a small note.
 - `message` is Vietnamese, display as-is. `item_ids` can pre-select items in the "create drive" form (`POST /donation-drives` takes items; see `04-logistics-api.md`).
 - Placement: top of the operations overview, above the existing report cards.
@@ -180,8 +179,7 @@ Notes for the existing web navigation (`app/catalog.ts`): the operations `overvi
 - Drive/distribution/need: `OPEN` Đang mở · `CLOSED` Đã đóng · `DRAFT` Bản nháp · `APPROVED` Đã duyệt · `DISPATCHED` Đã xuất kho (distribution) · `RECONCILED` Đã đối soát · `PARTIALLY_FULFILLED` Đáp ứng một phần · `FULFILLED` Đã đáp ứng đủ · `CANCELLED` Đã hủy. (`DISPATCHED` on a *request* already has the label "Đã giao nhiệm vụ": keep context-specific labels.)
 - Roles: `ADMIN` Quản trị viên · `COORDINATOR` Điều phối viên · `CAMPAIGN_MANAGER` Quản lý chiến dịch · `OPERATIONS_MANAGER` Quản lý vận hành · `INTAKE_STAFF` Nhân viên tiếp nhận · `REVIEWER` Người xác minh · `DISTRIBUTION_STAFF` Nhân viên phân phát · `VOLUNTEER` Tình nguyện viên · `CITIZEN` Người dân.
 - Organization kind: `COORDINATION` Điều phối · `VOLUNTEER` Tình nguyện. User status: `PENDING_EMAIL` Chờ xác minh email · `DISABLED` Đã khóa.
-- Incident category: `FLOOD` Ngập lụt · `LANDSLIDE` Sạt lở đất · `STORM` Bão, gió lốc · `MEDICAL` Cấp cứu y tế · `TRAPPED` Người bị mắc kẹt · `FIRE` Hỏa hoạn · `SUPPLY_SHORTAGE` Thiếu nhu yếu phẩm · `OTHER` Khác · `UNKNOWN` Chưa rõ · region bucket `UNASSIGNED` Chưa gán khu vực.
-- Regions in demo data: `DEMO_A` Khu vực Nam · `DEMO_B` Khu vực Trung · `DEMO_C` Khu vực Bắc. Prefer the region names from `GET /identity/regions` over hard-coding.
+- Incident category: `FLOOD` Ngập lụt · `LANDSLIDE` Sạt lở đất · `STORM` Bão, gió lốc · `MEDICAL` Cấp cứu y tế · `TRAPPED` Người bị mắc kẹt · `FIRE` Hỏa hoạn · `SUPPLY_SHORTAGE` Thiếu nhu yếu phẩm · `OTHER` Khác · `UNKNOWN` Chưa rõ.
 - Mission: `OFFERED` Chờ đội nhận · `ACCEPTED` Đã nhận · `EN_ROUTE` Đang di chuyển · `ON_SCENE` Đang tại hiện trường · `COMPLETED` Hoàn thành.
 - Weather level: `WATCH` Lưu ý · `WARNING` Cảnh báo · `SEVERE` Nguy hiểm. Suggestion severity: `INFO` Tham khảo · `WARNING` Cần chú ý · `URGENT` Khẩn.
 
@@ -194,7 +192,7 @@ Check the existing `i18n/labels.ts` first: `label()` returns "Có cập nhật m
 - Two volunteers without a team, in the coordination organization: `vol_free1`, `vol_free2` (ids `…0123`, `…0124`). Use them as leaders when demonstrating team creation by `coord1`/`coord2`. Password is the usual `SEED_PASSWORD`; all seeded users have `must_change_password=true`.
 - Demo accounts per role: `admin`, `coord1`, `ops_mgr`, `campaign_mgr`, `intake1`, `reviewer1`, `dist1`, `vol_leader1`, `vol_free1`, `citizen1`.
 - Login body needs `client_kind` (`WEB` or `NATIVE`).
-- With demo data the suggestions endpoint returns 4 items (hết hàng ở khu vực Trung/Nam, tồn kho thấp) and weather returns real forecast data: alerts only appear when the forecast crosses a threshold, so the map may legitimately show none. To demo the UI offline, mock the response shape in section 4.
+- With demo data the suggestions endpoint returns 4 items (hết hàng, tồn kho thấp) and weather returns real forecast data: alerts only appear when the forecast crosses a threshold, so the map may legitimately show none. To demo the UI offline, mock the response shape in section 4.
 
 ## 9. Not implemented (do not assume)
 

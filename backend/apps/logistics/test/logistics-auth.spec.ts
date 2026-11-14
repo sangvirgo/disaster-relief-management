@@ -26,7 +26,7 @@ function signedToken(now = Date.now()): string {
 }
 
 describe('Logistics session transport', () => {
-  it('forwards only the verified access cookie to the Identity region catalog', () => {
+  it('forwards only the verified access cookie to Identity', () => {
     const token = signedToken();
     const credential = accessCredential({
       method: 'GET',

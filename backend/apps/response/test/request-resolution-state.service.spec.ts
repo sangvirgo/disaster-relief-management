@@ -14,14 +14,14 @@ describe('RequestResolutionStateService', () => {
       statements.push(sql);
       if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
         id: requestId, status: 'RESOLVED', version: 12, work_cycle: 3, organization_id: organizationId,
-        region_code: 'DEMO_A', campaign_id: null, reporter_user_id: userId,
+        campaign_id: null, reporter_user_id: userId,
       }];
       if (sql.includes('UPDATE assistance_request')) return [[{ id: requestId, status: 'CLOSED', version: 13, reporter_user_id: userId }], 1];
       return [];
     }) };
     const dataSource = { query: jest.fn(async () => [{
       id: requestId, status: 'RESOLVED', version: 12, work_cycle: 3, organization_id: organizationId,
-      region_code: 'DEMO_A', campaign_id: null, reporter_user_id: userId,
+      campaign_id: null, reporter_user_id: userId,
     }]) };
     const idempotency = { execute: jest.fn(async (_source: unknown, command: IdempotentCommand<Record<string, unknown>>) => {
       const outcome = await command.execute(manager as never);
@@ -42,14 +42,14 @@ describe('RequestResolutionStateService', () => {
     const statements: string[] = [];
     const manager = { query: jest.fn(async (sql: string) => {
       statements.push(sql);
-      if (sql.includes('FROM campaign WHERE id=$1 FOR SHARE')) return [{ id: campaignId, status: 'PAUSED', organization_id: organizationId, region_code: 'DEMO_A' }];
+      if (sql.includes('FROM campaign WHERE id=$1 FOR SHARE')) return [{ id: campaignId, status: 'PAUSED', organization_id: organizationId }];
       if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
         id: requestId, status: 'CLOSED', version: 20, work_cycle: 4, organization_id: organizationId,
-        region_code: 'DEMO_A', campaign_id: campaignId, reporter_user_id: userId,
+        campaign_id: campaignId, reporter_user_id: userId,
       }];
       if (sql.includes('UPDATE assistance_request')) return [[{
         id: requestId, status: 'TRIAGED', version: 21, work_cycle: 5, organization_id: organizationId,
-        region_code: 'DEMO_A', campaign_id: null, reporter_user_id: userId,
+        campaign_id: null, reporter_user_id: userId,
       }], 1];
       if (sql.includes('SELECT r.version,r.work_cycle AS "workCycle"')) return [{
         version: 21, workCycle: 5, incidentCategoryCode: 'FLOOD', description: null,
@@ -61,7 +61,7 @@ describe('RequestResolutionStateService', () => {
     const dataSource = {
       query: jest.fn(async () => [{
         id: requestId, status: 'CLOSED', version: 20, work_cycle: 4, organization_id: organizationId,
-        region_code: 'DEMO_A', campaign_id: campaignId, reporter_user_id: userId,
+        campaign_id: campaignId, reporter_user_id: userId,
       }]),
     };
     const idempotency = { execute: jest.fn(async (_source: unknown, command: IdempotentCommand<Record<string, unknown>>) => {

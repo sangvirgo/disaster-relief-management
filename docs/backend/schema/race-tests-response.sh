@@ -15,11 +15,10 @@ P() { psql -qXAt -v ON_ERROR_STOP=1 -d "$DB" "$@"; }
 
 # ---------- fixtures ----------
 P >/dev/null <<'SQL'
-INSERT INTO region_boundary VALUES ('R1', ST_Multi(ST_GeomFromText('POLYGON((106 10,107 10,107 11,106 11,106 10))',4326)));
 INSERT INTO incident_category VALUES ('FLOOD','Ngập lụt');
-INSERT INTO rescue_team (id,organization_id,operating_region_code,name,team_kind) VALUES
-  ('00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-0000000000d1','R1','Đội A','VOLUNTEER'),
-  ('00000000-0000-0000-0000-0000000000a2','00000000-0000-0000-0000-0000000000d1','R1','Đội B','VOLUNTEER');
+INSERT INTO rescue_team (id,organization_id,name,team_kind) VALUES
+  ('00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-0000000000d1','Đội A','VOLUNTEER'),
+  ('00000000-0000-0000-0000-0000000000a2','00000000-0000-0000-0000-0000000000d1','Đội B','VOLUNTEER');
 -- six requests with one snapshot event each (mission.verification_revision must reference an event of the same request)
 INSERT INTO assistance_request (id,tracking_code,incident_category_code,report_mode,organization_id)
   SELECT ('00000000-0000-0000-0000-00000000b00'||i)::uuid, 'TRK000000'||i, 'FLOOD','SELF','00000000-0000-0000-0000-0000000000d1' FROM generate_series(1,6) i;

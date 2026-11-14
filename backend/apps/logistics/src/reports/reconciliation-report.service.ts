@@ -53,7 +53,7 @@ export class ReconciliationReportService {
     const cursor = decodeReportIdCursor(query.cursor, filters);
     const values: unknown[] = [];
     const conditions = [
-      reportScopeSql(session.grants, ['REPORT_READ', 'DISTRIBUTION_REVIEW'], values, 'w', ['SYSTEM', 'ORGANIZATION', 'REGION']),
+      reportScopeSql(session.grants, ['REPORT_READ', 'DISTRIBUTION_REVIEW'], values, 'w', ['SYSTEM', 'ORGANIZATION']),
     ];
     values.push(query.warehouse_id);
     conditions.push(`b.warehouse_id=$${values.length}::uuid`);
@@ -154,7 +154,7 @@ export class ReconciliationReportService {
 
   private async authorizedWarehouse(warehouseId: string, grants: Parameters<typeof reportScopeSql>[0]): Promise<boolean> {
     const values: unknown[] = [warehouseId];
-    const scope = reportScopeSql(grants, ['REPORT_READ', 'DISTRIBUTION_REVIEW'], values, 'w', ['SYSTEM', 'ORGANIZATION', 'REGION']);
+    const scope = reportScopeSql(grants, ['REPORT_READ', 'DISTRIBUTION_REVIEW'], values, 'w', ['SYSTEM', 'ORGANIZATION']);
     const rows = await this.dataSource.query(
       `SELECT w.id FROM warehouse w WHERE w.id=$1::uuid AND ${scope} LIMIT 1`,
       values,

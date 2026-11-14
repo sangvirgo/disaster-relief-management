@@ -17,7 +17,6 @@ interface DriveRow extends Record<string, unknown> {
   id: string;
   organization_id: string;
   intake_warehouse_id: string;
-  region_code: string;
   campaign_id: string | null;
   campaign_status: string | null;
   campaign_status_at?: Date | string | null;
@@ -33,7 +32,6 @@ interface DriveRow extends Record<string, unknown> {
 interface WarehouseRow {
   id: string;
   organization_id: string;
-  region_code: string;
   status: string;
 }
 
@@ -62,7 +60,7 @@ function driveValue(row: DriveRow, items: Array<Record<string, unknown>>): Recor
 
 async function readDrive(manager: Pick<EntityManager, 'query'>, id: string): Promise<Record<string, unknown>> {
   const rows = await manager.query(
-    `SELECT d.id,d.organization_id,d.intake_warehouse_id,w.region_code,d.campaign_id,d.campaign_status,d.campaign_status_at,d.status,
+    `SELECT d.id,d.organization_id,d.intake_warehouse_id,d.campaign_id,d.campaign_status,d.campaign_status_at,d.status,
             d.title,d.description,d.opens_at,d.closes_at,d.version,d.created_at
        FROM donation_drive d JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE d.id=$1`,
     [id],
@@ -294,7 +292,7 @@ export class DrivesService {
 
   private async findWarehouse(query: Pick<DataSource, 'query'> | Pick<EntityManager, 'query'>, id: string, forUpdate = false): Promise<WarehouseRow> {
     const rows = await query.query(
-      `SELECT id,organization_id,region_code,status FROM warehouse WHERE id=$1${forUpdate ? ' FOR UPDATE' : ''}`,
+      `SELECT id,organization_id,status FROM warehouse WHERE id=$1${forUpdate ? ' FOR UPDATE' : ''}`,
       [id],
     ) as WarehouseRow[];
     const warehouse = rows[0];
@@ -304,7 +302,7 @@ export class DrivesService {
 
   private async findDrive(query: Pick<DataSource, 'query'> | Pick<EntityManager, 'query'>, id: string, forUpdate = false): Promise<DriveRow> {
     const rows = await query.query(
-      `SELECT d.id,d.organization_id,d.intake_warehouse_id,w.region_code,d.campaign_id,d.campaign_status,d.status,
+      `SELECT d.id,d.organization_id,d.intake_warehouse_id,d.campaign_id,d.campaign_status,d.status,
               d.title,d.description,d.opens_at,d.closes_at,d.version,d.created_at
          FROM donation_drive d JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE d.id=$1${forUpdate ? ' FOR UPDATE OF d' : ''}`,
       [id],

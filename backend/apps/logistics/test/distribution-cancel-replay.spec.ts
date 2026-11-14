@@ -9,7 +9,6 @@ const cancelledDistribution = {
   id: 'distribution-1',
   warehouse_id: 'warehouse-1',
   organization_id: 'organization-1',
-  warehouse_region_code: 'REGION_1',
   warehouse_status: 'ACTIVE',
   relief_point_id: null,
   relief_point_status: null,
@@ -127,7 +126,7 @@ describe('distribution cancellation idempotency replay', () => {
     const session = { userId: 'preparer-1', grants, identityHeaders: {} };
     const dataSource = {
       query: jest.fn().mockResolvedValue([{
-        id: 'warehouse-1', organization_id: 'organization-1', region_code: 'REGION_1', status: 'INACTIVE',
+        id: 'warehouse-1', organization_id: 'organization-1', status: 'INACTIVE',
       }]),
     };
     const idempotency = {

@@ -6,17 +6,15 @@ import { ReporterSessionService } from '../src/requests/reporter-session';
 const organizationId = '00000000-0000-4000-8000-000000000001';
 const coordinatorId = '00000000-0000-4000-8000-000000000002';
 const matchingMissionId = '00000000-0000-4000-8000-000000000003';
-const otherRegionMissionId = '00000000-0000-4000-8000-000000000004';
 
 interface MissionsOverdueTestSurface {
   scanOverdue(): Promise<number>;
 }
 
 describe('MissionsOverdueService', () => {
-  it('creates notices only for coordinators whose grant covers each overdue mission', async () => {
+  it('creates notices only for coordinators whose organization grant covers each overdue mission', async () => {
     const rows = [
-      { id: matchingMissionId, version: 2, organization_id: organizationId, region_code: 'T8_REGION', campaign_id: null },
-      { id: otherRegionMissionId, version: 3, organization_id: organizationId, region_code: 'T8_OTHER', campaign_id: null },
+      { id: matchingMissionId, version: 2, organization_id: organizationId, campaign_id: null },
     ];
     const query = jest.fn(async (sql: string) => {
       if (sql.includes('pg_try_advisory_xact_lock')) return [{ locked: true }];
@@ -32,9 +30,8 @@ describe('MissionsOverdueService', () => {
       requestCoordinatorGrants: jest.fn(async () => [{
         user_id: coordinatorId,
         role_code: 'COORDINATOR' as const,
-        scope_type: 'REGION' as const,
+        scope_type: 'ORGANIZATION' as const,
         organization_id: organizationId,
-        region_code: 'T8_REGION',
         campaign_id: null,
       }]),
     } as unknown as ReporterSessionService;

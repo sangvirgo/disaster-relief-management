@@ -7,7 +7,7 @@ import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '@c48
 import { ReporterSessionService } from '../requests/reporter-session';
 import { RequestOperationsPersistenceService } from './request-operations.persistence.service';
 import type { AiAdvisoryReviewDto, RequestVersionDto } from './request-operations.dto';
-import { isAiAdvisoryFresh, loadAssessmentFacts } from '../ai/ai-advisory-input';
+import { enqueueAiAdvisory, isAiAdvisoryFresh, loadAssessmentFacts } from '../ai/ai-advisory-input';
 import { checkVersion } from './request-operations.helpers';
 
 @Injectable()
@@ -64,6 +64,61 @@ export class RequestOperationsAiAdvisoryService {
         const rows = await manager.query('SELECT payload FROM request_event WHERE id=$1 AND request_id=$2 AND event_type=\'AI_ADVISORY_REVIEW\'', [resource.id, requestId]) as Array<{ payload: Record<string, unknown> }>;
         if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
         return { request_id: requestId, advisory_id: rows[0].payload.advisory_id, decision: rows[0].payload.decision };
+      },
+    });
+  }
+
+  /** Queue an assessment for the current facts when there is none, it is outdated, or it was skipped. */
+  async requestAssessment(requestId: string, dto: RequestVersionDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
+    const session = await this.sessions.require(request);
+    return this.idempotency.execute(this.dataSource, {
+      scopeKey: `response.request-ai-request:${requestId}:${session.userId}`,
+      command: 'response.requests.request-ai-advisory',
+      key,
+      requestHash: canonicalRequestHash({ request_id: requestId, user_id: session.userId, dto }),
+      execute: async (manager) => {
+        const row = await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY', true);
+        checkVersion(Number(row.version), dto.expected_version);
+        if (!process.env.GEMINI_API_KEY) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+        const facts = await loadAssessmentFacts(manager, requestId);
+        const latestRows = await manager.query(
+          `SELECT id,status,request_version,input_hash FROM ai_advisory WHERE request_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1 FOR UPDATE`, [requestId],
+        ) as Array<Record<string, unknown> & { id: string; status: string }>;
+        const latest = latestRows[0];
+        const fresh = latest ? isAiAdvisoryFresh(latest, facts, facts.workCycle) : false;
+        // QUEUED/PROCESSING/COMPLETED/FAILED for current facts already have a path (wait, review, or retry).
+        if (latest && fresh && latest.status !== 'SKIPPED') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+        let advisoryId: string | undefined;
+        if (latest && fresh) {
+          const updated = await manager.query(
+            `UPDATE ai_advisory SET status='QUEUED',attempts=0,error_code=NULL,completed_at=NULL,extracted_json=NULL,lease_until=NULL,claim_token=NULL
+              WHERE id=$1 AND status='SKIPPED' RETURNING id`, [latest.id],
+          ) as Array<{ id: string }>;
+          advisoryId = updated[0]?.id;
+        } else {
+          await enqueueAiAdvisory(manager, requestId);
+          const created = await manager.query(
+            'SELECT id FROM ai_advisory WHERE request_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1', [requestId],
+          ) as Array<{ id: string }>;
+          advisoryId = created[0]?.id;
+        }
+        if (!advisoryId) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+        const events = await manager.query(
+          `INSERT INTO request_event (request_id,actor_user_id,event_type,visibility,payload)
+           VALUES ($1,$2,'AI_ADVISORY_REQUESTED','STAFF',$3::jsonb) RETURNING id`,
+          [requestId, session.userId, JSON.stringify({ advisory_id: advisoryId, status: 'QUEUED' })],
+        ) as Array<{ id: string }>;
+        if (!events[0]) throw new AppError('INTERNAL_ERROR', { status: 500 });
+        return { status: 202, value: { request_id: requestId, advisory_id: advisoryId, status: 'QUEUED' }, resource: { type: 'request_event', id: events[0].id } };
+      },
+      replay: async (manager: EntityManager, resource) => {
+        if (!resource || resource.type !== 'request_event') throw new AppError('INTERNAL_ERROR', { status: 500 });
+        await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_DETAIL_READ');
+        const rows = await manager.query(
+          "SELECT payload FROM request_event WHERE id=$1 AND request_id=$2 AND event_type='AI_ADVISORY_REQUESTED'", [resource.id, requestId],
+        ) as Array<{ payload: Record<string, unknown> }>;
+        if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
+        return { request_id: requestId, advisory_id: rows[0].payload.advisory_id, status: rows[0].payload.status };
       },
     });
   }

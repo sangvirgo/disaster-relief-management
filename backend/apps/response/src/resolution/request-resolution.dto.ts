@@ -29,9 +29,6 @@ export class RequestVersionDto {
 export class ReopenRequestDto extends RequestVersionReasonDto {
   @IsOptional() @IsUUID('all')
   declare campaign_id?: string | null;
-
-  @IsOptional() @IsString() @MaxLength(80) @Matches(/\S/u)
-  declare region_code?: string;
 }
 
 export class FailureReviewDto extends RequestVersionReasonDto {

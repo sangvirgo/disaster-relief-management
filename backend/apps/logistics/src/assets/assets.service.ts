@@ -6,7 +6,6 @@ import { AppError } from '@c48/technical/errors/errors';
 import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { validateQuantity } from '../common/quantity';
 import { cleanText } from '../common/text';
-import { LogisticsIdentityService } from '../auth/logistics-identity.service';
 import { AuthenticatedLogisticsSession, LogisticsSessionService } from '../auth/logistics-session.service';
 import {
   assetAuditState, assetTables, assetView, findAsset, pointCoordinates, requireAssetManage,
@@ -27,9 +26,9 @@ function requestKey(request: AssetRequest): string {
 }
 
 function assertCanManageRow(session: AuthenticatedLogisticsSession, row: AssetRow): void {
-  if (!row.organization_id || !row.region_code || !session.grants.some((grant) => {
+  if (!row.organization_id || !session.grants.some((grant) => {
     try {
-      requireAssetManage({ ...session, grants: [grant] }, row.organization_id, row.region_code);
+      requireAssetManage({ ...session, grants: [grant] }, row.organization_id);
       return true;
     } catch {
       return false;
@@ -107,7 +106,6 @@ export class AssetsService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly idempotency: IdempotencyService,
     private readonly sessions: LogisticsSessionService,
-    private readonly identity: LogisticsIdentityService,
   ) {}
 
   createWarehouse(dto: CreateWarehouseDto, request: AssetRequest): Promise<IdempotentResult<Record<string, unknown>>> {
@@ -140,9 +138,8 @@ export class AssetsService {
 
   private async create(kind: AssetKind, dto: AssetCreateDto, request: AssetRequest): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    requireAssetManage(session, dto.organization_id, dto.region_code);
+    requireAssetManage(session, dto.organization_id);
     validateAssetCreateText(kind, dto);
-    await this.identity.assertActiveRegion(dto.region_code, session.identityHeaders);
     if (kind === 'vehicle') {
       const vehicle = dto as CreateVehicleDto;
       await assertCapacityScale(this.dataSource, vehicle.capacity, vehicle.capacity_unit);
@@ -182,22 +179,22 @@ export class AssetsService {
     let values: unknown[];
     if (kind === 'warehouse') {
       const warehouse = dto as CreateWarehouseDto;
-      values = [dto.organization_id, dto.region_code, warehouse.name, warehouse.address_note ?? null,
+      values = [dto.organization_id, warehouse.name, warehouse.address_note ?? null,
         coordinates?.[0] ?? null, coordinates?.[1] ?? null, warehouse.location_public ?? false];
-      sql = `INSERT INTO warehouse (organization_id,region_code,name,address_note,location,location_public)
-             VALUES ($1,$2,$3,$4,CASE WHEN $5::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($5,$6),4326)::geography END,$7)
+      sql = `INSERT INTO warehouse (organization_id,name,address_note,location,location_public)
+             VALUES ($1,$2,$3,CASE WHEN $4::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($4,$5),4326)::geography END,$6)
              RETURNING id`;
     } else if (kind === 'relief_point') {
       const point = dto as CreateReliefPointDto;
       if (!coordinates) throw new AppError('VALIDATION_FAILED', { status: 400 });
-      values = [dto.organization_id, dto.region_code, point.name, point.contact_note ?? null, point.operating_note ?? null, coordinates[0], coordinates[1]];
-      sql = `INSERT INTO relief_point (organization_id,region_code,name,contact_note,operating_note,location)
-             VALUES ($1,$2,$3,$4,$5,ST_SetSRID(ST_MakePoint($6,$7),4326)::geography) RETURNING id`;
+      values = [dto.organization_id, point.name, point.contact_note ?? null, point.operating_note ?? null, coordinates[0], coordinates[1]];
+      sql = `INSERT INTO relief_point (organization_id,name,contact_note,operating_note,location)
+             VALUES ($1,$2,$3,$4,ST_SetSRID(ST_MakePoint($5,$6),4326)::geography) RETURNING id`;
     } else {
       const vehicle = dto as CreateVehicleDto;
-      values = [dto.organization_id, dto.region_code, vehicle.identifier, vehicle.vehicle_type, vehicle.capacity ?? null, vehicle.capacity_unit ?? null];
-      sql = `INSERT INTO vehicle (organization_id,region_code,identifier,vehicle_type,capacity,capacity_unit)
-             VALUES ($1,$2,$3,$4,$5::numeric,$6) RETURNING id`;
+      values = [dto.organization_id, vehicle.identifier, vehicle.vehicle_type, vehicle.capacity ?? null, vehicle.capacity_unit ?? null];
+      sql = `INSERT INTO vehicle (organization_id,identifier,vehicle_type,capacity,capacity_unit)
+             VALUES ($1,$2,$3,$4::numeric,$5) RETURNING id`;
     }
     const rows = await manager.query(sql, values) as Array<{ id: string }>;
     const id = rows[0]?.id;

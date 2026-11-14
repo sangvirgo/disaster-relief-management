@@ -31,8 +31,6 @@ const point = object({
 const teamViewSchema = object({
   id,
   organization_id: id,
-  operating_region_code: text,
-  nationwide_coverage: boolean(),
   name: text,
   kind: { type: 'string', enum: ['VOLUNTEER', 'MILITARY', 'GOVERNMENT', 'OTHER'] },
   reporting_mode: { type: 'string', enum: ['APP', 'COORDINATOR'] },
@@ -50,7 +48,7 @@ const teamViewSchema = object({
     }, ['age_s', 'accuracy_m', 'source']),
   ] },
   version,
-}, ['id', 'organization_id', 'operating_region_code', 'nationwide_coverage', 'name', 'kind', 'reporting_mode', 'availability', 'readiness_required', 'status', 'skills', 'position', 'version']);
+}, ['id', 'organization_id', 'name', 'kind', 'reporting_mode', 'availability', 'readiness_required', 'status', 'skills', 'position', 'version']);
 const teamPageSchema = object({ items: array(teamViewSchema), more: boolean(), cursor: text });
 const idempotentCommandResponseHeaders = {
   'Cache-Control': { $ref: '#/components/headers/CacheControlNoStore' },
@@ -61,9 +59,9 @@ const logisticsCommandResponseHeaders = {
   'Idempotent-Replay': { description: 'Present as true when this response replays the original command result.', schema: { type: 'string', enum: ['true'] } },
 };
 const requestCampaignAssociationViewSchema = object({
-  id, status: text, version, region_code: { anyOf: [text, { type: 'null' }] },
+  id, status: text, version,
   campaign_id: { anyOf: [id, { type: 'null' }] },
-}, ['id', 'status', 'version', 'region_code', 'campaign_id']);
+}, ['id', 'status', 'version', 'campaign_id']);
 const identityDetails = {
   registerCitizen: {
     summary: 'Start a citizen registration and send an email verification code.',
@@ -131,7 +129,6 @@ const identityPaginationQueries = {
   listIdentityUsers: ['cursor', 'limit'],
   listIdentityUserGrants: ['cursor', 'limit'],
   listIdentityOrganizations: ['cursor', 'limit'],
-  listIdentityRegions: ['cursor', 'limit'],
   listIdentityAuditLogs: ['cursor', 'limit'],
 };
 
@@ -155,6 +152,7 @@ const responseDetails = {
     request: request(object({ expected_version: { type: 'integer', minimum: 1 }, decision: { type: 'string', enum: ['ACCEPTED', 'ADJUSTED', 'REJECTED'] }, note: { type: 'string', maxLength: 1000 } }, ['expected_version', 'decision'])),
     response: response(object({ request_id: id, advisory_id: id, decision: { type: 'string', enum: ['ACCEPTED', 'ADJUSTED', 'REJECTED'] } }, ['request_id', 'advisory_id', 'decision'])),
   },
+  responseRequestOperationsRequestAiAssessment: ['NOT_FOUND', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
   responseRequestOperationsRetryAiAdvisory: {
     summary: 'Queue a coordinator-requested retry for a failed AI advisory.',
     description: 'Requires REQUEST_VERIFY scope, the current request expected_version, an idempotency key, a configured Gemini API key, and the latest advisory to be FAILED and fresh for current SOS facts. Resets that advisory retry budget, appends a staff timeline event, and returns 202. A stale or superseded advisory is not retried. This does not change request facts, official priority, or team assignment.',
@@ -200,7 +198,7 @@ const responseDetails = {
     }),
     response: response(requestCampaignAssociationViewSchema, 'Request after campaign attachment.', {
       id: '00000000-0000-4000-8000-000000000001', status: 'TRIAGED', version: 8,
-      region_code: 'NORTH-01', campaign_id: '00000000-0000-4000-8000-000000000003',
+      campaign_id: '00000000-0000-4000-8000-000000000003',
     }, idempotentCommandResponseHeaders),
   },
   responseRequestOperationsDetachCampaign: {
@@ -211,15 +209,15 @@ const responseDetails = {
     request: request(versionBody(), { expected_version: 8 }),
     response: response(requestCampaignAssociationViewSchema, 'Request after campaign detachment.', {
       id: '00000000-0000-4000-8000-000000000001', status: 'TRIAGED', version: 9,
-      region_code: 'NORTH-01', campaign_id: null,
+      campaign_id: null,
     }, idempotentCommandResponseHeaders),
   },
   responseRequestResolutionInternalOperation: {
-    response: response(object({ id, kind: text, state: text, request_id: id, work_cycle: integer(), request_status: text, organization_id: id, region_code: { anyOf: [text, { type: 'null' }] }, campaign_id: { anyOf: [id, { type: 'null' }] }, outcome_basis: { anyOf: [text, { type: 'null' }] } })),
+    response: response(object({ id, kind: text, state: text, request_id: id, work_cycle: integer(), request_status: text, organization_id: id, campaign_id: { anyOf: [id, { type: 'null' }] }, outcome_basis: { anyOf: [text, { type: 'null' }] } })),
   },
   responseRequestAdmissionAdmit: {
     noBody: true,
-    response: response(object({ request_id: id, work_cycle: integer(), version, status: { type: 'string', enum: ['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'] }, organization_id: id, region_code: { anyOf: [text, { type: 'null' }] }, campaign_id: { anyOf: [id, { type: 'null' }] } })),
+    response: response(object({ request_id: id, work_cycle: integer(), version, status: { type: 'string', enum: ['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'] }, organization_id: id, campaign_id: { anyOf: [id, { type: 'null' }] } })),
   },
   responseMissionsReviewFailure: {
     request: request(object({ expected_version: version, disposition: { type: 'string', enum: ['REPLACED', 'NO_FURTHER_ACTION', 'REFERRED'] }, reason: text, replacement_mission_id: id }, ['expected_version', 'disposition', 'reason'])),
@@ -245,7 +243,7 @@ const responseDetails = {
     response: response(object({ id, status: text, version, work_cycle: integer() }, ['id', 'status', 'version', 'work_cycle'])),
   },
   responseRequestResolutionReopen: {
-    request: request(object({ expected_version: version, reason: text, campaign_id: { anyOf: [id, { type: 'null' }] }, region_code: text }, ['expected_version', 'reason'])),
+    request: request(object({ expected_version: version, reason: text, campaign_id: { anyOf: [id, { type: 'null' }] } }, ['expected_version', 'reason'])),
     response: response(object({ id, status: text, version, work_cycle: integer() }, ['id', 'status', 'version', 'work_cycle'])),
   },
   responseRequestResolutionResolve: {
@@ -260,18 +258,18 @@ const responseDetails = {
     response: response(object({ items: item({ code: text, display_name: text }, ['code', 'display_name']) }, ['items'])),
   },
   responseTeamsList: {
-    query: ['region_code', 'availability', 'status'].map((name) => ({ name, in: 'query', required: false, schema: text })),
+    query: ['availability', 'status'].map((name) => ({ name, in: 'query', required: false, schema: text })),
     response: response(teamPageSchema),
   },
   responseTeamsCreate: {
-    request: request(object({ name: text, organization_id: id, operating_region_code: text, team_kind: text, reporting_mode: { type: 'string', enum: ['APP', 'COORDINATOR'] }, leader_user_id: id, external_contact_note: text, skill_codes: array(text) }, ['name', 'organization_id', 'operating_region_code', 'team_kind', 'reporting_mode', 'skill_codes'])),
+    request: request(object({ name: text, organization_id: id, team_kind: text, reporting_mode: { type: 'string', enum: ['APP', 'COORDINATOR'] }, leader_user_id: id, external_contact_note: text, skill_codes: array(text) }, ['name', 'organization_id', 'team_kind', 'reporting_mode', 'skill_codes'])),
     response: response(teamViewSchema),
   },
   responseTeamsDetail: {
     response: response(teamViewSchema),
   },
   responseTeamsUpdate: {
-    request: request(object({ expected_version: version, name: text, skill_codes: array(text), availability: text, operating_region_code: { type: 'string', pattern: '^[A-Z0-9_]{2,32}$' }, nationwide_coverage: boolean() }, ['expected_version'])),
+    request: request(object({ expected_version: version, name: text, skill_codes: array(text), availability: text }, ['expected_version'])),
     response: response(teamViewSchema),
   },
   responseTeamsReady: {
@@ -343,13 +341,13 @@ const logisticsDetails = {
   logisticsCatalogCreateUnit: { request: request(object({ code: text, display_name: text, scale: { type: 'integer', minimum: 0, maximum: 3 } }, ['code', 'display_name', 'scale'])) },
   logisticsCatalogCreateItem: { request: request(object({ item_type_code: text, unit_code: text, name: text }, ['item_type_code', 'unit_code', 'name'])) },
   logisticsCatalogDeactivateItem: { request: request(object({ expected_version: version }, ['expected_version'])) },
-  logisticsAssetsCreateWarehouse: { request: request(object({ organization_id: id, region_code: text, name: text, address_note: text, location: object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }), location_public: boolean() }, ['organization_id', 'region_code', 'name'])) },
+  logisticsAssetsCreateWarehouse: { request: request(object({ organization_id: id, name: text, address_note: text, location: object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }), location_public: boolean() }, ['organization_id', 'name'])) },
   logisticsAssetsPatchWarehouse: { request: request(versionBody({ name: text, address_note: { anyOf: [text, { type: 'null' }] }, location: { anyOf: [object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }), { type: 'null' }] }, location_public: boolean() })) },
   logisticsAssetsDeactivateWarehouse: { request: request(object({ expected_version: version }, ['expected_version'])) },
-  logisticsAssetsCreateReliefPoint: { request: request(object({ organization_id: id, region_code: text, name: text, contact_note: text, operating_note: text, location: object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }) }, ['organization_id', 'region_code', 'name', 'location'])) },
+  logisticsAssetsCreateReliefPoint: { request: request(object({ organization_id: id, name: text, contact_note: text, operating_note: text, location: object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }) }, ['organization_id', 'name', 'location'])) },
   logisticsAssetsPatchReliefPoint: { request: request(versionBody({ name: text, contact_note: text, operating_note: text, location: object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }) })) },
   logisticsAssetsDeactivateReliefPoint: { request: request(object({ expected_version: version }, ['expected_version'])) },
-  logisticsAssetsCreateVehicle: { request: request(object({ organization_id: id, region_code: text, identifier: text, vehicle_type: text, capacity: { anyOf: [quantity, { type: 'null' }] }, capacity_unit: { anyOf: [text, { type: 'null' }] } }, ['organization_id', 'region_code', 'identifier', 'vehicle_type'])) },
+  logisticsAssetsCreateVehicle: { request: request(object({ organization_id: id, identifier: text, vehicle_type: text, capacity: { anyOf: [quantity, { type: 'null' }] }, capacity_unit: { anyOf: [text, { type: 'null' }] } }, ['organization_id', 'identifier', 'vehicle_type'])) },
   logisticsAssetsPatchVehicle: { request: request(versionBody({ identifier: text, vehicle_type: text, capacity: { anyOf: [quantity, { type: 'null' }] }, capacity_unit: { anyOf: [text, { type: 'null' }] } })) },
   logisticsAssetsDeactivateVehicle: { request: request(object({ expected_version: version }, ['expected_version'])) },
   logisticsStockOpening: { request: request(object({ warehouse_id: id, lines: item({ item_id: id, quantity }, ['item_id', 'quantity']), note: text }, ['warehouse_id', 'lines', 'note'])) },
@@ -428,7 +426,6 @@ const logisticsDetails = {
       request_id: id,
       work_cycle: integer(),
       organization_id: id,
-      region_code: text,
       campaign_id: { anyOf: [id, { type: 'null' }] },
       item_id: id,
       item: object({
@@ -444,7 +441,7 @@ const logisticsDetails = {
       status: { type: 'string', enum: ['OPEN', 'PARTIALLY_FULFILLED', 'FULFILLED', 'CANCELLED'] },
       version,
       created_at: dateTime,
-    }, ['id', 'cycle_id', 'request_id', 'work_cycle', 'organization_id', 'region_code', 'campaign_id', 'item_id', 'item', 'original_quantity', 'requested_quantity', 'cancelled_remaining', 'delivery_target_kind', 'designated_point_id', 'status', 'version', 'created_at']), 'Created need projection returned by the needs query mapper.'),
+    }, ['id', 'cycle_id', 'request_id', 'work_cycle', 'organization_id', 'campaign_id', 'item_id', 'item', 'original_quantity', 'requested_quantity', 'cancelled_remaining', 'delivery_target_kind', 'designated_point_id', 'status', 'version', 'created_at']), 'Created need projection returned by the needs query mapper.'),
   },
   logisticsNeedsIncrease: { request: request(object({ expected_version: version, quantity, reason: text }, ['expected_version', 'quantity', 'reason'])) },
   logisticsNeedsReduce: { request: request(object({ expected_version: version, quantity, reason: text }, ['expected_version', 'quantity', 'reason'])) },
@@ -536,7 +533,7 @@ const commitmentValueSchema = object({
 });
 const needItemSchema = object({ id, name: text, unit: catalogUnitSchema });
 const needValueSchema = object({
-  id, cycle_id: id, request_id: id, work_cycle: integer(), organization_id: id, region_code: text,
+  id, cycle_id: id, request_id: id, work_cycle: integer(), organization_id: id,
   campaign_id: nullableValue(id), item_id: id, item: needItemSchema, original_quantity: quantity,
   requested_quantity: quantity, cancelled_remaining: nullableValue(quantity),
   delivery_target_kind: { type: 'string', enum: ['FINAL_RECIPIENT', 'RELIEF_POINT'] },
@@ -573,7 +570,7 @@ const driveValueSchema = object({
   version, created_at: dateTime, items: array(driveCommandItemSchema),
 });
 const assetCommonProperties = {
-  id, organization_id: id, region_code: text,
+  id, organization_id: id,
   status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] }, version, created_at: dateTime,
 };
 const warehouseCommandSchema = object({
@@ -630,7 +627,6 @@ const sharedLogisticsResponses = {
   logisticsAssetsReliefPointDetail: object({
     id,
     organization_id: id,
-    region_code: text,
     status: text,
     version,
     created_at: dateTime,
@@ -642,7 +638,6 @@ const sharedLogisticsResponses = {
   logisticsAssetsWarehouses: page({
     id,
     organization_id: id,
-    region_code: text,
     status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] },
     version,
     created_at: dateTime,
@@ -653,7 +648,6 @@ const sharedLogisticsResponses = {
   logisticsAssetsReliefPoints: page({
     id,
     organization_id: id,
-    region_code: text,
     status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] },
     version,
     created_at: dateTime,
@@ -663,7 +657,6 @@ const sharedLogisticsResponses = {
   logisticsAssetsVehicles: page({
     id,
     organization_id: id,
-    region_code: text,
     status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] },
     version,
     created_at: dateTime,
@@ -764,7 +757,7 @@ const sharedLogisticsResponses = {
   logisticsStockOpening: object({ warehouse_id: id, items: item({ balance_id: id, item_id: id, on_hand: quantity, reserved: quantity, available: quantity }) }),
   logisticsReportsStockSummary: page({ warehouse_id: id, item: object({ id, name: text }), unit: object({ code: text, display_name: text, scale: integer() }), on_hand: quantity, reserved: quantity, available: quantity, held: quantity, in_transit: quantity }),
   logisticsReportsFulfillmentSummary: page({
-    id, request_id: id, cycle_id: id, work_cycle: integer(), region_code: nullableValue(text), campaign_id: nullableValue(id),
+    id, request_id: id, cycle_id: id, work_cycle: integer(), campaign_id: nullableValue(id),
     item: object({ id, name: text }), unit: catalogUnitSchema, original: quantity, reduced: quantity,
     cancelled_remaining: quantity, active_requested: quantity, delivered: quantity, active_outstanding: quantity, status: text,
   }),
@@ -789,7 +782,7 @@ const logisticsQueries = {
   logisticsNeedsFulfillment: ['work_cycle'], logisticsNeedsInternalFulfillment: ['work_cycle'], logisticsRequestsFulfillment: ['work_cycle'],
   logisticsDistributionsList: ['status', 'cursor', 'limit'], logisticsStockBalances: ['warehouse_id', 'item_id', 'cursor', 'limit'],
   logisticsStockMovements: ['cursor', 'limit'], logisticsStockAdjustments: ['status', 'cursor', 'limit'],
-  logisticsReportsStockSummary: ['warehouse_id', 'cursor', 'limit'], logisticsReportsFulfillmentSummary: ['campaign_id', 'region_code', 'from', 'to', 'cursor', 'limit'],
+  logisticsReportsStockSummary: ['warehouse_id', 'cursor', 'limit'], logisticsReportsFulfillmentSummary: ['campaign_id', 'from', 'to', 'cursor', 'limit'],
   logisticsReportsReconciliationSummary: ['warehouse_id', 'item_id', 'cursor', 'limit'],
   logisticsReportsPublicDonationSummary: ['drive_id', 'campaign_id', 'warehouse_id', 'cursor', 'limit'],
 };
@@ -797,11 +790,10 @@ const logisticsQueries = {
 const logisticsRequiredQueries = {
   logisticsAuditList: ['entity_type'],
   logisticsReportsReconciliationSummary: ['warehouse_id'],
-  logisticsReportsFulfillmentSummary: ['from', 'to'],
+  logisticsReportsFulfillmentSummary: ['campaign_id', 'from', 'to'],
 };
 
 const logisticsQueryConstraints = {
-  logisticsReportsFulfillmentSummary: 'At least one of campaign_id or region_code is required; from is inclusive and to is exclusive.',
   logisticsReportsPublicDonationSummary: 'Exactly one of drive_id, campaign_id, or warehouse_id is required.',
 };
 
@@ -837,7 +829,6 @@ const routeErrorCodes = {
   revokeIdentityGrant: ['LAST_ADMIN'],
   createIdentityOrganization: ['ORGANIZATION_NAME_TAKEN'],
   deactivateIdentityOrganization: ['ORGANIZATION_IN_USE'],
-  createIdentityRegion: ['SCOPE_INVALID'],
   createSelfRequest: ['VALIDATION_FAILED', 'TRACKING_SECRET_INVALID', 'TRACKING_SECRET_IN_USE', 'IDEMPOTENCY_KEY_REUSED', 'SOS_RATE_CEILING'],
   createProxyRequest: ['VALIDATION_FAILED', 'IDENTITY_UNAVAILABLE', 'SESSION_EXPIRED'],
   trackSelfRequest: ['NOT_FOUND', 'RATE_LIMITED'],
@@ -854,15 +845,16 @@ const routeErrorCodes = {
   acceptMission: ['TEAM_BUSY', 'TEAM_NOT_ELIGIBLE', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'CAMPAIGN_PAUSED'],
   verifyRequest: ['VERIFICATION_BASIS_REQUIRED', 'SECOND_COORDINATOR_REQUIRED', 'PENDING_SUPPLEMENT_REVIEW'],
   rejectRequest: ['REJECT_THRESHOLD_NOT_MET'],
+  responseRequestOperationsFastTrack: ['FAST_TRACK_NOT_ELIGIBLE', 'REASON_REQUIRED', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'NOT_FOUND', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
   markRequestDuplicate: ['CANONICAL_INVALID', 'CANONICAL_HAS_DUPLICATES'],
-  createMissionOffer: ['TEAM_BUSY', 'TEAM_NOT_ELIGIBLE', 'OVERRIDE_REASON_REQUIRED', 'REGION_REQUIRED', 'CAMPAIGN_PAUSED', 'TEAM_HAS_ACTIVE_MISSION', 'CAMPAIGN_NOT_ACTIVE'],
+  createMissionOffer: ['TEAM_BUSY', 'TEAM_NOT_ELIGIBLE', 'OVERRIDE_REASON_REQUIRED', 'CAMPAIGN_PAUSED', 'TEAM_HAS_ACTIVE_MISSION', 'CAMPAIGN_NOT_ACTIVE'],
   recordMissionOnBehalf: ['RECORDED_BASIS_REQUIRED', 'MISSION_NOT_LEADER', 'STATE_TRANSITION_INVALID'],
   createCampaign: ['FORBIDDEN', 'VERSION_CONFLICT'],
   closeCampaign: ['CAMPAIGN_HAS_OPEN_REQUESTS', 'VERSION_CONFLICT'],
   responseRequestOperationsAttachCampaign: ['NOT_FOUND', 'CAMPAIGN_NOT_ACTIVE', 'ATTRIBUTION_LOCKED', 'VERSION_CONFLICT', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID'],
   responseRequestOperationsDetachCampaign: ['NOT_FOUND', 'ATTRIBUTION_LOCKED', 'VERSION_CONFLICT', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID'],
   getRequestHeatmap: ['TOO_MANY_CELLS', 'VALIDATION_FAILED'],
-  responseRequestAdmissionAdmit: ['ATTRIBUTION_LOCKED', 'REGION_REQUIRED', 'PENDING_SUPPLEMENT_REVIEW', 'REQUEST_NOT_VERIFIED'],
+  responseRequestAdmissionAdmit: ['ATTRIBUTION_LOCKED', 'PENDING_SUPPLEMENT_REVIEW', 'REQUEST_NOT_VERIFIED'],
   responseMissionsReviewFailure: ['REASON_REQUIRED', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   responseRequestResolutionResolve: ['RESOLUTION_BLOCKED', 'RESOLUTION_BASIS_INVALID', 'PENDING_SUPPLEMENT_REVIEW', 'LOGISTICS_UNAVAILABLE'],
   responseRequestResolutionClose: ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],

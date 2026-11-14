@@ -62,43 +62,6 @@ export class LogisticsIdentityService implements OnModuleDestroy {
     return operation;
   }
 
-  async assertActiveRegion(code: string, userHeaders: Record<string, string>): Promise<void> {
-    let cursor: string | null = null;
-    const seenCursors = new Set<string>();
-    for (let page = 0; page < 100; page++) {
-      const path = `/api/v1/identity/regions?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
-      let result;
-      try {
-        result = await this.client.get<unknown>(path, { headers: userHeaders });
-      } catch (error) {
-        if (error instanceof AppError) throw error;
-        throw unavailable();
-      }
-      if (result.status === 401) throw new AppError('SESSION_EXPIRED', { status: 401 });
-      if (result.status !== 200 || !result.body || typeof result.body !== 'object') throw unavailable();
-
-      const body = result.body as Record<string, unknown>;
-      if (!Array.isArray(body.items) || !(body.next_cursor === null || typeof body.next_cursor === 'string')) throw unavailable();
-      for (const item of body.items) {
-        if (!item || typeof item !== 'object') throw unavailable();
-        const region = item as Record<string, unknown>;
-        if (typeof region.code !== 'string' || typeof region.name !== 'string' || !['ACTIVE', 'INACTIVE'].includes(String(region.status))) {
-          throw unavailable();
-        }
-        if (region.code === code) {
-          if (region.status !== 'ACTIVE') throw new AppError('VALIDATION_FAILED', { status: 400 });
-          return;
-        }
-      }
-      const next = body.next_cursor as string | null;
-      if (!next) throw new AppError('VALIDATION_FAILED', { status: 400 });
-      if (seenCursors.has(next)) throw unavailable();
-      seenCursors.add(next);
-      cursor = next;
-    }
-    throw unavailable();
-  }
-
   serviceToken(audience: ServiceName): Promise<string> {
     return this.serviceTokens.get(audience);
   }

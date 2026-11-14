@@ -15,7 +15,6 @@ interface GrantRow {
   role_code: string;
   scope_type: string;
   organization_id: string | null;
-  region_code: string | null;
   campaign_id: string | null;
   created_at: Date;
   revoked_at: Date | null;
@@ -27,7 +26,7 @@ function publicGrant(row: GrantRow): Record<string, unknown> {
 
 async function readGrant(manager: Pick<EntityManager, 'query'>, id: string): Promise<Record<string, unknown>> {
   const rows = await manager.query(
-    `SELECT id, user_id, role_code, scope_type, organization_id, region_code, campaign_id, created_at, revoked_at
+    `SELECT id, user_id, role_code, scope_type, organization_id, campaign_id, created_at, revoked_at
        FROM role_grant WHERE id = $1`, [id],
   ) as GrantRow[];
   if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
@@ -63,7 +62,7 @@ export class GrantsService {
     }
     values.push(Math.min(dto.limit ?? 50, 100) + 1);
     const rows = await this.dataSource.query(
-      `SELECT id, user_id, role_code, scope_type, organization_id, region_code, campaign_id, created_at, revoked_at
+      `SELECT id, user_id, role_code, scope_type, organization_id, campaign_id, created_at, revoked_at
          FROM role_grant WHERE ${where}
         ORDER BY (revoked_at IS NOT NULL) ASC, created_at DESC, id DESC LIMIT $${values.length}`,
       values,
@@ -95,14 +94,10 @@ export class GrantsService {
           const organizations = await manager.query("SELECT id FROM organization WHERE id = $1 AND status = 'ACTIVE' FOR SHARE", [dto.organization_id]) as Array<{ id: string }>;
           if (!organizations[0]) throw new AppError('SCOPE_INVALID', { status: 400 });
         }
-        if (dto.region_code) {
-          const regions = await manager.query("SELECT code FROM region WHERE code = $1 AND status = 'ACTIVE' FOR SHARE", [dto.region_code]) as Array<{ code: string }>;
-          if (!regions[0]) throw new AppError('SCOPE_INVALID', { status: 400 });
-        }
         const rows = await manager.query(
-          `INSERT INTO role_grant (user_id, role_code, scope_type, organization_id, region_code, campaign_id)
-           VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-          [userId, dto.role_code, dto.scope_type, dto.organization_id ?? null, dto.region_code ?? null, dto.campaign_id ?? null],
+          `INSERT INTO role_grant (user_id, role_code, scope_type, organization_id, campaign_id)
+           VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+          [userId, dto.role_code, dto.scope_type, dto.organization_id ?? null, dto.campaign_id ?? null],
         ) as Array<{ id: string }>;
         const id = rows[0]!.id;
         const value = await readGrant(manager, id);

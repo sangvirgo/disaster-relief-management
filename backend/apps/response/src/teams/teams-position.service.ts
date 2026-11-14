@@ -9,7 +9,6 @@ import { SetTeamPositionDto } from './teams.dto';
 
 interface TeamPositionTeam {
   organization_id: string;
-  operating_region_code: string;
   reporting_mode: 'APP' | 'COORDINATOR';
   status: 'ACTIVE' | 'INACTIVE';
 }
@@ -48,7 +47,7 @@ export class TeamsPositionService {
 
     await this.dataSource.transaction(async (manager) => {
       const teams = await manager.query(
-        `SELECT organization_id,operating_region_code,reporting_mode,status
+        `SELECT organization_id,reporting_mode,status
            FROM rescue_team WHERE id=$1 FOR UPDATE`, [teamId],
       ) as TeamPositionTeam[];
       const team = teams[0];
@@ -56,7 +55,7 @@ export class TeamsPositionService {
 
       if (dto.location.source === 'COORDINATOR_REPORTED') {
         if (!hasPermission(session.grants, 'TEAM_POSITION_SET_ANY', {
-          organizationId: team.organization_id, regionCode: team.operating_region_code,
+          organizationId: team.organization_id,
         })) throw new AppError('FORBIDDEN', { status: 403 });
       } else {
         const leaders = team.reporting_mode === 'APP' && team.status === 'ACTIVE'

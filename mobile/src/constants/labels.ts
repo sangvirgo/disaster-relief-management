@@ -124,7 +124,7 @@ export const TIMELINE_EVENT_LABELS: Record<string, { title: string; desc: string
   },
   VERIFICATION_STARTED: {
     title: 'Bắt đầu quy trình xác minh thực địa',
-    desc: 'Điều phối viên phụ trách khu vực đã tiếp nhận hồ sơ.',
+    desc: 'Điều phối viên phụ trách đã tiếp nhận hồ sơ.',
   },
   REQUEST_VERIFIED: {
     title: 'Đã xác minh chính xác hiện trường',
@@ -226,7 +226,7 @@ export function formatNoticeDisplay(notice: any): {
   const NOTICES_MAP: Record<string, { title: string; message: string; isUrgent?: boolean }> = {
     REQUEST_SUBMITTED: {
       title: 'Đã Tiếp Nhận Hồ Sơ Cứu Hộ',
-      message: 'Hệ thống đã tiếp nhận yêu cầu cứu trợ của bạn và chuyển đến trung tâm điều phối khu vực.',
+      message: 'Hệ thống đã tiếp nhận yêu cầu cứu trợ của bạn và chuyển đến trung tâm điều phối.',
     },
     REQUEST_VERIFYING: {
       title: 'Điều Phối Viên Đang Xác Minh',

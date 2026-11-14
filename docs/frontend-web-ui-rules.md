@@ -131,7 +131,7 @@ Every spec below is exact. Pages MUST NOT restyle `color, background, border, fo
 |---|---|
 | `primary` (default) | bg `--color-primary`, text white, 1px border same as bg. Hover/active bg+border `--color-primary-dark`. No shadow. |
 | `secondary` | bg white, text `--color-text-primary`, border `--color-surface-divider`. Hover bg `--color-surface-subtle`. |
-| `ghost` | transparent, text `--color-primary`, no border, padding 0 12. Hover bg `--color-primary-bg`. Replaces `.text-button`, `.secondary-action-button`, `.region-manual-button`. |
+| `ghost` | transparent, text `--color-primary`, no border, padding 0 12. Hover bg `--color-primary-bg`. Replaces `.text-button`, `.secondary-action-button`. |
 | `danger` | bg `--color-emergency`, white text; hover `-dark`. Only for irreversible actions (and then via the confirm Dialog). |
 | `emergency` | same as danger + `--shadow-emergency`, size `lg`. SOS submit only. |
 
@@ -174,14 +174,14 @@ Keep `.tabs` markup. Style: row with bottom hairline; tab = height 44, padding 0
 ### 5.9 Filter bar and search
 One row directly under PageHeader, inside a Card `compact` (or bare on page bg): search control (min 240, max 360, leading 16 search icon), selects, then ghost "Xoá bộ lọc" shown only when filters are active. Wraps with gap 8/16. `.filter` labels become visually hidden labels or 12 secondary captions above controls, consistently.
 
-### 5.10 States (every list/detail/data region MUST implement all)
+### 5.10 States (every list/detail/data section MUST implement all)
 | State | Component | Spec |
 |---|---|---|
-| Loading | `Skeleton` | Shape-matching blocks (`--color-surface-subtle`, radius 8, shimmer 1.2 s, disabled under reduced-motion). Lists: 5 skeleton rows of real row height. Cards: title bar + 3 lines. Replaces every bare "Đang tải…" `<p>` (F8). Keep a visually-hidden `role="status"` Vietnamese text for screen readers. Region height must not jump on load. |
-| Empty | `EmptyState` | Centered inside the region, padding 48 24: 40px muted icon, 16/600 title, 14 secondary one-sentence explanation, optional primary/secondary action. Replaces `.empty`. |
+| Loading | `Skeleton` | Shape-matching blocks (`--color-surface-subtle`, radius 8, shimmer 1.2 s, disabled under reduced-motion). Lists: 5 skeleton rows of real row height. Cards: title bar + 3 lines. Replaces every bare "Đang tải…" `<p>` (F8). Keep a visually-hidden `role="status"` Vietnamese text for screen readers. Section height must not jump on load. |
+| Empty | `EmptyState` | Centered inside the section, padding 48 24: 40px muted icon, 16/600 title, 14 secondary one-sentence explanation, optional primary/secondary action. Replaces `.empty`. |
 | Error | `Notice error` or `ErrorState` | Vietnamese plain message, error code in 12 muted, "Thử lại" secondary button when retry is possible. |
 | Success | `Toast` / `Notice success` | As 5.3. |
-| Disabled/forbidden | `EmptyState` with lock icon | For role-limited regions; never show actions the user cannot use. |
+| Disabled/forbidden | `EmptyState` with lock icon | For role-limited sections; never show actions the user cannot use. |
 
 ### 5.11 KPI tile and key-value
 - `KpiTile`: Card compact; label 12/16 secondary, value 24/32 700 tabular-nums, optional 12 secondary delta/subtext; equal heights; 16 icon top-right in `--color-primary` on `--color-primary-bg` 32x32 radius 8 (optional).

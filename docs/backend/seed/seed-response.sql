@@ -1,20 +1,20 @@
--- C48 Response service — SYNTHETIC DEMO SEED (catalogs, region boundaries, campaigns, teams, requests, missions, notices).
+-- C48 Response service — SYNTHETIC DEMO SEED (catalogs, campaigns, teams, requests, missions, notices).
 -- Target: an EMPTY database that already has docs/backend/schema/response.sql applied (PostgreSQL 16+ / PostGIS 3).
 -- Load:   psql -v ON_ERROR_STOP=1 -f seed-response.sql          (single transaction; assertions at the end abort it on mismatch)
 --
--- Response has no FK to Identity, so user / organization / region ids are opaque uuids matching seed-identity.sql:
+-- Response has no FK to Identity, so user / organization ids are opaque uuids matching seed-identity.sql:
 --   ORG_COORD 00000000-0000-4000-8000-000000000001   ORG_VOLUNTEER ...000000000002
 --   CAMPAIGN_ACTIVE ...0000c1/2; expansion campaigns ...0000c3..c8 (see seed-campaigns.sql)
 --   users ...000101 .. ...000118 (see seed-identity.sql and seed-expansion-identity.sql)
 -- All people, phones (0900000xxx), hashes and call-signs are fictional. received_at / captured_at are relative to now().
 --
 -- Scenario map (request id suffix -> short name):
---   f1 R1  guest SELF, UNKNOWN category, no phone/headcount/description, GPS in DEMO_A, SUBMITTED, has tracking_secret_hash
+--   f1 R1  guest SELF, UNKNOWN category, no phone/headcount/description, GPS near Demo A, SUBMITTED, has tracking_secret_hash
 --   f2 R2  PROXY by citizen1, VERIFYING, alternate contact, 2 NO_ANSWER attempts (aged: overdue)
 --   f3 R3  VERIFIED (CONTACT_CONFIRMED), campaign-linked          f4 R4  DUPLICATE of R3
 --   f5 R5  IN_PROGRESS P2, Logistics-admitted, ACCEPTED mission team 1 (+ earlier FAILED team B mission with EN_ROUTE history)
 --   f6 R6  P1 trapped-person report: declared danger, children + elderly, rescue + supplies, Gemini suggestion pending review
---   f7 R7  unassigned: region NULL, point lon 105.0 lat 21.0 (deliberately outside DEMO_A and DEMO_B boundaries)
+--   f7 R7  point lon 105.0 lat 21.0 (deliberately away from the demo team positions)
 --   f8 R8  RATE_LIMITED_REVIEW lane        f9 R9  declared danger, SUBMITTED, 45 min old (overdue)
 --   fa R10 REJECTED with reason            fb R11 PROXY in PROXY_QUOTA_REVIEW lane
 --   fc R12 RESOLVED, COMPLETED mission with outcome_note, logistics_admitted_at NULL and NULL seal ("rescue only")
@@ -47,18 +47,18 @@ ON CONFLICT DO NOTHING;
 -- @include demo campaigns
 
 -- ---------- teams ----------
-INSERT INTO rescue_team (id, organization_id, operating_region_code, name, team_kind, reporting_mode, external_contact_note,
+INSERT INTO rescue_team (id, organization_id, name, team_kind, reporting_mode, external_contact_note,
                          readiness_required, affiliation_verified_at, affiliation_verified_by, availability, created_at) VALUES
-  (pg_temp.u('a1'), pg_temp.u('2'), 'DEMO_A', 'Đội xuồng cứu hộ 1',            'VOLUNTEER',  'APP',         NULL, false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE',   now() - interval '6 days'),
-  (pg_temp.u('a2'), pg_temp.u('2'), 'DEMO_A', 'Đội y tế lưu động',             'VOLUNTEER',  'APP',         NULL, false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE',   now() - interval '6 days'),
-  (pg_temp.u('a3'), pg_temp.u('1'), 'DEMO_A', 'Đại đội cơ động (demo)',        'MILITARY',   'COORDINATOR', 'Liên lạc qua bộ đàm, hô hiệu DEMO-ALPHA (giả lập); tần số do điều phối viên giữ.', false, now() - interval '4 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '5 days'),
-  (pg_temp.u('a4'), pg_temp.u('1'), 'DEMO_A', 'Đội cứu hỏa - cứu nạn (demo)',  'GOVERNMENT', 'COORDINATOR', 'Liên hệ trực ban qua số nội bộ 0900000900 (giả lập).', false, now() - interval '4 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '5 days'),
+  (pg_temp.u('a1'), pg_temp.u('2'), 'Đội xuồng cứu hộ 1',            'VOLUNTEER',  'APP',         NULL, false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE',   now() - interval '6 days'),
+  (pg_temp.u('a2'), pg_temp.u('2'), 'Đội y tế lưu động',             'VOLUNTEER',  'APP',         NULL, false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE',   now() - interval '6 days'),
+  (pg_temp.u('a3'), pg_temp.u('1'), 'Đại đội cơ động (demo)',        'MILITARY',   'COORDINATOR', 'Liên lạc qua bộ đàm, hô hiệu DEMO-ALPHA (giả lập); tần số do điều phối viên giữ.', false, now() - interval '4 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '5 days'),
+  (pg_temp.u('a4'), pg_temp.u('1'), 'Đội cứu hỏa - cứu nạn (demo)',  'GOVERNMENT', 'COORDINATOR', 'Liên hệ trực ban qua số nội bộ 0900000900 (giả lập).', false, now() - interval '4 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '5 days'),
   -- readiness latch example: not yet verified and flagged UNAVAILABLE until a leader and affiliation are confirmed
-  (pg_temp.u('a5'), pg_temp.u('2'), 'DEMO_A', 'Đội tình nguyện dự bị',         'VOLUNTEER',  'APP',         NULL, true,  NULL, NULL, 'UNAVAILABLE', now() - interval '1 day'),
+  (pg_temp.u('a5'), pg_temp.u('2'), 'Đội tình nguyện dự bị',         'VOLUNTEER',  'APP',         NULL, true,  NULL, NULL, 'UNAVAILABLE', now() - interval '1 day'),
   -- Candidate workload example: team B has two recent missions at 3 km; C is free at 4 km; D is free at 10 km.
-  (pg_temp.u('a6'), pg_temp.u('1'), 'DEMO_A', 'Đội cơ động B (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập B.', false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '6 days'),
-  (pg_temp.u('a7'), pg_temp.u('1'), 'DEMO_A', 'Đội cơ động C (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập C.', false, now() - interval '3 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '4 days'),
-  (pg_temp.u('a8'), pg_temp.u('1'), 'DEMO_A', 'Đội cơ động D (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập D.', false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '6 days')
+  (pg_temp.u('a6'), pg_temp.u('1'), 'Đội cơ động B (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập B.', false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '6 days'),
+  (pg_temp.u('a7'), pg_temp.u('1'), 'Đội cơ động C (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập C.', false, now() - interval '3 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '4 days'),
+  (pg_temp.u('a8'), pg_temp.u('1'), 'Đội cơ động D (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập D.', false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '6 days')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO team_member (team_id, user_id, member_role) VALUES
@@ -84,90 +84,90 @@ ON CONFLICT DO NOTHING;
 
 -- ---------- requests (snapshot pointer is set after the snapshot events exist) ----------
 -- R1 guest SELF, as little information as possible
-INSERT INTO assistance_request (id, tracking_code, tracking_secret_hash, incident_category_code, report_mode, organization_id, region_code,
+INSERT INTO assistance_request (id, tracking_code, tracking_secret_hash, incident_category_code, report_mode, organization_id,
                                 status, review_lane, received_at) VALUES
   (pg_temp.u('f1'), 'C48DEM0001', 'demo$sha256$0000000000000000000000000000000000000000000000000000000000000001',
-   'UNKNOWN', 'SELF', pg_temp.u('1'), 'DEMO_A', 'SUBMITTED', 'NORMAL', now() - interval '5 minutes');
+   'UNKNOWN', 'SELF', pg_temp.u('1'), 'SUBMITTED', 'NORMAL', now() - interval '5 minutes');
 
 -- R2 PROXY by citizen1, VERIFYING (verifying_since older than the 15 min threshold)
 INSERT INTO assistance_request (id, tracking_code, incident_category_code, report_mode, reporter_user_id, reporter_name, reporter_contact_phone,
-                                description, organization_id, region_code, status, verifying_since, received_at) VALUES
+                                description, organization_id, status, verifying_since, received_at) VALUES
   (pg_temp.u('f2'), 'C48DEM0002', 'FLOOD', 'PROXY', pg_temp.u('10f'), 'Người dân 1 (demo)', '0900000002',
-   'Báo hộ người thân lớn tuổi sống một mình, nước dâng quá thắt lưng.', pg_temp.u('1'), 'DEMO_A', 'VERIFYING',
+   'Báo hộ người thân lớn tuổi sống một mình, nước dâng quá thắt lưng.', pg_temp.u('1'), 'VERIFYING',
    now() - interval '90 minutes', now() - interval '2 hours');
 
 -- R3 VERIFIED, campaign-linked
 INSERT INTO assistance_request (id, tracking_code, campaign_id, incident_category_code, report_mode, reporter_user_id, reporter_name, reporter_contact_phone,
-                                description, organization_id, region_code, status, received_at) VALUES
+                                description, organization_id, status, received_at) VALUES
   (pg_temp.u('f3'), 'C48DEM0003', pg_temp.u('c1'), 'FLOOD', 'SELF', pg_temp.u('110'), 'Người dân 2 (demo)', '0900000003',
-   'Nước ngập tầng trệt, còn 4 người trong nhà.', pg_temp.u('1'), 'DEMO_A', 'VERIFIED', now() - interval '3 hours');
+   'Nước ngập tầng trệt, còn 4 người trong nhà.', pg_temp.u('1'), 'VERIFIED', now() - interval '3 hours');
 
 -- R4 duplicate of R3
 INSERT INTO assistance_request (id, tracking_code, incident_category_code, canonical_request_id, report_mode, reporter_contact_phone,
-                                description, organization_id, region_code, status, received_at) VALUES
+                                description, organization_id, status, received_at) VALUES
   (pg_temp.u('f4'), 'C48DEM0004', 'FLOOD', pg_temp.u('f3'), 'SELF', '0900000004',
-   'Cùng địa chỉ với báo cáo trước, gọi lại vì lo lắng.', pg_temp.u('1'), 'DEMO_A', 'DUPLICATE', now() - interval '150 minutes');
+   'Cùng địa chỉ với báo cáo trước, gọi lại vì lo lắng.', pg_temp.u('1'), 'DUPLICATE', now() - interval '150 minutes');
 
 -- R5 IN_PROGRESS, admitted by Logistics, campaign-linked (the request Logistics links to)
 INSERT INTO assistance_request (id, tracking_code, campaign_id, incident_category_code, report_mode, reporter_user_id, reporter_name, reporter_contact_phone,
-                                description, organization_id, region_code, status, priority, priority_basis, work_cycle,
+                                description, organization_id, status, priority, priority_basis, work_cycle,
                                 attribution_locked_at, logistics_admitted_at, received_at, version) VALUES
   (pg_temp.u('f5'), 'C48DEM0005', pg_temp.u('c1'), 'TRAPPED', 'SELF', pg_temp.u('10f'), 'Người dân 1 (demo)', '0900000005',
-   'Gia đình 5 người mắc kẹt trên mái nhà, cần xuồng và nhu yếu phẩm.', pg_temp.u('1'), 'DEMO_A', 'IN_PROGRESS', 'P2', 'COMPLETE', 1,
+   'Gia đình 5 người mắc kẹt trên mái nhà, cần xuồng và nhu yếu phẩm.', pg_temp.u('1'), 'IN_PROGRESS', 'P2', 'COMPLETE', 1,
    now() - interval '5 hours', now() - interval '4 hours', now() - interval '6 hours', 6);
 
 -- R6 P1 with an OFFERED mission (DISPATCHED)
 INSERT INTO assistance_request (id, tracking_code, incident_category_code, report_mode, reporter_user_id, reporter_name, reporter_contact_phone,
-                                description, organization_id, region_code, status, priority, priority_basis, reporter_declared_danger,
+                                description, organization_id, status, priority, priority_basis, reporter_declared_danger,
                                 attribution_locked_at, received_at, version) VALUES
   (pg_temp.u('f6'), 'C48DEM0006', 'TRAPPED', 'SELF', pg_temp.u('110'), 'Người dân 2 (demo)', '0900000006',
-   'Có người già và trẻ nhỏ bị mắc kẹt, nước đang lên nhanh.', pg_temp.u('1'), 'DEMO_A', 'DISPATCHED', 'P1', 'COMPLETE', true,
+   'Có người già và trẻ nhỏ bị mắc kẹt, nước đang lên nhanh.', pg_temp.u('1'), 'DISPATCHED', 'P1', 'COMPLETE', true,
    now() - interval '50 minutes', now() - interval '2 hours', 5);
 
--- R7 unassigned region, location outside every boundary
+-- R7 location away from the demo team positions
 INSERT INTO assistance_request (id, tracking_code, incident_category_code, report_mode, reporter_contact_phone, description,
-                                organization_id, region_code, status, received_at) VALUES
-  (pg_temp.u('f7'), 'C48DEM0007', 'OTHER', 'SELF', '0900000007', 'Vị trí nằm ngoài các khu vực đã cấu hình, cần điều phối viên gán khu vực.',
-   pg_temp.u('1'), NULL, 'SUBMITTED', now() - interval '8 minutes');
+                                organization_id, status, received_at) VALUES
+  (pg_temp.u('f7'), 'C48DEM0007', 'OTHER', 'SELF', '0900000007', 'Vị trí cần điều phối viên xác minh thêm.',
+   pg_temp.u('1'), 'SUBMITTED', now() - interval '8 minutes');
 
 -- R8 rate-limited review lane (guest, repeated submissions from one source)
 INSERT INTO assistance_request (id, tracking_code, incident_category_code, report_mode, reporter_contact_phone, source_ip_hash, description,
-                                organization_id, region_code, status, review_lane, received_at) VALUES
+                                organization_id, status, review_lane, received_at) VALUES
   (pg_temp.u('f8'), 'C48DEM0008', 'UNKNOWN', 'SELF', '0900000008', 'demo-ip-hash-0001', 'Nhiều báo cáo liên tiếp từ cùng một nguồn.',
-   pg_temp.u('1'), 'DEMO_A', 'SUBMITTED', 'RATE_LIMITED_REVIEW', now() - interval '12 minutes');
+   pg_temp.u('1'), 'SUBMITTED', 'RATE_LIMITED_REVIEW', now() - interval '12 minutes');
 
 -- R9 declared danger, SUBMITTED, aged 45 minutes
 INSERT INTO assistance_request (id, tracking_code, incident_category_code, report_mode, reporter_contact_phone, description,
-                                organization_id, region_code, status, reporter_declared_danger, received_at) VALUES
+                                organization_id, status, reporter_declared_danger, received_at) VALUES
   (pg_temp.u('f9'), 'C48DEM0009', 'FIRE', 'SELF', '0900000009', 'Cháy lan nhanh gần khu dân cư, người báo cho biết đang gặp nguy hiểm.',
-   pg_temp.u('1'), 'DEMO_A', 'SUBMITTED', true, now() - interval '45 minutes');
+   pg_temp.u('1'), 'SUBMITTED', true, now() - interval '45 minutes');
 
 -- R10 REJECTED with reason
 INSERT INTO assistance_request (id, tracking_code, incident_category_code, report_mode, reporter_contact_phone, description,
-                                organization_id, region_code, status, received_at) VALUES
+                                organization_id, status, received_at) VALUES
   (pg_temp.u('fa'), 'C48DEM0010', 'OTHER', 'SELF', '0900000010', 'Nội dung thử nghiệm, không có sự cố.',
-   pg_temp.u('1'), 'DEMO_A', 'REJECTED', now() - interval '1 day');
+   pg_temp.u('1'), 'REJECTED', now() - interval '1 day');
 
 -- R11 PROXY report held in the proxy quota review lane
 INSERT INTO assistance_request (id, tracking_code, incident_category_code, report_mode, reporter_user_id, reporter_name, reporter_contact_phone,
-                                description, organization_id, region_code, status, review_lane, received_at) VALUES
+                                description, organization_id, status, review_lane, received_at) VALUES
   (pg_temp.u('fb'), 'C48DEM0011', 'SUPPLY_SHORTAGE', 'PROXY', pg_temp.u('110'), 'Người dân 2 (demo)', '0900000011',
-   'Báo hộ nhiều hộ trong cùng một xóm, vượt hạn mức báo hộ.', pg_temp.u('1'), 'DEMO_A', 'SUBMITTED', 'PROXY_QUOTA_REVIEW',
+   'Báo hộ nhiều hộ trong cùng một xóm, vượt hạn mức báo hộ.', pg_temp.u('1'), 'SUBMITTED', 'PROXY_QUOTA_REVIEW',
    now() - interval '20 minutes');
 
 -- R12 RESOLVED rescue-only: Logistics never admitted it => no seal (resolved_pair CHECK allows NULL seal only then)
 INSERT INTO assistance_request (id, tracking_code, incident_category_code, report_mode, reporter_user_id, reporter_name, reporter_contact_phone,
-                                description, organization_id, region_code, status, priority, priority_basis, work_cycle,
+                                description, organization_id, status, priority, priority_basis, work_cycle,
                                 attribution_locked_at, logistics_admitted_at, resolution_seal_id, resolved_at, received_at, version) VALUES
   (pg_temp.u('fc'), 'C48DEM0012', 'MEDICAL', 'SELF', pg_temp.u('10f'), 'Người dân 1 (demo)', '0900000012',
-   'Người bị thương nhẹ cần sơ cứu và đưa đến trạm y tế.', pg_temp.u('1'), 'DEMO_A', 'RESOLVED', 'P3', 'COMPLETE', 1,
+   'Người bị thương nhẹ cần sơ cứu và đưa đến trạm y tế.', pg_temp.u('1'), 'RESOLVED', 'P3', 'COMPLETE', 1,
    now() - interval '20 hours', NULL, NULL, now() - interval '18 hours', now() - interval '22 hours', 8);
 
 -- R13 TRIAGED, no mission yet
 INSERT INTO assistance_request (id, tracking_code, incident_category_code, report_mode, reporter_contact_phone, description,
-                                organization_id, region_code, status, priority, priority_basis, received_at, version) VALUES
+                                organization_id, status, priority, priority_basis, received_at, version) VALUES
   (pg_temp.u('fd'), 'C48DEM0013', 'LANDSLIDE', 'SELF', '0900000013', 'Sạt lở nhẹ chặn lối vào nhà, chưa có người bị thương.',
-   pg_temp.u('1'), 'DEMO_A', 'TRIAGED', 'P3', 'INCOMPLETE_INFO', now() - interval '3 hours', 4);
+   pg_temp.u('1'), 'TRIAGED', 'P3', 'INCOMPLETE_INFO', now() - interval '3 hours', 4);
 
 -- ---------- request subjects ----------
 INSERT INTO request_subject (request_id, people_affected, location, location_source, location_accuracy_m, location_captured_at,
@@ -230,12 +230,12 @@ INSERT INTO request_event (id, request_id, actor_user_id, event_type, visibility
   (pg_temp.u('e202'), pg_temp.u('f2'), pg_temp.u('106'),   'VERIFICATION_STARTED', 'REPORTER', 'SUBMITTED', 'VERIFYING', NULL, '{"public_text_code":"VERIFYING"}', now() - interval '90 minutes'),
   (pg_temp.u('e301'), pg_temp.u('f3'), pg_temp.u('110'),   'REQUEST_SUBMITTED', 'REPORTER', NULL, 'SUBMITTED', NULL, '{"public_text_code":"RECEIVED"}', now() - interval '3 hours'),
   (pg_temp.u('e302'), pg_temp.u('f3'), pg_temp.u('108'),   'VERIFICATION_APPROVED', 'REPORTER', 'VERIFYING', 'VERIFIED', NULL,
-     '{"public_text_code":"VERIFIED","snapshot":{"incident_category_code":"FLOOD","people_affected":4,"region_code":"DEMO_A"}}', now() - interval '170 minutes'),
+     '{"public_text_code":"VERIFIED","snapshot":{"incident_category_code":"FLOOD","people_affected":4}}', now() - interval '170 minutes'),
   (pg_temp.u('e401'), pg_temp.u('f4'), NULL,               'REQUEST_SUBMITTED', 'REPORTER', NULL, 'SUBMITTED', NULL, '{"public_text_code":"RECEIVED"}', now() - interval '150 minutes'),
   (pg_temp.u('e402'), pg_temp.u('f4'), pg_temp.u('108'),   'MARKED_DUPLICATE', 'REPORTER', 'SUBMITTED', 'DUPLICATE', 'Trùng với báo cáo C48DEM0003.', '{"public_text_code":"DUPLICATE"}', now() - interval '140 minutes'),
   (pg_temp.u('e501'), pg_temp.u('f5'), pg_temp.u('10f'),   'REQUEST_SUBMITTED', 'REPORTER', NULL, 'SUBMITTED', NULL, '{"public_text_code":"RECEIVED"}', now() - interval '6 hours'),
   (pg_temp.u('e502'), pg_temp.u('f5'), pg_temp.u('108'),   'VERIFICATION_APPROVED', 'REPORTER', 'VERIFYING', 'VERIFIED', NULL,
-     '{"public_text_code":"VERIFIED","snapshot":{"incident_category_code":"TRAPPED","people_affected":5,"region_code":"DEMO_A"}}', now() - interval '330 minutes'),
+     '{"public_text_code":"VERIFIED","snapshot":{"incident_category_code":"TRAPPED","people_affected":5}}', now() - interval '330 minutes'),
   (pg_temp.u('e503'), pg_temp.u('f5'), pg_temp.u('102'),   'TRIAGED', 'STAFF', 'VERIFIED', 'TRIAGED', 'Ưu tiên P2: có trẻ nhỏ, nước đang rút chậm.', '{"priority":"P2"}', now() - interval '320 minutes'),
   (pg_temp.u('e504'), pg_temp.u('f5'), pg_temp.u('102'),   'MISSION_OFFERED', 'STAFF', 'TRIAGED', 'DISPATCHED', NULL, '{"mission_id":"00000000-0000-4000-8000-0000000000b2","team_id":"00000000-0000-4000-8000-0000000000a6"}', now() - interval '300 minutes'),
   (pg_temp.u('e505'), pg_temp.u('f5'), pg_temp.u('102'),   'MISSION_EN_ROUTE', 'REPORTER', 'DISPATCHED', 'IN_PROGRESS', NULL, '{"public_text_code":"TEAM_EN_ROUTE","mission_id":"00000000-0000-4000-8000-0000000000b2"}', now() - interval '280 minutes'),
@@ -245,7 +245,7 @@ INSERT INTO request_event (id, request_id, actor_user_id, event_type, visibility
   (pg_temp.u('e509'), pg_temp.u('f5'), pg_temp.u('10c'),   'MISSION_ACCEPTED', 'REPORTER', 'DISPATCHED', 'IN_PROGRESS', NULL, '{"public_text_code":"TEAM_ASSIGNED","mission_id":"00000000-0000-4000-8000-0000000000b1"}', now() - interval '220 minutes'),
   (pg_temp.u('e601'), pg_temp.u('f6'), pg_temp.u('110'),   'REQUEST_SUBMITTED', 'REPORTER', NULL, 'SUBMITTED', NULL, '{"public_text_code":"RECEIVED"}', now() - interval '2 hours'),
   (pg_temp.u('e602'), pg_temp.u('f6'), pg_temp.u('108'),   'VERIFICATION_APPROVED', 'REPORTER', 'VERIFYING', 'VERIFIED', NULL,
-     '{"public_text_code":"VERIFIED","snapshot":{"incident_category_code":"TRAPPED","people_affected":3,"region_code":"DEMO_A"}}', now() - interval '100 minutes'),
+     '{"public_text_code":"VERIFIED","snapshot":{"incident_category_code":"TRAPPED","people_affected":3}}', now() - interval '100 minutes'),
   (pg_temp.u('e603'), pg_temp.u('f6'), pg_temp.u('102'),   'TRIAGED', 'STAFF', 'VERIFIED', 'TRIAGED', 'Ưu tiên P1: nguy hiểm đến tính mạng.', '{"priority":"P1"}', now() - interval '60 minutes'),
   (pg_temp.u('e604'), pg_temp.u('f6'), pg_temp.u('102'),   'MISSION_OFFERED', 'STAFF', 'TRIAGED', 'DISPATCHED', NULL, '{"mission_id":"00000000-0000-4000-8000-0000000000b3","team_id":"00000000-0000-4000-8000-0000000000a3"}', now() - interval '50 minutes'),
   (pg_temp.u('e701'), pg_temp.u('f7'), NULL,               'REQUEST_SUBMITTED', 'REPORTER', NULL, 'SUBMITTED', NULL, '{"public_text_code":"RECEIVED"}', now() - interval '8 minutes'),
@@ -256,14 +256,14 @@ INSERT INTO request_event (id, request_id, actor_user_id, event_type, visibility
   (pg_temp.u('eb01'), pg_temp.u('fb'), pg_temp.u('110'),   'REQUEST_SUBMITTED', 'REPORTER', NULL, 'SUBMITTED', NULL, '{"public_text_code":"RECEIVED"}', now() - interval '20 minutes'),
   (pg_temp.u('ec01'), pg_temp.u('fc'), pg_temp.u('10f'),   'REQUEST_SUBMITTED', 'REPORTER', NULL, 'SUBMITTED', NULL, '{"public_text_code":"RECEIVED"}', now() - interval '22 hours'),
   (pg_temp.u('ec02'), pg_temp.u('fc'), pg_temp.u('109'),   'VERIFICATION_APPROVED', 'REPORTER', 'VERIFYING', 'VERIFIED', NULL,
-     '{"public_text_code":"VERIFIED","snapshot":{"incident_category_code":"MEDICAL","people_affected":1,"region_code":"DEMO_A"}}', now() - interval '21 hours'),
+     '{"public_text_code":"VERIFIED","snapshot":{"incident_category_code":"MEDICAL","people_affected":1}}', now() - interval '21 hours'),
   (pg_temp.u('ec03'), pg_temp.u('fc'), pg_temp.u('103'),   'TRIAGED', 'STAFF', 'VERIFIED', 'TRIAGED', NULL, '{"priority":"P3"}', now() - interval '20 hours'),
   (pg_temp.u('ec04'), pg_temp.u('fc'), pg_temp.u('103'),   'MISSION_OFFERED', 'STAFF', 'TRIAGED', 'DISPATCHED', NULL, '{"mission_id":"00000000-0000-4000-8000-0000000000b4"}', now() - interval '20 hours'),
   (pg_temp.u('ec05'), pg_temp.u('fc'), pg_temp.u('103'),   'MISSION_ACCEPTED', 'REPORTER', 'DISPATCHED', 'IN_PROGRESS', NULL, '{"public_text_code":"TEAM_ASSIGNED"}', now() - interval '19 hours'),
   (pg_temp.u('ec06'), pg_temp.u('fc'), pg_temp.u('103'),   'REQUEST_RESOLVED', 'REPORTER', 'IN_PROGRESS', 'RESOLVED', 'Đã sơ cứu và bàn giao trạm y tế.', '{"public_text_code":"RESOLVED"}', now() - interval '18 hours'),
   (pg_temp.u('ed01'), pg_temp.u('fd'), NULL,               'REQUEST_SUBMITTED', 'REPORTER', NULL, 'SUBMITTED', NULL, '{"public_text_code":"RECEIVED"}', now() - interval '3 hours'),
   (pg_temp.u('ed02'), pg_temp.u('fd'), pg_temp.u('108'),   'VERIFICATION_APPROVED', 'REPORTER', 'VERIFYING', 'VERIFIED', NULL,
-     '{"public_text_code":"VERIFIED","snapshot":{"incident_category_code":"LANDSLIDE","people_affected":2,"region_code":"DEMO_A"}}', now() - interval '170 minutes'),
+     '{"public_text_code":"VERIFIED","snapshot":{"incident_category_code":"LANDSLIDE","people_affected":2}}', now() - interval '170 minutes'),
   (pg_temp.u('ed03'), pg_temp.u('fd'), pg_temp.u('102'),   'TRIAGED', 'STAFF', 'VERIFIED', 'TRIAGED', 'Thông tin còn thiếu, ưu tiên tạm thời P3.', '{"priority":"P3"}', now() - interval '160 minutes');
 
 -- approved snapshot pointers (same-request FK)
@@ -368,7 +368,7 @@ SELECT pg_temp.must('one request per non-NORMAL lane',
   AND (SELECT count(*) FROM assistance_request WHERE review_lane = 'PROXY_QUOTA_REVIEW') = 1);
 SELECT pg_temp.must('R1 minimal guest report',
   (SELECT reporter_user_id IS NULL AND reporter_contact_phone IS NULL AND description IS NULL AND tracking_secret_hash IS NOT NULL
-          AND incident_category_code = 'UNKNOWN' AND region_code = 'DEMO_A' FROM assistance_request WHERE id = pg_temp.u('f1'))
+          AND incident_category_code = 'UNKNOWN' FROM assistance_request WHERE id = pg_temp.u('f1'))
   AND (SELECT people_affected IS NULL FROM request_subject WHERE request_id = pg_temp.u('f1')));
 SELECT pg_temp.must('R2 proxy verifying with 2 NO_ANSWER attempts and alternate contact',
   (SELECT report_mode = 'PROXY' AND status = 'VERIFYING' FROM assistance_request WHERE id = pg_temp.u('f2'))
@@ -380,7 +380,7 @@ SELECT pg_temp.must('R3 verified with CONTACT_CONFIRMED and snapshot',
 SELECT pg_temp.must('R4 duplicate of R3', (SELECT canonical_request_id = pg_temp.u('f3') AND status = 'DUPLICATE' FROM assistance_request WHERE id = pg_temp.u('f4')));
 SELECT pg_temp.must('R5 in progress, admitted, accepted mission for team 1, campaign-linked',
   (SELECT status = 'IN_PROGRESS' AND work_cycle = 1 AND attribution_locked_at IS NOT NULL AND logistics_admitted_at IS NOT NULL
-          AND campaign_id = pg_temp.u('c1') AND region_code = 'DEMO_A' AND resolution_seal_id IS NULL FROM assistance_request WHERE id = pg_temp.u('f5'))
+          AND campaign_id = pg_temp.u('c1') AND resolution_seal_id IS NULL FROM assistance_request WHERE id = pg_temp.u('f5'))
   AND EXISTS (SELECT 1 FROM mission m JOIN request_event e ON e.id = m.verification_revision AND e.request_id = m.request_id
               WHERE m.request_id = pg_temp.u('f5') AND m.team_id = pg_temp.u('a1') AND m.status = 'ACCEPTED')
   AND EXISTS (SELECT 1 FROM mission_event WHERE to_status = 'EN_ROUTE' AND mission_id IN (SELECT id FROM mission WHERE request_id = pg_temp.u('f5'))));
@@ -388,9 +388,8 @@ SELECT pg_temp.must('R6 P1 with OFFERED mission to a COORDINATOR-mode military t
   (SELECT priority = 'P1' FROM assistance_request WHERE id = pg_temp.u('f6'))
   AND EXISTS (SELECT 1 FROM mission m JOIN rescue_team t ON t.id = m.team_id
               WHERE m.request_id = pg_temp.u('f6') AND m.status = 'OFFERED' AND t.reporting_mode = 'COORDINATOR' AND t.team_kind = 'MILITARY'));
-SELECT pg_temp.must('R7 unassigned and outside every boundary',
-  (SELECT region_code IS NULL FROM assistance_request WHERE id = pg_temp.u('f7'))
-  AND NOT EXISTS (SELECT 1 FROM region_boundary b, request_subject s WHERE s.request_id = pg_temp.u('f7') AND ST_Intersects(b.geom, s.location::geometry)));
+SELECT pg_temp.must('R7 SUBMITTED without a team',
+  (SELECT status = 'SUBMITTED' FROM assistance_request WHERE id = pg_temp.u('f7')));
 SELECT pg_temp.must('R9 declared danger SUBMITTED older than 20 minutes',
   (SELECT reporter_declared_danger AND status = 'SUBMITTED' AND received_at < now() - interval '20 minutes' FROM assistance_request WHERE id = pg_temp.u('f9')));
 SELECT pg_temp.must('R10 rejected with reason',
@@ -424,9 +423,8 @@ SELECT pg_temp.must('P3 comparison: B is 3 km with 2 recent missions, C is 4 km 
   AND (SELECT count(*) FROM mission_event WHERE id IN (pg_temp.u('1b22'), pg_temp.u('1b23'), pg_temp.u('1b24'),
                                                         pg_temp.u('1b42'), pg_temp.u('1b43'), pg_temp.u('1b44'), pg_temp.u('1b45'))
        AND recorded_basis = 'RADIO' AND reported_by IS NOT NULL) = 7);
-SELECT pg_temp.must('regions do not overlap and 9 categories / 5 skills / 4 category-skill links',
-  NOT EXISTS (SELECT 1 FROM region_boundary a JOIN region_boundary b ON a.region_code < b.region_code WHERE ST_Intersects(a.geom, b.geom))
-  AND (SELECT count(*) FROM incident_category) = 9 AND (SELECT count(*) FROM skill) = 5 AND (SELECT count(*) FROM incident_category_skill) = 4);
+SELECT pg_temp.must('9 categories / 5 skills / 4 category-skill links',
+  (SELECT count(*) FROM incident_category) = 9 AND (SELECT count(*) FROM skill) = 5 AND (SELECT count(*) FROM incident_category_skill) = 4);
 SELECT pg_temp.must('6 active campaigns; 3 notices for coord1',
   (SELECT count(*) FROM campaign WHERE status = 'ACTIVE') = 6
   AND (SELECT count(*) FROM notice WHERE recipient_user_id = pg_temp.u('102')) = 3

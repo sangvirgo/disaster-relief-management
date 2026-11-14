@@ -19,7 +19,6 @@ interface RequestRow {
   version: number;
   work_cycle: number;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
   reporter_user_id: string | null;
   logistics_admitted_at: Date | string | null;
@@ -37,7 +36,6 @@ interface InternalOperation {
   work_cycle: number;
   request_status: string;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
   outcome_basis: ResolutionOutcomeBasis | null;
   version: number;
@@ -70,7 +68,7 @@ export class RequestResolutionService {
     }
     const reason = cleanText(dto.resolution_reason, true)!;
     const preflightRows = await this.dataSource.query(
-      `SELECT id,status,version,work_cycle,organization_id,region_code,campaign_id,reporter_user_id,logistics_admitted_at
+      `SELECT id,status,version,work_cycle,organization_id,campaign_id,reporter_user_id,logistics_admitted_at
          FROM assistance_request WHERE id=$1`, [requestId],
     ) as RequestRow[];
     const preflight = preflightRows[0];
@@ -110,7 +108,7 @@ export class RequestResolutionService {
     const session = await this.sessions.require(request);
     const rows = await this.dataSource.query(
       `SELECT i.id,i.kind,i.state,i.request_id,i.work_cycle,i.version,r.status AS request_status,
-              r.organization_id,r.region_code,r.campaign_id
+              r.organization_id,r.campaign_id
          FROM resolution_intent i JOIN assistance_request r ON r.id=i.request_id WHERE i.id=$1`, [operationId],
     ) as InternalOperation[];
     const row = rows[0];
@@ -123,7 +121,7 @@ export class RequestResolutionService {
   async internalOperation(intentId: string): Promise<Record<string, unknown>> {
     const rows = await this.dataSource.query(
       `SELECT i.id,i.kind,i.state,i.request_id,i.work_cycle,i.version,r.status AS request_status,
-              r.organization_id,r.region_code,r.campaign_id,
+              r.organization_id,r.campaign_id,
               (SELECT e.payload->>'outcome_basis' FROM request_event e
                 WHERE e.request_id=i.request_id AND e.event_type='RESOLUTION_INTENT_CREATED'
                   AND e.payload->>'intent_id'=i.id::text ORDER BY e.occurred_at DESC,e.id DESC LIMIT 1) AS outcome_basis
@@ -139,7 +137,6 @@ export class RequestResolutionService {
       work_cycle: Number(row.work_cycle),
       request_status: row.request_status,
       organization_id: row.organization_id,
-      region_code: row.region_code,
       campaign_id: row.campaign_id,
       outcome_basis: row.outcome_basis,
     };
@@ -155,7 +152,7 @@ export class RequestResolutionService {
     session: ReporterSession,
   ): Promise<IdempotentOutcome<Record<string, unknown>>> {
     const rows = await manager.query(
-      `SELECT id,status,version,work_cycle,organization_id,region_code,campaign_id,reporter_user_id,logistics_admitted_at
+      `SELECT id,status,version,work_cycle,organization_id,campaign_id,reporter_user_id,logistics_admitted_at
          FROM assistance_request WHERE id=$1 FOR UPDATE`, [requestId],
     ) as RequestRow[];
     const row = rows[0];

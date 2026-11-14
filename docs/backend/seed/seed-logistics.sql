@@ -4,7 +4,7 @@
 -- All data is synthetic: no real people, phones are 0900000xxx, hashes are placeholders. Stock is created only by stock_movement inserts
 -- (the apply_stock_movement trigger updates balances); balances are pre-inserted at zero. No trigger is disabled.
 -- Cross-service ids (fixed, shared with seed-identity.sql / seed-response.sql):
---   ORG_COORD 00000000-0000-4000-8000-000000000001   CAMPAIGN_ACTIVE ...0000000000c1   REQUEST_AID ...0000000000f5 (work_cycle 1, region DEMO_A)
+--   ORG_COORD 00000000-0000-4000-8000-000000000001   CAMPAIGN_ACTIVE ...0000000000c1   REQUEST_AID ...0000000000f5 (work_cycle 1)
 --   users: coord1 ...102, campaign_mgr ...104, ops_mgr ...105, intake1 ...106, intake2 ...107, reviewer1 ...108, reviewer2 ...109,
 --          dist1 ...10a, dist2 ...10b, vol_leader1 ...10c
 -- Local ids use the prefix 00000000-0000-4000-8000-0000000 + a 5-hex suffix (a1xxx items, a2xxx warehouses, a3xxx points, a4xxx vehicles,
@@ -36,23 +36,23 @@ INSERT INTO item (id, item_type_code, unit_code, name) VALUES
   ('00000000-0000-4000-8000-0000000a1008', 'CHAN_MEN',   'CAI',   'Màn chống muỗi');
 
 -- ---------- assets ----------
-INSERT INTO warehouse (id, organization_id, region_code, name, address_note, location, location_public) VALUES
-  ('00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-000000000001', 'DEMO_A', 'Kho trung tâm Demo A',
-   'Số 10 đường Mẫu, khu vực Demo A (dữ liệu giả lập)', ST_GeogFromText('SRID=4326;POINT(106.6300 10.8200)'), true),
-  ('00000000-0000-4000-8000-0000000a2002', '00000000-0000-4000-8000-000000000001', 'DEMO_B', 'Kho khu vực Demo B',
-   'Số 25 đường Thử nghiệm, khu vực Demo B (dữ liệu giả lập)', ST_GeogFromText('SRID=4326;POINT(108.2000 16.0700)'), false);
+INSERT INTO warehouse (id, organization_id, name, address_note, location, location_public) VALUES
+  ('00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-000000000001', 'Kho trung tâm Demo A',
+   'Số 10 đường Mẫu, Demo A (dữ liệu giả lập)', ST_GeogFromText('SRID=4326;POINT(106.6300 10.8200)'), true),
+  ('00000000-0000-4000-8000-0000000a2002', '00000000-0000-4000-8000-000000000001', 'Kho Demo B',
+   'Số 25 đường Thử nghiệm, Demo B (dữ liệu giả lập)', ST_GeogFromText('SRID=4326;POINT(108.2000 16.0700)'), false);
 
-INSERT INTO relief_point (id, organization_id, region_code, name, contact_note, operating_note, location, status) VALUES
-  ('00000000-0000-4000-8000-0000000a3001', '00000000-0000-4000-8000-000000000001', 'DEMO_A', 'Điểm cứu trợ Trường tiểu học Mẫu',
+INSERT INTO relief_point (id, organization_id, name, contact_note, operating_note, location, status) VALUES
+  ('00000000-0000-4000-8000-0000000a3001', '00000000-0000-4000-8000-000000000001', 'Điểm cứu trợ Trường tiểu học Mẫu',
    'Liên hệ qua điều phối viên, số giả lập 0900000201', 'Mở cửa 07:00 đến 19:00', ST_GeogFromText('SRID=4326;POINT(106.6450 10.8300)'), 'ACTIVE'),
-  ('00000000-0000-4000-8000-0000000a3002', '00000000-0000-4000-8000-000000000001', 'DEMO_B', 'Điểm cứu trợ Nhà văn hóa Thử nghiệm',
+  ('00000000-0000-4000-8000-0000000a3002', '00000000-0000-4000-8000-000000000001', 'Điểm cứu trợ Nhà văn hóa Thử nghiệm',
    'Liên hệ qua điều phối viên, số giả lập 0900000202', 'Mở cửa 08:00 đến 18:00', ST_GeogFromText('SRID=4326;POINT(108.2100 16.0600)'), 'ACTIVE'),
-  ('00000000-0000-4000-8000-0000000a3003', '00000000-0000-4000-8000-000000000001', 'DEMO_A', 'Điểm cứu trợ cũ (đã ngừng hoạt động)',
+  ('00000000-0000-4000-8000-0000000a3003', '00000000-0000-4000-8000-000000000001', 'Điểm cứu trợ cũ (đã ngừng hoạt động)',
    NULL, 'Tạm đóng do ngập sâu', ST_GeogFromText('SRID=4326;POINT(106.6100 10.8100)'), 'INACTIVE');
 
-INSERT INTO vehicle (id, organization_id, region_code, identifier, vehicle_type, capacity, capacity_unit) VALUES
-  ('00000000-0000-4000-8000-0000000a4001', '00000000-0000-4000-8000-000000000001', 'DEMO_A', '51D-000.01', 'Xe tải 1,5 tấn', 1500.000, 'KG'),
-  ('00000000-0000-4000-8000-0000000a4002', '00000000-0000-4000-8000-000000000001', 'DEMO_B', '43C-000.02', 'Xe bán tải', NULL, NULL);
+INSERT INTO vehicle (id, organization_id, identifier, vehicle_type, capacity, capacity_unit) VALUES
+  ('00000000-0000-4000-8000-0000000a4001', '00000000-0000-4000-8000-000000000001', '51D-000.01', 'Xe tải 1,5 tấn', 1500.000, 'KG'),
+  ('00000000-0000-4000-8000-0000000a4002', '00000000-0000-4000-8000-000000000001', '43C-000.02', 'Xe bán tải', NULL, NULL);
 
 -- ---------- zero balances first (warehouse A: a5a01..a5a08, warehouse B: a5b01..a5b08; item order as in the item table) ----------
 INSERT INTO stock_balance (id, warehouse_id, item_id)
@@ -165,9 +165,9 @@ INSERT INTO donation_dispute (id, delivery_id, status, opened_by_kind, opened_by
    'Tôi bàn giao 60 gói nhưng biên nhận ghi đã đếm 58 gói, đề nghị đối chiếu lại.', now() - interval '5 days 10 hours');
 
 -- ---------- fulfillment of the aid request (cycle OPEN, attribution copied from Response) ----------
-INSERT INTO fulfillment_cycle (id, request_id, work_cycle, organization_id, campaign_id, region_code, state, created_at) VALUES
+INSERT INTO fulfillment_cycle (id, request_id, work_cycle, organization_id, campaign_id, state, created_at) VALUES
   ('00000000-0000-4000-8000-0000000b7001', '00000000-0000-4000-8000-0000000000f5', 1, '00000000-0000-4000-8000-000000000001',
-   '00000000-0000-4000-8000-0000000000c1', 'DEMO_A', 'OPEN', now() - interval '4 days');
+   '00000000-0000-4000-8000-0000000000c1', 'OPEN', now() - interval '4 days');
 
 -- N1: bộ sơ cứu 20 (12 delivered, 8 still reserved => outstanding 8). N2: nước đóng chai 30, 12 delivered, remaining 18 cancelled.
 INSERT INTO relief_need (id, cycle_id, item_id, original_quantity, requested_quantity, cancelled_remaining, status, created_at) VALUES
@@ -204,7 +204,7 @@ INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_rese
   ('00000000-0000-4000-8000-0000000a5a03', 'ISSUE', -12, -12, '00000000-0000-4000-8000-0000000b2003', 'ISSUE:00000000-0000-4000-8000-0000000b4002', '00000000-0000-4000-8000-00000000010b', now() - interval '3 days 18 hours');
 
 INSERT INTO handoff_record (id, distribution_id, handoff_kind, receiver_label, recorder_user_id, confirmation_basis, occurred_at, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b5001', '00000000-0000-4000-8000-0000000b3001', 'DIRECT_HOUSEHOLD', 'Hộ gia đình giả lập, tổ 5 khu vực Demo A',
+  ('00000000-0000-4000-8000-0000000b5001', '00000000-0000-4000-8000-0000000b3001', 'DIRECT_HOUSEHOLD', 'Hộ gia đình giả lập, tổ 5 Demo A',
    '00000000-0000-4000-8000-00000000010c', 'Chủ hộ ký nhận trên phiếu giao', now() - interval '3 days 17 hours', now() - interval '3 days 17 hours');
 INSERT INTO handoff_line (id, handoff_id, distribution_id, distribution_line_id, commitment_id, quantity) VALUES
   ('00000000-0000-4000-8000-0000000b6001', '00000000-0000-4000-8000-0000000b5001', '00000000-0000-4000-8000-0000000b3001', '00000000-0000-4000-8000-0000000b4001', '00000000-0000-4000-8000-0000000b2001', 12),

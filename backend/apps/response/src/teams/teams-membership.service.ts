@@ -360,7 +360,7 @@ export class TeamsMembershipService {
     queryable: Pick<DataSource | EntityManager, 'query'> = this.dataSource,
   ): Promise<boolean> {
     if (hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
-      organizationId: team.organization_id, regionCode: team.operating_region_code,
+      organizationId: team.organization_id,
     })) return true;
     const leaders = await queryable.query(
       `SELECT 1 FROM team_member WHERE team_id=$1 AND user_id=$2 AND member_role='LEADER' AND left_at IS NULL LIMIT 1`,
@@ -371,7 +371,7 @@ export class TeamsMembershipService {
 
   private async assertCanRead(team: TeamRow, session: ReporterSession): Promise<void> {
     if (hasPermission(session.grants, 'TEAM_READ', {
-      organizationId: team.organization_id, regionCode: team.operating_region_code,
+      organizationId: team.organization_id,
     })) return;
     const members = await this.dataSource.query(
       'SELECT 1 FROM team_member WHERE team_id=$1 AND user_id=$2 AND left_at IS NULL LIMIT 1',
@@ -382,7 +382,7 @@ export class TeamsMembershipService {
 
   private assertCanTransfer(team: TeamRow, session: ReporterSession): void {
     if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
-      organizationId: team.organization_id, regionCode: team.operating_region_code,
+      organizationId: team.organization_id,
     })) throw new AppError('FORBIDDEN', { status: 403 });
   }
 

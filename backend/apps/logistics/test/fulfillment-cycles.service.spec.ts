@@ -23,7 +23,6 @@ function setup(options: {
     request_id: requestId,
     work_cycle: 3,
     organization_id: organizationId,
-    region_code: 'NORTH',
     campaign_id: null,
     state: options.cycleState ?? 'OPEN',
   };
@@ -35,7 +34,6 @@ function setup(options: {
     work_cycle: 3,
     request_status: 'RESOLVING',
     organization_id: organizationId,
-    region_code: 'NORTH',
     campaign_id: null,
     outcome_basis: 'RESCUE_COMPLETED',
     ...options.intent,

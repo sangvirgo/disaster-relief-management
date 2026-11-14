@@ -15,7 +15,6 @@ interface RequestCampaignRow {
   status: string;
   version: number;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
   attribution_locked_at: Date | string | null;
 }
@@ -24,14 +23,12 @@ interface CampaignRow {
   id: string;
   status: string;
   organization_id: string;
-  region_code: string | null;
 }
 
 interface RequestCampaignView {
   id: string;
   status: string;
   version: number;
-  region_code: string | null;
   campaign_id: string | null;
 }
 
@@ -72,7 +69,7 @@ export class RequestCampaignAssociationService {
         const [updated] = await manager.query(
           `UPDATE assistance_request SET campaign_id=$3,version=version+1
             WHERE id=$1 AND version=$2
-            RETURNING id,status,version,region_code,campaign_id`,
+            RETURNING id,status,version,campaign_id`,
           [row.id, dto.expected_version, campaign.id],
         ) as [Array<RequestCampaignView>, number];
         const result = updated?.[0];
@@ -109,7 +106,7 @@ export class RequestCampaignAssociationService {
         const [updated] = await manager.query(
           `UPDATE assistance_request SET campaign_id=NULL,version=version+1
             WHERE id=$1 AND version=$2
-            RETURNING id,status,version,region_code,campaign_id`,
+            RETURNING id,status,version,campaign_id`,
           [row.id, dto.expected_version],
         ) as [Array<RequestCampaignView>, number];
         const result = updated?.[0];
@@ -132,7 +129,7 @@ export class RequestCampaignAssociationService {
 
   private async loadCampaign(manager: EntityManager, campaignId: string, lock = false): Promise<CampaignRow> {
     const rows = await manager.query(
-      `SELECT id,status,organization_id,region_code FROM campaign WHERE id=$1${lock ? ' FOR SHARE' : ''}`,
+      `SELECT id,status,organization_id FROM campaign WHERE id=$1${lock ? ' FOR SHARE' : ''}`,
       [campaignId],
     ) as CampaignRow[];
     if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
@@ -141,7 +138,7 @@ export class RequestCampaignAssociationService {
 
   private async loadRequest(manager: EntityManager, requestId: string, lock = false): Promise<RequestCampaignRow> {
     const rows = await manager.query(
-      `SELECT id,status,version,organization_id,region_code,campaign_id,attribution_locked_at
+      `SELECT id,status,version,organization_id,campaign_id,attribution_locked_at
          FROM assistance_request WHERE id=$1${lock ? ' FOR UPDATE' : ''}`,
       [requestId],
     ) as RequestCampaignRow[];
@@ -151,18 +148,18 @@ export class RequestCampaignAssociationService {
 
   private assertPermission(
     session: Awaited<ReturnType<ReporterSessionService['require']>>,
-    row: Pick<RequestCampaignRow, 'organization_id' | 'region_code'>,
+    row: Pick<RequestCampaignRow, 'organization_id'>,
     campaignId: string | null,
   ): void {
     if (!hasPermission(session.grants, 'CAMPAIGN_MANAGE', {
-      organizationId: row.organization_id, regionCode: row.region_code, campaignId,
+      organizationId: row.organization_id, campaignId,
     })) throw new AppError('FORBIDDEN', { status: 403 });
   }
 
   private assertCompatible(row: RequestCampaignRow, campaign: CampaignRow): void {
-    if (campaign.organization_id !== row.organization_id || (campaign.region_code && campaign.region_code !== row.region_code)) {
+    if (campaign.organization_id !== row.organization_id) {
       throw new AppError('VALIDATION_FAILED', {
-        status: 400, fieldErrors: { campaign_id: ['Chiến dịch không phù hợp với tổ chức hoặc khu vực của yêu cầu.'] },
+        status: 400, fieldErrors: { campaign_id: ['Chiến dịch không phù hợp với tổ chức của yêu cầu.'] },
       });
     }
   }
@@ -200,7 +197,6 @@ export class RequestCampaignAssociationService {
       id: row.id,
       status: row.status,
       version: Number(row.version),
-      region_code: row.region_code,
       campaign_id: row.campaign_id,
     };
   }

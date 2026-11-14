@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { NativeLoginResponse, User, RoleGrant, RegionItem } from '../types/api';
+import { NativeLoginResponse, User, RoleGrant } from '../types/api';
 import { generateUUID, StorageService } from '../utils/secureStore';
 
 export const IdentityApi = {
@@ -116,14 +116,6 @@ export const IdentityApi = {
   async linkGoogle(idToken: string): Promise<{ linked: true }> {
     const response = await apiClient.post<{ linked: true }>('/identity/auth/google/link', {
       id_token: idToken,
-    });
-    return response.data;
-  },
-
-  // Danh mục khu vực hành chính (GET /identity/regions)
-  async getRegions(limit = 100, cursor?: string): Promise<{ items: RegionItem[]; next_cursor?: string | null }> {
-    const response = await apiClient.get<{ items: RegionItem[]; next_cursor?: string | null }>('/identity/regions', {
-      params: { limit, ...(cursor ? { cursor } : {}) },
     });
     return response.data;
   },

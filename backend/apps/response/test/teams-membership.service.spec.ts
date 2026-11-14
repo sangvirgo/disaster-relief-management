@@ -18,7 +18,6 @@ const joinedAt = new Date('2026-10-14T01:02:03.000Z');
 const initialTeam: TeamRow = {
   id: teamId,
   organization_id: organizationId,
-  operating_region_code: 'NORTH',
   name: 'Đội cứu hộ',
   team_kind: 'VOLUNTEER',
   reporting_mode: 'APP',

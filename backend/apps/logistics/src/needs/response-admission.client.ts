@@ -17,7 +17,6 @@ export interface ResponseAdmission {
   version: number;
   status: 'VERIFIED' | 'TRIAGED' | 'DISPATCHED' | 'IN_PROGRESS';
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
 }
 
@@ -120,7 +119,6 @@ export class ResponseAdmissionClient implements OnModuleDestroy {
         typeof row.version !== 'number' || !Number.isSafeInteger(row.version) || row.version < 1 ||
         typeof row.status !== 'string' || !eligibleStatuses.has(row.status as ResponseAdmission['status']) ||
         typeof row.organization_id !== 'string' || !uuidPattern.test(row.organization_id) ||
-        !(row.region_code === null || typeof row.region_code === 'string') ||
         !(row.campaign_id === null || (typeof row.campaign_id === 'string' && uuidPattern.test(row.campaign_id)))) {
       throw unavailable();
     }

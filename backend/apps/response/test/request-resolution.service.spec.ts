@@ -25,7 +25,7 @@ describe('RequestResolutionService', () => {
         statements.push({ sql, parameters });
         if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
           id: requestId, status: 'TRIAGED', version: 8, work_cycle: 2, organization_id: '70000000-0000-4000-8000-000000000001',
-          region_code: 'DEMO_A', campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
+          campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
         }];
         if (sql.includes('FROM request_event') && sql.includes('pending_review')) return [];
         if (sql.includes('FROM mission m')) return missions;
@@ -36,7 +36,7 @@ describe('RequestResolutionService', () => {
     };
     const dataSource = { query: jest.fn(async () => [{
       id: requestId, status: 'TRIAGED', version: 8, work_cycle: 2, organization_id: '70000000-0000-4000-8000-000000000001',
-      region_code: 'DEMO_A', campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
+      campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
     }]) };
     const idempotency = {
       execute: jest.fn(async (_source: unknown, command: IdempotentCommand<Record<string, unknown>>) => {
@@ -80,7 +80,7 @@ describe('RequestResolutionService', () => {
         if (sql.includes('FROM idempotency_record')) return [{ present: true }];
         return [{
           id: requestId, status: 'RESOLVED', version: 10, work_cycle: 2,
-          organization_id: '70000000-0000-4000-8000-000000000001', region_code: 'DEMO_A', campaign_id: null,
+          organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
           reporter_user_id: userId, logistics_admitted_at: new Date(),
         }];
       }),
@@ -88,7 +88,7 @@ describe('RequestResolutionService', () => {
     const replayManager = {
       query: jest.fn(async () => [{
         id: intentId, kind: 'RESOLUTION', state: 'COMPLETED', request_id: requestId, work_cycle: 2, version: 2,
-        request_status: 'RESOLVED', organization_id: '70000000-0000-4000-8000-000000000001', region_code: 'DEMO_A', campaign_id: null,
+        request_status: 'RESOLVED', organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
       }]),
     };
     const idempotency = {

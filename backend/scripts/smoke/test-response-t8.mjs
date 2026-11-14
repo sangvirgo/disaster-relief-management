@@ -14,8 +14,6 @@ const identityDb = new Client({ connectionString: process.env.C48_IDENTITY_DATAB
 const organizationId = process.env.DEMO_INTAKE_ORGANIZATION_ID;
 assert.ok(organizationId, 'DEMO_INTAKE_ORGANIZATION_ID is required');
 const runSuffix = randomBytes(5).toString('hex').toUpperCase();
-const regionCode = `T8_${runSuffix}`;
-const otherRegionCode = `T8_OTHER_${runSuffix}`;
 let identityIpSequence = 32 + randomBytes(1)[0] % 160;
 
 function identityIp() { return `198.51.100.${identityIpSequence++}`; }
@@ -70,7 +68,7 @@ async function waitForTeamRowLockWaits(database, blockerPid, minimum, pendingCom
   assert.fail(`Team command completed before ${minimum} lock waiters appeared: HTTP ${outcome.result.status} ${JSON.stringify(outcome.result.value)}`);
 }
 
-async function registerAndLogin(label, regionCode) {
+async function registerAndLogin(label, grantCoordinator = label === 'coordinator' || label === 'overdue-reader') {
   const suffix = randomBytes(5).toString('hex');
   const credentials = {
     username: `t8${label}${suffix}`,
@@ -84,13 +82,7 @@ async function registerAndLogin(label, regionCode) {
   assert.equal(registered.status, 201, JSON.stringify(registered.value));
   await activateEmailRegistration(identityDb, registered);
   const userId = registered.value.user.id;
-  if (regionCode !== undefined) {
-    await identityDb.query(
-      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id,region_code)
-       VALUES ($1,'COORDINATOR','REGION',$2,$3)`,
-      [userId, organizationId, regionCode],
-    );
-  } else if (label === 'coordinator') {
+  if (grantCoordinator) {
     await identityDb.query(
       `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
        VALUES ($1,'COORDINATOR','ORGANIZATION',$2)`,
@@ -109,7 +101,7 @@ async function createAppTeam(coordinatorToken, leaderUserId, name = `Đội ứn
   return call(responseUrl, 'teams', {
     method: 'POST',
     body: {
-      name, organization_id: organizationId, operating_region_code: regionCode,
+      name, organization_id: organizationId,
       team_kind: 'VOLUNTEER', reporting_mode: 'APP', leader_user_id: leaderUserId, skill_codes: ['T8_A'],
     },
     headers: { Authorization: `Bearer ${coordinatorToken}`, 'Idempotency-Key': key() },
@@ -128,24 +120,14 @@ try {
     `INSERT INTO organization (id,name,organization_kind) VALUES ($1,'T8 test organization','COORDINATION') ON CONFLICT (id) DO NOTHING`,
     [organizationId],
   );
-  await identityDb.query(
-    `INSERT INTO region (code,name) VALUES ($1,$2),($3,$4) ON CONFLICT (code) DO NOTHING`,
-    [regionCode, 'Khu vực T8', otherRegionCode, 'Khu vực khác T8'],
-  );
-  await responseDb.query(
-    `INSERT INTO region_boundary (region_code,geom) VALUES
-      ($1,ST_Multi(ST_GeomFromText('POLYGON((104 14,106 14,106 16,104 16,104 14))',4326))),
-      ($2,ST_Multi(ST_GeomFromText('POLYGON((107 14,109 14,109 16,107 16,107 14))',4326)))
-     ON CONFLICT (region_code) DO NOTHING`, [regionCode, otherRegionCode],
-  );
   await responseDb.query(
     `INSERT INTO skill (code,display_name) VALUES ('T8_A','Kỹ năng A'),('T8_B','Kỹ năng B'),('T8_C','Kỹ năng C') ON CONFLICT (code) DO NOTHING`,
   );
 
   const reporter = await registerAndLogin('reporter');
   const coordinator = await registerAndLogin('coordinator');
-  const otherRegionCoordinator = await registerAndLogin('other', otherRegionCode);
-  const overdueReader = await registerAndLogin('overdue-reader', regionCode);
+  const otherCoordinator = await registerAndLogin('other');
+  const overdueReader = await registerAndLogin('overdue-reader');
   await identityDb.query(
     `INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)
      ON CONFLICT (user_id,organization_id) DO UPDATE SET status='ACTIVE'`,
@@ -174,7 +156,6 @@ try {
   const createBody = {
     name: 'Đội cứu hộ không dùng ứng dụng',
     organization_id: organizationId,
-    operating_region_code: regionCode,
     team_kind: 'GOVERNMENT',
     reporting_mode: 'COORDINATOR',
     external_contact_note: externalContact,
@@ -199,7 +180,7 @@ try {
   assert.equal(replayed.headers.get('idempotent-replay'), 'true');
   assert.equal(replayed.value.id, created.value.id);
 
-  const teamPage = await call(responseUrl, `teams?region_code=${regionCode}&limit=10`, {
+  const teamPage = await call(responseUrl, `teams?limit=10`, {
     headers: { Authorization: `Bearer ${coordinator.token}` },
   });
   assert.equal(teamPage.status, 200, JSON.stringify(teamPage.value));
@@ -218,7 +199,7 @@ try {
   assert.deepEqual(detail.value.skills, ['T8_A', 'T8_C']);
   assert.equal(JSON.stringify(detail.value).includes(externalContact), false, 'team detail must not expose commander contact PII');
 
-  const patchBody = { expected_version: 1, name: 'Đội điều phối khu vực T8', skill_codes: ['T8_B'], availability: 'UNAVAILABLE' };
+  const patchBody = { expected_version: 1, name: 'Đội điều phối T8', skill_codes: ['T8_B'], availability: 'UNAVAILABLE' };
   const patchKey = key();
   const updated = await call(responseUrl, `teams/${created.value.id}`, {
     method: 'PATCH', body: patchBody,
@@ -367,7 +348,7 @@ try {
     captured_at: new Date().toISOString(), note: 'Điều phối viên xác nhận vị trí',
   };
   assertVietnameseError(
-    await setPosition(created.value.id, otherRegionCoordinator.token, coordinatorPositionBody), 403, 'FORBIDDEN',
+    await setPosition(created.value.id, otherCoordinator.token, coordinatorPositionBody), 403, 'FORBIDDEN',
   );
   const coordinatorCannotSetGps = await setPosition(created.value.id, coordinator.token, {
     ...coordinatorPositionBody,
@@ -431,13 +412,12 @@ try {
   const nonexistentLeaderTeam = await responseDb.query('SELECT id FROM rescue_team WHERE name=$1', [nonexistentLeaderName]);
   assert.equal(nonexistentLeaderTeam.rowCount, 0, 'a nonexistent leader must not create a team');
 
-  const outOfScope = await call(responseUrl, `teams?region_code=${regionCode}&limit=10`, {
-    headers: { Authorization: `Bearer ${otherRegionCoordinator.token}` },
+  const outOfScope = await call(responseUrl, 'teams?limit=10', {
+    headers: { Authorization: `Bearer ${otherCoordinator.token}` },
   });
-  assert.equal(outOfScope.status, 200, JSON.stringify(outOfScope.value));
-  assert.deepEqual(outOfScope.value.items, []);
+  assertVietnameseError(outOfScope, 403, 'FORBIDDEN');
   const outOfScopeDetail = await call(responseUrl, `teams/${created.value.id}`, {
-    headers: { Authorization: `Bearer ${otherRegionCoordinator.token}` },
+    headers: { Authorization: `Bearer ${otherCoordinator.token}` },
   });
   assertVietnameseError(outOfScopeDetail, 403, 'FORBIDDEN');
 
@@ -446,11 +426,11 @@ try {
   const storedContact = await responseDb.query('SELECT external_contact_note FROM rescue_team WHERE id=$1', [created.value.id]);
   assert.equal(storedContact.rows[0].external_contact_note, externalContact);
   await runTeamCandidatesSmoke({
-    responseDb, responseUrl, reporter, coordinator, otherRegionCoordinator, organizationId, regionCode, otherRegionCode, appTeam, call, key,
+    responseDb, responseUrl, reporter, coordinator, otherCoordinator, organizationId, appTeam, call, key,
   });
   await runMissionSmoke({
-    responseDb, responseUrl, reporter, coordinator, otherRegionCoordinator, overdueReader, appTeam,
-    coordinatorTeam: created, organizationId, regionCode, call, key, assertVietnameseError,
+    responseDb, responseUrl, reporter, coordinator, otherCoordinator, overdueReader, appTeam,
+    coordinatorTeam: created, organizationId, call, key, assertVietnameseError,
   });
 
   const activeMember = await registerAndLogin('active-member-without-grants');

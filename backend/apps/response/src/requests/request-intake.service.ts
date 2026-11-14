@@ -284,12 +284,6 @@ export class RequestIntakeService {
           if (!counts) throw new AppError('INTERNAL_ERROR', { status: 500 });
           proxyQuotaReached = counts.open_count >= this.config.proxyOpenCap || counts.daily_count >= this.config.proxyDailySoftLimit;
         }
-        const regionRows = await manager.query(
-          `SELECT min(region_code) AS region_code FROM region_boundary
-            WHERE ST_Covers(geom, ST_SetSRID(ST_MakePoint($1, $2), 4326))
-            HAVING count(*) = 1`,
-          location.coordinates,
-        ) as Array<{ region_code: string }>;
         const rateLimited = Number(throttle.ip_count) >= this.config.softLimitPerMinute ||
           Number(throttle.phone_count) >= this.config.softLimitPerMinute ||
           Number(throttle.global_count) >= this.config.globalLimitPerMinute;
@@ -299,14 +293,14 @@ export class RequestIntakeService {
           const rows = await manager.query(
             `INSERT INTO assistance_request
               (tracking_code, tracking_secret_hash, incident_category_code, report_mode, reporter_user_id,
-               reporter_name, reporter_contact_phone, source_ip_hash, description, organization_id, region_code,
+               reporter_name, reporter_contact_phone, source_ip_hash, description, organization_id,
                review_lane, reporter_declared_danger, needs_rescue, needs_relief_supplies, received_at)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
              ON CONFLICT (tracking_code) DO NOTHING
              RETURNING id, tracking_code, status, received_at, review_lane, version`,
             [generateTrackingCode(), secretHash, dto.incident_category_code, proxy ? 'PROXY' : 'SELF', reporterUserId,
               dto.reporter_name ?? null, phone, sourceIpHash, dto.description ?? null, this.config.organizationId,
-              regionRows[0]?.region_code ?? null, reviewLane, dto.reporter_declared_danger ?? false, needsRescue, needsReliefSupplies, throttle.received_at],
+              reviewLane, dto.reporter_declared_danger ?? false, needsRescue, needsReliefSupplies, throttle.received_at],
           ) as Array<{ id: string; tracking_code: string; status: string; received_at: Date | string; review_lane: string; version: number }>;
           request = rows[0];
         }

@@ -17,17 +17,14 @@ function filtersFor(kind: AssetKind, userId: string, grants: unknown[], status?:
   return { route: `logistics.${kind}`, user_id: userId, grants, status: status ?? null };
 }
 
-function scopeWhere(grants: readonly { role_code: keyof typeof ROLE_PERMISSIONS; scope_type: string; organization_id: string | null; region_code?: string | null; campaign_id?: string | null }[], values: unknown[]): string {
+function scopeWhere(grants: readonly { role_code: keyof typeof ROLE_PERMISSIONS; scope_type: string; organization_id: string | null; campaign_id?: string | null }[], values: unknown[]): string {
   const branches: string[] = [];
   for (const grant of grants) {
     const permissions: readonly string[] = ROLE_PERMISSIONS[grant.role_code];
     if (!permissions.includes('ASSET_MANAGE') || !grant.organization_id) continue;
-    if (grant.scope_type === 'ORGANIZATION' && !grant.region_code && !grant.campaign_id) {
+    if (grant.scope_type === 'ORGANIZATION' && !grant.campaign_id) {
       values.push(grant.organization_id);
       branches.push(`a.organization_id=$${values.length}`);
-    } else if (grant.scope_type === 'REGION' && grant.region_code && !grant.campaign_id) {
-      values.push(grant.organization_id, grant.region_code);
-      branches.push(`(a.organization_id=$${values.length - 1} AND a.region_code=$${values.length})`);
     }
   }
   if (branches.length === 0) throw new AppError('FORBIDDEN', { status: 403 });
@@ -81,7 +78,7 @@ export class AssetsQueriesService {
     requireAnyAssetManage(session);
     const row = await findAsset(this.dataSource, 'relief_point', id);
     if (!row || !session.grants.some((grant) => hasPermission([grant], 'ASSET_MANAGE', {
-      organizationId: row.organization_id, regionCode: row.region_code,
+      organizationId: row.organization_id,
     }))) throw new AppError('NOT_FOUND', { status: 404 });
     return assetView('relief_point', row, true);
   }

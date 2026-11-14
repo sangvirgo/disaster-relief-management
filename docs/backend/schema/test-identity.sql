@@ -5,7 +5,6 @@ BEGIN
     RAISE EXCEPTION 'FAIL % still has column %', tbl, col; END IF;
   RAISE NOTICE 'PASS % has no column %', tbl, col;
 END $$;
-INSERT INTO region (code,name,status) VALUES ('R1','Khu vực 1','ACTIVE');
 INSERT INTO organization (id,name,organization_kind) VALUES ('00000000-0000-0000-0000-0000000000a1','Trung tâm','COORDINATION');
 INSERT INTO app_user (id,username,display_name,password_hash) VALUES ('00000000-0000-0000-0000-0000000000b1','Alice','A','h');
 SELECT expect_fail('username case-insensitive unique', $$INSERT INTO app_user (username,display_name,password_hash) VALUES ('alice','A2','h')$$);
@@ -16,7 +15,6 @@ SELECT expect_fail('SYSTEM scope must not carry org', $$INSERT INTO role_grant (
 SELECT expect_fail('ADMIN only with SYSTEM scope', $$INSERT INTO role_grant (user_id,role_code,scope_type,organization_id) VALUES ('00000000-0000-0000-0000-0000000000b1','ADMIN','ORGANIZATION','00000000-0000-0000-0000-0000000000a1')$$);
 SELECT expect_fail('CITIZEN cannot be CAMPAIGN scoped', $$INSERT INTO role_grant (user_id,role_code,scope_type,organization_id,campaign_id) VALUES ('00000000-0000-0000-0000-0000000000b1','CITIZEN','CAMPAIGN','00000000-0000-0000-0000-0000000000a1',gen_random_uuid())$$);
 SELECT expect_fail('staff role cannot be SYSTEM scoped', $$INSERT INTO role_grant (user_id,role_code,scope_type) VALUES ('00000000-0000-0000-0000-0000000000b1','COORDINATOR','SYSTEM')$$);
-SELECT expect_fail('REGION scope needs a region', $$INSERT INTO role_grant (user_id,role_code,scope_type,organization_id) VALUES ('00000000-0000-0000-0000-0000000000b1','COORDINATOR','REGION','00000000-0000-0000-0000-0000000000a1')$$);
 INSERT INTO role_grant (user_id,role_code,scope_type,organization_id) VALUES ('00000000-0000-0000-0000-0000000000b1','COORDINATOR','ORGANIZATION','00000000-0000-0000-0000-0000000000a1');
 SELECT expect_fail('duplicate live grant', $$INSERT INTO role_grant (user_id,role_code,scope_type,organization_id) VALUES ('00000000-0000-0000-0000-0000000000b1','COORDINATOR','ORGANIZATION','00000000-0000-0000-0000-0000000000a1')$$);
 UPDATE role_grant SET revoked_at=now();
@@ -49,8 +47,7 @@ SELECT expect_fail('idempotency key unique per scope+command', $$INSERT INTO ide
 SELECT expect_no_column('idempotency_record','response_body');
 SELECT expect_fail('resource type and id are paired', $$INSERT INTO idempotency_record (scope_key,command,idempotency_key,request_hash,resource_type) VALUES ('a','c','00000000-0000-0000-0000-000000000002','h','user')$$);
 INSERT INTO idempotency_record (scope_key,command,idempotency_key,request_hash,response_status,resource_type,resource_id) VALUES ('a','c','00000000-0000-0000-0000-000000000003','h',201,'user','00000000-0000-0000-0000-0000000000b1');
--- region/organization carry a version for expected_version commands
-UPDATE region SET version = version + 1 WHERE code='R1';
+-- organization carries a version for expected_version commands
 UPDATE organization SET version = version + 1;
 
 -- ---------- restricted application role c48_identity_app ----------

@@ -11,7 +11,6 @@ const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DA
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
 const organizationId = randomUUID();
 const otherOrganizationId = randomUUID();
-const regionCode = `T11_${randomBytes(5).toString('hex').toUpperCase()}`;
 const identityNetwork = randomBytes(2);
 let identityIp = 10;
 
@@ -99,10 +98,6 @@ try {
     `INSERT INTO organization (id,name,organization_kind) VALUES ($1,$2,'COORDINATION')`,
     [otherOrganizationId, `T11 other organization ${otherOrganizationId}`],
   );
-  await identityDb.query(
-    'INSERT INTO region (code,name) VALUES ($1,$2)',
-    [regionCode, 'Khu vực kiểm thử T11'],
-  );
 
   const operator = await registerAndLogin('ops', ['OPERATIONS_MANAGER']);
   const otherOrganizationOperator = await registerAndLogin('other_org_ops', ['OPERATIONS_MANAGER'], otherOrganizationId);
@@ -142,13 +137,13 @@ try {
 
   const warehouse = await call(logisticsUrl, 'warehouses', {
     method: 'POST', actor: operator, idempotencyKey: key(),
-    body: { organization_id: organizationId, region_code: regionCode, name: `Kho T11 ${suffix}` },
+    body: { organization_id: organizationId, name: `Kho T11 ${suffix}` },
   });
   expectSuccess(warehouse, 201);
   const point = await call(logisticsUrl, 'relief-points', {
     method: 'POST', actor: operator, idempotencyKey: key(),
     body: {
-      organization_id: organizationId, region_code: regionCode, name: `Điểm cứu trợ T11 ${suffix}`,
+      organization_id: organizationId, name: `Điểm cứu trợ T11 ${suffix}`,
       location: { type: 'Point', coordinates: [105.85, 21.03] },
     },
   });
@@ -156,7 +151,7 @@ try {
   const vehicle = await call(logisticsUrl, 'vehicles', {
     method: 'POST', actor: operator, idempotencyKey: key(),
     body: {
-      organization_id: organizationId, region_code: regionCode,
+      organization_id: organizationId,
       identifier: `T11-${suffix}`, vehicle_type: 'Xe tải kiểm thử', capacity: '100.00', capacity_unit: unitCode,
     },
   });

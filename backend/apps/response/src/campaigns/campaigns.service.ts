@@ -19,7 +19,7 @@ export interface CampaignCommandRequest extends Request {
 
 type CampaignPage = { items: Record<string, unknown>[]; more: boolean; cursor?: string };
 
-const campaignColumns = `id,organization_id,region_code,name,objective,status,starts_at,ends_at,version,created_at,
+const campaignColumns = `id,organization_id,name,objective,status,starts_at,ends_at,version,created_at,
   to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at`;
 
 @Injectable()
@@ -32,11 +32,9 @@ export class CampaignsService {
 
   async create(dto: CampaignCreateDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    const regionCode = dto.region_code ?? null;
-    const organizationId = this.organizationForCreate(session.grants, regionCode);
+    const organizationId = this.organizationForCreate(session.grants);
     const name = cleanCampaignName(dto.name);
     validateCampaignDates(dto.starts_at, dto.ends_at);
-    await this.assertRegion(this.dataSource, regionCode);
 
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `user:${session.userId}`,
@@ -45,9 +43,9 @@ export class CampaignsService {
       requestHash: canonicalRequestHash({ actor_user_id: session.userId, organization_id: organizationId, dto }),
       execute: async (manager) => {
         const rows = await manager.query(
-          `INSERT INTO campaign (organization_id,region_code,name,objective,starts_at,ends_at,created_by_user_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING ${campaignColumns}`,
-          [organizationId, regionCode, name, dto.objective ?? null, dto.starts_at ?? null, dto.ends_at ?? null, session.userId],
+          `INSERT INTO campaign (organization_id,name,objective,starts_at,ends_at,created_by_user_id)
+           VALUES ($1,$2,$3,$4,$5,$6) RETURNING ${campaignColumns}`,
+          [organizationId, name, dto.objective ?? null, dto.starts_at ?? null, dto.ends_at ?? null, session.userId],
         ) as CampaignRow[];
         const row = rows[0];
         if (!row) throw new AppError('INTERNAL_ERROR', { status: 500 });
@@ -90,7 +88,7 @@ export class CampaignsService {
 
   async patch(id: string, dto: CampaignPatchDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    const changed = ['name', 'objective', 'region_code', 'starts_at', 'ends_at'].some((field) => Object.hasOwn(dto, field));
+    const changed = ['name', 'objective', 'starts_at', 'ends_at'].some((field) => Object.hasOwn(dto, field));
     if (!changed) throw new AppError('VALIDATION_FAILED', { status: 400 });
     const name = dto.name === undefined ? undefined : cleanCampaignName(dto.name);
 
@@ -104,10 +102,6 @@ export class CampaignsService {
         this.assertCampaignPermission(session, row, 'CAMPAIGN_MANAGE');
         this.assertVersion(row, dto.expected_version);
         if (row.status !== 'DRAFT') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
-        if (dto.region_code !== undefined) {
-          this.assertCampaignPermission(session, { ...row, region_code: dto.region_code }, 'CAMPAIGN_MANAGE');
-        }
-        if (dto.region_code !== undefined) await this.assertRegion(manager, dto.region_code);
         validateCampaignDates(
           dto.starts_at === undefined ? row.starts_at : dto.starts_at,
           dto.ends_at === undefined ? row.ends_at : dto.ends_at,
@@ -116,13 +110,11 @@ export class CampaignsService {
           `UPDATE campaign SET
              name=CASE WHEN $3::boolean THEN $4::text ELSE name END,
              objective=CASE WHEN $5::boolean THEN $6::text ELSE objective END,
-             region_code=CASE WHEN $7::boolean THEN $8::text ELSE region_code END,
-             starts_at=CASE WHEN $9::boolean THEN $10::timestamptz ELSE starts_at END,
-             ends_at=CASE WHEN $11::boolean THEN $12::timestamptz ELSE ends_at END,
+             starts_at=CASE WHEN $7::boolean THEN $8::timestamptz ELSE starts_at END,
+             ends_at=CASE WHEN $9::boolean THEN $10::timestamptz ELSE ends_at END,
              version=version+1 WHERE id=$1 AND version=$2 RETURNING ${campaignColumns}`,
           [id, dto.expected_version, dto.name !== undefined, name ?? null, dto.objective !== undefined, dto.objective ?? null,
-            dto.region_code !== undefined, dto.region_code ?? null, dto.starts_at !== undefined, dto.starts_at ?? null,
-            dto.ends_at !== undefined, dto.ends_at ?? null],
+            dto.starts_at !== undefined, dto.starts_at ?? null, dto.ends_at !== undefined, dto.ends_at ?? null],
         ) as [CampaignRow[], number];
         const next = updated[0];
         if (!next) throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
@@ -197,11 +189,9 @@ export class CampaignsService {
     ) as CampaignRow[];
     const more = rows.length > (query.limit ?? 50);
     const items = rows.slice(0, query.limit ?? 50);
-    const codes = [...new Set(items.flatMap((row) => row.region_code ? [row.region_code] : []))];
-    const names = codes.length ? await this.sessions.lookupRegionNames(codes) : new Map<string, string>();
     const last = items.at(-1);
     return {
-      items: items.map((row) => publicCampaignView(row, row.region_code ? names.get(row.region_code) ?? null : null)),
+      items: items.map((row) => publicCampaignView(row)),
       more,
       ...(more && last ? { cursor: encodeKeysetCursor([last.cursor_created_at!], last.id, filters) } : {}),
     };
@@ -213,7 +203,6 @@ export class CampaignsService {
       id: row.id,
       status: row.status,
       organization_id: row.organization_id,
-      region_code: row.region_code,
       version: Number(row.version),
     };
   }
@@ -246,34 +235,22 @@ export class CampaignsService {
     return row;
   }
 
-  private organizationForCreate(grants: readonly Grant[], regionCode: string | null): string {
+  private organizationForCreate(grants: readonly Grant[]): string {
     const organizations = new Set(grants.flatMap((grant) => grant.organization_id ? [grant.organization_id] : []));
-    const matching = [...organizations].filter((organizationId) => hasPermission(grants, 'CAMPAIGN_MANAGE', {
-      organizationId, regionCode,
-    }));
+    const matching = [...organizations].filter((organizationId) => hasPermission(grants, 'CAMPAIGN_MANAGE', { organizationId }));
     if (matching.length !== 1) throw new AppError('FORBIDDEN', { status: 403 });
     return matching[0]!;
   }
 
   private assertCampaignPermission(session: ReporterSession, row: CampaignRow, permission: 'CAMPAIGN_READ' | 'CAMPAIGN_MANAGE'): void {
     if (!hasPermission(session.grants, permission, {
-      organizationId: row.organization_id, regionCode: row.region_code, campaignId: row.id,
+      organizationId: row.organization_id, campaignId: row.id,
     })) throw new AppError('FORBIDDEN', { status: 403 });
   }
 
   private assertVersion(row: CampaignRow, expected: number): void {
     if (Number(row.version) !== expected) {
       throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
-    }
-  }
-
-  private async assertRegion(query: DataSource | EntityManager, regionCode: string | null): Promise<void> {
-    if (!regionCode) return;
-    const rows = await query.query('SELECT 1 FROM region_boundary WHERE region_code=$1', [regionCode]) as unknown[];
-    if (!rows.length) {
-      throw new AppError('VALIDATION_FAILED', {
-        status: 400, fieldErrors: { region_code: ['Mã khu vực không hợp lệ hoặc chưa được cấu hình.'] },
-      });
     }
   }
 

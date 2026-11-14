@@ -6,13 +6,6 @@ CREATE EXTENSION IF NOT EXISTS citext;
 -- Rule for every human-readable label: not blank and NFC-normalised (blocks NFC/NFD look-alike duplicates)
 CREATE FUNCTION is_clean_text(t text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$ SELECT btrim(t) <> '' AND t = normalize(t, NFC) $$;
 
-CREATE TABLE region (
-  code        text PRIMARY KEY CHECK (code ~ '^[A-Z0-9_]{2,32}$'),
-  name        text NOT NULL CHECK (is_clean_text(name)),
-  status      text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','INACTIVE')),
-  version     int NOT NULL DEFAULT 1                     -- deactivate carries expected_version
-);
-
 CREATE TABLE organization (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name              text NOT NULL CHECK (is_clean_text(name)),
@@ -108,17 +101,15 @@ CREATE TABLE role_grant (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         uuid NOT NULL REFERENCES app_user(id),
   role_code       text NOT NULL CHECK (role_code IN ('CITIZEN','VOLUNTEER','COORDINATOR','CAMPAIGN_MANAGER','OPERATIONS_MANAGER','INTAKE_STAFF','REVIEWER','DISTRIBUTION_STAFF','ADMIN')),
-  scope_type      text NOT NULL CHECK (scope_type IN ('SYSTEM','ORGANIZATION','REGION','CAMPAIGN')),
+  scope_type      text NOT NULL CHECK (scope_type IN ('SYSTEM','ORGANIZATION','CAMPAIGN')),
   organization_id uuid REFERENCES organization(id),
-  region_code     text REFERENCES region(code),
   campaign_id     uuid,                       -- opaque Response reference, validated through the Response API
   created_at      timestamptz NOT NULL DEFAULT now(),
   revoked_at      timestamptz,                -- who granted/revoked is recorded in audit_log
   CONSTRAINT scope_shape CHECK (
-    (scope_type = 'SYSTEM'       AND organization_id IS NULL AND region_code IS NULL AND campaign_id IS NULL) OR
-    (scope_type = 'ORGANIZATION' AND organization_id IS NOT NULL AND region_code IS NULL AND campaign_id IS NULL) OR
-    (scope_type = 'REGION'       AND organization_id IS NOT NULL AND region_code IS NOT NULL AND campaign_id IS NULL) OR
-    (scope_type = 'CAMPAIGN'     AND organization_id IS NOT NULL AND campaign_id IS NOT NULL AND region_code IS NULL)),
+    (scope_type = 'SYSTEM'       AND organization_id IS NULL AND campaign_id IS NULL) OR
+    (scope_type = 'ORGANIZATION' AND organization_id IS NOT NULL AND campaign_id IS NULL) OR
+    (scope_type = 'CAMPAIGN'     AND organization_id IS NOT NULL AND campaign_id IS NOT NULL)),
   CONSTRAINT revoke_after_create CHECK (revoked_at IS NULL OR revoked_at >= created_at),
   CONSTRAINT role_scope CHECK (
     (role_code = 'ADMIN' AND scope_type = 'SYSTEM') OR
@@ -129,7 +120,6 @@ CREATE TABLE role_grant (
 CREATE UNIQUE INDEX role_grant_live_uq ON role_grant (
   user_id, role_code, scope_type,
   COALESCE(organization_id, '00000000-0000-0000-0000-000000000000'::uuid),
-  COALESCE(region_code, ''),
   COALESCE(campaign_id, '00000000-0000-0000-0000-000000000000'::uuid)
 ) WHERE revoked_at IS NULL;
 -- introspection hot path is served by role_grant_live_uq (leading column user_id); no separate index
@@ -205,7 +195,7 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE CREATE ON SCHEMA public FROM c48_identity_app;
 GRANT USAGE ON SCHEMA public TO c48_identity_app;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO c48_identity_app;
-GRANT INSERT, UPDATE ON region, organization, app_user, membership, role_grant, session_family, refresh_session, idempotency_record TO c48_identity_app;
+GRANT INSERT, UPDATE ON organization, app_user, membership, role_grant, session_family, refresh_session, idempotency_record TO c48_identity_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON email_registration TO c48_identity_app; -- ephemeral registration only; no account deletion
 GRANT SELECT, INSERT ON external_identity TO c48_identity_app; -- lookup and add identities; no mutation or deletion
 GRANT INSERT ON audit_log TO c48_identity_app;                          -- append-only: no UPDATE, DELETE or TRUNCATE

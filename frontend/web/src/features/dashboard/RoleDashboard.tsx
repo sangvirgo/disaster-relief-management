@@ -7,13 +7,13 @@ import './role-dashboard.css';
 type Counts = Record<string, number>;
 type ResponseOverview = {
   requests: { open_total: number; open_by_status: Counts; open_by_priority: Counts; open_by_category: Counts;
-    open_by_region: Counts; received_last_24h: number; resolved_total: number; verification_overdue: number;
+    received_last_24h: number; resolved_total: number; verification_overdue: number;
     declared_danger_waiting: number; awaiting_team_assignment: number };
   missions: { active_by_status: Counts; overdue_offers: number };
   teams: { total: number; available: number; unavailable: number; awaiting_readiness: number;
     on_mission: number; position_missing_or_stale: number };
   thresholds: { verification_overdue_minutes: number; offer_overdue_minutes: number; team_position_fresh_minutes: number };
-  recent_open_requests: { id: string; status: string; priority: string | null; region_code: string | null;
+  recent_open_requests: { id: string; status: string; priority: string | null;
     category: string; received_at: string }[];
   generated_at: string;
 };
@@ -33,8 +33,8 @@ type AdminOverview = {
   recent_audit: { action: string; entity_type: string; created_at: string }[];
   generated_at: string;
 };
-type Suggestions = { open_drives: { id: string; title: string; region_code: string | null }[];
-  suggestions: { code: string; severity: string; region_code: string | null; item_ids: string[]; message: string }[];
+type Suggestions = { open_drives: { id: string; title: string }[];
+  suggestions: { code: string; severity: string; item_ids: string[]; message: string }[];
   weather_available: boolean; generated_at: string };
 
 function useSnapshot<T>(service: 'identity' | 'response' | 'logistics', path: string, enabled = true) {
@@ -116,13 +116,12 @@ function ResponseDashboard({ onOpenRequest }: { onOpenRequest?: (id: string) => 
         <Breakdown title="SOS theo trạng thái" counts={data.requests.open_by_status} requestStatuses />
         <Breakdown title="Mức ưu tiên" counts={data.requests.open_by_priority} />
         <Breakdown title="Loại sự cố" counts={data.requests.open_by_category} />
-        <Breakdown title="Khu vực" counts={data.requests.open_by_region} />
         <Breakdown title="Nhiệm vụ đang hoạt động" counts={data.missions.active_by_status} />
       </div>
       <h3>SOS mới đang mở</h3>
       {data.recent_open_requests.length ? <div className="record-list">{data.recent_open_requests.map((item) =>
         <div className="record" key={item.id}><div><strong>{requestStatusLabel(item.status)} · {label(item.category)}</strong>
-          <p>{label(item.priority)} · {label(item.region_code)} · {timeLabel(item.received_at)}</p></div>
+          <p>{label(item.priority)} · {timeLabel(item.received_at)}</p></div>
           {onOpenRequest && <button type="button" className="button secondary" onClick={() => onOpenRequest(item.id)}>Xem SOS</button>}
         </div>)}</div> : <p>Chưa có SOS đang mở.</p>}
     </>}
@@ -168,7 +167,7 @@ function OperationsSnapshot({ showReports }: { showReports: boolean }) {
         <Breakdown title="Trạng thái nhu cầu" counts={data.needs.by_status} /></>}
     </>}
   </section>{showReports && <><DriveSuggestions /><details className="card dashboard-more-metrics dashboard-history">
-    <summary>Báo cáo chi tiết theo khu vực và tồn kho</summary><OperationsDashboard />
+    <summary>Báo cáo chi tiết và tồn kho</summary><OperationsDashboard />
   </details></>}</>;
 }
 
@@ -180,7 +179,7 @@ function DriveSuggestions() {
     <SnapshotState {...snapshot} onRetry={snapshot.refresh} />
     {data && !snapshot.error && <>{!data.weather_available && <p className="notice warning">Chưa có dữ liệu thời tiết; gợi ý về kho vẫn có hiệu lực.</p>}
       {data.suggestions.length ? <div className="record-list">{data.suggestions.map((item, index) =>
-        <article className="record" key={`${item.code}:${item.region_code}:${index}`}><div><strong>{label(item.severity)} · {label(item.code)}</strong>
+        <article className="record" key={`${item.code}:${index}`}><div><strong>{label(item.severity)} · {label(item.code)}</strong>
           <p>{item.message}</p></div></article>)}</div> : <p>Chưa có gợi ý mới.</p>}
       <p className="muted">Đợt đang mở: {data.open_drives.length}.</p></>}
   </section>;

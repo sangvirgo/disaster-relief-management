@@ -5,7 +5,6 @@ import { lockDistributionAssets } from '../src/distributions/distribution-assets
 const distribution = {
   warehouse_id: 'warehouse-1',
   organization_id: 'organization-1',
-  warehouse_region_code: 'REGION_1',
   relief_point_id: 'point-1',
   vehicle_id: 'vehicle-1',
 };
@@ -13,7 +12,7 @@ const distribution = {
 function assetManager(inactiveAsset?: 'warehouse' | 'relief_point' | 'vehicle') {
   const query = jest.fn(async (sql: string) => {
     if (sql.includes('FROM warehouse')) {
-      return [{ organization_id: 'organization-1', region_code: 'REGION_1', status: inactiveAsset === 'warehouse' ? 'INACTIVE' : 'ACTIVE' }];
+      return [{ organization_id: 'organization-1', status: inactiveAsset === 'warehouse' ? 'INACTIVE' : 'ACTIVE' }];
     }
     if (sql.includes('FROM relief_point')) {
       return [{ organization_id: 'organization-1', status: inactiveAsset === 'relief_point' ? 'INACTIVE' : 'ACTIVE' }];

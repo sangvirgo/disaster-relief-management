@@ -12,12 +12,12 @@ Remove progress, test-result, implementation-completion, and outstanding-work st
 
 ## Seed data
 
-Expand campaign fixtures from two to eight, covering the existing demo regions and an added synthetic region. Include varied campaign statuses and relative dates so public and internal campaign views have useful examples.
+Expand campaign fixtures from two to eight, covering the existing demo organizations and an added synthetic campaign set. Include varied campaign statuses and relative dates so public and internal campaign views have useful examples.
 
 Add deterministic, synthetic fixture rows across the three owned databases:
 
-- Identity: a small number of extra demo users, their memberships/grants, and region/organization support.
-- Response: additional teams, positions, skills, and SOS requests linked to the demo regions and campaigns.
+- Identity: a small number of extra demo users, their memberships/grants, and organization support.
+- Response: additional teams, positions, skills, and SOS requests linked to the demo organizations and campaigns.
 - Logistics: additional catalog/warehouse support, an open donation drive, donor declarations, and representative stock/fulfillment records where their ledger relationships can be maintained.
 
 Put the additional rows in focused per-service SQL fragments. Include those fragments from the full seed files, and execute the same fragments in the populated-database path. Use stable IDs, conflict-safe inserts, transactions, and prerequisite checks for optional child records. These fragments only insert; they do not update or delete existing records. Keep the full seed scripts' existing lifecycle updates and ledger assertions restricted to empty databases.

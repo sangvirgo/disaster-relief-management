@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import {
-  ArrayMaxSize, IsArray, IsDateString, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID,
+  ArrayMaxSize, Equals, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID,
   Matches, Max, MaxLength, Min, ValidateNested,
 } from 'class-validator';
 
@@ -25,9 +25,6 @@ export class TeamCandidatesQueryDto {
 export class RequestQueueQueryDto extends RequestOperationPageDto {
   @IsOptional() @IsIn(statuses)
   declare status?: string;
-
-  @IsOptional() @IsString() @Matches(/^[A-Z0-9_]{2,32}$/u)
-  declare region_code?: string;
 
   @IsOptional() @IsIn(priorities)
   declare priority?: string;
@@ -143,14 +140,6 @@ export class AuthorityReferralDto {
   note!: string;
 }
 
-export class CorrectRegionDto extends RequestVersionDto {
-  @IsString() @Matches(/^[A-Z0-9_]{2,32}$/u)
-  region_code!: string;
-
-  @IsString() @MaxLength(1000) @Matches(/\S/u)
-  reason!: string;
-}
-
 export class SupplementReviewDto extends RequestVersionDto {
   @IsIn(['ACCEPT', 'REJECT'])
   decision!: string;
@@ -170,5 +159,18 @@ export class AiAdvisoryReviewDto extends RequestVersionDto {
   decision!: 'ACCEPTED' | 'ADJUSTED' | 'REJECTED';
 
   @IsOptional() @IsString() @MaxLength(1000) @Matches(/\S/u)
+  declare note?: string;
+}
+
+export class FastTrackRequestDto extends RequestVersionDto {
+  /** The coordinator's attestation that they reviewed the record and agree with the suggestion. */
+  @IsBoolean() @Equals(true)
+  confirmed!: boolean;
+
+  /** Optional override of the suggested priority; a note is required when it differs from the suggestion. */
+  @IsOptional() @IsIn(priorities)
+  declare priority?: string;
+
+  @IsOptional() @IsString() @MaxLength(1000)
   declare note?: string;
 }

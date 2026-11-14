@@ -11,7 +11,6 @@ import { IdentityDashboardModule } from './dashboard/dashboard.module';
 import { GrantsModule } from './grants/grants.module';
 import { InternalModule } from './internal/internal.module';
 import { OrganizationsModule } from './organizations/organizations.module';
-import { RegionsModule } from './regions/regions.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -22,7 +21,6 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     OrganizationsModule,
     GrantsModule,
-    RegionsModule,
     AuditModule,
     IdentityDashboardModule,
     InternalModule,

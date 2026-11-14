@@ -8,7 +8,6 @@ type DistributionAssetReferences = Pick<DistributionContext, 'warehouse_id' | 'r
 
 interface LockedWarehouse {
   organization_id: string;
-  region_code: string;
   status: 'ACTIVE' | 'INACTIVE';
 }
 
@@ -22,7 +21,7 @@ export async function lockDistributionAssets(
   distribution: DistributionAssetReferences,
 ): Promise<LockedWarehouse> {
   const warehouses = await manager.query(
-    'SELECT organization_id,region_code,status FROM warehouse WHERE id=$1 FOR SHARE',
+    'SELECT organization_id,status FROM warehouse WHERE id=$1 FOR SHARE',
     [distribution.warehouse_id],
   ) as LockedWarehouse[];
   const warehouse = warehouses[0];

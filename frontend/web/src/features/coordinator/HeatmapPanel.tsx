@@ -428,14 +428,10 @@ function HeatmapCanvas({
 }
 
 export function HeatmapPanel({
-  region,
-  overviewRegions,
   selected = null,
   compact = false,
   showLayers = true,
 }: {
-  region: string;
-  overviewRegions?: string[];
   selected?: SelectedSos | null;
   compact?: boolean;
   showLayers?: boolean;
@@ -445,7 +441,7 @@ export function HeatmapPanel({
   const [showWeather, setShowWeather] = useState(true);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [weatherError, setWeatherError] = useState(false);
-  const [showRadar, setShowRadar] = useState(true);
+  const [showRadar, setShowRadar] = useState(!compact);
   const [radarTemplate, setRadarTemplate] = useState<string | null>(null);
   const [radarError, setRadarError] = useState(false);
   useEffect(() => {
@@ -475,15 +471,12 @@ export function HeatmapPanel({
   const [heatOpacity, setHeatOpacity] = useState(55);
   const [data, setData] = useState<{ items: HeatmapCell[]; generated_at: string } | null>(null);
   const [error, setError] = useState('');
-  const [warning, setWarning] = useState('');
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const previousQuery = useRef('');
   const visibleCells = data?.items ?? [];
   const count = visibleCells.reduce((sum, cell) => sum + cell.count, 0);
-  const targetRegions = overviewRegions?.length ? [...new Set(overviewRegions)] : region ? [region] : [];
-  const regionKey = targetRegions.join('|');
-  const queryKey = `${regionKey}|${layer}|${category}|${resolution}`;
+  const queryKey = `${layer}|${category}|${resolution}`;
   const onResolutionChange = useCallback((next: typeof resolution) => {
     setResolution((current) => current === next ? current : next);
   }, []);
@@ -491,10 +484,6 @@ export function HeatmapPanel({
     setZoom((current) => current === next ? current : next);
   }, []);
   useEffect(() => {
-    if (!regionKey) {
-      setData(null);
-      return;
-    }
     let active = true;
     setLoading(true);
     if (previousQuery.current !== queryKey) {
@@ -502,38 +491,28 @@ export function HeatmapPanel({
       previousQuery.current = queryKey;
     }
     setError('');
-    setWarning('');
     const now = new Date().toISOString();
     const from = new Date(Date.now() - 7 * 86_400_000).toISOString();
-    void Promise.allSettled(targetRegions.map((code) => {
-      const params = new URLSearchParams({
-        from, to: now, status_layer: layer, region_code: code, cell_m: String(resolution),
-      });
-      if (category) params.set('category', category);
-      return api<HeatmapResult>('response', `/map/heatmap?${params}`);
-    })).then((results) => {
-      if (!active) return;
-      const values = results.filter((result): result is PromiseFulfilledResult<HeatmapResult> => result.status === 'fulfilled');
-      if (!values.length) {
-        const first = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
-        setError(first?.reason instanceof Error ? first.reason.message : 'Không thể tải bản đồ nhiệt.');
+    const params = new URLSearchParams({ from, to: now, status_layer: layer, cell_m: String(resolution) });
+    if (category) params.set('category', category);
+    api<HeatmapResult>('response', `/map/heatmap?${params}`)
+      .then((result) => {
+        if (!active) return;
+        setData({ items: result.items, generated_at: now });
+      })
+      .catch((cause) => {
+        if (!active) return;
+        setError(cause instanceof Error ? cause.message : 'Không thể tải bản đồ nhiệt.');
         setData(null);
-        return;
-      }
-      if (values.length < targetRegions.length)
-        setWarning(`Chỉ tải được ${values.length}/${targetRegions.length} khu vực. Số SOS trên bản đồ chưa đầy đủ.`);
-      setData({ items: values.flatMap((result) => result.value.items), generated_at: now });
-    }).finally(() => { if (active) setLoading(false); });
+      })
+      .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [regionKey, layer, category, resolution, refresh]);
+  }, [layer, category, resolution, refresh]);
 
   useEffect(() => {
-    if (!regionKey) return;
     const timer = window.setInterval(() => setRefresh((value) => value + 1), 45_000);
     return () => window.clearInterval(timer);
-  }, [regionKey]);
-
-  const showMap = Boolean(regionKey || validPoint(selected));
+  }, []);
 
   return (
     <div className={`heatmap-panel${compact ? ' heatmap-panel-compact' : ''}`}>
@@ -543,6 +522,7 @@ export function HeatmapPanel({
         <button type="button" className={layer === 'unverified' ? 'active' : ''}
           onClick={() => setLayer('unverified')}>Chưa xác minh</button>
       </div>}
+      {!compact && <>
       <label className="heatmap-category-filter">
         <span>Loại sự cố</span>
         <span className="heatmap-category-select-wrap"><select value={category} onChange={(event) => setCategory(event.target.value)} aria-label="Lọc bản đồ nhiệt theo loại sự cố">
@@ -556,16 +536,33 @@ export function HeatmapPanel({
         <span>{category ? `· ${label(category)}` : '· Tất cả loại sự cố'} · trong 7 ngày gần đây</span>
       </div>
       {selected?.status && <p className="muted">SOS đang chọn: {selected.trackingCode} · {requestStatusLabel(selected.status)}. Ghim vị trí được hiển thị riêng với lớp mật độ.</p>}
-      {showMap && <button type="button" className="button secondary heatmap-refresh" disabled={loading}
-        onClick={() => setRefresh((value) => value + 1)}>Cập nhật SOS trên bản đồ</button>}
-      {!showMap && <p>Chọn khu vực để xem bản đồ nhiệt.</p>}
-      {showMap && <>
+      <button type="button" className="button secondary heatmap-refresh" disabled={loading}
+        onClick={() => setRefresh((value) => value + 1)}>Cập nhật SOS trên bản đồ</button>
+      </>}
+      <>
         {loading && <p role="status">Đang cập nhật bản đồ nhiệt…</p>}
         {error && <p className="notice error" role="alert">{error}</p>}
-        {warning && <p className="notice warning" role="status">{warning}</p>}
-        <HeatmapCanvas key={regionKey} cells={visibleCells} selected={selected} onResolutionChange={onResolutionChange} onZoomChange={onZoomChange} heatOpacity={heatOpacity}
+        <HeatmapCanvas cells={visibleCells} selected={selected} onResolutionChange={onResolutionChange} onZoomChange={onZoomChange} heatOpacity={heatOpacity}
           weather={showWeather ? weatherData?.locations ?? [] : []}
           radarUrl={showRadar ? radarTemplate : null} />
+        {compact ? <div className="weather-layer-control">
+          {weatherData && <small className="muted">
+            {weatherData.locations.some((place) => place.alerts.length)
+              ? `Có ${weatherData.locations.filter((place) => place.alerts.length).length} khu vực có cảnh báo thời tiết trong 24 giờ tới.`
+              : 'Không có cảnh báo thời tiết trong 24 giờ tới.'}
+            {weatherData.stale ? ' Dữ liệu có thể đã cũ.' : ''}
+          </small>}
+          {weatherError && !weatherData && <small className="muted">Chưa tải được cảnh báo thời tiết.</small>}
+          <details>
+            <summary>Lớp bản đồ</summary>
+            <label><input type="checkbox" checked={showWeather} onChange={(event) => setShowWeather(event.target.checked)} />
+              {' '}Cảnh báo thời tiết</label>
+            <label><input type="checkbox" checked={showRadar} onChange={(event) => setShowRadar(event.target.checked)} />
+              {' '}Radar mưa</label>
+            {radarError && showRadar && <small className="muted" role="status">Chưa tải được radar mưa.</small>}
+            {weatherData && <small className="muted">{weatherData.disclaimer} {weatherData.attribution}</small>}
+          </details>
+        </div> : (
         <div className="weather-layer-control">
           <label><input type="checkbox" checked={showWeather} onChange={(event) => setShowWeather(event.target.checked)} />
             {' '}Hiện cảnh báo thời tiết trên bản đồ</label>
@@ -581,7 +578,8 @@ export function HeatmapPanel({
             {weatherData.stale ? ' Dữ liệu có thể đã cũ.' : ''} {weatherData.disclaimer} {weatherData.attribution}
           </small>}
         </div>
-        {data && <>
+        )}
+        {data && !compact && <>
           {zoom > 10 && <label className="heatmap-opacity-control">
             <span>Độ đậm vùng nhiệt</span>
             <input type="range" min="0" max="100" step="5" value={heatOpacity}
@@ -596,15 +594,12 @@ export function HeatmapPanel({
             <small>{count} SOS · 7 ngày gần đây · độ chi tiết {resolution >= 1000 ? `${resolution / 1000} km` : `${resolution} m`}</small>
           </div>
           {zoom > 10 && <p className="muted">Ghim đỏ là khu vực có SOS. Nhấn ghim để xem số yêu cầu và mật độ trong bán kính 1 km.</p>}
-          {compact && validPoint(selected) && <p className="muted">
-            Ghim đỏ nhấp nháy là SOS đang chọn.
-          </p>}
           {count === 0 && <p className="muted">
             Chưa có SOS thuộc lớp dữ liệu và loại sự cố đã chọn trong khu vực và thời gian này.
           </p>}
           <p className="muted">Cập nhật: {timeLabel(data.generated_at)}</p>
         </>}
-      </>}
+      </>
     </div>
   );
 }

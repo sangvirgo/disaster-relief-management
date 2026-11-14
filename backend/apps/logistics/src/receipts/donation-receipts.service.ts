@@ -28,7 +28,6 @@ interface ReceiptContext {
   delivery_status: string;
   donor_user_id: string | null;
   organization_id: string;
-  region_code: string;
   drive_id: string;
 }
 
@@ -39,11 +38,9 @@ interface DeliveryCreateContext {
   drive_id: string;
   drive_status: string;
   organization_id: string;
-  region_code: string;
   intake_warehouse_id: string;
   selected_warehouse_id: string | null;
   selected_organization_id: string | null;
-  selected_region_code: string | null;
   selected_warehouse_status: string | null;
 }
 
@@ -54,10 +51,10 @@ interface CountLine extends ReceiptLineFacts {
 function requireReceiptPermission(
   grants: Parameters<typeof hasWarehouseScope>[0],
   permission: 'DONATION_INTAKE' | 'DONATION_REVIEW',
-  scope: Pick<ReceiptContext, 'organization_id' | 'region_code'>,
+  scope: Pick<ReceiptContext, 'organization_id'>,
 ): void {
-  if (!hasWarehouseScope(grants, scope.organization_id, scope.region_code)) throw new AppError('NOT_FOUND', { status: 404 });
-  requireWarehousePermission(grants, permission, scope.organization_id, scope.region_code);
+  if (!hasWarehouseScope(grants, scope.organization_id)) throw new AppError('NOT_FOUND', { status: 404 });
+  requireWarehousePermission(grants, permission, scope.organization_id);
 }
 
 function expectVersion(actual: number | string, expected: number): void {
@@ -323,21 +320,21 @@ export class DonationReceiptsService {
 
   private assertCreateScope(grants: Parameters<typeof hasWarehouseScope>[0], delivery: DeliveryCreateContext): void {
     const target = delivery.selected_warehouse_id;
-    if (!target || delivery.selected_organization_id !== delivery.organization_id || delivery.selected_region_code !== delivery.region_code) {
+    if (!target || delivery.selected_organization_id !== delivery.organization_id) {
       throw new AppError('VALIDATION_FAILED', { status: 400 });
     }
     if (delivery.selected_warehouse_status !== 'ACTIVE' && delivery.selected_warehouse_id !== delivery.intake_warehouse_id) {
       throw new AppError('VALIDATION_FAILED', { status: 400 });
     }
-    if (!hasWarehouseScope(grants, delivery.organization_id, delivery.region_code)) throw new AppError('NOT_FOUND', { status: 404 });
-    requireWarehousePermission(grants, 'DONATION_INTAKE', delivery.organization_id, delivery.region_code);
+    if (!hasWarehouseScope(grants, delivery.organization_id)) throw new AppError('NOT_FOUND', { status: 404 });
+    requireWarehousePermission(grants, 'DONATION_INTAKE', delivery.organization_id);
   }
 
   private async deliveryForCreate(query: Pick<DataSource | EntityManager, 'query'>, deliveryId: string, warehouseId: string, lock = false): Promise<DeliveryCreateContext> {
     const rows = await query.query(
-      `SELECT dd.id,dd.status,dd.version,d.id AS drive_id,d.status AS drive_status,d.organization_id,iw.region_code,
+      `SELECT dd.id,dd.status,dd.version,d.id AS drive_id,d.status AS drive_status,d.organization_id,
               d.intake_warehouse_id,tw.id AS selected_warehouse_id,tw.organization_id AS selected_organization_id,
-              tw.region_code AS selected_region_code,tw.status AS selected_warehouse_status
+              tw.status AS selected_warehouse_status
          FROM donation_delivery dd JOIN donation_drive d ON d.id=dd.drive_id
          JOIN warehouse iw ON iw.id=d.intake_warehouse_id LEFT JOIN warehouse tw ON tw.id=$2
         WHERE dd.id=$1${lock ? ' FOR UPDATE OF dd' : ''}`,
@@ -350,7 +347,7 @@ export class DonationReceiptsService {
   private async receiptContext(query: Pick<DataSource | EntityManager, 'query'>, id: string, lock = false): Promise<ReceiptContext> {
     const rows = await query.query(
       `SELECT r.id,r.delivery_id,r.warehouse_id,r.version,dd.status AS delivery_status,dd.donor_user_id,
-              w.organization_id,w.region_code,d.id AS drive_id
+              w.organization_id,d.id AS drive_id
          FROM donation_receipt r JOIN donation_delivery dd ON dd.id=r.delivery_id
          JOIN donation_drive d ON d.id=dd.drive_id JOIN warehouse w ON w.id=r.warehouse_id
         WHERE r.id=$1${lock ? ' FOR UPDATE OF r' : ''}`,
@@ -362,7 +359,7 @@ export class DonationReceiptsService {
 
   private async disputeContext(query: Pick<DataSource | EntityManager, 'query'>, id: string, lock = false): Promise<ReceiptContext & { status: string }> {
     const rows = await query.query(
-      `SELECT dis.id,dis.status,dd.id AS delivery_id,dd.donor_user_id,w.organization_id,w.region_code,d.id AS drive_id
+      `SELECT dis.id,dis.status,dd.id AS delivery_id,dd.donor_user_id,w.organization_id,d.id AS drive_id
          FROM donation_dispute dis JOIN donation_delivery dd ON dd.id=dis.delivery_id
          JOIN donation_drive d ON d.id=dd.drive_id JOIN warehouse w ON w.id=d.intake_warehouse_id
         WHERE dis.id=$1${lock ? ' FOR UPDATE OF dis,dd' : ''}`,

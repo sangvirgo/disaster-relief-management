@@ -9,7 +9,7 @@ import { ReporterSessionService } from '../requests/reporter-session';
 import { TeamPageQueryDto } from './teams.dto';
 import { teamView, TeamRow } from './teams.helpers';
 
-const teamSelect = `SELECT t.id,t.organization_id,t.operating_region_code,t.nationwide_coverage,t.name,t.team_kind,t.reporting_mode,
+const teamSelect = `SELECT t.id,t.organization_id,t.name,t.team_kind,t.reporting_mode,
                            t.availability,t.status,t.readiness_required,t.version,t.created_at,
                            COALESCE(s.skills,ARRAY[]::text[]) AS skills,
                            CASE WHEN p.team_id IS NULL THEN NULL ELSE greatest(0,floor(extract(epoch FROM clock_timestamp()-p.captured_at)))::int END AS position_age_s,
@@ -26,7 +26,7 @@ function listFilters(route: string, userId: string, grants: unknown[], query: ob
   return { route, user_id: userId, grants, query: queryFilters };
 }
 
-function readScopeSql(grants: readonly { role_code: keyof typeof ROLE_PERMISSIONS; scope_type: string; organization_id: string | null; region_code?: string | null; campaign_id?: string | null }[], userId: string, values: unknown[], alias = 't'): string {
+function readScopeSql(grants: readonly { role_code: keyof typeof ROLE_PERMISSIONS; scope_type: string; organization_id: string | null; campaign_id?: string | null }[], userId: string, values: unknown[], alias = 't'): string {
   const branches: string[] = [];
   for (const grant of grants) {
     if (grant.role_code === 'ADMIN' && grant.scope_type === 'SYSTEM') {
@@ -37,9 +37,6 @@ function readScopeSql(grants: readonly { role_code: keyof typeof ROLE_PERMISSION
     if (grant.scope_type === 'ORGANIZATION') {
       values.push(grant.organization_id);
       branches.push(`${alias}.organization_id=$${values.length}`);
-    } else if (grant.scope_type === 'REGION' && grant.region_code) {
-      values.push(grant.organization_id, grant.region_code);
-      branches.push(`(${alias}.organization_id=$${values.length - 1} AND ${alias}.operating_region_code=$${values.length})`);
     }
   }
   values.push(userId);
@@ -72,7 +69,6 @@ export class TeamsQueriesService {
       values.push(value);
       conditions.push(clause(values.length));
     };
-    if (query.region_code) add((index) => `t.operating_region_code=$${index}`, query.region_code);
     if (query.availability) add((index) => `t.availability=$${index}`, query.availability);
     if (query.status) add((index) => `t.status=$${index}`, query.status);
     values.push(cursor?.sort[0] ?? null, cursor?.id ?? null);
@@ -87,9 +83,7 @@ export class TeamsQueriesService {
     const items = rows.slice(0, limit);
     const next = more ? items.at(-1) : undefined;
     return {
-      items: items.map((row) => teamView(row, hasPermission(session.grants, 'TEAM_READ', {
-        organizationId: row.organization_id, regionCode: row.operating_region_code,
-      }))),
+      items: items.map((row) => teamView(row, hasPermission(session.grants, 'TEAM_READ', { organizationId: row.organization_id }))),
       more,
       ...(next ? { cursor: encodeKeysetCursor([next.id], next.id, filters) } : {}),
     };
@@ -99,9 +93,7 @@ export class TeamsQueriesService {
     const session = await this.sessions.require(request);
     const row = await this.findTeam(this.dataSource, teamId);
     if (!row) throw new AppError('NOT_FOUND', { status: 404 });
-    const coordinatorRead = hasPermission(session.grants, 'TEAM_READ', {
-      organizationId: row.organization_id, regionCode: row.operating_region_code,
-    });
+    const coordinatorRead = hasPermission(session.grants, 'TEAM_READ', { organizationId: row.organization_id });
     if (!coordinatorRead) {
       const members = await this.dataSource.query(
         'SELECT 1 FROM team_member WHERE team_id=$1 AND user_id=$2 AND left_at IS NULL LIMIT 1',

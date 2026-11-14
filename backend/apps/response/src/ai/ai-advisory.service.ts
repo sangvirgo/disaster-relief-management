@@ -3,7 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
 import { buildAiAssessmentInput } from './ai-risk';
-import { isAiAdvisoryFresh } from './ai-advisory-input';
+import { enqueueAiAdvisory, isAiAdvisoryFresh } from './ai-advisory-input';
 
 interface AdvisoryJob {
   id: string;
@@ -101,6 +101,7 @@ function hasVietnameseText(value: string): boolean {
 export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AiAdvisoryService.name);
   private timer?: NodeJS.Timeout;
+  private backfillTimer?: NodeJS.Timeout;
   private running = false;
 
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
@@ -108,11 +109,37 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
   onModuleInit(): void {
     this.timer = setInterval(() => void this.processOne(), 2_000);
     this.timer.unref();
+    this.backfillTimer = setInterval(() => void this.backfillOpenRequests(), 60_000);
+    this.backfillTimer.unref();
+    void this.backfillOpenRequests();
     void this.processOne();
   }
 
   onModuleDestroy(): void {
     if (this.timer) clearInterval(this.timer);
+    if (this.backfillTimer) clearInterval(this.backfillTimer);
+  }
+
+  /**
+   * Requests created outside the intake API (imports, seed data) never had an advisory queued.
+   * Queue one for open, unverified requests that have none, a few at a time. Advisory only:
+   * a coordinator still reviews every result.
+   */
+  private async backfillOpenRequests(): Promise<void> {
+    if (!process.env.GEMINI_API_KEY) return;
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT r.id FROM assistance_request r
+          WHERE r.status IN ('SUBMITTED','VERIFYING') AND r.review_lane='NORMAL'
+            AND NOT EXISTS (SELECT 1 FROM ai_advisory a WHERE a.request_id=r.id)
+          ORDER BY r.received_at DESC LIMIT 10`,
+      ) as Array<{ id: string }>;
+      for (const row of rows) {
+        await this.dataSource.transaction((manager) => enqueueAiAdvisory(manager, row.id));
+      }
+    } catch {
+      this.logger.warn('AI_ADVISORY_BACKFILL_FAILED');
+    }
   }
 
   private async processOne(): Promise<void> {

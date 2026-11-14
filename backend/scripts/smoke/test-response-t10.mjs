@@ -10,7 +10,6 @@ const identityUrl = requiredEnv('C48_IDENTITY_BASE_URL').replace(/\/+$/u, '');
 const responseDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
 const organizationId = randomUUID();
-const regionCode = `T10_${randomBytes(5).toString('hex').toUpperCase()}`;
 const users = [];
 const notices = [randomUUID(), randomUUID(), randomUUID()];
 const requestId = randomUUID();
@@ -75,9 +74,9 @@ async function registerAndLogin(label) {
 
   if (label === 'coordinator') {
     await identityDb.query(
-      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id,region_code)
-       VALUES ($1,'COORDINATOR','REGION',$2,$3)`,
-      [userId, organizationId, regionCode],
+      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
+       VALUES ($1,'COORDINATOR','ORGANIZATION',$2)`,
+      [userId, organizationId],
     );
   }
 
@@ -111,15 +110,6 @@ try {
     `INSERT INTO organization (id,name,organization_kind)
      VALUES ($1,$2,'COORDINATION')`,
     [otherOrganizationId, `T10 scope fixture ${otherOrganizationId}`],
-  );
-  await identityDb.query(
-    'INSERT INTO region (code,name) VALUES ($1,$2)',
-    [regionCode, 'Khu vực kiểm thử T10'],
-  );
-  await responseDb.query(
-    `INSERT INTO region_boundary (region_code,geom)
-     VALUES ($1,ST_Multi(ST_GeomFromText('POLYGON((104 14,106 14,106 16,104 16,104 14))',4326)))`,
-    [regionCode],
   );
 
   const coordinator = await registerAndLogin('coordinator');
@@ -161,7 +151,6 @@ try {
   const campaignCreateBody = {
     name: 'Chiến dịch kiểm thử T10',
     objective: 'Kiểm tra API chiến dịch và báo cáo',
-    region_code: regionCode,
     starts_at: new Date(Date.now() - 60_000).toISOString(),
     ends_at: new Date(Date.now() + 86_400_000).toISOString(),
   };
@@ -267,28 +256,14 @@ try {
   assert.deepEqual(publicCampaigns.map((item) => item.id).sort(), [campaignId, secondCampaignId].sort());
   const publicCampaign = publicCampaigns.find((item) => item.id === campaignId);
   assert.ok(publicCampaign, 'active campaign should be publicly listed');
-  assert.deepEqual(Object.keys(publicCampaign).sort(), ['ends_at', 'id', 'objective', 'region_name', 'starts_at', 'status', 'title'].sort());
-  assert.equal(publicCampaign.region_name, 'Khu vực kiểm thử T10');
+  assert.deepEqual(Object.keys(publicCampaign).sort(), ['ends_at', 'id', 'objective', 'starts_at', 'status', 'title'].sort());
 
   const responseToken = await createServiceToken(requiredEnv('RESPONSE_SERVICE_CLIENT_ID'), requiredEnv('RESPONSE_SERVICE_CLIENT_SECRET'), 'identity');
-  const unauthenticatedRegionLookup = await call(identityUrl, 'internal/regions:lookup', {
-    method: 'POST', body: { codes: [regionCode] },
-  });
-  assert.equal(unauthenticatedRegionLookup.status, 401, JSON.stringify(unauthenticatedRegionLookup.value));
-  assert.equal(unauthenticatedRegionLookup.value?.code, 'UNAUTHENTICATED');
-  assert.match(unauthenticatedRegionLookup.value?.message ?? '', /[\u0102-\u01b0\u1ea0-\u1ef9]/u, 'expected Vietnamese user-facing copy');
-  const regionLookup = await call(identityUrl, 'internal/regions:lookup', {
-    method: 'POST', body: { codes: [regionCode] }, headers: bearer(responseToken),
-  });
-  expectSuccess(regionLookup);
-  assert.deepEqual(regionLookup.value.items, [{ code: regionCode, name: 'Khu vực kiểm thử T10' }]);
-
   const identityToken = await createServiceToken(requiredEnv('IDENTITY_SERVICE_CLIENT_ID'), requiredEnv('IDENTITY_SERVICE_CLIENT_SECRET'), 'response');
   const internalCampaign = await call(responseUrl, `internal/campaigns/${campaignId}`, { headers: bearer(identityToken) });
   expectSuccess(internalCampaign);
-  assert.deepEqual(Object.keys(internalCampaign.value).sort(), ['id', 'organization_id', 'region_code', 'status', 'version'].sort());
+  assert.deepEqual(Object.keys(internalCampaign.value).sort(), ['id', 'organization_id', 'status', 'version'].sort());
   assert.equal(internalCampaign.value.organization_id, organizationId);
-  assert.equal(internalCampaign.value.region_code, regionCode);
 
   const draftToClose = await call(responseUrl, 'campaigns', {
     method: 'POST', body: { ...campaignCreateBody, name: 'Chiến dịch đóng từ bản nháp T10' },
@@ -326,9 +301,9 @@ try {
   const secondOfferAt = new Date(receivedAt.getTime() + 22 * 60_000);
   await responseDb.query(
     `INSERT INTO assistance_request
-       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,region_code,status,priority,priority_basis,received_at)
-     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,$5,'DISPATCHED','P2','COMPLETE',$6)`,
-    [requestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, organizationId, regionCode, receivedAt],
+       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,status,priority,priority_basis,received_at)
+     VALUES ($1,$2,'UNKNOWN','SELF',$3,'DISPATCHED','P2','COMPLETE',$4)`,
+    [requestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, organizationId, receivedAt],
   );
   await responseDb.query(
     `INSERT INTO request_subject (request_id,location,location_source)
@@ -338,7 +313,7 @@ try {
   const approvedFacts = {
     report_mode: 'SELF', incident_category_code: 'UNKNOWN', description: 'Yêu cầu báo cáo kiểm thử T10.',
     reporter_name: null, reporter_contact_phone: null, reporter_declared_danger: false,
-    region_code: regionCode, campaign_id: null, people_affected: 1,
+    campaign_id: null, people_affected: 1,
     location: { type: 'Point', coordinates: [105, 15], source: 'MANUAL_PIN' },
   };
   const [verificationEvent] = (await responseDb.query(
@@ -355,9 +330,9 @@ try {
 
   await responseDb.query(
     `INSERT INTO assistance_request
-       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,region_code,status,received_at)
-     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,$5,'SUBMITTED',$6)`,
-    [unverifiedRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, organizationId, regionCode, receivedAt],
+       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,status,received_at)
+     VALUES ($1,$2,'UNKNOWN','SELF',$3,'SUBMITTED',$4)`,
+    [unverifiedRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, organizationId, receivedAt],
   );
   await responseDb.query(
     `INSERT INTO request_subject (request_id,location,location_source)
@@ -367,9 +342,9 @@ try {
 
   await responseDb.query(
     `INSERT INTO assistance_request
-       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,region_code,status,received_at)
-     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,$5,'SUBMITTED',$6)`,
-    [duplicateRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, organizationId, regionCode, receivedAt],
+       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,status,received_at)
+     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,'SUBMITTED',$5)`,
+    [duplicateRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, organizationId, receivedAt],
   );
   await responseDb.query(
     `INSERT INTO request_subject (request_id,location,location_source)
@@ -379,9 +354,9 @@ try {
 
   await responseDb.query(
     `INSERT INTO assistance_request
-       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,region_code,status,received_at)
-     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,$5,'VERIFIED',$6)`,
-    [outOfScopeRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, otherOrganizationId, regionCode, receivedAt],
+       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,status,received_at)
+     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,'VERIFIED',$5)`,
+    [outOfScopeRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, otherOrganizationId, receivedAt],
   );
   await responseDb.query(
     `INSERT INTO request_subject (request_id,location,location_source)
@@ -451,10 +426,10 @@ try {
   assert.equal(duplicateAttach.value.version, 3);
 
   await responseDb.query(
-    `INSERT INTO rescue_team (id,organization_id,operating_region_code,name,team_kind,reporting_mode,external_contact_note)
-     VALUES ($1,$3,$4,$5,'OTHER','COORDINATOR','Đội kiểm thử T10'),
-            ($2,$3,$4,$6,'OTHER','COORDINATOR','Đội kiểm thử T10')`,
-    [missionTeamIds[0], missionTeamIds[1], organizationId, regionCode, `T10 đội 1 ${missionTeamIds[0]}`, `T10 đội 2 ${missionTeamIds[1]}`],
+    `INSERT INTO rescue_team (id,organization_id,name,team_kind,reporting_mode,external_contact_note)
+     VALUES ($1,$3,$4,'OTHER','COORDINATOR','Đội kiểm thử T10'),
+            ($2,$3,$5,'OTHER','COORDINATOR','Đội kiểm thử T10')`,
+    [missionTeamIds[0], missionTeamIds[1], organizationId, `T10 đội 1 ${missionTeamIds[0]}`, `T10 đội 2 ${missionTeamIds[1]}`],
   );
   await responseDb.query('UPDATE assistance_request SET attribution_locked_at=now() WHERE id=$1', [requestId]);
   await responseDb.query(
@@ -466,8 +441,8 @@ try {
   );
   const from = new Date(receivedAt.getTime() - 60_000).toISOString();
   const to = new Date(Date.now() + 60_000).toISOString();
-  const dateRegionFilter = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&region_code=${encodeURIComponent(regionCode)}`;
-  const campaignFilter = `${dateRegionFilter}&campaign_id=${campaignId}`;
+  const dateFilter = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  const campaignFilter = `${dateFilter}&campaign_id=${campaignId}`;
   const heatmap = await call(responseUrl, `map/heatmap?${campaignFilter}&status_layer=confirmed&cell_m=1000`, { headers: coordinatorAuth });
   expectSuccess(heatmap);
   assert.equal(heatmap.value.items.length, 1, JSON.stringify(heatmap.value));
@@ -493,10 +468,6 @@ try {
   assert.equal(unverifiedHeatmap.value.items[0].center.type, 'Point');
   assert.equal(JSON.stringify(unverifiedHeatmap.value).includes(unverifiedRequestId), false, 'unverified heatmap must not expose request identifiers');
 
-  const regionHeatmap = await call(responseUrl, `map/heatmap?${dateRegionFilter}&status_layer=confirmed&cell_m=1000`, { headers: coordinatorAuth });
-  expectSuccess(regionHeatmap);
-  assert.equal(regionHeatmap.value.items.length, 1, JSON.stringify(regionHeatmap.value));
-  assert.equal(regionHeatmap.value.items[0].count, 1, 'regional map excludes duplicates and requests outside the coordinator organization');
 
   const paused = await call(responseUrl, `campaigns/${campaignId}/pause`, {
     method: 'POST', body: { expected_version: 3, reason: 'Hoàn tất kiểm tra trạng thái' },
@@ -539,17 +510,6 @@ try {
   assert.equal(summary.value.median_seconds.receipt_to_verification, 240);
   assert.equal(summary.value.median_seconds.receipt_to_assignment, 300);
 
-  const regionSummary = await call(responseUrl, `reports/summary?${dateRegionFilter}`, { headers: coordinatorAuth });
-  expectSuccess(regionSummary);
-  assert.equal(regionSummary.value.status_counts.DISPATCHED, 1);
-  assert.equal(regionSummary.value.status_counts.DUPLICATE, 1);
-  assert.equal(regionSummary.value.status_counts.SUBMITTED, 1);
-  assert.equal(Object.hasOwn(regionSummary.value.status_counts, 'VERIFIED'), false, 'report scope excludes the fixture from another organization');
-  assert.equal(regionSummary.value.priority_counts.P2, 1);
-  assert.equal(regionSummary.value.active_missions, 2);
-  assert.equal(regionSummary.value.overdue_missions, 1);
-  assert.equal(regionSummary.value.median_seconds.receipt_to_verification, 240);
-  assert.equal(regionSummary.value.median_seconds.receipt_to_assignment, 300);
 
   const blockedClose = await call(responseUrl, `campaigns/${campaignId}/close`, {
     method: 'POST', body: { expected_version: 4, reason: 'Đóng để kiểm tra yêu cầu còn mở.' },
@@ -581,9 +541,9 @@ try {
 
   await responseDb.query(
     `INSERT INTO assistance_request
-       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,region_code,status,received_at)
-     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,$5,'SUBMITTED',now())`,
-    [closeRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, otherRecipient.id, organizationId, regionCode],
+       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,status,received_at)
+     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,'SUBMITTED',now())`,
+    [closeRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, otherRecipient.id, organizationId],
   );
   await responseDb.query(
     `INSERT INTO request_subject (request_id,people_affected,location,location_source,location_accuracy_m,location_captured_at)

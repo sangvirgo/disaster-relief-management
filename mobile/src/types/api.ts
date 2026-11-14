@@ -21,9 +21,8 @@ export interface User {
 export interface RoleGrant {
   id: string;
   role_code: UserRole;
-  scope_type: 'SYSTEM' | 'ORGANIZATION' | 'REGION' | 'CAMPAIGN';
+  scope_type: 'SYSTEM' | 'ORGANIZATION' | 'CAMPAIGN';
   organization_id?: string | null;
-  region_code?: string | null;
   campaign_id?: string | null;
 }
 
@@ -245,13 +244,6 @@ export interface TeamSkillOption {
   display_name: string;
 }
 
-export interface RegionItem {
-  code: string;
-  name: string;
-  status: 'ACTIVE' | 'INACTIVE';
-  version: number;
-}
-
 export interface TeamPositionLocation {
   type: 'Point';
   coordinates: [number, number];
@@ -311,7 +303,6 @@ export interface PublicCampaign {
   title: string;
   objective?: string | null;
   status: 'ACTIVE' | 'PAUSED';
-  region_name?: string | null;
   starts_at?: string | null;
   ends_at?: string | null;
 }

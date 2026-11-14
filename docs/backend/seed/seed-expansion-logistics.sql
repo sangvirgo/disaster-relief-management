@@ -19,8 +19,8 @@ SELECT fixture.id, fixture.item_type_code, fixture.unit_code, fixture.name
  WHERE true
 ON CONFLICT DO NOTHING;
 
-INSERT INTO warehouse (id, organization_id, region_code, name, address_note, location, location_public) VALUES
-  ('00000000-0000-4000-8000-0000000a2010', '00000000-0000-4000-8000-000000000001', 'DEMO_C', 'Kho phân phối Bắc Demo C',
+INSERT INTO warehouse (id, organization_id, name, address_note, location, location_public) VALUES
+  ('00000000-0000-4000-8000-0000000a2010', '00000000-0000-4000-8000-000000000001', 'Kho phân phối Bắc Demo C',
    'Địa điểm giả lập phục vụ trình diễn tại Demo C', ST_GeogFromText('SRID=4326;POINT(105.8800 21.0400)'), false)
 ON CONFLICT DO NOTHING;
 
@@ -30,12 +30,11 @@ SELECT fixture.id, fixture.campaign_id, 'ACTIVE', now(), fixture.organization_id
        fixture.title, fixture.description, 'OPEN', now() - interval '1 day', now() + interval '12 days', now() - interval '1 day'
   FROM (VALUES
     ('00000000-0000-4000-8000-0000000a6010'::uuid, '00000000-0000-4000-8000-0000000000c3'::uuid,
-     '00000000-0000-4000-8000-000000000001'::uuid, 'Quyên góp nhu yếu phẩm khu vực Bắc Demo C',
+     '00000000-0000-4000-8000-000000000001'::uuid, 'Quyên góp nhu yếu phẩm Bắc Demo C',
      'Tiếp nhận lương thực, nước uống, vật tư y tế và chăn màn tại kho giả lập Demo C.')
   ) AS fixture(id, campaign_id, organization_id, title, description)
   JOIN warehouse ON warehouse.id = '00000000-0000-4000-8000-0000000a2010'
                 AND warehouse.organization_id = fixture.organization_id
-                AND warehouse.region_code = 'DEMO_C'
                 AND warehouse.name = 'Kho phân phối Bắc Demo C'
  WHERE true
 ON CONFLICT DO NOTHING;
@@ -43,10 +42,10 @@ ON CONFLICT DO NOTHING;
 INSERT INTO drive_item (drive_id, item_id, target_quantity, acceptance_note)
 SELECT drive.id, item.id, fixture.target_quantity, fixture.acceptance_note
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000a6010'::uuid, 'Quyên góp nhu yếu phẩm khu vực Bắc Demo C', '00000000-0000-4000-8000-0000000a1010'::uuid, 'Gạo đóng túi Demo C', 100.000::numeric, 'Bao gói nguyên vẹn, còn hạn sử dụng'),
-    ('00000000-0000-4000-8000-0000000a6010'::uuid, 'Quyên góp nhu yếu phẩm khu vực Bắc Demo C', '00000000-0000-4000-8000-0000000a1011'::uuid, 'Nước uống đóng chai Demo C', 240.000::numeric, 'Chai nguyên niêm phong'),
-    ('00000000-0000-4000-8000-0000000a6010'::uuid, 'Quyên góp nhu yếu phẩm khu vực Bắc Demo C', '00000000-0000-4000-8000-0000000a1012'::uuid, 'Bộ sơ cứu cộng đồng Demo C', 40.000::numeric, 'Bộ dụng cụ còn nguyên vẹn'),
-    ('00000000-0000-4000-8000-0000000a6010'::uuid, 'Quyên góp nhu yếu phẩm khu vực Bắc Demo C', '00000000-0000-4000-8000-0000000a1013'::uuid, 'Chăn giữ nhiệt Demo C', 60.000::numeric, NULL::text)
+    ('00000000-0000-4000-8000-0000000a6010'::uuid, 'Quyên góp nhu yếu phẩm Bắc Demo C', '00000000-0000-4000-8000-0000000a1010'::uuid, 'Gạo đóng túi Demo C', 100.000::numeric, 'Bao gói nguyên vẹn, còn hạn sử dụng'),
+    ('00000000-0000-4000-8000-0000000a6010'::uuid, 'Quyên góp nhu yếu phẩm Bắc Demo C', '00000000-0000-4000-8000-0000000a1011'::uuid, 'Nước uống đóng chai Demo C', 240.000::numeric, 'Chai nguyên niêm phong'),
+    ('00000000-0000-4000-8000-0000000a6010'::uuid, 'Quyên góp nhu yếu phẩm Bắc Demo C', '00000000-0000-4000-8000-0000000a1012'::uuid, 'Bộ sơ cứu cộng đồng Demo C', 40.000::numeric, 'Bộ dụng cụ còn nguyên vẹn'),
+    ('00000000-0000-4000-8000-0000000a6010'::uuid, 'Quyên góp nhu yếu phẩm Bắc Demo C', '00000000-0000-4000-8000-0000000a1013'::uuid, 'Chăn giữ nhiệt Demo C', 60.000::numeric, NULL::text)
   ) AS fixture(drive_id, drive_title, item_id, item_name, target_quantity, acceptance_note)
   JOIN donation_drive drive ON drive.id = fixture.drive_id AND drive.title = fixture.drive_title
                            AND drive.campaign_id = '00000000-0000-4000-8000-0000000000c3'
@@ -67,7 +66,7 @@ SELECT fixture.id, fixture.public_code, drive.id, drive.organization_id, fixture
     ('00000000-0000-4000-8000-0000000a7014'::uuid, 'GD7K2N04', 'Nhà hảo tâm giả lập 14', '0900000304', NULL::text, interval '1 hour')
   ) AS fixture(id, public_code, donor_name, donor_phone, capability_hash, age)
   JOIN donation_drive drive ON drive.id = '00000000-0000-4000-8000-0000000a6010'
-                           AND drive.title = 'Quyên góp nhu yếu phẩm khu vực Bắc Demo C'
+                           AND drive.title = 'Quyên góp nhu yếu phẩm Bắc Demo C'
                            AND drive.campaign_id = '00000000-0000-4000-8000-0000000000c3'
                            AND drive.organization_id = '00000000-0000-4000-8000-000000000001'
                            AND drive.intake_warehouse_id = '00000000-0000-4000-8000-0000000a2010'
@@ -125,7 +124,7 @@ SELECT fixture.balance_id, warehouse.id, item.id
   ) AS fixture(balance_id, item_id, item_name)
   JOIN warehouse ON warehouse.id = '00000000-0000-4000-8000-0000000a2010'
                 AND warehouse.organization_id = '00000000-0000-4000-8000-000000000001'
-                AND warehouse.region_code = 'DEMO_C' AND warehouse.name = 'Kho phân phối Bắc Demo C'
+                AND warehouse.name = 'Kho phân phối Bắc Demo C'
   JOIN item ON item.id = fixture.item_id AND item.name = fixture.item_name
  WHERE true
 ON CONFLICT DO NOTHING;
@@ -143,7 +142,7 @@ SELECT balance.id, 'OPENING', fixture.quantity, 0, fixture.operation_ref,
                              AND balance.warehouse_id = fixture.warehouse_id AND balance.item_id = fixture.item_id
   JOIN warehouse ON warehouse.id = fixture.warehouse_id
                 AND warehouse.organization_id = '00000000-0000-4000-8000-000000000001'
-                AND warehouse.region_code = 'DEMO_C' AND warehouse.name = 'Kho phân phối Bắc Demo C'
+                AND warehouse.name = 'Kho phân phối Bắc Demo C'
   JOIN item ON item.id = fixture.item_id AND item.name = fixture.item_name
  WHERE true
 ON CONFLICT DO NOTHING;
@@ -156,7 +155,7 @@ SELECT fixture.id, warehouse.id, warehouse.organization_id, fixture.campaign_id,
      '00000000-0000-4000-8000-0000000000c3'::uuid)
   ) AS fixture(id, warehouse_id, campaign_id)
   JOIN warehouse ON warehouse.id = fixture.warehouse_id AND warehouse.organization_id = '00000000-0000-4000-8000-000000000001'
-                AND warehouse.region_code = 'DEMO_C' AND warehouse.name = 'Kho phân phối Bắc Demo C'
+                AND warehouse.name = 'Kho phân phối Bắc Demo C'
  WHERE true
 ON CONFLICT DO NOTHING;
 
@@ -174,7 +173,7 @@ SELECT fixture.id, distribution.id, warehouse.id, item.id, fixture.quantity
                    AND distribution.organization_id = '00000000-0000-4000-8000-000000000001'
   JOIN warehouse ON warehouse.id = fixture.warehouse_id
                 AND warehouse.organization_id = '00000000-0000-4000-8000-000000000001'
-                AND warehouse.region_code = 'DEMO_C' AND warehouse.name = 'Kho phân phối Bắc Demo C'
+                AND warehouse.name = 'Kho phân phối Bắc Demo C'
   JOIN item ON item.id = fixture.item_id AND item.name = fixture.item_name
  WHERE true
 ON CONFLICT DO NOTHING;

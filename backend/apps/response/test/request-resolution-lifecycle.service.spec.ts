@@ -16,7 +16,7 @@ describe('RequestResolutionLifecycleService', () => {
         statements.push(sql);
         if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
           id: requestId, status: 'IN_PROGRESS', version: 5, work_cycle: 2, organization_id: organizationId,
-          region_code: 'DEMO_A', campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
+          campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
         }];
         if (sql.includes('INSERT INTO resolution_intent')) return [{ id: intentId }];
         if (sql.includes('UPDATE assistance_request')) return [[{ id: requestId, version: 6 }], 1];
@@ -25,7 +25,7 @@ describe('RequestResolutionLifecycleService', () => {
     };
     const dataSource = { query: jest.fn(async () => [{
       id: requestId, status: 'IN_PROGRESS', version: 5, work_cycle: 2, organization_id: organizationId,
-      region_code: 'DEMO_A', campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
+      campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
     }]) };
     const idempotency = {
       execute: jest.fn(async (_source: unknown, command: IdempotentCommand<Record<string, unknown>>) => {
@@ -53,14 +53,14 @@ describe('RequestResolutionLifecycleService', () => {
     const dataSource = {
       query: jest.fn(async (): Promise<unknown[]> => [{
         id: requestId, status: 'CANCELLED', version: 7, work_cycle: 2, organization_id: organizationId,
-        region_code: 'DEMO_A', campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
+        campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
       }]),
     };
     const replayManager = {
       query: jest.fn(async () => [{
         id: intentId, request_id: requestId, kind: 'CANCELLATION', state: 'COMPLETED', version: 2,
         work_cycle: 2, request_status: 'CANCELLED', request_version: 7, organization_id: organizationId,
-        region_code: 'DEMO_A', campaign_id: null,
+        campaign_id: null,
       }]),
     };
     let replayCommand: IdempotentCommand<Record<string, unknown>> | undefined;
@@ -105,13 +105,13 @@ describe('RequestResolutionLifecycleService', () => {
       id: intentId, request_id: requestId, work_cycle: 2, kind: 'RESOLUTION', state: 'PENDING',
       actor_user_id: userId, expected_request_version: 9, previous_status: 'TRIAGED', reason: 'Hoàn tất',
       request_status: 'RESOLVING', request_version: 9, logistics_admitted_at: new Date(),
-      organization_id: organizationId, region_code: 'DEMO_A', campaign_id: null,
+      organization_id: organizationId, campaign_id: null,
       reporter_user_id: null, outcome_basis: 'RESCUE_COMPLETED',
     };
     const operation = () => ({
       id: intentId, request_id: requestId, kind: 'RESOLUTION', state: intentState, version: 1, work_cycle: 2,
       request_status: 'RESOLVING', request_version: 9, organization_id: organizationId,
-      region_code: 'DEMO_A', campaign_id: null,
+      campaign_id: null,
     });
     const manager = {
       query: jest.fn(async (sql: string) => {
@@ -141,7 +141,7 @@ describe('RequestResolutionLifecycleService', () => {
       }] })),
       requestCoordinatorGrants: jest.fn(async () => [{
         user_id: userId, role_code: 'COORDINATOR', scope_type: 'ORGANIZATION',
-        organization_id: organizationId, region_code: null, campaign_id: null,
+        organization_id: organizationId, campaign_id: null,
       }]),
     };
     const logistics = { seal: jest.fn(async () => { startSeal(); await sealGate; }), freeze: jest.fn(), unseal: jest.fn() };
@@ -175,7 +175,7 @@ describe('RequestResolutionLifecycleService', () => {
     const completedOperation = {
       id: intentId, request_id: requestId, kind: 'RESOLUTION', state: 'COMPLETED', version: 2, work_cycle: 2,
       request_status: 'RESOLVED', request_version: 10, organization_id: organizationId,
-      region_code: 'DEMO_A', campaign_id: null,
+      campaign_id: null,
     };
     const manager = {
       query: jest.fn(async (sql: string) => {

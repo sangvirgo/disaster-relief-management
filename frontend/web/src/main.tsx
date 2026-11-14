@@ -27,7 +27,6 @@ import {
 import { useUrlView } from './app/useUrlView';
 import { assetViews, donationViews, intakeSteps, missionViews, noticeViews, reportViews, reviewViews } from './app/routeViews';
 import { label, requestStatusLabel, timeLabel } from './i18n/labels';
-import { AnalyticsRegionField, useAnalyticsRegion } from './components/AnalyticsRegion';
 import { CitizenAccount, CitizenRequests, requestStatusTone } from './features/citizen/CitizenAccount';
 import { clearAllSosDrafts } from './features/citizen/sosDraft';
 import type { components as ResponseComponents } from './api/generated/response';
@@ -1054,7 +1053,6 @@ function RecordCard({ item, onOpen, clickable = false }: { item: Record<string, 
   const subtitle =
     text(item.objective) ||
     text(item.description) ||
-    text(item.region_name) ||
     text(item.username) ||
     text(item.address_note);
   const status = text(item.status) || text(item.review_lane);
@@ -1260,7 +1258,6 @@ function PublicCampaignDialog({ campaign, onClose }: { campaign: Record<string, 
       <p className="campaign-dialog-objective">{text(campaign.objective) || 'Chưa có mô tả mục tiêu.'}</p>
       <dl className="fact-list">
         <div><dt>Trạng thái</dt><dd><StatusBadge status={text(campaign.status) || ''} /></dd></div>
-        <div><dt>Khu vực</dt><dd>{text(campaign.region_name) || 'Chưa ghi khu vực'}</dd></div>
         <div><dt>Bắt đầu</dt><dd>{campaign.starts_at ? timeLabel(campaign.starts_at) : 'Chưa ấn định'}</dd></div>
         <div><dt>Kết thúc</dt><dd>{campaign.ends_at ? timeLabel(campaign.ends_at) : 'Chưa ấn định'}</dd></div>
       </dl>
@@ -1269,13 +1266,6 @@ function PublicCampaignDialog({ campaign, onClose }: { campaign: Record<string, 
 }
 
 function LivePage({ page, user }: { page: Page; user: Me | null }) {
-  const {
-    region,
-    setRegion,
-    regions,
-    loading: regionLoading,
-    error: regionError,
-  } = useAnalyticsRegion(page.path === '/reports/summary', true, false, user ? `reliva:response-region:${user.id}` : undefined);
   const [data, setData] = useState<DataPage | null>(null);
   const [error, setError] = useState('');
   const [forbidden, setForbidden] = useState(false);
@@ -1302,7 +1292,6 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
   const isResponseSummary = page.service === 'response' && page.path === '/reports/summary';
   useEffect(() => {
     if (!page.service || !page.path) return;
-    if (isResponseSummary && !region && (regionLoading || !regions.length)) return;
     let active = true;
     setLoading(true);
     setError('');
@@ -1313,26 +1302,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
       to: now.toISOString(),
     });
     const load = async (): Promise<DataPage> => {
-      if (isResponseSummary) {
-        const scopes = region ? [region] : regions;
-        const summaries = await Promise.all(scopes.map((code) =>
-          api<DataPage>('response', `/reports/summary?${summaryWindow}&region_code=${encodeURIComponent(code)}`)
-        ));
-        if (summaries.length === 1) return summaries[0];
-        const addCounts = (key: 'status_counts' | 'priority_counts') =>
-          summaries.reduce<Record<string, number>>((totals, summary) => {
-            for (const [status, count] of Object.entries(summary[key] || {}))
-              totals[status] = (totals[status] || 0) + count;
-            return totals;
-          }, {});
-        return {
-          status_counts: addCounts('status_counts'),
-          priority_counts: addCounts('priority_counts'),
-          active_missions: summaries.reduce((total, summary) => total + (summary.active_missions || 0), 0),
-          overdue_missions: summaries.reduce((total, summary) => total + (summary.overdue_missions || 0), 0),
-          generated_at: summaries.map((summary) => summary.generated_at).filter(Boolean).sort().at(-1),
-        };
-      }
+      if (isResponseSummary) return api<DataPage>('response', `/reports/summary?${summaryWindow}`);
       const path = page.path! + `${page.path!.includes('?') ? '&' : '?'}limit=${LIST_PAGE_SIZE}` +
         (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
       return api<DataPage>(page.service!, path);
@@ -1353,7 +1323,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
     return () => {
       active = false;
     };
-  }, [page, cursor, user, region, regions, regionLoading, isResponseSummary]);
+  }, [page, cursor, user, isResponseSummary]);
   if (!page.service || !page.path)
     return (
       <div className="card">
@@ -1373,26 +1343,8 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
       {page.note && page.path !== '/reports/summary' && <p>{page.note}</p>}
       {page.path === '/reports/summary' && (
         <>
-          <p className="muted">Mặc định xem SOS trên toàn Việt Nam trong phạm vi được cấp quyền. Chọn một khu vực để lọc bản đồ và xem số liệu chi tiết.</p>
-          <AnalyticsRegionField
-            region={region}
-            onChange={(value) => {
-              setCursor(null);
-              setData(null);
-              setRegion(value);
-            }}
-            regions={regions}
-            title="Khu vực"
-            hint="Dùng chung cho bản đồ nhiệt và số liệu"
-            allowAll
-          />
-          {regionError && (
-            <p role="alert" className="notice error">
-              {regionError}
-            </p>
-          )}
-          {!region && !regionLoading && !regions.length && <p className="muted">Chưa tìm thấy khu vực được cấp quyền để tổng hợp số liệu.</p>}
-          <div className="report-heatmap"><CoordinatorMap region={region} regions={regions} /></div>
+          <p className="muted">Xem SOS trên bản đồ và số liệu trong phạm vi được cấp quyền của tài khoản.</p>
+          <div className="report-heatmap"><CoordinatorMap /></div>
         </>
       )}
       {loading && <p role="status">Đang tải dữ liệu…</p>}
@@ -1439,7 +1391,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
                   <strong>
                     {Object.values(data.status_counts || {}).reduce((sum, count) => sum + count, 0)}
                   </strong>
-                  <small>{region ? 'Trong khu vực đã chọn' : 'Trong các khu vực được cấp quyền'}</small>
+                  <small>Trong phạm vi được cấp quyền</small>
                 </div>
               </div>
               <div className="report-breakdown">

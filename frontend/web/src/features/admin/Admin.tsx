@@ -27,7 +27,6 @@ type Detail = Row & {
     role_code: string;
     scope_type: string;
     organization_id: string | null;
-    region_code: string | null;
     campaign_id?: string | null;
     revoked_at: string | null;
   }[];
@@ -48,7 +47,6 @@ const types: Record<string, string> = {
   app_user: 'Người dùng',
   role_grant: 'Quyền truy cập',
   organization: 'Tổ chức',
-  region: 'Khu vực',
 };
 
 export function Admin({ page }: { page: string }) {
@@ -77,22 +75,15 @@ export function Admin({ page }: { page: string }) {
   const searchTerm = query.trim();
   const queryError = page === 'users' && searchTerm.length > 64 ? 'Từ khóa tìm kiếm không được vượt quá 64 ký tự.' : '';
   const [organizationOptions, setOrganizationOptions] = useState<{ value: string; label: string }[]>([]);
-  const [regionOptions, setRegionOptions] = useState<{ value: string; label: string }[]>([]);
   const listPath =
-    page === 'regions'
-      ? '/regions'
-      : page === 'organizations'
-        ? '/organizations'
-        : page === 'audit'
-          ? `/audit-logs?entity_type=${auditType}`
-          : '/users';
+    page === 'organizations'
+      ? '/organizations'
+      : page === 'audit'
+        ? `/audit-logs?entity_type=${auditType}`
+        : '/users';
   useEffect(() => {
     if (page !== 'users') return;
     let live = true;
-    void fetchAll<Row>('identity', '/regions').then((regions) => {
-      if (live) setRegionOptions(regions.filter(region => region.code && region.status === 'ACTIVE')
-        .map(region => ({ value: region.code!, label: String(region.name || region.code) })));
-    }).catch(() => { if (live) setRegionOptions([]); });
     void fetchAll<Row>('identity', '/organizations')
       .then((organizations) => {
         if (live) setOrganizationOptions(organizations
@@ -135,7 +126,7 @@ export function Admin({ page }: { page: string }) {
   useEffect(() => {
     if (!selected) return;
     if (!['users', 'grants', 'overview'].includes(page)) {
-      setDetail(items.find((item) => (page === 'regions' ? item.code : item.id) === selected) || null);
+      setDetail(items.find((item) => item.id === selected) || null);
       return;
     }
     let live = true;
@@ -191,17 +182,7 @@ export function Admin({ page }: { page: string }) {
       },
     ],
   };
-  const regionCreate: CommandSpec = {
-    title: 'Tạo khu vực',
-    service: 'identity',
-    path: '/regions',
-    fields: [
-      { name: 'code', label: 'Mã khu vực', required: true, pattern: /^[A-Z0-9_]{2,32}$/,
-        patternMessage: 'Mã khu vực cần 2–32 ký tự, chỉ gồm chữ in hoa, số hoặc dấu gạch dưới.', maxLength: 32 },
-      { name: 'name', label: 'Tên khu vực', required: true, maxLength: 120 },
-    ],
-  };
-  const createTitle = page === 'users' ? 'Thêm người dùng' : page === 'organizations' ? 'Thêm tổ chức' : 'Thêm khu vực';
+  const createTitle = page === 'users' ? 'Thêm người dùng' : 'Thêm tổ chức';
   useEffect(() => { setShowCreate(false); setSelected(null); }, [page]);
   return (
     <div className="grid-two admin-list-layout">
@@ -210,20 +191,18 @@ export function Admin({ page }: { page: string }) {
           <h2>
             {page === 'audit'
               ? 'Lịch sử thao tác'
-              : page === 'regions'
-                ? 'Danh sách khu vực'
-                : page === 'organizations'
-                  ? 'Danh sách tổ chức'
-                  : 'Danh sách người dùng'}
+              : page === 'organizations'
+                ? 'Danh sách tổ chức'
+                : 'Danh sách người dùng'}
           </h2>
-          {['users', 'organizations', 'regions'].includes(page) && (
+          {['users', 'organizations'].includes(page) && (
             <button type="button" className="button primary list-create-button" onClick={() => { setSelected(null); setShowTeamAssignment(false); setShowCreate(true); }}>
               {page === 'users' && <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M10 3v14M3 10h14" /></svg>}
               {createTitle}
             </button>
           )}
         </div>
-        {page === 'organizations' && <p className="muted">Tổ chức là đơn vị quản lý tài khoản và đội cứu hộ. Bạn có thể thêm tổ chức tại đây; khu vực hoạt động được chọn riêng khi tạo đội.</p>}
+        {page === 'organizations' && <p className="muted">Tổ chức là đơn vị quản lý tài khoản và đội cứu hộ. Bạn có thể thêm tổ chức tại đây.</p>}
         {page === 'audit' && (
           <label className="filter">
             Loại đối tượng
@@ -237,7 +216,6 @@ export function Admin({ page }: { page: string }) {
               <option value="app_user">Người dùng</option>
               <option value="role_grant">Quyền truy cập</option>
               <option value="organization">Tổ chức</option>
-              <option value="region">Khu vực</option>
             </select>
           </label>
         )}
@@ -268,13 +246,13 @@ export function Admin({ page }: { page: string }) {
         {!loading && !items.length && !error && !queryError && <div className="empty">{page === 'audit' ? 'Chưa có thay đổi nào thuộc loại đã chọn.' : 'Chưa có dữ liệu để hiển thị.'}</div>}
         <div className={`record-list ${page === 'audit' ? '' : 'admin-record-list'}`}>
           {items.map((item, index) => {
-            const canOpen = ['users', 'grants', 'overview', 'organizations', 'regions'].includes(page) && Boolean(item.id || item.code);
+            const canOpen = ['users', 'grants', 'overview', 'organizations'].includes(page) && Boolean(item.id);
             const title = page === 'audit'
               ? label(item.action)
               : item.display_name || item.name || item.username || 'Bản ghi';
             if (canOpen) return (
-              <button type="button" className="admin-record-card" key={item.id || item.code || index}
-                onClick={() => setSelected(item.id || item.code || null)} aria-label={`${String(title)}${item.status ? `, ${label(item.status)}` : ''}, xem chi tiết`}>
+              <button type="button" className="admin-record-card" key={item.id || index}
+                onClick={() => setSelected(item.id || null)} aria-label={`${String(title)}${item.status ? `, ${label(item.status)}` : ''}, xem chi tiết`}>
                 <span className="admin-record-heading">
                   <strong>{String(title)}</strong>
                   {item.status && <span className={`admin-record-status ${item.status === 'ACTIVE' ? 'is-active' : 'is-inactive'}`}>
@@ -285,7 +263,7 @@ export function Admin({ page }: { page: string }) {
                 {Boolean(item.created_at) && <small>{timeLabel(item.created_at)}</small>}
               </button>
             );
-            return <article className="record" key={item.id || item.code || index}>
+            return <article className="record" key={item.id || index}>
               <div>
                 <strong>{title}</strong>
                 {item.username && <p>{item.username}</p>}
@@ -316,11 +294,10 @@ export function Admin({ page }: { page: string }) {
         {showCreate && page === 'users' && <p className="notice">Để tạo đội trưởng: tạo tài khoản thuộc tổ chức của đội và cấp quyền Tình nguyện viên. Sau đó mở chi tiết tài khoản, gắn vào đội rồi giao vai trò đội trưởng.</p>}
         {selected && <div className="admin-detail-heading"><h2>
           {selected
-            ? ['users', 'grants', 'overview'].includes(page) ? 'Chi tiết người dùng' : page === 'organizations' ? 'Chi tiết tổ chức' : 'Chi tiết khu vực'
+            ? ['users', 'grants', 'overview'].includes(page) ? 'Chi tiết người dùng' : 'Chi tiết tổ chức'
             : page === 'users' ? 'Thêm người dùng'
               : page === 'organizations' ? 'Thêm tổ chức'
-                : page === 'regions' ? 'Thêm khu vực'
-                  : 'Thông tin quản trị'}
+                : 'Thông tin quản trị'}
         </h2>{['users', 'grants', 'overview'].includes(page) && detail && <details className="admin-action-menu" key={detail.id}>
           <summary aria-label="Tác vụ người dùng" title="Tác vụ người dùng">⋯</summary>
           <div className="admin-action-options">
@@ -342,7 +319,7 @@ export function Admin({ page }: { page: string }) {
                 <span className="admin-status-dot" aria-hidden="true" />{label(detail.status)}
               </span>
             </div>
-            {!['organizations', 'regions'].includes(page) && (
+            {page !== 'organizations' && (
               <>
                 <div className="admin-grants-heading">
                   <h3>Quyền hiện có</h3>
@@ -354,7 +331,6 @@ export function Admin({ page }: { page: string }) {
                       <p>
                         {label(grant.role_code)} · {label(grant.scope_type)}{' '}
                         {grant.organization_id && <> · {organizationOptions.find(option => option.value === grant.organization_id)?.label || grant.organization_id}</>}
-                        {grant.region_code && <> · {regionOptions.find(option => option.value === grant.region_code)?.label || grant.region_code}</>}
                         {grant.campaign_id && <> · Chiến dịch {grant.campaign_id}</>}
                         {grant.revoked_at ? ' (đã thu hồi)' : ''}
                       </p>
@@ -375,7 +351,7 @@ export function Admin({ page }: { page: string }) {
                 status: detail.status, memberships: detail.memberships, grants: detail.grants }} />}
             </div>}
             <div className="action-grid admin-user-actions">
-              {page === 'users' && userAction === 'revoke' && <div className="admin-selected-action"><label>Quyền cần thu hồi<select value={revokeGrantId} onChange={event => setRevokeGrantId(event.target.value)}><option value="">Chọn quyền</option>{detail.grants?.filter(grant => !grant.revoked_at).map(grant => <option key={grant.id} value={grant.id}>{label(grant.role_code)} · {label(grant.scope_type)}{grant.region_code ? ` · ${grant.region_code}` : ''}</option>)}</select></label>{revokeGrantId && <CommandForm key={revokeGrantId} spec={{ title: 'Thu hồi quyền', service: 'identity', path: `/grants/${revokeGrantId}/revoke`, warning: `Thu hồi quyền này của ${detail.username}?`, fields: [{ name: 'reason', label: 'Lý do thu hồi', type: 'textarea', required: true, maxLength: 500 }] }} onSuccess={success} />}</div>}
+              {page === 'users' && userAction === 'revoke' && <div className="admin-selected-action"><label>Quyền cần thu hồi<select value={revokeGrantId} onChange={event => setRevokeGrantId(event.target.value)}><option value="">Chọn quyền</option>{detail.grants?.filter(grant => !grant.revoked_at).map(grant => <option key={grant.id} value={grant.id}>{label(grant.role_code)} · {label(grant.scope_type)}{grant.campaign_id ? ` · Chiến dịch ${grant.campaign_id}` : ''}</option>)}</select></label>{revokeGrantId && <CommandForm key={revokeGrantId} spec={{ title: 'Thu hồi quyền', service: 'identity', path: `/grants/${revokeGrantId}/revoke`, warning: `Thu hồi quyền này của ${detail.username}?`, fields: [{ name: 'reason', label: 'Lý do thu hồi', type: 'textarea', required: true, maxLength: 500 }] }} onSuccess={success} />}</div>}
               {['users', 'grants', 'overview'].includes(page) && userAction === 'disable' && detail.status === 'ACTIVE' && (
                 <CommandForm
                   spec={{
@@ -437,19 +413,6 @@ export function Admin({ page }: { page: string }) {
                   onSuccess={success}
                 />
               )}
-              {page === 'regions' && detail.code && detail.status === 'ACTIVE' && detail.version != null && (
-                <CommandForm
-                  spec={{
-                    title: 'Ngừng hoạt động khu vực',
-                    service: 'identity',
-                    path: `/regions/${encodeURIComponent(detail.code)}/deactivate`,
-                    version: detail.version,
-                    warning: `Ngừng hoạt động khu vực ${detail.name || detail.code}?`,
-                    fields: [{ name: 'reason', label: 'Lý do', type: 'textarea', required: true, maxLength: 500 }],
-                  }}
-                  onSuccess={success}
-                />
-              )}
               {page === 'users' && userAction === 'grant' && (
                 <CommandForm
                   spec={{
@@ -459,7 +422,6 @@ export function Admin({ page }: { page: string }) {
                     warningFor: (values) => {
                       const scopeDetails = [
                         values.organization_id && (organizationOptions.find(option => option.value === values.organization_id)?.label || values.organization_id),
-                        values.region_code && (regionOptions.find(option => option.value === values.region_code)?.label || values.region_code),
                         values.campaign_id && `Chiến dịch ${values.campaign_id}`,
                       ].filter(Boolean).join(' · ');
                       return `Cấp quyền ${label(values.role_code)} · ${label(values.scope_type)}${scopeDetails ? ` · ${scopeDetails}` : ''} cho ${detail.username}? Phiên hiện tại của người này sẽ bị thu hồi.`;
@@ -471,7 +433,7 @@ export function Admin({ page }: { page: string }) {
                         type: 'select',
                         required: true,
                         options: roles.map((value) => ({ value, label: label(value) })),
-                        resetOnChange: ['scope_type', 'organization_id', 'region_code', 'campaign_id'],
+                        resetOnChange: ['scope_type', 'organization_id', 'campaign_id'],
                       },
                       {
                         name: 'scope_type',
@@ -482,13 +444,12 @@ export function Admin({ page }: { page: string }) {
                           values.role_code === 'ADMIN' ? ['SYSTEM']
                             : ['CITIZEN', 'VOLUNTEER'].includes(values.role_code)
                               ? ['SYSTEM', 'ORGANIZATION']
-                              : values.role_code ? ['ORGANIZATION', 'REGION', 'CAMPAIGN'] : []
+                              : values.role_code ? ['ORGANIZATION', 'CAMPAIGN'] : []
                         ).map((value) => ({ value, label: label(value) })),
-                        resetOnChange: ['organization_id', 'region_code', 'campaign_id'],
+                        resetOnChange: ['organization_id', 'campaign_id'],
                       },
                       { name: 'organization_id', label: 'Tổ chức', type: 'reference', options: organizationOptions, required: true,
-                        visibleFor: values => ['ORGANIZATION', 'REGION', 'CAMPAIGN'].includes(values.scope_type), resetOnChange: ['campaign_id'] },
-                      { name: 'region_code', label: 'Khu vực', type: 'select', options: regionOptions, required: true, visibleWhen: { field: 'scope_type', value: 'REGION' } },
+                        visibleFor: values => ['ORGANIZATION', 'CAMPAIGN'].includes(values.scope_type), resetOnChange: ['campaign_id'] },
                       { name: 'campaign_id', label: 'Chiến dịch', type: 'reference', required: true, visibleWhen: { field: 'scope_type', value: 'CAMPAIGN' }, placeholder: 'Dán mã chiến dịch do quản lý chiến dịch cung cấp' },
                       { name: 'reason', label: 'Lý do', type: 'textarea', required: true, maxLength: 500 },
                     ],
@@ -507,7 +468,6 @@ export function Admin({ page }: { page: string }) {
         {!selected && page === 'organizations' && (
           <CommandForm spec={organizationCreate} onSuccess={success} />
         )}
-        {!selected && page === 'regions' && <CommandForm spec={regionCreate} onSuccess={success} />}
         {!selected && page === 'grants' && <p>Chọn người dùng để xem và cấp quyền theo phạm vi.</p>}
         {!selected && page === 'audit' && (
           <p>

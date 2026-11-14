@@ -19,7 +19,6 @@ const suffix = randomBytes(5).toString('hex').toUpperCase();
 const ipNetworks = ['192.0.2', '198.51.100', '203.0.113'];
 const identityNetwork = ipNetworks[Number.parseInt(suffix.slice(0, 2), 16) % ipNetworks.length];
 const requestNetwork = ipNetworks[(ipNetworks.indexOf(identityNetwork) + 1) % ipNetworks.length];
-const regionCode = `T14_${suffix}`;
 const longitude = -160 + Number.parseInt(suffix.slice(0, 4), 16) % 140;
 const latitude = -70 + Number.parseInt(suffix.slice(4, 8), 16) % 140;
 let identityIp = Number.parseInt(suffix.slice(2, 4), 16) % 200 + 1;
@@ -144,7 +143,7 @@ async function triageRequest(requestId, coordinator) {
 
 async function requestState(requestId) {
   const result = await responseDb.query(
-    `SELECT status,version,work_cycle,organization_id,region_code,logistics_admitted_at,attribution_locked_at
+    `SELECT status,version,work_cycle,organization_id,logistics_admitted_at,attribution_locked_at
        FROM assistance_request WHERE id=$1`, [requestId],
   );
   assert.equal(result.rowCount, 1);
@@ -200,13 +199,7 @@ try {
     `INSERT INTO organization (id,name,organization_kind)
      VALUES ($1,'T14 test organization','COORDINATION') ON CONFLICT (id) DO NOTHING`, [organizationId],
   );
-  await identityDb.query('INSERT INTO region (code,name) VALUES ($1,$2)', [regionCode, 'Khu vực kiểm thử T14']);
   await responseDb.query("INSERT INTO incident_category (code,display_name) VALUES ('T14_FLOOD','Lũ lụt') ON CONFLICT (code) DO NOTHING");
-  await responseDb.query(
-    `INSERT INTO region_boundary (region_code,geom) VALUES
-      ($1,ST_Multi(ST_MakeEnvelope($2,$3,$4,$5,4326)))
-     ON CONFLICT (region_code) DO NOTHING`, [regionCode, longitude - 0.25, latitude - 0.25, longitude + 0.25, latitude + 0.25],
-  );
 
   const [staff, reporter] = await Promise.all([
     registerAndLogin('staff', ['COORDINATOR', 'OPERATIONS_MANAGER']),
@@ -216,7 +209,6 @@ try {
   const attributionTeam = await command(responseUrl, 'teams', staff, {
     name: `Đội kiểm thử T14 ${suffix}`,
     organization_id: organizationId,
-    operating_region_code: regionCode,
     team_kind: 'GOVERNMENT',
     reporting_mode: 'COORDINATOR',
     external_contact_note: 'Liên hệ nội bộ phục vụ kiểm thử.',
@@ -242,7 +234,7 @@ try {
   });
   expectSuccess(sealedItem, 201);
   const warehouse = await command(logisticsUrl, 'warehouses', staff, {
-    organization_id: organizationId, region_code: regionCode, name: `Kho T14 ${suffix}`,
+    organization_id: organizationId, name: `Kho T14 ${suffix}`,
   });
   expectSuccess(warehouse, 201);
   const opening = await command(logisticsUrl, 'stock/opening', staff, {
@@ -255,7 +247,6 @@ try {
   const pendingRequest = await createRequest(reporter);
   const pendingState = await requestState(pendingRequest.id);
   assert.equal(pendingState.status, 'SUBMITTED');
-  assert.equal(pendingState.region_code, regionCode, 'the T14 request must resolve inside its unique test region');
   const failedAdmissionKey = key();
   const rejectedNeed = await command(logisticsUrl, 'needs', staff, {
     request_id: pendingRequest.id, work_cycle: Number(pendingState.work_cycle), item_id: item.value.id, quantity: '2.00',
@@ -278,7 +269,6 @@ try {
   await verifyRequest(attributionRaceRequest, staff);
   const attributionRaceInitialState = await triageRequest(attributionRaceRequest.id, staff);
   assert.equal(attributionRaceInitialState.status, 'TRIAGED');
-  assert.equal(attributionRaceInitialState.region_code, regionCode);
   assert.equal(attributionRaceInitialState.attribution_locked_at, null);
   assert.equal(attributionRaceInitialState.logistics_admitted_at, null);
 
@@ -365,7 +355,6 @@ try {
   const verifiedState = await requestState(request.id);
   assert.equal(verifiedState.status, 'VERIFIED');
   assert.equal(verifiedState.organization_id, organizationId);
-  assert.equal(verifiedState.region_code, regionCode);
   assert.equal(verifiedState.logistics_admitted_at, null);
   const createBody = {
     request_id: request.id, work_cycle: Number(verifiedState.work_cycle), item_id: item.value.id, quantity: '10.00',

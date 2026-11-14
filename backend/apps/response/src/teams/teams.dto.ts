@@ -4,7 +4,6 @@ import {
 } from 'class-validator';
 
 const skillCodePattern = /^[A-Z0-9_]{2,40}$/u;
-const regionCodePattern = /^[A-Z0-9_]{2,32}$/u;
 
 export class TeamPageQueryDto {
   @IsOptional() @IsString() @MaxLength(2_000)
@@ -12,9 +11,6 @@ export class TeamPageQueryDto {
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
   declare limit?: number;
-
-  @IsOptional() @IsString() @Matches(regionCodePattern)
-  declare region_code?: string;
 
   @IsOptional() @IsIn(['AVAILABLE', 'UNAVAILABLE'])
   declare availability?: 'AVAILABLE' | 'UNAVAILABLE';
@@ -44,9 +40,6 @@ export class CreateTeamDto {
   @IsUUID('all')
   organization_id!: string;
 
-  @IsString() @Matches(regionCodePattern)
-  operating_region_code!: string;
-
   @IsIn(['VOLUNTEER', 'MILITARY', 'GOVERNMENT', 'OTHER'])
   team_kind!: 'VOLUNTEER' | 'MILITARY' | 'GOVERNMENT' | 'OTHER';
 
@@ -75,12 +68,6 @@ export class UpdateTeamDto {
 
   @IsOptional() @IsIn(['AVAILABLE', 'UNAVAILABLE'])
   declare availability?: 'AVAILABLE' | 'UNAVAILABLE';
-
-  @IsOptional() @IsString() @Matches(regionCodePattern)
-  declare operating_region_code?: string;
-
-  @IsOptional() @IsIn([true, false])
-  declare nationwide_coverage?: boolean;
 }
 
 export class ConfirmTeamReadinessDto {

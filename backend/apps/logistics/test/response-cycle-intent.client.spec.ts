@@ -14,7 +14,6 @@ const intentValue = {
   work_cycle: 3,
   request_status: 'RESOLVING',
   organization_id: organizationId,
-  region_code: 'NORTH',
   campaign_id: null,
   outcome_basis: 'RESCUE_COMPLETED',
 };

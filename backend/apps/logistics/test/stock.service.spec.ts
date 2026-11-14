@@ -21,13 +21,12 @@ describe('Logistics stock command scope', () => {
       id: balanceId,
       warehouse_id: warehouseId,
       organization_id: '77777777-7777-4777-8777-777777777777',
-      region_code: 'R02',
       scale: 2,
     }]) };
     const idempotency = { execute: jest.fn() };
     const sessions = { require: jest.fn().mockResolvedValue({
       userId: actorId,
-      grants: [{ role_code: 'INTAKE_STAFF', scope_type: 'REGION', organization_id: organizationId, region_code: 'R01' }],
+      grants: [{ role_code: 'INTAKE_STAFF', scope_type: 'ORGANIZATION', organization_id: organizationId }],
     }) };
     const service = new StockService(dataSource as never, idempotency as never, sessions as never);
 
@@ -43,7 +42,6 @@ describe('Logistics stock command scope', () => {
       requested_by_user_id: actorId,
       status: 'PENDING',
       organization_id: organizationId,
-      region_code: 'R01',
     }]) };
     const idempotency = { execute: jest.fn() };
     const sessions = { require: jest.fn().mockResolvedValue({
@@ -81,7 +79,7 @@ describe('Logistics stock command scope', () => {
     const balanceA = 'aaaaaaaa-1111-4111-8111-111111111111';
     const balanceB = 'bbbbbbbb-2222-4222-8222-222222222222';
     const dataSource = { query: jest.fn()
-      .mockResolvedValueOnce([{ id: warehouseId, organization_id: organizationId, region_code: 'R01', status: 'ACTIVE' }])
+      .mockResolvedValueOnce([{ id: warehouseId, organization_id: organizationId, status: 'ACTIVE' }])
       .mockResolvedValueOnce([{ id: itemB, status: 'ACTIVE', scale: 2 }, { id: itemA, status: 'ACTIVE', scale: 2 }]) };
     const idempotency = { execute: jest.fn() };
     const sessions = { require: jest.fn().mockResolvedValue({
@@ -99,8 +97,8 @@ describe('Logistics stock command scope', () => {
       execute(manager: never): Promise<unknown>;
     };
     const manager = { query: jest.fn(async (sql: string, _values?: unknown[]) => {
-      if (sql.includes('SELECT id,organization_id,region_code,status FROM warehouse')) {
-        return [{ id: warehouseId, organization_id: organizationId, region_code: 'R01', status: 'ACTIVE' }];
+      if (sql.includes('SELECT id,organization_id,status FROM warehouse')) {
+        return [{ id: warehouseId, organization_id: organizationId, status: 'ACTIVE' }];
       }
       if (sql.includes('SELECT i.id,i.status,u.scale')) {
         return [{ id: itemA, status: 'ACTIVE', scale: 2 }, { id: itemB, status: 'ACTIVE', scale: 2 }];
@@ -146,7 +144,6 @@ describe('Logistics stock command scope', () => {
       requested_by_user_id: requesterId,
       status: 'PENDING',
       organization_id: organizationId,
-      region_code: 'R01',
     }]) };
     const idempotency = { execute: jest.fn() };
     const sessions = { require: jest.fn().mockResolvedValue({

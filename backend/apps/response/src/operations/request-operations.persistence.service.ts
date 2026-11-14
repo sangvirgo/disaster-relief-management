@@ -14,7 +14,7 @@ export class RequestOperationsPersistenceService {
   ): Promise<OperationRequestRow> {
     const rows = await queryable.query(
       `SELECT id,tracking_code,tracking_secret_hash,reporter_user_id,reporter_name,reporter_contact_phone,source_ip_hash,report_mode,
-              status,version,review_lane,received_at,verifying_since,organization_id,region_code,campaign_id,description,
+              status,version,review_lane,received_at,verifying_since,organization_id,campaign_id,description,
               reporter_declared_danger,needs_rescue,needs_relief_supplies,priority,priority_basis,work_cycle,canonical_request_id,attribution_locked_at,incident_category_code
          FROM assistance_request WHERE id=$1${lock ? ' FOR UPDATE' : ''}`,
       [requestId],
@@ -27,7 +27,7 @@ export class RequestOperationsPersistenceService {
 
   async currentRequestValue(manager: EntityManager, requestId: string): Promise<Record<string, unknown>> {
     const rows = await manager.query(
-      `SELECT id,status,version,region_code,campaign_id,priority,priority_basis,verification_revision,canonical_request_id
+      `SELECT id,status,version,campaign_id,priority,priority_basis,verification_revision,canonical_request_id
          FROM assistance_request WHERE id=$1`, [requestId],
     ) as Array<Record<string, unknown>>;
     if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });

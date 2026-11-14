@@ -73,7 +73,6 @@ export class MapService implements OnModuleInit {
       `r.status IN (${statusLayer === 'confirmed' ? confirmedStatuses : unverifiedStatuses})`,
     ];
     if (statusLayer === 'confirmed') clauses.push('r.canonical_request_id IS NULL');
-    if (filters.region_code) clauses.push(`r.region_code=$${values.push(filters.region_code)}`);
     if (filters.campaign_id) clauses.push(`r.campaign_id=$${values.push(filters.campaign_id)}::uuid`);
     if (filters.category) clauses.push(`r.incident_category_code=$${values.push(filters.category)}`);
     const cellSizeParameter = values.push(cellSize);

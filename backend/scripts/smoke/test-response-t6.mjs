@@ -114,11 +114,6 @@ try {
     [organizationId],
   );
   await responseDb.query("INSERT INTO incident_category (code,display_name) VALUES ('T6_FLOOD','Lũ lụt') ON CONFLICT (code) DO NOTHING");
-  await responseDb.query(
-    `INSERT INTO region_boundary (region_code,geom) VALUES
-      ('T6_REGION_B',ST_Multi(ST_GeomFromText('POLYGON((108 12,110 12,110 14,108 14,108 12))',4326)))
-     ON CONFLICT (region_code) DO NOTHING`,
-  );
 
   const missingSessionKey = key();
   const missingSession = await call(responseUrl, 'requests/proxy', {
@@ -158,7 +153,7 @@ try {
   assert.equal(fourth.value.review_lane, 'PROXY_QUOTA_REVIEW', 'the fourth sequential open proxy is retained for review');
 
   const rows = await responseDb.query(
-    `SELECT r.id,r.report_mode,r.reporter_user_id,r.tracking_secret_hash,r.region_code,r.status,r.priority,r.review_lane,
+    `SELECT r.id,r.report_mode,r.reporter_user_id,r.tracking_secret_hash,r.status,r.priority,r.review_lane,
             r.reporter_contact_phone,r.source_ip_hash,s.reporter_relationship,s.beneficiary_contact_phone,
             s.alternate_contact_name,s.alternate_contact_phone,s.information_source,s.last_known_situation_at,
             s.contactability,s.location_source,s.location_accuracy_m,
@@ -170,7 +165,6 @@ try {
   assert.equal(rows.rowCount, 4);
   assert.ok(rows.rows.every((row) => row.report_mode === 'PROXY' && row.reporter_user_id === reporter.id));
   assert.ok(rows.rows.every((row) => row.tracking_secret_hash === null && row.status === 'SUBMITTED' && row.priority === null));
-  assert.ok(rows.rows.every((row) => row.region_code === 'T6_REGION_B'), 'the affected household pin determines the stored region');
   assert.equal(rows.rows[0].reporter_relationship, 'Người thân');
   assert.equal(rows.rows[0].beneficiary_contact_phone, null, 'the affected person needs no phone');
   assert.equal(rows.rows[0].alternate_contact_name, 'Nguyễn Lan');

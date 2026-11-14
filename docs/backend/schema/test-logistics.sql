@@ -2,13 +2,12 @@
 -- seed
 INSERT INTO item_type VALUES ('FOOD','Lương thực'); INSERT INTO unit VALUES ('PIECE','cái',0),('KG','kg',3);
 INSERT INTO item (id,item_type_code,unit_code,name) VALUES ('00000000-0000-0000-0000-0000000000c1','FOOD','PIECE','Mì gói'),('00000000-0000-0000-0000-0000000000c2','FOOD','KG','Gạo');
-INSERT INTO warehouse (id,organization_id,region_code,name) VALUES ('00000000-0000-0000-0000-0000000000d1','00000000-0000-0000-0000-00000000aaa1','R1','Kho 1');
-INSERT INTO relief_point (id,organization_id,region_code,name,location) VALUES ('00000000-0000-0000-0000-0000000000d9','00000000-0000-0000-0000-00000000aaa1','R1','Điểm 1',ST_GeogFromText('SRID=4326;POINT(106.7 10.7)'));
+INSERT INTO warehouse (id,organization_id,name) VALUES ('00000000-0000-0000-0000-0000000000d1','00000000-0000-0000-0000-00000000aaa1','Kho 1');
+INSERT INTO relief_point (id,organization_id,name,location) VALUES ('00000000-0000-0000-0000-0000000000d9','00000000-0000-0000-0000-00000000aaa1','Điểm 1',ST_GeogFromText('SRID=4326;POINT(106.7 10.7)'));
 INSERT INTO stock_balance (id,warehouse_id,item_id) VALUES ('00000000-0000-0000-0000-0000000000e1','00000000-0000-0000-0000-0000000000d1','00000000-0000-0000-0000-0000000000c1');
 -- names
-SELECT expect_fail('vehicle needs a region', $$INSERT INTO vehicle (organization_id,identifier,vehicle_type) VALUES (gen_random_uuid(),'x','truck')$$);
 SELECT expect_fail('item name NFC only', $$INSERT INTO item (item_type_code,unit_code,name) VALUES ('FOOD','PIECE',normalize('Cụ',NFD))$$);
-SELECT expect_fail('vehicle identifier case-insensitive', $$INSERT INTO vehicle (organization_id,region_code,identifier,vehicle_type) VALUES ('00000000-0000-0000-0000-00000000aaa1','R1','51A-1','truck'),('00000000-0000-0000-0000-00000000aaa1','R1','51a-1','truck')$$);
+SELECT expect_fail('vehicle identifier case-insensitive', $$INSERT INTO vehicle (organization_id,identifier,vehicle_type) VALUES ('00000000-0000-0000-0000-00000000aaa1','51A-1','truck'),('00000000-0000-0000-0000-00000000aaa1','51a-1','truck')$$);
 -- ledger drives the balance
 INSERT INTO stock_movement (balance_id,movement_type,delta_on_hand,delta_reserved,operation_ref,actor_user_id) VALUES ('00000000-0000-0000-0000-0000000000e1','OPENING',5,0,'open1',gen_random_uuid());
 SELECT 'balance after OPENING +5: '||on_hand FROM stock_balance;
@@ -81,7 +80,7 @@ INSERT INTO distribution (id,warehouse_id,organization_id,purpose,preparer_user_
 SELECT expect_fail('POINT_REPLENISHMENT needs a point', $$INSERT INTO distribution (warehouse_id,organization_id,purpose,preparer_user_id) VALUES ('00000000-0000-0000-0000-0000000000d1','00000000-0000-0000-0000-00000000aaa1','POINT_REPLENISHMENT',gen_random_uuid())$$);
 SELECT expect_fail('distribution organization must equal warehouse organization', $$INSERT INTO distribution (warehouse_id,organization_id,purpose,preparer_user_id) VALUES ('00000000-0000-0000-0000-0000000000d1',gen_random_uuid(),'CAMPAIGN_DISTRIBUTION',gen_random_uuid())$$);
 SELECT expect_fail('line item must equal the commitment item', $$INSERT INTO distribution_line (distribution_id,warehouse_id,item_id,commitment_id,quantity) VALUES ('00000000-0000-0000-0000-000000000d11','00000000-0000-0000-0000-0000000000d1','00000000-0000-0000-0000-0000000000c2','00000000-0000-0000-0000-000000000a31',1)$$);
-INSERT INTO warehouse (id,organization_id,region_code,name) VALUES ('00000000-0000-0000-0000-0000000000d2','00000000-0000-0000-0000-00000000aaa1','R1','Kho 2');
+INSERT INTO warehouse (id,organization_id,name) VALUES ('00000000-0000-0000-0000-0000000000d2','00000000-0000-0000-0000-00000000aaa1','Kho 2');
 SELECT expect_fail('line warehouse must equal the distribution warehouse', $$INSERT INTO distribution_line (distribution_id,warehouse_id,item_id,quantity) VALUES ('00000000-0000-0000-0000-000000000d11','00000000-0000-0000-0000-0000000000d2','00000000-0000-0000-0000-0000000000c1',1)$$);
 INSERT INTO distribution_line (id,distribution_id,warehouse_id,item_id,quantity) VALUES ('00000000-0000-0000-0000-000000000e11','00000000-0000-0000-0000-000000000d11','00000000-0000-0000-0000-0000000000d1','00000000-0000-0000-0000-0000000000c1',10),('00000000-0000-0000-0000-000000000e12','00000000-0000-0000-0000-000000000d12','00000000-0000-0000-0000-0000000000d1','00000000-0000-0000-0000-0000000000c1',10);
 SELECT expect_fail('in-transit + at-point <= quantity', $$UPDATE distribution_line SET in_transit_quantity=11 WHERE id='00000000-0000-0000-0000-000000000e11'$$);
@@ -205,8 +204,8 @@ SELECT expect_fail('attachment needs exactly one owner', $$INSERT INTO logistics
 SELECT expect_fail('dispute WITHDRAWN no longer exists', $$INSERT INTO donation_dispute (delivery_id,status,opened_by_kind,reason) VALUES ('00000000-0000-0000-0000-000000000a11','WITHDRAWN','DONOR','x')$$);
 
 -- ================= organization guards (01 §7) =================
-INSERT INTO warehouse (id,organization_id,region_code,name) VALUES ('00000000-0000-0000-0000-0000000000d3','00000000-0000-0000-0000-00000000aaa2','R1','Kho tổ chức khác');
-INSERT INTO relief_point (id,organization_id,region_code,name,location) VALUES ('00000000-0000-0000-0000-0000000000d8','00000000-0000-0000-0000-00000000aaa2','R1','Điểm tổ chức khác',ST_GeogFromText('SRID=4326;POINT(106.8 10.8)'));
+INSERT INTO warehouse (id,organization_id,name) VALUES ('00000000-0000-0000-0000-0000000000d3','00000000-0000-0000-0000-00000000aaa2','Kho tổ chức khác');
+INSERT INTO relief_point (id,organization_id,name,location) VALUES ('00000000-0000-0000-0000-0000000000d8','00000000-0000-0000-0000-00000000aaa2','Điểm tổ chức khác',ST_GeogFromText('SRID=4326;POINT(106.8 10.8)'));
 INSERT INTO fulfillment_cycle (id,request_id,work_cycle,organization_id) VALUES ('00000000-0000-0000-0000-000000000c12',gen_random_uuid(),1,'00000000-0000-0000-0000-00000000aaa1');
 SELECT expect_sqlstate('need point of another organization rejected', $$INSERT INTO relief_need (cycle_id,item_id,original_quantity,requested_quantity,designated_point_id) VALUES ('00000000-0000-0000-0000-000000000c12','00000000-0000-0000-0000-0000000000c2',5,5,'00000000-0000-0000-0000-0000000000d8')$$, '23514');
 INSERT INTO relief_need (id,cycle_id,item_id,original_quantity,requested_quantity,designated_point_id) VALUES ('00000000-0000-0000-0000-000000000a22','00000000-0000-0000-0000-000000000c12','00000000-0000-0000-0000-0000000000c2',5,5,'00000000-0000-0000-0000-0000000000d9');
@@ -220,7 +219,7 @@ SELECT expect_sqlstate('commitment moved to a foreign-organization warehouse rej
 -- ================= restricted application role (SECURITY DEFINER stock writer) =================
 -- fixtures created as the owner of the schema, then everything below runs as c48_logistics_app
 INSERT INTO item (id,item_type_code,unit_code,name) VALUES ('00000000-0000-0000-0000-0000000000c3','FOOD','PIECE','Nước đóng chai');
-INSERT INTO warehouse (id,organization_id,region_code,name) VALUES ('00000000-0000-0000-0000-0000000000d4','00000000-0000-0000-0000-00000000aaa1','R1','Kho phân quyền');
+INSERT INTO warehouse (id,organization_id,name) VALUES ('00000000-0000-0000-0000-0000000000d4','00000000-0000-0000-0000-00000000aaa1','Kho phân quyền');
 INSERT INTO stock_balance (id,warehouse_id,item_id) VALUES ('00000000-0000-0000-0000-0000000000e2','00000000-0000-0000-0000-0000000000d4','00000000-0000-0000-0000-0000000000c3');
 INSERT INTO stock_movement (balance_id,movement_type,delta_on_hand,delta_reserved,operation_ref,actor_user_id) VALUES ('00000000-0000-0000-0000-0000000000e2','OPENING',10,0,'role-open0',gen_random_uuid());
 INSERT INTO audit_log (id,action,entity_type,entity_id) OVERRIDING SYSTEM VALUE VALUES (9000000000000000000,'T11_PROOF','proof','T11_PROOF');

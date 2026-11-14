@@ -4,7 +4,6 @@ import type { Request } from 'express';
 import type { EntityManager } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
 import type { IdempotentResult } from '@c48/technical/idempotency/idempotency';
-import { hasPermission } from '@c48/identity-contracts/permissions';
 import { ReporterSessionService } from '../requests/reporter-session';
 import type { SupplementReviewDto } from './request-operations.dto';
 import { asObject, checkVersion, cleanText } from './request-operations.helpers';
@@ -43,26 +42,7 @@ export class RequestOperationsSupplementReviewService {
         if (reviewed.length) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         await validateSourceRefs(manager, row, dto.source_refs, session);
         const reported = asObject(asObject(supplement.payload).reported_facts);
-        let nextRegion = row.region_code;
-        if (dto.decision === 'ACCEPT' && reported.location !== undefined) {
-          const location = asObject(reported.location);
-          const coordinates = Array.isArray(location.coordinates) ? location.coordinates : [];
-          const [longitude, latitude] = coordinates;
-          if (coordinates.length !== 2 || typeof longitude !== 'number' || typeof latitude !== 'number' ||
-              longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) throw new AppError('INTERNAL_ERROR', { status: 500 });
-          const regionRows = await manager.query(
-            `SELECT min(region_code) AS region_code FROM region_boundary
-              WHERE ST_Covers(geom,ST_SetSRID(ST_MakePoint($1,$2),4326)) HAVING count(*)=1`, [longitude, latitude],
-          ) as Array<{ region_code: string }>;
-          nextRegion = regionRows[0]?.region_code ?? null;
-          if (row.attribution_locked_at !== null && nextRegion !== row.region_code) {
-            throw new AppError('ATTRIBUTION_LOCKED', { status: 409 });
-          }
-          if (!hasPermission(session.grants, 'REQUEST_VERIFY', { organizationId: row.organization_id, regionCode: nextRegion, campaignId: row.campaign_id })) {
-            throw new AppError('FORBIDDEN', { status: 403 });
-          }
-        }
-        const approvedFacts = dto.decision === 'ACCEPT' ? await loadApprovedFacts(manager, row.id, reported, nextRegion) : undefined;
+        const approvedFacts = dto.decision === 'ACCEPT' ? await loadApprovedFacts(manager, row.id, reported) : undefined;
         const reviewId = await this.persistence.insertEvent(manager, row.id, session.userId, 'SUPPLEMENT_REVIEW', 'STAFF', row.status, row.status, reason, {
           reviewed_event_id: eventId, decision: dto.decision, source_refs: sourceRefsView(dto.source_refs),
           source_note: sourceNote, ...(approvedFacts ? { approved_facts: approvedFacts } : {}),
@@ -72,15 +52,13 @@ export class RequestOperationsSupplementReviewService {
           `UPDATE assistance_request SET
              description=CASE WHEN $3::boolean THEN $4 ELSE description END,
              reporter_declared_danger=CASE WHEN $5::boolean THEN $6 ELSE reporter_declared_danger END,
-             region_code=CASE WHEN $7::boolean THEN $8 ELSE region_code END,
-             needs_rescue=CASE WHEN $11::boolean THEN $12::boolean ELSE needs_rescue END,
-             needs_relief_supplies=CASE WHEN $13::boolean THEN $14::boolean ELSE needs_relief_supplies END,
-             verification_revision=CASE WHEN $9::boolean THEN $10::uuid ELSE verification_revision END,
+             needs_rescue=CASE WHEN $9::boolean THEN $10::boolean ELSE needs_rescue END,
+             needs_relief_supplies=CASE WHEN $11::boolean THEN $12::boolean ELSE needs_relief_supplies END,
+             verification_revision=CASE WHEN $7::boolean THEN $8::uuid ELSE verification_revision END,
              version=version+1 WHERE id=$1 AND version=$2 RETURNING status,version,verification_revision`,
           [row.id, dto.expected_version,
             dto.decision === 'ACCEPT' && Object.hasOwn(reported, 'description'), reported.description ?? null,
             dto.decision === 'ACCEPT' && Object.hasOwn(reported, 'reporter_declared_danger'), reported.reporter_declared_danger ?? false,
-            dto.decision === 'ACCEPT' && Object.hasOwn(reported, 'location'), nextRegion,
             dto.decision === 'ACCEPT', reviewId,
             dto.decision === 'ACCEPT' && Object.hasOwn(reported, 'needs_rescue'), reported.needs_rescue ?? false,
             dto.decision === 'ACCEPT' && Object.hasOwn(reported, 'needs_relief_supplies'), reported.needs_relief_supplies ?? false],

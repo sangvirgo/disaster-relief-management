@@ -3,15 +3,16 @@ import type { Request } from 'express';
 import type { IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import type { ReporterSession } from '../requests/reporter-session';
 import type {
-  AuthorityReferralDto, ContactAttemptDto, ConcurRequestDto, CorrectRegionDto, DuplicateRequestDto,
+  AuthorityReferralDto, ContactAttemptDto, ConcurRequestDto, DuplicateRequestDto,
   AttachCampaignDto, RejectRequestDto, RequestQueueQueryDto, RequestOperationPageDto, RequestVersionDto, TeamCandidatesQueryDto,
-  SupplementReviewDto, TriageRequestDto, VerifyRequestDto,
+  SupplementReviewDto, TriageRequestDto, VerifyRequestDto, FastTrackRequestDto,
 } from './request-operations.dto';
 import { loadOperationsConfig } from './request-operations.helpers';
 import type { RequestOperationsConfig } from './request-operations.types';
 import { RequestOperationsQueriesService } from './request-operations.queries.service';
 import { RequestOperationsVerificationService } from './request-operations.verification.service';
 import { RequestOperationsSupplementReviewService } from './request-operations.supplement-review.service';
+import { RequestOperationsFastTrackService } from './request-operations.fast-track.service';
 import { RequestOperationsTriageService } from './request-operations.triage.service';
 import { RequestOperationsDedupReferralService } from './request-operations.dedup-referral.service';
 import { RequestOperationsTeamCandidatesService } from './request-operations.team-candidates.service';
@@ -27,6 +28,7 @@ export class RequestOperationsService {
     private readonly verification: RequestOperationsVerificationService,
     private readonly supplementReview: RequestOperationsSupplementReviewService,
     private readonly triageService: RequestOperationsTriageService,
+    private readonly fastTrackService: RequestOperationsFastTrackService,
     private readonly dedupReferral: RequestOperationsDedupReferralService,
     private readonly teamCandidatesService: RequestOperationsTeamCandidatesService,
     private readonly campaignAssociation: RequestCampaignAssociationService,
@@ -36,10 +38,6 @@ export class RequestOperationsService {
 
   async queue(query: RequestQueueQueryDto, request: Request): Promise<Record<string, unknown>> {
     return this.queries.queue(query, request);
-  }
-
-  async unassigned(query: RequestOperationPageDto, request: Request): Promise<Record<string, unknown>> {
-    return this.queries.unassigned(query, request);
   }
 
   async detail(requestId: string, request: Request): Promise<Record<string, unknown>> {
@@ -106,12 +104,12 @@ export class RequestOperationsService {
     return this.triageService.triage(requestId, dto, key, request);
   }
 
-  async authorityReferral(requestId: string, dto: AuthorityReferralDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
-    return this.dedupReferral.authorityReferral(requestId, dto, key, request);
+  async fastTrack(requestId: string, dto: FastTrackRequestDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
+    return this.fastTrackService.fastTrack(requestId, dto, key, request);
   }
 
-  async correctRegion(requestId: string, dto: CorrectRegionDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
-    return this.dedupReferral.correctRegion(requestId, dto, key, request);
+  async authorityReferral(requestId: string, dto: AuthorityReferralDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
+    return this.dedupReferral.authorityReferral(requestId, dto, key, request);
   }
 
   async attachCampaign(requestId: string, dto: AttachCampaignDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {

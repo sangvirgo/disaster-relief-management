@@ -14,7 +14,7 @@ const missionRow = (id: string, teamId: string, teamStatus = 'ACTIVE', teamRepor
   id, request_id: '00000000-0000-4000-8000-000000000006', team_id: teamId, team_name: 'Đội A', work_cycle: 1,
   team_status: teamStatus, team_reporting_mode: teamReportingMode,
   status: 'ACCEPTED', mission_kind: 'RESCUE', version: '3', created_at: '2026-10-01T00:00:00.000Z',
-  cursor_created_at: '2026-10-01T00:00:00.000000Z', organization_id: organizationId, region_code: 'R1', campaign_id: null,
+  cursor_created_at: '2026-10-01T00:00:00.000000Z', organization_id: organizationId, campaign_id: null,
   approved_facts: { reporter_contact_phone: '0912345678', reporter_declared_danger: false },
 });
 
@@ -33,7 +33,7 @@ function build(options: { grants?: unknown[]; memberRole?: 'LEADER' | 'MEMBER' |
 }
 const request = {} as Request;
 const coordinatorGrant = {
-  role_code: 'COORDINATOR', scope_type: 'REGION', organization_id: organizationId, region_code: 'R1', campaign_id: null,
+  role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId, campaign_id: null,
 };
 
 describe('MissionsQueriesService can_manage_mission', () => {

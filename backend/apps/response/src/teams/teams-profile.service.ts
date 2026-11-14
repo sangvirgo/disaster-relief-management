@@ -31,8 +31,6 @@ function auditState(team: TeamRow): Record<string, unknown> {
     name: team.name,
     kind: team.team_kind,
     reporting_mode: team.reporting_mode,
-    operating_region_code: team.operating_region_code,
-    nationwide_coverage: team.nationwide_coverage,
     availability: team.availability,
     readiness_required: team.readiness_required,
     status: team.status,
@@ -52,9 +50,9 @@ export class TeamsProfileService {
 
   async create(dto: CreateTeamDto, key: string, request: TeamCommandRequest): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
-      organizationId: dto.organization_id, regionCode: dto.operating_region_code,
-    })) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', { organizationId: dto.organization_id })) {
+      throw new AppError('FORBIDDEN', { status: 403 });
+    }
 
     const name = cleanName(dto.name);
     if (dto.reporting_mode === 'COORDINATOR' && !dto.external_contact_note?.trim()) {
@@ -64,7 +62,6 @@ export class TeamsProfileService {
       throw new AppError('LEADER_REQUIRED', { status: 409 });
     }
 
-    await this.assertRegion(dto.operating_region_code);
     const skillCodes = [...(dto.skill_codes ?? [])].sort();
     await this.assertSkills(skillCodes);
     if (dto.leader_user_id) await this.assertEligibleLeader(dto.leader_user_id, dto.organization_id);
@@ -78,9 +75,9 @@ export class TeamsProfileService {
       execute: async (manager) => {
         const inserted = await manager.query(
           `INSERT INTO rescue_team
-             (organization_id,operating_region_code,name,team_kind,reporting_mode,external_contact_note)
-           VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-          [dto.organization_id, dto.operating_region_code, name, dto.team_kind, dto.reporting_mode, dto.external_contact_note ?? null],
+             (organization_id,name,team_kind,reporting_mode,external_contact_note)
+           VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+          [dto.organization_id, name, dto.team_kind, dto.reporting_mode, dto.external_contact_note ?? null],
         ) as Array<{ id: string }>;
         const teamId = inserted[0]?.id;
         if (!teamId) throw new AppError('INTERNAL_ERROR', { status: 500 });
@@ -110,20 +107,8 @@ export class TeamsProfileService {
     const current = await this.queries.findTeam(this.dataSource, teamId);
     if (!current) throw new AppError('NOT_FOUND', { status: 404 });
     await this.assertCanManage(current, session);
-    if (dto.name === undefined && dto.skill_codes === undefined && dto.availability === undefined && dto.operating_region_code === undefined && dto.nationwide_coverage === undefined) {
+    if (dto.name === undefined && dto.skill_codes === undefined && dto.availability === undefined) {
       throw new AppError('VALIDATION_FAILED', { status: 400 });
-    }
-    if (dto.nationwide_coverage !== undefined && dto.nationwide_coverage !== current.nationwide_coverage &&
-      !hasPermission(session.grants, 'TEAM_MANAGE_ANY', { organizationId: current.organization_id })) {
-      throw new AppError('FORBIDDEN', { status: 403 });
-    }
-    if (dto.operating_region_code && dto.operating_region_code !== current.operating_region_code) {
-      if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
-        organizationId: current.organization_id, regionCode: current.operating_region_code,
-      }) || !hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
-        organizationId: current.organization_id, regionCode: dto.operating_region_code,
-      })) throw new AppError('FORBIDDEN', { status: 403 });
-      await this.assertRegion(dto.operating_region_code);
     }
     const name = dto.name === undefined ? undefined : cleanName(dto.name);
     const skillCodes = dto.skill_codes === undefined ? undefined : [...dto.skill_codes].sort();
@@ -139,24 +124,6 @@ export class TeamsProfileService {
         if (!row) throw new AppError('NOT_FOUND', { status: 404 });
         await this.assertCanManage(row, session, manager);
         validateExpectedVersion(Number(row.version), dto.expected_version);
-        const nextRegion = dto.operating_region_code ?? row.operating_region_code;
-        const nextNationwide = dto.nationwide_coverage ?? row.nationwide_coverage;
-        if (nextNationwide !== row.nationwide_coverage &&
-          !hasPermission(session.grants, 'TEAM_MANAGE_ANY', { organizationId: row.organization_id })) {
-          throw new AppError('FORBIDDEN', { status: 403 });
-        }
-        if (nextRegion !== row.operating_region_code || nextNationwide !== row.nationwide_coverage) {
-          if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
-            organizationId: row.organization_id, regionCode: row.operating_region_code,
-          }) || !hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
-            organizationId: row.organization_id, regionCode: nextRegion,
-          })) throw new AppError('FORBIDDEN', { status: 403 });
-          const active = await manager.query(
-            "SELECT 1 FROM mission WHERE team_id=$1 AND status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE') LIMIT 1",
-            [teamId],
-          ) as unknown[];
-          if (active.length) throw new AppError('TEAM_BUSY', { status: 409 });
-        }
         if (dto.availability === 'AVAILABLE' && row.readiness_required) {
           throw new AppError('TEAM_NOT_ELIGIBLE', { status: 409, details: { reason: 'UNAVAILABLE' } });
         }
@@ -173,10 +140,10 @@ export class TeamsProfileService {
         const before = auditState(row);
         const [updated] = await manager.query(
           `UPDATE rescue_team
-              SET name=COALESCE($3,name),availability=COALESCE($4,availability),operating_region_code=$5,nationwide_coverage=$6,version=version+1
+              SET name=COALESCE($3,name),availability=COALESCE($4,availability),version=version+1
             WHERE id=$1 AND version=$2
             RETURNING id`,
-          [teamId, dto.expected_version, name ?? null, dto.availability ?? null, nextRegion, nextNationwide],
+          [teamId, dto.expected_version, name ?? null, dto.availability ?? null],
         ) as [Array<{ id: string }>, number];
         if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
         if (skillCodes) await this.replaceSkills(manager, teamId, skillCodes);
@@ -255,18 +222,13 @@ export class TeamsProfileService {
       ) as unknown[] : [];
       if (!leaders.length) throw new AppError('FORBIDDEN', { status: 403 });
     } else {
-      if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
-        organizationId: team.organization_id, regionCode: team.operating_region_code,
-      })) throw new AppError('FORBIDDEN', { status: 403 });
+      if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', { organizationId: team.organization_id })) {
+        throw new AppError('FORBIDDEN', { status: 403 });
+      }
       if (!dto.reported_by?.trim()) throw new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: {
         reported_by: ['Vui lòng ghi người từ đội đã xác nhận sẵn sàng.'],
       } });
     }
-  }
-
-  private async assertRegion(regionCode: string): Promise<void> {
-    const rows = await this.dataSource.query('SELECT 1 FROM region_boundary WHERE region_code=$1', [regionCode]) as unknown[];
-    if (!rows.length) throw new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: { operating_region_code: ['Mã khu vực không hợp lệ hoặc chưa được cấu hình.'] } });
   }
 
   private async assertSkills(codes: string[]): Promise<void> {
@@ -286,9 +248,7 @@ export class TeamsProfileService {
   }
 
   private async assertCanManage(team: TeamRow, session: ReporterSession, queryable: Pick<DataSource | EntityManager, 'query'> = this.dataSource): Promise<void> {
-    if (hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
-      organizationId: team.organization_id, regionCode: team.operating_region_code,
-    })) return;
+    if (hasPermission(session.grants, 'TEAM_MANAGE_ANY', { organizationId: team.organization_id })) return;
     const leaders = await queryable.query(
       `SELECT 1 FROM team_member WHERE team_id=$1 AND user_id=$2 AND member_role='LEADER' AND left_at IS NULL LIMIT 1`,
       [team.id, session.userId],

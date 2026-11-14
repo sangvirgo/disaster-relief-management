@@ -888,17 +888,18 @@
 }
 
 .coordinator-detail-surface .queue-detail-card { position: static; max-height: none; overflow: visible; scrollbar-gutter: auto; }
-@media (min-width: 1051px) {
-  .coordinator-detail-surface.detail-panel-card {
-    position: sticky;
-    top: 16px;
-    margin-top: 0;
-    max-height: calc(100dvh - 96px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-gutter: stable;
-  }
-}
+/* The detail panel flows with the page: nested sticky scrolling hid its top under the app header and trapped scrolling. */
+.coordinator-detail-surface.detail-panel-card { position: relative; margin-top: 0; max-height: none; overflow: visible; }
+.sos-suggestion { display: grid; gap: 10px; margin: 0 0 12px; }
+.sos-suggestion h3 { margin: 0; }
+.sos-suggestion ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.sos-suggestion p { margin: 0; }
+.sos-suggestion .action-grid { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; }
+.sos-suggestion .action-grid > * { flex: 1 1 220px; }
+.sos-suggestion .action-grid .button { width: 100%; }
+.sos-suggestion .command-form { margin: 0; }
+.sos-suggestion__ai { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border, #e2e8f0); }
+.sos-suggestion__ai .command-form, .sos-suggestion__ai .button { width: auto; }
 .coordinator-layout .queue-filter-toolbar { justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
 .team-readiness-results { flex-basis: 100%; min-width: 0; }
 .team-readiness-results > p { margin: 0; }
@@ -927,3 +928,10 @@
 .sos-fold--advisory > summary { font-weight: 500; }
 .queue-danger-chip { color: #991b1b; background: #fee2e2; border-radius: 999px; padding: 1px 8px; font-weight: 700; width: fit-content; }
 .queue-detail-card .detail-grid { margin-top: 0; }
+
+/* Keep the floating close button clear of the first card. */
+.coordinator-detail-surface .queue-detail-card > h2 { margin: 0 0 22px; padding-right: 96px; min-height: 40px; display: flex; align-items: center; }
+.sos-suggestion__scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 16px; margin: 0; }
+.sos-suggestion__scores > div { display: grid; gap: 2px; }
+.sos-suggestion__scores dt { font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted, #64748b); }
+.sos-suggestion__scores dd { margin: 0; font-weight: 600; }

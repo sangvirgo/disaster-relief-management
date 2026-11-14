@@ -13,9 +13,9 @@ describe('Logistics report query contracts', () => {
     expect(invalid.some((error) => error.property === 'limit')).toBe(true);
   });
 
-  it('requires a bounded report window and at least one declared scope filter', async () => {
+  it('requires a bounded report window and a campaign scope', async () => {
     const valid = plainToInstance(FulfillmentReportQueryDto, {
-      region_code: 'R_1', from: '2026-01-01T00:00:00Z', to: '2026-01-02T00:00:00Z',
+      campaign_id: '00000000-0000-4000-8000-000000000001', from: '2026-01-01T00:00:00Z', to: '2026-01-02T00:00:00Z',
     });
     expect(await validate(valid)).toHaveLength(0);
 

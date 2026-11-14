@@ -31,7 +31,7 @@ export function previouslyReportedFacts(
  * `values` starts with `[requestId, expectedVersion]`, so the first placeholder is `$3`.
  */
 export function unverifiedRequestAssignments(
-  dto: SupplementRequestDto, mode: 'SUPPLEMENT' | 'PUT', requestId: string, regionCode: string | null,
+  dto: SupplementRequestDto, mode: 'SUPPLEMENT' | 'PUT', requestId: string,
 ): SqlAssignments {
   const values: unknown[] = [requestId, dto.expected_version];
   const sets: string[] = [];
@@ -46,7 +46,6 @@ export function unverifiedRequestAssignments(
   }
   if (Object.hasOwn(dto, 'needs_rescue')) set('needs_rescue', dto.needs_rescue, '::boolean');
   if (Object.hasOwn(dto, 'needs_relief_supplies')) set('needs_relief_supplies', dto.needs_relief_supplies, '::boolean');
-  if (dto.location) set('region_code', regionCode, '::text');
   return { sets, values };
 }
 

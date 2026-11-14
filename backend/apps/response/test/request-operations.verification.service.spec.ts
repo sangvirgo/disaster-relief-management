@@ -15,7 +15,7 @@ function fixture(options: { reportMode?: 'SELF' | 'PROXY'; evidenceReady?: boole
     id: requestId, tracking_code: '01HJKMNPQR', tracking_secret_hash: null, reporter_user_id: null,
     reporter_name: null, reporter_contact_phone: null, source_ip_hash: null, report_mode: options.reportMode ?? 'SELF',
     status: 'VERIFYING', version: 2, review_lane: 'NORMAL', received_at: '2026-10-26T00:00:00Z',
-    verifying_since: '2026-10-26T00:01:00Z', organization_id: organizationId, region_code: 'DEMO_A', campaign_id: null,
+    verifying_since: '2026-10-26T00:01:00Z', organization_id: organizationId, campaign_id: null,
     description: 'Nước ngập.', incident_category_code: 'FLOOD', reporter_declared_danger: false,
     needs_rescue: true, needs_relief_supplies: false, priority: null, priority_basis: null,
     work_cycle: 1, canonical_request_id: null, attribution_locked_at: null,

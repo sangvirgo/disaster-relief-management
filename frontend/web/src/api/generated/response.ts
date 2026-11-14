@@ -28,23 +28,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/requests/unassigned": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List organization-wide requests without a region */
-        get: operations["listUnassignedRequests"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/requests/{id}": {
         parameters: {
             query?: never;
@@ -298,26 +281,6 @@ export interface paths {
          * @description Human staff decision; all messages are Vietnamese. The response is no-store.
          */
         post: operations["recordAuthorityReferral"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/requests/{id}/correct-region": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Correct an unassigned request region
-         * @description Human staff decision; all messages are Vietnamese. The response is no-store.
-         */
-        post: operations["correctRequestRegion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -934,7 +897,7 @@ export interface paths {
         };
         /**
          * Aggregate requests into map cells
-         * @description Use strict UTC RFC 3339 timestamps ending in Z. The interval must be at most 31 days. At least one of region_code or campaign_id is required.
+         * @description Use strict UTC RFC 3339 timestamps ending in Z. The interval must be at most 31 days. campaign_id is required.
          */
         get: operations["getRequestHeatmap"];
         put?: never;
@@ -954,7 +917,7 @@ export interface paths {
         };
         /**
          * Get scoped request summary
-         * @description Use strict UTC RFC 3339 timestamps ending in Z. The interval must be at most 366 days. At least one of region_code or campaign_id is required.
+         * @description Use strict UTC RFC 3339 timestamps ending in Z. The interval must be at most 366 days. campaign_id is required.
          */
         get: operations["getReportSummary"];
         put?: never;
@@ -1491,6 +1454,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * DashboardController.overview
+         * @description Route exported from backend/apps/response/src/dashboard/dashboard.controller.ts#DashboardController.overview. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        get: operations["responseDashboardOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/weather/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * WeatherController.alerts
+         * @description Route exported from backend/apps/response/src/weather/weather.controller.ts#WeatherController.alerts. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        get: operations["responseWeatherAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/weather/at": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * WeatherController.at
+         * @description Route exported from backend/apps/response/src/weather/weather.controller.ts#WeatherController.at. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        get: operations["responseWeatherAt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/{id}/fast-track": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * RequestOperationsController.fastTrack
+         * @description Route exported from backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.fastTrack. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        post: operations["responseRequestOperationsFastTrack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/{id}/ai-advisories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * RequestOperationsController.requestAiAssessment
+         * @description Route exported from backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.requestAiAssessment. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        post: operations["responseRequestOperationsRequestAiAssessment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1683,7 +1746,6 @@ export interface components {
             review_lane: "NORMAL" | "RATE_LIMITED_REVIEW" | "PROXY_QUOTA_REVIEW";
             category: string;
             people_affected?: number | null;
-            region_code?: string | null;
             /** Format: date-time */
             received_at: string;
             declared_danger: boolean;
@@ -1941,11 +2003,6 @@ export interface components {
             referred_body: string;
             note: string;
         };
-        CorrectRegionRequest: {
-            expected_version: number;
-            region_code: string;
-            reason: string;
-        };
         SupplementReviewRequest: {
             expected_version: number;
             /** @enum {string} */
@@ -2182,7 +2239,6 @@ export interface components {
                 version: number;
                 /** Format: date-time */
                 created_at: string;
-                region_code: string | null;
             }[];
             more: boolean;
             cursor?: string;
@@ -2233,7 +2289,6 @@ export interface components {
             id: string;
             /** Format: uuid */
             organization_id: string;
-            region_code: string | null;
             name: string;
             objective: string | null;
             /** @enum {string} */
@@ -2249,7 +2304,6 @@ export interface components {
         CampaignCreate: {
             name: string;
             objective?: string | null;
-            region_code?: string | null;
             /** Format: date-time */
             starts_at?: string | null;
             /** Format: date-time */
@@ -2259,7 +2313,6 @@ export interface components {
             expected_version: number;
             name?: string;
             objective?: string | null;
-            region_code?: string | null;
             /** Format: date-time */
             starts_at?: string | null;
             /** Format: date-time */
@@ -2282,7 +2335,6 @@ export interface components {
             id: string;
             title: string;
             objective: string | null;
-            region_name: string | null;
             /** Format: date-time */
             starts_at: string | null;
             /** Format: date-time */
@@ -2302,7 +2354,6 @@ export interface components {
             status: "DRAFT" | "ACTIVE" | "PAUSED" | "CLOSED";
             /** Format: uuid */
             organization_id: string;
-            region_code: string | null;
             version: number;
         };
         /** @description GeoJSON point with WGS 84 longitude and latitude coordinates. */
@@ -2434,7 +2485,6 @@ export interface operations {
         parameters: {
             query?: {
                 status?: string;
-                region_code?: string;
                 priority?: string;
                 review_lane?: string;
                 category?: string;
@@ -2579,63 +2629,6 @@ export interface operations {
                 };
             };
             500: components["responses"]["Error"];
-        };
-    };
-    listUnassignedRequests: {
-        parameters: {
-            query?: {
-                cursor?: components["parameters"]["Cursor"];
-                limit?: components["parameters"]["PageLimit"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List organization-wide requests without a region */
-            200: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UnassignedRequestPage"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            400: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            401: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            403: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            404: components["responses"]["Error"];
-            500: components["responses"]["Error"];
-            503: components["responses"]["Error"];
         };
     };
     getStaffRequestDetail: {
@@ -3471,61 +3464,6 @@ export interface operations {
         responses: {
             /** @description Record an authority referral */
             201: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    "Idempotent-Replay": components["headers"]["IdempotentReplay"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OperationResult"];
-                };
-            };
-            400: components["responses"]["Error"];
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            401: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            403: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            404: components["responses"]["Error"];
-            409: components["responses"]["Error"];
-            500: components["responses"]["Error"];
-            503: components["responses"]["Error"];
-        };
-    };
-    correctRequestRegion: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                id: components["parameters"]["RequestId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CorrectRegionRequest"];
-            };
-        };
-        responses: {
-            /** @description Correct an unassigned request region */
-            200: {
                 headers: {
                     "Cache-Control": components["headers"]["CacheControlNoStore"];
                     "Idempotent-Replay": components["headers"]["IdempotentReplay"];
@@ -5736,7 +5674,6 @@ export interface operations {
                 from: string;
                 to: string;
                 status_layer?: "confirmed" | "unverified";
-                region_code?: string;
                 campaign_id?: string;
                 category?: string;
                 cell_m?: 250 | 500 | 1000 | 2000 | 5000;
@@ -5800,7 +5737,6 @@ export interface operations {
                 from: string;
                 to: string;
                 campaign_id?: string;
-                region_code?: string;
             };
             header?: never;
             path?: never;
@@ -5983,7 +5919,6 @@ export interface operations {
                         request_status?: string;
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string | null;
                         campaign_id?: string | null;
                         outcome_basis?: string | null;
                     };
@@ -6036,7 +5971,6 @@ export interface operations {
                         status?: "VERIFIED" | "TRIAGED" | "DISPATCHED" | "IN_PROGRESS";
                         /** Format: uuid */
                         organization_id?: string;
-                        region_code?: string | null;
                         campaign_id?: string | null;
                     };
                 };
@@ -6420,7 +6354,6 @@ export interface operations {
                     expected_version: number;
                     reason: string;
                     campaign_id?: string | null;
-                    region_code?: string;
                 };
             };
         };
@@ -6637,7 +6570,6 @@ export interface operations {
     responseTeamsList: {
         parameters: {
             query?: {
-                region_code?: string;
                 availability?: string;
                 status?: string;
                 cursor?: string;
@@ -6661,8 +6593,6 @@ export interface operations {
                             id: string;
                             /** Format: uuid */
                             organization_id: string;
-                            operating_region_code: string;
-                            nationwide_coverage: boolean;
                             name: string;
                             /** @enum {string} */
                             kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
@@ -6734,7 +6664,6 @@ export interface operations {
                     name: string;
                     /** Format: uuid */
                     organization_id: string;
-                    operating_region_code: string;
                     team_kind: string;
                     /** @enum {string} */
                     reporting_mode: "APP" | "COORDINATOR";
@@ -6757,8 +6686,6 @@ export interface operations {
                         id: string;
                         /** Format: uuid */
                         organization_id: string;
-                        operating_region_code: string;
-                        nationwide_coverage: boolean;
                         name: string;
                         /** @enum {string} */
                         kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
@@ -6827,8 +6754,6 @@ export interface operations {
                         id: string;
                         /** Format: uuid */
                         organization_id: string;
-                        operating_region_code: string;
-                        nationwide_coverage: boolean;
                         name: string;
                         /** @enum {string} */
                         kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
@@ -6891,8 +6816,6 @@ export interface operations {
                     name?: string;
                     skill_codes?: string[];
                     availability?: string;
-                    operating_region_code?: string;
-                    nationwide_coverage?: boolean;
                 };
             };
         };
@@ -6908,8 +6831,6 @@ export interface operations {
                         id: string;
                         /** Format: uuid */
                         organization_id: string;
-                        operating_region_code: string;
-                        nationwide_coverage: boolean;
                         name: string;
                         /** @enum {string} */
                         kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
@@ -7309,7 +7230,6 @@ export interface operations {
                      *       "id": "00000000-0000-4000-8000-000000000001",
                      *       "status": "TRIAGED",
                      *       "version": 8,
-                     *       "region_code": "NORTH-01",
                      *       "campaign_id": "00000000-0000-4000-8000-000000000003"
                      *     }
                      */
@@ -7318,7 +7238,6 @@ export interface operations {
                         id: string;
                         status: string;
                         version: number;
-                        region_code: string | null;
                         campaign_id: string | null;
                     };
                 };
@@ -7407,7 +7326,6 @@ export interface operations {
                      *       "id": "00000000-0000-4000-8000-000000000001",
                      *       "status": "TRIAGED",
                      *       "version": 9,
-                     *       "region_code": "NORTH-01",
                      *       "campaign_id": null
                      *     }
                      */
@@ -7416,7 +7334,6 @@ export interface operations {
                         id: string;
                         status: string;
                         version: number;
-                        region_code: string | null;
                         campaign_id: string | null;
                     };
                 };
@@ -7841,8 +7758,6 @@ export interface operations {
                         id: string;
                         /** Format: uuid */
                         organization_id: string;
-                        operating_region_code: string;
-                        nationwide_coverage: boolean;
                         name: string;
                         /** @enum {string} */
                         kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
@@ -7868,6 +7783,217 @@ export interface operations {
                         version: number;
                     };
                 };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseDashboardOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/03-response-api.md for the documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseWeatherAlerts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/03-response-api.md for the documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseWeatherAt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/03-response-api.md for the documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseRequestOperationsFastTrack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/03-response-api.md for the documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseRequestOperationsRequestAiAssessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/03-response-api.md for the documented response shape. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Documented error response; clients branch on the stable code. */
             401: {

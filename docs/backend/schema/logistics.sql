@@ -25,24 +25,24 @@ CREATE UNIQUE INDEX item_name_unit_uq ON item (lower(name), unit_code);
 CREATE INDEX item_type_idx ON item (item_type_code);
 
 CREATE TABLE warehouse (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL, region_code text NOT NULL,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL,
   name text NOT NULL CHECK (is_clean_text(name)), address_note text, location geography(Point,4326),
   location_public boolean NOT NULL DEFAULT false,              -- public pages show the point only when the manager opts in
   status text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','INACTIVE')),
   created_at timestamptz NOT NULL DEFAULT now(), version int NOT NULL DEFAULT 1,
   UNIQUE (id, organization_id)                                  -- target of composite FKs: children cannot disagree on the owning organization
 );
-CREATE INDEX warehouse_scope_idx ON warehouse (organization_id, region_code) WHERE status = 'ACTIVE';
+CREATE INDEX warehouse_scope_idx ON warehouse (organization_id) WHERE status = 'ACTIVE';
 CREATE TABLE relief_point (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL, region_code text NOT NULL,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL,
   name text NOT NULL CHECK (is_clean_text(name)), contact_note text, operating_note text, location geography(Point,4326) NOT NULL,
   status text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','INACTIVE')),
   created_at timestamptz NOT NULL DEFAULT now(), version int NOT NULL DEFAULT 1,
   UNIQUE (id, organization_id)
 );
-CREATE INDEX relief_point_scope_idx ON relief_point (organization_id, region_code) WHERE status = 'ACTIVE';
+CREATE INDEX relief_point_scope_idx ON relief_point (organization_id) WHERE status = 'ACTIVE';
 CREATE TABLE vehicle (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL, region_code text NOT NULL, identifier text NOT NULL CHECK (is_clean_text(identifier)),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid NOT NULL, identifier text NOT NULL CHECK (is_clean_text(identifier)),
   vehicle_type text NOT NULL, capacity numeric(18,3) CHECK (capacity > 0), capacity_unit text REFERENCES unit(code),
   status text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','INACTIVE')),
   created_at timestamptz NOT NULL DEFAULT now(), version int NOT NULL DEFAULT 1,
@@ -192,7 +192,7 @@ CREATE TABLE stock_balance (
 CREATE TABLE fulfillment_cycle (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   request_id uuid NOT NULL, work_cycle int NOT NULL CHECK (work_cycle >= 1),
-  organization_id uuid NOT NULL, campaign_id uuid, region_code text,        -- attribution copied from Response; same for every need in the cycle
+  organization_id uuid NOT NULL, campaign_id uuid,        -- attribution copied from Response; same for every need in the cycle
   state      text NOT NULL DEFAULT 'OPEN' CHECK (state IN ('OPEN','FROZEN','SEALED')),   -- hot guard; must match the latest non-aborted cycle_intent (see check_cycle_state_matches_intent())
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (request_id, work_cycle)
@@ -209,7 +209,6 @@ CREATE TABLE cycle_intent (
 -- At most one live (non-aborted) intent per cycle; ABORTED rows are permanent tombstones (no TTL, any number per cycle).
 CREATE UNIQUE INDEX cycle_intent_live_uq ON cycle_intent (cycle_id) WHERE state <> 'ABORTED';
 CREATE INDEX cycle_scope_idx ON fulfillment_cycle (organization_id, created_at DESC, id DESC);
-CREATE INDEX cycle_region_idx ON fulfillment_cycle (region_code, created_at);       -- region reports
 CREATE INDEX cycle_campaign_idx ON fulfillment_cycle (campaign_id) WHERE campaign_id IS NOT NULL;
 -- delivery target is derived: designated_point_id IS NULL => FINAL_RECIPIENT, else RELIEF_POINT (no redundant kind column)
 CREATE TABLE relief_need (
@@ -253,7 +252,7 @@ CREATE INDEX commitment_need_idx ON commitment (relief_need_id);
 -- ---------- distribution & handoff ----------
 CREATE TABLE distribution (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  warehouse_id uuid NOT NULL, organization_id uuid NOT NULL,               -- organization comes from the warehouse (composite FK), region via join
+  warehouse_id uuid NOT NULL, organization_id uuid NOT NULL,               -- organization comes from the warehouse (composite FK)
   relief_point_id uuid, vehicle_id uuid,
   campaign_id uuid,
   purpose text NOT NULL CHECK (purpose IN ('REQUEST_AID','CAMPAIGN_DISTRIBUTION','POINT_REPLENISHMENT')),

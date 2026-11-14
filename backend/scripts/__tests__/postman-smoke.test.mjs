@@ -190,7 +190,7 @@ test('main verification is a location/information/image review with no phone-con
 test('main scenario explicitly changes actors and finishes the rescue before resolving', () => {
   const operations = main.map((item) => meta(item).operationId);
   assert.deepEqual(operations, [
-    'login', 'listIdentityOrganizations', 'listIdentityRegions', 'createIdentityUser', 'createIdentityUserGrant', 'login', 'createSelfRequest', 'trackSelfRequest', 'supplementSelfRequest',
+    'login', 'listIdentityOrganizations', 'createIdentityUser', 'createIdentityUserGrant', 'login', 'createSelfRequest', 'trackSelfRequest', 'supplementSelfRequest',
     'login', 'getStaffRequestDetail', 'startRequestVerification', 'verifyRequest', 'triageRequest',
     'responseTeamsCreate', 'createMissionOffer', 'login', 'getMission', 'acceptMission', 'transitionMission', 'transitionMission', 'transitionMission',
     'login', 'getStaffRequestDetail', 'responseRequestResolutionResolve', 'responseRequestResolutionOperation', 'login', 'trackSelfRequest',
@@ -219,7 +219,7 @@ test('SOS creation commits its generated capability only on success; detail neve
   runner.send(create, { id: 'sos-a', tracking_code: 'ABC1234567', review_lane: 'NORMAL' });
   assert.equal(runner.values.get('requestId'), 'sos-a');
   assert.equal(runner.values.get('trackingSecret'), 'q'.repeat(43));
-  runner.send(op(main, 'getStaffRequestDetail'), { id: 'sos-a', version: 4, organization_id: 'org', region_code: 'DEMO_A' });
+  runner.send(op(main, 'getStaffRequestDetail'), { id: 'sos-a', version: 4, organization_id: 'org' });
   assert.equal(runner.values.get('requestVersion'), '4');
   assert.equal(runner.values.get('requestId'), 'sos-a');
   runner.send(op(main, 'getStaffRequestDetail'), { id: 'unrelated', version: 99 });
@@ -318,12 +318,11 @@ test('complete main script chain carries actor tokens, IDs and versions without 
   const runner = sandbox(); let version = 1; let missionVersion = 1; let detailCalls = 0;
   const responses = {
     listIdentityOrganizations: () => ({ items: [{ id: 'intake-org-a', name: 'Trung tâm điều phối C48 (demo)', status: 'ACTIVE' }] }),
-    listIdentityRegions: () => ({ items: [{ code: 'DEMO_A', name: 'Khu A', status: 'ACTIVE', version: 1 }], next_cursor: null }),
     createIdentityUser: () => ({ id: 'leader-a' }), createIdentityUserGrant: () => ({ id: 'grant-a' }),
     createSelfRequest: () => ({ id: 'sos-a', tracking_code: 'ABC1234567', review_lane: 'NORMAL' }),
     trackSelfRequest: () => ({ id: 'sos-a', version, status: version === 10 ? 'RESOLVED' : 'SUBMITTED' }),
     supplementSelfRequest: () => ({ id: 'sos-a', version: ++version }),
-    getStaffRequestDetail: () => ({ id: 'sos-a', version: ++detailCalls === 1 ? version : (version = 9), region_code: 'DEMO_A' }),
+    getStaffRequestDetail: () => ({ id: 'sos-a', version: ++detailCalls === 1 ? version : (version = 9) }),
     startRequestVerification: () => ({ id: 'sos-a', version: ++version }),
     verifyRequest: () => ({ id: 'sos-a', version: ++version }), triageRequest: () => ({ id: 'sos-a', version: ++version }),
     responseTeamsCreate: () => ({ id: 'team-a' }),
@@ -372,20 +371,6 @@ test('leader mission read requires server-derived can_manage_mission', () => {
     const bad = sandbox({ activeAccessToken: 'leader-token', missionId: 'mission-a' });
     bad.send(read, body);
     assert.equal(bad.failures.length, 1, JSON.stringify(body));
-    assert.equal(bad.next, null);
-  }
-});
-test('admin region list requires an integer version on every region', () => {
-  const read = op(main, 'listIdentityRegions');
-  assert.equal(read.request.method, 'GET');
-  assert.equal(read.request.url, '{{identityBaseUrl}}/regions?limit=100');
-  const ok = sandbox({ activeAccessToken: 'admin-token' });
-  ok.send(read, { items: [{ code: 'A', name: 'A', status: 'ACTIVE', version: 3 }], next_cursor: null });
-  assert.deepEqual(ok.failures, []);
-  for (const items of [[], [{ code: 'A', name: 'A', status: 'ACTIVE' }], [{ code: 'A', status: 'ACTIVE', version: '3' }], [{ code: 'A', version: 0 }]]) {
-    const bad = sandbox({ activeAccessToken: 'admin-token' });
-    bad.send(read, { items, next_cursor: null });
-    assert.equal(bad.failures.length, 1, JSON.stringify(items));
     assert.equal(bad.next, null);
   }
 });

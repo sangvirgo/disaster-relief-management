@@ -186,11 +186,6 @@ erDiagram
     string organization_kind
     string status
   }
-  REGION {
-    string code PK
-    string name
-    string status
-  }
   MEMBERSHIP {
     uuid user_id PK
     uuid organization_id PK
@@ -202,7 +197,6 @@ erDiagram
     string role_code
     string scope_type
     uuid organization_id FK
-    string region_code FK
     uuid campaign_id
     timestamp revoked_at
   }
@@ -229,12 +223,11 @@ erDiagram
   ORGANIZATION ||--o{ MEMBERSHIP : has
   APP_USER ||--o{ ROLE_GRANT : receives
   ORGANIZATION o|--o{ ROLE_GRANT : scopes
-  REGION o|--o{ ROLE_GRANT : scopes
   APP_USER ||--o{ SESSION_FAMILY : authenticates
   SESSION_FAMILY ||--o{ REFRESH_SESSION : rotates
 ```
 
-`ROLE_GRANT.campaign_id` is an opaque Response campaign ID and has no foreign key to the Response database. The audit actor ID is not an FK. `ROLE_GRANT.organization_id` / `region_code` scope grants; the role catalog and role-to-permission rules are enforced by application code and database checks.
+`ROLE_GRANT.campaign_id` is an opaque Response campaign ID and has no foreign key to the Response database. The audit actor ID is not an FK. `ROLE_GRANT.organization_id` scopes grants; the role catalog and role-to-permission rules are enforced by application code and database checks.
 
 ## 6. Response physical ERD (core)
 
@@ -243,7 +236,6 @@ erDiagram
   CAMPAIGN {
     uuid id PK
     uuid organization_id
-    string region_code FK
     string name
     string status
   }
@@ -254,10 +246,6 @@ erDiagram
   SKILL {
     string code PK
     string display_name
-  }
-  REGION_BOUNDARY {
-    string region_code PK
-    geometry geom
   }
   INCIDENT_CATEGORY_SKILL {
     string category_code PK
@@ -270,7 +258,6 @@ erDiagram
     uuid canonical_request_id FK
     uuid reporter_user_id
     uuid organization_id
-    string region_code FK
     string status
     string priority
     int work_cycle
@@ -309,7 +296,6 @@ erDiagram
   RESCUE_TEAM {
     uuid id PK
     string name
-    string operating_region_code FK
     string status
   }
   TEAM_MEMBER {
@@ -350,8 +336,6 @@ erDiagram
   }
 
   CAMPAIGN o|--o{ ASSISTANCE_REQUEST : relates
-  REGION_BOUNDARY o|--o{ CAMPAIGN : scopes
-  REGION_BOUNDARY o|--o{ ASSISTANCE_REQUEST : assigns_region
   INCIDENT_CATEGORY ||--o{ ASSISTANCE_REQUEST : classifies
   INCIDENT_CATEGORY ||--o{ INCIDENT_CATEGORY_SKILL : requires
   SKILL ||--o{ INCIDENT_CATEGORY_SKILL : required_by
@@ -364,7 +348,6 @@ erDiagram
   ASSISTANCE_REQUEST ||--o{ MISSION : dispatches
   REQUEST_EVENT ||--o{ MISSION : verified_snapshot
   RESCUE_TEAM ||--o{ TEAM_MEMBER : includes
-  REGION_BOUNDARY ||--o{ RESCUE_TEAM : operates_in
   RESCUE_TEAM ||--o{ TEAM_SKILL : qualified_for
   SKILL ||--o{ TEAM_SKILL : assigned
   RESCUE_TEAM ||--o| TEAM_POSITION : reports_position
@@ -399,14 +382,12 @@ erDiagram
   WAREHOUSE {
     uuid id PK
     uuid organization_id
-    string region_code
     string name
     string status
   }
   RELIEF_POINT {
     uuid id PK
     uuid organization_id
-    string region_code
     string name
     string status
   }

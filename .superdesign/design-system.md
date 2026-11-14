@@ -33,7 +33,7 @@ Style source: Superdesign `mosaic-grid-architecture-style`, adapted for an emerg
 2. Volunteer/Rescue: personal mission list/detail, accept/decline, progress, evidence, team profile/availability/position for eligible leaders.
 3. Coordinator: scoped SOS queue, verification/detail/duplicate review, priority decision, team comparison and mission assignment, map, campaigns, notices.
 4. Operations Manager: campaigns and donation drives, catalog/assets/stock, intake review with separate staff authority, needs/commitments, distributions/handoffs, reports/reconciliation.
-5. Administrator: users, organizations, memberships, grants, regions, audit. No SOS victim or donor detail by default.
+5. Administrator: users, organizations, memberships, grants, audit. No SOS victim or donor detail by default.
 
 ## SOS interface rules
 

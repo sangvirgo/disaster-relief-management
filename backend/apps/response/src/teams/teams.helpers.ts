@@ -3,8 +3,6 @@ import { AppError } from '@c48/technical/errors/errors';
 export interface TeamRow extends Record<string, unknown> {
   id: string;
   organization_id: string;
-  operating_region_code: string;
-  nationwide_coverage: boolean;
   name: string;
   team_kind: 'VOLUNTEER' | 'MILITARY' | 'GOVERNMENT' | 'OTHER';
   reporting_mode: 'APP' | 'COORDINATOR';
@@ -34,8 +32,6 @@ export function teamView(row: TeamRow, includeCoordinates = false): Record<strin
   return {
     id: row.id,
     organization_id: row.organization_id,
-    operating_region_code: row.operating_region_code,
-    nationwide_coverage: row.nationwide_coverage,
     name: row.name,
     kind: row.team_kind,
     reporting_mode: row.reporting_mode,

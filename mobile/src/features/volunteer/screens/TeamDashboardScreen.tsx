@@ -20,10 +20,9 @@ import { LocationPickerModal } from '../../../components/common/LocationPickerMo
 import { TeamMembersSection } from '../components/TeamMembersSection';
 import { useAuthStore } from '../../../store/authStore';
 import { useLocation } from '../../../hooks/useLocation';
-import { IdentityApi } from '../../../api/identityApi';
 import { ResponseApi } from '../../../api/responseApi';
 import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
-import { GeoLocation, RescueTeamDetail, Mission, RegionItem, TeamSkillOption } from '../../../types/api';
+import { GeoLocation, RescueTeamDetail, Mission, TeamSkillOption } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
 import { reverseGeocodeCoordinates } from '../../../utils/locationGeocoding';
 import { RESCUE_TEAM_KIND_LABELS, RESCUE_SKILL_LABELS } from '../../../constants/labels';
@@ -54,7 +53,6 @@ export const TeamDashboardScreen: React.FC = () => {
   const router = useRouter();
   const {
     user,
-    grants,
     logout,
     isLoading: authLoading,
     isAuthenticated,
@@ -69,9 +67,6 @@ export const TeamDashboardScreen: React.FC = () => {
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
   const [showUserIdModal, setShowUserIdModal] = useState<boolean>(false);
   const [teamSkills, setTeamSkills] = useState<TeamSkillOption[]>([]);
-  const [regionDirectory, setRegionDirectory] = useState<RegionItem[]>([]);
-  const [regionsLoading, setRegionsLoading] = useState(false);
-  const [regionsLoadFailed, setRegionsLoadFailed] = useState(false);
   const [membershipRole, setMembershipRole] = useState<TeamMembershipRole>('UNKNOWN');
   const [showTeamProfileModal, setShowTeamProfileModal] = useState(false);
   const [teamNameDraft, setTeamNameDraft] = useState('');
@@ -100,81 +95,6 @@ export const TeamDashboardScreen: React.FC = () => {
   const isResolvingTeamPositionArea = Boolean(
     teamCoordinatesKey && teamPositionAreaResult?.coordinatesKey !== teamCoordinatesKey,
   );
-  const volunteerRegionCodes = Array.from(new Set(grants
-    .filter((grant) => grant.role_code === 'VOLUNTEER' && grant.scope_type === 'REGION' && grant.region_code)
-    .map((grant) => grant.region_code!)));
-  const regionScopeKey = volunteerRegionCodes.join('|');
-
-  const loadRegionDirectory = useCallback(async () => {
-    setRegionsLoading(true);
-    setRegionsLoadFailed(false);
-    try {
-      const regions: RegionItem[] = [];
-      const seenCursors = new Set<string>();
-      let cursor: string | undefined;
-      for (let pageNumber = 0; pageNumber < 100; pageNumber += 1) {
-        const page = await IdentityApi.getRegions(100, cursor);
-        regions.push(...page.items);
-        const nextCursor = page.next_cursor ?? undefined;
-        if (!nextCursor || seenCursors.has(nextCursor)) break;
-        seenCursors.add(nextCursor);
-        cursor = nextCursor;
-      }
-      setRegionDirectory(regions);
-    } catch {
-      setRegionsLoadFailed(true);
-    } finally {
-      setRegionsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!isAuthenticated || !regionScopeKey) return;
-    // Load the region catalog after the signed-in user's region grants are available.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadRegionDirectory();
-  }, [isAuthenticated, loadRegionDirectory, regionScopeKey]);
-
-  const renderVolunteerRegionScopes = () => {
-    if (volunteerRegionCodes.length === 0) return null;
-    return (
-      <View style={styles.regionScopeSection}>
-        <View style={styles.regionScopeHeader}>
-          <MapPin size={15} color={THEME.colors.primary.main} />
-          <Text style={styles.regionScopeTitle}>KHU VỰC TRONG PHẠM VI CẤP QUYỀN</Text>
-          {regionsLoading ? <ActivityIndicator size="small" color={THEME.colors.primary.main} /> : null}
-        </View>
-        {volunteerRegionCodes.map((code) => {
-          const region = regionDirectory.find((item) => item.code === code);
-          return (
-            <View key={code} style={styles.regionScopeRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.regionScopeName}>{region?.name ?? code}</Text>
-                <Text style={styles.regionScopeCode}>{code}</Text>
-              </View>
-              {region ? (
-                <View style={[
-                  styles.regionScopeStatus,
-                  region.status === 'ACTIVE' ? styles.regionScopeStatusActive : styles.regionScopeStatusInactive,
-                ]}>
-                  <Text style={[
-                    styles.regionScopeStatusText,
-                    region.status === 'ACTIVE' ? styles.regionScopeStatusTextActive : styles.regionScopeStatusTextInactive,
-                  ]}>
-                    {region.status === 'ACTIVE' ? 'Đang hoạt động' : 'Ngừng hoạt động'}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          );
-        })}
-        {regionsLoadFailed ? (
-          <Text style={styles.regionScopeHint}>Chưa tải được tên khu vực; mã khu vực vẫn được hiển thị.</Text>
-        ) : null}
-      </View>
-    );
-  };
-
   useEffect(() => {
     const coordinatesKey = teamCoordinatesKey;
     if (
@@ -468,7 +388,7 @@ export const TeamDashboardScreen: React.FC = () => {
   if (!team) {
     return (
       <ScreenContainer
-        title="Khu Vực Đội Cứu Hộ"
+        title="Đội Cứu Hộ"
         subtitle={`Xin chào, ${user?.display_name || user?.username || 'Bạn'}`}
         headerRight={
           <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
@@ -510,7 +430,6 @@ export const TeamDashboardScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
             </View>
-            {renderVolunteerRegionScopes()}
           </View>
 
           {/* Thông báo trạng thái biên chế thực địa */}
@@ -650,8 +569,6 @@ export const TeamDashboardScreen: React.FC = () => {
               </Text>
             </View>
           </View>
-
-          {renderVolunteerRegionScopes()}
 
           {/* Danh sách kỹ năng chuyên môn của đội */}
           {team.skills && team.skills.length > 0 && (
@@ -1134,71 +1051,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: THEME.colors.surface.border,
     ...THEME.shadows.sm,
-  },
-  regionScopeSection: {
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: THEME.colors.surface.border,
-  },
-  regionScopeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
-  },
-  regionScopeTitle: {
-    flex: 1,
-    fontSize: 10,
-    fontWeight: '800',
-    color: THEME.colors.text.muted,
-    letterSpacing: 0.3,
-  },
-  regionScopeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 7,
-    borderTopWidth: 1,
-    borderTopColor: THEME.colors.surface.border,
-  },
-  regionScopeName: {
-    fontSize: THEME.typography.fontSizes.xs + 1,
-    fontWeight: '700',
-    color: THEME.colors.text.primary,
-  },
-  regionScopeCode: {
-    fontSize: 10,
-    color: THEME.colors.text.muted,
-    marginTop: 2,
-  },
-  regionScopeStatus: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  regionScopeStatusActive: {
-    backgroundColor: THEME.colors.success.bg,
-    borderColor: THEME.colors.success.border,
-  },
-  regionScopeStatusInactive: {
-    backgroundColor: THEME.colors.surface.background,
-    borderColor: THEME.colors.surface.border,
-  },
-  regionScopeStatusText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  regionScopeStatusTextActive: {
-    color: THEME.colors.success.dark,
-  },
-  regionScopeStatusTextInactive: {
-    color: THEME.colors.text.secondary,
-  },
-  regionScopeHint: {
-    fontSize: 10,
-    color: THEME.colors.text.muted,
-    marginTop: 5,
   },
   teamHeaderRow: {
     flexDirection: 'row',

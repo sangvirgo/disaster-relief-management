@@ -57,7 +57,7 @@ The project proposes a centralized information system through which stakeholders
 
 4. **Operations Manager**
    - Manage relief points, warehouses, and vehicles.
-   - Coordinate resources across regions and manage relief campaigns.
+   - Coordinate resources across organizations and manage relief campaigns.
 
 5. **System Administrator**
    - Manage accounts and access permissions.

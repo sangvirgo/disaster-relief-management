@@ -7,7 +7,7 @@ import { DashboardService } from './dashboard.service';
 export class DashboardController {
   constructor(private readonly dashboard: DashboardService) {}
 
-  /** Coordinators see their organization/region scope; administrators see the whole system. */
+  /** Coordinators see their organization or campaign scope; administrators see the whole system. */
   @Get('dashboard/overview')
   overview(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     noStore(response);

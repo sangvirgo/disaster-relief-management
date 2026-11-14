@@ -12,24 +12,22 @@ team_id="$(P -c 'SELECT gen_random_uuid()')"
 organization_id="$(P -c 'SELECT gen_random_uuid()')"
 request_event_a="$(P -c 'SELECT gen_random_uuid()')"
 request_event_b="$(P -c 'SELECT gen_random_uuid()')"
-region_code="C48_RACE_$(printf '%s' "$request_a" | tr -d '-' | cut -c1-12 | tr '[:lower:]' '[:upper:]')"
 category_code="C48_RACE_$(printf '%s' "$request_b" | tr -d '-' | cut -c1-12 | tr '[:lower:]' '[:upper:]')"
 track_a="$(printf '%s' "$request_a" | tr -d '-' | cut -c1-12 | tr '[:lower:]' '[:upper:]')"
 track_b="$(printf '%s' "$request_b" | tr -d '-' | cut -c1-12 | tr '[:lower:]' '[:upper:]')"
 
 cleanup() {
   if [[ -n "${request_a:-}" && -n "${request_b:-}" ]]; then
-    P -c "DELETE FROM mission WHERE request_id IN ('$request_a','$request_b'); DELETE FROM request_event WHERE request_id IN ('$request_a','$request_b'); DELETE FROM assistance_request WHERE id IN ('$request_a','$request_b'); DELETE FROM team_position WHERE team_id='$team_id'; DELETE FROM rescue_team WHERE id='$team_id'; DELETE FROM region_boundary WHERE region_code='$region_code'; DELETE FROM incident_category WHERE code='$category_code'" >/dev/null 2>&1 || true
+    P -c "DELETE FROM mission WHERE request_id IN ('$request_a','$request_b'); DELETE FROM request_event WHERE request_id IN ('$request_a','$request_b'); DELETE FROM assistance_request WHERE id IN ('$request_a','$request_b'); DELETE FROM team_position WHERE team_id='$team_id'; DELETE FROM rescue_team WHERE id='$team_id'; DELETE FROM incident_category WHERE code='$category_code'" >/dev/null 2>&1 || true
   fi
   rm -rf "$TMP"
 }
 trap cleanup EXIT
 
 P >/dev/null <<SQL
-INSERT INTO region_boundary VALUES ('$region_code', ST_Multi(ST_GeomFromText('POLYGON((106 10,107 10,107 11,106 11,106 10))',4326)));
 INSERT INTO incident_category VALUES ('$category_code','Kiểm tra cạnh tranh');
-INSERT INTO rescue_team (id,organization_id,operating_region_code,name,team_kind) VALUES
-  ('$team_id','$organization_id','$region_code','Đội kiểm tra $team_id','VOLUNTEER');
+INSERT INTO rescue_team (id,organization_id,name,team_kind) VALUES
+  ('$team_id','$organization_id','Đội kiểm tra $team_id','VOLUNTEER');
 INSERT INTO assistance_request (id,tracking_code,incident_category_code,report_mode,organization_id) VALUES
   ('$request_a','$track_a','$category_code','SELF','$organization_id'),
   ('$request_b','$track_b','$category_code','SELF','$organization_id');

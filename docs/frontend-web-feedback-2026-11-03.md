@@ -23,7 +23,7 @@ Affected: `LivePage` (`main.tsx`, which also calls `setData(null)` on every fetc
 
 ### P1-4. Dropdown reference data only loads the first page
 - `Operations.tsx` (~L100–140) loads `/organizations`, `/warehouses`, `/donation-drives`, `/items`, `/campaigns`, `/relief-points`, `/vehicles` and `/requests` once with no `limit` or `cursor`. Backend default page size is 50.
-- Anything beyond 50 items is missing from the selects, so users cannot pick a warehouse, item or SOS. `Campaigns.tsx`, `Coordinator.tsx` and `AnalyticsRegion.tsx` already loop with `limit=100`.
+- Anything beyond 50 items is missing from the selects, so users cannot pick a warehouse, item or SOS. `Campaigns.tsx` and `Coordinator.tsx` already loop with `limit=100`.
 - `ReceiptCountForm.tsx` reads `/items?status=ACTIVE&limit=100` once and drops item 101 onwards.
 - `Dashboard.tsx` requests `stock-summary?limit=10`, so the stock overview is silently truncated with no hint. The reconciliation and fulfillment reports have the same problem.
 - Fix: a shared `fetchAll()` for reference lists, or a searchable async select. Show "Hiển thị 10/…" when truncating on purpose.
@@ -34,7 +34,7 @@ Affected: `LivePage` (`main.tsx`, which also calls `setData(null)` on every fetc
 - Fix: hoist the reference cache above the tab (context or a module-level cache with a short TTL), and only fetch the sources the current page needs.
 
 ### P2-6. Free-text IDs in report filters
-- Operations → Đối soát: "Mã kho cần đối soát" and "Mã khu vực" are plain `<input>` fields. Users have to paste a UUID or region code, and the page stays empty with "Nhập bộ lọc bắt buộc…" until they do. The warehouse and region lists are already loaded, so use a `<select>`, default to the first entry and load immediately.
+- Operations → Đối soát: "Mã kho cần đối soát" is plain `<input>` fields. Users have to paste a UUID, and the page stays empty with "Nhập bộ lọc bắt buộc…" until they do. The warehouse list is already loaded, so use a `<select>`, default to the first entry and load immediately.
 
 ### P2-7. Reverse geocoding sends victim coordinates to a third party
 - `Coordinator.tsx` ~L149 calls `https://photon.komoot.io/reverse?lat=…&lon=…` from the browser for every SOS. This contradicts the privacy wording on the map page ("không hiển thị vị trí nạn nhân công khai") and the backend ownership model. It also has no timeout, rate limit or fallback beyond "Chưa tìm được địa chỉ".

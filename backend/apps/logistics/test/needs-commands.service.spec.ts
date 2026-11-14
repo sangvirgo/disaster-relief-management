@@ -24,7 +24,6 @@ const baseNeed = {
   request_id: '11111111-1111-4111-8111-111111111111',
   work_cycle: 2,
   organization_id: organizationId,
-  region_code: 'NORTH',
   campaign_id: null,
   item_id: itemId,
   item_name: 'Nước uống',
@@ -58,7 +57,6 @@ function setup(options: SetupOptions = {}) {
   const cycle = {
     id: cycleId,
     organization_id: organizationId,
-    region_code: 'NORTH',
     campaign_id: null,
     state: options.cycleState ?? 'OPEN',
   };
@@ -83,7 +81,7 @@ function setup(options: SetupOptions = {}) {
   } as unknown as EntityManager;
   const dataSource = {
     query: jest.fn(async (sql: string) => sql.includes('FROM relief_need n JOIN fulfillment_cycle')
-      ? [{ organization_id: organizationId, region_code: 'NORTH', campaign_id: null }]
+      ? [{ organization_id: organizationId, campaign_id: null }]
       : []),
     transaction: jest.fn(async (run: (manager: EntityManager) => Promise<unknown>) => run(manager)),
   };

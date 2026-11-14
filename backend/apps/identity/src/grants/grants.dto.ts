@@ -3,7 +3,7 @@ import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLeng
 import { Role, ScopeType } from '@c48/identity-contracts/permissions';
 
 const roles: readonly Role[] = ['CITIZEN', 'VOLUNTEER', 'COORDINATOR', 'CAMPAIGN_MANAGER', 'OPERATIONS_MANAGER', 'INTAKE_STAFF', 'REVIEWER', 'DISTRIBUTION_STAFF', 'ADMIN'];
-const scopes: readonly ScopeType[] = ['SYSTEM', 'ORGANIZATION', 'REGION', 'CAMPAIGN'];
+const scopes: readonly ScopeType[] = ['SYSTEM', 'ORGANIZATION', 'CAMPAIGN'];
 
 export class CreateGrantDto {
   @IsIn(roles)
@@ -14,9 +14,6 @@ export class CreateGrantDto {
 
   @IsOptional() @IsUUID('all')
   organization_id?: string;
-
-  @IsOptional() @IsString() @Matches(/^[A-Z0-9_]{2,32}$/)
-  region_code?: string;
 
   @IsOptional() @IsUUID('all')
   campaign_id?: string;

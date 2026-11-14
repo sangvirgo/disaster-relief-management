@@ -5,7 +5,6 @@ import type { AuthenticatedLogisticsSession } from '../auth/logistics-session.se
 
 export interface DriveScope {
   organization_id: string;
-  region_code: string;
 }
 
 export function requireDrivePermission(
@@ -15,7 +14,6 @@ export function requireDrivePermission(
 ): void {
   if (!hasPermission(session.grants, permission, {
     organizationId: scope.organization_id,
-    regionCode: scope.region_code,
   })) throw new AppError('FORBIDDEN', { status: 403 });
 }
 
@@ -30,17 +28,11 @@ export function driveScopeSql(
     const organizationId = grant.organization_id;
     if (!organizationId) continue;
     const permission = permissions.find((candidate) => grant.scope_type === 'ORGANIZATION'
-      ? hasPermission([grant], candidate, { organizationId, regionCode: '__scope_check__' })
-      : grant.scope_type === 'REGION' && grant.region_code
-        ? hasPermission([grant], candidate, { organizationId, regionCode: grant.region_code })
-        : false);
+      && hasPermission([grant], candidate, { organizationId }));
     if (!permission) continue;
-    if (grant.scope_type === 'ORGANIZATION' && !grant.region_code && !grant.campaign_id) {
+    if (grant.scope_type === 'ORGANIZATION' && !grant.campaign_id) {
       values.push(organizationId);
       branches.add(`${alias}.organization_id=$${values.length}`);
-    } else if (grant.scope_type === 'REGION' && grant.region_code && !grant.campaign_id) {
-      values.push(organizationId, grant.region_code);
-      branches.add(`(${alias}.organization_id=$${values.length - 1} AND ${alias}.region_code=$${values.length})`);
     }
   }
   if (branches.size === 0) throw new AppError('FORBIDDEN', { status: 403 });

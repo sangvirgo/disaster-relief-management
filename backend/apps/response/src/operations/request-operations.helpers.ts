@@ -44,24 +44,21 @@ export function checkVersion(actual: number, expected: number): void {
 }
 
 export function scopeSql(
-  grants: readonly Grant[], permission: Permission, values: unknown[], alias = 'r', organizationOnly = false,
+  grants: readonly Grant[], permission: Permission, values: unknown[], alias = 'r',
 ): string {
   const branches: string[] = [];
   for (const grant of grants) {
     const permissions: readonly string[] = ROLE_PERMISSIONS[grant.role_code];
     if (!permissions.includes(permission)) continue;
     if (grant.scope_type === 'SYSTEM') {
-      if (!organizationOnly && grant.organization_id === null && !grant.region_code && !grant.campaign_id) branches.push('TRUE');
+      if (grant.organization_id === null && !grant.campaign_id) branches.push('TRUE');
       continue;
     }
     if (!grant.organization_id) continue;
     if (grant.scope_type === 'ORGANIZATION') {
       values.push(grant.organization_id);
       branches.push(`${alias}.organization_id=$${values.length}`);
-    } else if (!organizationOnly && grant.scope_type === 'REGION' && grant.region_code) {
-      values.push(grant.organization_id, grant.region_code);
-      branches.push(`(${alias}.organization_id=$${values.length - 1} AND ${alias}.region_code=$${values.length})`);
-    } else if (!organizationOnly && grant.scope_type === 'CAMPAIGN' && grant.campaign_id) {
+    } else if (grant.scope_type === 'CAMPAIGN' && grant.campaign_id) {
       values.push(grant.organization_id, grant.campaign_id);
       branches.push(`(${alias}.organization_id=$${values.length - 1} AND ${alias}.campaign_id=$${values.length})`);
     }
@@ -74,17 +71,16 @@ export function hasOrganizationPermission(session: ReporterSession, permission: 
   return session.grants.some((grant) => {
     const permissions: readonly string[] = ROLE_PERMISSIONS[grant.role_code];
     return permissions.includes(permission) && (
-      (grant.scope_type === 'ORGANIZATION' && grant.organization_id === organizationId && !grant.region_code && !grant.campaign_id) ||
-      (grant.scope_type === 'SYSTEM' && grant.organization_id === null && !grant.region_code && !grant.campaign_id)
+      (grant.scope_type === 'ORGANIZATION' && grant.organization_id === organizationId && !grant.campaign_id) ||
+      (grant.scope_type === 'SYSTEM' && grant.organization_id === null && !grant.campaign_id)
     );
   });
 }
 
-export function grantCovers(grant: RequestCoordinatorGrant, row: Pick<OperationRequestRow, 'organization_id' | 'region_code' | 'campaign_id'>): boolean {
+export function grantCovers(grant: RequestCoordinatorGrant, row: Pick<OperationRequestRow, 'organization_id' | 'campaign_id'>): boolean {
   if (grant.organization_id !== row.organization_id) return false;
   if (grant.role_code === 'OPERATIONS_MANAGER') return grant.scope_type === 'ORGANIZATION';
   if (grant.scope_type === 'ORGANIZATION') return true;
-  if (grant.scope_type === 'REGION') return Boolean(row.region_code) && grant.region_code === row.region_code;
   return grant.scope_type === 'CAMPAIGN' && Boolean(row.campaign_id) && grant.campaign_id === row.campaign_id;
 }
 
@@ -103,8 +99,8 @@ export function parseBbox(value: string | undefined): [number, number, number, n
 export function filtersHash(grants: readonly Grant[], userId: string, query: object, route: string): unknown {
   const queryFilters = { ...(query as Record<string, unknown>) };
   delete queryFilters.cursor;
-  const scopes = grants.map(({ role_code, scope_type, organization_id, region_code, campaign_id }) => ({
-    role_code, scope_type, organization_id: organization_id ?? null, region_code: region_code ?? null, campaign_id: campaign_id ?? null,
+  const scopes = grants.map(({ role_code, scope_type, organization_id, campaign_id }) => ({
+    role_code, scope_type, organization_id: organization_id ?? null, campaign_id: campaign_id ?? null,
   })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   return { route, user_id: userId, grants: scopes, query: queryFilters };
 }

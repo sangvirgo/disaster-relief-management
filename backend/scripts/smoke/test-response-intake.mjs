@@ -141,7 +141,7 @@ async function main() {
 
   const massAssignmentKey = key();
   const massAssignment = await post(baseUrl, {
-    payload: body({ organization_id: '00000000-0000-4000-8000-000000000099', status: 'RESOLVED', region_code: 'T4_TEST_R1' }),
+    payload: body({ organization_id: '00000000-0000-4000-8000-000000000099', status: 'RESOLVED', priority: 'P1' }),
     idempotencyKey: massAssignmentKey, trackingSecret: secret(),
   });
   assertVietnameseError(massAssignment, 400, 'VALIDATION_FAILED');
@@ -178,7 +178,6 @@ async function main() {
   assert.equal(stored.rows[0].tracking_secret_hash.startsWith('v1:'), true);
   assert.notEqual(stored.rows[0].tracking_secret_hash, firstSecret);
   assert.equal(stored.rows[0].source_ip_hash.startsWith('v1:'), true);
-  assert.equal(stored.rows[0].region_code, 'R1');
   assert.equal(stored.rows[0].organization_id, organizationId);
   assert.equal(stored.rows[0].status, 'SUBMITTED');
   assert.equal(stored.rows[0].review_lane, 'NORMAL');
@@ -257,27 +256,13 @@ async function main() {
   });
   const signedIn = await post(baseUrl, { payload: manualBody, token: bearer, forwardedIp: '198.51.100.20' });
   assert.equal(signedIn.status, 201, JSON.stringify(signedIn.value));
-  const signedRow = await db.query('SELECT reporter_user_id, tracking_secret_hash, region_code FROM assistance_request WHERE id=$1', [signedIn.value.id]);
+  const signedRow = await db.query('SELECT reporter_user_id, tracking_secret_hash FROM assistance_request WHERE id=$1', [signedIn.value.id]);
   assert.equal(signedRow.rows[0].reporter_user_id, userId);
   assert.equal(signedRow.rows[0].tracking_secret_hash, null);
-  assert.equal(signedRow.rows[0].region_code, null);
   const signedSubject = await db.query('SELECT location_source, location_accuracy_m, location_captured_at FROM request_subject WHERE request_id=$1', [signedIn.value.id]);
   assert.equal(signedSubject.rows[0].location_source, 'MANUAL_PIN');
   assert.equal(signedSubject.rows[0].location_accuracy_m, null);
   assert.equal(signedSubject.rows[0].location_captured_at, null);
-
-  await db.query(
-    `INSERT INTO region_boundary (region_code, geom) VALUES
-       ('T4_AMBIG_A', ST_Multi(ST_GeomFromText('POLYGON((106.4 10.4,106.6 10.4,106.6 10.6,106.4 10.6,106.4 10.4))',4326))),
-       ('T4_AMBIG_B', ST_Multi(ST_GeomFromText('POLYGON((106.4 10.4,106.6 10.4,106.6 10.6,106.4 10.6,106.4 10.4))',4326)))`,
-  );
-  const ambiguous = await post(baseUrl, {
-    payload: body({ location: gpsLocation([106.5, 10.5]), reporter_contact_phone: null }),
-    trackingSecret: secret(), forwardedIp: '198.51.100.30',
-  });
-  assert.equal(ambiguous.status, 201, JSON.stringify(ambiguous.value));
-  const ambiguousRegion = await db.query('SELECT region_code FROM assistance_request WHERE id=$1', [ambiguous.value.id]);
-  assert.equal(ambiguousRegion.rows[0].region_code, null, 'overlapping administrative boundaries must be routed as unassigned');
 
   const csrfToken = randomBytes(24).toString('base64url');
   const cookieRequest = await post(baseUrl, {

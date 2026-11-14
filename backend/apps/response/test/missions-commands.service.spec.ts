@@ -46,12 +46,12 @@ describe('MissionsCommandsService UPDATE RETURNING handling', () => {
     const query = jest.fn(async (sql: string) => {
       if (sql.startsWith('SELECT campaign_id FROM assistance_request')) return [{ campaign_id: null }];
       if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
-        id: requestId, status: 'TRIAGED', version: 1, organization_id: organizationId, region_code: 'T8_REGION',
+        id: requestId, status: 'TRIAGED', version: 1, organization_id: organizationId,
         campaign_id: null, incident_category_code: 'FLOOD', priority: 'P2', priority_basis: 'COMPLETE',
         work_cycle: 1, verification_revision: revisionId, attribution_locked_at: null, reporter_user_id: null,
       }];
       if (sql.includes('FROM rescue_team WHERE id=$1 FOR SHARE')) return [{
-        id: teamId, organization_id: organizationId, operating_region_code: 'T8_REGION', reporting_mode: 'COORDINATOR',
+        id: teamId, organization_id: organizationId, reporting_mode: 'COORDINATOR',
         availability: 'AVAILABLE', status: 'ACTIVE', readiness_required: false, external_contact_note: 'Liên hệ điều phối',
       }];
       if (sql.includes('FROM incident_category_skill')) return [];
@@ -71,7 +71,7 @@ describe('MissionsCommandsService UPDATE RETURNING handling', () => {
       manager,
       requestId,
       { expected_version: 1, team_id: teamId } as CreateMissionDto,
-      { userId: coordinatorId, grants: [{ role_code: 'COORDINATOR', scope_type: 'REGION', organization_id: organizationId, region_code: 'T8_REGION' }] },
+      { userId: coordinatorId, grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId }] },
       teamId,
     )).rejects.toMatchObject({ code: 'VERSION_CONFLICT', details: { current_version: 1 } });
     expect(query.mock.calls.some(([sql]) => sql.startsWith('INSERT INTO request_event'))).toBe(false);
@@ -122,7 +122,7 @@ describe('MissionsCommandsService UPDATE RETURNING handling', () => {
     const query = jest.fn(async (sql: string) => {
       if (sql === 'SELECT campaign_id FROM assistance_request WHERE id=$1') return [{ campaign_id: null }];
       if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
-        id: requestId, status: 'RESOLVING', version: 5, organization_id: organizationId, region_code: 'T8_REGION',
+        id: requestId, status: 'RESOLVING', version: 5, organization_id: organizationId,
         campaign_id: null, incident_category_code: 'FLOOD', priority: 'P2', priority_basis: 'COMPLETE',
         work_cycle: 1, verification_revision: revisionId, attribution_locked_at: null, reporter_user_id: null,
       }];
@@ -138,25 +138,6 @@ describe('MissionsCommandsService UPDATE RETURNING handling', () => {
 });
 
 describe('MissionsCommandsService campaign mission-offer eligibility', () => {
-  it('rejects a first mission offer when the request has no region', async () => {
-    const query = jest.fn(async (sql: string) => {
-      if (sql.startsWith('SELECT campaign_id FROM assistance_request')) return [{ campaign_id: null }];
-      if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
-        id: requestId, status: 'TRIAGED', version: 1, organization_id: organizationId, region_code: null,
-        campaign_id: null, incident_category_code: 'FLOOD', priority: 'P2', priority_basis: 'COMPLETE',
-        work_cycle: 1, verification_revision: revisionId, attribution_locked_at: null, reporter_user_id: null,
-      }];
-      return [];
-    });
-
-    await expect(service().offerInTransaction(
-      { query }, requestId, { expected_version: 1, team_id: teamId } as CreateMissionDto,
-      { userId: coordinatorId, grants: [{
-        role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId,
-      }] }, null,
-    )).rejects.toMatchObject({ code: 'REGION_REQUIRED', status: 409 });
-    expect(query.mock.calls.some(([sql]) => sql.includes('FROM rescue_team'))).toBe(false);
-  });
 
   async function offerWithCampaignStatus(status: string) {
     const query = jest.fn(async (sql: string) => {

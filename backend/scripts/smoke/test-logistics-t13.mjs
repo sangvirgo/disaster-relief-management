@@ -10,7 +10,6 @@ const identityUrl = requiredEnv('C48_IDENTITY_BASE_URL').replace(/\/+$/u, '');
 const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DATABASE_URL') });
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
 const organizationId = randomUUID();
-const regionCode = `T13_${randomBytes(5).toString('hex').toUpperCase()}`;
 let identityIp = 210;
 
 function requiredEnv(name) {
@@ -87,7 +86,6 @@ await Promise.all([logisticsDb.connect(), identityDb.connect()]);
 try {
   await identityDb.query('INSERT INTO organization (id,name,organization_kind) VALUES ($1,$2,\'COORDINATION\')',
     [organizationId, `T13 test ${organizationId}`]);
-  await identityDb.query('INSERT INTO region (code,name) VALUES ($1,$2)', [regionCode, 'Khu vực kiểm thử T13']);
 
   const manager = await registerAndLogin('manager', ['OPERATIONS_MANAGER', 'INTAKE_STAFF', 'CAMPAIGN_MANAGER']);
   const counter = await registerAndLogin('counter', ['INTAKE_STAFF', 'REVIEWER']);
@@ -109,7 +107,7 @@ try {
   expectSuccess(item, 201);
   const warehouse = await call(logisticsUrl, 'warehouses', {
     method: 'POST', actor: manager, idempotencyKey: key(),
-    body: { organization_id: organizationId, region_code: regionCode, name: `Kho T13 ${suffix}` },
+    body: { organization_id: organizationId, name: `Kho T13 ${suffix}` },
   });
   expectSuccess(warehouse, 201);
   const drive = await call(logisticsUrl, 'donation-drives', {
@@ -308,7 +306,7 @@ try {
   expectSuccess(raceItemB, 201);
   const raceWarehouse = await call(logisticsUrl, 'warehouses', {
     method: 'POST', actor: manager, idempotencyKey: key(),
-    body: { organization_id: organizationId, region_code: regionCode, name: `Kho race T13 ${suffix}` },
+    body: { organization_id: organizationId, name: `Kho race T13 ${suffix}` },
   });
   expectSuccess(raceWarehouse, 201);
   const raceDrive = await call(logisticsUrl, 'donation-drives', {

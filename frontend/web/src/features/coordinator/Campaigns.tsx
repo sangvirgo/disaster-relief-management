@@ -6,20 +6,18 @@ import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { DetailCloseButton } from '../../components/DetailCloseButton';
 import { StatusBadge } from '../../components/StatusBadge';
 import { SuccessBanner } from '../../components/SuccessBanner';
-import { label, regionName, timeLabel } from '../../i18n/labels';
+import { label, timeLabel } from '../../i18n/labels';
 
 type Campaign = {
   id: string;
   name: string;
   objective: string | null;
-  region_code: string | null;
   status: string;
   version: number;
   starts_at: string | null;
   ends_at: string | null;
   created_at: string;
 };
-type Region = { code: string; name: string; status: string };
 export function Campaigns() {
   const [items, setItems] = useState<Campaign[]>([]);
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
@@ -30,35 +28,12 @@ export function Campaigns() {
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [regions, setRegions] = useState<Region[]>([]);
-  const [regionError, setRegionError] = useState('');
   const [createdName, setCreatedName] = useState('');
   useEffect(() => {
     if (!createdName) return;
     const timer = window.setTimeout(() => setCreatedName(''), 8000);
     return () => window.clearTimeout(timer);
   }, [createdName]);
-  useEffect(() => {
-    let live = true;
-    async function loadRegions() {
-      try {
-        const all: Region[] = [];
-        let next = '';
-        do {
-          const query = new URLSearchParams({ limit: '100' });
-          if (next) query.set('cursor', next);
-          const page = await api<{ items: Region[]; next_cursor?: string | null }>('identity', `/regions?${query}`);
-          all.push(...page.items);
-          next = page.next_cursor || '';
-        } while (next);
-        if (live) setRegions(all.filter((region) => region.status === 'ACTIVE'));
-      } catch {
-        if (live) setRegionError('Chưa tải được danh sách khu vực. Bạn vẫn có thể tạo chiến dịch không gắn khu vực.');
-      }
-    }
-    void loadRegions();
-    return () => { live = false; };
-  }, [revision]);
   useEffect(() => {
     let live = true;
     setError('');
@@ -99,9 +74,6 @@ export function Campaigns() {
     fields: [
       { name: 'name', label: 'Tên chiến dịch', required: true },
       { name: 'objective', label: 'Mục tiêu (nếu có)', type: 'textarea' },
-      { name: 'region_code', label: 'Khu vực', type: 'select',
-        emptyLabel: 'Không chọn khu vực',
-        options: regions.map((region) => ({ value: region.code, label: `${region.name} (${region.code})` })) },
       { name: 'starts_at', label: 'Thời điểm bắt đầu (nếu có)', type: 'datetime-local' },
       { name: 'ends_at', label: 'Thời điểm kết thúc (nếu có)', type: 'datetime-local' },
     ],
@@ -111,7 +83,6 @@ export function Campaigns() {
       return {
         name: values.name.trim().normalize('NFC'),
         ...(values.objective?.trim() ? { objective: values.objective.trim() } : {}),
-        ...(values.region_code ? { region_code: values.region_code } : {}),
         ...(values.starts_at ? { starts_at: new Date(values.starts_at).toISOString() } : {}),
         ...(values.ends_at ? { ends_at: new Date(values.ends_at).toISOString() } : {}),
       };
@@ -199,7 +170,7 @@ export function Campaigns() {
                 <strong>{item.name}</strong>
                 <small>{item.objective || 'Chưa có mô tả mục tiêu.'}</small>
                 <span>
-                  {item.region_code ? regionName(item.region_code) : 'Nhiều khu vực'} · Tạo {timeLabel(item.created_at)}
+                  Tạo {timeLabel(item.created_at)}
                 </span>
               </span>
               <StatusBadge status={item.status} />
@@ -228,10 +199,6 @@ export function Campaigns() {
                 </dd>
               </div>
               <div>
-                <dt>Khu vực</dt>
-                <dd>{selected.region_code ? regionName(selected.region_code) : 'Nhiều khu vực'}</dd>
-              </div>
-              <div>
                 <dt>Bắt đầu</dt>
                 <dd>{selected.starts_at ? timeLabel(selected.starts_at) : 'Chưa ấn định'}</dd>
               </div>
@@ -258,7 +225,6 @@ export function Campaigns() {
           </>
         ) : (
           <>
-            {regionError && <p className="notice warning" role="status">{regionError}</p>}
             <CommandForm key={revision} spec={create} onSuccess={(result) => { setCreatedName((result as Campaign | undefined)?.name || 'mới'); done(); }} />
           </>
         )}

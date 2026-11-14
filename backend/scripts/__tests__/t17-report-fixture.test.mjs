@@ -14,7 +14,7 @@ const fulfillmentStart = smokeSource.indexOf('const fulfillmentLimit =', reconci
 assert.notEqual(reconciliationStart, -1, 'T17 reconciliation endpoint check exists');
 assert.notEqual(fulfillmentStart, -1, 'T17 reconciliation endpoint check ends before fulfillment');
 const reconciliationSource = smokeSource.slice(reconciliationStart, fulfillmentStart);
-const fulfillmentScopeStart = smokeSource.indexOf('const warehouses = await logisticsDb.query(');
+const fulfillmentScopeStart = smokeSource.indexOf('const fulfillmentTargets = await logisticsDb.query(');
 const fulfillmentActorStart = smokeSource.indexOf('const actor = await loginSmokeActor', fulfillmentScopeStart);
 assert.notEqual(fulfillmentScopeStart, -1, 'T17 fulfillment scope selection exists');
 assert.notEqual(fulfillmentActorStart, -1, 'T17 actors are created after report scope selection');
@@ -39,7 +39,7 @@ test('T17 selects a recent populated fulfillment scope before registering smoke 
   assert.match(fulfillmentScopeSource, /fulfillment_need_count/u);
   assert.match(fulfillmentScopeSource, /ORDER BY fulfillment_need_count DESC/u);
   assert.match(fulfillmentScopeSource, /AND EXISTS \(SELECT 1 FROM stock_balance b WHERE b\.warehouse_id=w\.id\)/u);
-  assert.match(fulfillmentScopeSource, /assert\.ok\(Number\(warehouse\?\.fulfillment_need_count\) > 0/u);
+  assert.match(fulfillmentScopeSource, /assert\.ok\(Number\(fulfillmentTarget\?\.fulfillment_need_count\) > 0/u);
 });
 
 test('T17 reconciliation endpoint is deep-compared with a primary-row oracle', () => {

@@ -37,14 +37,6 @@
             }
           },
           {
-            "name": "region_code",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "priority",
             "in": "query",
             "required": false,
@@ -450,142 +442,6 @@
           }
         },
         "x-c48-controller-source": "backend/apps/response/src/requests/request-intake.controller.ts#RequestIntakeController.create"
-      }
-    },
-    "/requests/unassigned": {
-      "get": {
-        "operationId": "listUnassignedRequests",
-        "summary": "List organization-wide requests without a region",
-        "description": "",
-        "tags": [
-          "Request operations"
-        ],
-        "security": [
-          {
-            "NativeBearer": []
-          },
-          {
-            "WebAccessCookie": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/Cursor"
-          },
-          {
-            "$ref": "#/components/parameters/PageLimit"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List organization-wide requests without a region",
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnassignedRequestPage"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "CURSOR_INVALID": {
-                    "summary": "CURSOR_INVALID",
-                    "value": {
-                      "code": "CURSOR_INVALID",
-                      "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "401": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "403": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "500": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "x-c48-controller-source": "backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.unassigned"
       }
     },
     "/requests/{id}": {
@@ -1405,14 +1261,6 @@
                     "value": {
                       "code": "TEAM_NOT_ELIGIBLE",
                       "message": "Đội không đủ điều kiện nhận nhiệm vụ này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "REGION_REQUIRED": {
-                    "summary": "REGION_REQUIRED",
-                    "value": {
-                      "code": "REGION_REQUIRED",
-                      "message": "Cần xác định khu vực của yêu cầu trước khi giao nhiệm vụ.",
                       "correlation_id": "00000000-0000-4000-8000-000000000000"
                     }
                   },
@@ -2693,136 +2541,6 @@
           }
         },
         "x-c48-controller-source": "backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.authorityReferral"
-      }
-    },
-    "/requests/{id}/correct-region": {
-      "post": {
-        "operationId": "correctRequestRegion",
-        "summary": "Correct an unassigned request region",
-        "description": "Human staff decision; all messages are Vietnamese. The response is no-store.",
-        "tags": [
-          "Request operations"
-        ],
-        "security": [
-          {
-            "NativeBearer": []
-          },
-          {
-            "WebAccessCookie": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/RequestId"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CorrectRegionRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Correct an unassigned request region",
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              },
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OperationResult"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "403": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          },
-          "500": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "x-c48-controller-source": "backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.correctRegion"
       }
     },
     "/requests/{id}/supplements/{eventId}/review": {
@@ -8013,7 +7731,7 @@
       "get": {
         "operationId": "getRequestHeatmap",
         "summary": "Aggregate requests into map cells",
-        "description": "Use strict UTC RFC 3339 timestamps ending in Z. The interval must be at most 31 days. At least one of region_code or campaign_id is required.",
+        "description": "Use strict UTC RFC 3339 timestamps ending in Z. The interval must be at most 31 days. campaign_id is required.",
         "tags": [
           "Map"
         ],
@@ -8057,15 +7775,6 @@
                 "unverified"
               ],
               "default": "confirmed"
-            }
-          },
-          {
-            "name": "region_code",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "maxLength": 80
             }
           },
           {
@@ -8131,7 +7840,7 @@
                     "summary": "TOO_MANY_CELLS",
                     "value": {
                       "code": "TOO_MANY_CELLS",
-                      "message": "Khu vực hoặc khoảng thời gian quá lớn. Vui lòng thu hẹp bộ lọc.",
+                      "message": "Vùng bản đồ hoặc khoảng thời gian quá lớn. Vui lòng thu hẹp bộ lọc.",
                       "correlation_id": "00000000-0000-4000-8000-000000000000"
                     }
                   },
@@ -8233,7 +7942,7 @@
       "get": {
         "operationId": "getReportSummary",
         "summary": "Get scoped request summary",
-        "description": "Use strict UTC RFC 3339 timestamps ending in Z. The interval must be at most 366 days. At least one of region_code or campaign_id is required.",
+        "description": "Use strict UTC RFC 3339 timestamps ending in Z. The interval must be at most 366 days. campaign_id is required.",
         "tags": [
           "Reports"
         ],
@@ -8273,15 +7982,6 @@
             "schema": {
               "type": "string",
               "format": "uuid"
-            }
-          },
-          {
-            "name": "region_code",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "maxLength": 80
             }
           }
         ],
@@ -8687,16 +8387,6 @@
                       "type": "string",
                       "format": "uuid"
                     },
-                    "region_code": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
                     "campaign_id": {
                       "anyOf": [
                         {
@@ -8835,16 +8525,6 @@
                       "type": "string",
                       "format": "uuid"
                     },
-                    "region_code": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
                     "campaign_id": {
                       "anyOf": [
                         {
@@ -8922,14 +8602,6 @@
                     "value": {
                       "code": "ATTRIBUTION_LOCKED",
                       "message": "Phạm vi xử lý đã được cố định cho chu kỳ này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "REGION_REQUIRED": {
-                    "summary": "REGION_REQUIRED",
-                    "value": {
-                      "code": "REGION_REQUIRED",
-                      "message": "Cần xác định khu vực của yêu cầu trước khi giao nhiệm vụ.",
                       "correlation_id": "00000000-0000-4000-8000-000000000000"
                     }
                   },
@@ -9968,9 +9640,6 @@
                         "type": "null"
                       }
                     ]
-                  },
-                  "region_code": {
-                    "type": "string"
                   }
                 },
                 "required": [
@@ -10438,12 +10107,6 @@
                             "type": "string",
                             "format": "uuid"
                           },
-                          "operating_region_code": {
-                            "type": "string"
-                          },
-                          "nationwide_coverage": {
-                            "type": "boolean"
-                          },
                           "name": {
                             "type": "string"
                           },
@@ -10552,8 +10215,6 @@
                         "required": [
                           "id",
                           "organization_id",
-                          "operating_region_code",
-                          "nationwide_coverage",
                           "name",
                           "kind",
                           "reporting_mode",
@@ -10649,14 +10310,6 @@
         "x-c48-contract-source": "docs/backend/03-response-api.md",
         "parameters": [
           {
-            "name": "region_code",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "availability",
             "in": "query",
             "required": false,
@@ -10721,12 +10374,6 @@
                     "organization_id": {
                       "type": "string",
                       "format": "uuid"
-                    },
-                    "operating_region_code": {
-                      "type": "string"
-                    },
-                    "nationwide_coverage": {
-                      "type": "boolean"
                     },
                     "name": {
                       "type": "string"
@@ -10836,8 +10483,6 @@
                   "required": [
                     "id",
                     "organization_id",
-                    "operating_region_code",
-                    "nationwide_coverage",
                     "name",
                     "kind",
                     "reporting_mode",
@@ -10924,9 +10569,6 @@
                     "type": "string",
                     "format": "uuid"
                   },
-                  "operating_region_code": {
-                    "type": "string"
-                  },
                   "team_kind": {
                     "type": "string"
                   },
@@ -10954,7 +10596,6 @@
                 "required": [
                   "name",
                   "organization_id",
-                  "operating_region_code",
                   "team_kind",
                   "reporting_mode",
                   "skill_codes"
@@ -11005,12 +10646,6 @@
                     "organization_id": {
                       "type": "string",
                       "format": "uuid"
-                    },
-                    "operating_region_code": {
-                      "type": "string"
-                    },
-                    "nationwide_coverage": {
-                      "type": "boolean"
                     },
                     "name": {
                       "type": "string"
@@ -11120,8 +10755,6 @@
                   "required": [
                     "id",
                     "organization_id",
-                    "operating_region_code",
-                    "nationwide_coverage",
                     "name",
                     "kind",
                     "reporting_mode",
@@ -11226,12 +10859,6 @@
                       "type": "string",
                       "format": "uuid"
                     },
-                    "operating_region_code": {
-                      "type": "string"
-                    },
-                    "nationwide_coverage": {
-                      "type": "boolean"
-                    },
                     "name": {
                       "type": "string"
                     },
@@ -11340,8 +10967,6 @@
                   "required": [
                     "id",
                     "organization_id",
-                    "operating_region_code",
-                    "nationwide_coverage",
                     "name",
                     "kind",
                     "reporting_mode",
@@ -11435,13 +11060,6 @@
                   },
                   "availability": {
                     "type": "string"
-                  },
-                  "operating_region_code": {
-                    "type": "string",
-                    "pattern": "^[A-Z0-9_]{2,32}$"
-                  },
-                  "nationwide_coverage": {
-                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -12293,16 +11911,6 @@
                     "version": {
                       "type": "integer"
                     },
-                    "region_code": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
                     "campaign_id": {
                       "anyOf": [
                         {
@@ -12319,7 +11927,6 @@
                     "id",
                     "status",
                     "version",
-                    "region_code",
                     "campaign_id"
                   ]
                 },
@@ -12327,7 +11934,6 @@
                   "id": "00000000-0000-4000-8000-000000000001",
                   "status": "TRIAGED",
                   "version": 8,
-                  "region_code": "NORTH-01",
                   "campaign_id": "00000000-0000-4000-8000-000000000003"
                 }
               }
@@ -12561,16 +12167,6 @@
                     "version": {
                       "type": "integer"
                     },
-                    "region_code": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
                     "campaign_id": {
                       "anyOf": [
                         {
@@ -12587,7 +12183,6 @@
                     "id",
                     "status",
                     "version",
-                    "region_code",
                     "campaign_id"
                   ]
                 },
@@ -12595,7 +12190,6 @@
                   "id": "00000000-0000-4000-8000-000000000001",
                   "status": "TRIAGED",
                   "version": 9,
-                  "region_code": "NORTH-01",
                   "campaign_id": null
                 }
               }
@@ -13755,12 +13349,6 @@
                       "type": "string",
                       "format": "uuid"
                     },
-                    "operating_region_code": {
-                      "type": "string"
-                    },
-                    "nationwide_coverage": {
-                      "type": "boolean"
-                    },
                     "name": {
                       "type": "string"
                     },
@@ -13869,8 +13457,6 @@
                   "required": [
                     "id",
                     "organization_id",
-                    "operating_region_code",
-                    "nationwide_coverage",
                     "name",
                     "kind",
                     "reporting_mode",
@@ -14204,6 +13790,286 @@
           }
         ],
         "x-c48-contract-gap": "The API specification does not define this operation’s success response body."
+      }
+    },
+    "/requests/{id}/fast-track": {
+      "post": {
+        "operationId": "responseRequestOperationsFastTrack",
+        "summary": "RequestOperationsController.fastTrack",
+        "description": "Route exported from backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.fastTrack. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success response; see docs/backend/03-response-api.md for the documented response shape."
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "REASON_REQUIRED": {
+                    "summary": "REASON_REQUIRED",
+                    "value": {
+                      "code": "REASON_REQUIRED",
+                      "message": "Vui lòng nhập lý do.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "VALIDATION_FAILED": {
+                    "summary": "VALIDATION_FAILED",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "IDEMPOTENCY_KEY_INVALID": {
+                    "summary": "IDEMPOTENCY_KEY_INVALID",
+                    "value": {
+                      "code": "IDEMPOTENCY_KEY_INVALID",
+                      "message": "Mã yêu cầu không hợp lệ.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "CSRF_INVALID": {
+                    "summary": "CSRF_INVALID",
+                    "value": {
+                      "code": "CSRF_INVALID",
+                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "NOT_FOUND": {
+                    "summary": "NOT_FOUND",
+                    "value": {
+                      "code": "NOT_FOUND",
+                      "message": "Không tìm thấy dữ liệu yêu cầu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FAST_TRACK_NOT_ELIGIBLE": {
+                    "summary": "FAST_TRACK_NOT_ELIGIBLE",
+                    "value": {
+                      "code": "FAST_TRACK_NOT_ELIGIBLE",
+                      "message": "Yêu cầu này cần được rà soát đầy đủ, chưa thể xử lý nhanh theo gợi ý.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "STATE_TRANSITION_INVALID": {
+                    "summary": "STATE_TRANSITION_INVALID",
+                    "value": {
+                      "code": "STATE_TRANSITION_INVALID",
+                      "message": "Trạng thái hiện tại không cho phép thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "VERSION_CONFLICT": {
+                    "summary": "VERSION_CONFLICT",
+                    "value": {
+                      "code": "VERSION_CONFLICT",
+                      "message": "Dữ liệu đã được cập nhật. Vui lòng tải lại trước khi tiếp tục.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "IDEMPOTENCY_KEY_REUSED": {
+                    "summary": "IDEMPOTENCY_KEY_REUSED",
+                    "value": {
+                      "code": "IDEMPOTENCY_KEY_REUSED",
+                      "message": "Mã yêu cầu đã được dùng cho nội dung khác.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/03-response-api.md",
+        "x-c48-controller-source": "backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.fastTrack",
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "x-c48-contract-gap": "The API specification does not define this operation’s JSON request body. The API specification does not define this operation’s success response body."
+      }
+    },
+    "/requests/{id}/ai-advisories": {
+      "post": {
+        "operationId": "responseRequestOperationsRequestAiAssessment",
+        "summary": "RequestOperationsController.requestAiAssessment",
+        "description": "Route exported from backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.requestAiAssessment. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Success response; see docs/backend/03-response-api.md for the documented response shape."
+          },
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "CSRF_INVALID": {
+                    "summary": "CSRF_INVALID",
+                    "value": {
+                      "code": "CSRF_INVALID",
+                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/03-response-api.md",
+        "x-c48-controller-source": "backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.requestAiAssessment",
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "x-c48-contract-gap": "The API specification does not define this operation’s JSON request body. The API specification does not define this operation’s success response body."
       }
     }
   },
@@ -15229,12 +15095,6 @@
           "people_affected": {
             "type": [
               "integer",
-              "null"
-            ]
-          },
-          "region_code": {
-            "type": [
-              "string",
               "null"
             ]
           },
@@ -16455,30 +16315,6 @@
           }
         }
       },
-      "CorrectRegionRequest": {
-        "type": "object",
-        "required": [
-          "expected_version",
-          "region_code",
-          "reason"
-        ],
-        "additionalProperties": false,
-        "properties": {
-          "expected_version": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "region_code": {
-            "type": "string",
-            "pattern": "^[A-Z0-9_]{2,32}$"
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1000
-          }
-        }
-      },
       "SupplementReviewRequest": {
         "type": "object",
         "required": [
@@ -17413,8 +17249,7 @@
                 "team",
                 "status",
                 "version",
-                "created_at",
-                "region_code"
+                "created_at"
               ],
               "properties": {
                 "id": {
@@ -17451,12 +17286,6 @@
                 "created_at": {
                   "type": "string",
                   "format": "date-time"
-                },
-                "region_code": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
                 }
               },
               "additionalProperties": false
@@ -17636,7 +17465,6 @@
         "required": [
           "id",
           "organization_id",
-          "region_code",
           "name",
           "objective",
           "status",
@@ -17653,12 +17481,6 @@
           "organization_id": {
             "type": "string",
             "format": "uuid"
-          },
-          "region_code": {
-            "type": [
-              "string",
-              "null"
-            ]
           },
           "name": {
             "type": "string"
@@ -17719,12 +17541,6 @@
               "null"
             ]
           },
-          "region_code": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "starts_at": {
             "type": [
               "string",
@@ -17757,12 +17573,6 @@
             "minLength": 1
           },
           "objective": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "region_code": {
             "type": [
               "string",
               "null"
@@ -17844,7 +17654,6 @@
           "id",
           "title",
           "objective",
-          "region_name",
           "starts_at",
           "ends_at",
           "status"
@@ -17858,12 +17667,6 @@
             "type": "string"
           },
           "objective": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "region_name": {
             "type": [
               "string",
               "null"
@@ -17921,7 +17724,6 @@
           "id",
           "status",
           "organization_id",
-          "region_code",
           "version"
         ],
         "properties": {
@@ -17941,12 +17743,6 @@
           "organization_id": {
             "type": "string",
             "format": "uuid"
-          },
-          "region_code": {
-            "type": [
-              "string",
-              "null"
-            ]
           },
           "version": {
             "type": "integer",

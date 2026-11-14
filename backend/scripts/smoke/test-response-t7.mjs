@@ -36,7 +36,7 @@ function assertVietnameseError(result, status, code) {
   assert.equal(result.headers.get('cache-control'), 'no-store');
 }
 
-async function registerAndLogin(label, role = 'CITIZEN', scope = 'ORGANIZATION', regionCode = 'T7_OTHER') {
+async function registerAndLogin(label, role = 'CITIZEN') {
   const suffix = randomBytes(5).toString('hex');
   const credentials = {
     username: `t7${label}${suffix}`,
@@ -52,9 +52,9 @@ async function registerAndLogin(label, role = 'CITIZEN', scope = 'ORGANIZATION',
   const userId = registered.value.user.id;
   if (role === 'COORDINATOR') {
     await identityDb.query(
-      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id,region_code)
-       VALUES ($1,'COORDINATOR',$2,$3,$4)`,
-      [userId, scope, organizationId, scope === 'REGION' ? regionCode : null],
+      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
+       VALUES ($1,'COORDINATOR','ORGANIZATION',$2)`,
+      [userId, organizationId],
     );
   }
   const login = await call(identityUrl, 'auth/login', {
@@ -137,23 +137,15 @@ try {
     `INSERT INTO organization (id,name,organization_kind) VALUES ($1,'T7 test organization','COORDINATION') ON CONFLICT (id) DO NOTHING`,
     [organizationId],
   );
-  await identityDb.query("INSERT INTO region (code,name) VALUES ('T7_OTHER','Khu vực khác'),('T7_REGION','Khu vực thử nghiệm') ON CONFLICT (code) DO NOTHING");
   await responseDb.query("INSERT INTO incident_category (code,display_name) VALUES ('T7_FLOOD','Lũ lụt') ON CONFLICT (code) DO NOTHING");
-  await responseDb.query(
-    `INSERT INTO region_boundary (region_code,geom) VALUES
-      ('T7_REGION',ST_Multi(ST_GeomFromText('POLYGON((104 14,106 14,106 16,104 16,104 14))',4326))),
-      ('T7_OTHER',ST_Multi(ST_GeomFromText('POLYGON((107 14,109 14,109 16,107 16,107 14))',4326)))
-     ON CONFLICT (region_code) DO NOTHING`,
-  );
 
   const reporter = await registerAndLogin('reporter');
   const coordinator = await registerAndLogin('coord1', 'COORDINATOR');
   const secondCoordinator = await registerAndLogin('coord2', 'COORDINATOR');
-  const outOfScopeCoordinator = await registerAndLogin('other', 'COORDINATOR', 'REGION');
-  const regionCoordinator = await registerAndLogin('region', 'COORDINATOR', 'REGION', 'T7_REGION');
+  const outOfScopeUser = await registerAndLogin('other');
 
   const self = await createRequest(reporter, 'SELF', selfBody([105.1, 15.1], '+84912345678'));
-  const denied = await call(responseUrl, `requests/${self.id}`, { headers: { Authorization: `Bearer ${outOfScopeCoordinator.token}` } });
+  const denied = await call(responseUrl, `requests/${self.id}`, { headers: { Authorization: `Bearer ${outOfScopeUser.token}` } });
   assertVietnameseError(denied, 403, 'FORBIDDEN');
 
   const queue = await call(responseUrl, 'requests?category=T7_FLOOD&limit=100', { headers: { Authorization: `Bearer ${coordinator.token}` } });
@@ -180,11 +172,11 @@ try {
     [self.id, coordinator.id, JSON.stringify({ canonical_request_id: outOfScopeRequest.id })],
   );
   const scopedEvents = await call(responseUrl, `requests/${self.id}/events?limit=10`, {
-    headers: { Authorization: `Bearer ${regionCoordinator.token}` },
+    headers: { Authorization: `Bearer ${secondCoordinator.token}` },
   });
   assert.equal(scopedEvents.status, 200, JSON.stringify(scopedEvents.value));
   const scopedFixture = scopedEvents.value.items.find((event) => event.event_type === 'STAFF_SCOPE_FIXTURE');
-  assert.ok(scopedFixture, 'region-scoped coordinator can read an in-scope event');
+  assert.ok(scopedFixture, 'organization coordinator can read an in-scope event');
   assert.equal(Object.hasOwn(scopedFixture.payload, 'canonical_request_id'), false, 'out-of-scope request references are removed from event payloads');
 
   const detail = await call(responseUrl, `requests/${self.id}`, { headers: { Authorization: `Bearer ${coordinator.token}` } });
@@ -340,38 +332,6 @@ try {
   assert.equal(reporterTimeline.status, 200, JSON.stringify(reporterTimeline.value));
   assert.ok(reporterTimeline.value.items.some((item) => item.public_text_code === 'REQUEST_VERIFIED'));
   assert.equal(JSON.stringify(reporterTimeline.value).includes('Đã xác nhận vị trí'), false, 'staff contact notes stay private');
-
-  const unassigned = await createRequest(reporter, 'SELF', selfBody([150, 50]));
-  const secondUnassigned = await createRequest(reporter, 'SELF', selfBody([151, 51]));
-  const seenUnassignedIds = new Set();
-  let unassignedCursor;
-  while (!seenUnassignedIds.has(unassigned.id) || !seenUnassignedIds.has(secondUnassigned.id)) {
-    const cursorParam = unassignedCursor ? `&cursor=${encodeURIComponent(unassignedCursor)}` : '';
-    const unassignedPage = await call(responseUrl, `requests/unassigned?limit=1${cursorParam}`, {
-      headers: { Authorization: `Bearer ${coordinator.token}` },
-    });
-    assert.equal(unassignedPage.status, 200, JSON.stringify(unassignedPage.value));
-    const id = unassignedPage.value.items[0]?.id;
-    assert.ok(id);
-    assert.ok(!seenUnassignedIds.has(id), 'unassigned cursor advances to a different request');
-    seenUnassignedIds.add(id);
-    if (seenUnassignedIds.has(unassigned.id) && seenUnassignedIds.has(secondUnassigned.id)) break;
-    assert.equal(unassignedPage.value.more, true, 'both T7 fixtures appear before the unassigned queue ends');
-    assert.ok(unassignedPage.value.cursor);
-    unassignedCursor = unassignedPage.value.cursor;
-  }
-  const corrected = await command(`requests/${unassigned.id}/correct-region`, coordinator, {
-    expected_version: 1, region_code: 'T7_REGION', reason: 'Đối chiếu lại địa bàn.',
-  });
-  assert.equal(corrected.status, 200, JSON.stringify(corrected.value));
-  assert.equal(corrected.value.region_code, 'T7_REGION');
-
-  const attributionLocked = await createRequest(reporter, 'SELF', selfBody([105.18, 15.18]));
-  await responseDb.query('UPDATE assistance_request SET attribution_locked_at=clock_timestamp() WHERE id=$1', [attributionLocked.id]);
-  const lockedCorrection = await command(`requests/${attributionLocked.id}/correct-region`, coordinator, {
-    expected_version: 1, region_code: 'T7_REGION', reason: 'Đối chiếu lại địa bàn.',
-  });
-  assertVietnameseError(lockedCorrection, 409, 'ATTRIBUTION_LOCKED');
 
   const proxyReporter = await registerAndLogin('proxy');
   const proxyRequests = [];

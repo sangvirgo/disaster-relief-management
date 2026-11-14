@@ -24,8 +24,8 @@ function validCursor(cursor: ReturnType<typeof decodeKeysetCursor>): boolean {
   return Number.isFinite(date.getTime()) && date.toISOString() === cursor.sort[0];
 }
 
-function requireReadScope(grants: Parameters<typeof hasWarehouseScope>[0], organizationId: string, regionCode: string): void {
-  if (!hasWarehouseScope(grants, organizationId, regionCode)) throw new AppError('NOT_FOUND', { status: 404 });
+function requireReadScope(grants: Parameters<typeof hasWarehouseScope>[0], organizationId: string): void {
+  if (!hasWarehouseScope(grants, organizationId)) throw new AppError('NOT_FOUND', { status: 404 });
 }
 
 @Injectable()
@@ -82,7 +82,7 @@ export class DistributionQueriesService {
   async detail(id: string, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     const distribution = await loadDistribution(this.dataSource, id);
-    requireReadScope(session.grants, distribution.organization_id, distribution.warehouse_region_code);
+    requireReadScope(session.grants, distribution.organization_id);
     const groupedLines = await readDistributionLines(this.dataSource, [id]);
     return distributionView(distribution, groupedLines.get(id) ?? []);
   }
@@ -90,7 +90,7 @@ export class DistributionQueriesService {
   async handoffDetail(distributionId: string, handoffId: string, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     const distribution = await loadDistribution(this.dataSource, distributionId);
-    requireReadScope(session.grants, distribution.organization_id, distribution.warehouse_region_code);
+    requireReadScope(session.grants, distribution.organization_id);
     const handoffs = await this.dataSource.query(
       'SELECT h.handoff_kind FROM handoff_record h WHERE h.distribution_id=$1 AND h.id=$2',
       [distributionId, handoffId],

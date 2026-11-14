@@ -17,7 +17,6 @@ interface IntrospectionRow {
   role_code: string | null;
   scope_type: string | null;
   organization_id: string | null;
-  region_code: string | null;
   campaign_id: string | null;
 }
 
@@ -64,7 +63,7 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
     const rows = await this.introspectionDataSource.query(
       `SELECT sf.user_id, u.display_name, u.status, u.authz_version AS user_authz_version,
               sf.authz_version AS family_authz_version, sf.revoked_at, sf.absolute_expires_at,
-              g.id AS grant_id, g.role_code, g.scope_type, g.organization_id, g.region_code, g.campaign_id
+              g.id AS grant_id, g.role_code, g.scope_type, g.organization_id, g.campaign_id
          FROM session_family sf JOIN app_user u ON u.id = sf.user_id
          LEFT JOIN role_grant g ON g.user_id = u.id AND g.revoked_at IS NULL
         WHERE sf.id = $1 AND sf.user_id = $2
@@ -78,7 +77,6 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
       role_code: row.role_code,
       scope_type: row.scope_type,
       organization_id: row.organization_id,
-      region_code: row.region_code,
       campaign_id: row.campaign_id,
     }] : []);
     const active = first.status === 'ACTIVE' && !first.revoked_at &&
@@ -152,14 +150,6 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
     return rows[0].status === 'ACTIVE' ? { active: true } : { active: false, reason: 'USER_INACTIVE' };
   }
 
-  async lookupRegions(codes: string[]): Promise<{ items: Array<{ code: string; name: string }> }> {
-    const items = await this.introspectionDataSource.query(
-      'SELECT code, name FROM region WHERE code = ANY($1::text[]) ORDER BY code',
-      [codes],
-    ) as Array<{ code: string; name: string }>;
-    return { items };
-  }
-
   async teamLeaderEligibility(userId: string, organizationId: string): Promise<TeamLeaderEligibility> {
     const rows = await this.introspectionDataSource.query(
       `SELECT CASE
@@ -169,8 +159,8 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
                 WHEN NOT EXISTS (
                   SELECT 1 FROM role_grant g
                    WHERE g.user_id = u.id AND g.role_code = 'VOLUNTEER' AND g.revoked_at IS NULL
-                     AND ((g.scope_type = 'SYSTEM' AND g.organization_id IS NULL AND g.region_code IS NULL AND g.campaign_id IS NULL)
-                       OR (g.scope_type = 'ORGANIZATION' AND g.organization_id = o.id AND g.region_code IS NULL AND g.campaign_id IS NULL))
+                     AND ((g.scope_type = 'SYSTEM' AND g.organization_id IS NULL AND g.campaign_id IS NULL)
+                       OR (g.scope_type = 'ORGANIZATION' AND g.organization_id = o.id AND g.campaign_id IS NULL))
                 ) THEN 'VOLUNTEER_GRANT_REQUIRED'
                 ELSE NULL
               END AS reason
@@ -186,11 +176,11 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
 
   async requestCoordinators(organizationId: string): Promise<{ items: Array<Record<string, unknown>> }> {
     const items = await this.introspectionDataSource.query(
-      `SELECT g.user_id,g.role_code,g.scope_type,g.organization_id,g.region_code,g.campaign_id
+      `SELECT g.user_id,g.role_code,g.scope_type,g.organization_id,g.campaign_id
          FROM role_grant g JOIN app_user u ON u.id=g.user_id
         WHERE g.organization_id=$1 AND g.revoked_at IS NULL AND u.status='ACTIVE'
           AND (g.role_code='COORDINATOR' OR (g.role_code='OPERATIONS_MANAGER' AND g.scope_type='ORGANIZATION'))
-        ORDER BY g.user_id,g.role_code,g.scope_type,g.region_code,g.campaign_id`,
+        ORDER BY g.user_id,g.role_code,g.scope_type,g.campaign_id`,
       [organizationId],
     ) as Array<Record<string, unknown>>;
     return { items };

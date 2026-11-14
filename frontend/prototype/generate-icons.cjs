@@ -33,7 +33,6 @@ const artwork = {
   users: '<circle cx="9" cy="8" r="2.4"/><circle cx="17" cy="8" r="2.4"/><path d="M3.5 19v-1.4c0-2.4 2.2-4 5.5-4s5.5 1.6 5.5 4V19h-11ZM15 14c3 0 5.5 1.5 5.5 3.8V19H17"/>',
   organization: '<path d="M5 20V5h14v15M3 20h18M9 8h2m3 0h2M9 12h2m3 0h2M10 20v-4h4v4"/>',
   grants: '<path d="M12 3 5 6v6c0 4 2.3 7 7 9 4.7-2 7-5 7-9V6l-7-3Z"/><circle cx="12" cy="10" r="2"/><path d="M8.7 16c.3-1.6 1.5-2.5 3.3-2.5s3 .9 3.3 2.5"/>',
-  regions: '<path d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2V6Z"/><path d="M9 4v14M15 6v14"/><path d="m12 10 1.5 1.5-1.5 1.5-1.5-1.5L12 10Z" fill="#D7E7EF"/>',
   audit: '<path d="M5 4h14v16H5z"/><path d="M8 8h8M8 11.5h8M8 15h4"/><circle cx="16.5" cy="16.5" r="2.5" fill="#D7E7EF"/><path d="m18.3 18.3 2.2 2.2"/>',
 };
 

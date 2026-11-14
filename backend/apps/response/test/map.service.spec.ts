@@ -23,7 +23,8 @@ function setup(rows: unknown[] = [], projectionEpsg = 32648) {
 }
 
 describe('MapService heatmap', () => {
-  it('requires a region or campaign filter before querying', async () => {
+
+  it('requires a campaign filter before querying', async () => {
     const { service, dataSource } = setup();
 
     await expect(service.heatmap({ from, to }, {} as Request)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
@@ -37,7 +38,7 @@ describe('MapService heatmap', () => {
   ])('rejects invalid, reversed, or overlong UTC windows', async (window) => {
     const { service, dataSource } = setup();
 
-    await expect(service.heatmap({ ...window, region_code: 'VN01' }, {} as Request))
+    await expect(service.heatmap({ ...window }, {} as Request))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
     expect(dataSource.transaction).not.toHaveBeenCalled();
   });
@@ -49,7 +50,7 @@ describe('MapService heatmap', () => {
       grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: organizationId }],
     });
 
-    await expect(service.heatmap({ from, to, region_code: 'VN01', status_layer: 'unverified' }, {} as Request))
+    await expect(service.heatmap({ from, to, status_layer: 'unverified', campaign_id: '00000000-0000-4000-8000-000000000003' }, {} as Request))
       .rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(dataSource.transaction).not.toHaveBeenCalled();
   });
@@ -59,11 +60,11 @@ describe('MapService heatmap', () => {
       { cell: '{"type":"Polygon","coordinates":[]}', center: '{"type":"Point","coordinates":[]}', count: '7' },
     ]);
 
-    const result = await service.heatmap({ from, to, region_code: 'VN01', category: 'FLOOD' }, {} as Request);
+    const result = await service.heatmap({ from, to, category: 'FLOOD', campaign_id: '00000000-0000-4000-8000-000000000003' }, {} as Request);
 
     expect(result).toMatchObject({
       items: [{ cell: { type: 'Polygon' }, center: { type: 'Point' }, count: 7 }],
-      filters: { from, to, status_layer: 'confirmed', region_code: 'VN01', campaign_id: null, category: 'FLOOD', cell_m: 1000 },
+      filters: { from, to, status_layer: 'confirmed', campaign_id: '00000000-0000-4000-8000-000000000003', category: 'FLOOD', cell_m: 1000 },
     });
     expect(Object.keys((result as { items: Array<Record<string, unknown>> }).items[0]!).sort()).toEqual(['cell', 'center', 'count']);
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
@@ -78,14 +79,13 @@ describe('MapService heatmap', () => {
     expect(sql).toContain('ST_Transform(center, 4326)');
     expect(sql).toContain('LIMIT 5001');
     expect(sql).toContain('r.organization_id=$');
-    expect(sql).toContain('r.region_code=$');
     expect(sql).not.toMatch(/\bSELECT\s+(?:r\.)?id\b|reporter_contact_phone|tracking_code/i);
   });
 
   it('uses the configured projection EPSG in its SQL', async () => {
     const { service, query } = setup([], 3857);
 
-    await service.heatmap({ from, to, region_code: 'VN01' }, {} as Request);
+    await service.heatmap({ from, to, campaign_id: '00000000-0000-4000-8000-000000000003' }, {} as Request);
 
     expect(query.mock.calls[1]![0]).toContain('3857');
     expect(query.mock.calls[1]![0]).not.toContain('32648');
@@ -124,8 +124,8 @@ describe('MapService heatmap', () => {
   it('reuses authorized identical results from its short-lived cache', async () => {
     const { service, query, sessions } = setup([]);
 
-    const first = await service.heatmap({ from, to, region_code: 'VN01' }, {} as Request);
-    const second = await service.heatmap({ from, to, region_code: 'VN01' }, {} as Request);
+    const first = await service.heatmap({ from, to, campaign_id: '00000000-0000-4000-8000-000000000003' }, {} as Request);
+    const second = await service.heatmap({ from, to, campaign_id: '00000000-0000-4000-8000-000000000003' }, {} as Request);
 
     expect(second).toEqual(first);
     expect(sessions.require).toHaveBeenCalledTimes(2);

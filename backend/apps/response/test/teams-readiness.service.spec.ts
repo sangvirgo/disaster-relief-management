@@ -17,7 +17,7 @@ const dto: ConfirmTeamReadinessDto = {
 
 function fixture(options: { leader?: boolean; manager?: boolean; active?: boolean; validTime?: boolean;
   missing?: boolean; replay?: boolean; team?: Partial<TeamRow> } = {}) {
-  let row = { id: teamId, organization_id: organizationId, operating_region_code: 'DEMO_C',
+  let row = { id: teamId, organization_id: organizationId,
     name: 'Đội kiểm thử', team_kind: 'VOLUNTEER', reporting_mode: 'APP', status: 'ACTIVE',
     availability: 'UNAVAILABLE', readiness_required: true, version: 6, skills: [], position_source: null,
     ...options.team } as TeamRow;

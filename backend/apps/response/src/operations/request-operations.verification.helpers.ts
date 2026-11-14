@@ -5,7 +5,7 @@ import type { SupplementReviewDto, VerifyRequestDto } from './request-operations
 import { asObject, grantCovers, scopeSql, toIso } from './request-operations.helpers';
 import type { OperationRequestRow, ValidatedSourceRefs } from './request-operations.types';
 
-export async function hasPendingSupplement(manager: EntityManager, requestId: string): Promise<boolean> {
+export async function hasPendingSupplement(manager: Pick<EntityManager, 'query'>, requestId: string): Promise<boolean> {
   const rows = await manager.query(
     `SELECT 1 FROM request_event supplement
       WHERE supplement.request_id=$1 AND supplement.event_type='REPORTER_SUPPLEMENT'
@@ -104,11 +104,11 @@ export async function validateSourceRefs(
 }
 
 export async function approvedFacts(
-  manager: EntityManager, requestId: string, reported?: Record<string, unknown>, regionOverride?: string | null,
+  manager: EntityManager, requestId: string, reported?: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const rows = await manager.query(
     `SELECT r.report_mode,r.description,r.reporter_name,r.reporter_contact_phone,r.reporter_declared_danger,r.needs_rescue,r.needs_relief_supplies,
-            r.region_code,r.campaign_id,r.incident_category_code,s.people_affected,s.children_count,s.elderly_count,s.location_source,
+            r.campaign_id,r.incident_category_code,s.people_affected,s.children_count,s.elderly_count,s.location_source,
             s.location_accuracy_m,s.location_captured_at,ST_X(s.location::geometry) AS longitude,
             ST_Y(s.location::geometry) AS latitude,s.reporter_relationship,s.beneficiary_contact_phone,
             s.alternate_contact_name,s.alternate_contact_phone,s.information_source,s.last_known_situation_at,
@@ -121,7 +121,6 @@ export async function approvedFacts(
     report_mode: row.report_mode, incident_category_code: row.incident_category_code,
     description: row.description, reporter_name: row.reporter_name, reporter_contact_phone: row.reporter_contact_phone,
     reporter_declared_danger: row.reporter_declared_danger, needs_rescue: row.needs_rescue, needs_relief_supplies: row.needs_relief_supplies,
-    region_code: regionOverride === undefined ? row.region_code : regionOverride,
     campaign_id: row.campaign_id, people_affected: row.people_affected, children_count: row.children_count, elderly_count: row.elderly_count,
     location: { type: 'Point', coordinates: [Number(row.longitude), Number(row.latitude)], source: row.location_source,
       accuracy_m: row.location_accuracy_m, captured_at: row.location_captured_at == null ? null : toIso(row.location_captured_at as Date | string) },

@@ -862,7 +862,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                     <strong>Tình trạng nhiệm vụ</strong>
                     <span className="detail-value">{!teamActivityLoaded ? 'Chưa cập nhật được nhiệm vụ' : busyTeamIds.has(selectedTeam.id) ? 'Đang có nhiệm vụ' : 'Không có nhiệm vụ đang hoạt động'}</span>
                   </p>
-                  <p className="muted team-availability-help">Để nhận nhiệm vụ, đội cần đang sẵn sàng, không có nhiệm vụ đang hoạt động và có vị trí đủ mới. Điều phối viên còn kiểm tra khu vực và kỹ năng phù hợp.</p>
+                  <p className="muted team-availability-help">Để nhận nhiệm vụ, đội cần đang sẵn sàng, không có nhiệm vụ đang hoạt động và có vị trí đủ mới. Điều phối viên còn kiểm tra khoảng cách và kỹ năng phù hợp.</p>
                   <p>
                     <strong>Chế độ báo cáo</strong>
                     <span className="detail-value">

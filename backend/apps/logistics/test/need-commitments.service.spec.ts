@@ -24,7 +24,7 @@ const managerGrant: Grant = {
 
 const need = {
   id: needId, cycle_id: cycleId, request_id: '11111111-1111-4111-8111-111111111111', work_cycle: 2,
-  organization_id: organizationId, region_code: 'NORTH', campaign_id: null, item_id: itemId,
+  organization_id: organizationId, campaign_id: null, item_id: itemId,
   item_name: 'Nước uống', unit_code: 'L', unit_name: 'Lít', unit_scale: 2,
   original_quantity: '3.00', requested_quantity: '3.00', cancelled_remaining: null,
   designated_point_id: null, status: 'OPEN', version: 1, created_at: new Date('2026-10-12T12:00:00.000Z'),
@@ -50,12 +50,12 @@ type SetupOptions = {
 function setup(options: SetupOptions = {}) {
   const calls: Array<{ sql: string; values?: unknown[] }> = [];
   const cycle = {
-    id: cycleId, organization_id: organizationId, region_code: 'NORTH',
+    id: cycleId, organization_id: organizationId,
     campaign_id: options.campaign ?? null, state: options.cycleState ?? 'OPEN',
   };
   const lockedNeed = { ...need, campaign_id: cycle.campaign_id, status: options.needStatus ?? 'OPEN', requested_quantity: options.requested ?? '3.00' };
   const commitments = options.commitments ?? [];
-  const warehouse = { id: warehouseId, organization_id: organizationId, region_code: 'NORTH', status: 'ACTIVE' };
+  const warehouse = { id: warehouseId, organization_id: organizationId, status: 'ACTIVE' };
   const balance = options.balance === null ? [] : [{ id: balanceId, warehouse_id: warehouseId, item_id: itemId, ...options.balance ?? { on_hand: '5.00', reserved: '2.00' } }];
   const manager = {
     query: jest.fn(async (sql: string, values?: unknown[]) => {
@@ -71,7 +71,7 @@ function setup(options: SetupOptions = {}) {
       if (sql.includes('INSERT INTO stock_movement') || sql.includes('INSERT INTO audit_log')) return [];
       if (sql.includes('FROM commitment')) return [{
         id: commitmentId, relief_need_id: needId, item_id: itemId, warehouse_id: warehouseId,
-        cycle_id: cycleId, organization_id: organizationId, region_code: 'NORTH', campaign_id: null,
+        cycle_id: cycleId, organization_id: organizationId, campaign_id: null,
         unit_scale: 2, status: 'OPEN', requested_quantity: '3.00',
         quantity: '2.00', released_quantity: '1.00', issued_quantity: '0.00', delivered_quantity: '0.00',
         returned_quantity: '0.00', lost_quantity: '0.00', version: 4,
@@ -83,12 +83,11 @@ function setup(options: SetupOptions = {}) {
     query: jest.fn(async (sql: string) => {
       if (sql.includes('FROM relief_need')) return [{
         ...lockedNeed, cycle_id: cycleId, warehouse_id: warehouseId, warehouse_organization_id: organizationId,
-        warehouse_region_code: 'NORTH',
       }];
       if (sql.includes('FROM commitment')) return [{
         id: commitmentId, relief_need_id: needId, cycle_id: cycleId, organization_id: organizationId,
-        region_code: 'NORTH', warehouse_id: warehouseId, warehouse_organization_id: organizationId,
-        warehouse_region_code: 'NORTH', item_id: itemId,
+        warehouse_id: warehouseId, warehouse_organization_id: organizationId,
+        item_id: itemId,
       }];
       if (sql.includes('FROM warehouse')) return [warehouse];
       return [];
@@ -108,7 +107,7 @@ function setup(options: SetupOptions = {}) {
   };
   const campaigns = {
     getCampaign: jest.fn(async (id: string) => ({
-      id, status: options.campaignStatus ?? 'ACTIVE', organization_id: organizationId, region_code: 'NORTH', version: 1,
+      id, status: options.campaignStatus ?? 'ACTIVE', organization_id: organizationId, version: 1,
     })),
   };
   const service = new NeedCommitmentsService(

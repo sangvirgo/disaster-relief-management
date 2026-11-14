@@ -107,11 +107,6 @@
       "type": "string"
     },
     {
-      "key": "regionCode",
-      "value": "",
-      "type": "string"
-    },
-    {
       "key": "teamId",
       "value": "",
       "type": "string"
@@ -362,54 +357,6 @@
                       "const organization = (body.items || []).find((row) => row.name === 'Trung tâm điều phối C48 (demo)' && row.status === 'ACTIVE');",
                       "if (!organization?.id) throw new Error('Không tìm thấy tổ chức điều phối C48 đang hoạt động.');",
                       "pm.collectionVariables.set('intakeOrganizationId', organization.id);",
-                      "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
-                      "})();"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "id": "main-01c-regions",
-              "name": "01c · Quản trị viên đọc danh sách khu vực và version",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Accept",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{activeAccessToken}}"
-                  }
-                ],
-                "url": "{{identityBaseUrl}}/regions?limit=100",
-                "description": "GET danh sách khu vực; mỗi khu vực phải có version nguyên để lệnh vô hiệu hóa gửi expected_version."
-              },
-              "event": [
-                {
-                  "listen": "prerequest",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.variables.set('_c48', \"{\\\"service\\\": \\\"identity\\\", \\\"operationId\\\": \\\"listIdentityRegions\\\", \\\"expectedStatus\\\": 200}\");",
-                      "(function () {\n\nconst source = pm.request.url.toString() + ' ' + (pm.request.body?.raw || '') + ' ' + ['Authorization','X-Tracking-Code','X-Tracking-Secret','X-Donation-Secret','X-Recovery-Code'].map(k => pm.request.headers.get(k) || '').join(' ');\nconst missing = [...source.matchAll(/\\{\\{([A-Za-z][A-Za-z0-9_]*)\\}\\}/g)].map(match => match[1]).filter(key => !String(pm.variables.get(key) ?? '').trim());\nif (missing.length) { pm.test('Đã có dữ liệu cho bước này', function () { throw new Error('Thiếu biến: ' + [...new Set(missing)].join(', ')); }); pm.execution.setNextRequest(null); pm.execution.skipRequest(); }\n})();"
-                    ]
-                  }
-                },
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "(function () {",
-                      "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
-                      "const body = pm.response.json();",
-                      "try {",
-                      "if (!Array.isArray(body.items) || !body.items.length) throw new Error('Danh sách khu vực đang trống.');",
-                      "const invalid = body.items.filter((row) => !row.code || !Number.isInteger(row.version) || row.version < 1);",
-                      "if (invalid.length) throw new Error('Khu vực thiếu version nguyên: ' + invalid.map((row) => row.code).join(', '));",
                       "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                       "})();"
                     ]
@@ -896,7 +843,7 @@
                       "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
                       "const body = pm.response.json();",
                       "try {",
-                      "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); const organizationId = body.organization_id || pm.collectionVariables.get('intakeOrganizationId'); if (organizationId) pm.collectionVariables.set('requestOrganizationId', organizationId); if (body.region_code) pm.collectionVariables.set('regionCode', body.region_code);",
+                      "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); const organizationId = body.organization_id || pm.collectionVariables.get('intakeOrganizationId'); if (organizationId) pm.collectionVariables.set('requestOrganizationId', organizationId); ",
                       "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                       "})();"
                     ]
@@ -1120,7 +1067,7 @@
                 "description": "Tạo đội APP riêng, có đội trưởng và kỹ năng xuồng\n\nChạy theo thứ tự trong kịch bản. Lệnh ghi thay đổi dữ liệu demo chính; lỗi sẽ dừng Runner. Các lần đăng nhập, đọc chi tiết và chuyển trạng thái lặp có mục đích.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Đội xuồng phiên demo {{runSuffix}}\",\n  \"organization_id\": \"{{requestOrganizationId}}\",\n  \"operating_region_code\": \"{{regionCode}}\",\n  \"team_kind\": \"VOLUNTEER\",\n  \"reporting_mode\": \"APP\",\n  \"leader_user_id\": \"{{leaderUserId}}\",\n  \"skill_codes\": [\n    \"BOAT\"\n  ]\n}",
+                  "raw": "{\n  \"name\": \"Đội xuồng phiên demo {{runSuffix}}\",\n  \"organization_id\": \"{{requestOrganizationId}}\",\n  \"team_kind\": \"VOLUNTEER\",\n  \"reporting_mode\": \"APP\",\n  \"leader_user_id\": \"{{leaderUserId}}\",\n  \"skill_codes\": [\n    \"BOAT\"\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -1674,7 +1621,7 @@
                       "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
                       "const body = pm.response.json();",
                       "try {",
-                      "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); if (body.region_code) pm.collectionVariables.set('regionCode', body.region_code);",
+                      "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); ",
                       "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                       "})();"
                     ]
@@ -2060,7 +2007,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "(function () {\nif (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;\nconst body = pm.response.json();\ntry {\nif (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); if (body.region_code) pm.collectionVariables.set('regionCode', body.region_code);\nconst advisory = body.ai_advisory;\n['advisoryId','aiAdvisoryStatus','aiAdvisoryReviewStatus'].forEach(key => pm.collectionVariables.unset(key));\nif (advisory) { pm.collectionVariables.set('advisoryId', advisory.id); pm.collectionVariables.set('aiAdvisoryStatus', advisory.status); if (advisory.review_status) pm.collectionVariables.set('aiAdvisoryReviewStatus', advisory.review_status); }\nconst terminalStatuses = ['FAILED', 'SKIPPED', 'STALE'];\nif (!advisory || terminalStatuses.includes(advisory.status) || advisory.review_status) { console.warn('Gợi ý AI đã kết thúc hoặc không còn mới; luồng thủ công không bị ảnh hưởng.'); pm.execution.setNextRequest(null); }\nelse if (advisory.status === 'COMPLETED') { if (String(pm.variables.get('aiReviewDecision') || '').trim()) { pm.execution.setNextRequest('ai-03'); } else { console.warn('Gợi ý đã sẵn sàng; hãy chọn aiReviewDecision rồi chạy tiếp bước ghi nhận quyết định.'); pm.execution.setNextRequest(null); } }\nelse if (['QUEUED', 'PROCESSING'].includes(advisory.status)) {\n const attempt = Number(pm.collectionVariables.get('aiPollCount') || 0) + 1; pm.collectionVariables.set('aiPollCount', String(attempt));\n const limit = Math.min(30, Math.max(1, Number(pm.variables.get('pollLimit')) || 10));\n if (attempt >= limit) { console.warn('Dừng chờ AI sau số lần giới hạn; có thể chạy lại kịch bản khi worker sẵn sàng.'); pm.execution.setNextRequest(null); }\n else setTimeout(function () { pm.execution.setNextRequest(pm.info.requestId); }, Math.min(5000, Math.max(0, Number(pm.variables.get('pollDelayMs')) || 1000)));\n} else { console.warn('Trạng thái gợi ý AI không được hỗ trợ; dừng rà soát.'); pm.execution.setNextRequest(null); }\n\n} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }\n})();"
+                  "(function () {\nif (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;\nconst body = pm.response.json();\ntry {\nif (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); \nconst advisory = body.ai_advisory;\n['advisoryId','aiAdvisoryStatus','aiAdvisoryReviewStatus'].forEach(key => pm.collectionVariables.unset(key));\nif (advisory) { pm.collectionVariables.set('advisoryId', advisory.id); pm.collectionVariables.set('aiAdvisoryStatus', advisory.status); if (advisory.review_status) pm.collectionVariables.set('aiAdvisoryReviewStatus', advisory.review_status); }\nconst terminalStatuses = ['FAILED', 'SKIPPED', 'STALE'];\nif (!advisory || terminalStatuses.includes(advisory.status) || advisory.review_status) { console.warn('Gợi ý AI đã kết thúc hoặc không còn mới; luồng thủ công không bị ảnh hưởng.'); pm.execution.setNextRequest(null); }\nelse if (advisory.status === 'COMPLETED') { if (String(pm.variables.get('aiReviewDecision') || '').trim()) { pm.execution.setNextRequest('ai-03'); } else { console.warn('Gợi ý đã sẵn sàng; hãy chọn aiReviewDecision rồi chạy tiếp bước ghi nhận quyết định.'); pm.execution.setNextRequest(null); } }\nelse if (['QUEUED', 'PROCESSING'].includes(advisory.status)) {\n const attempt = Number(pm.collectionVariables.get('aiPollCount') || 0) + 1; pm.collectionVariables.set('aiPollCount', String(attempt));\n const limit = Math.min(30, Math.max(1, Number(pm.variables.get('pollLimit')) || 10));\n if (attempt >= limit) { console.warn('Dừng chờ AI sau số lần giới hạn; có thể chạy lại kịch bản khi worker sẵn sàng.'); pm.execution.setNextRequest(null); }\n else setTimeout(function () { pm.execution.setNextRequest(pm.info.requestId); }, Math.min(5000, Math.max(0, Number(pm.variables.get('pollDelayMs')) || 1000)));\n} else { console.warn('Trạng thái gợi ý AI không được hỗ trợ; dừng rà soát.'); pm.execution.setNextRequest(null); }\n\n} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }\n})();"
                 ]
               }
             }
@@ -2354,7 +2301,7 @@
                   "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
                   "const body = pm.response.json();",
                   "try {",
-                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); if (body.region_code) pm.collectionVariables.set('regionCode', body.region_code);",
+                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); ",
                   "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                   "})();"
                 ]
@@ -2522,7 +2469,7 @@
                   "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
                   "const body = pm.response.json();",
                   "try {",
-                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); if (body.region_code) pm.collectionVariables.set('regionCode', body.region_code);",
+                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); ",
                   "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                   "})();"
                 ]
@@ -3011,7 +2958,7 @@
                   "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
                   "const body = pm.response.json();",
                   "try {",
-                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); if (body.region_code) pm.collectionVariables.set('regionCode', body.region_code);",
+                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); ",
                   "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                   "})();"
                 ]
@@ -3251,7 +3198,7 @@
                   "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
                   "const body = pm.response.json();",
                   "try {",
-                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); if (body.region_code) pm.collectionVariables.set('regionCode', body.region_code);",
+                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); ",
                   "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                   "})();"
                 ]

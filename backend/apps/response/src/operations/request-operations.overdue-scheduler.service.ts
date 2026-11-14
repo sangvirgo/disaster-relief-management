@@ -33,7 +33,7 @@ export class RequestOperationsOverdueSchedulerService implements OnModuleInit, O
     let rows: OperationRequestRow[] = [];
     const ran = await this.jobs.runOnce('response.requests.overdue.scan', async (manager) => {
       rows = await manager.query(
-        `SELECT r.id,r.version,r.status,r.received_at,r.verifying_since,r.organization_id,r.region_code,r.campaign_id,
+        `SELECT r.id,r.version,r.status,r.received_at,r.verifying_since,r.organization_id,r.campaign_id,
                 r.reporter_declared_danger
            FROM assistance_request r
           WHERE ((r.status IN ('SUBMITTED','VERIFYING') AND

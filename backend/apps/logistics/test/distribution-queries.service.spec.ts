@@ -11,7 +11,6 @@ const distribution = {
   id: distributionId,
   warehouse_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   organization_id: organizationId,
-  warehouse_region_code: 'R1',
   warehouse_status: 'ACTIVE',
   relief_point_id: null,
   relief_point_status: null,
@@ -127,7 +126,7 @@ describe('DistributionQueriesService handoff detail', () => {
     expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM logistics_attachment a'), [handoffId, distributionId]);
   });
 
-  it('does not read handoff evidence outside the caller warehouse scope', async () => {
+  it('does not read handoff evidence outside the caller organization scope', async () => {
     const query = jest.fn(async (sql: string) => {
       if (sql.includes('WHERE d.id=ANY($1::uuid[])')) return [distribution];
       throw new Error(`Unexpected query: ${sql}`);
@@ -135,7 +134,7 @@ describe('DistributionQueriesService handoff detail', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: '11111111-1111-4111-8111-111111111111',
-        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'REGION', organization_id: organizationId, region_code: 'R2' }],
+        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'ORGANIZATION', organization_id: '99999999-9999-4999-8999-999999999999' }],
         identityHeaders: {},
       })),
     };

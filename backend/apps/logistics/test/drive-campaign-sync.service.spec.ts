@@ -30,7 +30,7 @@ describe('Logistics drive campaign synchronization', () => {
     }) };
     const dataSource = { transaction: jest.fn(async (work: (manager: never) => Promise<unknown>) => work(manager as never)) };
     const client = { getCampaign: jest.fn(async () => ({
-      id: campaignId, status: 'CLOSED', organization_id: '11111111-1111-4111-8111-111111111111', region_code: 'R01', version: 4,
+      id: campaignId, status: 'CLOSED', organization_id: '11111111-1111-4111-8111-111111111111', version: 4,
     })) };
     const service = new DriveCampaignSyncService(dataSource as never, client as never);
 

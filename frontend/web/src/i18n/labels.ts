@@ -61,10 +61,6 @@ export const statusLabels: Record<string, string> = {
   RECONCILED: 'Đã đối soát',
   PARTIALLY_FULFILLED: 'Đáp ứng một phần',
   FULFILLED: 'Đã đáp ứng',
-  UNASSIGNED: 'Chưa gán khu vực',
-  DEMO_A: 'Khu vực Nam',
-  DEMO_B: 'Khu vực Trung',
-  DEMO_C: 'Khu vực Bắc',
   INACTIVE: 'Ngừng hoạt động',
   PENDING_EMAIL: 'Chờ xác minh email',
   WATCH: 'Lưu ý',
@@ -97,9 +93,7 @@ export const statusLabels: Record<string, string> = {
   app_user: 'Người dùng',
   role_grant: 'Quyền truy cập',
   organization: 'Tổ chức',
-  region: 'Khu vực',
   ORGANIZATION: 'Tổ chức',
-  REGION: 'Khu vực',
   CAMPAIGN: 'Chiến dịch',
   COORDINATION: 'Điều phối',
   MILITARY: 'Lực lượng vũ trang',
@@ -137,9 +131,6 @@ export const statusLabels: Record<string, string> = {
   GRANT_REVOKED: 'Thu hồi quyền',
   ORGANIZATION_CREATED: 'Tạo tổ chức',
   ORGANIZATION_DEACTIVATED: 'Ngừng hoạt động tổ chức',
-  REGION_CREATED: 'Tạo khu vực',
-  REGION_UPDATED: 'Cập nhật khu vực',
-  REGION_DEACTIVATED: 'Ngừng hoạt động khu vực',
   CONCURRENCE: 'Điều phối viên khác đã đồng xác nhận',
   MEMBERSHIP_ADDED: 'Thêm thành viên tổ chức',
   MEMBERSHIP_REMOVED: 'Xóa thành viên tổ chức',
@@ -204,7 +195,3 @@ export const dateLabel = (value: unknown): string =>
   typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
     ? value.split('-').reverse().join('/')
     : label(value);
-// Names from the versioned demo region catalog; preserve unknown region identifiers.
-export function regionName(code: string): string {
-  return ({ DEMO_A: 'Khu vực Nam (demo)', DEMO_B: 'Khu vực Trung (demo)', DEMO_C: 'Khu vực Bắc (demo)' } as Record<string, string>)[code] || code;
-}

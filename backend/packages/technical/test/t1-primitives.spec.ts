@@ -146,24 +146,24 @@ describe('T1 technical package', () => {
   it('enforces role, permission, organization, and named SYSTEM-scope rules', () => {
     expect(ROLE_PERMISSIONS.ADMIN).not.toContain('REQUEST_DETAIL_READ');
     expect(ROLE_PERMISSIONS.INTAKE_STAFF).not.toContain('DONATION_REVIEW');
-    const grant = { role_code: 'COORDINATOR' as const, scope_type: 'REGION' as const, organization_id: 'org-1', region_code: 'R1' };
-    expect(hasPermission([grant], 'REQUEST_VERIFY', { organizationId: 'org-1', regionCode: 'R1' })).toBe(true);
-    expect(hasPermission([grant], 'REQUEST_VERIFY', { organizationId: 'org-1', regionCode: 'R2' })).toBe(false);
+    const grant = { role_code: 'COORDINATOR' as const, scope_type: 'ORGANIZATION' as const, organization_id: 'org-1' };
+    expect(hasPermission([grant], 'REQUEST_VERIFY', { organizationId: 'org-1' })).toBe(true);
+    expect(hasPermission([grant], 'REQUEST_VERIFY', { organizationId: 'org-2' })).toBe(false);
     const admin = { role_code: 'ADMIN' as const, scope_type: 'SYSTEM' as const, organization_id: null };
     expect(hasPermission([admin], 'USER_MANAGE', { organizationId: 'org-1' })).toBe(false);
     expect(hasPermission([admin], 'USER_MANAGE', { systemAction: 'USER_MANAGE' })).toBe(true);
-    const invalidCitizenGrant = { role_code: 'CITIZEN' as const, scope_type: 'REGION' as const, organization_id: 'org-1', region_code: 'R1' };
-    expect(hasPermission([invalidCitizenGrant], 'REQUEST_CREATE_PROXY', { organizationId: 'org-1', regionCode: 'R1' })).toBe(false);
+    const invalidCitizenGrant = { role_code: 'CITIZEN' as const, scope_type: 'CAMPAIGN' as const, organization_id: 'org-1', campaign_id: 'campaign-1' };
+    expect(hasPermission([invalidCitizenGrant], 'REQUEST_CREATE_PROXY', { organizationId: 'org-1' })).toBe(false);
   });
 
   it('encodes keyset cursors with filter binding and rejects changed filters', () => {
-    const filters = { status: ['ACTIVE', 'OPEN'], region: 'R1' };
+    const filters = { status: ['ACTIVE', 'OPEN'], campaign_id: 'C1' };
     const token = encodeKeysetCursor(['2026-10-10T00:00:00Z'], '00000000-0000-0000-0000-000000000001', filters);
-    expect(decodeKeysetCursor(token, { region: 'R1', status: ['ACTIVE', 'OPEN'] })).toMatchObject({
+    expect(decodeKeysetCursor(token, { campaign_id: 'C1', status: ['ACTIVE', 'OPEN'] })).toMatchObject({
       sort: ['2026-10-10T00:00:00Z'],
       id: '00000000-0000-0000-0000-000000000001',
     });
-    expect(() => decodeKeysetCursor(token, { region: 'R2', status: ['ACTIVE', 'OPEN'] }))
+    expect(() => decodeKeysetCursor(token, { campaign_id: 'C2', status: ['ACTIVE', 'OPEN'] }))
       .toThrow(expect.objectContaining({ code: 'CURSOR_INVALID' }));
   });
 

@@ -1,10 +1,10 @@
 # 02 — Identity service: API contract
 
-Schema: [schema/identity.sql](schema/identity.sql). Conventions: [00](00-setup.md). Permissions: [05](05-permissions.md). Owns accounts, credentials, organizations, memberships, scoped grants, refresh sessions, region catalog, audit of those. Never stores phones, locations or request data.
+Schema: [schema/identity.sql](schema/identity.sql). Conventions: [00](00-setup.md). Permissions: [05](05-permissions.md). Owns accounts, credentials, organizations, memberships, scoped grants, refresh sessions, audit of those. Never stores phones, locations or request data.
 
 ## 1. Auth model (implement exactly)
 
-- **Idempotency exceptions:** `register`, `change-password`, `deactivate`, `members/remove` and every other non-GET command require `Idempotency-Key` (00 §3); only login/refresh/logout/csrf are exempt. Versioned admin commands (`disable`, `enable`, `reset-password`, organization/region deactivate) require `expected_version`. DTOs forbid unknown fields (`role*`/`scope*` on register ⇒ 400); the granting actor is always the caller (recorded in `audit_log`; `role_grant` has no `granted_by` column), self-grant is refused (except the one-time bootstrap seed).
+- **Idempotency exceptions:** `register`, `change-password`, `deactivate`, `members/remove` and every other non-GET command require `Idempotency-Key` (00 §3); only login/refresh/logout/csrf are exempt. Versioned admin commands (`disable`, `enable`, `reset-password`, organization deactivate) require `expected_version`. DTOs forbid unknown fields (`role*`/`scope*` on register ⇒ 400); the granting actor is always the caller (recorded in `audit_log`; `role_grant` has no `granted_by` column), self-grant is refused (except the one-time bootstrap seed).
 - **Passwords:** Argon2id (maintained library, parameters pinned in config); minimum 10 characters, not equal to username, rejected if in a bundled common-password list; never logged. Login failures return one generic `INVALID_CREDENTIALS` (also for disabled/unknown users) with the same dummy-hash work for unknown **and disabled** users; Argon2id concurrency is capped by a semaphore and a global login budget (00 §3.3). Admin-chosen temporary passwords are redacted from logs.
 - **Access token:** RS256 asymmetric JWT (3072-bit RSA key pair), `iss`, `aud`, `sub`, `sid` (= `session_family.id`, constant across rotations), `iat`, `exp` = +10 min, `jti`. No roles, phones or PII. Services verify signature locally, then call introspection on **every** protected request (no positive cache).
 - **Sessions:** one `session_family` row per login (its id is the JWT `sid`; it carries `client_kind`, `authz_version`, `absolute_expires_at`, revocation). `refresh_session` rows are the rotation chain; the unique partial index guarantees **one live token per family**. Refresh token = opaque 32 random bytes, only its SHA-256+pepper hash is stored.
@@ -29,8 +29,7 @@ Schema: [schema/identity.sql](schema/identity.sql). Conventions: [00](00-setup.m
 | `POST /auth/refresh` | refresh cookie / `{ refresh_token }` (native), CSRF (Web) | → same shape as login without `user`. Errors: `SESSION_EXPIRED` 401, `REFRESH_REUSED` 401 (family revoked) |
 | `POST /auth/logout` | session, CSRF | `204`; revokes the family, clears cookies |
 | `POST /auth/change-password` | session, CSRF | `{ current_password, new_password }` → `204`; revokes all other families; clears `must_change_password`. Errors `INVALID_CREDENTIALS`, `PASSWORD_WEAK` |
-| `GET /me` | session | → `200 { id, username, display_name, must_change_password, grants: [ { id, role_code, scope_type, organization_id, region_code, campaign_id } ] }` |
-| `GET /regions` | session | → `{ items: [ { code, name, status, version } ], next_cursor }` (paginated like every list; the catalog is small) |
+| `GET /me` | session | → `200 { id, username, display_name, must_change_password, grants: [ { id, role_code, scope_type, organization_id, campaign_id } ] }` |
 
 A registration idempotency replay returns the same prospective account and the current challenge while the attempt is live, without sending another email. After ten minutes or cleanup, replay returns `410 REGISTRATION_EXPIRED`; register again with a new key. Distinct attempts may use the same username/email until one is verified; only actual accounts reserve identifiers. Passwords are Argon2id hashes, OTPs are purpose-bound hashes, and both hashes are cleared from the attempt on confirmation. No pending attempt can authenticate.
 
@@ -49,19 +48,18 @@ Throttling (Nginx + app): login 5 / minute per IP+username, 30 / minute per IP; 
 | `GET /users/{id}` | → user + memberships + live grants | |
 | `POST /users/{id}/disable` / `/enable` (Idem) | `{ expected_version, reason }` → `200 user` | Disable revokes all families. `LAST_ADMIN` 409 if it removes the last active ADMIN |
 | `POST /users/{id}/reset-password` (Idem) | `{ expected_version, temporary_password, reason }` → `204` | Revokes all families, sets `must_change_password` |
-| `POST /users/{id}/grants` (Idem) | `{ role_code, scope_type, organization_id?, region_code?, campaign_id?, reason }` → `201 grant` | Shape per `scope_shape` CHECK; region validated against catalog; campaign validated via Response `GET /internal/campaigns/{id}` (service token, outside any DB transaction); duplicate live grant → `GRANT_EXISTS` 409; `ADMIN` only with `SYSTEM` scope; self-grant of any role → `FORBIDDEN`. Revokes target's sessions |
+| `POST /users/{id}/grants` (Idem) | `{ role_code, scope_type, organization_id?, campaign_id?, reason }` → `201 grant` | Shape per `scope_shape` CHECK; campaign validated via Response `GET /internal/campaigns/{id}` (service token, outside any DB transaction); duplicate live grant → `GRANT_EXISTS` 409; `ADMIN` only with `SYSTEM` scope; self-grant of any role → `FORBIDDEN`. Revokes target's sessions |
 | `POST /grants/{id}/revoke` (Idem) | `{ reason }` → `200 grant` | Soft revoke; `LAST_ADMIN` guard |
 | `GET /users/{id}/grants?include_revoked=&cursor=` | → paged grants (live first) | |
 | `POST /organizations` (Idem) | `{ name, organization_kind }` → `201` | `ORGANIZATION_NAME_TAKEN` |
 | `GET /organizations?cursor=` · `POST /organizations/{id}/deactivate` | | Deactivation blocked while ACTIVE grants/memberships exist: `ORGANIZATION_IN_USE` 409 |
 | `POST /organizations/{id}/members` (Idem) | `{ user_id }` → `201` · `POST /organizations/{id}/members/{user_id}/remove` → `204` | Removing a member revokes the member's live grants scoped to this organization and all session families in the same transaction; each grant revocation and membership change is audited. |
-| `POST /regions` (Idem) · `POST /regions/{code}/deactivate` | `{ code, name }` | `SYSTEM`-scope admin |
 | `GET /audit-logs?entity_type=&entity_id=&cursor=` | → paged audit rows | `entity_type` is required; `AUDIT_READ`; no password/token/secret ever stored |
 | `GET /dashboard/admin` | → account/access snapshot | `USER_MANAGE` (system admin). Users by status, pending email verification, must-change-password, active in 24 h, active users per role, organizations per kind, 10 latest audit actions (action/entity type/time only). `no-store`. |
 
 Every admin write inserts an `audit_log` row (actor, action, entity, before/after, reason, correlation id) in the same transaction.
 
-Campaign-scoped grants call the Response internal campaign lookup before the Identity transaction. The lookup returns campaign status, organization, region, and version; grants fail closed when Response is unavailable.
+Campaign-scoped grants call the Response internal campaign lookup before the Identity transaction. The lookup returns campaign status, organization, and version; grants fail closed when Response is unavailable.
 
 ## 4. Internal endpoints (Compose network only; Nginx returns 404)
 
@@ -72,7 +70,6 @@ Campaign-scoped grants call the Response internal campaign lookup before the Ide
 | `POST /internal/users:lookup` | Response, Logistics | `{ ids: [uuid ≤ 100] }` → `{ items: [ { id, display_name } ] }`; unknown ids omitted. Disabled and non-volunteer users are included so callers can render historical actor names. Callers must derive IDs from records in their own database and enforce that ownership before calling. Lookup calls are logged by count. |
 | `POST /internal/users:search` | Response only | `{ query, cursor?, limit? }` → `{ items: [ { id, username, display_name } ], more, cursor? }`; searches ACTIVE accounts by case-insensitive username/display-name prefix (`query` 2–64 characters, `limit` 1–100, default 50). The filter-bound keyset cursor is private to this query. Only Response may call it; it exists for the scoped team-member picker, not as a general account directory. Responses are `no-store`. |
 | `POST /internal/users:check-active` | Response only | `{ user_id }` → `{ active: true }` or `{ active: false, reason: USER_NOT_FOUND\|USER_INACTIVE }`. Checks only whether `app_user` exists and has status `ACTIVE`; returns no Identity fields, memberships, or grants, and explicitly rejects Logistics. Used only to gate team membership. |
-| `POST /internal/regions:lookup` | Response only | `{ codes: [1..100 nonblank strings, each ≤ 80 characters] }` → `{ items: [ { code, name } ] }`; unknown codes are omitted. Reads only the Identity region catalog and explicitly rejects Logistics. |
 | `POST /internal/team-leader-eligibility` | Response only | `{ user_id, organization_id }` → `{ eligible: true }` or `{ eligible: false, reason }`, where `reason` is `USER_NOT_FOUND`, `USER_INACTIVE`, `MEMBERSHIP_REQUIRED`, or `VOLUNTEER_GRANT_REQUIRED`. Eligibility requires an active account, active membership in the active organization, and a current VOLUNTEER grant scoped to SYSTEM or that same organization. The endpoint returns no user identity fields and explicitly rejects Logistics. |
 | `POST /internal/request-coordinators` | Response only | `{ organization_id }` → active users' current COORDINATOR grants plus organization-scoped OPERATIONS_MANAGER grants; used to revalidate a second coordinator at verification and resolve scoped overdue-notice recipients. The route requires a valid Identity service token and explicitly rejects callers other than Response. |
 | `GET /internal/organizations/{id}` | Response, Logistics | existence/kind/status check |
@@ -97,4 +94,4 @@ The authoritative list of all codes and messages is [07-error-catalog.md](07-err
 
 ## 6. Seeds and tests
 
-Seed: regions, one coordinating organization, one ADMIN (password from env at first run, `must_change_password`), demo accounts per role (≥ 2 REVIEWER/INTAKE users so independent review is demonstrable). Tests: TC-BE-01, TC-BE-20, TC-BE-28, TC-L10N-01; add: two parallel refreshes → one child, the loser gets `REFRESH_RACE` and the family stays alive; replay after the grace window revokes the family; disable/reset racing a rotation leaves **no** live token (proven failing without the `authz_version` barrier), grant change revokes sessions, introspection under k6 load, last-admin guard, username case-insensitivity, native vs browser transport separation.
+Seed: one coordinating organization, one ADMIN (password from env at first run, `must_change_password`), demo accounts per role (≥ 2 REVIEWER/INTAKE users so independent review is demonstrable). Tests: TC-BE-01, TC-BE-20, TC-BE-28, TC-L10N-01; add: two parallel refreshes → one child, the loser gets `REFRESH_RACE` and the family stays alive; replay after the grace window revokes the family; disable/reset racing a rotation leaves **no** live token (proven failing without the `authz_version` barrier), grant change revokes sessions, introspection under k6 load, last-admin guard, username case-insensitivity, native vs browser transport separation.

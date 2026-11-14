@@ -66,7 +66,6 @@ describe('DistributionCommandsService vehicle capacity warning', () => {
       id: distributionId,
       warehouse_id: warehouseId,
       organization_id: organizationId,
-      warehouse_region_code: 'north',
       warehouse_status: 'ACTIVE',
       relief_point_id: null,
       relief_point_status: null,
@@ -120,8 +119,8 @@ describe('DistributionCommandsService vehicle capacity warning', () => {
     }));
 
     const query = jest.fn(async (sql: string, values: unknown[] = []) => {
-      if (sql.includes('SELECT organization_id,region_code,status FROM warehouse')) {
-        return [{ organization_id: organizationId, region_code: 'north', status: 'ACTIVE' }];
+      if (sql.includes('SELECT organization_id,status FROM warehouse')) {
+        return [{ organization_id: organizationId, status: 'ACTIVE' }];
       }
       if (sql.includes('SELECT organization_id,status FROM vehicle')) return [{ organization_id: organizationId, status: 'ACTIVE' }];
       if (sql.includes('FROM distribution d JOIN warehouse w')) return [distributionRow()];

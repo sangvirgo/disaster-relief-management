@@ -77,7 +77,7 @@ Các khuyến nghị dưới đây áp dụng lại ý tưởng quy trình đư�
 |---|---|---|
 | Hàng đợi rà soát, kiểm duyệt và tìm kiếm đã lưu của Ushahidi | Màn hình điều phối viên cho yêu cầu chờ xác minh, đã xác minh nhưng chưa phân công, nhiệm vụ đang diễn ra và yêu cầu mới được đáp ứng một phần; chỉ hiển thị vị trí/liên hệ chính xác trong phạm vi quyền hạn | Làm rõ điểm bàn giao và lượng việc tồn đọng mà không tự động hóa quyết định của con người |
 | Cam kết một phần và hồ sơ logistics tách biệt của Sahana ShaRe | Bảng đáp ứng nhu cầu hiển thị số lượng được yêu cầu, đã cam kết, đã xuất, đã giao và còn thiếu; nhiều kho/tổ chức có thể cùng đóng góp | Yêu cầu vẫn có thể mở dù đã giao một phần; một khoản đóng góp không che khuất nhu cầu còn lại |
-| Các đồ án cùng loại trong danh mục CNTT: khả năng quan sát điều động/logistics, xử lý vé đồng thời cao và số liệu mô phỏng lưu lượng có thể so sánh | Bổ sung thời gian quy trình có thể đo và chế độ xem cứu trợ còn thiếu được lọc theo yêu cầu/khu vực/mặt hàng trong phạm vi được cấp quyền; dùng k6 cho một kịch bản tải API vừa phải | Giúp demo thể hiện rõ kết quả vận hành và có số liệu minh chứng mà không sao chép broker, giao dịch hoặc miền mô phỏng không liên quan |
+| Các đồ án cùng loại trong danh mục CNTT: khả năng quan sát điều động/logistics, xử lý vé đồng thời cao và số liệu mô phỏng lưu lượng có thể so sánh | Bổ sung thời gian quy trình có thể đo và chế độ xem cứu trợ còn thiếu được lọc theo yêu cầu/mặt hàng trong phạm vi được cấp quyền; dùng k6 cho một kịch bản tải API vừa phải | Giúp demo thể hiện rõ kết quả vận hành và có số liệu minh chứng mà không sao chép broker, giao dịch hoặc miền mô phỏng không liên quan |
 
 Sổ tay dự án là danh mục mô tả đồ án, không phải bằng chứng rằng mọi công nghệ hay khối lượng công việc được liệt kê đều đã được triển khai. Điểm khác biệt của Reliva là quy trình truy vết từ xác minh báo cáo đến tiến độ nhiệm vụ và đáp ứng cứu trợ một phần, với số lượng kiểm toán được cùng số đo thời gian phản hồi.
 
@@ -264,7 +264,6 @@ erDiagram
   RESPONSE_REQUEST {
     uuid id PK
     uuid organization_id
-    string region_code
     int work_cycle
     int version
     uuid campaign_id
@@ -321,7 +320,6 @@ erDiagram
     uuid request_id
     uuid campaign_id
     uuid organization_id
-    string region_code
     int work_cycle
     uuid item_id
     decimal requested_quantity
@@ -375,8 +373,8 @@ Mỗi nhiệm vụ có đúng một đội; đội bổ sung nhận nhiệm vụ
 
 | Cơ sở dữ liệu | Bảng/thực thể tối thiểu |
 |---|---|
-| Identity | User, Organization, danh mục Region được kiểm soát, Membership, RoleGrant, trạng thái tài khoản, RefreshSession có xoay vòng/thu hồi, AuditRecord |
-| Response | Campaign, ResolutionIntent, RegionBoundary tham chiếu mã region được kiểm soát, AssistanceRequest có `organization_id` và `region/campaign` có thể rỗng, RequestEvent, ContactAttempt, AuthorityReferral, RescueTeam, TeamMember có user ID không hàm nghĩa, VolunteerProfile, Mission có một `team_id`, EvidenceMetadata, Notification trong ứng dụng theo phạm vi; tùy chọn AnalysisSnapshot, AnalysisJob, TriageRecommendation, RecommendationReview (Mục 12) |
+| Identity | User, Organization, Membership, RoleGrant, trạng thái tài khoản, RefreshSession có xoay vòng/thu hồi, AuditRecord |
+| Response | Campaign, ResolutionIntent, AssistanceRequest có `organization_id` và `campaign_id` có thể rỗng, RequestEvent, ContactAttempt, AuthorityReferral, RescueTeam, TeamMember có user ID không hàm nghĩa, VolunteerProfile, Mission có một `team_id`, EvidenceMetadata, Notification trong ứng dụng theo phạm vi; tùy chọn AnalysisSnapshot, AnalysisJob, TriageRecommendation, RecommendationReview (Mục 12) |
 | Logistics | Warehouse, Item, StockBalance, StockMovement, ReliefNeed/tham chiếu yêu cầu, Commitment (mỗi đóng góp cho một nhu cầu/mặt hàng), FulfillmentCycle, Transfer/lines, Distribution/lines, IssuedLineSettlement, TransferTransitLine, Vehicle, ReliefPoint, Notification trong ứng dụng theo phạm vi |
 
 Định nghĩa thực thể người dùng Identity và migration trước khi các dịch vụ khác phụ thuộc hợp đồng đó; dịch vụ bên ngoài chỉ lưu UUID người dùng không hàm nghĩa, không sao chép thông tin xác thực.
@@ -386,7 +384,7 @@ Mỗi nhiệm vụ có đúng một đội; đội bổ sung nhận nhiệm vụ
 - Tọa độ dùng WGS84/SRID 4326; thứ tự GeoJSON là kinh độ, vĩ độ. Kiểm tra kinh độ trong khoảng -180..180, vĩ độ -90..90 và độ chính xác không âm. [RFC 7946](https://datatracker.ietf.org/doc/html/rfc7946)
 - Lưu riêng thời điểm ghi nhận, độ chính xác theo mét, nguồn (GPS, ghim thủ công, geocoded) và thời điểm máy chủ nhận dữ liệu. Độ chính xác do thiết bị báo cáo không bảo đảm độ chính xác thực địa.
 - Lưu ảnh chụp vị trí cùng SOS. Chỉ bổ sung lịch sử vị trí khi có yêu cầu cụ thể; theo dõi liên tục ở chế độ nền không thuộc MVP.
-- Giới hạn truy vấn bản đồ theo quyền, khu vực/thời gian/trạng thái/khung bao. Không để lộ toàn bộ PII qua phản hồi bản đồ.
+- Giới hạn truy vấn bản đồ theo quyền, chiến dịch/thời gian/trạng thái/khung bao. Không để lộ toàn bộ PII qua phản hồi bản đồ.
 - Lưu tệp trong kho đối tượng. Cơ sở dữ liệu giữ object key, loại/ID chủ sở hữu, MIME đã xác thực, kích thước, checksum, người tải lên, thời gian và phạm vi hiển thị. Giữ bucket ở chế độ riêng tư; nếu truy cập trực tiếp thì dùng URL ký số có thời hạn ngắn.
 - Xác thực MIME thực tế, phần mở rộng và kích thước; không tin tên/MIME do client cung cấp. Tải lên phải được phân quyền dựa trên đối tượng nghiệp vụ sở hữu tệp.
 - Dữ liệu demo phải là dữ liệu tổng hợp; không dùng ảnh hay thông tin cá nhân của nạn nhân thật.
@@ -446,20 +444,20 @@ Với mức ưu tiên FR, **M** là cần thiết cho demo cốt lõi, **S** là
 | ID | Ưu tiên | Yêu cầu chức năng đề xuất | Tiêu chí xác minh |
 |---|---:|---|---|
 | FR-IAM-01 | M | Đăng ký công dân, đăng nhập, làm mới/đăng xuất, vô hiệu hóa tài khoản và đổi thông tin xác thực | Token sai/hết hạn hoặc tài khoản bị vô hiệu nhận 401; đăng xuất vô hiệu hóa phiên refresh |
-| FR-IAM-02 | M | Vai trò giới hạn theo tổ chức/khu vực/chiến dịch; kiểm tra thao tác và đối tượng | Công dân không truy cập yêu cầu của công dân khác; tình nguyện viên chỉ thấy nhiệm vụ của đội mình |
+| FR-IAM-02 | M | Vai trò giới hạn theo tổ chức/chiến dịch; kiểm tra thao tác và đối tượng | Công dân không truy cập yêu cầu của công dân khác; tình nguyện viên chỉ thấy nhiệm vụ của đội mình |
 | FR-IAM-03 | M | Quản trị tài khoản, tổ chức và vai trò theo đặc quyền tối thiểu | Thay đổi quyền ghi lại người thực hiện/thời gian và giá trị trước/sau |
 | FR-REQ-01 | M | Tạo yêu cầu với nhóm sự cố, mô tả ngắn, số người, số điện thoại liên hệ người báo tin (bắt buộc; xác minh cần cách liên hệ), vị trí/ghim thủ công, thời gian/nguồn, cờ “nguy hiểm tức thời” do người báo tin tự khai báo (chưa xác minh; xem FR-REQ-10) | Xác thực đầu vào, gồm định dạng điện thoại; trả ID và thời gian máy chủ nhận; chỉ người báo tin, điều phối viên đúng phạm vi và trưởng đội được phân công mới thấy số liên hệ; không đưa số này vào bản đồ, báo cáo hoặc đầu vào AI |
 | FR-REQ-02 | M | Bất kỳ ai cũng có thể gửi SOS không cần tài khoản (SOS khách); yêu cầu của công dân đã đăng nhập được liên kết tùy chọn với tài khoản. Khách theo dõi/bổ sung bằng bí mật theo dõi entropy cao do client tạo trước khi gửi (Mục 22.2); máy chủ chỉ trả ID yêu cầu không phải thông tin xác thực và mã theo dõi. Khách có thể nhận quyền sở hữu yêu cầu sau khi đăng nhập | Tạo yêu cầu không xác thực thành công có giới hạn tần suất; máy chủ chỉ lưu hash bí mật gắn với mục đích, không bao giờ trả lại hay ghi log; nếu mất phản hồi tạo yêu cầu, có thể gửi lại với cùng key/body/secret; không có secret (hoặc quyền sở hữu) thì từ chối xem/bổ sung; đăng ký vẫn chỉ cấp CITIZEN; tạo SOS và theo dõi bằng secret không gọi Identity |
 | FR-REQ-03 | M | Thử lại tạo SOS theo cách idempotent | Cùng key/payload/secret không tạo bản ghi thứ hai và trả ID yêu cầu cùng mã theo dõi ban đầu; cùng key nhưng payload hoặc secret khác bị từ chối (409) |
 | FR-REQ-04 | M | Xác minh, từ chối và liên kết yêu cầu trùng lặp; quyết định từ chối/trùng lặp cần có lý do | Giữ lại yêu cầu trùng và liên kết chúng đến yêu cầu chuẩn |
 | FR-REQ-05 | M | Gán mức ưu tiên P1–P4 thủ công kèm người thực hiện/thời gian/lý do và lịch sử ghi đè | Mức ưu tiên tách biệt trạng thái; AI không được tự đổi mức |
-| FR-REQ-06 | M | Lọc danh sách/bản đồ theo phạm vi bằng bbox/khu vực, trạng thái, mức ưu tiên và thời gian | Áp dụng bộ lọc phân quyền trước khi phân trang |
+| FR-REQ-06 | M | Lọc danh sách/bản đồ theo phạm vi bằng bbox, trạng thái, mức ưu tiên và thời gian | Áp dụng bộ lọc phân quyền trước khi phân trang |
 | FR-REQ-07 | M | Công dân xem dòng thời gian và bổ sung yêu cầu của chính mình ở trạng thái cho phép | Chỉ chủ sở hữu được truy cập; nội dung bổ sung ghi người thực hiện/thời gian |
 | FR-MSN-01 | M | Quản lý đội, kỹ năng, tình trạng sẵn sàng và thành viên qua user ID không hàm nghĩa | Từ chối đội không hoạt động/không sẵn sàng hoặc thiếu kỹ năng bắt buộc |
 | FR-MSN-02 | M | Tạo nhiệm vụ, đề nghị/giao nhiệm vụ, nhận/từ chối, chuyển trạng thái và ghi kết quả | Chỉ cho phép chuyển trạng thái hợp lệ; ghi người thực hiện/thời gian/lý do |
 | FR-MSN-03 | M | Một yêu cầu có thể có nhiều nhiệm vụ; trong MVP, mỗi nhiệm vụ thuộc một yêu cầu và một đội | Một nhiệm vụ hoàn tất không đóng yêu cầu còn nhu cầu chưa đáp ứng |
 | FR-MSN-04 | M | Tải bằng chứng yêu cầu/nhiệm vụ lên và để điều phối viên xác nhận kết quả | Metadata và quyền tải tuân theo phạm vi đối tượng |
-| FR-CAM-01 | M | Response quản lý chiến dịch, nhóm sự cố gắn với yêu cầu, khu vực hoạt động, thời gian và trạng thái | Tạo/sửa theo phạm vi; Logistics lưu tham chiếu chiến dịch |
+| FR-CAM-01 | M | Response quản lý chiến dịch, nhóm sự cố gắn với yêu cầu, thời gian và trạng thái | Tạo/sửa theo phạm vi; Logistics lưu tham chiếu chiến dịch |
 | FR-LOG-01 | M | Quản lý kho, mặt hàng, phương tiện, điểm cứu trợ và tham chiếu chiến dịch khi cần | Thực thể có trạng thái hoạt động/không hoạt động; giữ lịch sử đã phát sinh |
 | FR-LOG-02 | M | Tiếp nhận hàng, điều chuyển, xác nhận hàng đến, đặt trước/giải phóng, xuất, trả và điều chỉnh | Sổ cái ghi người thực hiện/thời gian/số lượng/lý do; số dư không âm |
 | FR-LOG-03 | M | Liên kết nhu cầu và cam kết Logistics với yêu cầu bằng ID không hàm nghĩa; ghi nhận cam kết/giải phóng/xuất/giao tại dịch vụ này | Hỗ trợ nhiều khoản đóng góp; không có giao dịch xuyên dịch vụ hoặc truy cập bảng trực tiếp |
@@ -677,7 +675,7 @@ theo Mục 23.4; không phải PATCH trạng thái tùy ý.
 
 **Tác nhân:** Điều phối viên/quản lý/quản trị viên theo phạm vi.
 
-**Luồng chính:** Chọn thời gian/khu vực/chiến dịch → API theo phạm vi của Response và Logistics trả số liệu tổng hợp có thẩm quyền cùng `generated_at` → UI kết hợp kết quả và hiển thị thời điểm của từng nguồn → xuất báo cáo nếu được cấp quyền.
+**Luồng chính:** Chọn thời gian/chiến dịch → API theo phạm vi của Response và Logistics trả số liệu tổng hợp có thẩm quyền cùng `generated_at` → UI kết hợp kết quả và hiển thị thời điểm của từng nguồn → xuất báo cáo nếu được cấp quyền.
 
 **Ngoại lệ:** API gián đoạn thì chỉ đánh dấu panel nguồn đó không khả dụng/đã cũ; từ chối và audit việc xuất không có quyền; quy ước cho kết quả không có dữ liệu cần được thống nhất.
 
@@ -707,9 +705,9 @@ theo Mục 23.4; không phải PATCH trạng thái tùy ý.
 
 **Tác nhân:** Điều phối viên hoặc quản lý vận hành có phạm vi chiến dịch.
 
-**Điều kiện trước:** Người dùng đã xác thực và có quyền quản lý khu vực/tổ chức.
+**Điều kiện trước:** Người dùng đã xác thực và có quyền quản lý tổ chức.
 
-**Luồng chính:** Tạo tên/mục tiêu/khu vực/thời gian chiến dịch → lưu trong Response → kích hoạt → liên kết yêu cầu → Logistics lưu tham chiếu chiến dịch không hàm nghĩa cho nhu cầu/cam kết/phân phối liên quan → quản lý tạm dừng/đóng khi đủ điều kiện.
+**Luồng chính:** Tạo tên/mục tiêu/thời gian chiến dịch → lưu trong Response → kích hoạt → liên kết yêu cầu → Logistics lưu tham chiếu chiến dịch không hàm nghĩa cho nhu cầu/cam kết/phân phối liên quan → quản lý tạm dừng/đóng khi đủ điều kiện.
 
 **Ngoại lệ:** Chiến dịch đã đóng không nhận yêu cầu mới; vẫn cho xử lý trả hàng/quyết toán; từ chối campaign ID không hợp lệ; đóng chiến dịch giữ nguyên ledger/lịch sử yêu cầu.
 
@@ -719,7 +717,7 @@ theo Mục 23.4; không phải PATCH trạng thái tùy ý.
 
 **Tác nhân:** Quản lý vận hành theo phạm vi.
 
-**Luồng chính:** Tạo/sửa tài sản cùng tổ chức/khu vực, loại/sức chứa đã xác thực hoặc thông tin vị trí/vận hành → chỉ liệt kê/xem tài sản được cấp quyền → chọn điểm cứu trợ đang hoạt động làm đích phân phối → vô hiệu hóa tài sản không dùng/đã nghỉ, có audit.
+**Luồng chính:** Tạo/sửa tài sản cùng tổ chức, loại/sức chứa đã xác thực hoặc thông tin vị trí/vận hành → chỉ liệt kê/xem tài sản được cấp quyền → chọn điểm cứu trợ đang hoạt động làm đích phân phối → vô hiệu hóa tài sản không dùng/đã nghỉ, có audit.
 
 **Ngoại lệ:** Từ chối truy cập khác phạm vi, giá trị không hợp lệ và chọn điểm không hoạt động cho phân phối mới. Vô hiệu hóa không xóa tham chiếu phân phối cũ; quản lý tài sản không tạo ra tồn kho giả hay hàm ý có quy trình định tuyến/bảo trì.
 
@@ -789,7 +787,7 @@ Phản hồi backend có thể giữ nguyên văn bản do người dùng nhập
 
 Mục 23.1 chốt cách truyền session trên trình duyệt/native, biện pháp cookie/CSRF và nơi client lưu session.
 
-Không mã hóa toàn bộ chính sách vào JWT: Response tự kiểm tra quan hệ đội/khu vực/yêu cầu; Logistics tự kiểm tra kho/cam kết. Sau khi Nest guard cho phép thao tác, truy vấn dịch vụ vẫn phải lọc dòng theo phạm vi. [NestJS guards](https://docs.nestjs.com/guards)
+Không mã hóa toàn bộ chính sách vào JWT: Response tự kiểm tra quan hệ đội/yêu cầu; Logistics tự kiểm tra kho/cam kết. Sau khi Nest guard cho phép thao tác, truy vấn dịch vụ vẫn phải lọc dòng theo phạm vi. [NestJS guards](https://docs.nestjs.com/guards)
 
 ## 11. Kiến trúc giao diện người dùng
 
@@ -800,7 +798,7 @@ Không mã hóa toàn bộ chính sách vào JWT: Response tự kiểm tra quan 
 - **Điều phối viên:** chế độ xem đã lưu cho yêu cầu chờ xác minh, đã xác minh nhưng chưa phân công, nhiệm vụ đang hoạt động và nhu cầu mới đáp ứng một phần; bản đồ/bộ lọc theo phạm vi; chi tiết yêu cầu, tình trạng sẵn sàng của đội, bảng nhiệm vụ và dòng thời gian audit.
 - **Quản lý vận hành:** chiến dịch, kho/mặt hàng, sổ tồn kho, cam kết/điều chuyển, phương tiện, điểm cứu trợ và phân phối.
 - **Quản trị viên:** tài khoản, tổ chức, cấp vai trò, tình trạng dịch vụ; chỉ xem PII khi có vai trò vận hành liên quan.
-- **Chỉ số vận hành:** vụ việc theo khu vực/trạng thái/ưu tiên; thời gian từ nhận đến xác minh/phân công/giao hàng; nhiệm vụ chưa xong; số lượng yêu cầu/đã cam kết/đã xuất/đã giao/còn thiếu theo từng yêu cầu được phép xem; dấu thời gian nguồn.
+- **Chỉ số vận hành:** vụ việc theo tổ chức/trạng thái/ưu tiên; thời gian từ nhận đến xác minh/phân công/giao hàng; nhiệm vụ chưa xong; số lượng yêu cầu/đã cam kết/đã xuất/đã giao/còn thiếu theo từng yêu cầu được phép xem; dấu thời gian nguồn.
 
 ### Mobile
 
@@ -1095,7 +1093,7 @@ Các ca dưới đây **được lập kế hoạch, không phải kết quả �
 | TC-05 | Cùng key nhưng payload hoặc tracking secret khác | Conflict; yêu cầu hiện có không đổi |
 | TC-06 | Công dân A đọc/cập nhật yêu cầu B | Từ chối truy cập mà không làm lộ thông tin nhạy cảm |
 | TC-07 | Tình nguyện viên liệt kê nhiệm vụ | Chỉ thấy nhiệm vụ đã phân công cho đội/thành viên |
-| TC-08 | Điều phối viên Khu vực A truy cập ca Khu vực B | Từ chối; bản đồ/danh sách không tiết lộ đối tượng |
+| TC-08 | Điều phối viên tổ chức A truy cập ca của tổ chức B | Từ chối; bản đồ/danh sách không tiết lộ đối tượng |
 | TC-09 | Từ chối không nêu lý do | Lỗi validation; trạng thái/lịch sử không đổi |
 | TC-10 | Đánh dấu trùng lặp không có yêu cầu chuẩn | Không lưu trạng thái DUPLICATE |
 | TC-11 | Chuyển thẳng SUBMITTED sang CLOSED | Conflict/lỗi validation; trạng thái/audit không đổi |
@@ -1200,7 +1198,7 @@ Mục tiêu do người phụ trách backend nêu là hai đến ba tuần tập
 | Thứ tự | Lát chức năng hoàn chỉnh | Bằng chứng hoàn tất |
 |---|---|---|
 | 1 | Workspace, Compose, ba ranh giới dịch vụ, migration, lỗi tiếng Việt, đăng ký/session/phạm vi Identity | Thiết lập lặp lại được; kiểm tra xác thực và phạm vi đối tượng; từng dịch vụ khởi động/migration độc lập |
-| 2 | Tiếp nhận SOS, PostGIS, idempotency, dòng thời gian yêu cầu, hàng đợi xác minh theo phạm vi | Retry tạo đúng một yêu cầu; khu vực chưa rõ/mơ hồ vẫn hiển thị cho nhân viên tiếp nhận được chỉ định |
+| 2 | Tiếp nhận SOS, PostGIS, idempotency, dòng thời gian yêu cầu, hàng đợi xác minh theo phạm vi | Retry tạo đúng một yêu cầu; yêu cầu luôn hiển thị cho nhân viên tiếp nhận được chỉ định |
 | 3 | Kết quả xác minh, ưu tiên thủ công, rà soát trùng, giao đội và tiến độ nhiệm vụ | Kiểm thử trạng thái/quyền; trùng lặp cần con người quyết định; quy trình đội hoàn tất không cần broker |
 | 4 | Danh mục Logistics, kho, sổ tồn kho, cam kết, xuất/giao một phần, điều chuyển và điểm cứu trợ | Kiểm thử ràng buộc tồn kho/đồng thời; demo 12/20 vẫn mở với 8 còn thiếu |
 | 5 | Phần cốt lõi quyên góp Mục 25: đợt, đăng ký/khai báo bằng secret client, kiểm đếm/rà soát độc lập, ghi sổ đúng một lần, nguồn gốc hàng | TC-DON-01..07/09; không cộng hai lần; từ chối tự rà soát; retry khách bị mất phản hồi chỉ tạo một bản ghi |
@@ -1389,9 +1387,9 @@ Mỗi ứng dụng sở hữu `main.ts`, `app.module.ts`, `config/`, `database/d
 | Lĩnh vực | Quyết định triển khai capstone |
 |---|---|
 | Đăng ký công dân | Đăng ký công khai có giới hạn tần suất chỉ cấp CITIZEN. Username chuẩn hóa duy nhất; hash mật khẩu bằng implementation phù hợp, còn được duy trì và được chọn lúc thiết lập. Lỗi tài khoản/mật khẩu không tiết lộ tài khoản có tồn tại hay không. Vai trò nhân viên/tình nguyện viên do quản trị viên cấp. SOS không bắt buộc đăng ký (bật SOS khách; xem NFR-SEC-01 và Mục 14). Idempotency SOS khách dùng key do client tạo (UUID ngẫu nhiên) cùng hash payload; khách có thể nhận quyền sở hữu yêu cầu bằng cách cung cấp tracking secret khi đã đăng nhập, thao tác đặt `reporter_user_id` một lần và ghi audit. **Giao thức tracking secret SOS:** trước lần gửi đầu, client khách sinh secret ngẫu nhiên mật mã 32 byte cùng idempotency key riêng và lưu cả hai (Web session storage/bộ nhớ cùng tùy chọn tải xuống mã riêng tư; Mobile SecureStore) rồi mới gửi. Response kiểm tra định dạng/độ dài, chỉ lưu hash gắn với mục đích (khác purpose của secret quyên góp) và giới hạn phát lại idempotent theo key + hash payload + hash secret. Bộ ba giống nhau trả ID yêu cầu/mã theo dõi ban đầu để mất phản hồi không làm mất quyền truy cập hay nhân đôi yêu cầu; cùng key với payload/secret khác trả 409; hash secret đã gắn yêu cầu khác trả 409 chung, không tiết lộ. Mã theo dõi là định danh, không phải thông tin xác thực. Nếu mất secret, điều phối viên theo phạm vi đã liên hệ người báo bằng số điện thoại ghi trong yêu cầu có thể thu hồi rồi gắn secret mới kèm audit; chỉ số điện thoại không bao giờ cấp quyền theo dõi, thao tác khôi phục thất bại không tiết lộ gì. |
-| Phạm vi | Mỗi grant gắn một tập vai trò/thao tác với một phạm vi: tổ chức, khu vực, chiến dịch hoặc phạm vi hệ thống cấp tường minh. Các grant khớp thay thế nhau theo OR; bên trong một match tổ chức/khu vực/chiến dịch, thao tác, tổ chức sở hữu và phạm vi đã chọn đều phải khớp (AND). Phạm vi hệ thống là ngoại lệ xuyên tổ chức tường minh chỉ cho các thao tác được nêu tên, không bao giờ ngầm định từ ADMIN. Grant khu vực/chiến dịch có tổ chức cha; vùng địa lý chồng lấn không bao giờ vượt ranh giới tổ chức. Quan hệ chủ sở hữu/đội là quyền tường minh riêng, không suy ra từ grant nhân viên. Quản lý tài khoản admin không đồng nghĩa được xem chi tiết nạn nhân. Chỉ người báo, điều phối viên được phép và đội đã phân công mới xem GPS chính xác. |
+| Phạm vi | Mỗi grant gắn một tập vai trò/thao tác với một phạm vi: tổ chức, chiến dịch hoặc phạm vi hệ thống cấp tường minh. Các grant khớp thay thế nhau theo OR; bên trong một match tổ chức/chiến dịch, thao tác, tổ chức sở hữu và phạm vi đã chọn đều phải khớp (AND). Phạm vi hệ thống là ngoại lệ xuyên tổ chức tường minh chỉ cho các thao tác được nêu tên, không bao giờ ngầm định từ ADMIN. Grant chiến dịch có tổ chức cha; không grant nào vượt ranh giới tổ chức. Quan hệ chủ sở hữu/đội là quyền tường minh riêng, không suy ra từ grant nhân viên. Quản lý tài khoản admin không đồng nghĩa được xem chi tiết nạn nhân. Chỉ người báo, điều phối viên được phép và đội đã phân công mới xem GPS chính xác. |
 | Thu hồi | Kiểm tra JWT gồm thuật toán được duyệt, issuer, audience, expiry và session ID. Identity introspection được xác thực dưới danh nghĩa dịch vụ, kiểm tra tài khoản/phiên/grant hiện hành. Demo không cache xác thực dương. Identity lỗi thì đóng an toàn và trả 503 tiếng Việt. Đây là đánh đổi khả dụng để có thu hồi đơn giản tại ranh giới request. |
-| Tiếp nhận yêu cầu | `campaign_id` có thể null. Cấu hình backend gán tổ chức tiếp nhận demo tổng hợp; công dân không thể đặt organization hay phạm vi nhân viên. Identity sở hữu danh mục mã region; Response sở hữu geometry ranh giới region đã seed và suy ra region từ vị trí. Kết quả ranh giới chưa biết/mơ hồ để region null và vào hàng đợi chưa phân công tường minh. Chỉ điều phối viên có quyền tiếp nhận cấp tổ chức hoặc grant tiếp nhận hệ thống tường minh mới xem/sửa hàng đợi đó; grant chỉ theo chiến dịch thì không. Không khớp ranh giới không được từ chối SOS hay âm thầm che khỏi mọi nhân viên tiếp nhận. Sửa region có version/audit. Chỉ điều phối viên được phép mới gắn/chuyển yêu cầu vào chiến dịch ACTIVE có tổ chức/khu vực vận hành tương thích. |
+| Tiếp nhận yêu cầu | `campaign_id` có thể null. Cấu hình backend gán tổ chức tiếp nhận demo tổng hợp; công dân không thể đặt organization hay phạm vi nhân viên. Yêu cầu không được định tuyến theo vị trí: không suy ra vùng địa lý, và không từ chối hay che SOS vì vị trí. Chỉ điều phối viên có quyền tiếp nhận cấp tổ chức hoặc grant tiếp nhận hệ thống tường minh mới xem/sửa attribution tiếp nhận; grant chỉ theo chiến dịch thì không. Chỉ điều phối viên được phép mới gắn/chuyển yêu cầu vào chiến dịch ACTIVE có tổ chức tương thích. |
 | Ưu tiên | Nhãn P1–P4 vẫn là taxonomy dự thảo ở Mục 8.1. Điều phối viên con người chọn ưu tiên/lý do sau xác minh. Không ngụ ý SLA và không tự xếp hàng/điều động theo nhãn này. |
 | Thông tin bổ sung | Người báo có thể bổ sung ở SUBMITTED/VERIFYING/VERIFIED/TRIAGED/DISPATCHED/IN_PROGRESS. Giữ thông tin cũ trong lịch sử. Yêu cầu kết thúc từ chối bổ sung; xử lý mở lại riêng. |
 | Hủy/giải quyết | Điều phối viên đúng phạm vi có thể hủy yêu cầu từ SUBMITTED đến IN_PROGRESS (không gồm RESOLVING/RESOLVED, xem Mục 8.1), kèm lý do và tuân theo điều kiện yêu cầu chuẩn bên dưới. Trước hết đóng băng chu kỳ Logistics bằng cancellation intent bền vững ở Mục 23.2. Sau đó trong giao dịch Response commit hủy, hủy nhiệm vụ chưa kết thúc và giải phóng sức chứa đội; giữ bằng chứng đã hoàn thành. Tiếp đó quyết toán tường minh các nhu cầu Logistics liên kết: hủy cam kết chưa xuất, giữ hàng đã xuất cho hạch toán giao/trả/mất. Trước RESOLVED, Response lấy seal giải quyết Logistics idempotent cho chu kỳ công việc hiện tại theo giao thức Mục 23.2. API không khả dụng, nhu cầu còn mở/một phần hoặc lượng đã xuất chưa quyết toán sẽ chặn seal và giải quyết. Lưu ID/phiên bản seal bất biến cùng xác nhận của con người. CLOSED theo sau RESOLVED. Mở lại CLOSED về TRIAGED kèm lý do; nhiệm vụ kết thúc cũ chỉ là lịch sử. |
@@ -1405,7 +1403,7 @@ Với lệnh chạm đến chiến dịch và yêu cầu trong Response, khóa d
 ### 22.3. Quyết định về đội, đáp ứng và tồn kho
 
 - Một nhiệm vụ thuộc một yêu cầu/chu kỳ công việc và chính xác một đội. Chỉ trưởng đội đang hoạt động nhận/từ chối, cập nhật và gửi kết quả; điều phối viên đúng phạm vi được giao/hủy kèm lý do. Thành viên xem công việc của đội; tình nguyện viên làm một mình dùng đội một thành viên.
-- Demo cho mỗi đội sức chứa một nhiệm vụ hoạt động. OFFERED, ACCEPTED, EN_ROUTE và ON_SCENE giữ sức chứa; trạng thái kết thúc giải phóng. Kiểm tra lại tư cách thành viên, kỹ năng bắt buộc, tương thích tổ chức/khu vực hoạt động và tình trạng sẵn sàng trong cùng giao dịch Response với lời mời. Không tự hết hạn lời mời hay tự phân công lại; hiển thị tuổi lời mời và gắn nhãn quá hạn cùng thông báo trong ứng dụng cho điều phối viên gửi lời mời/quản lý tổ chức khi OFFERED quá ngưỡng demo cấu hình được (mặc định 10 phút), để lời mời không được nhận không âm thầm làm yêu cầu DISPATCHED bị đình trệ. Điều phối viên tự hủy và tạo nhiệm vụ mới.
+- Demo cho mỗi đội sức chứa một nhiệm vụ hoạt động. OFFERED, ACCEPTED, EN_ROUTE và ON_SCENE giữ sức chứa; trạng thái kết thúc giải phóng. Kiểm tra lại tư cách thành viên, kỹ năng bắt buộc, tương thích tổ chức và tình trạng sẵn sàng trong cùng giao dịch Response với lời mời. Không tự hết hạn lời mời hay tự phân công lại; hiển thị tuổi lời mời và gắn nhãn quá hạn cùng thông báo trong ứng dụng cho điều phối viên gửi lời mời/quản lý tổ chức khi OFFERED quá ngưỡng demo cấu hình được (mặc định 10 phút), để lời mời không được nhận không âm thầm làm yêu cầu DISPATCHED bị đình trệ. Điều phối viên tự hủy và tạo nhiệm vụ mới.
 - Logistics sở hữu ReliefNeed, Commitment, tồn kho, điều chuyển và bản ghi phân phối. Nhu cầu tham chiếu `request_id`/`work_cycle` mà không có khóa ngoại xuyên cơ sở dữ liệu. Xác thực yêu cầu/phạm vi qua Response API trước khi tạo nhu cầu liên kết; gọi API trước khi mở giao dịch Logistics.
 - Nhu cầu có mặt hàng, đơn vị, số lượng cần, trạng thái và phiên bản. Cam kết có tham chiếu nhu cầu/kho/số lượng bất biến và trạng thái tóm tắt suy ra từ số lượng PROPOSED/COMMITTED/ISSUED/DELIVERED/SETTLED/CANCELLED; số lượng một phần/guard theo Mục 23.4. Khóa dòng nhu cầu trước khi tạo/đổi cam kết; `delivered + committed/reserved + issued-but-not-delivered` không vượt số lượng yêu cầu. Giữ khả năng quy nguồn riêng từng tổ chức/kho đóng góp.
 - Tính tổng đã cam kết/đặt trước, đã xuất, đã giao và còn thiếu từ cam kết một mặt hàng, bản ghi quyết toán và movement tồn kho. Với nhu cầu không CANCELLED, `outstanding = requested_effective - delivered`; CANCELLED có outstanding bằng 0 và báo cáo riêng `cancelled_remaining`, nhờ vậy backlog, dashboard và kiểm tra resolve không tính nhu cầu đã hủy là còn nợ. Giao một phần không hoàn tất nhu cầu. Báo cáo có các cột riêng cho số lượng ban đầu, lượng giảm/đã hủy, nhu cầu hoạt động, đã giao và còn thiếu đang hoạt động; không cộng `cancelled_remaining` vào outstanding hoạt động. Điều phối viên được phép có thể giảm/hủy kèm lý do, theo guard số lượng được bảo vệ và quyết toán thực tế ở Mục 23.4. Không xóa cam kết/movement tồn kho trước đó.
@@ -1430,7 +1428,7 @@ Trước khi viết từng lát, rà soát hợp đồng OpenAPI: đường dẫ
 | Thứ tự | Lát chức năng hoàn chỉnh | Bằng chứng hoàn tất |
 |---|---|---|
 | 1 | Workspace, Compose, ba app, migration, lỗi, đăng ký/session/grant Identity | Thiết lập lặp lại được; kiểm tra auth/phạm vi/thu hồi và thông báo tiếng Việt |
-| 2 | SOS, region được kiểm soát, PostGIS, idempotency, timeline riêng, hàng đợi xác minh | TC-01..14, TC-BE-01..04/11/12/24/25; bản đồ/danh sách theo phạm vi; quyết định trùng/ưu tiên do con người rà soát |
+| 2 | SOS, danh mục tổ chức, PostGIS, idempotency, timeline riêng, hàng đợi xác minh | TC-01..14, TC-BE-01..04/11/12/24/25; bản đồ/danh sách theo phạm vi; quyết định trùng/ưu tiên do con người rà soát |
 | 3 | Danh mục/tồn kho/cam kết Logistics, bảng yêu cầu, giao một phần, liên kết campaign/điểm cứu trợ | TC-15..19/31, TC-BE-05/06/09/10/13/15; không xuất vượt tồn; hành vi đáp ứng một phần và lỗi API |
 | 4 | Phần cốt lõi quyên góp Mục 25, phân phối/bàn giao và đối soát (xem lát 5–6 và thứ tự cắt ở Mục 16) | TC-DON-01..09, TC-DIST-01..04, TC-REC-01..03; rà soát độc lập, ghi sổ một lần, phương trình bảo toàn |
 | 5 | Tích hợp UI/API, dashboard, lưu tệp, phục hồi, lượt chạy k6, tài liệu/demo | TC-20..30, TC-BE-07/08/14/16, TC-L10N; dấu thời gian nguồn trung thực, tệp riêng tư, phục hồi backup, bằng chứng end-to-end |
@@ -1454,11 +1452,11 @@ Các ca dự kiến này mở rộng ID hiện tại mà không đánh số lạ
 | TC-BE-09 | FR-LOG-03, FR-LOG-05 | Hủy cam kết chưa xuất giải phóng tồn nhưng giữ số lượng yêu cầu; hàng đã xuất phải giao/trả/quyết toán mất |
 | TC-BE-10 | FR-MSN-02, FR-LOG-05 | Đổi trạng thái nhiệm vụ không tạo giả việc giao tồn kho; không resolve yêu cầu chỉ dựa vào hoàn tất nhiệm vụ |
 | TC-BE-11 | FR-REQ-04 | B liên kết trùng đến A; thử liên kết A → C, từ chối hoặc hủy sẽ conflict. B → A và A → C đồng thời không thể tạo chuỗi/vòng hay đích chuẩn sai |
-| TC-BE-12 | FR-IAM-02, FR-REQ-01/06 | Grant khớp thao tác VÀ tổ chức VÀ phạm vi chọn, OR giữa grant khớp; không truy cập xuyên tổ chức. SOS region lạ/mơ hồ thành công và chỉ điều phối viên tiếp nhận được chỉ định nhìn thấy; điều phối viên chỉ có campaign không đọc được; sửa theo phạm vi có audit |
+| TC-BE-12 | FR-IAM-02, FR-REQ-01/06 | Grant khớp thao tác VÀ tổ chức VÀ phạm vi chọn, OR giữa grant khớp; không truy cập xuyên tổ chức. Điều phối viên chỉ có campaign không đọc được yêu cầu tiếp nhận toàn tổ chức; sửa attribution theo phạm vi có audit |
 | TC-BE-13 | FR-CAM-01, FR-MSN-02, FR-LOG-03 | Tạm dừng chặn gắn mới, nhiệm vụ mới và cam kết gắn campaign; công việc đã nhận/hàng đã xuất vẫn hiển thị; tiếp tục khôi phục lệnh được phép; không mở lại yêu cầu CLOSED vào campaign CLOSED |
 | TC-BE-14 | FR-RPT-01, NFR-OBS-01 | Dashboard tổng hợp bộ Response/Logistics cố định đúng phạm vi/tổng số, dấu thời gian nguồn riêng và trạng thái unavailable rõ khi dừng một API |
 | TC-BE-15 | FR-LOG-03..05, FR-REQ-09 | Nhu cầu một yêu cầu đáp ứng 12/20 rồi 8; tổng giao/còn thiếu, ledger kho, trạng thái một phần, người audit và xác nhận giải quyết của con người đều đối soát |
-| TC-BE-16 | FR-REQ-06, FR-REQ-08 | Bộ lọc ứng viên trùng chỉ trả gợi ý gần về vị trí/thời gian/nhóm; điều phối viên có thể bỏ qua hoặc liên kết kèm lý do; khu vực ngoài quyền bị ẩn |
+| TC-BE-16 | FR-REQ-06, FR-REQ-08 | Bộ lọc ứng viên trùng chỉ trả gợi ý gần về vị trí/thời gian/nhóm; điều phối viên có thể bỏ qua hoặc liên kết kèm lý do; tổ chức ngoài quyền bị ẩn |
 
 ### 22.7. Quyết định còn lại và trạng thái repository hiện tại
 
@@ -1497,8 +1495,7 @@ Hủy dùng cùng nguyên tắc write barrier: ghi cancellation intent trong Res
 
 - Phạm vi hiện tại không cần aggregate `Incident` độc lập. AssistanceRequest mang nhóm sự cố được kiểm soát cùng dữ kiện sự cố được báo; Campaign gom các hoạt động ứng phó có tổ chức. Dùng nhất quán các nghĩa này trong SRS, ERD, DTO và UI. Chỉ thêm entity sự kiện hiểm họa dùng chung khi có yêu cầu được chứng minh trong tương lai.
 - Một ReliefNeed biểu diễn một mặt hàng/đơn vị cho một yêu cầu/chu kỳ. Một Commitment biểu diễn một kho đóng góp cho nhu cầu đó, với số lượng gốc bất biến và tổng lũy kế đã giải phóng/xuất/giao/trả/mất. Bỏ CommitmentLine; nhiều mặt hàng được yêu cầu dùng các need/commitment riêng. Transfer và Distribution giữ bảng dòng vì thực sự có nhiều mặt hàng. Dòng giao/phân phối tham chiếu cam kết đã xuất và thao tác settlement; không trừ kho lần hai.
-- Logistics lưu `campaign_id` không hàm nghĩa có thể null cùng tổ chức/khu vực nguồn trên nhu cầu liên kết; sao chép từ ngữ cảnh Response đã xác thực để báo cáo theo phạm vi. Đây là quy thuộc lịch sử, không phải thẩm quyền campaign hiện tại. Yêu cầu đã có need không được âm thầm đổi attribution campaign/tổ chức/khu vực: chặn chuyển lại cho đến khi need chu kỳ cũ được hủy/quyết toán, sau đó thiết lập attribution mới tường minh kèm audit. Điều kiện campaign hiện tại vẫn lấy từ Response. Không viết lại phân phối cũ khi campaign đổi.
-- **Dữ liệu khu vực:** Identity sở hữu danh mục mã khu vực được kiểm soát; Response sở hữu geometry ranh giới được seed từ đa giác giản lược của bộ ranh giới hành chính có giấy phép mở (ghi dataset, version, license trong seed README) hoặc vùng tổng hợp vẽ tay cho demo. Seed ít nhất một khu vực bao phủ tọa độ demo và một tọa độ cố ý nằm ngoài ranh giới cho kiểm thử hàng đợi chưa phân công (TC-BE-12). Không seed ranh giới thì mọi SOS sẽ vào hàng đợi chưa phân công.
+- Logistics lưu `campaign_id` không hàm nghĩa có thể null cùng tổ chức nguồn trên nhu cầu liên kết; sao chép từ ngữ cảnh Response đã xác thực để báo cáo theo phạm vi. Đây là quy thuộc lịch sử, không phải thẩm quyền campaign hiện tại. Yêu cầu đã có need không được âm thầm đổi attribution campaign/tổ chức: chặn chuyển lại cho đến khi need chu kỳ cũ được hủy/quyết toán, sau đó thiết lập attribution mới tường minh kèm audit. Điều kiện campaign hiện tại vẫn lấy từ Response. Không viết lại phân phối cũ khi campaign đổi.
 - Migration cuối gồm trường work_cycle/version/audit, cặp cycle và stock unique, tham chiếu thao tác bất biến, ràng buộc số lượng và chỉ mục không gian đã nêu. ERD logic chỉ là góc nhìn của các quyết định này, không phải schema vật lý đầy đủ.
 
 ### 23.4. Thay đổi số lượng và trạng thái tóm tắt cam kết một phần
@@ -1513,13 +1510,13 @@ Trạng thái Commitment được suy ra: PROPOSED trước khi đặt trước;
 
 ### 23.5. Tài sản, media và phạm vi chấp nhận
 
-Phương tiện và điểm cứu trợ vẫn là phạm vi bắt buộc. Phạm vi Vehicle là CRUD, tổ chức/khu vực, mã định danh, loại, sức chứa/đơn vị và trạng thái hoạt động/ngừng hoạt động; không gồm định tuyến, nhiên liệu, bảo trì hay engine tự động phân công. Phạm vi ReliefPoint là CRUD, vị trí theo phạm vi, thông tin liên hệ/hoạt động và trạng thái hoạt động/ngừng hoạt động, đồng thời được chọn làm đích phân phối. Ngừng hoạt động chặn sử dụng mới và giữ phân phối lịch sử. Không thực thể nào hàm ý có số dư tồn kho kho độc lập.
+Phương tiện và điểm cứu trợ vẫn là phạm vi bắt buộc. Phạm vi Vehicle là CRUD, tổ chức, mã định danh, loại, sức chứa/đơn vị và trạng thái hoạt động/ngừng hoạt động; không gồm định tuyến, nhiên liệu, bảo trì hay engine tự động phân công. Phạm vi ReliefPoint là CRUD, vị trí theo phạm vi, thông tin liên hệ/hoạt động và trạng thái hoạt động/ngừng hoạt động, đồng thời được chọn làm đích phân phối. Ngừng hoạt động chặn sử dụng mới và giữ phân phối lịch sử. Không thực thể nào hàm ý có số dư tồn kho kho độc lập.
 
 Hỗ trợ bằng chứng ảnh/video. Allowlist demo: JPEG/PNG nhận diện được tối đa 10 MiB mỗi ảnh, MP4 với video H.264/audio AAC được phép tối đa 50 MiB mỗi tệp; tối đa năm attachment READY/PENDING và tổng 100 MiB cho mỗi yêu cầu/nhiệm vụ. Đặt trước số attachment và quota byte khai báo dưới khóa đối tượng sở hữu trước khi upload; từ chối luồng vượt lượng đặt trước/giới hạn và đối soát quota PENDING bị bỏ dở để upload đồng thời không vượt quota. Mỗi upload có một tệp media; giới hạn body HTTP cho phép overhead multipart hữu hạn. Từ chối SVG, HTML, executable và container/codec không hỗ trợ. Xác thực nội dung media/container thực tế bằng công cụ còn được duy trì, chọn trong thử nghiệm setup; giới hạn thời gian/bộ nhớ parser, stream upload và cấu hình body limit Nginx/API khớp nhau. Không transcoding hay suy luận AI trên media. Phục vụ tệp gốc dưới dạng tải riêng tư với Content-Disposition an toàn và nosniff; preview phải dùng media đã xác thực. Vẫn cần key bất biến được tạo tự động và đối soát crash. TTL link tải ký số là 60 giây; kiểm tra quyền hiện tại trước khi ký. Chỉ dùng media tổng hợp; thời gian lưu dữ liệu thật được quyết định ở giai đoạn pilot.
 
 ### 23.6. Số đo demo và cổng thiết lập đã chốt
 
-Bộ dữ liệu hiệu năng: 10.000 yêu cầu lưu tổng hợp trên các khu vực/trạng thái/mức ưu tiên đã seed, cùng need/nhiệm vụ đại diện. Workload: 20 VU k6; khởi động 2 phút rồi đo 10 phút; 80% yêu cầu đọc theo phạm vi và 20% tạo SOS hợp lệ bằng idempotency key duy nhất. Giữ baseline 10.000 bản ghi đã chuẩn bị và báo mức tăng dữ liệu sau chạy. Dùng seed cố định, bộ lọc có giới hạn và không tính upload trong thời gian SOS. p95 đọc <= 2 giây, p95 SOS <= 3 giây, HTTP lỗi ngoài dự kiến < 1%; tình huống âm/bảo mật đo riêng. Bao gồm Nginx và Identity introspection; ghi CPU/RAM/disk, OS, phiên bản image/phụ thuộc, vị trí mạng và workload đầy đủ. Đây là mục tiêu demo, không phải tuyên bố quy mô toàn quốc hay khả dụng.
+Bộ dữ liệu hiệu năng: 10.000 yêu cầu lưu tổng hợp trên các tổ chức/trạng thái/mức ưu tiên đã seed, cùng need/nhiệm vụ đại diện. Workload: 20 VU k6; khởi động 2 phút rồi đo 10 phút; 80% yêu cầu đọc theo phạm vi và 20% tạo SOS hợp lệ bằng idempotency key duy nhất. Giữ baseline 10.000 bản ghi đã chuẩn bị và báo mức tăng dữ liệu sau chạy. Dùng seed cố định, bộ lọc có giới hạn và không tính upload trong thời gian SOS. p95 đọc <= 2 giây, p95 SOS <= 3 giây, HTTP lỗi ngoài dự kiến < 1%; tình huống âm/bảo mật đo riêng. Bao gồm Nginx và Identity introspection; ghi CPU/RAM/disk, OS, phiên bản image/phụ thuộc, vị trí mạng và workload đầy đủ. Đây là mục tiêu demo, không phải tuyên bố quy mô toàn quốc hay khả dụng.
 
 Node 24 LTS là baseline setup; cố định patch còn được hỗ trợ, phiên bản Nest/TypeORM tương thích và digest image PostgreSQL/PostGIS chính xác sau thử nghiệm tương thích migration/truy vấn không gian/khóa/OpenAPI. Chọn CommonJS và Jest theo hướng kiểm thử đã ghi nhận; xác minh với major Nest được chọn. Tài liệu Nest hiện hành phân biệt yêu cầu runtime của ứng dụng và CLI. [Các bản Node](https://nodejs.org/en/about/previous-releases), [Hướng dẫn chuyển phiên bản Nest](https://docs.nestjs.com/migration-guide).
 

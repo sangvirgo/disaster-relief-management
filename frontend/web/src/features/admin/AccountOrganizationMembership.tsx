@@ -35,7 +35,7 @@ export function AccountOrganizationMembership({ accountId, memberships, organiza
 
   return <details className="admin-organization-membership">
     <summary>Tổ chức tham gia ({active.length})</summary>
-    <p>Tổ chức quản lý tài khoản và đội; khu vực hoạt động được chọn riêng khi tạo đội.</p>
+    <p>Tổ chức quản lý tài khoản và đội.</p>
     {active.length ? <ul>{active.map((item) => <li key={item.organization_id}>
       {organizations.find((option) => option.value === item.organization_id)?.label || item.organization_id}
     </li>)}</ul> : <p>Chưa thuộc tổ chức nào.</p>}

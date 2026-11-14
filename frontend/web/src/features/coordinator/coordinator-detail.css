@@ -1,0 +1,72 @@
+/* Coordinator SOS detail: one calm column. Header -> summary -> decision -> secondary folds. Tokens only. */
+.coordinator-layout { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+.coordinator-detail-surface .queue-detail-card { display: grid; gap: var(--space-4); padding: 0; }
+.coordinator-detail-surface .queue-detail-card > * { margin: 0; }
+.coordinator-detail-surface .sos-head__fallback { margin: 0; font: 700 var(--text-title) var(--font-family); }
+
+/* header */
+.sos-head { display: grid; gap: var(--space-1); padding-right: 88px; min-height: 48px; }
+.sos-head__title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.sos-head__title h2 { margin: 0 var(--space-1) 0 0; font: 700 var(--text-title) var(--font-family); letter-spacing: 0; }
+.sos-head__nopriority { font: 400 var(--text-caption) var(--font-family); color: var(--color-text-muted); }
+.sos-head__sub { margin: 0; font: 400 var(--text-body) var(--font-family); color: var(--color-text-secondary); }
+
+/* alerts */
+.sos-alerts { display: grid; gap: var(--space-2); }
+.sos-alert { margin: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); border: 1px solid; font: 600 var(--text-body) var(--font-family); }
+.sos-alert--danger { background: var(--color-emergency-bg); border-color: var(--color-emergency-border); color: var(--color-emergency-dark); }
+.sos-alert--warning { background: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning-dark); }
+.sos-alert--info { background: var(--color-primary-bg); border-color: var(--color-primary-border); color: var(--color-primary-dark); font-weight: 500; }
+
+/* summary: no box, hairline only */
+.sos-summary { display: grid; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--color-surface-border); border-bottom: 1px solid var(--color-surface-border); }
+.sos-summary__desc { margin: 0; font: 400 var(--text-subtitle) var(--font-family); color: var(--color-text-primary); overflow-wrap: anywhere; }
+.sos-summary__facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-4); margin: 0; }
+.sos-summary__facts > div { display: grid; gap: var(--space-1); min-width: 0; }
+.sos-summary__wide { grid-column: 1 / -1; }
+.sos-summary__facts dt { font: 600 var(--text-caption) var(--font-family); color: var(--color-text-muted); }
+.sos-summary__facts dd { margin: 0; font: 500 var(--text-body) var(--font-family); color: var(--color-text-primary); overflow-wrap: anywhere; }
+
+/* decision */
+.sos-decision { display: grid; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-primary-border); background: var(--color-primary-bg); }
+.sos-decision[data-tone="review"] { border-color: var(--color-warning-border); background: var(--color-warning-bg); }
+.sos-decision__head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
+.sos-decision__eyebrow { margin: 0 0 var(--space-1); font: 600 var(--text-caption) var(--font-family); color: var(--color-text-secondary); }
+.sos-decision__priority { margin: 0; display: flex; align-items: center; gap: var(--space-2); font: 700 var(--text-title) var(--font-family); }
+.sos-decision__basis { margin: 0; font: 600 var(--text-caption) var(--font-family); color: var(--color-text-secondary); text-align: right; }
+.sos-decision__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.sos-decision__chips li { padding: 0 var(--space-2); height: 24px; display: inline-flex; align-items: center; border-radius: var(--radius-full); background: var(--color-surface-card); border: 1px solid var(--color-primary-border); font: 500 var(--text-caption) var(--font-family); color: var(--color-primary-dark); }
+.sos-decision__chips--warn li { border-color: var(--color-warning-border); color: var(--color-warning-dark); height: auto; min-height: 24px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); }
+.sos-decision__scores { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: var(--space-3); margin: 0; padding: var(--space-3) 0; border-top: 1px solid var(--color-surface-border); }
+.sos-decision__scores > div { display: grid; gap: var(--space-1); min-width: 0; }
+.sos-decision__scores dt { font: 600 var(--text-caption) var(--font-family); color: var(--color-text-muted); }
+.sos-decision__scores dd { margin: 0; font: 500 var(--text-body) var(--font-family); font-variant-numeric: tabular-nums; }
+.sos-decision__scores dd b { font: 700 var(--text-title) var(--font-family); }
+.sos-decision__scores dd small { font: 400 var(--text-caption) var(--font-family); color: var(--color-text-secondary); }
+.sos-decision__summary { margin: 0; font: 400 var(--text-body) var(--font-family); color: var(--color-text-secondary); }
+.sos-decision__hint { margin: 0; font: 400 var(--text-caption) var(--font-family); color: var(--color-text-secondary); align-self: center; }
+.sos-decision__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: stretch; }
+.sos-decision__actions > .command-form { flex: 2 1 240px; margin: 0; display: block; }
+.sos-decision__actions > .command-form .button, .sos-decision__actions > .secondary-command .button, .sos-decision__actions .sos-action-entry .button { width: 100%; min-height: var(--control-h); }
+.sos-decision__actions > .secondary-command, .sos-decision__actions > .sos-action-entry { flex: 1 1 160px; margin: 0; }
+.sos-decision__actions .secondary-command .sos-action-entry .button { background: var(--color-surface-card); color: var(--color-text-primary); border: 1px solid var(--color-surface-divider); }
+@media (max-width: 720px) { .sos-decision__scores { grid-template-columns: 1fr 1fr; } .sos-decision__aistatus { grid-column: 1 / -1; } .sos-summary__facts { grid-template-columns: 1fr; } }
+
+/* secondary action buttons and folds: flat, hairline separated */
+.coordinator-detail-surface .sos-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; }
+.coordinator-detail-surface .sos-actions > * { flex: 1 1 200px; }
+.coordinator-detail-surface .sos-fold { margin: 0; padding: 0; border: 0; border-top: 1px solid var(--color-surface-border); border-radius: 0; background: transparent; }
+.coordinator-detail-surface .sos-fold > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-3) 0; font: 600 var(--text-body) var(--font-family); color: var(--color-text-primary); list-style: none; cursor: pointer; }
+.coordinator-detail-surface .sos-fold > summary::-webkit-details-marker { display: none; }
+.coordinator-detail-surface .sos-fold > summary::after { content: ''; width: 8px; height: 8px; margin-right: var(--space-1); border-right: 2px solid var(--color-text-muted); border-bottom: 2px solid var(--color-text-muted); transform: rotate(45deg); transition: transform var(--ease); }
+.coordinator-detail-surface .sos-fold[open] > summary::after { transform: rotate(-135deg); }
+.coordinator-detail-surface .sos-fold[open] > summary { border-bottom: 0; margin-bottom: 0; }
+.coordinator-detail-surface .sos-fold > :not(summary) { margin-bottom: var(--space-3); }
+.coordinator-detail-surface .sos-fold .notice { border-radius: var(--radius-sm); }
+.coordinator-detail-surface .queue-context-map { border-bottom: 1px solid var(--color-surface-border); }
+@media (max-width: 1080px) { .coordinator-layout { grid-template-columns: 1fr; } }
+
+.ui-queue-row__foot .chip--suggest { background: var(--priority-p4-bg); border-color: var(--priority-p4-border); color: var(--priority-p4-text); }
+.ui-queue-row__foot .chip--suggest[data-priority="P1"] { background: var(--priority-p1-bg); border-color: var(--priority-p1-border); color: var(--priority-p1-text); }
+.ui-queue-row__foot .chip--suggest[data-priority="P2"] { background: var(--priority-p2-bg); border-color: var(--priority-p2-border); color: var(--priority-p2-text); }
+.ui-queue-row__foot .chip--suggest[data-priority="P3"] { background: var(--priority-p3-bg); border-color: var(--priority-p3-border); color: var(--priority-p3-text); }

@@ -16,7 +16,6 @@ test('T10 heatmap EXPLAIN fixture includes the bounded confirmed map projection'
 
   for (const fragment of [
     'r.organization_id=@oid@',
-    "r.region_code='R1'",
     'r.campaign_id=@cid@::uuid',
     'r.incident_category_code=@rcat@',
     'r.received_at>=@from@::timestamptz',
@@ -34,7 +33,6 @@ test('T10 heatmap EXPLAIN fixture includes the bounded confirmed map projection'
   for (const fragment of [
     'WHEN s.i <= 10000 THEN (SELECT id FROM camp WHERE n=1)',
     "WHEN s.i <= 10000 THEN 'FLOOD'",
-    "WHEN s.i <= 10000 THEN 'R1'",
     "WHEN s.i <= 10000 THEN '00000000-0000-0000-0000-0000000000d1'::uuid",
     "WHEN s.i <= 10000 THEN now() - (s.i % 30 + 1)*interval '1 day'",
     "ARRAY['VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING']",
@@ -53,7 +51,6 @@ test('T10 report summary EXPLAIN fixture includes the expected aggregates', () =
   for (const fragment of [
     'WITH filtered_requests AS MATERIALIZED',
     'r.organization_id=@oid@',
-    "r.region_code='R1'",
     'r.campaign_id=@cid@::uuid',
     'r.received_at>=@from@::timestamptz',
     'r.received_at<@to@::timestamptz',
@@ -77,7 +74,6 @@ test('T10 clustered heatmap stays under the MapService cell cap and follows its 
     'r.received_at<@to@::timestamptz',
     "r.status IN ('VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING')",
     'r.canonical_request_id IS NULL',
-    "r.region_code='R1'",
     'r.campaign_id=@cid@::uuid',
     'r.incident_category_code=@rcat@',
   ].map((predicate) => heatmap.indexOf(normalizeSql(predicate)));

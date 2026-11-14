@@ -19,7 +19,6 @@ interface FailureMissionRow {
   request_version: number;
   request_work_cycle: number;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
 }
 
@@ -29,7 +28,6 @@ interface RequestLockRow {
   version: number;
   work_cycle: number;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
 }
 
@@ -83,7 +81,7 @@ export class RequestFailureReviewService {
     const refs = await manager.query('SELECT request_id FROM mission WHERE id=$1', [missionId]) as Array<{ request_id: string }>;
     if (!refs[0]) throw new AppError('NOT_FOUND', { status: 404 });
     const requestRows = await manager.query(
-      `SELECT id,status,version,work_cycle,organization_id,region_code,campaign_id
+      `SELECT id,status,version,work_cycle,organization_id,campaign_id
          FROM assistance_request WHERE id=$1 FOR UPDATE`, [refs[0].request_id],
     ) as RequestLockRow[];
     const requestRow = requestRows[0];
@@ -149,7 +147,7 @@ export class RequestFailureReviewService {
   private async findMission(query: Pick<DataSource | EntityManager, 'query'>, missionId: string): Promise<FailureMissionRow> {
     const rows = await query.query(
       `SELECT m.id,m.request_id,m.work_cycle,m.status,m.version,r.status AS request_status,r.version AS request_version,
-              r.work_cycle AS request_work_cycle,r.organization_id,r.region_code,r.campaign_id
+              r.work_cycle AS request_work_cycle,r.organization_id,r.campaign_id
          FROM mission m JOIN assistance_request r ON r.id=m.request_id WHERE m.id=$1`, [missionId],
     ) as FailureMissionRow[];
     if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
@@ -165,7 +163,7 @@ export class RequestFailureReviewService {
     }
   }
 
-  private assertPermission(session: ReporterSession, row: Pick<FailureMissionRow, 'organization_id' | 'region_code' | 'campaign_id'>): void {
+  private assertPermission(session: ReporterSession, row: Pick<FailureMissionRow, 'organization_id' | 'campaign_id'>): void {
     assertRequestPermission(session, 'REQUEST_RESOLVE', row);
   }
 

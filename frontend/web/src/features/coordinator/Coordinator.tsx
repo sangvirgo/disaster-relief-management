@@ -7,7 +7,7 @@ import { PriorityBadge } from '../../components/PriorityBadge';
 import { StatusBadge } from '../../components/StatusBadge';
 import { QueueRow } from '../../components/ui/QueueRow';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
-import { label, regionName, requestStatusLabel, timeLabel } from '../../i18n/labels';
+import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
 import { HeatmapPanel } from './HeatmapPanel';
 import { ContactAttemptPanel } from './ContactAttemptPanel';
@@ -16,6 +16,7 @@ import { operationIdFromTimeline, ResolutionOperationPanel } from './ResolutionO
 import { RequestTimeline } from './RequestTimeline';
 import { RequestEvidencePanel } from './RequestEvidencePanel';
 import { TeamReadinessQueue } from './TeamReadinessQueue';
+import './coordinator-detail.css';
 
 type QueueItem = {
   id: string;
@@ -27,7 +28,6 @@ type QueueItem = {
   review_lane: string;
   declared_danger: boolean;
   people_affected?: number | null;
-  region_code?: string | null;
   priority_advisory?: {
     score: number | null;
     level: 'CRITICAL' | 'HIGH' | 'ELEVATED' | 'STANDARD' | null;
@@ -37,7 +37,33 @@ type QueueItem = {
     rules_version: string;
   };
   ai_priority_advisory?: AiPriorityAdvisory | null;
+  fast_track?: FastTrack;
 };
+type FastTrack = {
+  eligible: boolean;
+  blockers: string[];
+  suggested_priority: 'P1' | 'P2' | 'P3' | 'P4';
+  suggestion_confidence?: 'NORMAL' | 'LOW';
+  suggested_priority_basis: 'COMPLETE' | 'INCOMPLETE_INFO';
+  sources: Array<'BACKEND_RULES' | 'AI'>;
+  reason_codes: string[];
+};
+const fastTrackBlockerLabels: Record<string, string> = {
+  PROXY_REPORT: 'SOS báo hộ — cần hai điều phối viên xác minh độc lập',
+  REVIEW_LANE: 'Đang nằm trong nhóm cần rà soát (báo lặp hoặc báo hộ)',
+  PROXY_FLAGS: 'Có tín hiệu báo hộ bất thường',
+  PENDING_SUPPLEMENT: 'Người báo vừa bổ sung thông tin chưa được đối chiếu',
+  POSSIBLE_DUPLICATE: 'Có SOS cùng loại ở gần — cần kiểm tra trùng',
+  URGENT_MEDICAL_REVIEW: 'Có dấu hiệu cấp cứu — điều phối viên cần tự đánh giá ngay',
+  INSUFFICIENT_DATA: 'Chưa đủ thông tin để hệ thống gợi ý mức ưu tiên',
+  STATE_NOT_FAST_TRACKABLE: 'Trạng thái hiện tại không áp dụng xử lý nhanh',
+};
+const priorityMeaning: Record<string, string> = {
+  P1: 'P1 · Rất khẩn cấp', P2: 'P2 · Nguy cơ cao', P3: 'P3 · Cần ưu tiên', P4: 'P4 · Theo dõi thông thường',
+};
+function OptionalFold({ fold, summary, children }: { fold: boolean; summary: string; children: React.ReactNode }) {
+  return fold ? <details className="sos-fold"><summary>{summary}</summary>{children}</details> : <>{children}</>;
+}
 type AiPriorityAdvisory = {
   status: string;
   score: number | null;
@@ -185,8 +211,8 @@ const requiredDemoSkills: Record<string, string[]> = {
   FLOOD: ['BOAT'], TRAPPED: ['BOAT'], MEDICAL: ['FIRST_AID'], LANDSLIDE: ['CLIMBING'],
 };
 
-function TeamEligibilityDetails({ regionCode, category, revision }: {
-  regionCode: string; category: string; revision: number;
+function TeamEligibilityDetails({ category, revision }: {
+  category: string; revision: number;
 }) {
   const [teams, setTeams] = useState<ScopedTeam[] | null>(null);
   const [error, setError] = useState('');
@@ -199,7 +225,7 @@ function TeamEligibilityDetails({ regionCode, category, revision }: {
         const found: ScopedTeam[] = [];
         let cursor = '';
         do {
-          const query = new URLSearchParams({ region_code: regionCode, limit: '100' });
+          const query = new URLSearchParams({ limit: '100' });
           if (cursor) query.set('cursor', cursor);
           const page = await api<{ items: ScopedTeam[]; more: boolean; cursor?: string }>('response', `/teams?${query}`);
           found.push(...page.items);
@@ -212,13 +238,13 @@ function TeamEligibilityDetails({ regionCode, category, revision }: {
     }
     void load();
     return () => { live = false; };
-  }, [regionCode, revision]);
+  }, [revision]);
   const requiredSkills = requiredDemoSkills[category] || [];
   return <div className="team-eligibility-details">
     {requiredSkills.length > 0 && <p><strong>{label(category)}</strong> cần kỹ năng {requiredSkills.map(label).join(', ')}.</p>}
     {error && <p role="alert">{error}</p>}
-    {!teams && !error && <p role="status">Đang kiểm tra tình trạng các đội trong khu vực…</p>}
-    {teams?.length === 0 && <p>Chưa có đội nào trong khu vực mà tài khoản này được phép xem.</p>}
+    {!teams && !error && <p role="status">Đang kiểm tra tình trạng các đội…</p>}
+    {teams?.length === 0 && <p>Chưa có đội nào mà tài khoản này được phép xem.</p>}
     {teams?.map((team) => {
       const reasons = [
         ...(team.status !== 'ACTIVE' ? ['Đội ngừng hoạt động'] : []),
@@ -512,13 +538,13 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
   } | null>(null);
   const [showAdditionalDispatch, setShowAdditionalDispatch] = useState(false);
   const [campaignOptions, setCampaignOptions] = useState<{
-    value: string; label: string; regionCode: string | null
+    value: string; label: string
   }[]>([]);
   useEffect(() => {
     let live = true;
     async function loadCampaigns() {
       try {
-        const campaigns: { id: string; name: string; status: string; region_code: string | null }[] = [];
+        const campaigns: { id: string; name: string; status: string }[] = [];
         let cursor = '';
         do {
           const query = new URLSearchParams({ limit: '100' });
@@ -529,9 +555,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
         } while (cursor);
         if (live) setCampaignOptions(campaigns
           .filter((campaign) => campaign.status === 'ACTIVE')
-          .map((campaign) => ({ value: campaign.id,
-            label: `${campaign.name} · ${campaign.region_code ? regionName(campaign.region_code) : 'Nhiều khu vực'}`,
-            regionCode: campaign.region_code })));
+          .map((campaign) => ({ value: campaign.id, label: campaign.name })));
       } catch {
         if (live) setCampaignOptions([]);
       }
@@ -825,26 +849,25 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
               </select>
             </span>
             </label>
-            <div className="tabs queue-review-tabs" aria-label="Loại hàng đợi">
-            {[
-              ['NORMAL', 'Thông thường'],
-              ['RATE_LIMITED_REVIEW', 'Rà soát tần suất'],
-              ['PROXY_QUOTA_REVIEW', 'Rà soát báo hộ'],
-            ].map(([value, title]) => (
-              <button
-                key={value}
-                type="button"
-                className={reviewLane === value ? 'active' : ''}
-                onClick={() => {
-                  setReviewLane(value);
+            <label className="queue-status-field">
+            <span>Nhóm rà soát</span>
+            <span className="queue-status-select-wrap">
+              <select
+                value={reviewLane}
+                onChange={(event) => {
+                  setReviewLane(event.target.value);
                   setCursor('');
                   setSelected(null);
                 }}
               >
-                {title}
-              </button>
-            ))}
-            </div>
+                {[
+                  ['NORMAL', 'Thông thường'],
+                  ['RATE_LIMITED_REVIEW', 'Báo lặp cần rà soát'],
+                  ['PROXY_QUOTA_REVIEW', 'Báo hộ cần rà soát'],
+                ].map(([value, name]) => <option key={value} value={value}>{name}</option>)}
+              </select>
+            </span>
+            </label>
             <label className="check queue-attention-filter">
             <input
               type="checkbox"
@@ -893,8 +916,14 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   key={item.id}
                   details={<>
                     {item.declared_danger && <small className="queue-danger-chip">Nguy hiểm tính mạng</small>}
-                    {item.tracking_code.startsWith('C48HM') && <small className="chip">SOS mô phỏng</small>}
-                    {item.priority_advisory?.level && (
+                    {item.tracking_code.startsWith('C48HM') && <small className="chip">Mô phỏng</small>}
+                    {['SUBMITTED', 'VERIFYING'].includes(item.status) && item.fast_track && <>
+                      <small className="chip chip--suggest" data-priority={item.fast_track.suggested_priority}>
+                        {item.fast_track.suggestion_confidence === 'LOW' ? 'Tạm gợi ý' : 'Gợi ý'} {item.fast_track.suggested_priority}
+                      </small>
+                      {!item.fast_track.eligible && <small className="chip chip--review">Cần rà soát kỹ</small>}
+                    </>}
+                    {!['SUBMITTED', 'VERIFYING'].includes(item.status) && item.priority_advisory?.level && (
                       <small>Đánh giá: {advisoryScoreLabel(item.priority_advisory.score, item.priority_advisory.level)}</small>
                     )}
                   </>}
@@ -906,10 +935,10 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
         )}
       </section>
       <DetailSurface className="coordinator-detail-surface" modal={compactDetail} open={Boolean(selected)} label="Hồ sơ yêu cầu" onClose={() => setSelected(null)}><section
-        className={`queue-detail-card${detail && ['SUBMITTED', 'VERIFYING'].includes(detail.status) ? ' verification-detail-card' : ''}`}
+        className="queue-detail-card"
         ref={detailPanelRef}
       >
-        <h2>Hồ sơ yêu cầu</h2>
+        {!detail && <h2 className="sos-head__fallback">Hồ sơ yêu cầu</h2>}
         {updateMessage && (
           <p className="notice" role="status">
             {updateMessage}
@@ -933,26 +962,26 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
         {selected && !detail && !detailError && <p role="status">Đang tải hồ sơ…</p>}
         {detail && (
           <>
-            <section className="sos-hero" data-danger={detail.declared_danger ? 'true' : undefined}>
-              <div className="sos-hero__top">
-                <h3>{detail.tracking_code}</h3>
+            <header className="sos-head" data-danger={detail.declared_danger ? 'true' : undefined}>
+              <div className="sos-head__title">
+                <h2>{detail.tracking_code}</h2>
                 <StatusBadge status={detail.status} />
                 {detail.priority
                   ? <PriorityBadge priority={detail.priority as 'P1' | 'P2' | 'P3' | 'P4'} />
-                  : <span className="sos-hero__nopriority">Chưa chọn ưu tiên</span>}
+                  : <span className="sos-head__nopriority">Chưa chọn ưu tiên</span>}
               </div>
-              {detail.declared_danger && (
-                <p className="sos-hero__danger" role="alert">Người báo cho biết có nguy hiểm tính mạng — kiểm tra ngay.</p>
-              )}
-              {detail.proxy_activity_flags.length > 0 && (
-                <p className="sos-hero__flag">Có tín hiệu báo hộ cần rà soát (không phải kết luận gian lận).</p>
-              )}
-              {detail.tracking_code.startsWith('C48HM') && <p className="notice warning">Đây là SOS mô phỏng để hiển thị bản đồ nhiệt, không phải tín hiệu cứu hộ thực tế.</p>}
-              {detail.status === 'SUBMITTED' && <p className="sos-hero__step">Bước tiếp theo: bắt đầu xác minh.</p>}
-              {detail.status === 'VERIFYING' && <p className="sos-hero__step">Bước tiếp theo: đối chiếu vị trí, tình trạng, minh chứng rồi ghi rõ điều đã kiểm tra.</p>}
-              <p className="sos-hero__desc">{detail.description || 'Chưa có mô tả tình huống.'}</p>
-              <dl className="sos-hero__facts">
-                <div><dt>Loại sự cố</dt><dd>{label(detail.category)}</dd></div>
+              <p className="sos-head__sub">{label(detail.category)} · tiếp nhận {timeLabel(detail.received_at)}</p>
+            </header>
+            {(detail.declared_danger || detail.proxy_activity_flags.length > 0 || detail.tracking_code.startsWith('C48HM')) && (
+              <div className="sos-alerts">
+                {detail.declared_danger && <p className="sos-alert sos-alert--danger" role="alert">Người báo cho biết có nguy hiểm tính mạng — kiểm tra ngay.</p>}
+                {detail.proxy_activity_flags.length > 0 && <p className="sos-alert sos-alert--warning">Có tín hiệu báo hộ cần rà soát (không phải kết luận gian lận).</p>}
+                {detail.tracking_code.startsWith('C48HM') && <p className="sos-alert sos-alert--info">SOS mô phỏng để hiển thị bản đồ nhiệt, không phải tín hiệu cứu hộ thực tế.</p>}
+              </div>
+            )}
+            <section className="sos-summary" aria-label="Tóm tắt SOS">
+              <p className="sos-summary__desc">{detail.description || 'Chưa có mô tả tình huống.'}</p>
+              <dl className="sos-summary__facts">
                 <div><dt>Cần hỗ trợ</dt><dd>
                   {detail.subject.people_affected == null ? 'Chưa rõ số người' : `${detail.subject.people_affected} người`}
                   {detail.subject.children_count ? ` · ${detail.subject.children_count} trẻ em` : ''}
@@ -962,8 +991,8 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   ...(detail.needs_rescue ? ['Cứu hộ'] : []),
                   ...(detail.needs_relief_supplies ? ['Hàng cứu trợ'] : []),
                 ].join(' · ') || 'Chưa khai báo'}</dd></div>
-                <div><dt>Vị trí</dt><dd><NearbyAddress coordinates={detail.subject.location?.coordinates} /></dd></div>
                 <div><dt>Người báo</dt><dd>{detail.reporter.name || 'Chưa có tên'} · {detail.reporter.contact_phone || 'Chưa có số liên hệ'}</dd></div>
+                <div className="sos-summary__wide"><dt>Vị trí</dt><dd><NearbyAddress coordinates={detail.subject.location?.coordinates} /></dd></div>
               </dl>
               {detail.status === 'DUPLICATE' && (detail.canonical ? (
                 <>
@@ -975,6 +1004,94 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                 </>
               ) : <p>Không có thông tin hồ sơ gốc trong phạm vi truy cập hiện tại.</p>)}
             </section>
+            {detail.fast_track && ['SUBMITTED', 'VERIFYING'].includes(detail.status) && (() => {
+              const ft = detail.fast_track;
+              const rule = detail.priority_advisory;
+              const ai = detail.ai_priority_advisory;
+              const aiDone = ai?.status === 'COMPLETED' && ai.review_status !== 'REJECTED';
+              const aiStatus = ai?.status;
+              return (
+              <section className="sos-decision" data-tone={ft.eligible ? 'ready' : 'review'} aria-label="Quyết định xử lý">
+                <div className="sos-decision__head">
+                  <div>
+                    <p className="sos-decision__eyebrow">{ft.suggestion_confidence === 'LOW' ? 'Tạm gợi ý (thiếu thông tin)' : 'Hệ thống gợi ý mức ưu tiên'}</p>
+                    <p className="sos-decision__priority"><PriorityBadge priority={ft.suggested_priority} /> <span>{priorityMeaning[ft.suggested_priority].split(' · ')[1]}</span></p>
+                  </div>
+                  <p className="sos-decision__basis">
+                    {ft.sources.length === 0 ? 'Chưa có điểm đánh giá' : ft.sources.includes('AI') ? 'Quy tắc nghiệp vụ + AI' : 'Quy tắc nghiệp vụ'}
+                  </p>
+                </div>
+                {ft.reason_codes.length > 0 && (
+                  <ul className="sos-decision__chips">
+                    {ft.reason_codes.map((code) => <li key={code}>{advisoryReasonLabels[code] ?? 'Có yếu tố cần chú ý'}</li>)}
+                  </ul>
+                )}
+                {!ft.eligible && <>
+                  <ul className="sos-decision__chips sos-decision__chips--warn">
+                    {ft.blockers.map((code) => <li key={code}>{fastTrackBlockerLabels[code] ?? 'Cần điều phối viên kiểm tra thêm'}</li>)}
+                  </ul>
+                  <p className="sos-decision__hint">Đây chỉ là gợi ý. Hãy xác minh từng bước bên dưới, rồi đặt mức ưu tiên (hệ thống sẽ nhắc lại gợi ý ở bước đó).</p>
+                </>}
+                <dl className="sos-decision__scores">
+                  <div>
+                    <dt>Quy tắc</dt>
+                    <dd>{rule?.score != null ? <><b>{rule.score}</b>/100</> : '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>AI Gemini</dt>
+                    <dd>{aiDone && ai.score != null ? <><b>{ai.score}</b>/100{ai.confidence !== null ? <small> · tin cậy {Math.round(ai.confidence * 100)}%</small> : null}</> : '—'}</dd>
+                  </div>
+                  <div className="sos-decision__aistatus">
+                    <dt>Trạng thái AI</dt>
+                    <dd>{aiDone ? 'Đã đánh giá' : (advisoryStatusLabels[aiStatus ?? ''] ?? 'Chưa có đánh giá')}</dd>
+                  </div>
+                </dl>
+                {aiDone && detail.ai_advisory?.extracted_json?.summary && (
+                  <p className="sos-decision__summary">{detail.ai_advisory.extracted_json.summary}</p>
+                )}
+                <div className="sos-decision__actions">
+                  {ft.eligible && <>
+                    {command({
+                      title: `Xác nhận ${ft.suggested_priority} và chọn đội`,
+                      service: 'response',
+                      path: `/requests/${detail.id}/fast-track`,
+                      version: detail.version,
+                      hideTitle: true,
+                      warning: `Bạn đã xem thông tin SOS và đồng ý xác minh, đặt mức ưu tiên ${ft.suggested_priority}? Bước tiếp theo là chọn đội.`,
+                      build: () => ({ confirmed: true }),
+                    })}
+                    {secondaryCommand({
+                      title: 'Chọn mức ưu tiên khác',
+                      service: 'response',
+                      path: `/requests/${detail.id}/fast-track`,
+                      version: detail.version,
+                      warning: 'Xác nhận xác minh SOS và đặt mức ưu tiên do bạn chọn?',
+                      fields: [
+                        { name: 'priority', label: 'Mức ưu tiên', type: 'select', required: true, options: priorities },
+                        { name: 'note', label: 'Lý do chọn khác gợi ý', type: 'textarea', required: true, maxLength: 1000 },
+                      ],
+                      build: (values) => ({ confirmed: true, priority: values.priority, note: values.note }),
+                    })}
+                  </>}
+                  {(aiStatus === 'QUEUED' || aiStatus === 'PROCESSING') && <p className="sos-decision__hint">AI đang đánh giá, kết quả tự cập nhật sau ít phút.</p>}
+                  {aiStatus === 'FAILED' && detail.ai_advisory && !detail.ai_advisory.review_status && command({
+                    title: 'Gửi lại cho AI đánh giá',
+                    service: 'response',
+                    path: `/requests/${detail.id}/ai-advisories/${detail.ai_advisory.id}/retry`,
+                    version: detail.version,
+                    warning: 'Gửi lại yêu cầu đánh giá AI? Kết quả vẫn chỉ để tham khảo.',
+                  })}
+                  {(!aiStatus || aiStatus === 'STALE' || aiStatus === 'SKIPPED') && command({
+                    title: 'Nhờ AI đánh giá',
+                    service: 'response',
+                    path: `/requests/${detail.id}/ai-advisories`,
+                    version: detail.version,
+                    warning: 'Gửi thông tin SOS (đã rút gọn, không gồm số điện thoại hay tọa độ chính xác) cho AI đánh giá? Kết quả chỉ để tham khảo.',
+                  })}
+                </div>
+              </section>
+              );
+            })()}
             {pendingSupplements.map((event) => {
               const facts = event.payload?.reported_facts;
               const changes = facts && typeof facts === 'object' && !Array.isArray(facts)
@@ -1015,6 +1132,10 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                 <button type="button" className="button secondary" onClick={refreshAfterConflict}>Tải lại hồ sơ</button>
               </section>
             ))}
+            <OptionalFold
+              fold={Boolean(detail.fast_track?.eligible) && ['SUBMITTED', 'VERIFYING'].includes(detail.status)}
+              summary="Xác minh từng bước (cách xử lý đầy đủ)"
+            >
             <div className="action-grid sos-actions" id="request-actions" tabIndex={-1}>
               {!['RESOLVING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
                 secondaryCommand({
@@ -1035,9 +1156,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   version: detail.version,
                   fields: [
                     { name: 'campaign_id', label: 'Chiến dịch', type: 'choice-cards', required: true,
-                      options: campaignOptions
-                        .filter((campaign) => campaign.regionCode === null || campaign.regionCode === detail.region_code)
-                        .map(({ value, label: name }) => ({ value, label: name })) },
+                      options: campaignOptions.map(({ value, label: name }) => ({ value, label: name })) },
                   ],
                   warning: 'Xác nhận gắn yêu cầu này vào chiến dịch đã chọn?',
                 })}
@@ -1052,6 +1171,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
               {detail.status === 'SUBMITTED' &&
                 command({
                   title: 'Bắt đầu xác minh',
+                  hideTitle: true,
                   service: 'response',
                   path: `/requests/${detail.id}/start-verification`,
                   version: detail.version,
@@ -1217,7 +1337,8 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                       label: 'Mức ưu tiên',
                       type: 'select',
                       required: true,
-                      options: priorities,
+                      options: [...priorities].sort((a, b) => Number(b.value === detail.fast_track?.suggested_priority) - Number(a.value === detail.fast_track?.suggested_priority))
+                        .map((item) => ({ value: item.value, label: item.value === detail.fast_track?.suggested_priority ? `${item.value} (hệ thống gợi ý)` : item.label })),
                     },
                     {
                       name: 'priority_basis',
@@ -1246,33 +1367,26 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   </div>}
                   {showTeamCandidates && <>
                   <h3>Đội có thể giao nhiệm vụ</h3>
-                  <p>Xem khoảng cách, vị trí cập nhật và số nhiệm vụ gần đây trước khi chọn đội.</p>
-                  <p>
-                    Gợi ý cân bằng dựa trên nhiệm vụ 24 giờ và 7 ngày của các đội gần nhất. Đội đang
-                    bận không xuất hiện trong danh sách đủ điều kiện.
-                  </p>
+                  <p className="muted">Đội đầu tiên là gợi ý cân bằng khoảng cách và khối lượng việc; chỉ chọn đội khác khi có lý do.</p>
                   {candidateError && (
                     <p role="alert" className="notice error">
                       Tải đội phù hợp: {candidateError}
                     </p>
                   )}
                   {!candidates && !candidateError && <p role="status">Đang tải đội phù hợp…</p>}
-                  {candidates?.items.length === 0 && !detail.region_code && (
+                  {candidates?.items.length === 0 && (
                     <p role="status" className="notice warning">
-                      SOS chưa được xác định khu vực phụ trách nên hệ thống chưa thể tìm đội phù hợp.
-                      Hãy kiểm tra vị trí SOS và nhờ quản trị viên kiểm tra phạm vi khu vực trên hệ thống.
-                      Chỉ cập nhật vị trí đội sẽ không giải quyết được trường hợp này.
+                      Chưa có đội đủ điều kiện gần SOS này. Hệ thống chỉ gợi ý đội cùng tổ chức, đang sẵn sàng, có kỹ năng phù hợp,
+                      có vị trí được gửi trong 30 phút gần nhất và nằm trong bán kính cho phép. Xem tình trạng từng đội bên dưới;
+                      nếu đội đã di chuyển đến gần SOS, hãy nhờ đội gửi lại vị trí và xác nhận sẵn sàng.
                     </p>
                   )}
-                  {candidates?.items.length === 0 && detail.region_code && (
-                    <p role="status" className="notice warning">
-                      Chưa có đội đủ điều kiện trong khu vực {detail.region_code}. Xem tình trạng từng đội bên dưới; nếu đội đã di chuyển đến đây nhưng vẫn thuộc khu vực khác, nhờ quản trị viên chuyển khu vực hoạt động của đội. Cập nhật GPS không tự đổi phạm vi phụ trách.
-                    </p>
-                  )}
-                  {candidates?.items.length === 0 && detail.region_code &&
-                    <TeamEligibilityDetails regionCode={detail.region_code} category={detail.category} revision={revision} />}
-                  {candidates?.items.map((candidate) => (
-                    <div className="candidate" key={candidate.team.id}>
+                  {candidates?.items.length === 0 &&
+                    <TeamEligibilityDetails category={detail.category} revision={revision} />}
+                  {[...(candidates?.items ?? [])].sort((a, b) => Number(b.suggested) - Number(a.suggested)).map((candidate, _index, all) => (
+                    <OptionalFold key={candidate.team.id} fold={!candidate.suggested && all.some((item) => item.suggested)}
+                      summary={`Chọn đội khác: ${candidate.team.name} (cần ghi lý do)`}>
+                    <div className="candidate">
                       <strong>{candidate.team.name}</strong>
                       <p>
                         {candidate.suggested
@@ -1317,6 +1431,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                         }),
                       })}
                     </div>
+                    </OptionalFold>
                   ))}
                   {candidates?.unknown_position.map((candidate) => (
                     <div className="candidate" key={candidate.team.id}>
@@ -1375,11 +1490,25 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   ],
                 })}
             </div>
+            {['SUBMITTED', 'VERIFYING'].includes(detail.status) && <>
+              <RequestEvidencePanel items={detail.evidence?.items ?? []} />
+              <ContactAttemptPanel
+                key={`contacts-${detail.id}-${detail.version}`}
+                requestId={detail.id}
+                status={detail.status}
+                version={detail.version}
+                currentUserId={currentUserId}
+                reporterUserId={detail.reporter.user_id}
+                initial={detail.contact_attempts}
+                onSuccess={done}
+                onStale={refreshAfterConflict}
+              />
+            </>}
+            </OptionalFold>
             {page === 'queue' && detail.status !== 'VERIFIED' && detail.subject.location && (
               <details className="sos-fold queue-context-map">
                 <summary>Xem vị trí trên bản đồ</summary>
                 <HeatmapPanel
-                  region={detail.region_code || ''}
                   showLayers={false}
                   compact
                   selected={{
@@ -1407,7 +1536,6 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                 <div className="triage-context-map">
                   <h3>Vị trí trên bản đồ nhiệt</h3>
                   <HeatmapPanel
-                    region={detail.region_code || ''}
                     showLayers={false}
                     compact
                     selected={detail.subject.location ? {
@@ -1558,7 +1686,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
               </p>
             )}
             {detail.priority_advisory && (
-              <details className="sos-fold sos-fold--advisory" open={detail.priority_advisory.outcome !== 'INSUFFICIENT_DATA' && detail.status !== 'TRIAGED' ? true : undefined}>
+              <details className="sos-fold sos-fold--advisory">
                 <summary>
                   Đánh giá ban đầu: <strong>{advisoryScoreLabel(detail.priority_advisory.score, detail.priority_advisory.level)}</strong>
                 </summary>
@@ -1642,6 +1770,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
               </section></details>
             )}
             {detail.ai_advisory?.status === 'FAILED' && !detail.ai_advisory.review_status &&
+              !['SUBMITTED', 'VERIFYING'].includes(detail.status) &&
               detail.ai_priority_advisory?.source === 'GEMINI' && command({
                 title: 'Thử đánh giá AI lại',
                 service: 'response',
@@ -1650,66 +1779,27 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                 warning: 'Gửi lại yêu cầu đánh giá AI? Kết quả vẫn chỉ để tham khảo; bạn tiếp tục xử lý SOS theo thông tin đã xác minh.',
               })}
             {detail.ai_advisory && detail.ai_advisory.status === 'COMPLETED' && (
-              <details className="sos-fold" open={!detail.ai_advisory.review_status ? true : undefined}><summary>Gợi ý từ AI{detail.ai_advisory.review_status ? ' · đã rà soát' : ' · chờ rà soát'}</summary><section className="notice">
+              <details className="sos-fold"><summary>Gợi ý từ AI{detail.ai_advisory.review_status ? ' · đã rà soát' : ' · chờ rà soát'}</summary><section className="notice">
                 <h3>
                   {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
                     ? 'Thông tin AI minh họa'
                     : 'Thông tin AI ghi nhận'}
                 </h3>
-                <p>
+                <p className="muted">
                   {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
-                    ? 'Dữ liệu này dùng để minh họa và không phải phản hồi từ Gemini.'
-                    : 'AI có thể nhận bản mô tả đã được rút gọn cùng các thông tin tình huống. Số điện thoại, tọa độ chính xác và tệp đính kèm không được đưa vào phần đánh giá. Hãy đối chiếu với hồ sơ SOS trước khi sử dụng.'}
-                </p>
-                <p>
-                  <strong>Trạng thái:</strong>{' '}
-                  {advisoryStatusLabels[
-                    detail.ai_priority_advisory?.status || detail.ai_advisory.status
-                  ] || 'Chưa rõ trạng thái đánh giá AI'}
+                    ? 'Dữ liệu minh họa, không phải phản hồi từ Gemini.'
+                    : 'AI chỉ nhận mô tả đã rút gọn, không gồm số điện thoại, tọa độ chính xác hay tệp đính kèm. Hãy đối chiếu với hồ sơ.'}
                 </p>
                 {detail.ai_priority_advisory?.status === 'COMPLETED' && (
                   <>
-                    {detail.ai_advisory.risk_score !== null && (
-                      <p>
-                        <strong>Điểm rủi ro tham khảo:</strong> {detail.ai_advisory.risk_score}/100
-                      </p>
-                    )}
-                    {detail.ai_advisory.reason_codes.length > 0 && (
-                      <p>
-                        <strong>Dấu hiệu cần chú ý:</strong>{' '}
-                        {detail.ai_advisory.reason_codes
-                          .map((code) => advisoryReasonLabels[code] || 'Có dấu hiệu cần rà soát')
-                          .join(' · ')}
-                      </p>
-                    )}
-                    {detail.ai_advisory.extracted_json?.summary && (
-                      <p>
-                        <strong>Tóm tắt:</strong> {detail.ai_advisory.extracted_json.summary}
-                      </p>
-                    )}
-                    {detail.ai_advisory.extracted_json?.indicators &&
-                      detail.ai_advisory.extracted_json.indicators.length > 0 && (
-                        <p>
-                          <strong>Dấu hiệu AI ghi nhận:</strong>{' '}
-                          {detail.ai_advisory.extracted_json.indicators.join(' · ')}
-                        </p>
-                      )}
                     {detail.ai_advisory.extracted_json?.facts && (
-                      <div>
-                        <strong>Dữ kiện trích xuất cần đối chiếu</strong>
+                      <p>
+                        <strong>Dữ kiện AI trích xuất:</strong>{' '}
                         {Object.entries(detail.ai_advisory.extracted_json.facts)
                           .filter(([key]) => advisoryFactLabels[key])
-                          .map(([key, value]) => (
-                            <p key={key}>
-                              {advisoryFactLabels[key]}:{' '}
-                              {typeof value === 'boolean'
-                                ? value
-                                  ? 'Có'
-                                  : 'Không'
-                                : String(value)}
-                            </p>
-                          ))}
-                      </div>
+                          .map(([key, value]) => `${advisoryFactLabels[key]}: ${typeof value === 'boolean' ? (value ? 'Có' : 'Không') : String(value)}`)
+                          .join(' · ')}
+                      </p>
                     )}
                     {aiNeedsMismatch && (
                       <p role="status">
@@ -1726,11 +1816,6 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                         <p>Số chưa rõ không có nghĩa là 0. Giữ dữ liệu gốc và xác minh trước khi sử dụng số AI ghi nhận.</p>
                       </div>
                     )}
-                    <p>
-                      <strong>Độ tin cậy do AI ước tính:</strong>{' '}
-                      {Math.round((detail.ai_advisory.extracted_json?.confidence ?? 0) * 100)}% (chỉ
-                      tham khảo)
-                    </p>
                     {detail.ai_advisory.review_status ? (
                       <p>
                         <strong>Quyết định của điều phối viên:</strong>{' '}
@@ -1747,7 +1832,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                         <label className="ai-review-note">
                           <span>Ghi chú khi điều chỉnh hoặc bác bỏ</span>
                           <textarea
-                            rows={4}
+                            rows={2}
                             value={aiReviewNote}
                             onChange={(event) => setAiReviewNote(event.target.value)}
                             maxLength={1000}
@@ -1849,21 +1934,6 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                 </div>
               </section></details>
             )}
-            <details className="sos-fold" open={detail.status === 'VERIFYING' ? true : undefined}>
-            <summary>Minh chứng{detail.evidence?.items.length ? ` (${detail.evidence.items.length})` : ''} và liên hệ</summary>
-            <RequestEvidencePanel items={detail.evidence?.items ?? []} />
-            <ContactAttemptPanel
-              key={`contacts-${detail.id}-${detail.version}`}
-              requestId={detail.id}
-              status={detail.status}
-              version={detail.version}
-              currentUserId={currentUserId}
-              reporterUserId={detail.reporter.user_id}
-              initial={detail.contact_attempts}
-              onSuccess={done}
-              onStale={refreshAfterConflict}
-            />
-            </details>
             <details className="sos-fold"><summary>Lịch sử xử lý</summary>
             <RequestTimeline
               key={`timeline-${detail.id}-${detail.version}-${detail.timeline.items[0]?.id ?? 'empty'}`}
@@ -1878,14 +1948,14 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
   );
 }
 
-export function CoordinatorMap({ region, regions }: { region: string; regions: string[] }) {
+export function CoordinatorMap() {
   return (
     <section className="card">
       <h2>Bản đồ nhiệt SOS</h2>
       <p>
-        Bản đồ mở ở tầm nhìn Việt Nam. Chấm tròn cho biết khu vực có SOS; phóng gần bằng chuột hoặc nút + để xem vùng nhiệt.
+        Bản đồ mở ở tầm nhìn Việt Nam. Chấm tròn cho biết vị trí có SOS; phóng gần bằng chuột hoặc nút + để xem vùng nhiệt.
       </p>
-      <HeatmapPanel region={region} overviewRegions={region ? undefined : regions} />
+      <HeatmapPanel />
     </section>
   );
 }

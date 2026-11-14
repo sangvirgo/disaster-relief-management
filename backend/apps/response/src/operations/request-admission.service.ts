@@ -13,7 +13,6 @@ interface AdmissionRequestRow {
   work_cycle: number;
   version: number | string;
   organization_id: string;
-  region_code: string | null;
   campaign_id: string | null;
   attribution_locked_at: Date | string | null;
   logistics_admitted_at: Date | string | null;
@@ -44,7 +43,7 @@ export class RequestAdmissionService {
               SET attribution_locked_at=COALESCE(attribution_locked_at,clock_timestamp()),
                   logistics_admitted_at=clock_timestamp(),version=version+1
             WHERE id=$1 AND logistics_admitted_at IS NULL
-              RETURNING id,status,work_cycle,version,organization_id,region_code,campaign_id,
+              RETURNING id,status,work_cycle,version,organization_id,campaign_id,
                       attribution_locked_at,logistics_admitted_at`,
           [requestId],
         ) as [AdmissionRequestRow[], number];
@@ -58,7 +57,7 @@ export class RequestAdmissionService {
 
   private async findRequest(manager: Pick<EntityManager, 'query'>, requestId: string): Promise<AdmissionRequestRow> {
     const rows = await manager.query(
-      `SELECT id,status,work_cycle,version,organization_id,region_code,campaign_id,attribution_locked_at,logistics_admitted_at
+      `SELECT id,status,work_cycle,version,organization_id,campaign_id,attribution_locked_at,logistics_admitted_at
          FROM assistance_request WHERE id=$1 FOR UPDATE`,
       [requestId],
     ) as AdmissionRequestRow[];
@@ -73,7 +72,6 @@ export class RequestAdmissionService {
       version: Number(row.version),
       status: row.status,
       organization_id: row.organization_id,
-      region_code: row.region_code,
       campaign_id: row.campaign_id,
     };
   }

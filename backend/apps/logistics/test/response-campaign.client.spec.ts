@@ -9,13 +9,13 @@ describe('Logistics Response campaign client', () => {
   it('requests a Response audience token and validates the internal campaign projection', async () => {
     const get = jest.fn(async () => ({
       status: 200,
-      body: { id: campaignId, status: 'ACTIVE', organization_id: organizationId, region_code: 'R01', version: 3 },
+      body: { id: campaignId, status: 'ACTIVE', organization_id: organizationId, version: 3 },
     }));
     const identity = { serviceToken: jest.fn(async () => 'response-token') };
     const service = new LogisticsResponseCampaignClient({ get } as never, identity as never);
 
     await expect(service.getCampaign(campaignId)).resolves.toEqual({
-      id: campaignId, status: 'ACTIVE', organization_id: organizationId, region_code: 'R01', version: 3,
+      id: campaignId, status: 'ACTIVE', organization_id: organizationId, version: 3,
     });
     expect(identity.serviceToken).toHaveBeenCalledWith('response');
     expect(get).toHaveBeenCalledWith(`/api/v1/response/internal/campaigns/${campaignId}`, {

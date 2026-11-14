@@ -15,7 +15,6 @@ const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DA
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
 const organizationId = requiredEnv('DEMO_INTAKE_ORGANIZATION_ID');
 const suffix = randomBytes(5).toString('hex').toUpperCase();
-const regionCode = `T16_${suffix}`;
 const categoryCode = `T16_FLOOD_${suffix}`;
 let identityIp = 1 + randomBytes(1)[0] % 250;
 const recoveryLock = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
@@ -280,12 +279,7 @@ try {
     `INSERT INTO organization (id,name,organization_kind)
      VALUES ($1,$2,'COORDINATION') ON CONFLICT (id) DO NOTHING`, [organizationId, `T16 test organization ${suffix}`],
   );
-  await identityDb.query('INSERT INTO region (code,name) VALUES ($1,$2)', [regionCode, 'Khu vực kiểm thử T16']);
   await responseDb.query('INSERT INTO incident_category (code,display_name) VALUES ($1,$2)', [categoryCode, 'Lũ lụt']);
-  await responseDb.query(
-    `INSERT INTO region_boundary (region_code,geom) VALUES
-      ($1,ST_Multi(ST_GeomFromText('POLYGON((-121 -21,-119 -21,-119 -19,-121 -19,-121 -21))',4326)))`, [regionCode],
-  );
 
   const coordinator = await registerAndLogin('coordinator', ['COORDINATOR', 'OPERATIONS_MANAGER']);
   const reporter = await registerAndLogin('reporter');

@@ -20,11 +20,6 @@ export class HeatmapQueryDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(80)
-  region_code?: string;
-
-  @IsOptional()
-  @IsString()
   @Matches(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
   campaign_id?: string;
 

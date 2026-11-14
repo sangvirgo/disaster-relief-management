@@ -133,15 +133,8 @@ try {
     console.log('PASS Logistics T12 guest declarations and tracking with Identity stopped');
   } else {
     const organizationId = randomUUID();
-    const regionCode = `T12_${randomBytes(5).toString('hex').toUpperCase()}`;
     await identityDb.query('INSERT INTO organization (id,name,organization_kind) VALUES ($1,$2,\'COORDINATION\')',
       [organizationId, `T12 test ${organizationId}`]);
-    await identityDb.query('INSERT INTO region (code,name) VALUES ($1,$2)', [regionCode, 'Khu vực kiểm thử T12']);
-    await responseDb.query(
-      `INSERT INTO region_boundary (region_code,geom)
-       VALUES ($1,ST_Multi(ST_GeomFromText('POLYGON((104 14,106 14,106 16,104 16,104 14))',4326)))`,
-      [regionCode],
-    );
 
     const manager = await registerAndLogin('manager', organizationId, ['OPERATIONS_MANAGER', 'INTAKE_STAFF', 'CAMPAIGN_MANAGER']);
     const intakeOnly = await registerAndLogin('intake_only', organizationId, ['INTAKE_STAFF']);
@@ -162,7 +155,7 @@ try {
     expectSuccess(item, 201);
     const warehouse = await call(logisticsUrl, 'warehouses', {
       method: 'POST', actor: manager, idempotencyKey: key(),
-      body: { organization_id: organizationId, region_code: regionCode, name: `Kho T12 ${suffix}` },
+      body: { organization_id: organizationId, name: `Kho T12 ${suffix}` },
     });
     expectSuccess(warehouse, 201);
 
@@ -175,7 +168,7 @@ try {
 
     const campaign = await call(responseUrl, 'campaigns', {
       method: 'POST', actor: manager, idempotencyKey: key(),
-      body: { name: `Chiến dịch T12 ${suffix}`, objective: 'Kiểm tra liên kết dịch vụ.', region_code: regionCode },
+      body: { name: `Chiến dịch T12 ${suffix}`, objective: 'Kiểm tra liên kết dịch vụ.' },
     });
     expectSuccess(campaign, 201);
     const activatedCampaign = await call(responseUrl, `campaigns/${campaign.value.id}/activate`, {

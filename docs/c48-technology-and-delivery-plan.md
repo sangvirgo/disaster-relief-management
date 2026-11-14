@@ -110,7 +110,7 @@ The recommendations below reuse workflow ideas documented in [the disaster-respo
 |---|---|---|
 | Ushahidi's review queue, moderation, and saved searches | Coordinator views for awaiting verification, verified-but-unassigned, active missions, and partially fulfilled requests; exact location/contact data stays scoped | Makes the handoff and backlog visible without automating human decisions |
 | Sahana ShaRe's partial commitments and separate logistics records | A fulfillment board shows requested, committed, issued, delivered, and outstanding quantities; more than one warehouse/organization can contribute | A request can remain open while some aid has been delivered, and one contribution does not hide the remaining need |
-| Peer capstones described in the CNTT catalogue: dispatch/logistics visibility, high-concurrency ticketing, and comparative traffic-simulation metrics | Add measurable workflow timings and a filtered outstanding-aid view by authorized request/region/item; use k6 for a modest API load scenario | Gives the demo a clear operational outcome and evidence without copying unrelated brokers, trading, or simulation domains |
+| Peer capstones described in the CNTT catalogue: dispatch/logistics visibility, high-concurrency ticketing, and comparative traffic-simulation metrics | Add measurable workflow timings and a filtered outstanding-aid view by authorized request/item; use k6 for a modest API load scenario | Gives the demo a clear operational outcome and evidence without copying unrelated brokers, trading, or simulation domains |
 
 The workbook is a catalogue of project descriptions, not evidence that every listed technology or workload was implemented. Reliva's distinction is the traceable workflow from report verification through mission progress and partial aid fulfillment, supported by auditable quantities and response-time measurements.
 
@@ -278,7 +278,7 @@ This is the main workflow adaptation from Sahana ShaRe's partial commitments and
 
 ![Conceptual ERD](diagrams/c48-conceptual-erd.svg)
 
-[Editable conceptual ERD](diagrams/c48-conceptual-erd.drawio). This model shows business concepts and cardinalities, without database keys or service prefixes. The SOS/Assistance Request is central. A Reporter is distinct from the Affected Household; a Donor need not have an account. A Campaign may exist without SOS reports and an SOS may exist without a campaign. A Donation Drive is a collection appeal, not a rescue mission or a sales order. The v3.2 diagram also shows Incident category, Skill, Region, Vehicle, Relief point, Distribution and Handoff record, so the brief's vehicles, relief points and final handoff appear at business level.
+[Editable conceptual ERD](diagrams/c48-conceptual-erd.drawio). This model shows business concepts and cardinalities, without database keys or service prefixes. The SOS/Assistance Request is central. A Reporter is distinct from the Affected Household; a Donor need not have an account. A Campaign may exist without SOS reports and an SOS may exist without a campaign. A Donation Drive is a collection appeal, not a rescue mission or a sales order. The v3.2 diagram also shows Incident category, Skill, Vehicle, Relief point, Distribution and Handoff record, so the brief's vehicles, relief points and final handoff appear at business level.
 
 | Level | Purpose | Included here |
 |---|---|---|
@@ -357,14 +357,9 @@ erDiagram
     datetime absolute_expires_at
     datetime revoked_at
   }
-  REGION {
-    string code PK
-    string name
-    string status
-  }
 ```
 
-Solid ERD edges identify children whose PK contains the parent FK; dotted edges are non-identifying. Min/max cardinality is independent of that line style. Nullable attributes and conditional guards are stated below; an FK marker alone does not mean NOT NULL. ROLE and PERMISSION have unique codes; fixed seeds suffice for the demo. REGION is a controlled Identity catalog. REFRESH_SESSION has a local user FK and rotation/revocation fields. Region/campaign scope references are validated against the owning catalog/API; a campaign scope is never a cross-service FK. Nullable organization on a grant is allowed only for explicitly permitted SYSTEM actions. A government body can be represented by ORGANIZATION.organization_kind; this does not grant official authority or require government integration.
+Solid ERD edges identify children whose PK contains the parent FK; dotted edges are non-identifying. Min/max cardinality is independent of that line style. Nullable attributes and conditional guards are stated below; an FK marker alone does not mean NOT NULL. ROLE and PERMISSION have unique codes; fixed seeds suffice for the demo. REFRESH_SESSION has a local user FK and rotation/revocation fields. Campaign scope references are validated against the owning API; a campaign scope is never a cross-service FK. Nullable organization on a grant is allowed only for explicitly permitted SYSTEM actions. A government body can be represented by ORGANIZATION.organization_kind; this does not grant official authority or require government integration.
 
 #### 6.1.2 Response — reports, verification and rescue
 
@@ -399,7 +394,6 @@ erDiagram
     string report_mode
     string tracking_secret_hash
     uuid organization_id
-    string region_code
     string status
     string priority
     boolean reporter_declared_danger
@@ -447,7 +441,6 @@ erDiagram
   RESCUE_TEAM {
     uuid id PK
     uuid organization_id
-    string operating_region_code
     string name
     string availability
     string team_kind
@@ -498,7 +491,6 @@ erDiagram
   CAMPAIGN {
     uuid id PK
     uuid organization_id
-    string region_code
     string name
     string objective
     string status
@@ -678,7 +670,6 @@ erDiagram
   WAREHOUSE {
     uuid id PK
     uuid organization_id
-    string region_code
     string name
     geography location
     string status
@@ -810,7 +801,6 @@ erDiagram
   RELIEF_POINT {
     uuid id PK
     uuid organization_id
-    string region_code
     string name
     geography location
     string status
@@ -831,7 +821,6 @@ erDiagram
     uuid vehicle_id FK
     uuid campaign_id
     uuid organization_id
-    string region_code
     string purpose
     string status
     uuid preparer_user_id
@@ -857,7 +846,7 @@ FULFILLMENT_CYCLE is unique on `(request_id, work_cycle)`; request and campaign 
 | Reference | Owner | Consumer field | Enforcement |
 |---|---|---|---|
 | Account / staff actor | Identity | Response/Logistics `*_user_id` | Opaque UUID; grants/session through authenticated API; no local credential copy |
-| Organization / region | Identity catalog | Response/Logistics organization and region attribution | Validated catalog/API reference, no cross-service FK |
+| Organization | Identity catalog | Response/Logistics organization attribution | Validated catalog/API reference, no cross-service FK |
 | Campaign | Response | Logistics `campaign_id` on drive/need/distribution | Optional opaque reference; public drive sanitization and eligibility through scoped API |
 | SOS/request | Response | Logistics cycle `request_id` | Opaque reference; REST eligibility and cycle seal; never a local request FK |
 | Warehouse/item/unit/point | Logistics | Logistics local references | Local FKs and item-specific unit/quantity constraints |
@@ -871,7 +860,7 @@ Model review checklist: distinguish reporter/beneficiary/donor; show optional ca
 - Coordinates use WGS84/SRID 4326; GeoJSON order is longitude, latitude. Validate longitude within -180..180, latitude within -90..90, and nonnegative accuracy. [RFC 7946](https://datatracker.ietf.org/doc/html/rfc7946)
 - Store capture time, accuracy in meters, source (GPS, manual pin, geocoded), and server receive time separately. Device-reported accuracy is not a guarantee of field accuracy.
 - Store a location snapshot with the SOS. Add location history only for an explicit requirement; continuous background tracking is outside the MVP.
-- Scope map queries by authorization, region/time/status/bounding box. Do not expose all PII through map responses.
+- Scope map queries by authorization, campaign/time/status/bounding box. Do not expose all PII through map responses.
 - Store files in object storage. The database holds object key, owner type/ID, validated MIME, size, checksum, uploader, time, and visibility. Keep buckets private; use short-lived signed URLs if direct access is used.
 - Validate actual MIME, extension, and size; do not trust client-provided names/MIME. Uploads require authorization on the owning business object.
 - Demo data must be synthetic; do not use real victims' images or personal information.
@@ -931,20 +920,20 @@ For FR priorities, **M** means required for the core demo, **S** means should ha
 | ID | Priority | Proposed functional requirement | Verification criterion |
 |---|---:|---|---|
 | FR-IAM-01 | M | Citizen registration, login, refresh/logout, account disabling, and credential changes | Invalid/expired tokens or disabled accounts receive 401; logout invalidates the refresh session |
-| FR-IAM-02 | M | Organization/region/campaign-scoped roles; action and object checks | Citizens cannot access another citizen's request; volunteers see their team's missions only |
+| FR-IAM-02 | M | Organization/campaign-scoped roles; action and object checks | Citizens cannot access another citizen's request; volunteers see their team's missions only |
 | FR-IAM-03 | M | Admin account, organization, and role management with least privilege | Permission changes record actor/time and before/after values |
 | FR-REQ-01 | M | Create requests with category, optional note, nullable headcount and reporter contact phone when unknown (validate supplied values), location/manual pin, time/source, optional reporter-declared 'immediate danger' flag (unverified; see FR-REQ-10) | Validate input incl. phone format; return an identifier and server receive time; contact phone is visible only to the reporter, scoped coordinators and assigned team leaders, and excluded from maps, reports and AI input |
 | FR-REQ-02 | M | Anyone may submit an SOS without an account (guest SOS); an optional signed-in citizen's request is linked to the account. Guests track and supplement through a high-entropy tracking secret generated by the client before submission (Section 22.2); the server returns only a non-credential request ID and tracking code. A guest can later claim the request after signing in | Unauthenticated creation succeeds with rate limiting; the server stores only a purpose-bound hash of the secret and never returns or logs it; a lost creation response is recoverable by retrying with the same key/body/secret; without the secret (or ownership) tracking/supplement is denied; registration still grants CITIZEN only; SOS creation and secret-based tracking never call Identity |
 | FR-REQ-03 | M | Idempotent SOS creation retries | Same key/payload/secret creates no second row and returns the original request ID and tracking code; same key with a different payload or secret is rejected (409) |
 | FR-REQ-04 | M | Verify, reject, and duplicate-link; rejection/duplicate decisions require reasons | Preserve duplicate requests and link them to a canonical request |
 | FR-REQ-05 | M | Manual P1–P4 priority with actor/time/reason and override history | Priority is separate from status; AI cannot change it automatically |
-| FR-REQ-06 | M | Scoped list/map filtering by bbox/region, status, priority, and time | Apply authorization filters before pagination |
+| FR-REQ-06 | M | Scoped list/map filtering by bbox, status, priority, and time | Apply authorization filters before pagination |
 | FR-REQ-07 | M | Citizens view timelines and supplement their own requests in permitted states | Owner-only access; supplements record actor/time |
 | FR-MSN-01 | M | Manage teams, skills, availability, and members through opaque user IDs | Reject inactive/unavailable teams or missing mandatory skills |
 | FR-MSN-02 | M | Create missions, offer/assign, accept/decline, transition, and record results | Only valid transitions; record actor/time/reason |
 | FR-MSN-03 | M | One request may have multiple missions; one mission belongs to one request and one team in the MVP | One completed mission does not close a request with remaining needs |
 | FR-MSN-04 | M | Request/mission evidence uploads and coordinator outcome confirmation | Metadata and download access follow object scope |
-| FR-CAM-01 | M | Response manages campaigns, incident categories on requests, operating regions, time, and status | Scoped creation/editing; Logistics stores campaign references |
+| FR-CAM-01 | M | Response manages campaigns, incident categories on requests, time, and status | Scoped creation/editing; Logistics stores campaign references |
 | FR-LOG-01 | M | Manage warehouses, items, vehicles, relief points, and campaign references where needed | Active/inactive entities; preserve existing history |
 | FR-LOG-02 | M | Basic receipt, reserve/release, issue, verified return and independently reviewed correction; inter-warehouse transfers are deferred (S) | Ledger records actor/time/quantity/reason; balances never negative |
 | FR-LOG-03 | M | Link Logistics needs and commitments to a request by opaque ID; record commit/release/issue/delivery locally | Multiple contributions are supported; no cross-service transaction or direct table access |
@@ -1185,7 +1174,7 @@ Các sơ đồ riêng lẻ theo từng mã UC đã được gộp vào sơ đồ
 
 ### UC-15 — Report an affected household remotely
 
-**Actor:** Signed-in citizen, e.g. a relative outside the affected region.
+**Actor:** Signed-in citizen, e.g. a relative outside the affected area.
 
 **Preconditions:** Current account/session authorized; user provides household location/manual pin and reporter phone. The affected household need not have electricity, network access or an account.
 
@@ -1223,7 +1212,7 @@ Các sơ đồ riêng lẻ theo từng mã UC đã được gộp vào sơ đồ
 
 **Actor:** Scoped coordinator or operations manager with map/report grant.
 
-**Main flow:** Select region/time/status → Response aggregates eligible canonical reports within scope → display request-count density, legend, filters and generated_at → select a cell to open the authorized underlying queue → manually inspect reports and team candidates.
+**Main flow:** Select organization scope/time/status → Response aggregates eligible canonical reports within scope → display request-count density, legend, filters and generated_at → select a cell to open the authorized underlying queue → manually inspect reports and team candidates.
 
 **Exceptions:** Unverified layer explicitly separate; duplicates excluded from confirmed counts; low data density is not proof an area is safe; missing data/outage is labelled; counts never estimate victims or hazard severity.
 
@@ -1245,7 +1234,7 @@ Các sơ đồ riêng lẻ theo từng mã UC đã được gộp vào sơ đồ
 
 **Actors:** Scoped coordinator/manager/admin.
 
-**Main flow:** Select time/region/campaign → scoped APIs in Response and Logistics return authoritative aggregates with generated_at → UI composes the result and shows each source timestamp → export if authorized.
+**Main flow:** Select time/campaign → scoped APIs in Response and Logistics return authoritative aggregates with generated_at → UI composes the result and shows each source timestamp → export if authorized.
 
 **Exceptions:** API outage marks only that source panel unavailable/stale; unauthorized export is denied/audited; no-data results follow an agreed convention.
 
@@ -1275,9 +1264,9 @@ Các sơ đồ riêng lẻ theo từng mã UC đã được gộp vào sơ đồ
 
 **Actors:** Coordinator or operations manager with campaign scope.
 
-**Preconditions:** Authenticated user with region/organization management permission.
+**Preconditions:** Authenticated user with organization management permission.
 
-**Main flow:** Create campaign name/objective/region/time → persist in Response → activate → attach requests → Logistics records an opaque campaign reference on related needs/commitments/distributions → manager pauses/closes when permitted.
+**Main flow:** Create campaign name/objective/time → persist in Response → activate → attach requests → Logistics records an opaque campaign reference on related needs/commitments/distributions → manager pauses/closes when permitted.
 
 **Exceptions:** Closed campaigns cannot accept new requests; returns/settlements remain possible; reject invalid campaign IDs; closure preserves ledger/request history.
 
@@ -1287,7 +1276,7 @@ Các sơ đồ riêng lẻ theo từng mã UC đã được gộp vào sơ đồ
 
 **Actor:** Scoped operations manager.
 
-**Main flow:** Create/edit an asset with its organization/region and validated type/capacity or location/operating fields → list/view only authorized assets → select an active relief point as a distribution destination → inactivate an unused or retired asset with audit.
+**Main flow:** Create/edit an asset with its organization and validated type/capacity or location/operating fields → list/view only authorized assets → select an active relief point as a distribution destination → inactivate an unused or retired asset with audit.
 
 **Exceptions:** Reject cross-scope access, invalid values and selection of an inactive point for new distribution. Inactivation never deletes previous distribution references; asset management does not fabricate stock or imply routing/maintenance workflows.
 
@@ -1378,7 +1367,7 @@ These are SDD sketches, not final contracts. Finalize complete paths through Ope
 
 ### 10.3 Authorization matrix
 
-Public campaign summaries contain approved title/objective/broad region/time and sanitized drive links only. They are a separate allowlisted Response read projection, not the protected campaign-detail API. No exact SOS coordinates, household/contact lists, private evidence or internal work queues are exposed.
+Public campaign summaries contain approved title/objective/broad time and sanitized drive links only. They are a separate allowlisted Response read projection, not the protected campaign-detail API. No exact SOS coordinates, household/contact lists, private evidence or internal work queues are exposed.
 
 
 | Actor | Proposed core permissions |
@@ -1396,7 +1385,7 @@ Public campaign summaries contain approved title/objective/broad region/time and
 
 Section 23.1 fixes the browser/native transport, cookie/CSRF controls and client storage for these sessions.
 
-Do not encode all policy in JWTs: Response checks its own team/region/request relationships and Logistics checks warehouses/commitments. Service queries must still filter rows by scope after Nest guards authorize the action. [NestJS guards](https://docs.nestjs.com/guards)
+Do not encode all policy in JWTs: Response checks its own team/request relationships and Logistics checks warehouses/commitments. Service queries must still filter rows by scope after Nest guards authorize the action. [NestJS guards](https://docs.nestjs.com/guards)
 
 ## 11. User-interface architecture
 
@@ -1410,7 +1399,7 @@ Do not encode all policy in JWTs: Response checks its own team/region/request re
 - **Intake staff:** receiving/count queue and approved issue actions; separate from campaign ownership and SOS dispatch. Advanced warehouse screens are deferred.
 - **Public donor:** browse sanitized campaigns/drives; leave name/phone and actual items/quantities; receive a private tracking capability without account registration.
 - **Admin:** accounts, organizations, role grants, service health; PII only with a relevant operational role.
-- **Operational metrics:** cases by region/status/priority; time from receipt to verification/assignment/delivery; unfinished missions; requested/committed/issued/delivered/outstanding quantities per authorized request; source timestamps.
+- **Operational metrics:** cases by organization/status/priority; time from receipt to verification/assignment/delivery; unfinished missions; requested/committed/issued/delivered/outstanding quantities per authorized request; source timestamps.
 
 ### Mobile
 
@@ -1508,7 +1497,7 @@ Keep citizen-reported facts, coordinator-verified facts and model-extracted sugg
 
 Freshness also depends on time and external context. If waiting time is used, record its origin as the current work cycle's server start time (initial receipt or audited reopen), evaluated_at and expiry at the next relevant policy boundary or the configured maximum result age, whichever is earlier. An initial receipt timestamp must not age a reopened cycle. If hazard features are used, derive them locally in Response from authorized synthetic/manual geometry with source, version and validity; give providers minimized categories rather than exact GPS. Missing/stale hazard data remains unknown. Review checks work_cycle, expiry and current hazard/context version even when input_revision has not changed. Re-evaluation creates a new immutable context snapshot/job; unchanged equivalent context still deduplicates using the policy time bucket and hazard/context versions, not a different clock instant for each retry. Record actual expiry/re-evaluation configuration before enabling the affected policy.
 
-Input uses known structured facts and explicit null/unknown values: category, reported needs, headcount, incident/capture time, and confirmed operational flags from the agreed taxonomy. Exact GPS, reporter identity, phone number, tracking secrets/tokens, signed URLs, images, ContactAttempt and AuthorityReferral notes are excluded by default. The reporter-declared danger flag (Section 8.1) may enter only as a reported, unverified fact with provenance; it never counts as verified and never changes verification status, queue order or priority by itself. If coarse location is justified, document why it is needed and assess regional bias. Unknown is not false or zero; headcount alone is not an urgency policy.
+Input uses known structured facts and explicit null/unknown values: category, reported needs, headcount, incident/capture time, and confirmed operational flags from the agreed taxonomy. Exact GPS, reporter identity, phone number, tracking secrets/tokens, signed URLs, images, ContactAttempt and AuthorityReferral notes are excluded by default. The reporter-declared danger flag (Section 8.1) may enter only as a reported, unverified fact with provenance; it never counts as verified and never changes verification status, queue order or priority by itself. If coarse location is justified, document why it is needed and assess geographic bias. Unknown is not false or zero; headcount alone is not an urgency policy.
 
 Illustrative result envelope, **not a clinical rule or executable triage policy**:
 
@@ -1712,7 +1701,7 @@ These are **planned test cases, not execution results**. Test records must inclu
 | TC-05 | Same key with different payload or different tracking secret | Conflict; existing request unchanged |
 | TC-06 | Citizen A reads/updates Citizen B's request | Access denied without sensitive disclosure |
 | TC-07 | Volunteer lists missions | Only missions assigned to the team/member |
-| TC-08 | Region A coordinator accesses region B case | Denied; map/list do not disclose the object |
+| TC-08 | Coordinator of organization A accesses organization B case | Denied; map/list do not disclose the object |
 | TC-09 | Reject without reason | Validation error; state/history unchanged |
 | TC-10 | Duplicate designation without canonical request | Do not persist DUPLICATE |
 | TC-11 | SUBMITTED directly to CLOSED | Conflict/validation error; state/audit unchanged |
@@ -2009,9 +1998,9 @@ Each app owns `main.ts`, `app.module.ts`, `config/`, `database/data-source.ts`, 
 | Area | Capstone implementation decision |
 |---|---|
 | Citizen onboarding | Public rate-limited registration grants CITIZEN only. Unique normalized username; passwords are hashed with an appropriate maintained implementation selected at setup. Account/password errors do not disclose credential existence. Staff/volunteer roles are admin-granted. Registration is optional for SOS (guest SOS enabled; see NFR-SEC-01 and Section 14). Idempotency for guest SOS is scoped by the client-generated key (random UUID) plus payload hash; a guest can claim a request by presenting its tracking secret while signed in, which sets reporter_user_id once and audits it. **SOS tracking secret protocol:** before the first submission the guest client generates a cryptographically random 32-byte secret and a separate idempotency key and stores both (Web session storage/memory with an explicit private-code download; Mobile SecureStore) before sending. Response validates format/length, stores only a purpose-bound hash (distinct from the donation-secret purpose), and scopes idempotent replay to key + payload hash + secret hash. The same triple returns the original request ID and tracking code, so a lost response never loses access or duplicates a request; the same key with a different payload or secret returns 409; a secret hash already bound to another request returns a generic 409 without revealing it. The tracking code is an identifier, not a credential. If the secret is lost, scoped staff independently verifies reporter contact and issues an audited purpose-bound30min recovery code; authenticated redemption binds the unowned request once and revokes old access, as in Section27.2; phone number alone never grants tracking access, and failed recovery reveals nothing. |
-| Scope | Each grant binds a role/action set to one scope: organization, region, campaign or explicitly granted system scope. Alternative matching grants are OR; inside an organization/region/campaign match, the action, owning organization and selected scope must all match (AND). System scope is an explicit cross-organization exception for its named actions only, never implicit in ADMIN. Region/campaign grants carry their parent organization; geographic overlap alone never crosses organization boundaries. Owner/team relationships are separate explicit permissions, not inferred staff grants. Admin account management does not imply access to victim details. Exact GPS is limited to the reporter, authorized coordinators and assigned teams. |
+| Scope | Each grant binds a role/action set to one scope: organization, campaign or explicitly granted system scope. Alternative matching grants are OR; inside an organization/campaign match, the action, owning organization and selected scope must all match (AND). System scope is an explicit cross-organization exception for its named actions only, never implicit in ADMIN. Campaign grants carry their parent organization; no grant crosses organization boundaries. Owner/team relationships are separate explicit permissions, not inferred staff grants. Admin account management does not imply access to victim details. Exact GPS is limited to the reporter, authorized coordinators and assigned teams. |
 | Revocation | JWT checks include approved algorithm, issuer, audience, expiry and session ID. Identity introspection is authenticated as a service and checks active account/session/current grants. No positive auth cache in demo. Identity outage fails closed with Vietnamese 503. This trades availability for simple request-boundary revocation. |
-| Request intake | campaign_id is nullable. Backend configuration assigns the synthetic demo intake organization; citizens cannot set organization or staff scope. Identity owns controlled region codes; Response owns seeded region boundary geometry and derives region from the location. Unknown/ambiguous boundary results keep region null and enter an explicit unassigned queue. Only coordinators with organization-wide intake permission or explicit system intake grants can view/correct that queue; campaign-only grants cannot. No match must not reject SOS or silently hide it from all intake operators. Region correction is versioned/audited. Only authorized coordinators attach/reassign requests to ACTIVE campaigns with compatible organization/operating region. |
+| Request intake | campaign_id is nullable. Backend configuration assigns the synthetic demo intake organization; citizens cannot set organization or staff scope. Requests are never routed by location: no geographic area is derived, and a request is not rejected or hidden because of its location. Only coordinators with organization-wide intake permission or explicit system intake grants can view/correct intake attribution; campaign-only grants cannot. Only authorized coordinators attach/reassign requests to ACTIVE campaigns with a compatible organization. |
 | Priority | P1–P4 labels remain the draft taxonomy in Section 8.1. Human coordinator selects priority/reason after verification. No SLA is implied and no automatic queue ranking/dispatch is derived from these labels. |
 | Supplements | Reporter may add information in SUBMITTED/VERIFYING/VERIFIED/TRIAGED/DISPATCHED/IN_PROGRESS. Preserve earlier facts as history. Terminal requests reject supplements; coordinate reopen separately. |
 | Cancellation/resolution | Scoped coordinator may cancel a request in SUBMITTED through IN_PROGRESS (not RESOLVING or RESOLVED, see Section 8.1) with reason, subject to the canonical-reference guard below. First freeze the Logistics cycle through the durable cancellation intent in Section 23.2. In a Response transaction, commit cancellation, cancel nonterminal missions and release database slots; active field teams remain UNAVAILABLE until readiness acknowledgment; keep completed evidence. Then explicitly settle linked Logistics needs: cancel unissued commitments, and preserve issued goods for delivery/return/loss accounting. Before RESOLVED, Response obtains an idempotent Logistics resolution seal for the current work cycle under the protocol in Section 23.2. An unavailable API, open/partial need, or unsettled issued quantity blocks sealing and resolution. Record the immutable seal ID/version with the human confirmation. The seal prevents concurrent or later need changes in that cycle; reopening creates a new cycle. CLOSED follows RESOLVED. CLOSED reopens to TRIAGED with reason; old terminal missions remain historical. |
@@ -2025,7 +2014,7 @@ For commands touching campaigns and requests in Response, acquire campaign rows 
 ### 22.3 Team, fulfillment, and stock decisions
 
 - One mission belongs to one request/work cycle and exactly one team. APP teams require an active leader for direct actions; COORDINATOR teams require an external contact note and no app/account; scoped coordinators can assign or cancel with reason. Team members can view their team's work; solo volunteers use a one-member team.
-- Demo teams have capacity one active mission. OFFERED, ACCEPTED, EN_ROUTE, and ON_SCENE reserve capacity; terminal transitions release the database slot. Cancellation of ACCEPTED/EN_ROUTE/ON_SCENE also sets UNAVAILABLE and readiness_required=true until explicit field-readiness acknowledgment; OFFERED cancellation releases immediately. Generic availability edits cannot bypass readiness_required. Recheck mode-specific membership, required skills, organization/operating-region compatibility, and availability in the same Response transaction as the offer. No automatic offer expiry or auto-reassignment; expose offer age, and show an overdue badge plus an in-app notice to the offering coordinator and organization manager when an OFFERED mission is older than a configurable demo threshold (default 10 minutes) so an unanswered offer cannot silently stall a request in DISPATCHED. The coordinator cancels it and creates a new mission manually.
+- Demo teams have capacity one active mission. OFFERED, ACCEPTED, EN_ROUTE, and ON_SCENE reserve capacity; terminal transitions release the database slot. Cancellation of ACCEPTED/EN_ROUTE/ON_SCENE also sets UNAVAILABLE and readiness_required=true until explicit field-readiness acknowledgment; OFFERED cancellation releases immediately. Generic availability edits cannot bypass readiness_required. Recheck mode-specific membership, required skills, organization compatibility, and availability in the same Response transaction as the offer. No automatic offer expiry or auto-reassignment; expose offer age, and show an overdue badge plus an in-app notice to the offering coordinator and organization manager when an OFFERED mission is older than a configurable demo threshold (default 10 minutes) so an unanswered offer cannot silently stall a request in DISPATCHED. The coordinator cancels it and creates a new mission manually.
 - Logistics owns ReliefNeed, Commitment, stock, transfer, and distribution records. A need references `request_id` and `work_cycle` without a cross-database foreign key. Validate request/scope through the Response API before creating a linked need; make the API call before opening a Logistics transaction.
 - A need has item, unit, requested quantity, state, and version. A commitment has an immutable need/warehouse/quantity reference and quantity-derived summaries PROPOSED/COMMITTED/ISSUED/DELIVERED/SETTLED/CANCELLED, with partial quantities and guards defined in Section 23.4. Lock the need row before creating or changing commitments; `delivered + committed/reserved + issued-but-not-delivered` cannot exceed the requested quantity. Keep each organization's/warehouse's contribution separately attributable.
 - Derive committed/reserved, issued, delivered, and outstanding totals from single-item commitments, settlement records, and stock movements. For a non-CANCELLED need `outstanding = requested_effective - delivered`; a CANCELLED need has outstanding 0 and reports `cancelled_remaining` instead, so backlog, dashboards and request-resolution checks never count cancelled demand as still owed. A partial delivery never marks the need complete. Reports show original requested, reduction/cancelled quantity, active requested, delivered and active outstanding as separate columns and never add `cancelled_remaining` to active outstanding. An authorized coordinator may reduce or cancel a need with a reason under the protected-quantity and physical-settlement guards in Section 23.4. Do not delete prior commitments or stock movements.
@@ -2066,11 +2055,11 @@ These planned cases extend existing IDs without renumbering them. They are not e
 | TC-BE-09 | FR-LOG-03, FR-LOG-05 | Cancelling an unissued commitment releases stock but preserves requested quantity; issued goods require delivery/return/loss settlement |
 | TC-BE-10 | FR-MSN-02, FR-LOG-05 | Mission status changes do not fabricate stock delivery; request cannot be resolved from mission completion alone |
 | TC-BE-11 | FR-REQ-04 | B links to A; attempting A → C duplicate conflicts; reasoned rejection/cancellation of A preserves B’s historical link and exposes a safe canonical outcome. Concurrent B → A and A → C cannot create a chain/cycle or an invalid canonical target |
-| TC-BE-12 | FR-IAM-02, FR-REQ-01/06 | Grants match action AND organization AND selected scope, with OR across matching grants; no cross-organization access. Unknown/ambiguous region SOS succeeds and is visible to designated intake coordinator only; campaign-only coordinator cannot read it; scoped correction is audited |
+| TC-BE-12 | FR-IAM-02, FR-REQ-01/06 | Grants match action AND organization AND selected scope, with OR across matching grants; no cross-organization access. Campaign-only coordinator cannot read organization-wide intake requests; scoped attribution changes are audited |
 | TC-BE-13 | FR-CAM-01, FR-MSN-02, FR-LOG-03 | Pause blocks new attachments, missions, and campaign-linked commitments; accepted work and already-issued goods remain visible; resume restores permitted commands; CLOSED request cannot reopen in CLOSED campaign |
 | TC-BE-14 | FR-RPT-01, NFR-OBS-01 | Dashboard composes a fixed Response/Logistics dataset with correct scope, totals, separate source timestamps, and a clear unavailable state when one API is stopped |
 | TC-BE-15 | FR-LOG-03..05, FR-REQ-09 | One request need is fulfilled by 12 of 20 units, then another 8; delivered/outstanding totals, stock ledger, partial state, audit actors, and human resolution all reconcile |
-| TC-BE-16 | FR-REQ-06, FR-REQ-08 | Duplicate-candidate filter returns nearby/time/category matches only as suggestions; coordinator can ignore or link with a reason; unauthorized regions remain hidden |
+| TC-BE-16 | FR-REQ-06, FR-REQ-08 | Duplicate-candidate filter returns nearby/time/category matches only as suggestions; coordinator can ignore or link with a reason; unauthorized organizations remain hidden |
 
 ### 22.7 Remaining decisions and current repository status
 
@@ -2109,8 +2098,7 @@ Cancellation uses the same write-barrier principle: record a cancellation intent
 
 - No independent `Incident` aggregate is needed for the current scope. An AssistanceRequest carries a controlled incident category and reported incident facts; Campaign groups the organized response. Use these meanings consistently in SRS, ERD, DTOs and UI. A future shared hazard event requires a demonstrated requirement before adding an entity.
 - One ReliefNeed represents one item/unit for one request/work cycle. One Commitment represents one warehouse contribution to that need, with immutable original quantity and cumulative released/issued/delivered/returned/lost quantities. Remove CommitmentLine; multiple requested items use separate needs/commitments. Transfer and Distribution keep line tables because they genuinely contain multiple items. Delivery/distribution lines reference the issued commitment and settlement operation; no second stock decrement.
-- Logistics stores nullable opaque `campaign_id` plus organization/region attribution on linked needs, copied from authenticated Response context for scoped reporting. These are historical attribution, not current campaign authority. Attribution locks under the Response request lock at first mission offer or Logistics admission (Section 27.2). No attach/detach/region correction may change that cycle thereafter. Reopen atomically establishes the next cycle’s permitted attribution; old needs/missions remain historical. Current campaign eligibility still comes from Response. Do not rewrite past distributions when a campaign changes.
-- **Region data:** Identity owns the controlled region code catalog; Response owns boundary geometry seeded from simplified polygons derived from an openly licensed administrative-boundary dataset (record dataset, version and license in the seed README) or hand-drawn synthetic regions for the demo. Seed at least one region with boundaries covering the demo coordinates, plus a deliberately uncovered coordinate for the unassigned-queue test (TC-BE-12). Without seeded boundaries every SOS would land in the unassigned queue.
+- Logistics stores nullable opaque `campaign_id` plus organization attribution on linked needs, copied from authenticated Response context for scoped reporting. These are historical attribution, not current campaign authority. Attribution locks under the Response request lock at first mission offer or Logistics admission (Section 27.2). No attach/detach correction may change that cycle thereafter. Reopen atomically establishes the next cycle’s permitted attribution; old needs/missions remain historical. Current campaign eligibility still comes from Response. Do not rewrite past distributions when a campaign changes.
 - Final migrations include work_cycle/version/audit fields, unique cycle and stock pairs, immutable operation references, quantity constraints and the spatial indexes already specified. The logical ERD is a view of these decisions, not a full physical schema.
 
 ### 23.4 Quantity changes and partial commitment summaries
@@ -2125,13 +2113,13 @@ Commitment status is derived: PROPOSED before reservation; COMMITTED while reser
 
 ### 23.5 Asset, media and acceptance coverage
 
-Vehicles and relief points remain basic catalog entries; advanced fleet and warehouse workflows are deferred. Vehicle scope is CRUD, organization/region, identifier, type, capacity/unit and active/inactive status; no routing, fuel, maintenance or automatic assignment engine. ReliefPoint scope is CRUD, scoped location, contact/operating information and active/inactive status, plus selection as a distribution destination. Inactivation blocks new use and preserves historical distributions. Neither entity implies an independent warehouse stock balance.
+Vehicles and relief points remain basic catalog entries; advanced fleet and warehouse workflows are deferred. Vehicle scope is CRUD, organization, identifier, type, capacity/unit and active/inactive status; no routing, fuel, maintenance or automatic assignment engine. ReliefPoint scope is CRUD, scoped location, contact/operating information and active/inactive status, plus selection as a distribution destination. Inactivation blocks new use and preserves historical distributions. Neither entity implies an independent warehouse stock balance.
 
 Photo and video evidence are supported. Demo allowlist: detected JPEG/PNG images up to 10 MiB each, MP4 with allowed H.264 video/AAC audio up to 50 MiB each; at most five READY/PENDING attachments and 100 MiB total per request/mission. Reserve attachment count and declared-byte quota under the owning object lock before upload, reject streams above the reservation/limit, and reconcile abandoned PENDING reservations so concurrent uploads cannot exceed quota. Each upload contains one media file; allow bounded multipart overhead in the HTTP body limit. Reject SVG, HTML, executables and unsupported container/codecs. Validate actual media/container content with maintained tooling selected in the setup spike; bound parser time/memory, stream uploads and configure matching Nginx/API body limits. No transcoding or AI media inference. Serve originals as private downloads with safe Content-Disposition and nosniff; previews must use validated media. Generated immutable keys and crash reconciliation remain required. Signed download TTL is 60 seconds; current authorization is checked before signing. Synthetic media only; real-data retention remains a pilot decision.
 
 ### 23.6 Adopted demonstration measurements and setup gates
 
-Performance dataset: 10,000 synthetic stored requests across seeded regions, states and priorities, with representative needs/missions. Workload: 20 k6 VUs; 2-minute warm-up followed by a 10-minute measured interval; 80% scoped read requests and 20% valid SOS creation with unique idempotency keys. Keep the prepared 10,000-record baseline and report the resulting dataset growth. Use fixed seed, bounded filters and no upload in the SOS timing. Read p95 <= 2 s, SOS p95 <= 3 s, unexpected HTTP failures < 1%; negative/security scenarios are separate. Include Nginx and Identity introspection; record CPU/RAM/disk, OS, image/dependency versions, network placement and complete workload. These are demo targets, not national-scale or availability claims.
+Performance dataset: 10,000 synthetic stored requests across seeded organizations, states and priorities, with representative needs/missions. Workload: 20 k6 VUs; 2-minute warm-up followed by a 10-minute measured interval; 80% scoped read requests and 20% valid SOS creation with unique idempotency keys. Keep the prepared 10,000-record baseline and report the resulting dataset growth. Use fixed seed, bounded filters and no upload in the SOS timing. Read p95 <= 2 s, SOS p95 <= 3 s, unexpected HTTP failures < 1%; negative/security scenarios are separate. Include Nginx and Identity introspection; record CPU/RAM/disk, OS, image/dependency versions, network placement and complete workload. These are demo targets, not national-scale or availability claims.
 
 Node 24 LTS is the setup baseline; pin the exact supported patch, compatible Nest/TypeORM versions and PostgreSQL/PostGIS image digest after a migration/spatial-query/locking/OpenAPI compatibility spike. Choose CommonJS and Jest for the existing documented testing approach; verify against the selected Nest major. Current Nest documentation distinguishes application and CLI runtime floors. [Node releases](https://nodejs.org/en/about/previous-releases), [Nest migration guide](https://docs.nestjs.com/migration-guide).
 
@@ -2344,7 +2332,7 @@ Extend TC-L10N-01..03 across public guest forms, counts, conflicts, denied permi
 | Less warehouse responsibility | Campaign managers publish appeals/approve allocations; intake staff count/receive/issue; independent review remains. Advanced warehouse scope deferred. |
 | Donation without login | User request: name/phone and goods suffice, private capability secures tracking. No mandatory donor account. |
 | Commerce / transfer notes | User explicitly answered in-kind only, no money. Do not implement payments or reinterpret this as sales. |
-| Grouping | Proposed region/time/category/status saved views and canonical duplicate links; not automatic household merging, not one mission spanning several SOS. Clarify if supervisor intended dispatch batching. |
+| Grouping | Proposed time/category/status saved views and canonical duplicate links; not automatic household merging, not one mission spanning several SOS. Clarify if supervisor intended dispatch batching. |
 | Prior report reference | Existing weeks 1–3 Markdown reports contain only headings. Read the text of [weeks 1–2 slides](reports/Tuan-01-02.pptx), especially slides 5, 10 and 11, plus the separate weeks 1/2 decks: preserve their three-service ownership, five baseline actor groups and conceptual/logical distinction; add omitted proxy/donor/intake relationships. Those slides are plans, not completed SRS/SDD or a detailed ERD template. Public prior PTIT-HCM capstones were subsequently researched at the user's request; findings and limits are in Section 26.8. |
 | Fragmented/repeated chat notes | Treat as incomplete meeting notes, not a diagnosis, product feature or stakeholder identity. No unsupported requirement is inferred. |
 
@@ -2361,7 +2349,7 @@ Do not classify people as fraudulent from a heuristic or AI score. Coordinator r
 Team affiliation: VOLUNTEER, MILITARY, GOVERNMENT or OTHER; linked organization and staff-verified affiliation. Every team obeys the same scope, mandatory skills, availability and capacity-one demo guard. These labels do not assert participation by an actual authority. Seed demo teams under one coordinating organization, recording affiliation as metadata; affiliation never bypasses the existing organization scope. A real multi-agency deployment needs explicit cross-organization participation/grants before offering missions across organizations.
 
 0. **Priority-aware balancing.** Workload balancing applies fully only to P3/P4 requests. For P1 (and P2) the comparable band shrinks to `distance_tolerance_p1 = 0` (P2: 500 m, configurable): the nearest eligible fresh-position team is suggested first, and lighter workload only breaks exact ties. A coordinator may still choose otherwise with a recorded reason. Rationale: a detour matters most when life is at risk; spreading load is a fairness aid for less urgent work, and both values are team proposals pending field review.
-1. Filter by active membership/leader, mandatory skills, compatible organization/region, AVAILABLE and no reserved active slot. OFFERED/ACCEPTED/EN_ROUTE/ON_SCENE all occupy the one active slot; atomic offer checks prevent two coordinators booking it twice.
+1. Filter by active membership/leader, mandatory skills, compatible organization, AVAILABLE and no reserved active slot. OFFERED/ACCEPTED/EN_ROUTE/ON_SCENE all occupy the one active slot; atomic offer checks prevent two coordinators booking it twice.
 2. Use a manually confirmed/foreground team position, source/accuracy/time. No background tracking. Proposed synthetic-demo freshness is 30 minutes; stale/unknown positions are shown separately as “Chưa đủ dữ liệu vị trí”, never labelled nearest, but remain selectable by the coordinator with a visible warning and a recorded reason (otherwise an app-less team would never appear). A team leader confirms position in the app (UC-18); a coordinator can set/refresh it by radio/phone report with `source = COORDINATOR_REPORTED` and audit. Required position fields are on TEAM_POSITION (Section 6).
 3. Query eligible nearby teams with PostGIS geography radius/distance. Proposed demo search radius 10 km; explicitly expand it if none are suitable. Show geodesic distance in meters/kilometers, not road distance/ETA. [PostGIS ST_DWithin](https://postgis.net/docs/ST_DWithin.html), [ST_Distance](https://postgis.net/docs/ST_Distance.html) checked 2026-10-06.
 4. Define a comparable nearby band: candidates within `nearest_eligible_distance + distance_tolerance`; proposed demo tolerance 2 km, configurable and visible in the comparison. Within that band suggest ascending recent mission burden, then distance, then team ID for deterministic ties. Other radius candidates remain visible by distance. Recent burden counts distinct non-DECLINED/non-CANCELLED missions with an offer or active/terminal work in the preceding 24 hours; count one mission once, not each transition. Also show any current active work even if older. This simple count cannot measure actual fatigue; display it as “Số nhiệm vụ gần đây”, not a readiness guarantee. Parameters are team proposals pending field review.
@@ -2372,11 +2360,11 @@ No weighted optimization, AI dispatch, route engine or global multi-SOS scheduli
 
 ### 26.4 Heatmap and grouping semantics
 
-Heatmap means density of **confirmed requests**, not hazard forecast or severity. Scope-filter first, then aggregate by a seeded demo grid (proposed 1 km cells) in a documented meter-based local projection; never treat WGS84 degrees as kilometers. Choose projection with the demo-region seed. Return cell geometry/center, canonical request count, time window/status filters and generated_at, without contacts/exact household pins. Default counts verified nonterminal canonical requests; DUPLICATE/REJECTED/CANCELLED are excluded. CLOSED/historical views require an explicit filter. A reopened request counts once in its current cycle.
+Heatmap means density of **confirmed requests**, not hazard forecast or severity. Scope-filter first, then aggregate by a seeded demo grid (proposed 1 km cells) in a documented meter-based local projection; never treat WGS84 degrees as kilometers. Choose projection with the demo-area seed. Return cell geometry/center, canonical request count, time window/status filters and generated_at, without contacts/exact household pins. Default counts verified nonterminal canonical requests; DUPLICATE/REJECTED/CANCELLED are excluded. CLOSED/historical views require an explicit filter. A reopened request counts once in its current cycle.
 
 Unverified reports remain in the intake queue and an optional clearly labelled staff-only layer; never mix them into confirmed totals. Counts are not estimates of affected persons; reported headcounts may overlap and must not be added blindly. Legend, time window, filter scope, sample size and empty/stale states are visible in Vietnamese. Small cells are still sensitive: operational heatmap is authenticated/scoped, not public. No heat-based priority or automatic allocation.
 
-Grouping is a saved/filterable view (region/category/time/status or canonical request), not loss of report history. Multiple rescue teams use separate missions under one SOS; the MVP still has one request per mission. Cross-request convoy/group dispatch requires a separately approved model.
+Grouping is a saved/filterable view (category/time/status or canonical request), not loss of report history. Multiple rescue teams use separate missions under one SOS; the MVP still has one request per mission. Cross-request convoy/group dispatch requires a separately approved model.
 
 ### 26.5 Diagram delivery and review conventions
 
@@ -2388,7 +2376,7 @@ Review diagram-to-text consistency before using in SDD: no required donor login;
 
 | ID | Links | Scenario and required outcome |
 |---|---|---|
-| TC-REV-01 | UR-01, FR-REQ-11, UC-15 | Reporter in city A pins family in region B; stored/routed subject is B; reporter GPS/contact cannot overwrite it; victim phone/account not required |
+| TC-REV-01 | UR-01, FR-REQ-11, UC-15 | Reporter pins a family location away from own GPS; stored/routed subject is the pinned location; reporter GPS/contact cannot overwrite it; victim phone/account not required |
 | TC-REV-02 | FR-REQ-11, FR-IAM-02, UC-15 | Missing/expired/revoked login cannot create PROXY; citizen cannot choose organization/role or read another proxy report; Identity outage shows pending/error, never silent SELF fallback |
 | TC-REV-03 | FR-REQ-03/11, FR-REQ-10, UC-15 | Retry remote report gives one row; login does not verify; failed victim calls preserve VERIFYING; alternate-source details/time remain private/history |
 | TC-REV-04 | FR-REQ-04/10/11, UC-02/15 | Reporter-only claim or reused account/phone as corroboration insufficient; independent evidence or distinct coordinator concurrence recorded; nearby different households not auto-merged |
@@ -2448,13 +2436,13 @@ This review preserves Sections 1–26, technology comparisons, architecture, dia
 - APP teams require an active leader. COORDINATOR teams require external_contact_note and may have no accounts. Affiliation is audited metadata within the demo coordinating organization, not permission to cross organization boundaries. Coordinator records source, reported_by, actual occurrence and outcome; structured field reports are valid evidence without photos.
 - Active cancellation sets a team readiness latch and UNAVAILABLE atomically. Ready requires authorized actor, expected_version, source/person/time and no active mission. A stale acknowledgment cannot clear a newer unavailable decision.
 - Verification sources reference actual scoped contact attempts, READY evidence or corroborating requests, with independence/limitations recorded. Concurrence event stores reviewed_version and resulting_version=reviewed_version+1; verify requires the resulting current version and a distinct still-authorized actor. Material mutations, including automated progress changes, increment version; no-op/notice-only work does not.
-- Verification stores an immutable approved snapshot in request_event; request.verification_revision identifies it. Existing subject fields provide the current approved spatial/list projection. Later material supplements await explicit scoped accept/reject review before changing approved facts; pending danger=true alerts immediately. A mission captures its approved snapshot reference at offer and never silently changes destination. An outside-locked-region location needs a new report/eligible cycle.
+- Verification stores an immutable approved snapshot in request_event; request.verification_revision identifies it. Existing subject fields provide the current approved spatial/list projection. Later material supplements await explicit scoped accept/reject review before changing approved facts; pending danger=true alerts immediately. A mission captures its approved snapshot reference at offer and never silently changes destination.
 - Resolve requires a reason, no active mission, reviewed failed work and actual current-cycle outcome. mission_not_required is valid only when that cycle has zero missions; failure/cancellation is not completion. A scoped failure-review event records disposition/reason and a completed replacement reference where applicable.
 
 ### 27.2 Attribution, recovery and cross-service fences
 
 - Add nullable assistance_request.attribution_locked_at. First mission offer sets it in the same Response transaction. Logistics first calls POST /internal/requests/{id}/cycles/{work_cycle}/admit with service identity and signed live actor; under the request lock Response validates cycle/status/scope/campaign and returns canonical attribution. Logistics then upserts/locks its cycle outside that network call. Failure leaves a conservative stamp; retry is safe.
-- Stamp forbids attach/detach/region correction for that cycle. Reopen is one reasoned transaction: optional campaign_id omitted retains only ACTIVE, null detaches, supplied id requires eligible authorized campaign; region correction requires organization-wide permission. Increment cycle, clear stamp/seal/resolved time and preserve all old attribution/history.
+- Stamp forbids attach/detach correction for that cycle. Reopen is one reasoned transaction: optional campaign_id omitted retains only ACTIVE, null detaches, supplied id requires eligible authorized campaign. Increment cycle, clear stamp/seal/resolved time and preserve all old attribution/history.
 - Remote PENDING precheck is insufficient to fence delayed seal retries. Logistics retains cycle_intent(intent_id PK, cycle_id FK, kind, state, created_at); state SEALED/FROZEN/ABORTED is checked under the cycle lock. Abort persists ABORTED even for an empty/missing cycle; delayed old intents cannot resurrect or undo a newer seal. No TTL unseal. Adoption/abort checks kind-specific live permission and scope.
 - Lost-secret revocation alone does not enable claim. Scoped staff records independently verified contact basis/reason and issues a purpose/object-bound code, hashed with 30-minute expiry. Authenticated redemption binds an unowned object once, consumes code and revokes old capability. Initial issuance exposes plaintext once; issuance replay returns safe metadata only. All other replay returns original response/status. Unknown/expired codes reveal no existence.
 - Native session plus capability uses Bearer and X-Tracking-Secret/X-Donation-Secret, never two Authorization values. Recovery uses X-Recovery-Code; all credentials are redacted. Recovery hash/expiry fields have paired nullability and are cleared on consumption.
@@ -2466,7 +2454,7 @@ This review preserves Sections 1–26, technology comparisons, architecture, dia
 - Held release follows new intake revision → independent exact-revision review → positive unposted increment. POSTED remains posted while later review is pending. Accepted public totals derive from posted ledger, never all count revisions or unapproved latest counts. Source allocation after pooling remains deferred.
 - Need increase is explicit/reasoned/versioned; original_quantity remains initial, not a maximum. Remove requested<=original constraint. Reductions preserve delivered+reserved_remaining+unsettled_issued. Warehouse/point organization must match the cycle.
 - Harden balance writer with dedicated NOLOGIN owner, SECURITY DEFINER, fixed trusted search_path/schema-qualified objects; app cannot own/replace function, directly change balances or mutate/truncate history. Prove it using restricted app credentials, not a superuser.
-- Every target column must list its writer and reader or integrity/audit purpose, null/default and PII treatment. Wire existing household note, affiliation verification, public warehouse location and informational expiry fields to real actions/views. Vehicle needs organization/region for scoped assets. Compensation applies only to nonoperational OPENING/ADJUSTMENT entries with reserved delta0; business movements use their owning review/release/return paths.
+- Every target column must list its writer and reader or integrity/audit purpose, null/default and PII treatment. Wire existing household note, affiliation verification, public warehouse location and informational expiry fields to real actions/views. Vehicle needs organization for scoped assets. Compensation applies only to nonoperational OPENING/ADJUSTMENT entries with reserved delta0; business movements use their owning review/release/return paths.
 - Every index must list exact WHERE/ORDER BY or constraint, overlap and measured plan; remove unexplained indexes. Keep FK constraint targets; do not index every FK automatically. Open partial indexes must match actual explicit status predicates; parent keyset pages have id tie-breakers and overlapping grants are deduplicated before LIMIT. Validate generic/custom prepared plans where relevant. No N+1 reads/calls.
 - T0-S aligns target schema and assertions before T0/application code. Verify/pin supported PostgreSQL/PostGIS baseline first; test expected SQLSTATE/constraint with valid fixtures, actual app-role privileges and controlled two-session races. Measure EXPLAIN(ANALYZE,BUFFERS) on representative history/open-work data. Existing assertions/old benchmarks do not certify these new rules.
 
@@ -2523,8 +2511,8 @@ Receipt posting never bypasses the distinct reviewer; the owner removed the prop
 4. **Loss approval.** `handoff_record` stays append-only and immutable (no `state`, no `version`). A LOSS handoff is accounted only when an `APPROVE` row exists in a new append-only `handoff_loss_review(id, handoff_id, reviewer_user_id, decision, reason, reviewed_at)`; reviewer differs from recorder; at most one final review per handoff. Pending/rejected losses are excluded from custody arithmetic.
 5. **Recovery codes.** Replace the paired hash/expiry columns on request/delivery by one small table per service, `capability_recovery(id, object_type, object_id, code_hash UNIQUE, expires_at, issued_by_user_id, basis, source_note, consumed_at, consumed_by_user_id, created_at)`. Its `id` is the API's `issuance_id`; plaintext is never stored; issuing a new code marks older unconsumed ones consumed. This keeps the hot request row narrow.
 6. **Idempotency storage.** `idempotency_record` keeps `response_status` and a `resource_ref` (type + id); `response_body` is removed. Replay re-reads the resource, so no PII and no recovery plaintext is stored. Issuance replay returns safe metadata only.
-7. **Teams without the app.** Police and military units are `GOVERNMENT`/`MILITARY` teams in `COORDINATOR` mode. Create one team per deployable squad because the demo slot is one active rescue mission per team. A team has one `operating_region_code`; a unit working in several regions gets one team per region. `external_contact_note` is PII (commander phone): add it to the PII inventory, never in list rows. Record-on-behalf also supports `DECLINE` (to DECLINED, requires basis, reporter and reason), which is not the same as the coordinator's CANCEL.
-8. **Region and offers.** A mission offer requires a non-null `region_code`; unassigned requests are corrected first. After the first offer or admission the attribution lock applies.
+7. **Teams without the app.** Police and military units are `GOVERNMENT`/`MILITARY` teams in `COORDINATOR` mode. Create one team per deployable squad because the demo slot is one active rescue mission per team. `external_contact_note` is PII (commander phone): add it to the PII inventory, never in list rows. Record-on-behalf also supports `DECLINE` (to DECLINED, requires basis, reporter and reason), which is not the same as the coordinator's CANCEL.
+8. **Offers.** A mission offer requires the request to carry an organization attribution. After the first offer or admission the attribution lock applies.
 9. **Releasing the attribution lock.** `attribution_locked_at` is set by the first offer or by Logistics admission. New `logistics_admitted_at` is set only by admission. A coordinator may release the lock (`POST /requests/{id}/attribution-lock/release`, audited) only when the cycle has no mission and Response's read of Logistics confirms no cycle with needs. A failed Logistics creation therefore no longer freezes the request forever.
 10. **Closing requests that never touched Logistics.** If `logistics_admitted_at IS NULL` at the barrier (admission is blocked while CANCELLING/RESOLVING), cancel skips the freeze and resolve skips the seal; `resolution_seal_id` may then be NULL. Cancelling or resolving a spam or rescue-only request no longer depends on Logistics being up.
 11. **Supplements.** A pending material supplement shows an alert and blocks only `verify` of an unverified request and the final `resolve`. It does not block priority change or mission offers, because missions use the approved snapshot and a life-safety offer must not wait for review.
@@ -2547,7 +2535,7 @@ Goal: a team that already works on the request can carry and hand over the aid, 
 ### 28.4 Column and index discipline (applies to every migration)
 
 - A column exists only if the task table in 01 names its writer (endpoint, job, seed or trigger) and its reader (endpoint, report, integrity check or audit). Removed or reworked in this round: `request_subject.location_source = 'GEOCODED'` (no geocoding exists), `idempotency_record.response_body`, `fulfillment_cycle.intent_id` (replaced by `cycle_intent`), `handoff_record.state/version` (replaced by `handoff_loss_review`), recovery hash/expiry pairs (replaced by `capability_recovery`). `vehicle.capacity` is read by the capacity warning; `donation_drive.opens_at/closes_at` by the declaration check; `campaign.starts_at/ends_at` are display only and must not drive state; `request_subject.contactability` is a reporter-declared intake fact and is not updated by contact attempts.
-- Indexes: one per proven query or constraint. `assistance_request` merges the review-lane, SUBMITTED-alert and overdue-VERIFYING scans into one partial `(organization_id, received_at, id) WHERE status IN ('SUBMITTED','VERIFYING')` and keeps at most: org FIFO, org+region FIFO, unassigned, attention, reporter, phone (partial `WHERE reporter_contact_phone IS NOT NULL`), canonical, campaign. Drop the foreign-key-only indexes on `item_id`/`warehouse_id`/`capacity_unit` columns (`need_item_idx`, `donation_line_item_idx`, `receipt_count_line_item_idx`, `distribution_line_item_idx`, `drive_item_item_idx`, `stock_balance_item_idx`, `item_unit_idx`, `vehicle_unit_idx`, `drive_warehouse_idx`, `commitment_warehouse_idx`, `distribution_warehouse_idx`, `receipt_warehouse_idx`) unless a measured query needs them. Region-filtered fulfillment reports need `(region_code, created_at)` on the cycle; donation phone throttling is done at Nginx or by a bounded time-window index, not a table scan. Every status-first list index is rewritten with the organization and time first.
+- Indexes: one per proven query or constraint. `assistance_request` merges the review-lane, SUBMITTED-alert and overdue-VERIFYING scans into one partial `(organization_id, received_at, id) WHERE status IN ('SUBMITTED','VERIFYING')` and keeps at most: org FIFO, attention, reporter, phone (partial `WHERE reporter_contact_phone IS NOT NULL`), canonical, campaign. Drop the foreign-key-only indexes on `item_id`/`warehouse_id`/`capacity_unit` columns (`need_item_idx`, `donation_line_item_idx`, `receipt_count_line_item_idx`, `distribution_line_item_idx`, `drive_item_item_idx`, `stock_balance_item_idx`, `item_unit_idx`, `vehicle_unit_idx`, `drive_warehouse_idx`, `commitment_warehouse_idx`, `distribution_warehouse_idx`, `receipt_warehouse_idx`) unless a measured query needs them. Fulfillment reports filtered by time need a `(created_at)` index on the cycle; donation phone throttling is done at Nginx or by a bounded time-window index, not a table scan. Every status-first list index is rewritten with the organization and time first.
 
 ### 28.5 Platform references for these choices
 

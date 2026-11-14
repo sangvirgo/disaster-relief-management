@@ -87,7 +87,7 @@ try {
 
   const jobs = new JobRunner(dataSource);
   const activeJob = jobs.runOnce('technical.idempotency.test', async (manager) => {
-    await claimBatch(manager, 'SELECT code FROM region ORDER BY code', [], 10);
+    await claimBatch(manager, 'SELECT code FROM incident_category ORDER BY code', [], 10);
     signalJobStarted();
     await heldJob;
   });
