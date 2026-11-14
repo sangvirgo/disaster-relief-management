@@ -43,7 +43,7 @@
   max-width: 450px;
   padding: 28px 32px 30px;
   border: 1px solid #dbeafe;
-  background: linear-gradient(170deg, #f0f9ff 0, #fff 155px);
+  background: var(--color-surface-card);
 }
 .auth-brand {
   display: flex;
@@ -175,7 +175,7 @@
   min-height: 49px;
   margin-top: 4px;
   border-radius: 12px;
-  background: linear-gradient(110deg, #2563eb, #1782bd);
+  background: var(--color-primary);
   box-shadow: 0 7px 18px rgba(37, 99, 235, 0.18);
 }
 .auth-modal-card form > .button:hover:not(:disabled) {
@@ -213,7 +213,7 @@
 }
 .account-layout--profile-only { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; max-width: 720px; margin-inline: auto; }
 .account-profile {
-  background: linear-gradient(155deg, #f0fdf4, #fff 58%);
+  background: var(--color-surface-card);
 }
 .account-profile h2 {
   font-size: 22px;
@@ -314,9 +314,10 @@
 .priority-badge[data-priority='P4'] { --priority-bg: #eff6ff; --priority-border: #93c5fd; --priority-color: #1e40af; }
 .queue-status-chip { display: inline-flex; align-items: center; gap: 8px; }
 .queue-status-chip .priority-badge { margin-block: -2px; }
-.admin-detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-right: 92px; }
-.admin-detail-heading h2 { margin: 8px 0; }
-.admin-action-menu { position: relative; margin-left: auto; }
+.admin-detail-heading { position: relative; display: flex; align-items: center; min-height: 48px; padding-right: 180px; }
+.admin-detail-heading h2 { margin: 0; }
+.record-detail-dialog:has(.admin-detail-heading) > .detail-close-button { top: 28px; right: 28px; min-height: 44px; }
+.admin-action-menu { position: absolute; top: 2px; right: 114px; z-index: 3; }
 .admin-action-menu summary { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid #cbd7e7; border-radius: 10px; cursor: pointer; color: #24446f; background: #f8fafc; font-size: 25px; line-height: 1; list-style: none; }
 .admin-action-menu summary::-webkit-details-marker { display: none; }
 .admin-action-menu summary:focus-visible { outline: 3px solid #8bb8ff; outline-offset: 2px; }
@@ -325,7 +326,11 @@
 .admin-action-options button:hover, .admin-action-options button:focus-visible { background: #eef5ff; }
 .admin-action-options button:disabled { opacity: .45; cursor: not-allowed; }
 .admin-selected-action { width: 100%; }
-@media (max-width: 560px) { .admin-detail-heading { padding-right: 0; } .admin-detail-heading h2 { padding-right: 54px; } .sos-tracking-receipt .button { width: 100%; } }
+.admin-selected-action > label { display: grid; gap: 8px; font-weight: 700; }
+.admin-selected-action > label select { width: 100%; }
+.admin-grants-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 18px 0 12px; }
+.admin-grants-heading h3 { margin: 0; }
+@media (max-width: 560px) { .admin-detail-heading { min-height: 104px; padding-right: 0; align-items: flex-end; } .admin-action-menu { top: 0; right: 114px; } .sos-tracking-receipt .button { width: 100%; } }
 .admin-status-badge, .admin-version-badge { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border: 1px solid #d6e0ed; border-radius: 9px; background: #f7f9fc; color: #43546b; font-size: 13px; font-weight: 700; }
 .admin-status-badge.is-active { border-color: #a9dfc4; background: #ecfdf3; color: #087443; }
 .admin-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
@@ -530,8 +535,8 @@
 .command-choice-card.selected .command-choice-indicator { border-color: var(--color-primary); background: var(--color-primary); }
 .emergency-bar {
   position: sticky;
-  top: 0;
-  z-index: 20;
+  top: 56px;
+  z-index: var(--z-sticky);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -539,7 +544,7 @@
   gap: 8px 12px;
   padding: 9px 14px;
   border-bottom: 1px solid #7f1d1d;
-  background: linear-gradient(105deg, #991b1b, #c52a24);
+  background: var(--color-emergency-dark);
   color: #fff;
   font-size: 13px;
   box-shadow: 0 3px 12px rgba(127, 29, 29, 0.17);
@@ -710,7 +715,7 @@
   padding: 16px;
   border: 1px solid #cbd5e1;
   border-radius: 16px;
-  background: linear-gradient(120deg, #f0f9ff, #f0fdf4);
+  background: var(--color-surface-subtle);
 }
 .region-control-heading {
   display: flex;
@@ -801,7 +806,7 @@
 }
 
 .report-card {
-  background: linear-gradient(175deg, #f8fbff, #fff 180px);
+  background: var(--color-surface-card);
 }
 .report-period {
   border: 1px solid #bfdbfe;
@@ -900,7 +905,7 @@
   align-items: start;
 }
 .campaign-list-panel {
-  background: linear-gradient(175deg, #f8fbff, #fff 170px);
+  background: var(--color-surface-card);
 }
 .campaign-filters {
   display: flex;
@@ -1089,13 +1094,13 @@
 .donation-action {
   min-height: 46px;
   border-color: #1762c8;
-  background: linear-gradient(110deg, #2468dc, #1682bd);
+  background: var(--color-primary);
   color: #fff;
   box-shadow: 0 5px 14px rgba(25, 96, 185, 0.18);
 }
 .donation-action:hover:not(:disabled) {
   border-color: #1457b8;
-  background: linear-gradient(110deg, #1e5ecb, #1175ae);
+  background: var(--color-primary-dark);
   box-shadow: 0 8px 17px rgba(25, 96, 185, 0.23);
   transform: translateY(-1px);
 }
@@ -1346,6 +1351,18 @@
   font-size: .83rem;
 }
 .heatmap-context strong { color: #183a60; }
+.heatmap-category-filter { display: grid; gap: 7px; width: min(100%, 360px); margin: 14px 0 16px; color: var(--color-text-secondary); font-size: 13px; font-weight: 700; }
+.heatmap-category-filter > span { padding-left: 2px; }
+.heatmap-category-select-wrap { position: relative; display: block; min-width: 0; }
+.heatmap-category-select-wrap::after { content: ''; position: absolute; right: 17px; top: 50%; width: 8px; height: 8px; border-right: 2px solid var(--color-primary-dark); border-bottom: 2px solid var(--color-primary-dark); transform: translateY(-65%) rotate(45deg); pointer-events: none; }
+.heatmap-category-filter select { appearance: none; display: block; width: 100%; min-height: 46px; padding: 10px 42px 10px 14px; border: 1px solid #cbd9ed; border-radius: 12px; background: #fff; color: var(--color-text-primary); font: inherit; font-size: 14px; font-weight: 600; box-shadow: 0 1px 3px #0f172a0a; cursor: pointer; }
+.heatmap-category-filter select:hover { border-color: var(--color-primary-light); }
+.heatmap-category-filter select:focus-visible { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 4px #2563eb24; }
+.admin-team-management { display: grid; gap: 18px; min-width: 0; }
+.admin-team-option { display: grid; gap: 6px; width: 100%; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.admin-team-option span, .admin-team-option small { color: var(--color-text-secondary); }
+.admin-team-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+@media (max-width: 800px) { .admin-team-actions { grid-template-columns: minmax(0, 1fr); } }
 .heatmap-context-dot { width: 8px; height: 8px; border-radius: 50%; background: #e25a38; flex: none; }
 .sos-form [aria-invalid="true"] { border-color: #c53939; box-shadow: 0 0 0 3px #c5393922; }
 .sos-field-error { display: block; color: #a62626; font-size: .84rem; line-height: 1.4; margin-top: 5px; font-weight: 600; }
@@ -1386,7 +1403,7 @@
 .admin-create-brand-copy strong { color: #174c83; font-size: 22px; line-height: 1.1; }
 .admin-create-brand-copy small { color: #54718d; font-size: 10px; font-weight: 750; letter-spacing: .09em; }
 .record-detail-dialog.admin-create-dialog > .command-form { border-top: 0; padding-top: 0; }
-.admin-create-dialog > .command-form > .button { width: 100%; min-height: 46px; border: 0; border-radius: 12px; background-color: #205be5; background-image: linear-gradient(110deg, #2865eb, #174fc6 55%, #0b7691); background-size: 180% 100%; color: #fff; font-weight: 750; box-shadow: 0 8px 20px #1e56d13d; transition: background-position .25s ease, box-shadow .2s ease, transform .2s ease; }
+.admin-create-dialog > .command-form > .button { width: 100%; min-height: var(--control-h-lg); border: 1px solid var(--color-primary); border-radius: var(--radius-sm); background: var(--color-primary); color: var(--color-text-inverse); font-weight: 600; box-shadow: none; transition: background-color var(--ease), border-color var(--ease); }
 .admin-create-dialog > .command-form > .button:hover:not(:disabled) { background-position: 100% 0; box-shadow: 0 12px 26px #1e56d152; }
 .admin-create-dialog > .command-form > .button:focus-visible { outline: 3px solid #8bb8ff; outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) { .admin-create-dialog > .command-form > .button { transition: none; } }

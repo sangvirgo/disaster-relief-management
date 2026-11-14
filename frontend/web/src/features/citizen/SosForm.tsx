@@ -5,6 +5,8 @@ import { me } from '../../auth/session';
 import type { components as ResponseComponents } from '../../api/generated/response';
 import { requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { LocationPicker } from '../../maps/LocationPicker';
+import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/ui/Card';
 import { clearSosDraft, readSosDraft, writeSosDraft, type SosDraft } from './sosDraft';
 
 // Versioned demo catalog: docs/backend/seed/seed-response.sql (2026-10-18).
@@ -340,7 +342,7 @@ export function SosForm({
       </section>
     );
   return (
-    <form className="card form-stack sos-form" onSubmit={submit} onBlurCapture={(event) => {
+    <form className="form-stack sos-form" onSubmit={submit} onBlurCapture={(event) => {
       const field = (event.target as HTMLElement).dataset.sosField;
       if (field) setTouched((current) => ({ ...current, [field]: true }));
     }} onChange={(event) => {
@@ -351,11 +353,27 @@ export function SosForm({
       setNetworkError(false);
       pending.current = null;
     }} noValidate>
-      <h2>Thông tin yêu cầu hỗ trợ</h2>
       {restored && <div className="notice warning" role="status">
         <strong>Đã khôi phục bản nháp chưa gửi.</strong> Kiểm tra lại tình huống và vị trí trước khi gửi.
         <button type="button" className="button secondary" onClick={discardDraft}>Bỏ bản nháp</button>
       </div>}
+      <Card className="sos-location-card" aria-labelledby="sos-location-title">
+        <div className="location-heading" id="sos-location">
+          <h2 id="sos-location-title">Vị trí cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></h2>
+          {mode === 'SELF' && <Button type="button" variant="secondary" onClick={locate}>
+            Dùng vị trí hiện tại
+          </Button>}
+        </div>
+        {fieldMessage('location')}
+        <LocationPicker
+          initiallyOpen
+          value={longitude && latitude ? { longitude: Number(longitude), latitude: Number(latitude) } : null}
+          onSelect={chooseMapPoint}
+        />
+        {longitude && latitude && <p className="sos-selected-coordinates">Vị trí đã chọn: {Number(latitude).toFixed(5)}, {Number(longitude).toFixed(5)}</p>}
+      </Card>
+      <Card className="sos-information-card" aria-labelledby="sos-information-title">
+      <h2 id="sos-information-title">Thông tin yêu cầu hỗ trợ</h2>
       {user && (
         <fieldset>
           <legend>Người cần hỗ trợ</legend>
@@ -552,22 +570,6 @@ export function SosForm({
         />{' '}
         Có dấu hiệu nguy hiểm tính mạng theo thông tin tôi biết
       </label>
-      <div className="location-heading" id="sos-location">
-        <h3>Vị trí cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></h3>
-        {mode === 'SELF' && <button type="button" className="button secondary" onClick={locate}>
-          Dùng vị trí hiện tại
-        </button>}
-      </div>
-      {fieldMessage('location')}
-      <LocationPicker
-        value={
-          longitude && latitude
-            ? { longitude: Number(longitude), latitude: Number(latitude) }
-            : null
-        }
-        onSelect={chooseMapPoint}
-      />
-      {longitude && latitude && <p className="sos-selected-coordinates">Vị trí đã chọn: {Number(latitude).toFixed(5)}, {Number(longitude).toFixed(5)}</p>}
       {mode === 'PROXY' && (
         <>
           <div className="notice warning">
@@ -640,12 +642,12 @@ export function SosForm({
             'Bạn có thể thử lại với cùng yêu cầu; ứng dụng giữ khóa gửi lại khi trang còn mở.'}
         </p>
       )}
-      <button type="submit" className="button" disabled={busy}>
+      </Card>
+      <div className="sos-submit-bar">
+      <Button type="submit" variant="emergency" size="lg" disabled={busy} loading={busy}>
         {busy ? 'Đang gửi…' : 'Gửi yêu cầu SOS'}
-      </button>
-      <small>
-        Nếu chưa biết rõ loại sự cố, hãy chọn “Chưa rõ” và mô tả tình huống bằng lời của bạn.
-      </small>
+      </Button>
+      </div>
     </form>
   );
 }

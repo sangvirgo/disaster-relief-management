@@ -10231,6 +10231,16 @@
                               "type": "string",
                               "format": "uuid"
                             },
+                            "organization_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "operating_region_code": {
+                              "type": "string"
+                            },
+                            "nationwide_coverage": {
+                              "type": "boolean"
+                            },
                             "name": {
                               "type": "string"
                             },
@@ -10338,6 +10348,9 @@
                           },
                           "required": [
                             "id",
+                            "organization_id",
+                            "operating_region_code",
+                            "nationwide_coverage",
                             "name",
                             "kind",
                             "reporting_mode",
@@ -10502,6 +10515,16 @@
                         "type": "string",
                         "format": "uuid"
                       },
+                      "organization_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "operating_region_code": {
+                        "type": "string"
+                      },
+                      "nationwide_coverage": {
+                        "type": "boolean"
+                      },
                       "name": {
                         "type": "string"
                       },
@@ -10609,6 +10632,9 @@
                     },
                     "required": [
                       "id",
+                      "organization_id",
+                      "operating_region_code",
+                      "nationwide_coverage",
                       "name",
                       "kind",
                       "reporting_mode",
@@ -10773,6 +10799,16 @@
                         "type": "string",
                         "format": "uuid"
                       },
+                      "organization_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "operating_region_code": {
+                        "type": "string"
+                      },
+                      "nationwide_coverage": {
+                        "type": "boolean"
+                      },
                       "name": {
                         "type": "string"
                       },
@@ -10880,6 +10916,9 @@
                     },
                     "required": [
                       "id",
+                      "organization_id",
+                      "operating_region_code",
+                      "nationwide_coverage",
                       "name",
                       "kind",
                       "reporting_mode",
@@ -10980,6 +11019,16 @@
                         "type": "string",
                         "format": "uuid"
                       },
+                      "organization_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "operating_region_code": {
+                        "type": "string"
+                      },
+                      "nationwide_coverage": {
+                        "type": "boolean"
+                      },
                       "name": {
                         "type": "string"
                       },
@@ -11087,6 +11136,9 @@
                     },
                     "required": [
                       "id",
+                      "organization_id",
+                      "operating_region_code",
+                      "nationwide_coverage",
                       "name",
                       "kind",
                       "reporting_mode",
@@ -11180,6 +11232,13 @@
                     },
                     "availability": {
                       "type": "string"
+                    },
+                    "operating_region_code": {
+                      "type": "string",
+                      "pattern": "^[A-Z0-9_]{2,32}$"
+                    },
+                    "nationwide_coverage": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -13489,6 +13548,16 @@
                         "type": "string",
                         "format": "uuid"
                       },
+                      "organization_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "operating_region_code": {
+                        "type": "string"
+                      },
+                      "nationwide_coverage": {
+                        "type": "boolean"
+                      },
                       "name": {
                         "type": "string"
                       },
@@ -13596,6 +13665,9 @@
                     },
                     "required": [
                       "id",
+                      "organization_id",
+                      "operating_region_code",
+                      "nationwide_coverage",
                       "name",
                       "kind",
                       "reporting_mode",

@@ -7,12 +7,13 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { api } from '../../api/client';
 import type { components } from '../../api/generated/response';
-import { requestStatusLabel, timeLabel } from '../../i18n/labels';
+import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 
 setWorkerUrl(workerUrl);
 
 type HeatmapResult = components['schemas']['HeatmapResult'];
 type HeatmapCell = components['schemas']['HeatmapCell'];
+const incidentCategories = ['FLOOD', 'STORM', 'LANDSLIDE', 'FIRE', 'TRAPPED', 'MEDICAL', 'SUPPLY_SHORTAGE', 'OTHER', 'UNKNOWN'] as const;
 export type SelectedSos = {
   id: string;
   trackingCode: string;
@@ -372,6 +373,7 @@ export function HeatmapPanel({
   showLayers?: boolean;
 }) {
   const [layer, setLayer] = useState<'confirmed' | 'unverified'>('unverified');
+  const [category, setCategory] = useState('');
   useEffect(() => {
     if (compact && selected?.status)
       setLayer(['SUBMITTED', 'VERIFYING'].includes(selected.status) ? 'unverified' : 'confirmed');
@@ -389,7 +391,7 @@ export function HeatmapPanel({
   const count = visibleCells.reduce((sum, cell) => sum + cell.count, 0);
   const targetRegions = overviewRegions?.length ? [...new Set(overviewRegions)] : region ? [region] : [];
   const regionKey = targetRegions.join('|');
-  const queryKey = `${regionKey}|${layer}|${resolution}`;
+  const queryKey = `${regionKey}|${layer}|${category}|${resolution}`;
   const onResolutionChange = useCallback((next: typeof resolution) => {
     setResolution((current) => current === next ? current : next);
   }, []);
@@ -415,6 +417,7 @@ export function HeatmapPanel({
       const params = new URLSearchParams({
         from, to: now, status_layer: layer, region_code: code, cell_m: String(resolution),
       });
+      if (category) params.set('category', category);
       return api<HeatmapResult>('response', `/map/heatmap?${params}`);
     })).then((results) => {
       if (!active) return;
@@ -430,7 +433,7 @@ export function HeatmapPanel({
       setData({ items: values.flatMap((result) => result.value.items), generated_at: now });
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [regionKey, layer, resolution, refresh]);
+  }, [regionKey, layer, category, resolution, refresh]);
 
   useEffect(() => {
     if (!regionKey) return;
@@ -448,10 +451,17 @@ export function HeatmapPanel({
         <button type="button" className={layer === 'unverified' ? 'active' : ''}
           onClick={() => setLayer('unverified')}>Chưa xác minh</button>
       </div>}
+      <label className="heatmap-category-filter">
+        <span>Loại sự cố</span>
+        <span className="heatmap-category-select-wrap"><select value={category} onChange={(event) => setCategory(event.target.value)} aria-label="Lọc bản đồ nhiệt theo loại sự cố">
+          <option value="">Tất cả loại sự cố</option>
+          {incidentCategories.map((code) => <option key={code} value={code}>{label(code)}</option>)}
+        </select></span>
+      </label>
       <div className="heatmap-context" role="status">
         <span className="heatmap-context-dot" aria-hidden="true" />
         <strong>Lớp mật độ: {layer === 'unverified' ? 'SOS chưa xác minh' : 'SOS đã xác minh'}</strong>
-        <span>trong 7 ngày gần đây</span>
+        <span>{category ? `· ${label(category)}` : '· Tất cả loại sự cố'} · trong 7 ngày gần đây</span>
       </div>
       {selected?.status && <p className="muted">SOS đang chọn: {selected.trackingCode} · {requestStatusLabel(selected.status)}. Ghim vị trí được hiển thị riêng với lớp mật độ.</p>}
       {showMap && <button type="button" className="button secondary heatmap-refresh" disabled={loading}
@@ -481,7 +491,7 @@ export function HeatmapPanel({
             Ghim đỏ nhấp nháy là SOS đang chọn.
           </p>}
           {count === 0 && <p className="muted">
-            Chưa có SOS thuộc lớp dữ liệu này trong khu vực và thời gian đã chọn.
+            Chưa có SOS thuộc lớp dữ liệu và loại sự cố đã chọn trong khu vực và thời gian này.
           </p>}
           <p className="muted">Cập nhật: {timeLabel(data.generated_at)}</p>
         </>}

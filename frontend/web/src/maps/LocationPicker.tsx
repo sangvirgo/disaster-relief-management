@@ -10,65 +10,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 setWorkerUrl(workerUrl);
 
 export type Point = { longitude: number; latitude: number };
-type SearchPlace = { id: string; name: string; address: string; point: Point };
-
-function photonPlaces(value: unknown): SearchPlace[] {
-  if (
-    !value ||
-    typeof value !== 'object' ||
-    !('features' in value) ||
-    !Array.isArray(value.features)
-  )
-    return [];
-  return value.features.flatMap((feature: unknown) => {
-    if (
-      !feature ||
-      typeof feature !== 'object' ||
-      !('geometry' in feature) ||
-      !('properties' in feature)
-    )
-      return [];
-    const { geometry, properties } = feature as {
-      geometry?: { coordinates?: unknown };
-      properties?: Record<string, unknown>;
-    };
-    const coordinates = geometry?.coordinates;
-    if (!Array.isArray(coordinates) || coordinates.length < 2) return [];
-    const [longitude, latitude] = coordinates;
-    if (
-      typeof longitude !== 'number' ||
-      typeof latitude !== 'number' ||
-      !Number.isFinite(longitude) ||
-      !Number.isFinite(latitude) ||
-      Math.abs(longitude) > 180 ||
-      Math.abs(latitude) > 90
-    )
-      return [];
-    const field = (key: string) =>
-      typeof properties?.[key] === 'string' ? String(properties[key]).trim() : '';
-    if (field('countrycode').toUpperCase() !== 'VN') return [];
-    const name = field('name') || field('street') || 'Địa điểm chưa có tên';
-    const address = [
-      ...new Set(
-        [
-          field('housenumber'),
-          field('street'),
-          field('locality'),
-          field('district'),
-          field('city'),
-        ].filter(Boolean)
-      ),
-    ].join(', ');
-    return [
-      {
-        id: `${field('osm_type')}-${String(properties?.osm_id ?? '')}-${longitude}-${latitude}`,
-        name,
-        address,
-        point: { longitude, latitude },
-      },
-    ];
-  });
-}
+type SearchPlace = { id: string; name: string; address: string; point?: Point; magicKey?: string };
 
 const envApiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() || '';
 const tileUrl = (import.meta.env.VITE_OSM_TILE_URL as string | undefined)?.trim() || '';
@@ -90,26 +32,35 @@ function samePoint(a: Point, b: Point) {
 }
 
 function nearbyAddress(value: unknown): string | null {
-  if (!value || typeof value !== 'object' || !('features' in value)) return null;
-  const features = value.features;
-  if (!Array.isArray(features)) return null;
-  const properties = features[0]?.properties as Record<string, unknown> | undefined;
-  if (!properties || properties.countrycode !== 'VN') return null;
-  const part = (key: string) => typeof properties[key] === 'string' ? String(properties[key]).trim() : '';
-  const street = [part('housenumber'), part('street')].filter(Boolean).join(' ');
-  const parts = [street, street ? '' : part('name'), part('locality'), part('district'),
-    part('city'), part('county'), part('state'), part('country')].filter(Boolean);
-  return [...new Set(parts)].join(', ') || null;
+  if (!value || typeof value !== 'object') return null;
+  const result = value as { display_name?: unknown; address?: Record<string, unknown> };
+  const address = result.address;
+  if (!address || address.country_code !== 'vn') return null;
+  const part = (key: string) => typeof address[key] === 'string' ? String(address[key]).trim() : '';
+  const street = [part('house_number'), part('road') || part('pedestrian')].filter(Boolean).join(' ');
+  const parts = [street, part('neighbourhood') || part('quarter') || part('suburb'),
+    part('city') || part('town') || part('village') || part('county'), part('state')].filter(Boolean);
+  return [...new Set(parts)].join(', ') ||
+    (typeof result.display_name === 'string' ? result.display_name.trim() : null);
+}
+
+function arcgisNearbyAddress(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null;
+  const result = value as { address?: { Match_addr?: unknown; CountryCode?: unknown }; error?: unknown };
+  if (result.error || result.address?.CountryCode !== 'VNM') return null;
+  return typeof result.address.Match_addr === 'string' ? result.address.Match_addr.trim() || null : null;
 }
 
 export function LocationPicker({
   value,
   onSelect,
+  initiallyOpen = false,
 }: {
   value: Point | null;
   onSelect: (point: Point | null) => void;
+  initiallyOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const activeGoogleKey = envApiKey;
   const [mapEngine, setMapEngine] = useState<'osm' | 'google'>(() =>
     activeGoogleKey ? 'google' : 'osm'
@@ -130,11 +81,13 @@ export function LocationPicker({
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
 
-  // Photon uses the same OSM search index as the current Mobile picker.
+  // ArcGIS provides live suggestions; Photon is a backup when that service is unavailable.
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [suggestions, setSuggestions] = useState<SearchPlace[]>([]);
   const searchAbortRef = useRef<AbortController | null>(null);
+  const searchCacheRef = useRef(new Map<string, SearchPlace[]>());
+  const lastNominatimRequestRef = useRef(0);
   const addressAbortRef = useRef<AbortController | null>(null);
   const addressTimerRef = useRef<number | null>(null);
   const addressCacheRef = useRef(new Map<string, string>());
@@ -148,7 +101,9 @@ export function LocationPicker({
 
   function lookupAddress(point: Point, confirmed = false) {
     searchOnTypingRef.current = false;
+    searchAbortRef.current?.abort();
     addressAbortRef.current?.abort();
+    addressAbortRef.current = null;
     if (addressTimerRef.current !== null) window.clearTimeout(addressTimerRef.current);
     const original = chosenSearchRef.current;
     if (original && samePoint(original.point, point)) {
@@ -164,30 +119,54 @@ export function LocationPicker({
       setSelectedAddress(`${prefix}: ${cached}`);
       return;
     }
+    const coordinateLabel = `Tọa độ ${pointLabel(point)}`;
     setSearchQuery('Đang tìm địa chỉ gần ghim…');
-    setSelectedAddress('Đang tìm địa chỉ gần vị trí ghim…');
+    setSelectedAddress(`${confirmed ? 'Đã xác nhận vị trí' : 'Vị trí ghim'}: ${coordinateLabel}. Đang tìm địa chỉ gần đúng…`);
     const controller = new AbortController();
     addressAbortRef.current = controller;
+    const wait = 150;
     addressTimerRef.current = window.setTimeout(async () => {
+      const timeout = window.setTimeout(() => controller.abort(), 8000);
       try {
-        const response = await fetch(`https://photon.komoot.io/reverse?lon=${encodeURIComponent(point.longitude)}&lat=${encodeURIComponent(point.latitude)}&limit=1`, { signal: controller.signal });
-        if (!response.ok) throw new Error('ADDRESS_LOOKUP_FAILED');
-        const address = nearbyAddress(await response.json());
+        let address: string | null = null;
+        try {
+          const response = await fetch(
+            `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?location=${encodeURIComponent(`${point.longitude},${point.latitude}`)}&langCode=VI&featureTypes=PointAddress%2CStreetAddress%2CStreetName&forStorage=false&f=json`,
+            { signal: controller.signal }
+          );
+          if (response.ok) address = arcgisNearbyAddress(await response.json());
+        } catch {
+          // Try OSM below when the primary reverse lookup is unavailable.
+        }
+        if (!address && !controller.signal.aborted) {
+          const delay = Math.max(0, 1100 - (Date.now() - lastNominatimRequestRef.current));
+          if (delay) await new Promise<void>((resolve) => window.setTimeout(resolve, delay));
+          if (controller.signal.aborted) return;
+          lastNominatimRequestRef.current = Date.now();
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(point.latitude)}&lon=${encodeURIComponent(point.longitude)}&zoom=17&layer=address&addressdetails=1&accept-language=vi`,
+            { signal: controller.signal }
+          );
+          if (response.ok) address = nearbyAddress(await response.json());
+        }
         if (controller.signal.aborted) return;
         if (address) addressCacheRef.current.set(key, address);
-        setSearchQuery(address || 'Chưa tìm được địa chỉ gần ghim');
-        setSelectedAddress(address ? `${prefix}: ${address}` : 'Chưa tìm được địa chỉ gần ghim. Hãy đối chiếu trực tiếp trên bản đồ.');
+        setSearchQuery(address || coordinateLabel);
+        setSelectedAddress(address ? `${prefix}: ${address}` : `Chưa tìm được địa chỉ gần ghim. Vị trí đã chọn: ${coordinateLabel}.`);
       } catch {
-        if (!controller.signal.aborted) {
-          setSearchQuery('Chưa tra được địa chỉ gần ghim');
-          setSelectedAddress('Chưa tra được địa chỉ gần ghim. Hãy đối chiếu trực tiếp trên bản đồ.');
+        if (addressAbortRef.current === controller) {
+          setSearchQuery(coordinateLabel);
+          setSelectedAddress(`Chưa tra được địa chỉ gần ghim. Vị trí đã chọn: ${coordinateLabel}.`);
         }
+      } finally {
+        window.clearTimeout(timeout);
       }
-    }, 350);
+    }, wait);
   }
 
   useEffect(() => () => {
     addressAbortRef.current?.abort();
+    addressAbortRef.current = null;
     if (addressTimerRef.current !== null) window.clearTimeout(addressTimerRef.current);
   }, [open, mapEngine]);
 
@@ -245,7 +224,8 @@ export function LocationPicker({
         }
       });
     };
-    map.on('dragstart', () => { userMovedMap = true; setMoving(true); });
+    map.on('dragstart', () => { userMovedMap = true; chosenSearchRef.current = null; setMoving(true); });
+    map.on('zoomstart', () => { if (!suppressMoveRef.current) { userMovedMap = true; chosenSearchRef.current = null; } });
     map.on('move', updateCenter);
     map.on('moveend', () => {
       setMoving(false);
@@ -258,6 +238,7 @@ export function LocationPicker({
     });
     map.on('click', (event: L.LeafletMouseEvent) => {
       userMovedMap = true;
+      chosenSearchRef.current = null;
       map.setView(event.latlng, map.getZoom(), { animate: false });
     });
 
@@ -326,7 +307,7 @@ export function LocationPicker({
         }
 
         let userMovedMap = false;
-        moveStartListener = map.addListener('dragstart', () => { userMovedMap = true; setMoving(true); });
+        moveStartListener = map.addListener('dragstart', () => { userMovedMap = true; chosenSearchRef.current = null; setMoving(true); });
         moveListener = map.addListener('center_changed', () => {
           if (suppressMoveRef.current || !userMovedMap) return;
           const center = map.getCenter();
@@ -349,6 +330,7 @@ export function LocationPicker({
         clickListener = map.addListener('click', (event: google.maps.MapMouseEvent) => {
           if (!event.latLng) return;
           userMovedMap = true;
+          chosenSearchRef.current = null;
           map.panTo(event.latLng);
         });
 
@@ -372,6 +354,9 @@ export function LocationPicker({
               const lat = place.location.lat();
               const lng = place.location.lng();
               const point = { latitude: lat, longitude: lng };
+              addressAbortRef.current?.abort();
+              addressAbortRef.current = null;
+              if (addressTimerRef.current !== null) window.clearTimeout(addressTimerRef.current);
               setSelectedAddress(
                 place.formattedAddress || 'Đã chọn địa điểm. Hãy xác nhận địa chỉ.'
               );
@@ -380,8 +365,10 @@ export function LocationPicker({
                 point,
                 label: place.formattedAddress || pointLabel(point),
               };
-              confirmedPointRef.current = null;
-              selectRef.current(null);
+              if (confirmedPointRef.current) {
+                confirmedPointRef.current = null;
+                selectRef.current(null);
+              }
             } catch {
               if (active)
                 setError('Không thể lấy tọa độ địa điểm này. Hãy chạm điểm trực tiếp trên bản đồ.');
@@ -413,7 +400,7 @@ export function LocationPicker({
     };
   }, [open, mapEngine, activeGoogleKey]);
 
-  // Debounce public Photon requests and ignore responses from superseded text.
+  // Debounce live suggestions and ignore responses from superseded text.
   useEffect(() => {
     if (!open || mapEngine !== 'osm' || !searchOnTypingRef.current) return;
     const query = searchQuery.trim();
@@ -422,25 +409,74 @@ export function LocationPicker({
       setSearching(false);
       return;
     }
-    const timer = window.setTimeout(() => void searchPlaces(query), 450);
+    const timer = window.setTimeout(() => {
+      if (searchOnTypingRef.current) void searchPlaces(query);
+    }, 250);
     return () => window.clearTimeout(timer);
   }, [searchQuery, open, mapEngine]);
 
   async function searchPlaces(query: string) {
+    const cacheKey = query.toLocaleLowerCase('vi');
+    const cached = searchCacheRef.current.get(cacheKey);
+    if (cached) {
+      searchAbortRef.current?.abort();
+      searchAbortRef.current = null;
+      setSearching(false);
+      setSuggestions(cached);
+      setError('');
+      if (!cached.length) setError('Không tìm thấy địa điểm phù hợp. Hãy thử tên khác hoặc kéo bản đồ.');
+      return;
+    }
     searchAbortRef.current?.abort();
     const controller = new AbortController();
     searchAbortRef.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 8500);
     setSearching(true);
     setSuggestions([]);
     setError('');
     try {
-      const res = await fetch(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10&countrycode=VN`,
-        { signal: controller.signal }
-      );
-      if (!res.ok) throw new Error('PLACE_SEARCH_FAILED');
-      const places = photonPlaces(await res.json());
+      let places: SearchPlace[];
+      try {
+        const arcgisController = new AbortController();
+        const abortArcgis = () => arcgisController.abort();
+        controller.signal.addEventListener('abort', abortArcgis, { once: true });
+        const arcgisTimeout = window.setTimeout(abortArcgis, 3500);
+        try {
+          const res = await fetch(
+            `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/suggest?text=${encodeURIComponent(query)}&countryCode=VNM&maxSuggestions=8&f=json`,
+            { signal: arcgisController.signal }
+          );
+          if (!res.ok) throw new Error('PLACE_SEARCH_FAILED');
+          const payload = await res.json() as { suggestions?: Array<{ text?: string; magicKey?: string }> ; error?: unknown };
+          if (payload.error) throw new Error('PLACE_SEARCH_FAILED');
+          places = (payload.suggestions ?? []).flatMap((row) => {
+            if (!row.text || !row.magicKey) return [];
+            const [name, ...address] = row.text.split(',').map((part) => part.trim());
+            return [{ id: row.magicKey, magicKey: row.magicKey, name, address: address.join(', ') }];
+          });
+        } finally {
+          window.clearTimeout(arcgisTimeout);
+          controller.signal.removeEventListener('abort', abortArcgis);
+        }
+      } catch {
+        if (controller.signal.aborted) return;
+        const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&countrycode=VN&limit=8`, { signal: controller.signal });
+        if (!response.ok) throw new Error('PLACE_SEARCH_FAILED');
+        const payload = await response.json() as { features?: Array<{ geometry?: { coordinates?: number[] }; properties?: Record<string, unknown> }> };
+        places = (payload.features ?? []).flatMap((feature, index) => {
+          const coordinates = feature.geometry?.coordinates;
+          const properties = feature.properties ?? {};
+          const name = typeof properties.name === 'string' ? properties.name.trim() : '';
+          if (!name || !coordinates || !Number.isFinite(coordinates[0]) || !Number.isFinite(coordinates[1])) return [];
+          const address = [properties.street, properties.district, properties.city, properties.county, properties.state]
+            .filter((part): part is string => typeof part === 'string' && !!part.trim())
+            .filter((part) => part !== name).join(', ');
+          return [{ id: `photon-${index}-${coordinates.join('-')}`, name, address,
+            point: { longitude: coordinates[0], latitude: coordinates[1] } }];
+        });
+      }
       if (controller.signal.aborted) return;
+      searchCacheRef.current.set(cacheKey, places);
       if (places.length > 0) {
         setSuggestions(places);
       } else {
@@ -450,9 +486,11 @@ export function LocationPicker({
         );
       }
     } catch {
-      if (!controller.signal.aborted)
-        setError('Không thể tìm địa điểm lúc này. Bạn có thể kéo bản đồ đến vị trí cần chọn.');
+      if (searchAbortRef.current === controller) {
+        setError('Chưa tải được gợi ý địa chỉ. Hãy thử lại hoặc kéo bản đồ đến vị trí cần chọn.');
+      }
     } finally {
+      window.clearTimeout(timeout);
       if (searchAbortRef.current === controller) {
         setSearching(false);
         searchAbortRef.current = null;
@@ -460,23 +498,62 @@ export function LocationPicker({
     }
   }
 
-  function chooseSuggestion(item: SearchPlace) {
+  async function chooseSuggestion(item: SearchPlace) {
     searchOnTypingRef.current = false;
     searchAbortRef.current?.abort();
-    const { latitude: lat, longitude: lon } = item.point;
+    addressAbortRef.current?.abort();
+    addressAbortRef.current = null;
+    if (addressTimerRef.current !== null) window.clearTimeout(addressTimerRef.current);
+    let point = item.point;
+    let resolvedLabel = '';
+    if (!point) {
+      const controller = new AbortController();
+      searchAbortRef.current = controller;
+      const timeout = window.setTimeout(() => controller.abort(), 8000);
+      setSearching(true);
+      setError('');
+      try {
+        // Resolve only the suggestion the user selected; typing itself stays lightweight.
+        const query = [item.name, item.address].filter(Boolean).join(', ');
+        const response = await fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=${encodeURIComponent(query)}&magicKey=${encodeURIComponent(item.magicKey ?? '')}&countryCode=VNM&outFields=Match_addr&f=json`, { signal: controller.signal });
+        if (!response.ok) throw new Error('PLACE_RESOLVE_FAILED');
+        const payload = await response.json() as { candidates?: Array<{ location?: { x?: number; y?: number }; address?: string }> ; error?: unknown };
+        if (controller.signal.aborted) return;
+        if (payload.error) throw new Error('PLACE_RESOLVE_FAILED');
+        const candidate = payload.candidates?.[0];
+        const latitude = candidate?.location?.y;
+        const longitude = candidate?.location?.x;
+        if (typeof latitude !== 'number' || typeof longitude !== 'number') throw new Error('PLACE_RESOLVE_FAILED');
+        point = { latitude, longitude };
+        resolvedLabel = candidate?.address ?? '';
+      } catch {
+        if (searchAbortRef.current === controller) setError('Không lấy được vị trí địa chỉ này. Hãy chọn gợi ý khác hoặc kéo bản đồ.');
+        return;
+      } finally {
+        window.clearTimeout(timeout);
+        if (searchAbortRef.current === controller) {
+          searchAbortRef.current = null;
+          setSearching(false);
+        }
+      }
+    }
+    if (!point) return;
+    const { latitude: lat, longitude: lon } = point;
     if (leafletMapRef.current) {
       suppressMoveRef.current = true;
       leafletMapRef.current.setView([lat, lon], 17, { animate: false });
       suppressMoveRef.current = false;
     }
-    const label = [item.name, item.address].filter(Boolean).join(' · ');
-    chosenSearchRef.current = { point: item.point, label };
+    const label = resolvedLabel || [item.name, item.address].filter(Boolean).join(' · ');
+    chosenSearchRef.current = { point, label };
     setSearchQuery(label);
     setSelectedAddress(label);
-    setDraftPoint(item.point);
+    setDraftPoint(point);
     setSuggestions([]);
-    confirmedPointRef.current = null;
-    selectRef.current(null);
+    if (confirmedPointRef.current) {
+      confirmedPointRef.current = null;
+      selectRef.current(null);
+    }
   }
 
   async function confirmCenter() {
@@ -484,13 +561,14 @@ export function LocationPicker({
     const center =
       mapEngine === 'osm' ? leafletMapRef.current?.getCenter() : googleMapRef.current?.getCenter();
     if (!center) return;
-    const point =
+    const centerPoint =
       mapEngine === 'osm'
         ? { latitude: (center as L.LatLng).lat, longitude: (center as L.LatLng).lng }
         : {
             latitude: (center as google.maps.LatLng).lat(),
             longitude: (center as google.maps.LatLng).lng(),
           };
+    const point = chosenSearchRef.current?.point ?? centerPoint;
     confirmedPointRef.current = point;
     setDraftPoint(point);
     setPinDropKey((current) => current + 1);
@@ -514,7 +592,7 @@ export function LocationPicker({
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
       >
-        {open ? 'Ẩn bản đồ chọn vị trí' : '📍 Tìm địa chỉ và chọn trên bản đồ'}
+        {open ? 'Ẩn bản đồ chọn vị trí' : 'Tìm địa chỉ và chọn trên bản đồ'}
       </button>
 
       {open && (
@@ -550,7 +628,7 @@ export function LocationPicker({
             </div>
           </div>
 
-          {/* Tìm kiếm địa điểm bằng Photon trên dữ liệu OpenStreetMap */}
+          {/* Gợi ý địa chỉ xuất hiện khi nhập */}
           {mapEngine === 'osm' && (
             <div className="location-search">
               <input
@@ -563,11 +641,13 @@ export function LocationPicker({
                 onChange={(e) => {
                   searchOnTypingRef.current = true;
                   addressAbortRef.current?.abort();
+                  addressAbortRef.current = null;
                   if (addressTimerRef.current !== null) window.clearTimeout(addressTimerRef.current);
                   searchAbortRef.current?.abort();
                   searchAbortRef.current = null;
                   setSearching(false);
                   setSuggestions([]);
+                  setError('');
                   chosenSearchRef.current = null;
                   setSearchQuery(e.target.value);
                   setSelectedAddress(confirmedPointRef.current
@@ -575,9 +655,14 @@ export function LocationPicker({
                     : '');
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') e.preventDefault();
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const first = suggestions[0];
+                    if (first) void chooseSuggestion(first);
+                  }
                 }}
               />
+              <small className="location-search-hint">Gợi ý địa chỉ xuất hiện khi nhập. Chọn một địa chỉ để đưa ghim đến đó, rồi kiểm tra và xác nhận.</small>
               {searching && (
                 <span className="location-search-status" role="status">
                   Đang tìm địa điểm…
@@ -592,24 +677,10 @@ export function LocationPicker({
                       role="option"
                       aria-selected="false"
                       key={item.id}
-                      onClick={() => chooseSuggestion(item)}
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        textAlign: 'left',
-                        background: '#FFFFFF',
-                        border: 0,
-                        padding: '8px 12px',
-                        fontSize: 13,
-                        cursor: 'pointer',
-                        borderBottom: '1px solid var(--color-surface-border)',
-                      }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.backgroundColor = 'var(--color-primary-bg)')
-                      }
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
+                      onClick={() => void chooseSuggestion(item)}
+                      className="location-suggestion"
                     >
-                      📍 <strong>{item.name}</strong>
+                      <strong>{item.name}</strong>
                       {item.address ? ` · ${item.address}` : ''}
                     </button>
                   ))}

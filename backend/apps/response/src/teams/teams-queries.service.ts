@@ -9,7 +9,7 @@ import { ReporterSessionService } from '../requests/reporter-session';
 import { TeamPageQueryDto } from './teams.dto';
 import { teamView, TeamRow } from './teams.helpers';
 
-const teamSelect = `SELECT t.id,t.organization_id,t.operating_region_code,t.name,t.team_kind,t.reporting_mode,
+const teamSelect = `SELECT t.id,t.organization_id,t.operating_region_code,t.nationwide_coverage,t.name,t.team_kind,t.reporting_mode,
                            t.availability,t.status,t.readiness_required,t.version,t.created_at,
                            COALESCE(s.skills,ARRAY[]::text[]) AS skills,
                            CASE WHEN p.team_id IS NULL THEN NULL ELSE greatest(0,floor(extract(epoch FROM clock_timestamp()-p.captured_at)))::int END AS position_age_s,
@@ -29,6 +29,10 @@ function listFilters(route: string, userId: string, grants: unknown[], query: ob
 function readScopeSql(grants: readonly { role_code: keyof typeof ROLE_PERMISSIONS; scope_type: string; organization_id: string | null; region_code?: string | null; campaign_id?: string | null }[], userId: string, values: unknown[], alias = 't'): string {
   const branches: string[] = [];
   for (const grant of grants) {
+    if (grant.role_code === 'ADMIN' && grant.scope_type === 'SYSTEM') {
+      branches.push('TRUE');
+      continue;
+    }
     if (!ROLE_PERMISSIONS[grant.role_code].includes('TEAM_READ' as never) || !grant.organization_id) continue;
     if (grant.scope_type === 'ORGANIZATION') {
       values.push(grant.organization_id);

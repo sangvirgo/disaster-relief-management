@@ -1,0 +1,100 @@
+.sos-form {
+  width: 100%;
+  max-width: 720px;
+  gap: var(--space-5);
+}
+.sos-location-card,
+.sos-information-card {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+}
+.content--sos { max-width: 980px; }
+.sos-weather-banner.card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  margin: 0 0 var(--space-5);
+  padding: 12px 16px;
+  border: 1px solid #cbdcf0;
+  border-left: 4px solid #5c85ad;
+  background: #f4f8fc;
+  color: #214361;
+  box-shadow: none;
+}
+.sos-weather-banner--watch.card { border-color: #adc8ee; border-left-color: #2563eb; background: #eef5ff; color: #19498c; }
+.sos-weather-banner--warning.card { border-color: #f4d28b; border-left-color: #d97706; background: #fff8e9; color: #824200; }
+.sos-weather-banner--severe.card { border-color: #f3b6b6; border-left-color: #c92a2a; background: #fff1f1; color: #8b1d1d; }
+.sos-weather-symbol { display: grid; flex: 0 0 22px; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #5c85ad; color: #fff; font-size: 13px; font-weight: 800; }
+.sos-weather-banner--watch .sos-weather-symbol { background: #2563eb; }
+.sos-weather-banner--warning .sos-weather-symbol { background: #d97706; }
+.sos-weather-banner--severe .sos-weather-symbol { background: #c92a2a; }
+.sos-weather-body { min-width: 0; line-height: 1.5; }
+.sos-weather-body > p { margin: 0; font-size: 14px; }
+.sos-weather-body > small { display: block; margin-top: 3px; }
+.sos-weather-details { margin-top: 2px; font-size: 12px; }
+.sos-weather-details summary { width: fit-content; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.sos-weather-details p { margin: 4px 0 0; }
+.sos-information-card > h2 {
+  margin: 0;
+}
+.sos-form .location-heading {
+  margin: 0;
+  align-items: center;
+}
+.sos-form .location-heading h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+}
+.sos-form .form-grid {
+  gap: var(--space-4);
+}
+.sos-form fieldset {
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  padding: var(--space-4);
+}
+.sos-form legend {
+  padding: 0 var(--space-1);
+}
+.sos-form .radio {
+  gap: var(--space-2);
+}
+.sos-form .location-picker {
+  min-width: 0;
+}
+.sos-submit-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-surface-border);
+  background: var(--color-surface-card);
+  box-shadow: var(--shadow-md);
+}
+.sos-submit-bar .ui-button {
+  flex: none;
+}
+@media (max-width: 719px) {
+  .sos-form .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sos-form .location-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .sos-submit-bar {
+    align-items: stretch;
+  }
+  .sos-submit-bar .button {
+    width: 100%;
+  }
+}

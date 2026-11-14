@@ -1,0 +1,30 @@
+.ui-skeleton {
+  display: grid;
+  gap: var(--space-2);
+  min-height: 312px;
+}
+.ui-skeleton__row {
+  display: block;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  animation: ui-skeleton-pulse 1.2s ease-in-out infinite alternate;
+}
+.ui-skeleton__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+@keyframes ui-skeleton-pulse {
+  to {
+    opacity: 0.5;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-skeleton__row {
+    animation: none;
+  }
+}

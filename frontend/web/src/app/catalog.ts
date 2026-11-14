@@ -47,11 +47,13 @@ export const pages: Record<Workspace, Page[]> = {
     { id: 'notices', title: 'Thông báo', icon: 'notice', service: 'response', path: '/notices' },
   ],
   coordinator: [
+    { id: 'dashboard', title: 'Thống kê', icon: 'report' },
     {
       id: 'reports', title: 'Tổng quan và bản đồ', icon: 'report', service: 'response',
       path: '/reports/summary', note: 'Tình hình SOS, nhiệm vụ và bản đồ nhiệt theo khu vực.',
     },
     { id: 'queue', title: 'Xử lý SOS', icon: 'queue', service: 'response', path: '/requests' },
+    { id: 'teams', title: 'Đội cứu hộ', icon: 'team', service: 'response', path: '/teams' },
     { id: 'notices', title: 'Thông báo', icon: 'notice', service: 'response', path: '/notices' },
     { id: 'needs', title: 'Nhu cầu vật tư', icon: 'needs', service: 'logistics', path: '/needs' },
     {
@@ -116,6 +118,8 @@ export const pages: Record<Workspace, Page[]> = {
     },
   ],
   admin: [
+    { id: 'dashboard', title: 'Thống kê', icon: 'report' },
+    { id: 'teams', title: 'Đội cứu hộ', icon: 'team', service: 'response', path: '/teams' },
     { id: 'users', title: 'Người dùng', icon: 'users', service: 'identity', path: '/users' },
     {
       id: 'organizations',
@@ -190,6 +194,7 @@ export function allowedPages(workspace: Workspace, user: Me | null): Page[] {
         r.has('REVIEWER') ||
         r.has('DISTRIBUTION_STAFF')
       );
+    if (page.id === 'overview') return ['OPERATIONS_MANAGER', 'CAMPAIGN_MANAGER', 'INTAKE_STAFF', 'REVIEWER', 'DISTRIBUTION_STAFF'].some((role) => r.has(role));
     return r.has('OPERATIONS_MANAGER') || r.has('CAMPAIGN_MANAGER');
   }).map((page) => workspace === 'operations' && page.id === 'intake' && r.has('REVIEWER')
     ? { ...page, title: 'Tiếp nhận và duyệt' }

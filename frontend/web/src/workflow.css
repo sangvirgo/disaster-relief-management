@@ -83,7 +83,7 @@
   padding: 0 14px;
   border: 1px solid var(--color-surface-border);
   border-radius: var(--radius-lg);
-  background: linear-gradient(150deg, #f8fbff 0%, #f5f8fd 100%);
+  background: var(--color-surface-card);
 }
 
 .queue-filter-panel > summary {
@@ -315,6 +315,12 @@
 }
 @media (prefers-reduced-motion: reduce) { .record.volunteer-record-open { transition: none; } }
 .volunteer-team-card { position: relative; align-items: center; }
+.grid-two.volunteer-teams-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.volunteer-team-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 12px; }
+.volunteer-team-list .volunteer-team-card { min-width: 0; height: 100%; }
+.volunteer-teams-layout .mission-detail-card { min-width: 0; }
+.volunteer-teams-layout .mission-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 700px) { .volunteer-teams-layout .mission-facts { grid-template-columns: minmax(0, 1fr); } }
 .volunteer-team-open { display: block; flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .volunteer-team-open::after { content: ''; position: absolute; inset: 0; }
 .volunteer-team-open:focus-visible, .team-card-add:focus-visible { outline: 3px solid #8bb8ff; outline-offset: 3px; }

@@ -387,7 +387,7 @@ describe('TeamsMembershipService', () => {
     expect(managerQuery).not.toHaveBeenCalled();
   });
 
-  it('requires coordinator-level TEAM_MANAGE_ANY for leadership transfer', async () => {
+  it('requires TEAM_MANAGE_ANY for leadership transfer', async () => {
     const { service, managerQuery } = fixture({
       grants: [{ role_code: 'VOLUNTEER', scope_type: 'SYSTEM', organization_id: null }],
     });
@@ -395,5 +395,22 @@ describe('TeamsMembershipService', () => {
     await expect(service.transferLeader(teamId, { user_id: userId, expected_version: 4 }, idempotencyKey, request))
       .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
     expect(managerQuery).not.toHaveBeenCalled();
+  });
+
+  it('lets a system administrator transfer leadership to an eligible active member', async () => {
+    const oldLeader = '00000000-0000-4000-8000-000000000006';
+    const { service, state, sessions } = fixture({
+      grants: [{ role_code: 'ADMIN', scope_type: 'SYSTEM', organization_id: null }],
+      members: {
+        [oldLeader]: { member_role: 'LEADER', left_at: null },
+        [userId]: { member_role: 'MEMBER', left_at: null },
+      },
+    });
+
+    await expect(service.transferLeader(teamId, { user_id: userId, expected_version: 4 }, idempotencyKey, request))
+      .resolves.toMatchObject({ status: 200, value: { leader_user_id: userId, version: 5 } });
+    expect(state.members.get(oldLeader)?.member_role).toBe('MEMBER');
+    expect(state.members.get(userId)?.member_role).toBe('LEADER');
+    expect(sessions.teamLeaderEligibility).toHaveBeenCalledWith(userId, organizationId);
   });
 });

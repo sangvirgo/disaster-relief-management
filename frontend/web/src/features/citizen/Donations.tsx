@@ -244,9 +244,9 @@ export function Donations({ user }: { user: Me | null }) {
       setOwnedRevision((current) => current + 1);
     } catch { setOwnedError('Không lưu được lịch sử trên trình duyệt này. Hãy giữ định danh phiếu để tra cứu lại.'); }
   }
-  const nav = <div className="donation-nav" role="group" aria-label="Mục đóng góp">
-    <button type="button" className={`button ${view === 'drives' ? '' : 'secondary'}`} onClick={() => { setView('drives'); setShowCreatedTracking(false); setCreated(null); setShowDeclaration(false); setQuantities({}); setError(''); }}>Đợt quyên góp</button>
-    <button type="button" className={`button ${view === 'donation' ? '' : 'secondary'}`} onClick={() => { setView('donation'); setError(''); }}>Theo dõi đóng góp</button>
+  const nav = <div className="donation-nav tabs" role="group" aria-label="Mục đóng góp">
+    <button type="button" className={view === 'drives' ? 'active' : ''} aria-pressed={view === 'drives'} onClick={() => { setView('drives'); setShowCreatedTracking(false); setCreated(null); setShowDeclaration(false); setQuantities({}); setError(''); }}>Đợt quyên góp</button>
+    <button type="button" className={view === 'donation' ? 'active' : ''} aria-pressed={view === 'donation'} onClick={() => { setView('donation'); setError(''); }}>Theo dõi đóng góp</button>
   </div>;
   useEffect(() => {
     if (!showDeclaration) return;

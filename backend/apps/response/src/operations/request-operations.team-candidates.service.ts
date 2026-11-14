@@ -43,7 +43,7 @@ export class RequestOperationsTeamCandidatesService {
            FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
           WHERE r.id=$1 AND r.organization_id=$3 AND r.region_code IS NOT DISTINCT FROM $4
        ), eligible AS (
-         SELECT t.id,t.organization_id,t.operating_region_code,t.name,t.team_kind,t.reporting_mode,t.availability,t.status,
+         SELECT t.id,t.organization_id,t.operating_region_code,t.nationwide_coverage,t.name,t.team_kind,t.reporting_mode,t.availability,t.status,
                 t.readiness_required,t.version,t.created_at,
                 COALESCE((SELECT array_agg(ts.skill_code ORDER BY ts.skill_code) FROM team_skill ts WHERE ts.team_id=t.id),ARRAY[]::text[]) AS skills,
                 floor(extract(epoch FROM (q.query_time-p.captured_at)))::int AS position_age_s,
@@ -81,7 +81,7 @@ export class RequestOperationsTeamCandidatesService {
                WHERE m.team_id=t.id
            ) recent ON true
           WHERE t.status='ACTIVE' AND t.availability='AVAILABLE' AND NOT t.readiness_required
-            AND t.organization_id=q.organization_id AND t.operating_region_code=q.region_code
+            AND t.organization_id=q.organization_id AND (t.nationwide_coverage OR t.operating_region_code=q.region_code)
             AND ((t.reporting_mode='APP' AND EXISTS (
                     SELECT 1 FROM team_member tm WHERE tm.team_id=t.id AND tm.member_role='LEADER' AND tm.left_at IS NULL))
               OR (t.reporting_mode='COORDINATOR' AND NULLIF(btrim(t.external_contact_note),'') IS NOT NULL))
@@ -92,7 +92,7 @@ export class RequestOperationsTeamCandidatesService {
                                AND NOT EXISTS (SELECT 1 FROM team_skill ts
                                                 WHERE ts.team_id=t.id AND ts.skill_code=required.skill_code))
        )
-       SELECT id,organization_id,operating_region_code,name,team_kind,reporting_mode,availability,status,readiness_required,version,created_at,
+       SELECT id,organization_id,operating_region_code,nationwide_coverage,name,team_kind,reporting_mode,availability,status,readiness_required,version,created_at,
               skills,position_age_s,position_accuracy_m,position_source,longitude,latitude,distance_m,recent_missions_24h,recent_missions_7d,recent_history
          FROM eligible
         WHERE position_team_id IS NULL

@@ -75,6 +75,12 @@ export class UpdateTeamDto {
 
   @IsOptional() @IsIn(['AVAILABLE', 'UNAVAILABLE'])
   declare availability?: 'AVAILABLE' | 'UNAVAILABLE';
+
+  @IsOptional() @IsString() @Matches(regionCodePattern)
+  declare operating_region_code?: string;
+
+  @IsOptional() @IsIn([true, false])
+  declare nationwide_coverage?: boolean;
 }
 
 export class ConfirmTeamReadinessDto {

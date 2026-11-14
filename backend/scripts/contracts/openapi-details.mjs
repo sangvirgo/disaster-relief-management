@@ -30,6 +30,9 @@ const point = object({
 }, ['type', 'coordinates']);
 const teamViewSchema = object({
   id,
+  organization_id: id,
+  operating_region_code: text,
+  nationwide_coverage: boolean(),
   name: text,
   kind: { type: 'string', enum: ['VOLUNTEER', 'MILITARY', 'GOVERNMENT', 'OTHER'] },
   reporting_mode: { type: 'string', enum: ['APP', 'COORDINATOR'] },
@@ -47,7 +50,7 @@ const teamViewSchema = object({
     }, ['age_s', 'accuracy_m', 'source']),
   ] },
   version,
-}, ['id', 'name', 'kind', 'reporting_mode', 'availability', 'readiness_required', 'status', 'skills', 'position', 'version']);
+}, ['id', 'organization_id', 'operating_region_code', 'nationwide_coverage', 'name', 'kind', 'reporting_mode', 'availability', 'readiness_required', 'status', 'skills', 'position', 'version']);
 const teamPageSchema = object({ items: array(teamViewSchema), more: boolean(), cursor: text });
 const idempotentCommandResponseHeaders = {
   'Cache-Control': { $ref: '#/components/headers/CacheControlNoStore' },
@@ -268,7 +271,7 @@ const responseDetails = {
     response: response(teamViewSchema),
   },
   responseTeamsUpdate: {
-    request: request(object({ expected_version: version, name: text, skill_codes: array(text), availability: text }, ['expected_version'])),
+    request: request(object({ expected_version: version, name: text, skill_codes: array(text), availability: text, operating_region_code: { type: 'string', pattern: '^[A-Z0-9_]{2,32}$' }, nationwide_coverage: boolean() }, ['expected_version'])),
     response: response(teamViewSchema),
   },
   responseTeamsReady: {

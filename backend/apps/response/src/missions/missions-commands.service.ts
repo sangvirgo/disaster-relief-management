@@ -49,6 +49,7 @@ interface TeamRow {
   id: string;
   organization_id: string;
   operating_region_code: string;
+  nationwide_coverage: boolean;
   reporting_mode: 'APP' | 'COORDINATOR';
   availability: 'AVAILABLE' | 'UNAVAILABLE';
   status: 'ACTIVE' | 'INACTIVE';
@@ -153,14 +154,14 @@ export class MissionsCommandsService {
     }
 
     const teamRows = await manager.query(
-      `SELECT id,organization_id,operating_region_code,reporting_mode,availability,status,readiness_required,external_contact_note
+      `SELECT id,organization_id,operating_region_code,nationwide_coverage,reporting_mode,availability,status,readiness_required,external_contact_note
          FROM rescue_team WHERE id=$1 FOR SHARE`, [dto.team_id],
     ) as TeamRow[];
     const team = teamRows[0];
     if (!team) throw new AppError('NOT_FOUND', { status: 404 });
     if (team.status !== 'ACTIVE') throw this.teamNotEligible('INACTIVE');
     if (team.availability !== 'AVAILABLE' || team.readiness_required) throw this.teamNotEligible('UNAVAILABLE');
-    if (team.organization_id !== row.organization_id || team.operating_region_code !== row.region_code) throw this.teamNotEligible('SCOPE_MISMATCH');
+    if (team.organization_id !== row.organization_id || (!team.nationwide_coverage && team.operating_region_code !== row.region_code)) throw this.teamNotEligible('SCOPE_MISMATCH');
     if (team.reporting_mode === 'COORDINATOR' && !team.external_contact_note?.trim()) throw new AppError('TEAM_NOT_ELIGIBLE', { status: 409 });
 
     const missingSkills = await manager.query(

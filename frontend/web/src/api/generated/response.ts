@@ -1471,6 +1471,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/{id}/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Explicitly confirm field readiness after active mission cancellation.
+         * @description An active APP leader uses SELF; a scoped TEAM_MANAGE_ANY caller records RADIO/PHONE/IN_PERSON/OTHER with reported_by. Requires the current team version, no active mission, and a confirmation time after the last active cancellation and not in the future. Atomically clears readiness_required, sets AVAILABLE, and records audit evidence. Generic PATCH does not clear the latch.
+         */
+        post: operations["responseTeamsReady"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6639,6 +6659,10 @@ export interface operations {
                         items?: {
                             /** Format: uuid */
                             id: string;
+                            /** Format: uuid */
+                            organization_id: string;
+                            operating_region_code: string;
+                            nationwide_coverage: boolean;
                             name: string;
                             /** @enum {string} */
                             kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
@@ -6646,6 +6670,7 @@ export interface operations {
                             reporting_mode: "APP" | "COORDINATOR";
                             /** @enum {string} */
                             availability: "AVAILABLE" | "UNAVAILABLE";
+                            readiness_required: boolean;
                             /** @enum {string} */
                             status: "ACTIVE" | "INACTIVE";
                             skills: string[];
@@ -6730,6 +6755,10 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id: string;
+                        /** Format: uuid */
+                        organization_id: string;
+                        operating_region_code: string;
+                        nationwide_coverage: boolean;
                         name: string;
                         /** @enum {string} */
                         kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
@@ -6737,6 +6766,7 @@ export interface operations {
                         reporting_mode: "APP" | "COORDINATOR";
                         /** @enum {string} */
                         availability: "AVAILABLE" | "UNAVAILABLE";
+                        readiness_required: boolean;
                         /** @enum {string} */
                         status: "ACTIVE" | "INACTIVE";
                         skills: string[];
@@ -6795,6 +6825,10 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id: string;
+                        /** Format: uuid */
+                        organization_id: string;
+                        operating_region_code: string;
+                        nationwide_coverage: boolean;
                         name: string;
                         /** @enum {string} */
                         kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
@@ -6802,6 +6836,7 @@ export interface operations {
                         reporting_mode: "APP" | "COORDINATOR";
                         /** @enum {string} */
                         availability: "AVAILABLE" | "UNAVAILABLE";
+                        readiness_required: boolean;
                         /** @enum {string} */
                         status: "ACTIVE" | "INACTIVE";
                         skills: string[];
@@ -6856,6 +6891,8 @@ export interface operations {
                     name?: string;
                     skill_codes?: string[];
                     availability?: string;
+                    operating_region_code?: string;
+                    nationwide_coverage?: boolean;
                 };
             };
         };
@@ -6869,6 +6906,10 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id: string;
+                        /** Format: uuid */
+                        organization_id: string;
+                        operating_region_code: string;
+                        nationwide_coverage: boolean;
                         name: string;
                         /** @enum {string} */
                         kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
@@ -6876,6 +6917,7 @@ export interface operations {
                         reporting_mode: "APP" | "COORDINATOR";
                         /** @enum {string} */
                         availability: "AVAILABLE" | "UNAVAILABLE";
+                        readiness_required: boolean;
                         /** @enum {string} */
                         status: "ACTIVE" | "INACTIVE";
                         skills: string[];
@@ -7757,6 +7799,87 @@ export interface operations {
             };
             /** @description Documented error response; clients branch on the stable code. */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseTeamsReady: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                    /** @enum {string} */
+                    confirmation_basis: "SELF" | "RADIO" | "PHONE" | "IN_PERSON" | "OTHER";
+                    reported_by?: string;
+                    /** Format: date-time */
+                    occurred_at: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        organization_id: string;
+                        operating_region_code: string;
+                        nationwide_coverage: boolean;
+                        name: string;
+                        /** @enum {string} */
+                        kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
+                        /** @enum {string} */
+                        reporting_mode: "APP" | "COORDINATOR";
+                        /** @enum {string} */
+                        availability: "AVAILABLE" | "UNAVAILABLE";
+                        readiness_required: boolean;
+                        /** @enum {string} */
+                        status: "ACTIVE" | "INACTIVE";
+                        skills: string[];
+                        position: null | {
+                            age_s: number;
+                            accuracy_m: number | null;
+                            /** @enum {string} */
+                            source: "GPS" | "MANUAL_PIN" | "COORDINATOR_REPORTED";
+                            location?: {
+                                /** @constant */
+                                type: "Point";
+                                coordinates: number[];
+                            };
+                        };
+                        version: number;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

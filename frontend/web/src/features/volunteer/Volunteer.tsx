@@ -738,11 +738,11 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
   const directionsUrl = activeMission && googleMapsDirectionsUrl(activeMission.location);
 
   return (
-    <div className={`grid-two ${isTeam ? '' : 'volunteer-missions-layout'}`}>
+    <div className={`grid-two ${isTeam ? 'volunteer-teams-layout' : 'volunteer-missions-layout'}`}>
       {/* Cột trái: Danh sách Nhiệm vụ hoặc Đội */}
       <section className={`card ${isTeam ? '' : 'mission-list-panel'}`} ref={missionListRef}>
         <div className="section-header"><h2>{isTeam ? 'Đội của tôi' : 'Nhiệm vụ và tiến độ'}</h2><button type="button" className="button secondary" disabled={loading || busy} onClick={() => { setCursor(''); refreshAll(); }}>Cập nhật</button></div>
-        {!isTeam && <p className="mission-list-intro">Chọn nhiệm vụ để xem tình huống và tiến độ xử lý.</p>}
+        <p className="mission-list-intro">{isTeam ? 'Chọn thẻ đội để mở thông tin và cập nhật vị trí ở bên dưới.' : 'Chọn nhiệm vụ để xem tình huống và tiến độ xử lý.'}</p>
         {error && (
           <p role="alert" className="notice error">
             {error}
@@ -758,14 +758,14 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
             <button type="button" className="button secondary" aria-pressed={missionFilter === value} disabled={busy} key={value} onClick={() => changeMissionFilter(value)}>{text}</button>)}
         </div>}
         {!isTeam && !loading && !error && items.length > 0 && !visibleMissions.length && <p>Chưa có nhiệm vụ trong nhóm này trên các trang đã tải. Hãy tải thêm nếu còn dữ liệu.</p>}
-        <div className={`record-list ${isTeam ? '' : 'mission-record-list'}`}>
+        <div className={`record-list ${isTeam ? 'volunteer-team-list' : 'mission-record-list'}`}>
           {isTeam
             ? (items as Team[]).map((team) => (
                 <article
                   className={`record volunteer-team-card ${selectedTeam?.id === team.id ? 'selected' : ''}`}
                   key={team.id}
                 >
-                  <button type="button" className="volunteer-team-open" aria-label={`Xem đội ${team.name}`} onClick={() => {
+                  <button type="button" className="volunteer-team-open" aria-expanded={selectedTeam?.id === team.id} aria-controls="volunteer-team-detail" aria-label={`Xem đội ${team.name}`} onClick={() => {
                     setCanManageTeam(false);
                     setSelectedTeam(team);
                     setTeamSelectionRevision(value => value + 1);
@@ -838,7 +838,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
       </section>
 
       {/* Cột phải: Bảng điều hành chi tiết */}
-      <section className="card mission-detail-card" ref={missionCardRef}>
+      <section className="card mission-detail-card" id={isTeam ? 'volunteer-team-detail' : undefined} ref={missionCardRef}>
         {isTeam ? (
           <>
             <h2>Chi tiết đội cứu hộ</h2>

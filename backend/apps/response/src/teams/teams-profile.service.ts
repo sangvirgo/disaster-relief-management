@@ -31,6 +31,8 @@ function auditState(team: TeamRow): Record<string, unknown> {
     name: team.name,
     kind: team.team_kind,
     reporting_mode: team.reporting_mode,
+    operating_region_code: team.operating_region_code,
+    nationwide_coverage: team.nationwide_coverage,
     availability: team.availability,
     readiness_required: team.readiness_required,
     status: team.status,
@@ -108,8 +110,20 @@ export class TeamsProfileService {
     const current = await this.queries.findTeam(this.dataSource, teamId);
     if (!current) throw new AppError('NOT_FOUND', { status: 404 });
     await this.assertCanManage(current, session);
-    if (dto.name === undefined && dto.skill_codes === undefined && dto.availability === undefined) {
+    if (dto.name === undefined && dto.skill_codes === undefined && dto.availability === undefined && dto.operating_region_code === undefined && dto.nationwide_coverage === undefined) {
       throw new AppError('VALIDATION_FAILED', { status: 400 });
+    }
+    if (dto.nationwide_coverage !== undefined && dto.nationwide_coverage !== current.nationwide_coverage &&
+      !hasPermission(session.grants, 'TEAM_MANAGE_ANY', { organizationId: current.organization_id })) {
+      throw new AppError('FORBIDDEN', { status: 403 });
+    }
+    if (dto.operating_region_code && dto.operating_region_code !== current.operating_region_code) {
+      if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
+        organizationId: current.organization_id, regionCode: current.operating_region_code,
+      }) || !hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
+        organizationId: current.organization_id, regionCode: dto.operating_region_code,
+      })) throw new AppError('FORBIDDEN', { status: 403 });
+      await this.assertRegion(dto.operating_region_code);
     }
     const name = dto.name === undefined ? undefined : cleanName(dto.name);
     const skillCodes = dto.skill_codes === undefined ? undefined : [...dto.skill_codes].sort();
@@ -125,6 +139,24 @@ export class TeamsProfileService {
         if (!row) throw new AppError('NOT_FOUND', { status: 404 });
         await this.assertCanManage(row, session, manager);
         validateExpectedVersion(Number(row.version), dto.expected_version);
+        const nextRegion = dto.operating_region_code ?? row.operating_region_code;
+        const nextNationwide = dto.nationwide_coverage ?? row.nationwide_coverage;
+        if (nextNationwide !== row.nationwide_coverage &&
+          !hasPermission(session.grants, 'TEAM_MANAGE_ANY', { organizationId: row.organization_id })) {
+          throw new AppError('FORBIDDEN', { status: 403 });
+        }
+        if (nextRegion !== row.operating_region_code || nextNationwide !== row.nationwide_coverage) {
+          if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
+            organizationId: row.organization_id, regionCode: row.operating_region_code,
+          }) || !hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
+            organizationId: row.organization_id, regionCode: nextRegion,
+          })) throw new AppError('FORBIDDEN', { status: 403 });
+          const active = await manager.query(
+            "SELECT 1 FROM mission WHERE team_id=$1 AND status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE') LIMIT 1",
+            [teamId],
+          ) as unknown[];
+          if (active.length) throw new AppError('TEAM_BUSY', { status: 409 });
+        }
         if (dto.availability === 'AVAILABLE' && row.readiness_required) {
           throw new AppError('TEAM_NOT_ELIGIBLE', { status: 409, details: { reason: 'UNAVAILABLE' } });
         }
@@ -141,10 +173,10 @@ export class TeamsProfileService {
         const before = auditState(row);
         const [updated] = await manager.query(
           `UPDATE rescue_team
-              SET name=COALESCE($3,name),availability=COALESCE($4,availability),version=version+1
+              SET name=COALESCE($3,name),availability=COALESCE($4,availability),operating_region_code=$5,nationwide_coverage=$6,version=version+1
             WHERE id=$1 AND version=$2
             RETURNING id`,
-          [teamId, dto.expected_version, name ?? null, dto.availability ?? null],
+          [teamId, dto.expected_version, name ?? null, dto.availability ?? null, nextRegion, nextNationwide],
         ) as [Array<{ id: string }>, number];
         if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
         if (skillCodes) await this.replaceSkills(manager, teamId, skillCodes);

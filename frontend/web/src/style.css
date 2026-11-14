@@ -377,7 +377,7 @@ textarea:focus-visible {
   width: 36px;
   height: 36px;
   border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  background: var(--color-primary-bg);
   color: #ffffff;
   display: grid;
   place-items: center;
@@ -1032,7 +1032,7 @@ textarea[aria-invalid='true'] {
   place-items: center;
   padding: 24px;
   color: var(--color-text-primary);
-  background: radial-gradient(circle at 50% 38%, #eaf3ff, #f6f8fb 68%);
+  background: var(--color-surface-bg);
   font-weight: 600;
   text-align: center;
 }

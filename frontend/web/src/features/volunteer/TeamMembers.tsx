@@ -149,7 +149,7 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
       <h4>Thêm thành viên</h4>
       {!loading && !canManage && <p className="notice error" role="alert">Bạn không có quyền thêm thành viên vào đội này.</p>}
       {canManage && <>
-      <p className="muted">Tìm theo tên hoặc tài khoản. Người đó cần có vai trò Tình nguyện viên và chưa thuộc đội khác.</p>
+      <p className="muted">Tìm theo tên hoặc tài khoản. Tài khoản phải đang hoạt động và chưa thuộc đội khác. Để làm đội trưởng, người đó còn cần quyền Tình nguyện viên trong tổ chức của đội.</p>
       <form className="team-member-search" noValidate onSubmit={(event) => void search(event)}>
         <label htmlFor="team-member-query">Tìm người tham gia</label>
         <div className="team-member-search-row">

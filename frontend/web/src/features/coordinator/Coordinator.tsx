@@ -3,6 +3,8 @@ import { api, ApiError, newCommandKey } from '../../api/client';
 import { appendPage } from '../../api/pagination';
 import { DetailSurface } from '../../components/DetailSurface';
 import { PriorityBadge } from '../../components/PriorityBadge';
+import { StatusBadge } from '../../components/StatusBadge';
+import { QueueRow } from '../../components/ui/QueueRow';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { label, regionName, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
@@ -873,9 +875,13 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
             )}
             <div className="record-list">
               {queue.items.map((item) => (
-                <button
-                  type="button"
-                  className={`queue-row ${selected === item.id ? 'selected' : ''}`}
+                <QueueRow
+                  title={item.tracking_code}
+                  meta={label(item.category)}
+                  priority={<PriorityBadge priority={item.priority as 'P1' | 'P2' | 'P3' | 'P4' | null | undefined} />}
+                  status={<StatusBadge status={item.status} />}
+                  time={timeLabel(item.received_at)}
+                  selected={selected === item.id}
                   onClick={() => {
                     detailPanelRef.current?.closest('.coordinator-detail-surface')?.scrollTo(0, 0);
                     if (selected === item.id) {
@@ -888,13 +894,8 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                     setUpdateMessage('');
                   }}
                   key={item.id}
-                >
-                  <span>
-                    <strong>{item.tracking_code}</strong>
+                  details={<>
                     {item.tracking_code.startsWith('C48HM') && <small className="chip">SOS mô phỏng · bản đồ nhiệt</small>}
-                    <small>
-                      {label(item.category)} · {timeLabel(item.received_at)}
-                    </small>
                     {item.priority_advisory && (
                       <small>
                         Đánh giá ban đầu:{' '}
@@ -922,12 +923,8 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                       </small>
                     )}
                     {item.declared_danger && <small>Có khai báo nguy hiểm tính mạng</small>}
-                  </span>
-                  <span className="chip queue-status-chip" data-status={item.status}>
-                    {requestStatusLabel(item.status)}
-                    {item.priority && <PriorityBadge priority={item.priority as 'P1' | 'P2' | 'P3' | 'P4'} />}
-                  </span>
-                </button>
+                  </>}
+                />
               ))}
             </div>
             {queue.more && queue.cursor && (
@@ -1811,7 +1808,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   )}
                   {candidates?.items.length === 0 && detail.region_code && (
                     <p role="status" className="notice warning">
-                      Chưa có đội đủ điều kiện. Xem tình trạng từng đội trong khu vực bên dưới để biết điều kiện cần bổ sung.
+                      Chưa có đội đủ điều kiện trong khu vực {detail.region_code}. Xem tình trạng từng đội bên dưới; nếu đội đã di chuyển đến đây nhưng vẫn thuộc khu vực khác, nhờ quản trị viên chuyển khu vực hoạt động của đội. Cập nhật GPS không tự đổi phạm vi phụ trách.
                     </p>
                   )}
                   {candidates?.items.length === 0 && detail.region_code &&

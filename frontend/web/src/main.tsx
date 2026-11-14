@@ -32,6 +32,7 @@ import type { components as ResponseComponents } from './api/generated/response'
 import './style.css';
 import { StatusBadge } from './components/StatusBadge';
 import { DetailSurface } from './components/DetailSurface';
+import { PageHeader } from './components/ui/PageHeader';
 
 declare global {
   interface Window {
@@ -51,6 +52,11 @@ declare global {
 import './sos.css';
 import './workflow.css';
 import './refinements.css';
+import './styles/tokens.css';
+import './components/ui/Badge.css';
+import './components/ui/PageHeader.css';
+import './styles/layout.css';
+import './features/citizen/sos-page.css';
 
 const commonPasswords = new Set([
   'password123', 'password1', '1234567890', 'qwerty1234', 'qwertyuiop', 'letmein123', 'iloveyou', 'welcome123',
@@ -59,6 +65,7 @@ const commonPasswords = new Set([
 ]);
 
 const SosForm = React.lazy(() => import('./features/citizen/SosForm').then((module) => ({ default: module.SosForm })));
+const SosWeatherAlerts = React.lazy(() => import('./features/citizen/SosWeatherAlerts').then((module) => ({ default: module.SosWeatherAlerts })));
 const Donations = React.lazy(() => import('./features/citizen/Donations').then((module) => ({ default: module.Donations })));
 const TrackingActions = React.lazy(() => import('./features/citizen/TrackingActions').then((module) => ({ default: module.TrackingActions })));
 const Coordinator = React.lazy(() => import('./features/coordinator/Coordinator').then((module) => ({ default: module.Coordinator })));
@@ -67,8 +74,9 @@ const Campaigns = React.lazy(() => import('./features/coordinator/Campaigns').th
 const Notices = React.lazy(() => import('./features/volunteer/Volunteer').then((module) => ({ default: module.Notices })));
 const Volunteer = React.lazy(() => import('./features/volunteer/Volunteer').then((module) => ({ default: module.Volunteer })));
 const Admin = React.lazy(() => import('./features/admin/Admin').then((module) => ({ default: module.Admin })));
+const CoordinatorTeams = React.lazy(() => import('./features/coordinator/CoordinatorTeams').then((module) => ({ default: module.CoordinatorTeams })));
 const Operations = React.lazy(() => import('./features/operations/Operations').then((module) => ({ default: module.Operations })));
-const OperationsDashboard = React.lazy(() => import('./features/operations/Dashboard').then((module) => ({ default: module.OperationsDashboard })));
+const RoleDashboard = React.lazy(() => import('./features/dashboard/RoleDashboard').then((module) => ({ default: module.RoleDashboard })));
 
 function IntakeReview({ user }: { user: Me }) {
   const canReview = roles(user).has('REVIEWER');
@@ -1904,7 +1912,7 @@ function App() {
               aria-expanded={menuOpen}
               aria-controls="primary-navigation"
             >
-              ☰
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
             <div className="topbar-breadcrumb">
               <span className="breadcrumb-workspace">{workspaceLabels[workspace]}</span>
@@ -1958,14 +1966,11 @@ function App() {
         <main className={`content ${workspace === 'citizen' && selected.id === 'sos' ? 'content--sos' : ''} ${selected.id === 'track' ? 'content--tracking' : ''}`}>
           <ContentErrorBoundary key={`${user?.id || 'guest'}:${workspace}:${selected.id}`}>
           <React.Suspense fallback={<div className="card" role="status">Đang tải nội dung…</div>}>
-          <div className="heading">
-            <div>
-              <h1>{selected.title}</h1>
-              {selected.id === 'track'
-                ? <p>{user ? 'Xem danh sách SOS đã gắn với tài khoản và tiến độ xử lý.' : 'Nhập mã theo dõi để xem tiến độ SOS đã gửi.'}</p>
-                : selected.note && <p>{selected.note}</p>}
-            </div>
-          </div>
+          <PageHeader title={selected.title}
+            eyebrow={selected.id === 'sos' ? 'Khẩn cấp' : undefined}
+            description={selected.id === 'track'
+              ? (user ? 'Xem danh sách SOS đã gắn với tài khoản và tiến độ xử lý.' : 'Nhập mã theo dõi để xem tiến độ SOS đã gửi.')
+              : selected.note} />
 
           {sessionState === 'error' && (
             <div className="card notice error" role="alert">
@@ -1996,7 +2001,7 @@ function App() {
                     onChangePassword={() => setShowPasswordModal(true)}
                   />
                 ) : workspace === 'citizen' && selected.id === 'sos' ? (
-                  <SosForm key={user?.id || 'guest'} user={user} onTrack={trackOwnedRequest} />
+                  <><SosWeatherAlerts /><SosForm key={user?.id || 'guest'} user={user} onTrack={trackOwnedRequest} /></>
                 ) : selected.id === 'track' ? (
                   <Tracking
                     key={selectedTrackingCode}
@@ -2032,12 +2037,22 @@ function App() {
                   <Volunteer key={`${selected.id}:${selectedMissionId}`} page={selected.id} currentUserId={user!.id} initialMissionId={selectedMissionId}
                     sharingTeamId={sharingTeamId} sharingMessage={sharingMessage}
                     onToggleSharing={(teamId) => { setSharingTeamId((current) => current === teamId ? '' : teamId); setSharingMessage(''); }} />
+                ) : (workspace === 'coordinator' || workspace === 'admin') && selected.id === 'dashboard' ? (
+                  <RoleDashboard role={workspace} onOpenRequest={workspace === 'coordinator' ? (requestId) => {
+                    setSelectedRequestId(requestId);
+                    setPageId('queue');
+                    writeRoute('coordinator', 'queue', user);
+                  } : undefined} />
                 ) : workspace === 'operations' && selected.id === 'overview' ? (
-                  <OperationsDashboard />
+                  <RoleDashboard role="operations" showReports={roles(user).has('OPERATIONS_MANAGER') || roles(user).has('CAMPAIGN_MANAGER')} />
                 ) : workspace === 'operations' && selected.id === 'intake' && user ? (
                   <IntakeReview user={user} />
                 ) : workspace === 'operations' && user ? (
                   <Operations key={selected.id} page={selected.id} user={user} />
+                ) : workspace === 'coordinator' && selected.id === 'teams' ? (
+                  <CoordinatorTeams user={user!} />
+                ) : workspace === 'admin' && selected.id === 'teams' ? (
+                  <CoordinatorTeams user={user!} />
                 ) : workspace === 'admin' ? (
                   <Admin key={selected.id} page={selected.id} />
                 ) : (

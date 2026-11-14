@@ -17,6 +17,7 @@ const team: TeamRow = {
   id: teamId,
   organization_id: organizationId,
   operating_region_code: 'NORTH',
+  nationwide_coverage: false,
   name: 'Đội cứu hộ',
   team_kind: 'VOLUNTEER',
   reporting_mode: 'APP',
@@ -33,8 +34,8 @@ const team: TeamRow = {
   latitude: null,
 };
 
-function fixture(activeMissions: unknown[] = [], currentTeam: TeamRow = team) {
-  const dataSource = {} as DataSource;
+function fixture(activeMissions: unknown[] = [], currentTeam: TeamRow = team, scopeType: 'ORGANIZATION' | 'REGION' = 'ORGANIZATION') {
+  const dataSource = { query: jest.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue([{ ok: 1 }]) } as unknown as DataSource;
   const managerQuery = jest.fn<(...args: unknown[]) => Promise<unknown>>().mockImplementation(async (...args) => {
     if (String(args[0]).includes('FROM mission WHERE team_id=$1')) return activeMissions;
     return [[], 0];
@@ -49,7 +50,8 @@ function fixture(activeMissions: unknown[] = [], currentTeam: TeamRow = team) {
   const sessions = {
     require: jest.fn<(...args: unknown[]) => Promise<ReporterSession>>().mockResolvedValue({
       userId,
-      grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId }],
+      grants: [{ role_code: 'COORDINATOR', scope_type: scopeType, organization_id: organizationId,
+        ...(scopeType === 'REGION' ? { region_code: 'NORTH' } : {}) }],
     }),
   } as unknown as ReporterSessionService;
   const idempotency = {
@@ -84,5 +86,27 @@ describe('TeamsProfileService', () => {
 
     expect(managerQuery).toHaveBeenCalledTimes(1);
   expect(String(managerQuery.mock.calls[0]?.[0] ?? '')).toContain("FROM mission WHERE team_id=$1 AND status='OFFERED'");
+  });
+
+  it('does not transfer an active team with an offered mission to another region', async () => {
+    const { service, managerQuery } = fixture([{ status: 'OFFERED' }]);
+    await expect(service.update(teamId, { expected_version: 4, operating_region_code: 'CENTRAL' }, idempotencyKey, request))
+      .rejects.toMatchObject({ code: 'TEAM_BUSY', status: 409 });
+    expect(managerQuery).toHaveBeenCalledTimes(1);
+    expect(String(managerQuery.mock.calls[0]?.[0] ?? '')).toContain("status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE')");
+  });
+
+  it('rejects nationwide coverage changes by a region-scoped coordinator', async () => {
+    const { service, managerQuery } = fixture([], team, 'REGION');
+    await expect(service.update(teamId, { expected_version: 4, nationwide_coverage: true }, idempotencyKey, request))
+      .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+    expect(managerQuery).not.toHaveBeenCalled();
+  });
+
+  it('rejects a nationwide coverage change while a mission is active', async () => {
+    const { service, managerQuery } = fixture([{ status: 'OFFERED' }]);
+    await expect(service.update(teamId, { expected_version: 4, nationwide_coverage: true }, idempotencyKey, request))
+      .rejects.toMatchObject({ code: 'TEAM_BUSY', status: 409 });
+    expect(String(managerQuery.mock.calls[0]?.[0] ?? '')).toContain("status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE')");
   });
 });

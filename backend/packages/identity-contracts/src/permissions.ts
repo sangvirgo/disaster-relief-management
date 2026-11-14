@@ -16,7 +16,7 @@ export const ROLE_PERMISSIONS = {
   INTAKE_STAFF: ['REQUEST_CREATE_PROXY', 'DONATION_INTAKE', 'DISTRIBUTION_PREPARE', 'DISTRIBUTION_DISPATCH', 'STOCK_ADJUST_REQUEST'],
   REVIEWER: ['DONATION_REVIEW', 'DISTRIBUTION_REVIEW', 'LOSS_APPROVE', 'ADJUSTMENT_REVIEW'],
   DISTRIBUTION_STAFF: ['REQUEST_CREATE_PROXY', 'DISTRIBUTION_PREPARE', 'DISTRIBUTION_DISPATCH', 'HANDOFF_RECORD', 'STOCK_ADJUST_REQUEST'],
-  ADMIN: ['USER_MANAGE', 'GRANT_MANAGE', 'ORG_MANAGE', 'AUDIT_READ', 'REQUEST_CREATE_PROXY', 'REPORT_READ'],
+  ADMIN: ['USER_MANAGE', 'GRANT_MANAGE', 'ORG_MANAGE', 'AUDIT_READ', 'REQUEST_CREATE_PROXY', 'REPORT_READ', 'TEAM_READ', 'TEAM_MANAGE_ANY'],
 } as const;
 
 export type Role = keyof typeof ROLE_PERMISSIONS;
@@ -39,7 +39,8 @@ export interface ScopeTarget {
 }
 
 function matchesScope(grant: Grant, target: ScopeTarget, permission: Permission): boolean {
-  if (grant.role_code === 'ADMIN') return grant.scope_type === 'SYSTEM' && grant.organization_id === null && !grant.region_code && !grant.campaign_id && target.systemAction === permission;
+  if (grant.role_code === 'ADMIN') return grant.scope_type === 'SYSTEM' && grant.organization_id === null && !grant.region_code && !grant.campaign_id &&
+    (target.systemAction === permission || ((permission === 'TEAM_READ' || permission === 'TEAM_MANAGE_ANY') && Boolean(target.organizationId)));
   if (grant.role_code === 'CITIZEN' || grant.role_code === 'VOLUNTEER') {
     if (!['SYSTEM', 'ORGANIZATION'].includes(grant.scope_type)) return false;
   } else if (grant.scope_type === 'SYSTEM') {

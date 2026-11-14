@@ -7,6 +7,8 @@ import { DetailSurface } from '../../components/DetailSurface';
 import { label, timeLabel } from '../../i18n/labels';
 import { useUrlView } from '../../app/useUrlView';
 import { auditTypes } from '../../app/routeViews';
+import { AccountTeamAssignment } from './AccountTeamAssignment';
+import { AccountOrganizationMembership } from './AccountOrganizationMembership';
 
 type Row = Record<string, unknown> & {
   id?: string;
@@ -28,7 +30,7 @@ type Detail = Row & {
     campaign_id?: string | null;
     revoked_at: string | null;
   }[];
-  memberships?: unknown[];
+  memberships?: { organization_id: string; status: string }[];
 };
 const roles = [
   'CITIZEN',
@@ -55,9 +57,11 @@ export function Admin({ page }: { page: string }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [detail, setDetail] = useState<Detail | null>(null);
-  const [userAction, setUserAction] = useState<'disable' | 'enable' | 'reset' | 'revoke' | null>(null);
+  const [userAction, setUserAction] = useState<'disable' | 'enable' | 'reset' | 'revoke' | 'grant' | null>(null);
   const [revokeGrantId, setRevokeGrantId] = useState('');
+  const [showTeamAssignment, setShowTeamAssignment] = useState(false);
   useEffect(() => { setUserAction(null); setRevokeGrantId(''); }, [selected]);
+  useEffect(() => { setShowTeamAssignment(false); }, [selected, page]);
   useEffect(() => {
     if (!userAction) return;
     const frame = requestAnimationFrame(() => document.querySelector<HTMLElement>('.admin-user-actions')?.scrollIntoView({ block: 'nearest' }));
@@ -150,6 +154,7 @@ export function Admin({ page }: { page: string }) {
   }, [selected, revision, page, items]);
   function success() {
     setShowCreate(false);
+    setShowTeamAssignment(false);
     setDetail(null);
     setUserAction(null);
     setRevokeGrantId('');
@@ -213,12 +218,13 @@ export function Admin({ page }: { page: string }) {
                   : 'Danh sách người dùng'}
           </h2>
           {['users', 'organizations', 'regions'].includes(page) && (
-            <button type="button" className="button primary list-create-button" onClick={() => setShowCreate(true)}>
+            <button type="button" className="button primary list-create-button" onClick={() => { setSelected(null); setShowTeamAssignment(false); setShowCreate(true); }}>
               {page === 'users' && <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M10 3v14M3 10h14" /></svg>}
               {createTitle}
             </button>
           )}
         </div>
+        {page === 'organizations' && <p className="muted">Tổ chức là đơn vị quản lý tài khoản và đội cứu hộ. Bạn có thể thêm tổ chức tại đây; khu vực hoạt động được chọn riêng khi tạo đội.</p>}
         {page === 'audit' && (
           <label className="filter">
             Loại đối tượng
@@ -305,13 +311,14 @@ export function Admin({ page }: { page: string }) {
           </button>
         )}
       </section>
-      <DetailSurface modal open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); setUserAction(null); setRevokeGrantId(''); }} label={selected ? 'Chi tiết bản ghi' : createTitle} className={showCreate && page === 'users' ? 'admin-create-dialog' : ''}>
+      <DetailSurface modal open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); setShowTeamAssignment(false); setUserAction(null); setRevokeGrantId(''); }} label={selected ? 'Chi tiết bản ghi' : createTitle} className={showCreate && page === 'users' ? 'admin-create-dialog' : ''}>
         {showCreate && page === 'users' && (
           <div className="admin-create-brand">
             <span className="auth-logo-frame"><img src="/reliva-logo.png" alt="" /></span>
             <span className="admin-create-brand-copy"><strong>Reliva</strong><small>QUẢN TRỊ NGƯỜI DÙNG</small></span>
           </div>
         )}
+        {showCreate && page === 'users' && <p className="notice">Để tạo đội trưởng: tạo tài khoản thuộc tổ chức của đội và cấp quyền Tình nguyện viên. Sau đó mở chi tiết tài khoản, gắn vào đội rồi giao vai trò đội trưởng.</p>}
         {selected && <div className="admin-detail-heading"><h2>
           {selected
             ? ['users', 'grants', 'overview'].includes(page) ? 'Chi tiết người dùng' : page === 'organizations' ? 'Chi tiết tổ chức' : 'Chi tiết khu vực'
@@ -342,7 +349,10 @@ export function Admin({ page }: { page: string }) {
             </div>
             {!['organizations', 'regions'].includes(page) && (
               <>
-                <h3>Quyền hiện có</h3>
+                <div className="admin-grants-heading">
+                  <h3>Quyền hiện có</h3>
+                  {page === 'users' && <button type="button" className="button secondary" aria-expanded={userAction === 'grant'} onClick={() => { setUserAction(current => current === 'grant' ? null : 'grant'); setRevokeGrantId(''); }}>{userAction === 'grant' ? 'Đóng biểu mẫu' : 'Cấp quyền'}</button>}
+                </div>
                 {detail.grants?.length ? (
                   detail.grants.map((grant) => (
                     <div className="candidate" key={grant.id}>
@@ -360,6 +370,15 @@ export function Admin({ page }: { page: string }) {
                 )}
               </>
             )}
+            {page === 'users' && detail.id && <AccountOrganizationMembership accountId={detail.id} memberships={detail.memberships || []}
+              organizations={organizationOptions} onSuccess={success} />}
+            {page === 'users' && detail.id && <div className="admin-team-role-block">
+              <button type="button" className="button secondary" aria-expanded={showTeamAssignment} onClick={() => setShowTeamAssignment((value) => !value)}>
+                {showTeamAssignment ? 'Đóng quản lý đội' : 'Quản lý thành viên và đội trưởng'}
+              </button>
+              {showTeamAssignment && <AccountTeamAssignment key={`${detail.id}:${revision}`} account={{ id: detail.id, display_name: detail.display_name,
+                status: detail.status, memberships: detail.memberships, grants: detail.grants }} />}
+            </div>}
             <div className="action-grid admin-user-actions">
               {page === 'users' && userAction === 'revoke' && <div className="admin-selected-action"><label>Quyền cần thu hồi<select value={revokeGrantId} onChange={event => setRevokeGrantId(event.target.value)}><option value="">Chọn quyền</option>{detail.grants?.filter(grant => !grant.revoked_at).map(grant => <option key={grant.id} value={grant.id}>{label(grant.role_code)} · {label(grant.scope_type)}{grant.region_code ? ` · ${grant.region_code}` : ''}</option>)}</select></label>{revokeGrantId && <CommandForm key={revokeGrantId} spec={{ title: 'Thu hồi quyền', service: 'identity', path: `/grants/${revokeGrantId}/revoke`, warning: `Thu hồi quyền này của ${detail.username}?`, fields: [{ name: 'reason', label: 'Lý do thu hồi', type: 'textarea', required: true, maxLength: 500 }] }} onSuccess={success} />}</div>}
               {['users', 'grants', 'overview'].includes(page) && userAction === 'disable' && detail.status === 'ACTIVE' && (
@@ -436,7 +455,7 @@ export function Admin({ page }: { page: string }) {
                   onSuccess={success}
                 />
               )}
-              {page === 'users' && (
+              {page === 'users' && userAction === 'grant' && (
                 <CommandForm
                   spec={{
                     title: 'Cấp quyền',
@@ -485,7 +504,11 @@ export function Admin({ page }: { page: string }) {
             </div>
           </>
         )}
-        {!selected && page === 'users' && <CommandForm spec={userCreate} onSuccess={success} />}
+        {!selected && page === 'users' && <CommandForm spec={userCreate} onSuccess={(result) => {
+          success();
+          const created = result as { id?: unknown } | undefined;
+          if (typeof created?.id === 'string') setSelected(created.id);
+        }} />}
         {!selected && page === 'organizations' && (
           <CommandForm spec={organizationCreate} onSuccess={success} />
         )}

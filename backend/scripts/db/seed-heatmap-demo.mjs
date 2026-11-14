@@ -60,6 +60,25 @@ const groups = [
   { region: 'DEMO_A', name: 'Trà Vinh', lat: 9.934, lon: 106.345, count: 8, radiusM: 2300, category: 'STORM' },
   { region: 'DEMO_A', name: 'Bến Tre', lat: 10.243, lon: 106.376, count: 8, radiusM: 2300, category: 'FLOOD' },
   { region: 'DEMO_A', name: 'Long Xuyên, An Giang', lat: 10.383, lon: 105.435, count: 8, radiusM: 2200, category: 'FLOOD' },
+  // Dense, fictional flood and storm corridors for the central Vietnam map demo.
+  // Keep these after the existing groups so previously seeded IDs remain stable.
+  { region: 'DEMO_B', name: 'Lệ Thủy, Quảng Bình', lat: 17.218, lon: 106.800, count: 48, radiusM: 3500, category: 'FLOOD' },
+  { region: 'DEMO_B', name: 'Ba Đồn, Quảng Bình', lat: 17.756, lon: 106.422, count: 22, radiusM: 2600, category: 'FLOOD' },
+  { region: 'DEMO_B', name: 'Hải Lăng, Quảng Trị', lat: 16.694, lon: 107.300, count: 44, radiusM: 3200, category: 'FLOOD' },
+  { region: 'DEMO_B', name: 'Phong Điền, Huế', lat: 16.586, lon: 107.367, count: 32, radiusM: 2900, category: 'FLOOD' },
+  { region: 'DEMO_B', name: 'Phú Lộc, Huế', lat: 16.269, lon: 107.884, count: 30, radiusM: 2800, category: 'STORM' },
+  { region: 'DEMO_B', name: 'Hòa Vang, Đà Nẵng', lat: 16.010, lon: 108.075, count: 32, radiusM: 3200, category: 'FLOOD' },
+  { region: 'DEMO_B', name: 'Đại Lộc, Quảng Nam', lat: 15.887, lon: 108.119, count: 38, radiusM: 3300, category: 'FLOOD' },
+  { region: 'DEMO_B', name: 'Duy Xuyên, Quảng Nam', lat: 15.830, lon: 108.294, count: 24, radiusM: 2600, category: 'STORM' },
+  { region: 'DEMO_B', name: 'Sơn Tịnh, Quảng Ngãi', lat: 15.191, lon: 108.760, count: 24, radiusM: 2800, category: 'FLOOD' },
+  { region: 'DEMO_B', name: 'Hương Sơn, Hà Tĩnh', lat: 18.511, lon: 105.399, count: 18, radiusM: 2800, category: 'LANDSLIDE' },
+  { region: 'DEMO_B', name: 'Yên Thành, Nghệ An', lat: 18.988, lon: 105.484, count: 16, radiusM: 3000, category: 'FLOOD' },
+  { region: 'DEMO_C', name: 'Nam Định', lat: 20.438, lon: 106.162, count: 18, radiusM: 2700, category: 'STORM' },
+  { region: 'DEMO_C', name: 'Thái Bình', lat: 20.446, lon: 106.337, count: 16, radiusM: 2600, category: 'FLOOD' },
+  { region: 'DEMO_C', name: 'Lào Cai', lat: 22.485, lon: 103.970, count: 14, radiusM: 2800, category: 'LANDSLIDE' },
+  { region: 'DEMO_A', name: 'Mỹ Tho, Tiền Giang', lat: 10.360, lon: 106.359, count: 18, radiusM: 2700, category: 'FLOOD' },
+  { region: 'DEMO_A', name: 'Bến Tre', lat: 10.243, lon: 106.376, count: 16, radiusM: 2700, category: 'STORM' },
+  { region: 'DEMO_A', name: 'Cà Mau', lat: 9.176, lon: 105.150, count: 14, radiusM: 2700, category: 'FLOOD' },
 ];
 
 function uuidFor(index, purpose) {
