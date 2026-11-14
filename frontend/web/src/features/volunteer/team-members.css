@@ -1,0 +1,190 @@
+.team-member-dialog.record-detail-dialog {
+  box-sizing: border-box;
+  width: min(640px, calc(100vw - var(--space-6)));
+  max-height: calc(100dvh - var(--space-6));
+  padding: 0;
+  border: 1px solid var(--color-surface-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-card);
+  box-shadow: var(--shadow-lg);
+}
+
+.team-member-dialog > .detail-surface-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-surface-border);
+}
+
+.team-member-dialog > .detail-surface-header h2 {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-text-primary);
+  font: 700 var(--text-title) var(--font-family);
+}
+
+.team-member-dialog > .detail-surface-header .detail-close-button {
+  position: static;
+  float: none;
+  flex: none;
+}
+
+.team-member-dialog .team-member-add {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-5);
+  border: 0;
+}
+
+.team-member-add__intro {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font: 400 var(--text-body) var(--font-family);
+}
+
+.team-member-search {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.team-member-search > label {
+  color: var(--color-text-primary);
+  font: 600 var(--text-body) var(--font-family);
+}
+
+.team-member-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.team-member-search-row input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-h-lg);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-surface-divider);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
+  font: 400 var(--text-body) var(--font-family);
+  transition: background-color var(--ease), border-color var(--ease), color var(--ease), box-shadow var(--ease);
+}
+
+.team-member-search-row input::placeholder {
+  color: var(--color-text-placeholder);
+}
+
+.team-member-search-row input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-color: var(--color-primary);
+}
+
+.team-member-search-row .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control-h-lg);
+  white-space: nowrap;
+}
+
+.team-member-search-results {
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 160px;
+  max-height: 240px;
+  height: min(240px, 32dvh);
+  padding: var(--space-3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  align-content: start;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+}
+
+.team-member-search-status {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font: 400 var(--text-body) var(--font-family);
+}
+
+.team-member-results-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-surface-border);
+  color: var(--color-text-primary);
+  font: 600 var(--text-body) var(--font-family);
+}
+
+.team-member-results-heading span {
+  color: var(--color-text-secondary);
+  font: 400 var(--text-caption) var(--font-family);
+  font-variant-numeric: tabular-nums;
+}
+
+.team-member-dialog .team-member-candidates {
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.team-member-dialog .team-member-row {
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-color: var(--color-surface-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-card);
+  transition: background-color var(--ease), border-color var(--ease);
+}
+
+.team-member-dialog .team-member-row:hover {
+  border-color: var(--color-primary-border);
+  background: var(--color-surface-subtle);
+}
+
+.team-member-dialog .team-member-avatar {
+  width: 40px;
+  height: 40px;
+  flex-basis: 40px;
+  background: var(--color-primary-bg);
+  color: var(--color-primary-dark);
+}
+
+.team-member-dialog .team-member-identity span {
+  color: var(--color-text-secondary);
+  font: 400 var(--text-caption) var(--font-family);
+}
+
+.team-member-dialog .team-member-add-button {
+  min-height: var(--control-h);
+}
+
+@media (min-width: 720px) {
+  .team-member-search-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .team-member-search-row .button {
+    min-width: 152px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team-member-search-row input,
+  .team-member-dialog .team-member-row {
+    transition: none;
+  }
+}

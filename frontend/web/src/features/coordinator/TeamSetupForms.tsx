@@ -120,6 +120,11 @@ export function TeamCreateForm({ organizations, regions, skills, onSuccess }: {
     } finally { setBusy(false); }
   }
   const fieldError = (name: string) => fieldErrors[name]?.join(' ');
+  const hasInvalidFields = !name.trim() || name.length > 200 || !organizationId || !regionCode
+    || (reportingMode === 'APP'
+      ? !leaderId
+      : !contactNote.trim() || contactNote.length > 1000)
+    || Object.keys(fieldErrors).length > 0;
   return <form className="form-stack command-form" onSubmit={submit}>
     <h3>Tạo đội cứu hộ</h3>
     <label>Tên đội *<input required maxLength={200} value={name} onChange={(e) => { setName(e.target.value); changed(); }} />{fieldError('name') && <small className="field-error">{fieldError('name')}</small>}</label>
@@ -144,6 +149,6 @@ export function TeamCreateForm({ organizations, regions, skills, onSuccess }: {
       <p className="notice warning">Không tìm thấy tài khoản đủ điều kiện (cần thuộc tổ chức này và có quyền Tình nguyện viên).</p>}
     {fieldError('skill_codes') && <p className="field-error">{fieldError('skill_codes')}</p>}
     {error && <p className="notice error" role="alert">{error}</p>}
-    <button type="submit" className="button" disabled={busy || !organizations.length || !regions.length || (reportingMode === 'APP' && !leaderId)}>{busy ? 'Đang tạo…' : 'Tạo đội cứu hộ'}</button>
+    <button type="submit" className="button" disabled={busy || hasInvalidFields || !organizations.length || !regions.length}>{busy ? 'Đang tạo…' : 'Tạo đội cứu hộ'}</button>
   </form>;
 }

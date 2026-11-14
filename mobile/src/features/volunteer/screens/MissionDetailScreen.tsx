@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNetInfo } from '@react-native-community/netinfo';
 import {
   View,
   Text,
@@ -20,11 +21,16 @@ import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { TimelineStep } from '../../../components/common/TimelineStep';
 import { ResponseApi } from '../../../api/responseApi';
-import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
+import { getApiErrorMessage, isApiErrorCode, MobileApiError } from '../../../api/client';
 import { MissionDetail, MissionProgressTarget, MissionStatus } from '../../../types/api';
 import { INCIDENT_CATEGORIES, MISSION_KIND_LABELS, MISSION_STATUS_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
-import { generateUUID } from '../../../utils/secureStore';
+import { useAuthStore } from '../../../store/authStore';
+import {
+  generateUUID,
+  PendingMissionTransitionCommand,
+  StorageService,
+} from '../../../utils/secureStore';
 import { getEvidenceSizeLimitBytes, getSupportedEvidenceMimeType } from '../../../utils/evidence';
 import {
   Users,
@@ -41,19 +47,31 @@ import {
   Video,
   X,
   Info,
+  Clock,
 } from 'lucide-react-native';
 
 const isLoopbackDownloadUrl = (url: string) =>
   /^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::|\/)/i.test(url);
 
+type MissionTransitionResult =
+  | { status: 'SUBMITTED' }
+  | { status: 'QUEUED' }
+  | { status: 'BUSY' }
+  | { status: 'REJECTED'; error: unknown };
+
 export const MissionDetailScreen: React.FC = () => {
   const router = useRouter();
+  const currentUserId = useAuthStore((state) => state.user?.id);
+  const networkInfo = useNetInfo();
+  const isNetworkAvailable = networkInfo.isConnected !== false && networkInfo.isInternetReachable !== false;
   const { missionId: routeMissionId } = useLocalSearchParams<{ missionId?: string }>();
   const missionId = Array.isArray(routeMissionId) ? routeMissionId[0] : routeMissionId;
 
   const [mission, setMission] = useState<MissionDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [pendingTransition, setPendingTransition] = useState<PendingMissionTransitionCommand | null>(null);
+  const [pendingTransitionMissionId, setPendingTransitionMissionId] = useState<string | null>(null);
 
   // Modal hoàn thành nhiệm vụ & ảnh bằng chứng cứu nạn
   const [showCompleteModal, setShowCompleteModal] = useState<boolean>(false);
@@ -61,6 +79,10 @@ export const MissionDetailScreen: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Record<string, string | undefined>>({});
   const [completionImage, setCompletionImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const evidenceUploadKey = useRef<{ uri: string; key: string } | null>(null);
+  const transitionActionInProgress = useRef<boolean>(false);
+  const lastAutoSyncKey = useRef<string | null>(null);
+  const pendingTransitionLoaded = Boolean(missionId && pendingTransitionMissionId === missionId);
+  const activePendingTransition = pendingTransition?.missionId === missionId ? pendingTransition : null;
 
   // Modal từ chối hoặc báo thất bại
   const [showDeclineModal, setShowDeclineModal] = useState<boolean>(false);
@@ -171,6 +193,172 @@ export const MissionDetailScreen: React.FC = () => {
     fetchDetail();
   }, [fetchDetail]);
 
+  useEffect(() => {
+    let isCurrentScreen = true;
+    if (!missionId) return () => { isCurrentScreen = false; };
+
+    void StorageService.getPendingMissionTransition(missionId)
+      .then((command) => {
+        if (isCurrentScreen) setPendingTransition(command);
+      })
+      .catch(() => {
+        if (isCurrentScreen) setPendingTransition(null);
+      })
+      .finally(() => {
+        if (isCurrentScreen) setPendingTransitionMissionId(missionId);
+      });
+
+    return () => { isCurrentScreen = false; };
+  }, [missionId]);
+
+  const performPendingMissionTransition = useCallback(async (
+    command: PendingMissionTransitionCommand,
+    forceAttempt = false,
+  ): Promise<MissionTransitionResult> => {
+    if (!isNetworkAvailable && !forceAttempt) return { status: 'QUEUED' };
+
+    try {
+      await ResponseApi.transitionMission(
+        command.missionId,
+        command.expectedVersion,
+        command.toStatus,
+        command.note,
+        command.outcomeNote,
+        command.idempotencyKey,
+      );
+      await StorageService.clearPendingMissionTransition(command.missionId).catch(() => undefined);
+      setPendingTransition(null);
+      await fetchDetail();
+      return { status: 'SUBMITTED' };
+    } catch (error) {
+      if (error instanceof MobileApiError && (error.status === undefined || error.status === 408 || error.status >= 500)) {
+        setPendingTransition(command);
+        return { status: 'QUEUED' };
+      }
+
+      await StorageService.clearPendingMissionTransition(command.missionId).catch(() => undefined);
+      setPendingTransition(null);
+      await fetchDetail();
+      return { status: 'REJECTED', error };
+    }
+  }, [fetchDetail, isNetworkAvailable]);
+
+  const submitMissionProgress = useCallback(async (
+    expectedVersion: number,
+    toStatus: MissionProgressTarget,
+    note?: string,
+    outcomeNote?: string,
+  ): Promise<MissionTransitionResult> => {
+    if (!missionId || !currentUserId) {
+      return { status: 'REJECTED', error: new Error('MISSION_PROGRESS_REQUIRES_SIGN_IN') };
+    }
+    if (transitionActionInProgress.current) return { status: 'BUSY' };
+
+    transitionActionInProgress.current = true;
+    setActionLoading(true);
+    try {
+      const command = await StorageService.getOrCreatePendingMissionTransition({
+        missionId,
+        actorUserId: currentUserId,
+        expectedVersion,
+        toStatus,
+        note,
+        outcomeNote,
+      });
+      setPendingTransition(command);
+      return await performPendingMissionTransition(command);
+    } catch (error) {
+      return { status: 'REJECTED', error };
+    } finally {
+      setActionLoading(false);
+      transitionActionInProgress.current = false;
+    }
+  }, [currentUserId, missionId, performPendingMissionTransition]);
+
+  const retryPendingMissionProgress = useCallback(async (
+    showFeedback: boolean,
+    forceAttempt = false,
+  ): Promise<MissionTransitionResult> => {
+    if (!activePendingTransition) return { status: 'BUSY' };
+    if (activePendingTransition.actorUserId !== currentUserId) {
+      if (showFeedback) {
+        Alert.alert(
+          'Đang chờ tài khoản đã tạo thao tác',
+          'Hãy đăng nhập lại bằng tài khoản đội đã lưu cập nhật ngoại tuyến để gửi thao tác này.',
+        );
+      }
+      return { status: 'REJECTED', error: new Error('MISSION_PROGRESS_ACTOR_MISMATCH') };
+    }
+    if (transitionActionInProgress.current) return { status: 'BUSY' };
+
+    transitionActionInProgress.current = true;
+    setActionLoading(true);
+    try {
+      const result = await performPendingMissionTransition(activePendingTransition, forceAttempt);
+      if (showFeedback && result.status === 'SUBMITTED') {
+        Alert.alert('Đã gửi cập nhật', 'Máy chủ đã xác nhận tiến độ nhiệm vụ mới.');
+      } else if (showFeedback && result.status === 'QUEUED') {
+        Alert.alert(
+          'Tiến độ vẫn đang chờ gửi',
+          'Thao tác được giữ trên thiết bị và sẽ được thử lại khi có kết nối.',
+        );
+      } else if (result.status === 'REJECTED') {
+        Alert.alert('Chưa thể cập nhật tiến độ', getApiErrorMessage(result.error, 'Hãy tải lại nhiệm vụ rồi thử xác nhận lại.'));
+      }
+      return result;
+    } finally {
+      setActionLoading(false);
+      transitionActionInProgress.current = false;
+    }
+  }, [activePendingTransition, currentUserId, performPendingMissionTransition]);
+
+  useEffect(() => {
+    if (!isNetworkAvailable) {
+      lastAutoSyncKey.current = null;
+      return;
+    }
+    if (
+      !pendingTransitionLoaded ||
+      loading ||
+      !activePendingTransition ||
+      activePendingTransition.actorUserId !== currentUserId ||
+      lastAutoSyncKey.current === activePendingTransition.idempotencyKey
+    ) return;
+
+    lastAutoSyncKey.current = activePendingTransition.idempotencyKey;
+    void retryPendingMissionProgress(false);
+  }, [activePendingTransition, currentUserId, isNetworkAvailable, loading, pendingTransitionLoaded, retryPendingMissionProgress]);
+
+  const pendingTransitionNotice = activePendingTransition ? (
+    <View style={styles.pendingTransitionBox} accessibilityLiveRegion="polite">
+      <View style={styles.pendingTransitionHeader}>
+        <Clock size={17} color={THEME.colors.warning.dark} />
+        <Text style={styles.pendingTransitionTitle}>Tiến độ đang chờ gửi</Text>
+      </View>
+      <Text style={styles.pendingTransitionText}>
+        Cập nhật “{MISSION_STATUS_LABELS[activePendingTransition.toStatus].label}” đang được lưu trên thiết bị. Máy chủ chưa xác nhận, trạng thái nhiệm vụ hiện tại vẫn được giữ nguyên.
+      </Text>
+      {activePendingTransition.actorUserId === currentUserId ? (
+        <TouchableOpacity
+          style={[styles.pendingTransitionButton, actionLoading && styles.pendingTransitionButtonDisabled]}
+          onPress={() => { void retryPendingMissionProgress(true, true); }}
+          disabled={actionLoading}
+          accessibilityRole="button"
+          accessibilityLabel="Thử gửi lại tiến độ nhiệm vụ đang chờ"
+        >
+          {actionLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
+          <Text style={styles.pendingTransitionButtonText}>
+            {actionLoading ? 'Đang thử gửi…' : 'Thử gửi lại'}
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <Text style={styles.pendingTransitionText}>
+          Hãy đăng nhập lại bằng tài khoản đội đã lưu thao tác để tiếp tục gửi.
+        </Text>
+      )}
+    </View>
+  ) : null;
+
   // Mở Google Maps ngoài điều hướng đường đi
   const openExternalMaps = () => {
     if (!mission?.location?.coordinates) {
@@ -225,12 +413,17 @@ export const MissionDetailScreen: React.FC = () => {
         await ResponseApi.declineMission(mission.id, mission.version, reason);
         Alert.alert('Đã từ chối', 'Lý do từ chối nhiệm vụ đã được ghi nhận.');
       } else {
-        await ResponseApi.transitionMission(
-          mission.id,
-          mission.version,
-          'FAILED',
-          reason
-        );
+        const result = await submitMissionProgress(mission.version, 'FAILED', reason);
+        if (result.status === 'QUEUED') {
+          setShowDeclineModal(false);
+          Alert.alert(
+            'Tiến độ đang chờ gửi',
+            'Thao tác được lưu trên thiết bị nhưng máy chủ chưa xác nhận. Hãy thử gửi lại khi có kết nối.',
+          );
+          return;
+        }
+        if (result.status === 'REJECTED') throw result.error;
+        if (result.status === 'BUSY') return;
         Alert.alert('Đã ghi nhận', 'Trạng thái nhiệm vụ không thể tiếp cận đã được ghi nhận.');
       }
       setShowDeclineModal(false);
@@ -250,14 +443,14 @@ export const MissionDetailScreen: React.FC = () => {
       {
         text: 'Xác nhận',
         onPress: async () => {
-          setActionLoading(true);
-          try {
-            await ResponseApi.transitionMission(mission.id, mission.version, toStatus);
-            fetchDetail();
-          } catch (e: any) {
-            Alert.alert('Lỗi cập nhật', getApiErrorMessage(e, 'Không thể cập nhật trạng thái.'));
-          } finally {
-            setActionLoading(false);
+          const result = await submitMissionProgress(mission.version, toStatus);
+          if (result.status === 'QUEUED') {
+            Alert.alert(
+              'Tiến độ đang chờ gửi',
+              'Thao tác được lưu trên thiết bị nhưng máy chủ chưa xác nhận. Hãy thử gửi lại khi có kết nối.',
+            );
+          } else if (result.status === 'REJECTED') {
+            Alert.alert('Lỗi cập nhật', getApiErrorMessage(result.error, 'Không thể cập nhật trạng thái.'));
           }
         },
       },
@@ -315,13 +508,19 @@ export const MissionDetailScreen: React.FC = () => {
         }
       }
 
-      await ResponseApi.transitionMission(
-        mission.id,
-        mission.version,
-        'COMPLETED',
-        undefined,
-        outcome
-      );
+      const result = await submitMissionProgress(mission.version, 'COMPLETED', undefined, outcome);
+      if (result.status === 'QUEUED') {
+        setShowCompleteModal(false);
+        setCompletionImage(null);
+        evidenceUploadKey.current = null;
+        Alert.alert(
+          'Tiến độ đang chờ gửi',
+          'Báo cáo kết quả được lưu trên thiết bị nhưng máy chủ chưa xác nhận. Hãy thử gửi lại khi có kết nối.',
+        );
+        return;
+      }
+      if (result.status === 'REJECTED') throw result.error;
+      if (result.status === 'BUSY') return;
       Alert.alert('Đã ghi nhận kết quả', 'Đã ghi nhận kết quả hoàn thành nhiệm vụ.');
       setShowCompleteModal(false);
       setCompletionImage(null);
@@ -339,8 +538,8 @@ export const MissionDetailScreen: React.FC = () => {
     }
   };
 
-  const completeSubmitDisabled = actionLoading || !outcomeNote.trim() || outcomeNote.length > 2000;
-  const declineSubmitDisabled = actionLoading || !declineReason.trim() || declineReason.length > 2000;
+  const completeSubmitDisabled = actionLoading || !pendingTransitionLoaded || Boolean(activePendingTransition) || !outcomeNote.trim() || outcomeNote.length > 2000;
+  const declineSubmitDisabled = actionLoading || !pendingTransitionLoaded || Boolean(activePendingTransition) || !declineReason.trim() || declineReason.length > 2000;
 
   if (loading) {
     return (
@@ -356,6 +555,7 @@ export const MissionDetailScreen: React.FC = () => {
   if (!mission) {
     return (
       <ScreenContainer title="Chi Tiết Nhiệm Vụ" onBack={() => goBackOrHome(router)}>
+        {pendingTransitionNotice}
         <Text style={styles.errorText}>Không tìm thấy thông tin nhiệm vụ này.</Text>
       </ScreenContainer>
     );
@@ -393,6 +593,7 @@ export const MissionDetailScreen: React.FC = () => {
       subtitle={`Mã: ${mission.id.slice(0, 8)}`}
       onBack={() => goBackOrHome(router)}
     >
+      {pendingTransitionNotice}
       {/* 1. THẺ TỔNG QUAN SỰ CỐ */}
       <View style={styles.card}>
         <View style={styles.headerRow}>
@@ -590,21 +791,21 @@ export const MissionDetailScreen: React.FC = () => {
           {mission.status === 'OFFERED' && (
             <View style={styles.buttonRow}>
               <TouchableOpacity
-                style={[styles.declineBtn, actionLoading && { opacity: 0.6 }]}
+                style={[styles.declineBtn, (actionLoading || !pendingTransitionLoaded || Boolean(activePendingTransition)) && { opacity: 0.6 }]}
                 onPress={() => {
                   setFormErrors((current) => ({ ...current, declineReason: undefined }));
                   setShowDeclineModal(true);
                 }}
-                disabled={actionLoading}
+                disabled={actionLoading || !pendingTransitionLoaded || Boolean(activePendingTransition)}
               >
                 <XCircle size={18} color={THEME.colors.emergency.main} />
                 <Text style={styles.declineBtnText}>Từ Chối</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.acceptBtn, actionLoading && { opacity: 0.6 }]}
+                style={[styles.acceptBtn, (actionLoading || !pendingTransitionLoaded || Boolean(activePendingTransition)) && { opacity: 0.6 }]}
                 onPress={handleAccept}
-                disabled={actionLoading}
+                disabled={actionLoading || !pendingTransitionLoaded || Boolean(activePendingTransition)}
               >
                 <CheckCircle2 size={18} color="#FFFFFF" />
                 <Text style={styles.acceptBtnText}>Tiếp Nhận Nhiệm Vụ</Text>
@@ -618,7 +819,7 @@ export const MissionDetailScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.primaryActionBtn}
                 onPress={() => handleTransition('EN_ROUTE', 'Đang trên đường di chuyển')}
-                disabled={actionLoading}
+                disabled={actionLoading || !pendingTransitionLoaded || Boolean(activePendingTransition)}
               >
                 <Truck size={20} color="#FFFFFF" />
                 <Text style={styles.primaryActionText}>Bắt đầu di chuyển đến điểm nhiệm vụ</Text>
@@ -629,7 +830,7 @@ export const MissionDetailScreen: React.FC = () => {
                   setDeclineReason('');
                   setShowDeclineModal(true);
                 }}
-                disabled={actionLoading}
+                disabled={actionLoading || !pendingTransitionLoaded || Boolean(activePendingTransition)}
               >
                 <Text style={styles.failedBtnText}>Báo không thể triển khai nhiệm vụ</Text>
               </TouchableOpacity>
@@ -642,7 +843,7 @@ export const MissionDetailScreen: React.FC = () => {
               <TouchableOpacity
                 style={[styles.primaryActionBtn, { backgroundColor: '#7C3AED' }]}
                 onPress={() => handleTransition('ON_SCENE', 'Đã tiếp cận điểm nhiệm vụ')}
-                disabled={actionLoading}
+                disabled={actionLoading || !pendingTransitionLoaded || Boolean(activePendingTransition)}
               >
                 <Flag size={20} color="#FFFFFF" />
                 <Text style={styles.primaryActionText}>Xác nhận đã tiếp cận điểm nhiệm vụ</Text>
@@ -653,7 +854,7 @@ export const MissionDetailScreen: React.FC = () => {
                   setDeclineReason('');
                   setShowDeclineModal(true);
                 }}
-                disabled={actionLoading}
+                disabled={actionLoading || !pendingTransitionLoaded || Boolean(activePendingTransition)}
               >
                 <Text style={styles.failedBtnText}>Báo không thể tiếp cận điểm nhiệm vụ</Text>
               </TouchableOpacity>
@@ -669,7 +870,7 @@ export const MissionDetailScreen: React.FC = () => {
                   setFormErrors((current) => ({ ...current, outcomeNote: undefined }));
                   setShowCompleteModal(true);
                 }}
-                disabled={actionLoading}
+                disabled={actionLoading || !pendingTransitionLoaded || Boolean(activePendingTransition)}
               >
                 <FileCheck size={20} color="#FFFFFF" />
                 <Text style={styles.primaryActionText}>Báo cáo hoàn thành nhiệm vụ</Text>
@@ -681,7 +882,7 @@ export const MissionDetailScreen: React.FC = () => {
                   setDeclineReason('');
                   setShowDeclineModal(true);
                 }}
-                disabled={actionLoading}
+                disabled={actionLoading || !pendingTransitionLoaded || Boolean(activePendingTransition)}
               >
                 <Text style={styles.failedBtnText}>Báo không thể hoàn thành nhiệm vụ</Text>
               </TouchableOpacity>
@@ -878,6 +1079,49 @@ export const MissionDetailScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  pendingTransitionBox: {
+    backgroundColor: THEME.colors.warning.bg,
+    borderColor: THEME.colors.warning.light,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 13,
+    marginBottom: 14,
+  },
+  pendingTransitionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 6,
+  },
+  pendingTransitionTitle: {
+    color: THEME.colors.warning.dark,
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '800',
+  },
+  pendingTransitionText: {
+    color: THEME.colors.warning.dark,
+    fontSize: THEME.typography.fontSizes.xs,
+    lineHeight: 18,
+  },
+  pendingTransitionButton: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: THEME.colors.primary.main,
+  },
+  pendingTransitionButtonDisabled: {
+    opacity: 0.65,
+  },
+  pendingTransitionButtonText: {
+    color: '#FFFFFF',
+    fontSize: THEME.typography.fontSizes.xs,
+    fontWeight: '700',
+  },
   card: {
     backgroundColor: THEME.colors.surface.card,
     borderRadius: 16,

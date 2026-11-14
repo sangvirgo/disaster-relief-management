@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { DetailCloseButton } from './DetailCloseButton';
+import { useModalScrollLock } from './modalScrollLock';
 
 export function DetailSurface({ modal, open, onClose, children, label = 'Chi tiáº¿t biÃªn nháº­n', className = '', heading, explicitCloseOnly = false }: {
   label?: string; className?: string; heading?: string; modal: boolean; open: boolean; onClose: () => void; children: ReactNode; explicitCloseOnly?: boolean;
@@ -7,6 +8,7 @@ export function DetailSurface({ modal, open, onClose, children, label = 'Chi tiá
   const ref = useRef<HTMLDialogElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [closing, setClosing] = useState(false);
+  useModalScrollLock(modal && open);
   useEffect(() => {
     if (modal && open) { setClosing(false); ref.current?.showModal(); }
     return () => { if (timer.current) clearTimeout(timer.current); };
@@ -27,8 +29,7 @@ export function DetailSurface({ modal, open, onClose, children, label = 'Chi tiá
       event.preventDefault();
       event.stopPropagation();
       if (!explicitCloseOnly) close();
-    }}
-    onMouseDown={(event) => { if (!explicitCloseOnly && event.target === event.currentTarget) close(); }}>
+    }}>
     {header}{children}
   </dialog>;
 }

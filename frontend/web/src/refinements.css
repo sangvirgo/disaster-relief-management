@@ -336,17 +336,33 @@
 .admin-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
 .admin-status-badge.is-active .admin-status-dot { background: #16a34a; }
 .admin-version-badge { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #fff; }
-.notice-record { align-items: center; }
-.notice-record.is-unread { border-color: #b9d2ff; background: #f6f9ff; }
-.notice-record-open { display: block; flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.notice-record-open:hover strong { color: var(--color-primary); text-decoration: underline; }
-.notice-record-open:focus-visible { outline: 3px solid #8bb8ff; outline-offset: 4px; border-radius: 4px; }
-.notice-detail-dialog { width: min(540px, calc(100vw - 32px)); }
-.notice-detail-content { padding-top: 8px; }
-.notice-detail-content h2 { margin: 8px 90px 6px 0; font-size: 23px; }
-.notice-detail-content > p { line-height: 1.6; }
-.notice-reference { overflow-wrap: anywhere; border: 1px solid #dce5f0; border-radius: 10px; padding: 10px 12px; background: #f8fafc; }
-.notice-detail-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+.volunteer-notices { display: grid; gap: 4px; }
+.volunteer-notices > .notice-page-header { align-items: center; gap: 18px; margin-bottom: 12px; }
+.notice-page-header h2 { margin: 0; }
+.notice-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.notice-mark-all { min-height: 38px; padding: 8px 13px; font-size: 13px; }
+.notice-filter-tabs { display: flex; align-items: center; gap: 3px; margin: 0; padding: 4px; border: 1px solid #dce5f0; border-radius: 11px; background: #f7f9fc; }
+.notice-filter-tabs button { min-height: 34px; padding: 6px 12px; border: 0; border-radius: 7px; background: transparent; color: #53647b; font-size: 13px; }
+.notice-filter-tabs button.active { background: #fff; color: var(--color-primary-dark); box-shadow: 0 1px 3px #18345320; }
+.notice-filter-tabs button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.notice-record-list { gap: 8px; }
+.notice-record-list .notice-record,
+.notice-record-list .notice-record:first-child { align-items: center; gap: 16px; margin: 0; padding: 13px 15px; border: 1px solid #e1e8f0; border-radius: 13px; background: #fff; }
+.notice-record-list .notice-record.is-unread { border-color: #c7d9f5; background: #f7faff; box-shadow: inset 3px 0 #3b82f6; }
+.notice-record-main { display: flex; align-items: flex-start; gap: 12px; flex: 1; min-width: 0; }
+.notice-record-icon { display: grid; flex: 0 0 36px; width: 36px; height: 36px; place-items: center; border-radius: 11px; background: #eef3f9; color: #60738c; }
+.notice-record.is-unread .notice-record-icon { background: #e6efff; color: #2563eb; }
+.notice-record-copy { display: grid; gap: 5px; min-width: 0; }
+.notice-record-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.notice-record-title-row strong { font-size: 14px; line-height: 20px; }
+.notice-unread-badge { padding: 2px 7px; border-radius: 999px; background: #e8f1ff; color: #245bb0; font-size: 11px; font-weight: 700; line-height: 17px; }
+.notice-record-references { display: flex; flex-wrap: wrap; gap: 4px 14px; min-width: 0; }
+.notice-record-references span { color: #52637a; font-size: 12px; line-height: 18px; }
+.notice-record-references code { color: #34445a; font-size: 11px; }
+.notice-record-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; color: #7a8798; font-size: 11px; line-height: 16px; }
+.notice-record-meta time { font-variant-numeric: tabular-nums; }
+.notice-record-actions { display: flex; flex-direction: row; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 7px; }
+.notice-record-actions .button { min-height: 36px; padding: 7px 11px; font-size: 12px; }
 .account-manual-lookup {
   margin-top: 10px;
 }
@@ -1244,7 +1260,7 @@
   .donation-item-table tbody td::before { content: attr(data-label); display: block; margin-bottom: 4px; color: var(--color-text-secondary); font-size: 11px; font-weight: 700; }
   .donation-item-table tbody td:last-child { grid-column: 1 / -1; border-top: 1px solid var(--color-surface-border); }
 }
-.campaign-public-dialog { width: min(600px, calc(100vw - 32px)); max-height: min(80dvh, 700px); padding: 0; border: 1px solid #dce5f0; border-radius: 20px; background: #fff; color: var(--color-text-primary); box-shadow: 0 28px 70px #0b254455; animation: reliefReveal .22s ease-out; }
+.campaign-public-dialog { width: min(600px, calc(100vw - 32px)); max-height: min(80dvh, 700px); overflow-y: auto; overscroll-behavior: contain; padding: 0; border: 1px solid #dce5f0; border-radius: 20px; background: #fff; color: var(--color-text-primary); box-shadow: 0 28px 70px #0b254455; animation: reliefReveal .22s ease-out; }
 .campaign-public-dialog::backdrop { background: #10243a99; backdrop-filter: blur(4px); animation: reliefFade .2s ease-out; }
 .campaign-dialog-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 24px 26px 18px; border-bottom: 1px solid var(--color-surface-border); }
 .campaign-dialog-header h2 { margin: 7px 0 0; font-size: clamp(19px, 3vw, 24px); line-height: 1.25; }
@@ -1264,8 +1280,8 @@
 @media (max-width: 900px) { .donation-nav .button { flex: 1 1 0; min-width: 0; } }
 @media (max-width: 520px) { .donation-drive-detail > .donation-drive-actions .button { flex: 1 1 100%; } .campaign-dialog-header { padding: 20px; } .campaign-dialog-objective { padding: 18px 20px 8px; } .campaign-public-dialog .fact-list { padding: 0 20px 20px; } }
 @media (prefers-reduced-motion: reduce) { .donation-drive-card, .donation-drive-detail, .campaign-public-dialog, .campaign-public-dialog::backdrop { animation: none; transition: none; } .donation-drive-card:hover { transform: none; } }
-.donation-modal-backdrop { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 20px; background: rgba(15, 23, 42, .55); backdrop-filter: blur(4px); }
-.donation-modal { width: min(680px, 100%); max-height: calc(100dvh - 40px); overflow-y: auto; background: #fff; border-radius: 18px; box-shadow: 0 25px 60px rgba(15, 23, 42, .3); padding: 0 24px 24px; }
+.donation-modal-backdrop { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; overflow: hidden; overscroll-behavior: contain; padding: 20px; background: rgba(15, 23, 42, .55); backdrop-filter: blur(4px); }
+.donation-modal { width: min(680px, 100%); max-height: calc(100dvh - 40px); overflow-y: auto; overscroll-behavior: contain; background: #fff; border-radius: 18px; box-shadow: 0 25px 60px rgba(15, 23, 42, .3); padding: 0 24px 24px; }
 .donation-modal-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 18px 0; margin-bottom: 10px; background: #fff; cursor: grab; touch-action: none; border-bottom: 1px solid var(--color-surface-border); }
 .donation-modal-header:active { cursor: grabbing; }
 .donation-modal-header h2 { margin: 0; }
@@ -1372,7 +1388,7 @@
 .operations-review-layout { grid-template-columns: minmax(0, 1fr); }
 .operations-review-layout .record-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .operations-review-layout .queue-row { align-items: flex-start; flex-direction: column; border: 1px solid var(--color-surface-border); padding: 18px; gap: 12px; }
-.record-detail-dialog { border: 1px solid #dbe5f1; border-radius: 22px; padding: 28px; width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; box-shadow: 0 24px 80px #172b4d40; animation: reliefDialogIn .2s ease both; }
+.record-detail-dialog { border: 1px solid #dbe5f1; border-radius: 22px; padding: 28px; width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; overscroll-behavior: contain; box-shadow: 0 24px 80px #172b4d40; animation: reliefDialogIn .2s ease both; }
 .record-detail-dialog::backdrop { background: #172b4d66; backdrop-filter: blur(5px); }
 .record-detail-dialog > h2 { margin-top: 8px; padding-right: 90px; }
 .detail-close-button, .modal-close-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 38px; min-height: 38px; border: 1px solid #dce5f0; border-radius: 12px; background: #f4f7fb; color: #41536b; cursor: pointer; transition: background .15s, color .15s, transform .15s; }
@@ -1390,6 +1406,7 @@
 .detail-close-button .close-icon { display: block; flex: 0 0 16px; }
 .detail-close-button .close-label { display: inline; font-size: 14px; line-height: 20px; }
 .record-detail-dialog { position: fixed; }
+.action-confirm-dialog, .modal-card { overscroll-behavior: contain; }
 .record-detail-dialog > .command-form { border-top: 0; padding-top: 8px; }
 .record-detail-dialog > .command-form > h3 { padding-right: 92px; margin-top: 0; font-size: 22px; }
 .admin-create-brand { display: flex; align-items: center; gap: 12px; min-height: 56px; padding-right: 94px; margin-bottom: 14px; }
@@ -1432,6 +1449,16 @@
 @keyframes detailSwitchIn { from { opacity: .55; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @media (min-width: 1051px) { .campaign-detail-panel { position: sticky; top: 20px; max-height: calc(100dvh - 40px); overflow-y: auto; scrollbar-width: thin; } }
 @media (max-width: 600px) { .list-action-header { align-items: stretch; } .list-action-header h2, .list-create-button { width: 100%; } .notice-header-actions { justify-content: flex-start; } }
+@media (max-width: 680px) {
+  .volunteer-notices > .notice-page-header { align-items: flex-start; }
+  .notice-header-actions { justify-content: flex-start; width: 100%; }
+  .notice-record-list .notice-record { align-items: flex-start; }
+  .notice-record-actions { justify-content: flex-start; width: 100%; }
+}
+@media (max-width: 420px) {
+  .notice-header-actions { align-items: flex-start; flex-direction: column; }
+  .notice-filter-tabs { align-self: flex-start; }
+}
 @media (prefers-reduced-motion: reduce) { .operations-detail-transition { animation: none; } }
 .sos-action-entry { padding: 16px 0; border-top: 1px solid var(--color-surface-border); }
 .report-heatmap > .card { border: 0; padding: 0; box-shadow: none; background: transparent; }

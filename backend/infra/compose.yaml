@@ -332,7 +332,7 @@ services:
       - minio-data:/mnt/data
     ports:
       # Host backup clients use S3 directly; never send app credentials through the public ingress.
-      - "127.0.0.1:${MINIO_BACKUP_HOST_PORT:-59000}:9000"
+      - "127.0.0.1:${MINIO_BACKUP_HOST_PORT:-59500}:9000"
       - "127.0.0.1:${MINIO_CONSOLE_PORT:-9005}:9001"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/ready >/dev/null"]

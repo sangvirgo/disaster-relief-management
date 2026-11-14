@@ -269,6 +269,7 @@ export interface RescueTeam {
   name: string;
   version: number;
   availability: 'AVAILABLE' | 'UNAVAILABLE';
+  readiness_required: boolean;
   status: 'ACTIVE' | 'INACTIVE';
   kind: 'VOLUNTEER' | 'MILITARY' | 'GOVERNMENT' | 'OTHER';
   reporting_mode: 'APP' | 'COORDINATOR';

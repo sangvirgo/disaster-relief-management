@@ -66,6 +66,7 @@ export const TeamDashboardScreen: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isUpdatingPosition, setIsUpdatingPosition] = useState<boolean>(false);
+  const [isConfirmingReady, setIsConfirmingReady] = useState<boolean>(false);
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
   const [showUserIdModal, setShowUserIdModal] = useState<boolean>(false);
   const [teamSkills, setTeamSkills] = useState<TeamSkillOption[]>([]);
@@ -88,6 +89,9 @@ export const TeamDashboardScreen: React.FC = () => {
     ? getTeamRoleFromMissionList(missions, team?.id)
     : membershipRole;
   const isTeamLeader = teamRole === 'LEADER';
+  const teamHasActiveMission = missions.some((mission) =>
+    ['OFFERED', 'ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(mission.status),
+  );
   const teamCoordinates = team?.position?.location?.coordinates;
   const teamLongitude = teamCoordinates?.[0] ?? null;
   const teamLatitude = teamCoordinates?.[1] ?? null;
@@ -270,9 +274,44 @@ export const TeamDashboardScreen: React.FC = () => {
     void loadTeamData();
   }, [authLoading, isAuthenticated, loadTeamData, router, user?.must_change_password]);
 
-  // Đội trưởng cập nhật trạng thái sẵn sàng của đội
+  // Explicitly record team readiness after an active mission is cancelled.
+  const handleConfirmTeamReady = async () => {
+    if (!team || !isTeamLeader || !team.readiness_required || isConfirmingReady) return;
+    setIsConfirmingReady(true);
+    try {
+      const updated = await ResponseApi.confirmTeamReady(team.id, team.version);
+      setTeam(updated);
+      setIsAvailable(updated.availability === 'AVAILABLE');
+      Alert.alert('Đội đã sẵn sàng', 'Xác nhận sẵn sàng của đội đã được ghi nhận.');
+    } catch (err: any) {
+      if (isApiErrorCode(err, 'VERSION_CONFLICT', 'TEAM_HAS_ACTIVE_MISSION')) {
+        await loadTeamData();
+        Alert.alert(
+          'Trạng thái đội đã thay đổi',
+          'Thông tin mới nhất của đội đã được tải. Hãy kiểm tra nhiệm vụ và trạng thái hiện tại rồi xác nhận lại.',
+        );
+      } else {
+        Alert.alert('Không thể xác nhận', getApiErrorMessage(err, 'Không thể ghi nhận trạng thái sẵn sàng của đội.'));
+      }
+    } finally {
+      setIsConfirmingReady(false);
+    }
+  };
+
+  // The team leader updates the team's availability.
   const handleToggleAvailability = async (nextValue: boolean) => {
     if (!team || !isTeamLeader) return;
+    if (nextValue && team.readiness_required) {
+      await handleConfirmTeamReady();
+      return;
+    }
+    if (!nextValue && teamHasActiveMission) {
+      Alert.alert(
+        'Đội đang có nhiệm vụ',
+        'Không thể tạm dừng đội khi còn lời mời hoặc nhiệm vụ chưa kết thúc. Hãy cập nhật với Ban điều phối nếu cần thay đổi phân công.',
+      );
+      return;
+    }
     const prevValue = isAvailable;
     setIsAvailable(nextValue);
     try {
@@ -286,9 +325,10 @@ export const TeamDashboardScreen: React.FC = () => {
     } catch (err: any) {
       setIsAvailable(prevValue);
       if (nextValue && isApiErrorCode(err, 'TEAM_NOT_ELIGIBLE')) {
+        await loadTeamData();
         Alert.alert(
           'Cần xác nhận trạng thái sẵn sàng',
-          'Đội cần được xác nhận lại trạng thái sẵn sàng trước khi nhận nhiệm vụ. Vui lòng liên hệ Ban điều phối để được hỗ trợ.'
+          'Đội cần được xác nhận lại trạng thái sẵn sàng sau nhiệm vụ trước. Hãy kiểm tra thông tin đội và xác nhận khi đội thực sự sẵn sàng.'
         );
       } else if (isApiErrorCode(err, 'VERSION_CONFLICT')) {
         await loadTeamData();
@@ -690,25 +730,61 @@ export const TeamDashboardScreen: React.FC = () => {
             <View style={{ flex: 1, marginRight: 8 }}>
               <Text style={styles.availTitle}>Trực chiến nhận nhiệm vụ</Text>
               <Text style={styles.availSubtitle}>
-                {isAvailable ? 'Đội đang sẵn sàng nhận phân công nhiệm vụ mới' : 'Đội đang tạm dừng nhận nhiệm vụ'}
+                {team.readiness_required
+                  ? 'Cần đội trưởng xác nhận lại sau nhiệm vụ trước'
+                  : isAvailable
+                    ? 'Đội đang sẵn sàng nhận phân công nhiệm vụ mới'
+                    : 'Đội đang tạm dừng nhận nhiệm vụ'}
               </Text>
             </View>
 
-            {isTeamLeader ? (
+            {isTeamLeader && !team.readiness_required ? (
               <Switch
                 value={isAvailable}
                 onValueChange={handleToggleAvailability}
+                disabled={teamHasActiveMission || isConfirmingReady}
                 trackColor={{ false: '#CBD5E1', true: THEME.colors.success.light }}
                 thumbColor={isAvailable ? THEME.colors.success.main : '#FFFFFF'}
               />
             ) : (
-              <Text style={styles.availabilityValue}>{isAvailable ? 'Sẵn sàng' : 'Tạm dừng'}</Text>
+              <Text style={styles.availabilityValue}>
+                {team.readiness_required ? 'Cần xác nhận' : isAvailable ? 'Sẵn sàng' : 'Tạm dừng'}
+              </Text>
             )}
           </View>
 
+          {isTeamLeader && team.readiness_required ? (
+            <View style={styles.readinessRequiredBox}>
+              <Text style={styles.readinessRequiredText}>
+                Chỉ xác nhận sau khi đội đã kiểm tra nhân lực và sẵn sàng tiếp nhận nhiệm vụ mới.
+              </Text>
+              <TouchableOpacity
+                style={[styles.readinessButton, isConfirmingReady && styles.readinessButtonDisabled]}
+                onPress={handleConfirmTeamReady}
+                disabled={isConfirmingReady}
+                accessibilityRole="button"
+                accessibilityLabel="Xác nhận đội đã sẵn sàng nhận nhiệm vụ"
+                activeOpacity={0.8}
+              >
+                {isConfirmingReady ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <CheckCircle2 size={17} color="#FFFFFF" />
+                )}
+                <Text style={styles.readinessButtonText}>
+                  {isConfirmingReady ? 'Đang ghi nhận…' : 'Xác nhận đội đã sẵn sàng'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
           <Text style={styles.memberNote}>
             {isTeamLeader
-              ? 'Đội trưởng có thể thay đổi trạng thái sẵn sàng của đội.'
+              ? team.readiness_required
+                ? 'Xác nhận này được lưu cùng thời điểm và tài khoản đội trưởng.'
+                : teamHasActiveMission
+                  ? 'Đang có lời mời hoặc nhiệm vụ chưa kết thúc; trạng thái đội tạm thời không thể thay đổi.'
+                  : 'Đội trưởng có thể thay đổi trạng thái sẵn sàng của đội.'
               : 'Chỉ đội trưởng mới có thể thay đổi trạng thái sẵn sàng của đội.'}
           </Text>
         </View>
@@ -1326,6 +1402,38 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: THEME.colors.text.secondary,
     marginTop: 2,
+  },
+  readinessRequiredBox: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: THEME.colors.warning.bg,
+    borderWidth: 1,
+    borderColor: THEME.colors.warning.light,
+  },
+  readinessRequiredText: {
+    color: THEME.colors.warning.dark,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  readinessButton: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: THEME.colors.success.main,
+  },
+  readinessButtonDisabled: {
+    opacity: 0.65,
+  },
+  readinessButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
   availabilityValue: {
     color: THEME.colors.text.primary,

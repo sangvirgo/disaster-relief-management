@@ -80,7 +80,6 @@ export const CreateSOSScreen: React.FC = () => {
   const coordinatesKey = longitude === null || latitude === null
     ? null
     : `${longitude},${latitude}`;
-
   const isManualPin = location?.source === 'MANUAL_PIN';
 
   useEffect(() => {
@@ -189,13 +188,12 @@ export const CreateSOSScreen: React.FC = () => {
     if (detectedAddress) {
       setLocationAreaResult({ coordinatesKey: `${coords[0]},${coords[1]}`, address: detectedAddress });
     }
-    if (note) {
-      setLocationNote(note);
-    }
+    const nextLocationNote = note ?? '';
+    setLocationNote(nextLocationNote);
     setFormErrors((current) => ({
       ...current,
       location: undefined,
-      description: descriptionError(description, note ?? locationNote),
+      description: descriptionError(description, nextLocationNote),
     }));
   };
 

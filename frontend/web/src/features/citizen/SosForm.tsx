@@ -662,7 +662,7 @@ export function SosForm({
         </div>
       </div>
       <div className="sos-submit-bar">
-      <Button type="submit" variant="emergency" size="lg" disabled={busy} loading={busy}>
+      <Button type="submit" variant="emergency" size="lg" disabled={busy || Object.keys(clientErrors).length > 0 || Boolean(fieldError)} loading={busy}>
         {busy ? 'Đang gửi…' : 'Gửi yêu cầu SOS'}
       </Button>
       </div>

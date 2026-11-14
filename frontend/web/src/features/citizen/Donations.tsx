@@ -11,6 +11,7 @@ import { useUrlView } from '../../app/useUrlView';
 import { donationViews } from '../../app/routeViews';
 import { StatusBadge } from '../../components/StatusBadge';
 import { DetailSurface } from '../../components/DetailSurface';
+import { useModalScrollLock } from '../../components/modalScrollLock';
 import { SuccessBanner } from '../../components/SuccessBanner';
 
 type DriveItem = {
@@ -104,6 +105,7 @@ export function Donations({ user }: { user: Me | null }) {
   const drivePages = useLoadMore<Drive>('logistics', '/public/donation-drives', 10);
   const drives = drivePages.items;
   const [selected, setSelected] = useState<Drive | null>(null);
+  useModalScrollLock(Boolean(selected && showDeclaration));
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [donorName, setDonorName] = useState('');
   const [donorPhone, setDonorPhone] = useState('');
@@ -611,7 +613,7 @@ export function Donations({ user }: { user: Me | null }) {
               />
               {(trackingAttempted || trackingTouched.trackSecret) && donationTrackSecretError && <small className="field-error" role="alert">{donationTrackSecretError}</small>}
             </label>
-            <button className="button" disabled={loading}>
+            <button className="button" disabled={loading || Boolean(donationTrackIdError || donationTrackSecretError)}>
               Xem tiến độ
             </button>
           </form>
@@ -662,7 +664,7 @@ export function Donations({ user }: { user: Me | null }) {
                 />
                 {(recoveryAttempted || recoveryTouched.code) && donationRecoveryCodeError && <small className="field-error" role="alert">{donationRecoveryCodeError}</small>}
               </label>
-              <button className="button secondary" disabled={loading}>
+              <button className="button secondary" disabled={loading || Boolean(donationRecoveryPublicError || donationRecoveryCodeError)}>
                 Gắn bản khai với tài khoản
               </button>
               {recoveryMessage && (
@@ -750,7 +752,7 @@ export function Donations({ user }: { user: Me | null }) {
                 />
                 {(disputeAttempted || disputeTouched) && donationDisputeError && <small className="field-error" role="alert">{donationDisputeError}</small>}
               </label>
-              <button className="button donation-action" disabled={loading}>
+              <button className="button donation-action" disabled={loading || Boolean(donationDisputeError)}>
                 Gửi khiếu nại
               </button>
             </form>
@@ -943,7 +945,7 @@ export function Donations({ user }: { user: Me | null }) {
         </div>
         {drives.length > 0 && <LoadMore hasMore={drivePages.hasMore} loading={drivePages.loading} onClick={drivePages.loadMore} shown={drives.length} noun="đợt" />}
       </section>
-      {selected && showDeclaration && <div className={`donation-modal-backdrop ${closingDeclaration ? 'is-closing' : ''}`} onMouseDown={(event) => { if (event.target === event.currentTarget) closeDeclaration(); }}>
+      {selected && showDeclaration && <div className={`donation-modal-backdrop ${closingDeclaration ? 'is-closing' : ''}`} onClick={(event) => event.stopPropagation()}>
             <section className="donation-modal" role="dialog" aria-modal="true" aria-label="Khai báo vật phẩm" style={{ transform: `translate(${dialogOffset.x}px, ${dialogOffset.y}px)` }}>
               <div className="donation-modal-header" onPointerDown={(event) => { if ((event.target as HTMLElement).closest('button')) return; dragStart.current = { x: event.clientX, y: event.clientY, left: dialogOffset.x, top: dialogOffset.y }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={(event) => { if (!dragStart.current) return; setDialogOffset({ x: Math.max(-Math.min(220, innerWidth / 3), Math.min(Math.min(220, innerWidth / 3), dragStart.current.left + event.clientX - dragStart.current.x)), y: Math.max(-120, Math.min(120, dragStart.current.top + event.clientY - dragStart.current.y)) }); }} onPointerUp={() => { dragStart.current = null; }}>
                 <h2>Khai báo vật phẩm</h2><button type="button" className="modal-close-button" aria-label="Đóng cửa sổ khai báo" onClick={closeDeclaration}>×</button>
@@ -1019,6 +1021,7 @@ export function Donations({ user }: { user: Me | null }) {
                 className="button"
                 disabled={
                   loading ||
+                  declarationInvalid ||
                   Boolean(driveUnavailable(selected))
                 }
               >

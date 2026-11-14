@@ -3,7 +3,6 @@ import { api } from '../../api/client';
 import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
 import { ListNav } from '../../components/ui/Pager';
 import type { Me } from '../../auth/session';
-import { GoogleLink } from '../../auth/GoogleLink';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 
 type OwnedRequest = {
@@ -138,7 +137,6 @@ export function CitizenAccount({
         </div>
         <p className="account-hint">Các không gian làm việc xuất hiện theo vai trò được cấp cho tài khoản.</p>
       </section>
-      {!user.must_change_password && <GoogleLink key={user.id} user={user} />}
     </div>
   );
 }

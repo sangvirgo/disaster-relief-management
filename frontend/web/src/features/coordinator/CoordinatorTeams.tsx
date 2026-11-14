@@ -78,11 +78,9 @@ export function CoordinatorTeams({ user }: { user: Me }) {
   return <div className="admin-team-management">
     <Card id="coordinator-team-list" className="coordinator-team-list-card">
       <div className="section-header"><h2>Quản lý đội cứu hộ</h2><div className="team-header-actions">
-        {isAdmin && <Button type="button" onClick={() => setShowCreate((value) => !value)}>{showCreate ? 'Đóng biểu mẫu' : 'Tạo đội'}</Button>}
+        {isAdmin && <Button type="button" onClick={() => setShowCreate(true)}>Tạo đội</Button>}
         <Button type="button" variant="secondary" onClick={refresh}>Cập nhật</Button></div></div>
       <p>Phạm vi hoạt động quyết định SOS nào có thể giao; GPS cho biết đội đang ở đâu. Đội toàn quốc vẫn phải thuộc cùng tổ chức với SOS.</p>
-      {isAdmin && showCreate && <TeamCreateForm organizations={organizations} regions={regions.filter((row) => row.status === 'ACTIVE').map((row) => ({ value: row.code, label: row.name }))}
-        skills={skills} onSuccess={(id) => { setShowCreate(false); setSelectedId(id); refresh(); }} />}
       {loading && <Skeleton label="Đang tải đội cứu hộ…" />}
       {error && <div className="notice error" role="alert">{error} <Button type="button" variant="secondary" onClick={refresh}>Thử lại</Button></div>}
       {!loading && teams.length > 0 && <><div className="team-table-scroll"><table className="team-table">
@@ -99,6 +97,10 @@ export function CoordinatorTeams({ user }: { user: Me }) {
       </table></div><Pager page={teamPages.page} hasNext={teamPages.hasNext} loading={teamPages.loading} onPrev={teamPages.prev} onNext={teamPages.next} count={teams.length} noun="đội" /></>}
       {!loading && !teams.length && !error && teamPages.page === 0 && <EmptyState title="Chưa có đội cứu hộ" description="Hiện chưa có đội trong phạm vi quản lý của bạn." />}
     </Card>
+    {isAdmin && <DetailSurface modal open={showCreate} onClose={() => setShowCreate(false)} label="Tạo đội cứu hộ" className="team-create-dialog">
+      {showCreate && <TeamCreateForm organizations={organizations} regions={regions.filter((row) => row.status === 'ACTIVE').map((row) => ({ value: row.code, label: row.name }))}
+        skills={skills} onSuccess={(id) => { setShowCreate(false); setSelectedId(id); refresh(); }} />}
+    </DetailSurface>}
     {selected && <DetailSurface key={selected.id} modal open onClose={closeDetail} label={`Chi tiết đội ${selected.name}`} heading={selected.name} className="team-detail-dialog">
       <p>Khu vực gốc: <strong>{regions.find((region) => region.code === selected.operating_region_code)?.name || selected.operating_region_code}</strong>. Phạm vi: <strong>{selected.nationwide_coverage ? 'Toàn quốc' : 'Theo khu vực gốc'}</strong>. Đội phải không có nhiệm vụ đang hoạt động khi đổi phạm vi.</p>
       <TeamSkillsForm key={`skills-${selected.id}-${selected.version}`} teamId={selected.id} version={selected.version} current={selected.skills} skills={skills} onSuccess={refresh} />
