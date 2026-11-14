@@ -396,7 +396,7 @@ export function CommandForm({
           {message}
         </p>
       )}
-      <button className="button" disabled={busy}>
+      <button className="button" disabled={busy || hasInvalidFields}>
         {busy ? 'Đang xử lý…' : spec.title}
       </button>
     </form>

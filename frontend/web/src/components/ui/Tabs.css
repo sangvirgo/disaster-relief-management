@@ -1,0 +1,50 @@
+.ui-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-surface-border);
+  scrollbar-width: none;
+}
+
+.ui-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.ui-tabs button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: 600 var(--text-body) var(--font-family);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--ease), border-color var(--ease), color var(--ease);
+}
+
+.ui-tabs button:hover {
+  background: var(--color-surface-subtle);
+  color: var(--color-text-primary);
+}
+
+.ui-tabs button[aria-selected='true'] {
+  border-bottom-color: var(--color-primary);
+  background: transparent;
+  color: var(--color-primary);
+}
+
+.ui-tabs button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-tabs button {
+    transition: none;
+  }
+}

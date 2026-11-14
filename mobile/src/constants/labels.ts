@@ -240,6 +240,10 @@ export function formatNoticeDisplay(notice: any): {
       title: 'Đã Xếp Mức Độ Ưu Tiên Ứng Cứu',
       message: 'Ban chỉ huy cứu trợ đã đánh giá mức độ khẩn cấp và đang sắp xếp đội cứu nạn cơ động phù hợp để triển khai.',
     },
+    REQUEST_DUPLICATED: {
+      title: 'Yêu Cầu Được Liên Kết Với Hồ Sơ Gốc',
+      message: 'Điều phối viên đã liên kết tin báo này với hồ sơ cứu nạn liên quan. Hãy theo dõi tiến trình tại hồ sơ đang được xử lý.',
+    },
     REQUEST_DISPATCHED: {
       title: 'Đang Điều Phối Đội Cứu Nạn',
       message: 'Hồ sơ đã được chuyển đến bước điều phối. Trung tâm sẽ cập nhật khi có thay đổi.',
@@ -265,6 +269,10 @@ export function formatNoticeDisplay(notice: any): {
     REQUEST_REOPENED: {
       title: 'Hồ Sơ Được Mở Lại',
       message: 'Hồ sơ đã được chuyển lại để tiếp tục xử lý. Vui lòng theo dõi các cập nhật mới.',
+    },
+    REQUEST_STATUS_CHANGED: {
+      title: 'Hồ Sơ Có Cập Nhật Mới',
+      message: 'Trạng thái hồ sơ cứu trợ đã thay đổi. Mở trang theo dõi để xem thông tin mới nhất.',
     },
     DUPLICATE_ORPHANED: {
       title: 'Hồ Sơ Được Xem Xét Riêng',
@@ -310,6 +318,19 @@ export function formatNoticeDisplay(notice: any): {
     REPORTER_SUPPLEMENT: {
       title: 'Ghi Nhận Thông Tin Bổ Sung',
       message: 'Ghi chú và hình ảnh hiện trường mới của bạn đã được cập nhật thành công vào hồ sơ theo dõi.',
+    },
+    SUPPLEMENT_ACCEPT: {
+      title: 'Thông Tin Bổ Sung Đã Được Chấp Nhận',
+      message: 'Điều phối viên đã xem xét và cập nhật thông tin bổ sung vào hồ sơ cứu trợ.',
+    },
+    SUPPLEMENT_REJECT: {
+      title: 'Thông Tin Bổ Sung Chưa Được Chấp Nhận',
+      message: 'Thông tin mới chưa được dùng để thay đổi dữ kiện đã xác minh. Mở trang theo dõi để xem tiến trình hiện tại.',
+    },
+    MISSION_OFFER_OVERDUE: {
+      title: 'Lời Mời Nhiệm Vụ Chưa Được Phản Hồi',
+      message: 'Lời mời nhiệm vụ đang chờ phản hồi. Vui lòng kiểm tra danh sách nhiệm vụ của đội.',
+      isUrgent: true,
     },
   };
 

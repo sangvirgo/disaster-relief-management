@@ -23,6 +23,7 @@ export function HandoffDetail({ distributionId, initialId, canReview, userId, on
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
+  const lookupInvalid = !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lookup.trim());
   useEffect(() => {
     if (!id) { setDetail(null); setBusy(false); return; }
     let live = true; setBusy(true); setError(''); setDetail(null);
@@ -37,7 +38,7 @@ export function HandoffDetail({ distributionId, initialId, canReview, userId, on
   }, [distributionId, id, revision, storageKey]);
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lookup.trim())) { setError('Nhập mã bản ghi bàn giao hợp lệ.'); return; }
+    if (lookupInvalid) { setError('Nhập mã bản ghi bàn giao hợp lệ.'); return; }
     setId(lookup.trim()); setRevision((value) => value + 1);
   }
   return <section className="form-stack">
@@ -45,15 +46,15 @@ export function HandoffDetail({ distributionId, initialId, canReview, userId, on
     <p>Nhập mã bản ghi do người ghi nhận cung cấp. Mã này được hiển thị sau khi ghi nhận thành công.</p>
     {initialId && <p role="status">Đã ghi nhận. Mã bản ghi để tra cứu hoặc chuyển người duyệt: <strong>{initialId}</strong></p>}
     <form className="form-stack" onSubmit={submit}>
-      <label>Mã bản ghi bàn giao<input value={lookup} onChange={(event) => {
+      <label><span>Mã bản ghi bàn giao <span className="required-mark" aria-hidden="true">*</span></span><input value={lookup} onChange={(event) => {
         const value = event.target.value;
         setLookup(value); setError('');
         if (value.trim().toLowerCase() !== id.toLowerCase()) {
           setId(''); setDetail(null); setBusy(false);
           try { sessionStorage.removeItem(storageKey); } catch { /* Optional view persistence. */ }
         }
-      }} /></label>
-      <button className="button secondary" disabled={busy}>{busy ? 'Đang tải…' : 'Xem bản ghi bàn giao'}</button>
+      }} maxLength={36} required aria-invalid={lookupInvalid} />{lookupInvalid && <small className="field-error">Nhập mã bản ghi bàn giao hợp lệ.</small>}</label>
+      <button className="button secondary" disabled={busy || lookupInvalid}>{busy ? 'Đang tải…' : 'Xem bản ghi bàn giao'}</button>
     </form>
     {error && <p role="alert" className="notice error">{error}</p>}
     {detail && <>

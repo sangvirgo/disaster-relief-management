@@ -162,7 +162,7 @@ export function AsyncRequestForm({
               {touched.basis && basisError && <small className="field-error" id="async-request-basis-error" role="alert">{basisError}</small>}
             </label>
           )}
-          <button className="button" disabled={busy}>
+          <button className="button" disabled={busy || invalid}>
             {busy ? 'Đang gửi lệnh…' : kind === 'cancel' ? 'Xác nhận hủy' : 'Gửi đề nghị kết thúc'}
           </button>
         </>

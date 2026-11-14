@@ -182,7 +182,7 @@ export function RecoveryIssue({
               {error}
             </p>
           )}
-          <button className="button" disabled={busy}>
+          <button className="button" disabled={busy || invalid}>
             {busy ? 'Đang cấp mã…' : 'Cấp mã khôi phục'}
           </button>
         </form>

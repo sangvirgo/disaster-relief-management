@@ -1,3 +1,5 @@
+import { acquireModalScrollLock } from './modalScrollLock';
+
 export function confirmAction(message: string): Promise<boolean> {
   return new Promise((resolve) => {
     const dialog = document.createElement('dialog');
@@ -31,20 +33,19 @@ export function confirmAction(message: string): Promise<boolean> {
     content.append(icon, title, description, actions);
     dialog.append(content);
     document.body.append(dialog);
+    const releaseScrollLock = acquireModalScrollLock();
     let answered = false;
     const finish = (result: boolean) => {
       if (answered) return;
       answered = true;
       dialog.close();
       dialog.remove();
+      releaseScrollLock();
       resolve(result);
     };
     cancel.addEventListener('click', () => finish(false));
     confirm.addEventListener('click', () => finish(true));
     dialog.addEventListener('cancel', (event) => { event.preventDefault(); finish(false); });
-    dialog.addEventListener('click', (event) => {
-      if (event.target === dialog) finish(false);
-    });
     dialog.showModal();
     cancel.focus();
   });

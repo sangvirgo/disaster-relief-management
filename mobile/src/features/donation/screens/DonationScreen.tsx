@@ -233,6 +233,7 @@ export const DonationScreen: React.FC = () => {
       drive_title?: string;
       created_at: string;
       evidence?: DonationEvidenceReference[];
+      status?: string;
     }[]
   >([]);
 
@@ -318,24 +319,52 @@ export const DonationScreen: React.FC = () => {
   const loadRecentReceipts = useCallback(async () => {
     const list = await StorageService.getSavedDonationReceipts();
     setRecentReceipts(list);
-    if (!isAuthenticated) return;
+    if (isAuthenticated) {
+      try {
+        const mine = await LogisticsApi.getMyDonations(50);
+        setRecentReceipts((current) => {
+          const known = new Set(mine.items.map((item) => item.id));
+          return [
+            ...mine.items.map((item) => ({
+              id: item.id,
+              public_code: item.public_code,
+              drive_title: item.drive_title,
+              created_at: item.created_at,
+              evidence: current.find((receipt) => receipt.id === item.id)?.evidence,
+              status: item.status,
+            })),
+            ...current.filter((receipt) => !known.has(receipt.id)),
+          ];
+        });
+      } catch {
+        // Giữ danh sách đã lưu trên thiết bị khi chưa tải được từ máy chủ.
+      }
+      return;
+    }
+
     try {
-      const mine = await LogisticsApi.getMyDonations(50);
-      setRecentReceipts((current) => {
-        const known = new Set(mine.items.map((item) => item.id));
-        return [
-          ...mine.items.map((item) => ({
-            id: item.id,
-            public_code: item.public_code,
-            drive_title: item.drive_title,
-            created_at: item.created_at,
-            evidence: current.find((receipt) => receipt.id === item.id)?.evidence,
-          })),
-          ...current.filter((receipt) => !known.has(receipt.id)),
-        ];
-      });
+      const capabilities = await Promise.all(list.map(async (receipt) => {
+        const secret = await StorageService.getSecretForDonation(receipt.id)
+          || await StorageService.getSecretForDonation(receipt.public_code);
+        return secret ? { id: receipt.id, secret } : null;
+      }));
+      const items = capabilities.filter((item): item is { id: string; secret: string } => item !== null).slice(0, 20);
+      if (items.length === 0) return;
+
+      const lookup = await LogisticsApi.lookupGuestDonations(items);
+      const summaries = new Map(lookup.items.map((item) => [item.id, item]));
+      setRecentReceipts((current) => current.map((receipt) => {
+        const summary = summaries.get(receipt.id);
+        return summary
+          ? {
+            ...receipt,
+            drive_title: summary.drive_title || receipt.drive_title,
+            status: summary.status,
+          }
+          : receipt;
+      }));
     } catch {
-      // Giữ danh sách đã lưu trên thiết bị khi chưa tải được từ máy chủ.
+      // Giữ các biên nhận cục bộ nếu tra cứu hàng loạt chưa khả dụng.
     }
   }, [isAuthenticated]);
 
@@ -1345,6 +1374,13 @@ export const DonationScreen: React.FC = () => {
                     <Text style={styles.recentDate}>
                       {new Date(item.created_at).toLocaleDateString('vi-VN')} {new Date(item.created_at).toLocaleTimeString('vi-VN')}
                     </Text>
+                    {item.status ? (
+                      <View style={[styles.receiptStatusBadge, { backgroundColor: getStatusBadge(item.status).bg }]}>
+                        <Text style={[styles.receiptStatusText, { color: getStatusBadge(item.status).color }]}>
+                          {getStatusBadge(item.status).label}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                   <Search size={18} color={THEME.colors.primary.main} />
                 </TouchableOpacity>
@@ -2396,6 +2432,17 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: THEME.colors.text.muted,
     marginTop: 2,
+  },
+  receiptStatusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 5,
+  },
+  receiptStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   errorBox: {
     backgroundColor: THEME.colors.emergency.bg,

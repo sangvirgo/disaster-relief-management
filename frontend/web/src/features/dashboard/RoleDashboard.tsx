@@ -89,7 +89,9 @@ function Breakdown({ title, counts, requestStatuses = false, organizationKinds =
   </section>;
 }
 
-function ResponseDashboard({ onOpenRequest }: { onOpenRequest?: (id: string) => void }) {
+function ResponseDashboard({ onOpenRequest, showRecentOpenRequests = true }: {
+  onOpenRequest?: (id: string) => void; showRecentOpenRequests?: boolean;
+}) {
   const snapshot = useSnapshot<ResponseOverview>('response', '/dashboard/overview');
   const { data } = snapshot;
   return <section className="card dashboard-section"><div className="section-header"><h2>Tình hình ứng cứu</h2><button type="button" className="button secondary" onClick={snapshot.refresh}>Cập nhật</button></div>
@@ -118,12 +120,14 @@ function ResponseDashboard({ onOpenRequest }: { onOpenRequest?: (id: string) => 
         <Breakdown title="Loại sự cố" counts={data.requests.open_by_category} />
         <Breakdown title="Nhiệm vụ đang hoạt động" counts={data.missions.active_by_status} />
       </div>
-      <h3>SOS mới đang mở</h3>
-      {data.recent_open_requests.length ? <div className="record-list">{data.recent_open_requests.map((item) =>
-        <div className="record" key={item.id}><div><strong>{requestStatusLabel(item.status)} · {label(item.category)}</strong>
-          <p>{label(item.priority)} · {timeLabel(item.received_at)}</p></div>
-          {onOpenRequest && <button type="button" className="button secondary" onClick={() => onOpenRequest(item.id)}>Xem SOS</button>}
-        </div>)}</div> : <p>Chưa có SOS đang mở.</p>}
+      {showRecentOpenRequests && <>
+        <h3>SOS mới đang mở</h3>
+        {data.recent_open_requests.length ? <div className="record-list">{data.recent_open_requests.map((item) =>
+          <div className="record" key={item.id}><div><strong>{requestStatusLabel(item.status)} · {label(item.category)}</strong>
+            <p>{label(item.priority)} · {timeLabel(item.received_at)}</p></div>
+            {onOpenRequest && <button type="button" className="button secondary" onClick={() => onOpenRequest(item.id)}>Xem SOS</button>}
+          </div>)}</div> : <p>Chưa có SOS đang mở.</p>}
+      </>}
     </>}
   </section>;
 }
@@ -137,12 +141,6 @@ function AdminDashboard() {
       <p className="muted">Cập nhật lúc {timeLabel(data.generated_at)}</p>
       <div className="report-metrics"><Metric title="Tổng tài khoản" value={data.users.total} /><Metric title="Chờ xác minh email" value={data.users.pending_email_verification} />
         <Metric title="Cần đổi mật khẩu" value={data.users.must_change_password} /><Metric title="Hoạt động trong 24 giờ" value={data.users.active_last_24h} /></div>
-      <div className="dashboard-breakdowns"><Breakdown title="Trạng thái tài khoản" counts={data.users.by_status} />
-        <Breakdown title="Người dùng theo vai trò" counts={data.active_users_by_role} />
-        <Breakdown title="Tổ chức theo loại" counts={data.active_organizations_by_kind} organizationKinds /></div>
-      <h3>Thao tác gần đây</h3>{data.recent_audit.length ? <div className="record-list">{data.recent_audit.map((item, index) =>
-        <div className="record" key={`${item.created_at}:${index}`}><strong>{label(item.action)}</strong><span>{label(item.entity_type)} · {timeLabel(item.created_at)}</span></div>)}</div>
-        : <p>Chưa có thao tác gần đây.</p>}
     </>}
   </section>;
 }
@@ -189,7 +187,7 @@ export function RoleDashboard({ role, showReports = false, onOpenRequest }: { ro
   showReports?: boolean; onOpenRequest?: (id: string) => void }) {
   return <div className="dashboard-stack">
     {role === 'admin' && <AdminDashboard />}
-    {(role === 'admin' || role === 'coordinator') && <ResponseDashboard onOpenRequest={onOpenRequest} />}
+    {(role === 'admin' || role === 'coordinator') && <ResponseDashboard onOpenRequest={onOpenRequest} showRecentOpenRequests={role === 'coordinator'} />}
     {role === 'operations' && <OperationsSnapshot showReports={showReports} />}
   </div>;
 }

@@ -182,13 +182,12 @@ export const ProxySOSScreen: React.FC = () => {
     setHouseholdLng(coords[0].toFixed(6));
     setHouseholdLat(coords[1].toFixed(6));
     setHouseholdLocation({ type: 'Point', coordinates: coords, source: 'MANUAL_PIN', captured_at: new Date().toISOString() });
-    if (note) {
-      setHouseholdAddressNote(note);
-    }
+    const nextAddressNote = note ?? '';
+    setHouseholdAddressNote(nextAddressNote);
     setFormErrors((current) => ({
       ...current,
       location: undefined,
-      description: descriptionError(description, note ?? householdAddressNote),
+      description: descriptionError(description, nextAddressNote),
     }));
   };
 

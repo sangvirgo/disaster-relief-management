@@ -9,11 +9,13 @@ import type { components as ResponseComponents } from '../../api/generated/respo
 import { googleMapsDirectionsUrl } from '../../maps/googleMaps';
 import { LocationPicker, type Point } from '../../maps/LocationPicker';
 import { confirmAction } from '../../components/confirmAction';
-import { DetailSurface } from '../../components/DetailSurface';
+import { Tabs } from '../../components/ui/Tabs';
 import { useUrlView } from '../../app/useUrlView';
 import { missionViews, noticeViews } from '../../app/routeViews';
 import { TeamMembers } from './TeamMembers';
 import { TeamReadinessForm } from './TeamReadinessForm';
+import './volunteer-missions.css';
+import './volunteer-team.css';
 
 type Mission = ResponseComponents['schemas']['MissionView'];
 type MissionDetail = ResponseComponents['schemas']['MissionDetail'];
@@ -35,6 +37,19 @@ type Team = {
     coordinates?: [number, number];
   };
 };
+type TeamDetailTab = 'overview' | 'members' | 'readiness' | 'location';
+const teamDetailTabs: { id: TeamDetailTab; label: string }[] = [
+  { id: 'overview', label: 'Tổng quan' },
+  { id: 'members', label: 'Thành viên' },
+  { id: 'readiness', label: 'Sẵn sàng' },
+  { id: 'location', label: 'Vị trí' },
+];
+type MissionDetailTab = 'overview' | 'progress' | 'history';
+const missionDetailTabs: { id: MissionDetailTab; label: string }[] = [
+  { id: 'overview', label: 'Tình huống' },
+  { id: 'progress', label: 'Tiến độ & thao tác' },
+  { id: 'history', label: 'Minh chứng & lịch sử' },
+];
 type Notice = ResponseComponents['schemas']['Notice'];
 
 const noticeNames: Record<string, string> = {
@@ -61,7 +76,6 @@ export function Notices({ onOpenMission, onOpenRequest }: {
   onOpenRequest?: (requestId: string) => void;
 }) {
   const [items, setItems] = useState<Notice[]>([]);
-  const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [next, setNext] = useState('');
@@ -116,7 +130,6 @@ export function Notices({ onOpenMission, onOpenRequest }: {
       setItems(current => activeFilter.current === 'unread'
         ? current.filter(item => item.id !== result.id)
         : current.map(item => item.id === result.id ? { ...item, read_at: result.read_at } : item));
-      setSelectedNotice(current => current?.id === result.id ? { ...current, read_at: result.read_at } : current);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Không thể đánh dấu đã đọc.');
     } finally {
@@ -150,35 +163,29 @@ export function Notices({ onOpenMission, onOpenRequest }: {
   }
 
   return (
-    <section className="card">
-      <div className="section-header">
+    <section className="card volunteer-notices">
+      <div className="section-header notice-page-header">
         <h2>Thông báo của tôi</h2>
         <div className="notice-header-actions">
-        <button type="button" className="button secondary" onClick={markAllRead} disabled={loading || markingAll || readingIds.length > 0}>
-          {markingAll ? 'Đang đánh dấu…' : 'Đánh dấu tất cả đã đọc'}
-        </button>
-        <div className="tabs">
-          <button
-            className={filter === 'all' ? 'active' : ''}
-            disabled={markingAll || readingIds.length > 0}
-            onClick={() => {
-              setFilter('all');
-              setCursor('');
-            }}
-          >
-            Tất cả
+          <button type="button" className="button secondary notice-mark-all" onClick={markAllRead} disabled={loading || markingAll || readingIds.length > 0}>
+            {markingAll ? 'Đang đánh dấu…' : 'Đánh dấu tất cả đã đọc'}
           </button>
-          <button
-            className={filter === 'unread' ? 'active' : ''}
-            disabled={markingAll || readingIds.length > 0}
-            onClick={() => {
-              setFilter('unread');
-              setCursor('');
-            }}
-          >
-            Chưa đọc
-          </button>
-        </div>
+          <div className="tabs notice-filter-tabs" role="group" aria-label="Lọc thông báo">
+            <button
+              type="button"
+              className={filter === 'all' ? 'active' : ''}
+              aria-pressed={filter === 'all'}
+              disabled={markingAll || readingIds.length > 0}
+              onClick={() => { setFilter('all'); setCursor(''); }}
+            >Tất cả</button>
+            <button
+              type="button"
+              className={filter === 'unread' ? 'active' : ''}
+              aria-pressed={filter === 'unread'}
+              disabled={markingAll || readingIds.length > 0}
+              onClick={() => { setFilter('unread'); setCursor(''); }}
+            >Chưa đọc</button>
+          </div>
         </div>
       </div>
       {markAllMessage && <p className="notice success" role="status">{markAllMessage}</p>}
@@ -191,23 +198,38 @@ export function Notices({ onOpenMission, onOpenRequest }: {
       {!loading && !items.length && !error && (
         <div className="empty">Chưa có thông báo trong mục này.</div>
       )}
-      <div className="record-list">
+      <div className="record-list notice-record-list">
         {items.map((item) => (
           <article className={`record notice-record ${item.read_at ? '' : 'is-unread'}`} key={item.id}>
-            <button className="notice-record-open" type="button" onClick={() => setSelectedNotice(item)}
-              aria-label={`Xem chi tiết: ${noticeNames[item.notice_type] || 'Có cập nhật mới'}`}>
-              <strong>{noticeNames[item.notice_type] || 'Có cập nhật mới'}</strong>
-              {typeof item.payload.request_id === 'string' && <p>Hồ sơ SOS · {item.payload.request_id.slice(0, 8)}</p>}
-              {typeof item.payload.mission_id === 'string' && <p>Nhiệm vụ · {item.payload.mission_id.slice(0, 8)}</p>}
-              <p>{timeLabel(item.created_at)}</p>
-              <small>{item.read_at ? `Đã đọc lúc ${timeLabel(item.read_at)}` : 'Chưa đọc'}</small>
-            </button>
-            <div className="record-actions">
+            <div className="notice-record-main">
+              <span className="notice-record-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15.5 7.5a5.5 5.5 0 0 0-11 0c0 6-2 6-2 7.5h15c0-1.5-2-1.5-2-7.5ZM8 17h4" />
+                </svg>
+              </span>
+              <div className="notice-record-copy">
+                <div className="notice-record-title-row">
+                  <strong>{noticeNames[item.notice_type] || 'Có cập nhật mới'}</strong>
+                  {!item.read_at && <span className="notice-unread-badge">Chưa đọc</span>}
+                </div>
+                <div className="notice-record-references">
+                  {typeof item.payload.request_id === 'string' && <span>Hồ sơ SOS · <code>{item.payload.request_id.slice(0, 8)}</code></span>}
+                  {typeof item.payload.mission_id === 'string' && <span>Nhiệm vụ · <code>{item.payload.mission_id.slice(0, 8)}</code></span>}
+                </div>
+                <div className="notice-record-meta">
+                  <time dateTime={item.created_at}>{timeLabel(item.created_at)}</time>
+                  {item.read_at && <span>Đã đọc lúc {timeLabel(item.read_at)}</span>}
+                </div>
+              </div>
+            </div>
+            <div className="record-actions notice-record-actions">
+              {onOpenRequest && typeof item.payload.request_id === 'string' &&
+                <button className="button secondary" type="button" onClick={() => onOpenRequest(item.payload.request_id as string)}>Mở hồ sơ SOS</button>}
               {onOpenMission && typeof item.payload.mission_id === 'string' &&
                 <button className="button secondary" type="button"
                   onClick={() => onOpenMission(item.payload.mission_id as string)}>Xem nhiệm vụ</button>}
               {!item.read_at && (
-                <button className="button secondary" onClick={() => markRead(item.id)} disabled={loading || markingAll || readingIds.includes(item.id)}>
+                <button className="button secondary" type="button" onClick={() => markRead(item.id)} disabled={loading || markingAll || readingIds.includes(item.id)}>
                   Đánh dấu đã đọc
                 </button>
               )}
@@ -215,44 +237,14 @@ export function Notices({ onOpenMission, onOpenRequest }: {
           </article>
         ))}
       </div>
-      <DetailSurface modal open={Boolean(selectedNotice)} label="Chi tiết thông báo"
-        onClose={() => setSelectedNotice(null)} className="notice-detail-dialog">
-        {selectedNotice && <div className="notice-detail-content">
-          <span className="eyebrow">THÔNG BÁO</span>
-          <h2>{noticeNames[selectedNotice.notice_type] || 'Có cập nhật mới'}</h2>
-          <p className="muted">Nhận lúc {timeLabel(selectedNotice.created_at)}</p>
-          {selectedNotice.read_at && <p role="status">Đã đọc lúc {timeLabel(selectedNotice.read_at)}</p>}
-          {error && <p role="alert" className="notice error">{error}</p>}
-          <p>{selectedNotice.notice_type.startsWith('MISSION')
-            ? 'Nhiệm vụ của đội có cập nhật. Mở nhiệm vụ để xem tình huống và tiến độ mới nhất.'
-            : selectedNotice.notice_type.startsWith('REQUEST')
-              ? onOpenRequest
-                ? 'Yêu cầu SOS có cập nhật. Mở hồ sơ SOS để xem trạng thái mới nhất.'
-                : 'Yêu cầu SOS có cập nhật. Nếu đây là yêu cầu bạn đã gửi, chọn vai trò Người dân rồi mở Theo dõi SOS để xem tiến độ.'
-              : 'Có cập nhật về hoạt động cứu trợ của bạn.'}</p>
-          {typeof selectedNotice.payload.request_id === 'string' &&
-            <p className="notice-reference">Mã hồ sơ SOS: <code>{selectedNotice.payload.request_id}</code></p>}
-          {typeof selectedNotice.payload.mission_id === 'string' &&
-            <p className="notice-reference">Mã nhiệm vụ: <code>{selectedNotice.payload.mission_id}</code></p>}
-          <div className="notice-detail-actions">
-            {onOpenRequest && typeof selectedNotice.payload.request_id === 'string' &&
-              <button className="button" type="button" onClick={() => onOpenRequest(selectedNotice.payload.request_id as string)}>Mở hồ sơ SOS</button>}
-            {onOpenMission && typeof selectedNotice.payload.mission_id === 'string' &&
-              <button className="button" type="button" onClick={() => onOpenMission(selectedNotice.payload.mission_id as string)}>Mở nhiệm vụ</button>}
-            {!selectedNotice.read_at && <button className="button secondary" type="button"
-              disabled={markingAll || readingIds.includes(selectedNotice.id)}
-              onClick={() => { void markRead(selectedNotice.id); }}>Đánh dấu đã đọc</button>}
-          </div>
-        </div>}
-      </DetailSurface>
       <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading || markingAll || readingIds.length > 0} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} noun="thông báo" />
     </section>
   );
 }
 
-export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId = '', sharingMessage = '', onToggleSharing }: {
+export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId = '', sharingMessage = '', onToggleSharing, onClearInitialMission }: {
   page: string; currentUserId: string; initialMissionId?: string; sharingTeamId?: string; sharingMessage?: string;
-  onToggleSharing?: (teamId: string) => void;
+  onToggleSharing?: (teamId: string) => void; onClearInitialMission?: () => void;
 }) {
   const isTeam = page === 'team';
   const [items, setItems] = useState<Mission[] | Team[]>([]);
@@ -264,12 +256,14 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
 
   // Selected mission and detailed state
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
+  const [missionDetailTab, setMissionDetailTab] = useState<MissionDetailTab>('overview');
   const selectionKey = `reliva:mission-selection:${currentUserId}`;
   const [missionSelectionRevision, setMissionSelectionRevision] = useState(0);
   const [missionDetail, setMissionDetail] = useState<MissionDetail | null>(null);
   const missionCardRef = useRef<HTMLElement | null>(null);
   const missionListRef = useRef<HTMLElement | null>(null);
   const missionHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const teamHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const [missionLoading, setMissionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -325,6 +319,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
   const [teamPoint, setTeamPoint] = useState<Point | null>(null);
   const [teamAccuracy, setTeamAccuracy] = useState<number | null>(null);
   const [teamMessage, setTeamMessage] = useState('');
+  const [teamDetailTab, setTeamDetailTab] = useState<TeamDetailTab>('overview');
 
   useEffect(() => {
     if (!isTeam || !selectedTeam?.id) return;
@@ -452,7 +447,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
   }, [selectedMission?.id, revision, missionSelectionRevision]);
 
   useEffect(() => {
-    if (isTeam || !selectedMission?.id || (initialMissionId !== selectedMission.id && !window.matchMedia('(max-width: 1180px)').matches)) return;
+    if (isTeam || !selectedMission?.id) return;
     missionCardRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' });
     missionHeadingRef.current?.focus({ preventScroll: true });
   }, [isTeam, selectedMission?.id, initialMissionId, missionSelectionRevision]);
@@ -476,6 +471,16 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
   }
 
   function selectMission(mission: Mission) {
+    setMissionDetailTab('overview');
+    if (selectedMission?.id === mission.id) {
+      window.requestAnimationFrame(() => {
+        if (window.matchMedia('(max-width: 1180px)').matches) {
+          missionCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        document.getElementById('volunteer-mission-tab-overview')?.focus();
+      });
+      return;
+    }
     setSelectedMission(mission);
     setMissionSelectionRevision(value => value + 1);
     setMissionDetail(null);
@@ -491,6 +496,33 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
     completionUploadKeyRef.current = null;
     if (completionFileInputRef.current) completionFileInputRef.current.value = '';
     commandKeyRef.current = null;
+  }
+
+  function returnToMissionList() {
+    try { window.sessionStorage.removeItem(selectionKey); } catch { /* Storage may be unavailable. */ }
+    onClearInitialMission?.();
+    setSelectedMission(null);
+    setMissionDetail(null);
+    setMissionDetailTab('overview');
+    setActionMessage('');
+    setShowDeclineForm(false);
+    setShowCompleteForm(false);
+    setShowFailForm(false);
+    setDeclineReason('');
+    setProgressNote('');
+    setOutcomeNote('');
+    setMissionFormTouched({});
+    setMissionFormAttempted({});
+    setEvidenceFile(null);
+    setCompletionFile(null);
+    setCompletionPreviewUrl('');
+    completionUploadKeyRef.current = null;
+    commandKeyRef.current = null;
+    window.requestAnimationFrame(() => {
+      const firstMission = missionListRef.current?.querySelector<HTMLElement>('.mission-table-open');
+      if (firstMission) firstMission.focus();
+      else missionListRef.current?.querySelector<HTMLElement>('.section-header button')?.focus();
+    });
   }
 
   // --- Mission Actions ---
@@ -729,13 +761,44 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
   const activeMission = missionDetail || selectedMission;
   const canManageMission = activeMission?.can_manage_mission === true;
   const directionsUrl = activeMission && googleMapsDirectionsUrl(activeMission.location);
+  const selectedTeamCanBeManaged = Boolean(selectedTeam &&
+    (canManageTeam || manageableTeamIds.has(selectedTeam.id)));
+
+  function selectTeam(team: Team, tab: TeamDetailTab = 'overview', openAdd = false) {
+    setCanManageTeam(false);
+    setSelectedTeam(team);
+    setTeamSelectionRevision(value => value + 1);
+    setTeamDetailTab(tab);
+    setAddMemberOpen(openAdd);
+    setTeamPoint(null);
+    setTeamMessage('');
+    window.requestAnimationFrame(() => {
+      missionCardRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' });
+      teamHeadingRef.current?.focus({ preventScroll: true });
+    });
+  }
+
+  function returnToTeamList() {
+    setSelectedTeam(null);
+    setCanManageTeam(false);
+    setAddMemberOpen(false);
+    setTeamPoint(null);
+    setTeamAccuracy(null);
+    setTeamMessage('');
+    setTeamDetailTab('overview');
+    window.requestAnimationFrame(() => {
+      const firstTeam = missionListRef.current?.querySelector<HTMLElement>('.volunteer-team-table-open');
+      if (firstTeam) firstTeam.focus();
+      else missionListRef.current?.querySelector<HTMLElement>('.section-header button')?.focus();
+    });
+  }
 
   return (
-    <div className={`grid-two ${isTeam ? 'volunteer-teams-layout' : 'volunteer-missions-layout'}`}>
-      {/* Cột trái: Danh sách Nhiệm vụ hoặc Đội */}
-      <section className={`card ${isTeam ? '' : 'mission-list-panel'}`} ref={missionListRef}>
+    <div className={`grid-two ${isTeam ? 'volunteer-teams-layout volunteer-team-workspace' : 'volunteer-missions-layout'}`}>
+      {/* Danh sách nhiệm vụ hoặc đội */}
+      {(isTeam ? !selectedTeam : !activeMission) && <section className={`card ${isTeam ? 'volunteer-team-list-card' : 'mission-list-panel'}`} ref={missionListRef}>
         <div className="section-header"><h2>{isTeam ? 'Đội của tôi' : 'Nhiệm vụ và tiến độ'}</h2><button type="button" className="button secondary" disabled={loading || busy} onClick={() => { setCursor(''); refreshAll(); }}>Cập nhật</button></div>
-        <p className="mission-list-intro">{isTeam ? 'Chọn thẻ đội để mở thông tin và cập nhật vị trí ở bên dưới.' : 'Chọn nhiệm vụ để xem tình huống và tiến độ xử lý.'}</p>
+        <p className="mission-list-intro">{isTeam ? 'Chọn một đội để xem hồ sơ và các thao tác quản lý.' : 'Chọn một nhiệm vụ trong bảng để xem tình huống, tiến độ và minh chứng.'}</p>
         {error && (
           <p role="alert" className="notice error">
             {error}
@@ -751,228 +814,242 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
             <button type="button" className="button secondary" aria-pressed={missionFilter === value} disabled={busy} key={value} onClick={() => changeMissionFilter(value)}>{text}</button>)}
         </div>}
         {!isTeam && !loading && !error && items.length > 0 && !visibleMissions.length && <p>Chưa có nhiệm vụ trong nhóm này trên các trang đã tải. Hãy tải thêm nếu còn dữ liệu.</p>}
-        <div className={`record-list ${isTeam ? 'volunteer-team-list' : 'mission-record-list'}`}>
-          {isTeam
-            ? (items as Team[]).map((team) => (
-                <article
-                  className={`record volunteer-team-card ${selectedTeam?.id === team.id ? 'selected' : ''}`}
-                  key={team.id}
-                >
-                  <button type="button" className="volunteer-team-open" aria-expanded={selectedTeam?.id === team.id} aria-controls="volunteer-team-detail" aria-label={`Xem đội ${team.name}`} onClick={() => {
-                    setCanManageTeam(false);
-                    setSelectedTeam(team);
-                    setTeamSelectionRevision(value => value + 1);
-                    setAddMemberOpen(false);
-                    setTeamPoint(null);
-                    setTeamMessage('');
-                  }}>
-                  <span className="volunteer-team-summary">
-                    <strong>{team.name}</strong>
-                    <span className="team-summary-line">
-                      {label(team.kind)} · <span className={`chip team-availability-status ${team.availability === 'AVAILABLE' && team.status === 'ACTIVE' && teamActivityLoaded && !busyTeamIds.has(team.id) ? 'is-ready' : ''}`}><span className="team-availability-dot" aria-hidden="true" />{!teamActivityLoaded ? 'Chưa cập nhật nhiệm vụ' : busyTeamIds.has(team.id) ? 'Đang có nhiệm vụ' : label(team.availability)}</span>
-                    </span>
-                    <span className="team-summary-line">
-                      Kỹ năng: {team.skills.length ? team.skills.map(label).join(', ') : 'Chưa có'}
-                    </span>
-                    <small>
-                      {team.position
-                        ? `Vị trí cập nhật ${positionAge(team.position.age_s)} trước (${label(team.position.source)})`
-                        : 'Chưa có dữ liệu tọa độ'}
-                    </small>
-                  </span>
-                  </button>
-                  {manageableTeamIds.has(team.id) && <button type="button" className="button secondary team-card-add" onClick={() => {
-                    setCanManageTeam(false);
-                    setSelectedTeam(team);
-                    setTeamSelectionRevision(value => value + 1);
-                    setTeamPoint(null);
-                    setTeamMessage('');
-                    setAddMemberOpen(true);
-                  }}>Thêm thành viên</button>}
-                </article>
-              ))
-            : visibleMissions.map((mission) => (
-                <article
-                  className={`record volunteer-record-open ${selectedMission?.id === mission.id ? 'selected' : ''}`}
-                  key={mission.id}
-                  role="button"
-                  tabIndex={0}
-                  aria-pressed={selectedMission?.id === mission.id}
-                  aria-label={`Xem nhiệm vụ của ${mission.team.name}, ${label(mission.status)}, tạo lúc ${timeLabel(mission.created_at)}`}
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Enter' && event.key !== ' ') return;
-                    event.preventDefault();
-                    selectMission(mission);
-                  }}
-                  onClick={() => selectMission(mission)}
-                >
-                  <div className="mission-record-heading">
-                    <div><small className="mission-record-reference" title={mission.id}>Mã nhiệm vụ · …{mission.id.slice(-12)}</small><strong>{label(mission.category)}</strong></div>
-                    <span className={`chip mission-status mission-status-${mission.status.toLowerCase()}`}>{label(mission.status)}</span>
-                  </div>
-                  <p className="mission-record-team">{mission.team.name}</p>
-                    {mission.declared_danger && (
-                      <p className="notice warning">Có nguy hiểm tính mạng</p>
-                    )}
-                  <p className="mission-record-description">{mission.description || 'Chưa có mô tả tình huống.'}</p>
-                  <div className="mission-record-meta">
-                    <span>{mission.people_affected == null ? 'Chưa rõ số người' : `${mission.people_affected} người cần hỗ trợ`}</span>
-                    <time dateTime={mission.created_at}>Giao lúc {timeLabel(mission.created_at)}</time>
-                  </div>
-                  <span className="mission-record-action" aria-hidden="true">{selectedMission?.id === mission.id ? 'Đang xem chi tiết' : 'Xem nhiệm vụ'} <span>→</span></span>
-                </article>
-              ))}
-        </div>
+        {isTeam ? (
+          (items as Team[]).length > 0 &&
+          <div className="mission-table-scroll">
+            <table className="mission-table volunteer-team-table">
+              <thead>
+                <tr>
+                  <th scope="col">Mã đội</th>
+                  <th scope="col">Đội cứu hộ</th>
+                  <th scope="col">Tình trạng đội</th>
+                  <th scope="col">Vị trí gần nhất</th>
+                  <th scope="col">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(items as Team[]).map((team) => (
+                  <tr
+                    className={selectedTeam?.id === team.id ? 'is-selected' : ''}
+                    key={team.id}
+                    onClick={() => selectTeam(team)}
+                  >
+                    <td><code className="mission-table-code" title={team.id}>{team.id}</code></td>
+                    <td>
+                      <button type="button" className="mission-table-open volunteer-team-table-open" aria-pressed={selectedTeam?.id === team.id} onClick={(event) => { event.stopPropagation(); selectTeam(team); }}>
+                        <strong>{team.name}</strong>
+                        <small>{label(team.kind)} · {team.skills.length ? `${team.skills.length} kỹ năng` : 'Chưa khai báo kỹ năng'}</small>
+                      </button>
+                    </td>
+                    <td>
+                      <span className={`chip team-availability-status ${team.availability === 'AVAILABLE' && team.status === 'ACTIVE' && teamActivityLoaded && !busyTeamIds.has(team.id) ? 'is-ready' : ''}`}>
+                        <span className="team-availability-dot" aria-hidden="true" />
+                        {team.status !== 'ACTIVE' ? label(team.status) : !teamActivityLoaded ? teamActivityError ? 'Chưa cập nhật được nhiệm vụ' : 'Đang kiểm tra' : busyTeamIds.has(team.id) ? 'Đang có nhiệm vụ' : label(team.availability)}
+                      </span>
+                    </td>
+                    <td><span className="team-table-position">{team.position ? `Cập nhật ${positionAge(team.position.age_s)} trước · ${label(team.position.source)}` : 'Chưa có dữ liệu tọa độ'}</span></td>
+                    <td>
+                      {manageableTeamIds.has(team.id)
+                        ? <button type="button" className="button secondary team-table-add" aria-label={`Thêm thành viên vào đội ${team.name}`} onClick={(event) => { event.stopPropagation(); selectTeam(team, 'members', true); }}>Thêm thành viên</button>
+                        : <span className="muted">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          visibleMissions.length > 0 &&
+          <div className="mission-table-scroll">
+            <table className="mission-table">
+              <thead>
+                <tr>
+                  <th scope="col">Mã nhiệm vụ</th>
+                  <th scope="col">Nhiệm vụ</th>
+                  <th scope="col">Đội cứu hộ</th>
+                  <th scope="col">Trạng thái</th>
+                  <th scope="col">Thời điểm giao</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleMissions.map((mission) => (
+                  <tr
+                    className={selectedMission?.id === mission.id ? 'is-selected' : ''}
+                    key={mission.id}
+                    onClick={() => selectMission(mission)}
+                  >
+                    <td><code className="mission-table-code" title={mission.id}>{mission.id}</code></td>
+                    <td>
+                      <button type="button" className="mission-table-open" aria-pressed={selectedMission?.id === mission.id} onClick={(event) => { event.stopPropagation(); selectMission(mission); }}>
+                        <strong>{label(mission.category)}</strong>
+                      </button>
+                      {mission.declared_danger && <span className="mission-table-danger">Cần hỗ trợ khẩn cấp</span>}
+                    </td>
+                    <td><span className="mission-table-team">{mission.team.name}</span></td>
+                    <td><span className={`chip mission-status mission-status-${mission.status.toLowerCase()}`}>{label(mission.status)}</span></td>
+                    <td><time className="mission-table-time" dateTime={mission.created_at}>{timeLabel(mission.created_at)}</time></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
         <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} noun={isTeam ? 'đội' : 'nhiệm vụ'} />
-      </section>
+      </section>}
 
-      {/* Cột phải: Bảng điều hành chi tiết */}
-      <section className="card mission-detail-card" id={isTeam ? 'volunteer-team-detail' : undefined} ref={missionCardRef}>
+      {/* Hồ sơ chi tiết */}
+      {(isTeam ? Boolean(selectedTeam) : Boolean(activeMission)) && <section className={`card mission-detail-card ${isTeam ? 'volunteer-team-detail-card' : ''}`} id={isTeam ? 'volunteer-team-detail' : undefined} ref={missionCardRef}>
         {isTeam ? (
           <>
-            <h2>Chi tiết đội cứu hộ</h2>
+            <div className="volunteer-team-detail-heading">
+              <h2 ref={teamHeadingRef} tabIndex={-1}>Chi tiết đội cứu hộ</h2>
+              {selectedTeam && <div className="mission-detail-heading__actions">
+                <button type="button" className="button secondary" disabled={loading || teamLoading || busy} onClick={() => { setCursor(''); setRevision(value => value + 1); }}>Cập nhật</button>
+                <button type="button" className="button secondary" onClick={returnToTeamList}>← Danh sách đội</button>
+              </div>}
+            </div>
             {!selectedTeam && (
               <div className="empty">
                 Chọn một đội cứu hộ để xem thông tin và thành viên.
               </div>
             )}
             {selectedTeam && (
-              <div className="form-stack">
-                {canManageTeam && <span className="chip team-leader-badge">Bạn đang quản lý đội này</span>}
-                <div className="detail-grid mission-facts">
-                  <p>
-                    <strong>Tên đội</strong>
-                    <span className="detail-value">
-                      {selectedTeam.name}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Loại đội</strong>
-                    <span className="detail-value">
-                      {label(selectedTeam.kind)}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Khả năng nhận nhiệm vụ</strong>
-                    <span className="detail-value">
-                      {label(selectedTeam.availability)}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Tình trạng nhiệm vụ</strong>
-                    <span className="detail-value">{!teamActivityLoaded ? 'Chưa cập nhật được nhiệm vụ' : busyTeamIds.has(selectedTeam.id) ? 'Đang có nhiệm vụ' : 'Không có nhiệm vụ đang hoạt động'}</span>
-                  </p>
-                  <p className="muted team-availability-help">Để nhận nhiệm vụ, đội cần đang sẵn sàng, không có nhiệm vụ đang hoạt động và có vị trí đủ mới. Điều phối viên còn kiểm tra khoảng cách và kỹ năng phù hợp.</p>
-                  <p>
-                    <strong>Chế độ báo cáo</strong>
-                    <span className="detail-value">
-                      {label(selectedTeam.reporting_mode)}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Trạng thái</strong>
-                    <span className="detail-value">
-                      {selectedTeam.status === 'ACTIVE' ? 'Hồ sơ đang được sử dụng' : label(selectedTeam.status)}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Phiên bản</strong>
-                    <span className="detail-value">
-                      {selectedTeam.version}
-                    </span>
-                  </p>
+              <div className="volunteer-team-detail">
+                <div className="volunteer-team-profile">
+                  <div>
+                    <span className="volunteer-team-kind">{label(selectedTeam.kind)}</span>
+                    <h3>{selectedTeam.name}</h3>
+                  </div>
+                  {selectedTeamCanBeManaged && <span className="chip team-leader-badge">Bạn đang quản lý đội này</span>}
                 </div>
-
-                <TeamMembers key={`${selectedTeam.id}-${teamSelectionRevision}`} teamId={selectedTeam.id} onManageChange={setCanManageTeam} addOpen={addMemberOpen} onCloseAdd={() => setAddMemberOpen(false)} />
-
-                {selectedTeam.readiness_required && <p className="notice warning" role="status">Đội cần xác nhận sẵn sàng trở lại sau khi nhiệm vụ đang hoạt động bị hủy.</p>}
-                {canManageTeam && selectedTeam.status === 'ACTIVE' && selectedTeam.availability === 'AVAILABLE' && <div className="action-grid">
-                  <button
-                    className={`button ${selectedTeam.availability === 'AVAILABLE' ? 'secondary' : ''}`}
-                    disabled={busy || teamLoading}
-                    onClick={() => toggleTeamAvailability(selectedTeam)}
-                  >
-                    {selectedTeam.availability === 'AVAILABLE'
-                      ? 'Chuyển sang Tạm ngưng'
-                      : 'Chuyển sang Sẵn sàng hoạt động'}
-                  </button>
-                </div>}
-
-                {canManageTeam && selectedTeam.status === 'ACTIVE' && selectedTeam.availability !== 'AVAILABLE' && (
-                  teamActivityError ? <p className="notice error" role="alert">{teamActivityError}</p>
-                    : !teamActivityLoaded ? <p role="status">Đang kiểm tra nhiệm vụ của đội trước khi xác nhận sẵn sàng…</p>
-                    : busyTeamIds.has(selectedTeam.id) ? <p className="notice warning">Đội còn nhiệm vụ đang hoạt động hoặc chờ nhận. Hãy xử lý nhiệm vụ đó trước khi xác nhận sẵn sàng.</p>
-                      : !teamLoading && <TeamReadinessForm key={`${selectedTeam.id}-${selectedTeam.version}`}
-                        teamId={selectedTeam.id} teamName={selectedTeam.name} version={selectedTeam.version}
-                        recorded={selectedTeam.reporting_mode === 'COORDINATOR'}
-                        onSuccess={() => { setTeamMessage('Đã xác nhận đội sẵn sàng.'); refreshAll(); }}
-                        onStale={refreshAll} />
-                )}
-
-                {canManageTeam && selectedTeam.reporting_mode === 'APP' && selectedTeam.status === 'ACTIVE' && <>
-                <hr />
-                <h3>Cập nhật vị trí GPS của đội</h3>
-                <p>Vị trí mới nhất giúp điều phối viên tìm đội gần nơi cần hỗ trợ. Chỉ chia sẻ khi bạn bật và tab trình duyệt đang hoạt động.</p>
-                {onToggleSharing && <div className="team-sharing-control">
-                  <button type="button" className={`button ${sharingTeamId === selectedTeam.id ? 'secondary' : ''}`}
-                    onClick={() => onToggleSharing(selectedTeam.id)}>
-                    {sharingTeamId === selectedTeam.id ? 'Dừng chia sẻ vị trí' : 'Bắt đầu chia sẻ vị trí'}
-                  </button>
-                  <small>Tự động gửi GPS mỗi 2 phút. Bạn có thể dừng bất kỳ lúc nào.</small>
-                  {sharingTeamId === selectedTeam.id && sharingMessage && <p role="status" className="notice">{sharingMessage}</p>}
-                </div>}
-                <p>Hoặc chọn vị trí thủ công khi GPS không khả dụng:</p>
-                <div className="action-grid">
-                  <button
-                    type="button"
-                    className="button secondary"
-                    onClick={getTeamDeviceLocation}
-                    disabled={busy}
-                  >
-                    Lấy vị trí GPS từ thiết bị
-                  </button>
-                </div>
-                <LocationPicker
-                  value={teamPoint}
-                  onSelect={(point) => {
-                    setTeamPoint(point);
-                    setTeamAccuracy(null);
-                  }}
+                {teamMessage && <p className="notice" role="status">{teamMessage}</p>}
+                <Tabs
+                  items={teamDetailTabs}
+                  value={teamDetailTab}
+                  onChange={(value) => setTeamDetailTab(value as TeamDetailTab)}
+                  ariaLabel="Thông tin đội cứu hộ"
+                  idBase="volunteer-team"
+                  className="volunteer-team-tabs"
                 />
-                {teamPoint && (
-                  <p role="status">
-                    Tọa độ đã chọn:{' '}
-                    <strong>
-                      {teamPoint.latitude.toFixed(6)}, {teamPoint.longitude.toFixed(6)}
-                    </strong>
-                    {teamAccuracy ? ` (độ chính xác ~${Math.round(teamAccuracy)}m)` : ''}
-                  </p>
-                )}
-                {teamPoint && (
-                  <button
-                    className="button"
-                    disabled={busy}
-                    onClick={() => updateTeamPosition(selectedTeam)}
-                  >
-                    Lưu vị trí mới lên hệ thống
-                  </button>
-                )}
-                </>}
-                {teamMessage && (
-                  <p className="notice" role="status">
-                    {teamMessage}
-                  </p>
-                )}
+                <section
+                  className="volunteer-team-panel"
+                  id="volunteer-team-tabpanel"
+                  role="tabpanel"
+                  aria-labelledby={`volunteer-team-tab-${teamDetailTab}`}
+                  tabIndex={0}
+                >
+                  {teamDetailTab === 'overview' && (
+                    <div className="volunteer-team-overview">
+                      <dl className="volunteer-team-facts">
+                        <div><dt>Khả năng nhận nhiệm vụ</dt><dd>{label(selectedTeam.availability)}</dd></div>
+                        <div><dt>Tình trạng nhiệm vụ</dt><dd>{!teamActivityLoaded ? 'Chưa cập nhật được nhiệm vụ' : busyTeamIds.has(selectedTeam.id) ? 'Đang có nhiệm vụ' : 'Không có nhiệm vụ đang hoạt động'}</dd></div>
+                        <div><dt>Chế độ báo cáo</dt><dd>{label(selectedTeam.reporting_mode)}</dd></div>
+                        <div><dt>Trạng thái hồ sơ</dt><dd>{selectedTeam.status === 'ACTIVE' ? 'Đang hoạt động' : label(selectedTeam.status)}</dd></div>
+                        <div><dt>Vị trí gần nhất</dt><dd>{selectedTeam.position ? `${positionAge(selectedTeam.position.age_s)} trước · ${label(selectedTeam.position.source)}` : 'Chưa có dữ liệu tọa độ'}</dd></div>
+                        <div><dt>Phiên bản hồ sơ</dt><dd>{selectedTeam.version}</dd></div>
+                      </dl>
+                      <div className="volunteer-team-skills">
+                        <h4>Kỹ năng chuyên môn</h4>
+                        {selectedTeam.skills.length ? (
+                          <div className="volunteer-team-skill-list">
+                            {selectedTeam.skills.map(skill => <span className="chip" key={skill}>{label(skill)}</span>)}
+                          </div>
+                        ) : <p className="muted">Đội chưa khai báo kỹ năng.</p>}
+                      </div>
+                      <p className="muted team-availability-help">Để nhận nhiệm vụ, đội cần đang sẵn sàng, không có nhiệm vụ đang hoạt động và có vị trí đủ mới. Điều phối viên còn kiểm tra khu vực và kỹ năng phù hợp.</p>
+                    </div>
+                  )}
+                  {teamDetailTab === 'members' && (
+                    <TeamMembers
+                      key={`${selectedTeam.id}-${teamSelectionRevision}`}
+                      teamId={selectedTeam.id}
+                      onManageChange={setCanManageTeam}
+                      addOpen={addMemberOpen}
+                      onCloseAdd={() => setAddMemberOpen(false)}
+                    />
+                  )}
+                  {teamDetailTab === 'readiness' && (
+                    <div className="volunteer-team-panel-content">
+                      <div className="volunteer-team-section-heading">
+                        <div><h4>Trạng thái sẵn sàng</h4><p>Kiểm soát việc đội có thể tiếp nhận nhiệm vụ mới.</p></div>
+                        <span className={`chip team-availability-status ${selectedTeam.availability === 'AVAILABLE' && selectedTeam.status === 'ACTIVE' && teamActivityLoaded && !busyTeamIds.has(selectedTeam.id) ? 'is-ready' : ''}`}>
+                          <span className="team-availability-dot" aria-hidden="true" />
+                          {!teamActivityLoaded ? 'Đang kiểm tra' : busyTeamIds.has(selectedTeam.id) ? 'Đang có nhiệm vụ' : label(selectedTeam.availability)}
+                        </span>
+                      </div>
+                      {selectedTeam.readiness_required && <p className="notice warning" role="status">Đội cần xác nhận sẵn sàng trở lại sau khi nhiệm vụ đang hoạt động bị hủy.</p>}
+                      {selectedTeamCanBeManaged && selectedTeam.status === 'ACTIVE' && selectedTeam.availability === 'AVAILABLE' && (
+                        <button
+                          type="button"
+                          className="button secondary"
+                          disabled={busy || teamLoading}
+                          onClick={() => toggleTeamAvailability(selectedTeam)}
+                        >
+                          Chuyển sang Tạm ngưng
+                        </button>
+                      )}
+                      {selectedTeamCanBeManaged && selectedTeam.status === 'ACTIVE' && selectedTeam.availability !== 'AVAILABLE' && (
+                        teamActivityError ? <p className="notice error" role="alert">{teamActivityError}</p>
+                          : !teamActivityLoaded ? <p role="status">Đang kiểm tra nhiệm vụ của đội trước khi xác nhận sẵn sàng…</p>
+                            : busyTeamIds.has(selectedTeam.id) ? <p className="notice warning">Đội còn nhiệm vụ đang hoạt động hoặc chờ nhận. Hãy xử lý nhiệm vụ đó trước khi xác nhận sẵn sàng.</p>
+                              : !teamLoading && <TeamReadinessForm key={`${selectedTeam.id}-${selectedTeam.version}`}
+                                teamId={selectedTeam.id} teamName={selectedTeam.name} version={selectedTeam.version}
+                                recorded={selectedTeam.reporting_mode === 'COORDINATOR'}
+                                onSuccess={() => { setTeamMessage('Đã xác nhận đội sẵn sàng.'); refreshAll(); }}
+                                onStale={refreshAll} />
+                      )}
+                      {!selectedTeamCanBeManaged && <p className="muted">Chỉ trưởng đội mới có thể thay đổi trạng thái sẵn sàng.</p>}
+                    </div>
+                  )}
+                  {teamDetailTab === 'location' && (
+                    <div className="volunteer-team-panel-content volunteer-team-location">
+                      <div className="volunteer-team-section-heading">
+                        <div><h4>Vị trí đội cứu hộ</h4><p>Điều phối viên dùng vị trí mới để so sánh đội phù hợp.</p></div>
+                      </div>
+                      <p className="volunteer-team-location-status">{selectedTeam.position ? `Cập nhật ${positionAge(selectedTeam.position.age_s)} trước · ${label(selectedTeam.position.source)}` : 'Đội chưa gửi vị trí.'}</p>
+                      {selectedTeamCanBeManaged && selectedTeam.reporting_mode === 'APP' && selectedTeam.status === 'ACTIVE' ? <>
+                        <p>Chia sẻ GPS chỉ hoạt động khi bạn bật và tab trình duyệt đang mở.</p>
+                        {onToggleSharing && <div className="team-sharing-control">
+                          <button type="button" className={`button ${sharingTeamId === selectedTeam.id ? 'secondary' : ''}`}
+                            onClick={() => onToggleSharing(selectedTeam.id)}>
+                            {sharingTeamId === selectedTeam.id ? 'Dừng chia sẻ vị trí' : 'Bắt đầu chia sẻ vị trí'}
+                          </button>
+                          <small>Tự động gửi GPS mỗi 2 phút. Bạn có thể dừng bất kỳ lúc nào.</small>
+                          {sharingTeamId === selectedTeam.id && sharingMessage && <p role="status" className="notice">{sharingMessage}</p>}
+                        </div>}
+                        <div className="volunteer-team-manual-location">
+                          <div className="volunteer-team-section-heading">
+                            <div><h4>Cập nhật thủ công</h4><p>Dùng GPS thiết bị hoặc ghim vị trí trên bản đồ.</p></div>
+                            <button type="button" className="button secondary" onClick={getTeamDeviceLocation} disabled={busy}>
+                              Lấy vị trí GPS
+                            </button>
+                          </div>
+                          <LocationPicker
+                            value={teamPoint}
+                            onSelect={(point) => { setTeamPoint(point); setTeamAccuracy(null); }}
+                          />
+                          {teamPoint && (
+                            <p role="status">
+                              Tọa độ đã chọn: <strong>{teamPoint.latitude.toFixed(6)}, {teamPoint.longitude.toFixed(6)}</strong>
+                              {teamAccuracy ? ` (độ chính xác ~${Math.round(teamAccuracy)}m)` : ''}
+                            </p>
+                          )}
+                          {teamPoint && <button type="button" className="button" disabled={busy} onClick={() => updateTeamPosition(selectedTeam)}>Lưu vị trí mới</button>}
+                        </div>
+                      </> : <p className="muted">Vị trí chỉ có thể cập nhật bởi trưởng đội dùng ứng dụng.</p>}
+                    </div>
+                  )}
+                </section>
               </div>
             )}
           </>
         ) : (
           <>
             <div className="mission-detail-heading"><h2 ref={missionHeadingRef} tabIndex={-1}>Chi tiết nhiệm vụ</h2>
-              {activeMission && <button type="button" className="button secondary mission-back-to-list" onClick={() => {
-                const selected = missionListRef.current?.querySelector<HTMLElement>('.volunteer-record-open[aria-pressed="true"]');
-                if (selected) selected.focus(); else missionListRef.current?.scrollIntoView({ block: 'start' });
-              }}>← Danh sách nhiệm vụ</button>}
+              {activeMission && <div className="mission-detail-heading__actions">
+                <button type="button" className="button secondary" disabled={loading || missionLoading || busy} onClick={() => { setCursor(''); refreshAll(); }}>Cập nhật</button>
+                <button type="button" className="button secondary mission-back-to-list" onClick={returnToMissionList}>← Danh sách nhiệm vụ</button>
+              </div>}
             </div>
             {!activeMission && (
               <div className="empty">
@@ -981,49 +1058,45 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
             )}
             {missionLoading && <p role="status">Đang tải hồ sơ nhiệm vụ…</p>}
             {activeMission && (
-              <div className="form-stack">
-                <div className="detail-grid mission-facts">
-                  <p>
-                    <strong>Đội thực hiện</strong>
-                    <span className="detail-value">
-                      {activeMission.team.name}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Trạng thái</strong>
-                    <span className="detail-value">
-                      <span className={`chip mission-status mission-status-${activeMission.status.toLowerCase()}`}>{label(activeMission.status)}</span>
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Loại sự cố</strong>
-                    <span className="detail-value">
-                      {label(activeMission.category)}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Số người cần hỗ trợ</strong>
-                    <span className="detail-value">
-                      {activeMission.people_affected ?? 'Chưa rõ'}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Thời điểm giao</strong>
-                    <span className="detail-value">
-                      {timeLabel(activeMission.created_at)}
-                    </span>
-                  </p>
+              <div className="volunteer-mission-detail">
+                <div className="volunteer-mission-summary">
+                  <div className="volunteer-mission-summary__identity">
+                    <small>Mã nhiệm vụ · …{activeMission.id.slice(-12)}</small>
+                    <h3>{label(activeMission.category)}</h3>
+                    <p>{activeMission.team.name}</p>
+                  </div>
+                  <span className={`chip mission-status mission-status-${activeMission.status.toLowerCase()}`}>{label(activeMission.status)}</span>
+                </div>
+                {actionMessage && <p className="notice" role="status">{actionMessage}</p>}
+                <Tabs
+                  items={missionDetailTabs}
+                  value={missionDetailTab}
+                  onChange={(value) => setMissionDetailTab(value as MissionDetailTab)}
+                  ariaLabel="Chi tiết nhiệm vụ"
+                  idBase="volunteer-mission"
+                  className="volunteer-mission-tabs"
+                />
+                <section
+                  className="volunteer-mission-panel"
+                  id="volunteer-mission-tabpanel"
+                  role="tabpanel"
+                  aria-labelledby={`volunteer-mission-tab-${missionDetailTab}`}
+                  tabIndex={0}
+                >
+                {missionDetailTab === 'overview' && <div className="volunteer-mission-tab-content">
+                <div className="volunteer-mission-facts">
+                  <div><small>Số người cần hỗ trợ</small><strong>{activeMission.people_affected ?? 'Chưa rõ'}</strong></div>
+                  <div><small>Thời điểm giao</small><strong>{timeLabel(activeMission.created_at)}</strong></div>
+                  <div><small>Đội thực hiện</small><strong>{activeMission.team.name}</strong></div>
                 </div>
 
-                {activeMission.description && (
-                  <div>
-                    <strong>Mô tả tình huống:</strong>
-                    <p>{activeMission.description}</p>
-                  </div>
-                )}
+                <div className="volunteer-mission-context">
+                  <h3>Mô tả tình huống</h3>
+                  <p>{activeMission.description || 'Chưa có mô tả tình huống được cung cấp.'}</p>
+                </div>
 
                 {activeMission.declared_danger && (
-                  <p className="notice warning">
+                  <p className="notice warning volunteer-mission-danger">
                     Người báo cho biết có nguy hiểm tính mạng cần hỗ trợ khẩn cấp.
                   </p>
                 )}
@@ -1031,8 +1104,9 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                 {/* Thông tin liên hệ chỉ hiển thị với Đội trưởng */}
                 {(activeMission.reporter_contact_phone ||
                   activeMission.beneficiary_contact_phone) && (
-                  <div className="candidate">
-                    <strong>Thông tin liên lạc tại hiện trường (dành cho đội trưởng):</strong>
+                  <div className="volunteer-mission-contacts">
+                    <div><h3>Liên hệ hiện trường</h3><p>Thông tin dành cho đội trưởng.</p></div>
+                    <div className="volunteer-mission-contact-list">
                     {activeMission.reporter_contact_phone && (
                       <p>
                         Người báo:{' '}
@@ -1049,12 +1123,13 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                         </a>
                       </p>
                     )}
+                    </div>
                   </div>
                 )}
 
                 {/* Chỉ đường Google Maps */}
                 {directionsUrl ? (
-                  <div className="mission-location">
+                  <div className="mission-location volunteer-mission-location">
                     <h3>Vị trí hiện trường</h3>
                     <div className="mission-route-summary">
                       <div><small>Điểm xuất phát</small><strong>Chọn trên Google Maps</strong></div>
@@ -1080,8 +1155,9 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                     Chưa nhận được tọa độ hiện trường từ hệ thống. Hãy bấm Cập nhật để thử lại; nếu vẫn thiếu, báo điều phối viên bổ sung vị trí trước khi di chuyển.
                   </p>
                 )}
+                </div>}
 
-                <hr />
+                {missionDetailTab === 'progress' && <div className="volunteer-mission-tab-content volunteer-mission-progress">
                 {['OFFERED', 'ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) ? (
                   <h3>{canManageMission ? 'Thao tác điều hành nhiệm vụ' : 'Theo dõi nhiệm vụ'}</h3>
                 ) : (
@@ -1137,7 +1213,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                       />
                       {(missionFormAttempted.decline || missionFormTouched.decline) && declineReasonError && <small id="mission-decline-reason-error" className="field-error" role="alert">{declineReasonError}</small>}
                     </label>
-                    <button className="button" disabled={busy}>
+                    <button className="button" disabled={busy || Boolean(declineReasonError)}>
                       Xác nhận từ chối
                     </button>
                   </form>
@@ -1263,7 +1339,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                     )}
                     {completionFile && missionEvidenceError(completionFile) && <small className="field-error" id="mission-completion-file-error" role="alert">{missionEvidenceError(completionFile)}</small>}
                     <p className="account-hint">Nếu chọn tệp, Web sẽ tải minh chứng trước rồi mới ghi nhận hoàn thành. Ảnh tối đa 10 MB; video MP4 tối đa 50 MB.</p>
-                    <button className="button" disabled={busy || Boolean(completionFile && missionEvidenceError(completionFile))}>
+                    <button className="button" disabled={busy || Boolean(outcomeNoteError) || Boolean(completionFile && missionEvidenceError(completionFile))}>
                       Xác nhận hoàn thành nhiệm vụ
                     </button>
                   </form>
@@ -1298,7 +1374,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                       />
                       {(missionFormAttempted.failed || missionFormTouched.failed) && progressNoteError && <small id="mission-failure-reason-error" className="field-error" role="alert">{progressNoteError}</small>}
                     </label>
-                    <button className="button" disabled={busy}>
+                    <button className="button" disabled={busy || Boolean(progressNoteError)}>
                       Xác nhận báo cáo thất bại
                     </button>
                   </form>
@@ -1339,10 +1415,13 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                   </form>
                 )}
 
+                </div>}
+
+                {missionDetailTab === 'history' && <div className="volunteer-mission-tab-content volunteer-mission-history">
                 {/* Hiển thị danh sách minh chứng đã có */}
-                {missionDetail?.evidence?.items && missionDetail.evidence.items.length > 0 && (
-                  <div>
-                    <h4>Minh chứng đã lưu ({missionDetail.evidence.items.length})</h4>
+                <div className="volunteer-mission-history-section">
+                    <div className="volunteer-mission-history-heading"><h3>Minh chứng đã lưu</h3><span>{missionDetail?.evidence?.items.length || 0}</span></div>
+                    {missionDetail?.evidence?.items && missionDetail.evidence.items.length > 0 ? (
                     <div className="record-list">
                       {(missionDetail.evidence.items as EvidenceItem[]).map((ev) => (
                         <div className="record" key={ev.id}>
@@ -1372,13 +1451,13 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                    ) : <p className="empty">Chưa có minh chứng được lưu cho nhiệm vụ này.</p>}
+                </div>
 
                 {/* Timeline nhiệm vụ */}
-                {missionDetail?.timeline?.items && missionDetail.timeline.items.length > 0 && (
-                  <div>
-                    <h4>Lịch sử tiến trình nhiệm vụ</h4>
+                <div className="volunteer-mission-history-section">
+                    <div className="volunteer-mission-history-heading"><h3>Lịch sử tiến trình</h3><span>{missionDetail?.timeline?.items.length || 0}</span></div>
+                    {missionDetail?.timeline?.items && missionDetail.timeline.items.length > 0 ? (
                     <div className="timeline">
                       {(
                         missionDetail.timeline.items as Array<{
@@ -1398,19 +1477,15 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                         </p>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                {actionMessage && (
-                  <p className="notice" role="status">
-                    {actionMessage}
-                  </p>
-                )}
+                    ) : <p className="empty">Chưa có cập nhật tiến trình.</p>}
+                </div>
+                </div>}
+                </section>
               </div>
             )}
           </>
         )}
-      </section>
+      </section>}
     </div>
   );
 }

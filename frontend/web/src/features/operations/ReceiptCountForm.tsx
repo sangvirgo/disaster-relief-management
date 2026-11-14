@@ -321,7 +321,7 @@ export function ReceiptCountForm({
           {error}
         </p>
       )}
-      <button className="button" disabled={busy || driveLoading || !driveItems.length}>
+      <button className="button" disabled={busy || driveLoading || !driveItems.length || hasInvalidFields}>
         {busy ? 'Đang gửi kết quả…' : 'Gửi kiểm đếm để duyệt'}
       </button>
     </form>

@@ -33,6 +33,7 @@ import type { components as ResponseComponents } from './api/generated/response'
 import './style.css';
 import { StatusBadge } from './components/StatusBadge';
 import { DetailSurface } from './components/DetailSurface';
+import { useModalScrollLock } from './components/modalScrollLock';
 import { PageHeader } from './components/ui/PageHeader';
 
 declare global {
@@ -205,6 +206,7 @@ function AuthModal({
     return authErrors[field] || ((authAttempted || authTouched[field] || Boolean(value)) ? authValidationErrors[field] : '');
   }
 
+  useModalScrollLock(isOpen);
   useEffect(() => {
     if (!isOpen) {
       setMode('login');
@@ -215,13 +217,7 @@ function AuthModal({
       setAuthTouched({});
       setAuthAttempted(false);
     }
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -380,6 +376,7 @@ function AuthModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="auth-modal-title"
+      onClick={(event) => event.stopPropagation()}
     >
       <div ref={authCard} className="modal-card auth-modal-card" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close-button" onClick={onClose} aria-label="Đóng cửa sổ">
@@ -674,24 +671,6 @@ function PasswordChange({
     <section className="card auth-card">
       <div className="eyebrow">Bảo mật tài khoản</div>
       <h2>Đổi mật khẩu tài khoản</h2>
-      <p>
-        {forced
-          ? 'Tài khoản vừa đăng nhập bằng mật khẩu tạm. Vui lòng cập nhật mật khẩu mới để tiếp tục.'
-          : 'Nhập mật khẩu hiện tại và mật khẩu mới để bảo vệ tài khoản của bạn.'}
-      </p>
-
-      {!forced && (
-        <p className="notice">
-          Biểu mẫu này chỉ đổi mật khẩu Reliva. Không nhập mật khẩu Google tại đây.
-          Nếu bạn chỉ đăng nhập bằng Google và chưa có mật khẩu Reliva, hãy tiếp tục dùng
-          nút Đăng nhập bằng Google; biểu mẫu này không tạo mật khẩu Reliva mới cho bạn.
-        </p>
-      )}
-
-      <div className="notice" style={{ fontSize: 13, marginBottom: 14 }}>
-        💡 <strong>Quy chuẩn mật khẩu mới:</strong> Tối thiểu 10 ký tự, khác tên đăng nhập và khác
-        mật khẩu hiện tại (Ví dụ: <code>MatKhauRieng!2026</code>).
-      </div>
 
       <form className="form-stack" onSubmit={submit} noValidate>
         <label>
@@ -1243,14 +1222,14 @@ function PublicCampaignDialog({ campaign, onClose }: { campaign: Record<string, 
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const [closing, setClosing] = useState(false);
   function closeDialog() { setClosing(true); window.setTimeout(() => dialogRef.current?.close(), 180); }
+  useModalScrollLock(true);
   useEffect(() => {
     const dialog = dialogRef.current;
     dialog?.showModal();
     return () => { if (dialog?.open) dialog.close(); };
   }, []);
   return (
-    <dialog ref={dialogRef} className={`campaign-public-dialog ${closing ? 'is-closing' : ''}`} aria-label="Chi tiết chiến dịch" onClose={onClose} onCancel={(event) => { event.preventDefault(); closeDialog(); }}
-      onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog(); }}>
+    <dialog ref={dialogRef} className={`campaign-public-dialog ${closing ? 'is-closing' : ''}`} aria-label="Chi tiết chiến dịch" onClose={onClose} onCancel={(event) => { event.preventDefault(); closeDialog(); }}>
       <div className="campaign-dialog-header">
         <div><span className="eyebrow">CHIẾN DỊCH CỨU TRỢ</span><h2>{text(campaign.title) || 'Chiến dịch cứu trợ'}</h2></div>
         <button type="button" className="modal-close-button" aria-label="Đóng chi tiết chiến dịch" onClick={closeDialog}>×</button>
@@ -2006,6 +1985,7 @@ function App() {
                 ) : workspace === 'volunteer' ? (
                   <Volunteer key={`${selected.id}:${selectedMissionId}`} page={selected.id} currentUserId={user!.id} initialMissionId={selectedMissionId}
                     sharingTeamId={sharingTeamId} sharingMessage={sharingMessage}
+                    onClearInitialMission={() => setSelectedMissionId('')}
                     onToggleSharing={(teamId) => { setSharingTeamId((current) => current === teamId ? '' : teamId); setSharingMessage(''); }} />
                 ) : (workspace === 'coordinator' || workspace === 'admin') && selected.id === 'dashboard' ? (
                   <RoleDashboard role={workspace} onOpenRequest={workspace === 'coordinator' ? (requestId) => {

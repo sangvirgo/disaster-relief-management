@@ -336,6 +336,20 @@ export const ResponseApi = {
     return response.data;
   },
 
+  // Explicitly record team readiness after an active mission is cancelled.
+  async confirmTeamReady(teamId: string, expectedVersion: number): Promise<RescueTeamDetail> {
+    const response = await apiClient.post<RescueTeamDetail>(
+      `/response/teams/${teamId}/ready`,
+      {
+        expected_version: expectedVersion,
+        confirmation_basis: 'SELF',
+        occurred_at: new Date().toISOString(),
+      },
+      { headers: { 'Idempotency-Key': generateUUID() } },
+    );
+    return response.data;
+  },
+
   async updateTeamProfile(
     teamId: string,
     expectedVersion: number,

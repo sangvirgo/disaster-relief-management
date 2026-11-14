@@ -82,12 +82,13 @@ function useLeaderSearch(organizationId: string, term: string) {
   return { options, searching };
 }
 
-export function TeamCreateForm({ organizations, skills, onSuccess }: {
-  organizations: SelectOption[]; skills: Skill[];
+export function TeamCreateForm({ organizations, regions, skills, onSuccess }: {
+  organizations: SelectOption[]; regions: SelectOption[]; skills: Skill[];
   onSuccess: (id: string) => void;
 }) {
   const [name, setName] = useState('');
   const [organizationId, setOrganizationId] = useState('');
+  const [regionCode, setRegionCode] = useState('');
   const [teamKind, setTeamKind] = useState('VOLUNTEER');
   const [reportingMode, setReportingMode] = useState('APP');
   const [leaderId, setLeaderId] = useState('');
@@ -105,7 +106,7 @@ export function TeamCreateForm({ organizations, skills, onSuccess }: {
     if (reportingMode === 'APP' && !leaderId) { setError('Hãy chọn tài khoản đội trưởng.'); return; }
     if (reportingMode === 'COORDINATOR' && !contactNote.trim()) { setError('Hãy nhập đầu mối liên hệ của đội.'); return; }
     if (!pending.current) pending.current = { key: newCommandKey(), body: {
-      name: name.trim().normalize('NFC'), organization_id: organizationId,
+      name: name.trim().normalize('NFC'), organization_id: organizationId, operating_region_code: regionCode,
       team_kind: teamKind, reporting_mode: reportingMode, skill_codes: [...selectedSkills].sort(),
       ...(reportingMode === 'APP' ? { leader_user_id: leaderId } : { external_contact_note: contactNote.trim().normalize('NFC') }),
     } };
@@ -119,11 +120,18 @@ export function TeamCreateForm({ organizations, skills, onSuccess }: {
     } finally { setBusy(false); }
   }
   const fieldError = (name: string) => fieldErrors[name]?.join(' ');
+  const hasInvalidFields = !name.trim() || name.length > 200 || !organizationId || !regionCode
+    || (reportingMode === 'APP'
+      ? !leaderId
+      : !contactNote.trim() || contactNote.length > 1000)
+    || Object.keys(fieldErrors).length > 0;
   return <form className="form-stack command-form" onSubmit={submit}>
     <h3>Tạo đội cứu hộ</h3>
     <label>Tên đội *<input required maxLength={200} value={name} onChange={(e) => { setName(e.target.value); changed(); }} />{fieldError('name') && <small className="field-error">{fieldError('name')}</small>}</label>
     <label>Tổ chức *<select required value={organizationId} onChange={(e) => { setOrganizationId(e.target.value); setLeaderId(''); changed(); }}><option value="">Chọn tổ chức</option>
       {organizations.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{fieldError('organization_id') && <small className="field-error">{fieldError('organization_id')}</small>}</label>
+    <label>Khu vực hoạt động *<select required value={regionCode} onChange={(e) => { setRegionCode(e.target.value); changed(); }}><option value="">Chọn khu vực</option>
+      {regions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{fieldError('operating_region_code') && <small className="field-error">{fieldError('operating_region_code')}</small>}</label>
     <label>Loại đội *<select value={teamKind} onChange={(e) => { setTeamKind(e.target.value); changed(); }}><option value="VOLUNTEER">Tình nguyện</option>
       <option value="MILITARY">Lực lượng vũ trang</option><option value="GOVERNMENT">Cơ quan nhà nước</option><option value="OTHER">Khác</option></select></label>
     <label>Chế độ báo cáo *<select value={reportingMode} onChange={(e) => { setReportingMode(e.target.value); changed(); }}><option value="APP">Qua ứng dụng</option>
@@ -141,6 +149,6 @@ export function TeamCreateForm({ organizations, skills, onSuccess }: {
       <p className="notice warning">Không tìm thấy tài khoản đủ điều kiện (cần thuộc tổ chức này và có quyền Tình nguyện viên).</p>}
     {fieldError('skill_codes') && <p className="field-error">{fieldError('skill_codes')}</p>}
     {error && <p className="notice error" role="alert">{error}</p>}
-    <button type="submit" className="button" disabled={busy || !organizations.length || (reportingMode === 'APP' && !leaderId)}>{busy ? 'Đang tạo…' : 'Tạo đội cứu hộ'}</button>
+    <button type="submit" className="button" disabled={busy || hasInvalidFields || !organizations.length || !regions.length}>{busy ? 'Đang tạo…' : 'Tạo đội cứu hộ'}</button>
   </form>;
 }

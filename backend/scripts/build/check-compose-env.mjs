@@ -97,7 +97,7 @@ assert.equal(compose.services.nginx.ports[0].host_ip, '127.0.0.1', 'nginx must b
 const s3BackupPorts = compose.services.minio.ports.filter((port) => port.target === 9000);
 assert.equal(s3BackupPorts.length, 1, 'the existing MinIO service must expose one S3 backup port');
 assert.equal(s3BackupPorts[0].host_ip, '127.0.0.1', 'the S3 backup transport must bind only to loopback');
-assert.equal(s3BackupPorts[0].published, '59000');
+assert.equal(s3BackupPorts[0].published, '59500');
 assert.match(compose.services.minio.image, /\/minio:RELEASE\.2025-10-15T17-29-55Z$/);
 assert.match(compose.services['minio-init'].image, /\/minio-mc:RELEASE\.2025-08-13T08-35-41Z$/);
 assert.ok(!compose.services.minio.volumes.some((volume) => volume.target === '/minio.license'),

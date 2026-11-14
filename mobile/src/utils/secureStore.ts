@@ -5,6 +5,7 @@ import {
   CreateSOSPayload,
   DonationDeclarationPayload,
   DonationEvidenceReference,
+  MissionProgressTarget,
 } from '../types/api';
 
 const KEYS = {
@@ -18,6 +19,7 @@ const KEYS = {
   PENDING_PROXY_SOS: 'c48_pending_proxy_sos_command',
   PENDING_DONATION: 'c48_pending_donation_command',
   PENDING_SUPPLEMENT: 'c48_pending_supplement_command',
+  PENDING_MISSION_TRANSITION: 'c48_pending_mission_transition',
 };
 
 const SECURE_JSON_CHUNK_BYTES = 1200;
@@ -209,8 +211,22 @@ export interface PendingSupplementCommand {
   idempotencyKey: string;
 }
 
+export interface PendingMissionTransitionCommand {
+  missionId: string;
+  actorUserId: string;
+  expectedVersion: number;
+  toStatus: MissionProgressTarget;
+  note?: string;
+  outcomeNote?: string;
+  idempotencyKey: string;
+}
+
 function samePayload(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function pendingMissionTransitionKey(missionId: string): string {
+  return `${KEYS.PENDING_MISSION_TRANSITION}_${missionId.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
 }
 
 export const StorageService = {
@@ -465,5 +481,46 @@ export const StorageService = {
   async clearPendingSupplement(requestId: string): Promise<void> {
     const key = `${KEYS.PENDING_SUPPLEMENT}_${requestId.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     await clearSecureJson(key);
+  },
+
+  async getPendingMissionTransition(missionId: string): Promise<PendingMissionTransitionCommand | null> {
+    const command = await readSecureJson<PendingMissionTransitionCommand>(pendingMissionTransitionKey(missionId));
+    return command?.missionId === missionId ? command : null;
+  },
+
+  async getOrCreatePendingMissionTransition(
+    input: Omit<PendingMissionTransitionCommand, 'idempotencyKey'>,
+  ): Promise<PendingMissionTransitionCommand> {
+    const key = pendingMissionTransitionKey(input.missionId);
+    const existing = await readSecureJson<PendingMissionTransitionCommand>(key);
+    const payload = {
+      actorUserId: input.actorUserId,
+      expectedVersion: input.expectedVersion,
+      toStatus: input.toStatus,
+      note: input.note,
+      outcomeNote: input.outcomeNote,
+    };
+    if (existing) {
+      const existingPayload = {
+        actorUserId: existing.actorUserId,
+        expectedVersion: existing.expectedVersion,
+        toStatus: existing.toStatus,
+        note: existing.note,
+        outcomeNote: existing.outcomeNote,
+      };
+      if (existing.missionId === input.missionId && samePayload(existingPayload, payload)) return existing;
+      throw new Error('PENDING_MISSION_TRANSITION_MUST_BE_RESUMED');
+    }
+
+    const command: PendingMissionTransitionCommand = {
+      ...input,
+      idempotencyKey: generateUUID(),
+    };
+    await saveSecureJson(key, command);
+    return command;
+  },
+
+  async clearPendingMissionTransition(missionId: string): Promise<void> {
+    await clearSecureJson(pendingMissionTransitionKey(missionId));
   },
 };
