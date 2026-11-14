@@ -1,5 +1,6 @@
 import { useId, useRef, useState, type FormEvent } from 'react';
-import { api, ApiError, newCommandKey, type Service, type HttpMethod } from '../api/client';
+import { api, ApiError, newCommandKey, upload, type Service, type HttpMethod } from '../api/client';
+import { evidenceFileError } from '../i18n/evidence';
 import { LocationPicker } from '../maps/LocationPicker';
 import { confirmAction } from './confirmAction';
 
@@ -38,7 +39,10 @@ export interface CommandSpec {
   /** Hide the heading when the surrounding UI already names the action. */
   hideTitle?: boolean;
   warningFor?: (values: Record<string, string>) => string;
-  build?: (values: Record<string, string>) => Record<string, unknown> | Promise<Record<string, unknown>>;
+  /** When set, the form offers optional photo/video files uploaded here before the command is sent. */
+  uploadPath?: string;
+  uploadLabel?: string;
+  build?: (values: Record<string, string>, uploadedEvidenceIds: string[]) => Record<string, unknown> | Promise<Record<string, unknown>>;
 }
 const sentenceLabel = (value: string) =>
   value.charAt(0).toLocaleLowerCase('vi-VN') + value.slice(1);
@@ -113,6 +117,9 @@ export function CommandForm({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [attempted, setAttempted] = useState(false);
   const [manualFields, setManualFields] = useState<Record<string, boolean>>({});
+  const [files, setFiles] = useState<File[]>([]);
+  const [fileError, setFileError] = useState('');
+  const uploaded = useRef<{ file: File; key: string; id?: string }[]>([]);
   const formId = useId();
   const pending = useRef<{ scope: string; key: string; body: Record<string, unknown> } | null>(null);
   const visibleFields = (spec.fields || []).filter(
@@ -178,7 +185,17 @@ export function CommandForm({
               (!field?.visibleFor || field.visibleFor(values)) && (!field?.visibleWhen || submittedValues[field.visibleWhen.field] === field.visibleWhen.value);
           })
         );
-        const body = spec.build ? await spec.build(submittedValues) : visibleValues;
+        if (spec.uploadPath && files.length) {
+          if (uploaded.current.length !== files.length || uploaded.current.some((entry, index) => entry.file !== files[index]))
+            uploaded.current = files.map((file) => ({ file, key: newCommandKey() }));
+          for (const entry of uploaded.current) {
+            if (entry.id) continue;
+            const result = await upload<{ id: string }>(spec.service, spec.uploadPath, entry.file, { idempotencyKey: entry.key });
+            entry.id = result.id;
+          }
+        }
+        const evidenceIds = uploaded.current.flatMap((entry) => entry.id ? [entry.id] : []);
+        const body = spec.build ? await spec.build(submittedValues, evidenceIds) : visibleValues;
         if (spec.version !== undefined) body.expected_version = spec.version;
         pending.current = { scope, key: newCommandKey(), body };
       }
@@ -188,6 +205,8 @@ export function CommandForm({
         idempotencyKey: pending.current.key,
       });
       pending.current = null;
+      uploaded.current = [];
+      setFiles([]);
       setMessage('Thao tác đã được máy chủ xác nhận.');
       onSuccess(result);
     } catch (cause) {
@@ -388,6 +407,22 @@ export function CommandForm({
         )
         );
       })}
+      {spec.uploadPath && (
+        <label>
+          <span>{spec.uploadLabel || 'Ảnh hoặc video đối chiếu (không bắt buộc, tối đa 5 tệp)'}</span>
+          <input type="file" multiple accept="image/jpeg,image/png,video/mp4"
+            onChange={(event) => {
+              const chosen = Array.from(event.target.files ?? []).slice(0, 5);
+              const problem = chosen.map(evidenceFileError).find(Boolean) ?? '';
+              setFileError(problem || ((event.target.files?.length ?? 0) > 5 ? 'Chỉ nhận tối đa 5 tệp; các tệp thừa đã bị bỏ qua.' : ''));
+              setFiles(problem ? [] : chosen);
+              if (problem) event.target.value = '';
+              pending.current = null;
+            }} />
+          {files.length > 0 && <small>Đã chọn {files.length} tệp.</small>}
+          {fileError && <small className="field-error" role="alert">{fileError}</small>}
+        </label>
+      )}
       {message && (
         <p
           role={message.startsWith('Thao tác đã') ? 'status' : 'alert'}

@@ -157,7 +157,6 @@ export class MissionsCommandsService {
     if (!team) throw new AppError('NOT_FOUND', { status: 404 });
     if (team.status !== 'ACTIVE') throw this.teamNotEligible('INACTIVE');
     if (team.availability !== 'AVAILABLE' || team.readiness_required) throw this.teamNotEligible('UNAVAILABLE');
-    if (team.organization_id !== row.organization_id) throw this.teamNotEligible('SCOPE_MISMATCH');
     if (team.reporting_mode === 'COORDINATOR' && !team.external_contact_note?.trim()) throw new AppError('TEAM_NOT_ELIGIBLE', { status: 409 });
 
     const missingSkills = await manager.query(

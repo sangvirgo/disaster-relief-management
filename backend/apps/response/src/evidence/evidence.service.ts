@@ -13,7 +13,7 @@ import { ReporterAccessService, ReporterRequestRow } from '../tracking/reporter-
 import { EvidenceMime } from '@c48/technical/media/evidence-media';
 import { stageEvidenceMultipart } from '@c48/technical/uploads/evidence-upload';
 import { EvidenceObjectStorage, EvidenceStorageConfig, RESPONSE_EVIDENCE_STORAGE } from './evidence-storage';
-import { canAccessRequest } from '../requests/request-scope';
+import { assertRequestPermission, canAccessRequest } from '../requests/request-scope';
 
 const requestAttachmentCountLimit = 5;
 const ownerAttachmentByteLimit = 100 * 1024 * 1024;
@@ -83,6 +83,7 @@ interface EvidenceUploadOwner {
   trackingCode?: string;
   trackingSecret?: string;
   hasTrackingCapability: boolean;
+  staff?: boolean;
 }
 
 @Injectable()
@@ -133,6 +134,29 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
     }, idempotencyKey, request);
   }
 
+  async uploadStaff(requestId: string, idempotencyKey: string, request: Request): Promise<IdempotentResult<EvidenceView>> {
+    const session = await this.sessions.require(request);
+    const owner = await this.staffRequestRow(this.dataSource, requestId, session);
+    if (!uploadEligible(owner)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+    return this.uploadOwned({ requestId, session, hasTrackingCapability: false, staff: true }, idempotencyKey, request);
+  }
+
+  private async staffRequestRow(
+    queryable: Pick<DataSource | EntityManager, 'query'>,
+    requestId: string,
+    session: ReporterSession,
+    lock = false,
+  ): Promise<ReporterRequestRow> {
+    const rows = await queryable.query(
+      `SELECT id,status,review_lane,organization_id,campaign_id FROM assistance_request WHERE id=$1${lock ? ' FOR UPDATE' : ''}`,
+      [requestId],
+    ) as ReporterRequestRow[];
+    const row = rows[0];
+    if (!row) throw new AppError('NOT_FOUND', { status: 404 });
+    assertRequestPermission(session, 'REQUEST_VERIFY', row);
+    return row;
+  }
+
   async uploadMission(missionId: string, idempotencyKey: string, request: Request): Promise<IdempotentResult<EvidenceView>> {
     const session = await this.sessions.require(request);
     const owner = await this.missionUploadOwner(this.dataSource, missionId, session);
@@ -157,7 +181,9 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
       const sourceIpHash = hashPurposeBoundSecret(requestIp(request), 'sos-source-ip', this.intakeConfig.peppers, 'v1');
       const quotaIpHash = owner.session ? null : sourceIpHash;
       const capabilityHash = owner.hasTrackingCapability ? this.access.trackingSecretHash(owner.trackingSecret!) : undefined;
-      scopeKey = owner.missionId
+      scopeKey = owner.staff
+        ? `response.evidence.staff:${owner.requestId}:${owner.session!.userId}`
+        : owner.missionId
         ? `response.evidence.mission:${owner.missionId}:${owner.session!.userId}`
         : `response.evidence.request:${owner.requestId}:${owner.session?.userId ?? 'guest'}`;
       const requestHash = canonicalRequestHash(owner.missionId ? {
@@ -176,6 +202,8 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
           if (quotaIpHash) await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [quotaIpHash]);
           const lockedOwner = owner.missionId
             ? await this.missionUploadOwner(manager, owner.missionId, owner.session!, true)
+            : owner.staff
+            ? await this.staffRequestRow(manager, owner.requestId, owner.session!, true)
             : await this.access.forRequest(owner.requestId, owner.trackingCode, owner.trackingSecret, owner.session, manager, true);
           if (!uploadEligible(lockedOwner)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
           await this.reserveQuota(manager, owner.requestId, quotaIpHash, declaredBytes);

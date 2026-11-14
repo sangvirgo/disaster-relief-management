@@ -29,7 +29,6 @@ export function dateWindowFilters(
   }
 
   const campaignId = optionalUuid(query.campaign_id);
-  if (!campaignId) throw invalidQuery();
   return { from, to, campaign_id: campaignId };
 }
 

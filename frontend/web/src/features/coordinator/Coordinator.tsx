@@ -1210,6 +1210,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                       title: 'Hoàn tất xác minh SOS',
                       service: 'response',
                       path: `/requests/${detail.id}/verify`,
+                      uploadPath: `/requests/${detail.id}/staff-evidence`,
                       version: detail.version,
                       warning:
                         'Bạn đã đối chiếu vị trí, thông tin và hình ảnh được gắn cờ và thấy phù hợp? Quyết định này do điều phối viên thực hiện.',
@@ -1223,13 +1224,13 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                           placeholder: 'Ví dụ: Đã xác nhận vị trí, tình trạng và số người cần hỗ trợ.',
                         },
                       ],
-                      build: (values) => ({
+                      build: (values, uploadedIds) => ({
                         basis: 'EVIDENCE_REVIEWED',
                         reason: values.reason,
                         source_refs: {
-                          evidence_ids: (detail.evidence?.items ?? [])
+                          evidence_ids: [...(detail.evidence?.items ?? [])
                             .filter((item) => item.state === 'READY')
-                            .map((item) => item.id),
+                            .map((item) => item.id), ...uploadedIds],
                         },
                       }),
                     })}

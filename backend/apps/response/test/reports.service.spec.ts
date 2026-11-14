@@ -26,13 +26,12 @@ function setup(row: unknown = {
   return { service: new ReportsService(dataSource, sessions as never, config), query, sessions };
 }
 
+import { dateWindowFilters } from '../src/analytics/analytics.helpers';
+
 describe('ReportsService summary', () => {
 
-  it('requires a campaign filter before querying', async () => {
-    const { service, query } = setup();
-
-    await expect(service.summary({ from, to }, {} as Request)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
-    expect(query).not.toHaveBeenCalled();
+  it('treats the campaign filter as optional (scope comes from grants)', () => {
+    expect(dateWindowFilters({ from, to }, 31)).toEqual({ from, to, campaign_id: null });
   });
 
   it('rejects report windows longer than 366 days', async () => {

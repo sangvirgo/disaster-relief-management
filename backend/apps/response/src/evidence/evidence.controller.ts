@@ -33,6 +33,21 @@ export class EvidenceController {
     return result.value;
   }
 
+  @Post('requests/:id/staff-evidence')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async uploadStaff(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Req() request: EvidenceRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
+    const result = await this.evidence.uploadStaff(id, request.idempotencyKey, request);
+    if (result.replay) response.setHeader('Idempotent-Replay', 'true');
+    return result.value;
+  }
+
   @Post('missions/:id/evidence')
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(IdempotencyKeyInterceptor)

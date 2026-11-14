@@ -22,13 +22,12 @@ function setup(rows: unknown[] = [], projectionEpsg = 32648) {
   return { service, query, dataSource, sessions, validateProjection };
 }
 
+import { dateWindowFilters } from '../src/analytics/analytics.helpers';
+
 describe('MapService heatmap', () => {
 
-  it('requires a campaign filter before querying', async () => {
-    const { service, dataSource } = setup();
-
-    await expect(service.heatmap({ from, to }, {} as Request)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
-    expect(dataSource.transaction).not.toHaveBeenCalled();
+  it('treats the campaign filter as optional (scope comes from grants)', () => {
+    expect(dateWindowFilters({ from, to }, 31)).toEqual({ from, to, campaign_id: null });
   });
 
   it.each([

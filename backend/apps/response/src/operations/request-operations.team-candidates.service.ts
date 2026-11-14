@@ -79,7 +79,6 @@ export class RequestOperationsTeamCandidatesService {
                WHERE m.team_id=t.id
            ) recent ON true
           WHERE t.status='ACTIVE' AND t.availability='AVAILABLE' AND NOT t.readiness_required
-            AND t.organization_id=q.organization_id
             AND ((t.reporting_mode='APP' AND EXISTS (
                     SELECT 1 FROM team_member tm WHERE tm.team_id=t.id AND tm.member_role='LEADER' AND tm.left_at IS NULL))
               OR (t.reporting_mode='COORDINATOR' AND NULLIF(btrim(t.external_contact_note),'') IS NOT NULL))

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { api, ApiError, newCommandKey } from '../../api/client';
+import { api, ApiError, newCommandKey, upload } from '../../api/client';
+import { evidenceFileError } from '../../i18n/evidence';
 import type { Me } from '../../auth/session';
 import { me } from '../../auth/session';
 import type { components as ResponseComponents } from '../../api/generated/response';
@@ -87,6 +88,9 @@ export function SosForm({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [attempted, setAttempted] = useState(false);
   const [created, setCreated] = useState<Created | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [fileMessage, setFileMessage] = useState('');
+  const [uploadReport, setUploadReport] = useState('');
   const [ackSecret, setAckSecret] = useState('');
   const pending = useRef<Pending | null>(null);
   const locationAttempt = useRef(0);
@@ -286,6 +290,21 @@ export function SosForm({
       clearSosDraft(user?.id);
       setAckSecret(command.secret);
       setCreated(result);
+      if (files.length) {
+        let failed = 0;
+        for (const file of files) {
+          try {
+            await upload('response', `/requests/${result.id}/evidence`, file, {
+              headers: { 'X-Tracking-Code': result.tracking_code, ...(command.secret ? { 'X-Tracking-Secret': command.secret } : {}) },
+              idempotencyKey: newCommandKey(),
+            });
+          } catch { failed += 1; }
+        }
+        setUploadReport(failed
+          ? `Đã gửi SOS nhưng ${failed}/${files.length} tệp chưa tải lên được. Bạn có thể bổ sung tệp trong mục Theo dõi SOS.`
+          : `Đã tải lên ${files.length} tệp minh chứng.`);
+        setFiles([]);
+      }
       onConfirmed?.(result);
       pending.current = null;
     } catch (cause) {
@@ -335,6 +354,7 @@ export function SosForm({
           hoặc 115.
         </p>
         {copyMessage && <p role="status">{copyMessage}</p>}
+        {uploadReport && <p role="status" className="notice">{uploadReport}</p>}
         {user && onTrack && (
           <button type="button" className="button" onClick={() => onTrack(created.tracking_code)}>
             Theo dõi tiến độ
@@ -542,6 +562,19 @@ export function SosForm({
                 placeholder="Mô tả ngắn tình trạng và điều cần hỗ trợ"
               />
               {fieldMessage('description')}
+            </label>
+            <label>
+              Ảnh hoặc video hiện trường (không bắt buộc, tối đa 5 tệp)
+              <input type="file" multiple accept="image/jpeg,image/png,video/mp4"
+                onChange={(e) => {
+                  const chosen = Array.from(e.target.files ?? []).slice(0, 5);
+                  const problem = chosen.map(evidenceFileError).find(Boolean) ?? '';
+                  setFileMessage(problem || ((e.target.files?.length ?? 0) > 5 ? 'Chỉ nhận tối đa 5 tệp; các tệp thừa đã bị bỏ qua.' : ''));
+                  setFiles(problem ? [] : chosen);
+                  if (problem) e.target.value = '';
+                }} />
+              {files.length > 0 && <small>Đã chọn {files.length} tệp. Tệp sẽ được tải lên ngay sau khi gửi SOS.</small>}
+              {fileMessage && <span className="sos-field-error" role="alert">{fileMessage}</span>}
             </label>
             <p className="sos-ai-note">
               Mô tả giúp điều phối viên hiểu tình huống và có thể được rút gọn để AI hỗ trợ đánh giá.
