@@ -1,5 +1,8 @@
 # Web/backend contract review — 2026-11-05
 
+> **Lưu ý (2026-11-14):** Tài liệu lịch sử này đã lỗi thời sau 2026-11-14: tổ chức (organization) và membership đã bị gỡ khỏi hệ thống; phạm vi hiện tại chỉ còn SYSTEM và CAMPAIGN. Xem [05-permissions](backend/05-permissions.md).
+
+
 ## Scope and method
 
 Reviewed the current Web client on the `mobile` branch after the user's merge against the Response, Identity, and Logistics OpenAPI snapshots, backend controller/DTO implementations, and the Web integration notes. The review focused on the user-facing workflows and authorization/state rules; it did not try to expose every backend operation as a Web screen.

@@ -88,18 +88,11 @@ export class UsersService {
 
   async get(id: string): Promise<Record<string, unknown>> {
     const user = await readUser(this.dataSource, id);
-    const [memberships, grants] = await Promise.all([
-      this.dataSource.query(
-        `SELECT o.id AS organization_id, o.name, o.organization_kind, m.status
-           FROM membership m JOIN organization o ON o.id = m.organization_id
-          WHERE m.user_id = $1 ORDER BY o.created_at DESC, o.id DESC`, [id],
-      ) as Promise<Array<Record<string, unknown>>>,
-      this.dataSource.query(
-        `SELECT id, role_code, scope_type, organization_id, campaign_id, created_at, revoked_at
-           FROM role_grant WHERE user_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC, id DESC`, [id],
-      ) as Promise<Array<Record<string, unknown>>>,
-    ]);
-    return { ...user, memberships, grants };
+    const grants = await this.dataSource.query(
+      `SELECT id, role_code, scope_type, campaign_id, created_at, revoked_at
+         FROM role_grant WHERE user_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC, id DESC`, [id],
+    ) as Array<Record<string, unknown>>;
+    return { ...user, grants };
   }
 
   async create(dto: CreateUserDto, actor: AdminRequest): Promise<{ status: number; value: Record<string, unknown>; replay: boolean }> {
@@ -113,10 +106,6 @@ export class UsersService {
       requestHash: canonicalRequestHash({ ...requestPayload, temporary_password_binding: this.authService.hashTemporaryPasswordBinding(dto.temporary_password) }),
       databaseErrorMappings: { unique: { app_user_username_key: 'USERNAME_TAKEN' } },
       execute: async (manager) => {
-        if (dto.organization_id) {
-          const orgs = await manager.query("SELECT id FROM organization WHERE id = $1 AND status = 'ACTIVE' FOR SHARE", [dto.organization_id]) as Array<{ id: string }>;
-          if (!orgs[0]) throw new AppError('NOT_FOUND', { status: 404 });
-        }
         const inserted = await manager.query(
           `INSERT INTO app_user (username, display_name, password_hash, must_change_password)
            VALUES ($1, $2, $3, true) RETURNING id`,
@@ -126,12 +115,6 @@ export class UsersService {
         await this.support.audit(manager, actorId, 'USER_CREATED', 'app_user', id, null, {
           id, username: dto.username, display_name: dto.display_name.trim(), status: 'ACTIVE', must_change_password: true,
         }, null);
-        if (dto.organization_id) {
-          await manager.query('INSERT INTO membership (user_id, organization_id) VALUES ($1, $2)', [id, dto.organization_id]);
-          await this.support.audit(manager, actorId, 'MEMBERSHIP_ADDED', 'membership', `${dto.organization_id}:${id}`, null, {
-            user_id: id, organization_id: dto.organization_id, status: 'ACTIVE',
-          }, null);
-        }
         return { status: 201, value: await readUser(manager, id), resource: { type: 'app_user', id } };
       },
       replay: async (manager, resource) => readUser(manager, this.resourceId(resource)),

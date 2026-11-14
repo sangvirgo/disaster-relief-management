@@ -22,7 +22,7 @@ export type DonationCommandRequest = Request & { idempotencyKey?: string };
 interface DeliveryRow {
   id: string;
   drive_id: string;
-  organization_id: string;
+  campaign_id: string | null;
   public_code: string;
   donor_user_id: string | null;
   donor_name: string;
@@ -102,10 +102,10 @@ export class DonationsService {
       databaseErrorMappings: { unique: { delivery_capability_uq: 'DONATION_SECRET_IN_USE' } },
       execute: async (manager) => {
         const driveRows = await manager.query(
-          `SELECT d.id,d.organization_id,d.status,d.opens_at,d.closes_at,d.campaign_status
+          `SELECT d.id,d.status,d.opens_at,d.closes_at,d.campaign_status
              FROM donation_drive d WHERE d.id=$1 FOR UPDATE`,
           [driveId],
-        ) as Array<{ id: string; organization_id: string; status: string; opens_at: Date | string | null; closes_at: Date | string | null; campaign_status: string | null }>;
+        ) as Array<{ id: string; status: string; opens_at: Date | string | null; closes_at: Date | string | null; campaign_status: string | null }>;
         const drive = driveRows[0];
         if (!drive) throw new AppError('NOT_FOUND', { status: 404 });
         if (drive.status !== 'OPEN') throw new AppError('DRIVE_NOT_OPEN', { status: 409 });
@@ -116,9 +116,9 @@ export class DonationsService {
         const publicCode = generatePublicCode();
         const rows = await manager.query(
           `INSERT INTO donation_delivery
-             (public_code,drive_id,organization_id,donor_user_id,donor_name,donor_phone,capability_hash)
-           VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id,public_code`,
-          [publicCode, driveId, drive.organization_id, session?.userId ?? null, donorName, donorPhone, capabilityHash],
+             (public_code,drive_id,donor_user_id,donor_name,donor_phone,capability_hash)
+           VALUES ($1,$2,$3,$4,$5,$6) RETURNING id,public_code`,
+          [publicCode, driveId, session?.userId ?? null, donorName, donorPhone, capabilityHash],
         ) as Array<{ id: string; public_code: string }>;
         const delivery = rows[0]!;
         await manager.query(
@@ -369,8 +369,8 @@ export class DonationsService {
       requestHash: canonicalRequestHash({ public_code: dto.public_code }, codeHash ?? undefined),
       execute: async (manager) => {
         const rows = await manager.query(
-          `SELECT id,drive_id,organization_id,public_code,donor_user_id,donor_name,donor_phone,
-                  capability_hash,status,version
+          `SELECT dd.id,dd.drive_id,dd.public_code,dd.donor_user_id,dd.donor_name,dd.donor_phone,
+                  dd.capability_hash,dd.status,dd.version,d.campaign_id
              FROM donation_delivery dd JOIN donation_drive d ON d.id=dd.drive_id
              JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE dd.id=$1 FOR UPDATE OF dd`,
           [deliveryId],
@@ -439,8 +439,8 @@ export class DonationsService {
     forUpdate = false,
   ): Promise<DeliveryRow> {
     const rows = await query.query(
-      `SELECT dd.id,dd.drive_id,dd.organization_id,dd.public_code,dd.donor_user_id,dd.donor_name,dd.donor_phone,
-              dd.capability_hash,dd.status,dd.version,d.opens_at,d.closes_at,d.campaign_status
+      `SELECT dd.id,dd.drive_id,dd.public_code,dd.donor_user_id,dd.donor_name,dd.donor_phone,
+              dd.capability_hash,dd.status,dd.version,d.opens_at,d.closes_at,d.campaign_status,d.campaign_id
          FROM donation_delivery dd JOIN donation_drive d ON d.id=dd.drive_id
          JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE dd.id=$1${forUpdate ? ' FOR UPDATE OF dd' : ''}`,
       [id],

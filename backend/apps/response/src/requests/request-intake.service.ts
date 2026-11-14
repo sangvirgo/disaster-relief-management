@@ -13,11 +13,9 @@ export const REQUEST_INTAKE_CONFIG = Symbol('REQUEST_INTAKE_CONFIG');
 const trackingAlphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 const trackingSecretPattern = /^[A-Za-z0-9_-]{43}$/;
 const utcTimestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export interface RequestIntakeConfig {
   auth: ReporterTokenConfig;
-  organizationId: string;
   peppers: PepperSet;
   globalLimitPerMinute: number;
   softLimitPerMinute: number;
@@ -59,12 +57,10 @@ function positiveInteger(env: Record<string, string | undefined>, name: string, 
 }
 
 export function loadRequestIntakeConfig(env: Record<string, string | undefined> = process.env): RequestIntakeConfig {
-  const organizationId = env.DEMO_INTAKE_ORGANIZATION_ID ?? '';
   const pepper = env.SECRET_HASH_PEPPER_SOS ?? '';
-  if (!uuidPattern.test(organizationId) || pepper.length < 32) throw new Error('Invalid Response configuration: DEMO_INTAKE_ORGANIZATION_ID, SECRET_HASH_PEPPER_SOS');
+  if (pepper.length < 32) throw new Error('Invalid Response configuration: SECRET_HASH_PEPPER_SOS');
   return {
     auth: requireReporterConfig(env),
-    organizationId,
     peppers: { v1: pepper },
     globalLimitPerMinute: positiveInteger(env, 'SOS_GLOBAL_PER_MIN', 300),
     softLimitPerMinute: positiveInteger(env, 'SOS_SOFT_LIMIT_PER_IP', 30),
@@ -264,11 +260,11 @@ export class RequestIntakeService {
         const throttleRows = await manager.query(
           `WITH intake_time AS MATERIALIZED (SELECT clock_timestamp() AS at)
            SELECT intake_time.at AS received_at,
-                  (SELECT count(*) FROM assistance_request r WHERE r.organization_id = $1 AND r.received_at >= intake_time.at - interval '1 minute') AS global_count,
-                  (SELECT count(*) FROM assistance_request p WHERE $2::text IS NOT NULL AND p.reporter_contact_phone = $2 AND p.received_at >= intake_time.at - interval '1 minute') AS phone_count,
-                  (SELECT count(*) FROM assistance_request i WHERE i.source_ip_hash = $3 AND i.received_at >= intake_time.at - interval '1 minute') AS ip_count
+                  (SELECT count(*) FROM assistance_request r WHERE r.received_at >= intake_time.at - interval '1 minute') AS global_count,
+                  (SELECT count(*) FROM assistance_request p WHERE $1::text IS NOT NULL AND p.reporter_contact_phone = $1 AND p.received_at >= intake_time.at - interval '1 minute') AS phone_count,
+                  (SELECT count(*) FROM assistance_request i WHERE i.source_ip_hash = $2 AND i.received_at >= intake_time.at - interval '1 minute') AS ip_count
              FROM intake_time`,
-          [this.config.organizationId, phone, sourceIpHash],
+          [phone, sourceIpHash],
         ) as Array<{ received_at: Date; global_count: string; phone_count: string; ip_count: string }>;
         const throttle = throttleRows[0];
         if (!throttle) throw new AppError('INTERNAL_ERROR', { status: 500 });
@@ -293,13 +289,13 @@ export class RequestIntakeService {
           const rows = await manager.query(
             `INSERT INTO assistance_request
               (tracking_code, tracking_secret_hash, incident_category_code, report_mode, reporter_user_id,
-               reporter_name, reporter_contact_phone, source_ip_hash, description, organization_id,
+               reporter_name, reporter_contact_phone, source_ip_hash, description,
                review_lane, reporter_declared_danger, needs_rescue, needs_relief_supplies, received_at)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
              ON CONFLICT (tracking_code) DO NOTHING
              RETURNING id, tracking_code, status, received_at, review_lane, version`,
             [generateTrackingCode(), secretHash, dto.incident_category_code, proxy ? 'PROXY' : 'SELF', reporterUserId,
-              dto.reporter_name ?? null, phone, sourceIpHash, dto.description ?? null, this.config.organizationId,
+              dto.reporter_name ?? null, phone, sourceIpHash, dto.description ?? null,
               reviewLane, dto.reporter_declared_danger ?? false, needsRescue, needsReliefSupplies, throttle.received_at],
           ) as Array<{ id: string; tracking_code: string; status: string; received_at: Date | string; review_lane: string; version: number }>;
           request = rows[0];

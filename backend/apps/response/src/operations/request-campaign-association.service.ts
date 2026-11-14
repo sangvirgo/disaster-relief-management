@@ -14,7 +14,6 @@ interface RequestCampaignRow {
   id: string;
   status: string;
   version: number;
-  organization_id: string;
   campaign_id: string | null;
   attribution_locked_at: Date | string | null;
 }
@@ -22,7 +21,6 @@ interface RequestCampaignRow {
 interface CampaignRow {
   id: string;
   status: string;
-  organization_id: string;
 }
 
 interface RequestCampaignView {
@@ -56,16 +54,14 @@ export class RequestCampaignAssociationService {
         if (row.campaign_id !== pointer.campaign_id) {
           throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
         }
-        this.assertPermission(session, row, dto.campaign_id);
-        if (row.campaign_id && row.campaign_id !== dto.campaign_id) this.assertPermission(session, row, row.campaign_id);
+        this.assertPermission(session, dto.campaign_id);
+        if (row.campaign_id && row.campaign_id !== dto.campaign_id) this.assertPermission(session, row.campaign_id);
         checkVersion(Number(row.version), dto.expected_version);
         if (row.attribution_locked_at) throw new AppError('ATTRIBUTION_LOCKED', { status: 409 });
         if (row.campaign_id === campaign.id) {
           return { status: 200, value: this.view(row), resource: { type: 'assistance_request', id: row.id } };
         }
         if (campaign.status !== 'ACTIVE') throw new AppError('CAMPAIGN_NOT_ACTIVE', { status: 409 });
-        this.assertCompatible(row, campaign);
-
         const [updated] = await manager.query(
           `UPDATE assistance_request SET campaign_id=$3,version=version+1
             WHERE id=$1 AND version=$2
@@ -96,7 +92,7 @@ export class RequestCampaignAssociationService {
         if (row.campaign_id !== pointer.campaign_id) {
           throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
         }
-        this.assertPermission(session, row, row.campaign_id);
+        this.assertPermission(session, row.campaign_id);
         checkVersion(Number(row.version), dto.expected_version);
         if (row.attribution_locked_at) throw new AppError('ATTRIBUTION_LOCKED', { status: 409 });
         if (!row.campaign_id) {
@@ -129,7 +125,7 @@ export class RequestCampaignAssociationService {
 
   private async loadCampaign(manager: EntityManager, campaignId: string, lock = false): Promise<CampaignRow> {
     const rows = await manager.query(
-      `SELECT id,status,organization_id FROM campaign WHERE id=$1${lock ? ' FOR SHARE' : ''}`,
+      `SELECT id,status FROM campaign WHERE id=$1${lock ? ' FOR SHARE' : ''}`,
       [campaignId],
     ) as CampaignRow[];
     if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
@@ -138,7 +134,7 @@ export class RequestCampaignAssociationService {
 
   private async loadRequest(manager: EntityManager, requestId: string, lock = false): Promise<RequestCampaignRow> {
     const rows = await manager.query(
-      `SELECT id,status,version,organization_id,campaign_id,attribution_locked_at
+      `SELECT id,status,version,campaign_id,attribution_locked_at
          FROM assistance_request WHERE id=$1${lock ? ' FOR UPDATE' : ''}`,
       [requestId],
     ) as RequestCampaignRow[];
@@ -148,20 +144,9 @@ export class RequestCampaignAssociationService {
 
   private assertPermission(
     session: Awaited<ReturnType<ReporterSessionService['require']>>,
-    row: Pick<RequestCampaignRow, 'organization_id'>,
     campaignId: string | null,
   ): void {
-    if (!hasPermission(session.grants, 'CAMPAIGN_MANAGE', {
-      organizationId: row.organization_id, campaignId,
-    })) throw new AppError('FORBIDDEN', { status: 403 });
-  }
-
-  private assertCompatible(row: RequestCampaignRow, campaign: CampaignRow): void {
-    if (campaign.organization_id !== row.organization_id) {
-      throw new AppError('VALIDATION_FAILED', {
-        status: 400, fieldErrors: { campaign_id: ['Chiến dịch không phù hợp với tổ chức của yêu cầu.'] },
-      });
-    }
+    if (!hasPermission(session.grants, 'CAMPAIGN_MANAGE', { campaignId })) throw new AppError('FORBIDDEN', { status: 403 });
   }
 
   private async replay(
@@ -174,7 +159,7 @@ export class RequestCampaignAssociationService {
     if (!resource) throw new AppError('INTERNAL_ERROR', { status: 500 });
     const row = await this.loadRequest(manager, requestId, true);
     if (resource.type === 'assistance_request') {
-      this.assertPermission(session, row, row.campaign_id);
+      this.assertPermission(session, row.campaign_id);
     } else if (resource.type === 'request_event') {
       const events = await manager.query(
         'SELECT event_type,payload FROM request_event WHERE id=$1 AND request_id=$2', [resource.id, requestId],
@@ -184,8 +169,8 @@ export class RequestCampaignAssociationService {
       const campaignId = eventType === 'CAMPAIGN_ATTACHED'
         ? event.payload?.campaign_id
         : event.payload?.previous_campaign_id;
-      this.assertPermission(session, row, typeof campaignId === 'string' ? campaignId : null);
-      if (row.campaign_id) this.assertPermission(session, row, row.campaign_id);
+      this.assertPermission(session, typeof campaignId === 'string' ? campaignId : null);
+      if (row.campaign_id) this.assertPermission(session, row.campaign_id);
     } else {
       throw new AppError('INTERNAL_ERROR', { status: 500 });
     }

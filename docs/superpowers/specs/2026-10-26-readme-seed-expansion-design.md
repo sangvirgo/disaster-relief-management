@@ -1,5 +1,8 @@
 # README and Demo Seed Expansion Design
 
+> **Lưu ý (2026-11-14):** Tài liệu lịch sử này đã lỗi thời sau 2026-11-14: tổ chức (organization) và membership đã bị gỡ khỏi hệ thống; phạm vi hiện tại chỉ còn SYSTEM và CAMPAIGN. Xem [05-permissions](backend/05-permissions.md).
+
+
 ## Goal
 
 Make the root README a comprehensive project guide without project-progress reporting, and expand the synthetic demo dataset so the seed command can add representative data to both empty and populated databases.

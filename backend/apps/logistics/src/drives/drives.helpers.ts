@@ -4,7 +4,7 @@ import { Grant, hasPermission, Permission } from '@c48/identity-contracts/permis
 import type { AuthenticatedLogisticsSession } from '../auth/logistics-session.service';
 
 export interface DriveScope {
-  organization_id: string;
+  campaign_id: string | null;
 }
 
 export function requireDrivePermission(
@@ -12,31 +12,31 @@ export function requireDrivePermission(
   permission: Permission,
   scope: DriveScope,
 ): void {
-  if (!hasPermission(session.grants, permission, {
-    organizationId: scope.organization_id,
-  })) throw new AppError('FORBIDDEN', { status: 403 });
+  if (!hasPermission(session.grants, permission, { campaignId: scope.campaign_id })) {
+    throw new AppError('FORBIDDEN', { status: 403 });
+  }
 }
 
+/**
+ * List predicate for drives. A SYSTEM grant sees every drive; CAMPAIGN grants see only drives
+ * attached to their campaigns. Unattached drives are reachable through SYSTEM grants only.
+ */
 export function driveScopeSql(
   grants: readonly Grant[],
   values: unknown[],
   permissions: readonly Permission[],
   alias = 'd',
 ): string {
-  const branches = new Set<string>();
-  for (const grant of grants) {
-    const organizationId = grant.organization_id;
-    if (!organizationId) continue;
-    const permission = permissions.find((candidate) => grant.scope_type === 'ORGANIZATION'
-      && hasPermission([grant], candidate, { organizationId }));
-    if (!permission) continue;
-    if (grant.scope_type === 'ORGANIZATION' && !grant.campaign_id) {
-      values.push(organizationId);
-      branches.add(`${alias}.organization_id=$${values.length}`);
-    }
+  const allowed = grants.filter((grant) => permissions.some((permission) => hasPermission([grant], permission, { campaignId: grant.campaign_id ?? null })));
+  if (allowed.length === 0) throw new AppError('FORBIDDEN', { status: 403 });
+  if (allowed.some((grant) => grant.scope_type === 'SYSTEM')) return 'TRUE';
+  const campaigns = [...new Set(allowed.map((grant) => grant.campaign_id).filter((id): id is string => Boolean(id)))];
+  if (campaigns.length === 1) {
+    values.push(campaigns[0]);
+    return `(${alias}.campaign_id=$${values.length})`;
   }
-  if (branches.size === 0) throw new AppError('FORBIDDEN', { status: 403 });
-  return `(${[...branches].join(' OR ')})`;
+  values.push(campaigns);
+  return `(${alias}.campaign_id=ANY($${values.length}::uuid[]))`;
 }
 
 export function assertExpectedVersion(actual: number | string, expected: number): void {

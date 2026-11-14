@@ -13,13 +13,12 @@ export class IdentityDashboardService {
   /** System-wide account and access snapshot for administrators. */
   async admin(): Promise<Record<string, unknown>> {
     const q = <T>(sql: string) => this.dataSource.query(sql) as Promise<T>;
-    const [users, roles, orgs, pending, recentLogins, mustChange, audit] = await Promise.all([
+    const [users, roles, pending, recentLogins, mustChange, audit] = await Promise.all([
       q<{ key: string; total: string }[]>('SELECT status AS key, COUNT(*)::int AS total FROM app_user GROUP BY status'),
       q<{ key: string; total: string }[]>(
         `SELECT g.role_code AS key, COUNT(DISTINCT g.user_id)::int AS total
            FROM role_grant g JOIN app_user u ON u.id = g.user_id AND u.status = 'ACTIVE'
           WHERE g.revoked_at IS NULL GROUP BY g.role_code`),
-      q<{ key: string; total: string }[]>('SELECT organization_kind AS key, COUNT(*)::int AS total FROM organization WHERE status = \'ACTIVE\' GROUP BY organization_kind'),
       q<{ total: string }[]>(`SELECT COUNT(*)::int AS total FROM app_user WHERE status = 'PENDING_EMAIL'`),
       q<{ total: string }[]>(`SELECT COUNT(DISTINCT user_id)::int AS total FROM session_family WHERE created_at >= now() - interval '24 hours'`)
         .catch(() => [{ total: '0' }]),
@@ -37,7 +36,6 @@ export class IdentityDashboardService {
         active_last_24h: count(recentLogins[0]?.total),
       },
       active_users_by_role: countMap(roles),
-      active_organizations_by_kind: countMap(orgs),
       recent_audit: audit.map((row) => ({ action: row.action, entity_type: row.entity_type, created_at: row.created_at })),
       generated_at: new Date().toISOString(),
     };

@@ -11,7 +11,7 @@ const identityUrl = requiredEnv('C48_IDENTITY_BASE_URL').replace(/\/+$/u, '');
 const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DATABASE_URL') });
 const responseDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
-const organizationId = requiredEnv('DEMO_INTAKE_ORGANIZATION_ID');
+const logisticsFixtureId = '40000000-0000-4000-8000-000000000004';
 const suffix = randomBytes(5).toString('hex').toUpperCase();
 const categoryCode = `T15_FLOOD_${suffix}`;
 let identityIp = 20 + randomBytes(1)[0] % 200;
@@ -131,9 +131,9 @@ async function registerAndLogin(label, roles = []) {
   account.id = registered.value.user.id;
   for (const role of roles) {
     await identityDb.query(
-      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-       VALUES ($1,$2,'ORGANIZATION',$3)`,
-      [account.id, role, organizationId],
+      `INSERT INTO role_grant (user_id,role_code,scope_type)
+       VALUES ($1,$2,'SYSTEM')`,
+      [account.id, role],
     );
   }
   return login(account);
@@ -159,9 +159,9 @@ async function cloneAndLogin(label, roles, template) {
   );
   for (const role of roles) {
     await identityDb.query(
-      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-       VALUES ($1,$2,'ORGANIZATION',$3)`,
-      [account.id, role, organizationId],
+      `INSERT INTO role_grant (user_id,role_code,scope_type)
+       VALUES ($1,$2,'SYSTEM')`,
+      [account.id, role],
     );
   }
   return login(account);
@@ -227,10 +227,6 @@ async function distributionDetail(id, actor) {
 
 await Promise.all([logisticsDb.connect(), responseDb.connect(), identityDb.connect()]);
 try {
-  await identityDb.query(
-    `INSERT INTO organization (id,name,organization_kind)
-     VALUES ($1,'T15 test organization','COORDINATION') ON CONFLICT (id) DO NOTHING`, [organizationId],
-  );
   await responseDb.query('INSERT INTO incident_category (code,display_name) VALUES ($1,$2)', [categoryCode, 'Lũ lụt']);
 
   const staff = await registerAndLogin('staff', ['COORDINATOR', 'OPERATIONS_MANAGER']);
@@ -255,11 +251,11 @@ try {
   });
   expectSuccess(item, 201);
   const warehouse = await command(logisticsUrl, 'warehouses', staff, {
-    organization_id: organizationId, name: `Kho phân phối T15 ${suffix}`,
+    organization_id: logisticsFixtureId, name: `Kho phân phối T15 ${suffix}`,
   });
   expectSuccess(warehouse, 201);
   const lowCapacityVehicle = await command(logisticsUrl, 'vehicles', staff, {
-    organization_id: organizationId,
+    organization_id: logisticsFixtureId,
     identifier: `T15-${suffix}`,
     vehicle_type: 'Xe tải kiểm thử',
     capacity: '1.00',
@@ -273,7 +269,7 @@ try {
   });
   expectSuccess(opening, 201);
   const reliefPoint = await command(logisticsUrl, 'relief-points', staff, {
-    organization_id: organizationId,
+    organization_id: logisticsFixtureId,
     name: `Điểm cứu trợ T15 ${suffix}`,
     location: { type: 'Point', coordinates: [107.6, 16.0] },
   });
@@ -626,8 +622,8 @@ try {
   );
   expectVietnameseError(revokedReviewReplay, 403, 'FORBIDDEN');
   await identityDb.query(
-    `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-     VALUES ($1,'REVIEWER','ORGANIZATION',$2)`, [reviewWinner.id, organizationId],
+    `INSERT INTO role_grant (user_id,role_code,scope_type)
+     VALUES ($1,'REVIEWER','SYSTEM')`, [reviewWinner.id],
   );
   await identityDb.query('UPDATE app_user SET authz_version=authz_version+1 WHERE id=$1', [reviewWinner.id]);
   await login(reviewWinner);

@@ -3,7 +3,6 @@ import { DataSource } from 'typeorm';
 import { MissionsOverdueService } from '../src/missions/missions-overdue.service';
 import { ReporterSessionService } from '../src/requests/reporter-session';
 
-const organizationId = '00000000-0000-4000-8000-000000000001';
 const coordinatorId = '00000000-0000-4000-8000-000000000002';
 const matchingMissionId = '00000000-0000-4000-8000-000000000003';
 
@@ -12,9 +11,9 @@ interface MissionsOverdueTestSurface {
 }
 
 describe('MissionsOverdueService', () => {
-  it('creates notices only for coordinators whose organization grant covers each overdue mission', async () => {
+  it('creates notices for system coordinators responsible for an unassigned mission', async () => {
     const rows = [
-      { id: matchingMissionId, version: 2, organization_id: organizationId, campaign_id: null },
+      { id: matchingMissionId, version: 2, campaign_id: null },
     ];
     const query = jest.fn(async (sql: string) => {
       if (sql.includes('pg_try_advisory_xact_lock')) return [{ locked: true }];
@@ -30,8 +29,7 @@ describe('MissionsOverdueService', () => {
       requestCoordinatorGrants: jest.fn(async () => [{
         user_id: coordinatorId,
         role_code: 'COORDINATOR' as const,
-        scope_type: 'ORGANIZATION' as const,
-        organization_id: organizationId,
+        scope_type: 'SYSTEM' as const,
         campaign_id: null,
       }]),
     } as unknown as ReporterSessionService;
@@ -40,7 +38,7 @@ describe('MissionsOverdueService', () => {
     const created = await (service as unknown as MissionsOverdueTestSurface).scanOverdue();
 
     expect(created).toBe(1);
-    expect(sessions.requestCoordinatorGrants).toHaveBeenCalledWith(organizationId);
+    expect(sessions.requestCoordinatorGrants).toHaveBeenCalledWith(null);
     expect(insertNotice).toHaveBeenCalledWith(
       expect.stringContaining("'MISSION_OFFER_OVERDUE'"),
       [[matchingMissionId], [2], [coordinatorId]],

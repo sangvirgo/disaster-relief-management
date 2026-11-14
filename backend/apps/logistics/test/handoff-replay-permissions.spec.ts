@@ -34,7 +34,7 @@ const distribution = {
 } as unknown as DistributionContext;
 
 const inScopeWithoutHandoffPermission: Grant[] = [
-  { role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: 'organization-1' },
+  { role_code: 'COORDINATOR', scope_type: 'SYSTEM',},
 ];
 
 function replayService(handoffKind: 'DIRECT_HOUSEHOLD' | 'LOSS') {

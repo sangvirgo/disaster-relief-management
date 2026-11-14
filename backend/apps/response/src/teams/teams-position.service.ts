@@ -8,7 +8,6 @@ import { ReporterSessionService } from '../requests/reporter-session';
 import { SetTeamPositionDto } from './teams.dto';
 
 interface TeamPositionTeam {
-  organization_id: string;
   reporting_mode: 'APP' | 'COORDINATOR';
   status: 'ACTIVE' | 'INACTIVE';
 }
@@ -47,16 +46,14 @@ export class TeamsPositionService {
 
     await this.dataSource.transaction(async (manager) => {
       const teams = await manager.query(
-        `SELECT organization_id,reporting_mode,status
+        `SELECT reporting_mode,status
            FROM rescue_team WHERE id=$1 FOR UPDATE`, [teamId],
       ) as TeamPositionTeam[];
       const team = teams[0];
       if (!team) throw new AppError('NOT_FOUND', { status: 404 });
 
       if (dto.location.source === 'COORDINATOR_REPORTED') {
-        if (!hasPermission(session.grants, 'TEAM_POSITION_SET_ANY', {
-          organizationId: team.organization_id,
-        })) throw new AppError('FORBIDDEN', { status: 403 });
+        if (!hasPermission(session.grants, 'TEAM_POSITION_SET_ANY', { campaignId: null })) throw new AppError('FORBIDDEN', { status: 403 });
       } else {
         const leaders = team.reporting_mode === 'APP' && team.status === 'ACTIVE'
           ? await manager.query(

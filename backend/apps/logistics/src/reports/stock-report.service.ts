@@ -41,7 +41,7 @@ export class StockReportService {
     const filters = reportFilters(session.userId, session.grants, query);
     const cursor = decodeReportPairCursor(query.cursor, filters);
     const warehouseValues: unknown[] = [];
-    const warehouseConditions = [reportScopeSql(session.grants, ['REPORT_READ'], warehouseValues, 'w', ['SYSTEM', 'ORGANIZATION'])];
+    const warehouseConditions = [reportScopeSql(session.grants, ['REPORT_READ'], warehouseValues, 'w', ['SYSTEM'])];
 
     if (query.warehouse_id) {
       warehouseValues.push(query.warehouse_id);
@@ -59,7 +59,7 @@ export class StockReportService {
     values.push(limit + 1);
     const rows = await this.dataSource.query(
       `WITH visible_warehouses AS MATERIALIZED (
-         SELECT w.id,w.organization_id
+         SELECT w.id
            FROM warehouse w
           WHERE ${warehouseConditions.join(' AND ')}
        ), held AS MATERIALIZED (

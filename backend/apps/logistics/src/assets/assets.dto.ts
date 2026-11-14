@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import {
-  ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested,
+  ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested,
 } from 'class-validator';
 
 const decimalQuantity = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/u;
@@ -24,10 +24,7 @@ export class AssetPointDto {
   coordinates!: [number, number];
 }
 
-abstract class AssetCreateDto {
-  @IsUUID('all')
-  organization_id!: string;
-}
+abstract class AssetCreateDto {}
 
 export class CreateWarehouseDto extends AssetCreateDto {
   @IsString() @MaxLength(200) @Matches(/\S/u)

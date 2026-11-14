@@ -14,7 +14,7 @@ const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DA
 const responseDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
 const connectedDatabases = [];
-const organizationId = process.env.DEMO_INTAKE_ORGANIZATION_ID ?? '40000000-0000-4000-8000-000000000004';
+const logisticsFixtureId = '40000000-0000-4000-8000-000000000004';
 const suffix = randomBytes(5).toString('hex').toUpperCase();
 const ipNetworks = ['192.0.2', '198.51.100', '203.0.113'];
 const identityNetwork = ipNetworks[Number.parseInt(suffix.slice(0, 2), 16) % ipNetworks.length];
@@ -81,9 +81,9 @@ async function registerAndLogin(label, roles = []) {
   await activateEmailRegistration(identityDb, registered);
   for (const role of roles) {
     await identityDb.query(
-      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-       VALUES ($1,$2,'ORGANIZATION',$3)`,
-      [registered.value.user.id, role, organizationId],
+      `INSERT INTO role_grant (user_id,role_code,scope_type)
+       VALUES ($1,$2,'SYSTEM')`,
+      [registered.value.user.id, role],
     );
   }
   const login = await call(identityUrl, 'auth/login', {
@@ -143,7 +143,7 @@ async function triageRequest(requestId, coordinator) {
 
 async function requestState(requestId) {
   const result = await responseDb.query(
-    `SELECT status,version,work_cycle,organization_id,logistics_admitted_at,attribution_locked_at
+    `SELECT status,version,work_cycle,logistics_admitted_at,attribution_locked_at
        FROM assistance_request WHERE id=$1`, [requestId],
   );
   assert.equal(result.rowCount, 1);
@@ -195,10 +195,6 @@ try {
     await database.connect();
     connectedDatabases.push(database);
   }
-  await identityDb.query(
-    `INSERT INTO organization (id,name,organization_kind)
-     VALUES ($1,'T14 test organization','COORDINATION') ON CONFLICT (id) DO NOTHING`, [organizationId],
-  );
   await responseDb.query("INSERT INTO incident_category (code,display_name) VALUES ('T14_FLOOD','Lũ lụt') ON CONFLICT (code) DO NOTHING");
 
   const [staff, reporter] = await Promise.all([
@@ -208,7 +204,6 @@ try {
   const responseToken = await responseServiceToken();
   const attributionTeam = await command(responseUrl, 'teams', staff, {
     name: `Đội kiểm thử T14 ${suffix}`,
-    organization_id: organizationId,
     team_kind: 'GOVERNMENT',
     reporting_mode: 'COORDINATOR',
     external_contact_note: 'Liên hệ nội bộ phục vụ kiểm thử.',
@@ -234,7 +229,7 @@ try {
   });
   expectSuccess(sealedItem, 201);
   const warehouse = await command(logisticsUrl, 'warehouses', staff, {
-    organization_id: organizationId, name: `Kho T14 ${suffix}`,
+    organization_id: logisticsFixtureId, name: `Kho T14 ${suffix}`,
   });
   expectSuccess(warehouse, 201);
   const opening = await command(logisticsUrl, 'stock/opening', staff, {
@@ -354,7 +349,6 @@ try {
   await verifyRequest(request, staff);
   const verifiedState = await requestState(request.id);
   assert.equal(verifiedState.status, 'VERIFIED');
-  assert.equal(verifiedState.organization_id, organizationId);
   assert.equal(verifiedState.logistics_admitted_at, null);
   const createBody = {
     request_id: request.id, work_cycle: Number(verifiedState.work_cycle), item_id: item.value.id, quantity: '10.00',

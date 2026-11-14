@@ -19,6 +19,9 @@ import { TeamReadinessQueue } from './TeamReadinessQueue';
 import './coordinator-detail.css';
 
 type QueueItem = {
+  handled_by?: string | null;
+  handled_at?: string | null;
+  handled_by_name?: string | null;
   id: string;
   tracking_code: string;
   status: string;
@@ -104,6 +107,9 @@ function supplementValue(value: unknown): string {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : 'Xem chi tiết trong hồ sơ';
 }
 type Detail = QueueItem & {
+  handled_by?: string | null;
+  handled_at?: string | null;
+  handled_by_name?: string | null;
   canonical?: { id: string; tracking_code: string; status: string } | null;
   version: number;
   work_cycle?: number;
@@ -511,7 +517,20 @@ function advisoryScoreLabel(score: number | null, level: string | null): string 
   return `${advisoryLevelLabels[level]} · ${score}/100`;
 }
 
-export function Coordinator({ page, initialRequestId, currentUserId }: { page: string; initialRequestId?: string; currentUserId: string }) {
+/** Claim window mirrored from the server (CLAIM_TTL_MINUTES = 15); the server remains the authority. */
+const CLAIM_WINDOW_MS = 15 * 60_000;
+
+function claimActive(detail: Pick<Detail, 'handled_at'>): boolean {
+  return Boolean(detail.handled_at) && Date.now() - Date.parse(detail.handled_at as string) < CLAIM_WINDOW_MS;
+}
+
+function claimBlockedBy(detail: Pick<Detail, 'handled_by' | 'handled_at'>, currentUserId: string): boolean {
+  return Boolean(detail.handled_by) && detail.handled_by !== currentUserId && claimActive(detail);
+}
+
+export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnassigned = false }: {
+  page: string; initialRequestId?: string; currentUserId: string; canSeeUnassigned?: boolean;
+}) {
   const restoredView = useRef<QueueView | null>(null);
   if (!restoredView.current) restoredView.current = readQueueView(currentUserId, page);
   const [queue, setQueue] = useState<Queue | null>(null);
@@ -525,6 +544,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
   const [duplicateError, setDuplicateError] = useState('');
   const [reviewLane, setReviewLane] = useState(restoredView.current.reviewLane);
   const [overdue, setOverdue] = useState(restoredView.current.overdue);
+  const [unassignedOnly, setUnassignedOnly] = useState(false);
   const [error, setError] = useState('');
   const [detailError, setDetailError] = useState('');
   const [updateMessage, setUpdateMessage] = useState('');
@@ -533,6 +553,8 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
   const [detailRevision, setDetailRevision] = useState(0);
+  const [claimBusy, setClaimBusy] = useState(false);
+  const [claimError, setClaimError] = useState('');
   const [completedMissionCycle, setCompletedMissionCycle] = useState<{
     requestId: string; missionId: string; cycle: number | null; error: boolean
   } | null>(null);
@@ -637,6 +659,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
     if (cursor) params.set('cursor', cursor);
     if (reviewLane) params.set('review_lane', reviewLane);
     if (overdue) params.set('overdue', 'true');
+    if (unassignedOnly && canSeeUnassigned) params.set('unassigned', 'true');
     api<Queue>('response', `/requests${params.size ? '?' + params : ''}`)
       .then((value) => {
         if (live) setQueue(value);
@@ -650,7 +673,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
     return () => {
       live = false;
     };
-  }, [page, queueStatus, cursor, revision, reviewLane, overdue]);
+  }, [page, queueStatus, cursor, revision, reviewLane, overdue, unassignedOnly, canSeeUnassigned]);
   useEffect(() => {
     if (!selected) return;
     let live = true;
@@ -734,6 +757,22 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
     setUpdateMessage('Đã lưu thay đổi. Đang tải trạng thái mới từ máy chủ…');
     setRevision((value) => value + 1);
   }, []);
+  const runClaim = useCallback(async (action: 'claim' | 'release') => {
+    if (!detail) return;
+    setClaimBusy(true);
+    setClaimError('');
+    try {
+      await api('response', `/requests/${detail.id}/${action}`, {
+        method: 'POST',
+        idempotencyKey: crypto.randomUUID(),
+      });
+    } catch (cause) {
+      setClaimError(cause instanceof Error ? cause.message : 'Không thể cập nhật trạng thái nhận xử lý.');
+    } finally {
+      setClaimBusy(false);
+      setDetailRevision((value) => value + 1);
+    }
+  }, [detail]);
   const refreshAfterConflict = useCallback(() => {
     refreshReasonRef.current = 'stale';
     setUpdateMessage('Đang tải lại hồ sơ để kiểm tra trạng thái.');
@@ -880,6 +919,20 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
             />
             Chỉ xem yêu cầu cần chú ý
             </label>
+            {canSeeUnassigned && (
+              <label className="check queue-attention-filter">
+                <input
+                  type="checkbox"
+                  checked={unassignedOnly}
+                  onChange={(event) => {
+                    setUnassignedOnly(event.target.checked);
+                    setCursor('');
+                    setSelected(null);
+                  }}
+                />
+                Hàng chờ chung (chưa gắn chiến dịch)
+              </label>
+            )}
         </div>
         {loading && <p role="status">Đang cập nhật danh sách…</p>}
         {error && (
@@ -897,7 +950,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
               {queue.items.map((item) => (
                 <QueueRow
                   title={item.tracking_code}
-                  meta={label(item.category)}
+                  meta={item.handled_by_name ? `${label(item.category)} · Đang do ${item.handled_by_name} xử lý` : label(item.category)}
                   priority={<PriorityBadge priority={item.priority as 'P1' | 'P2' | 'P3' | 'P4' | null | undefined} />}
                   status={<StatusBadge status={item.status} />}
                   time={timeLabel(item.received_at)}
@@ -1132,6 +1185,24 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                 <button type="button" className="button secondary" onClick={refreshAfterConflict}>Tải lại hồ sơ</button>
               </section>
             ))}
+            <section className="claim-panel" aria-label="Nhận xử lý hồ sơ">
+              {detail.handled_by && claimActive(detail) ? (
+                <p role="status" className="notice">
+                  {detail.handled_by === currentUserId
+                    ? 'Bạn đang nhận xử lý hồ sơ này. Nhớ nhả khi không còn xử lý.'
+                    : `Hồ sơ đang do ${detail.handled_by_name || 'người khác'} xử lý.`}
+                </p>
+              ) : (
+                <p className="muted">Chưa có người nhận xử lý. Nhận xử lý để các điều phối viên khác biết bạn đang theo dõi hồ sơ này.</p>
+              )}
+              {claimError && <p role="alert" className="notice warning">{claimError}</p>}
+              {detail.handled_by === currentUserId && claimActive(detail) ? (
+                <button type="button" className="button secondary" disabled={claimBusy} onClick={() => void runClaim('release')}>Nhả xử lý</button>
+              ) : (
+                <button type="button" className="button secondary" disabled={claimBusy || claimBlockedBy(detail, currentUserId)} onClick={() => void runClaim('claim')}>Nhận xử lý</button>
+              )}
+            </section>
+            <fieldset className="claim-guard" disabled={claimBlockedBy(detail, currentUserId)} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             <OptionalFold
               fold={Boolean(detail.fast_track?.eligible) && ['SUBMITTED', 'VERIFYING'].includes(detail.status)}
               summary="Xác minh từng bước (cách xử lý đầy đủ)"
@@ -1377,7 +1448,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   {!candidates && !candidateError && <p role="status">Đang tải đội phù hợp…</p>}
                   {candidates?.items.length === 0 && (
                     <p role="status" className="notice warning">
-                      Chưa có đội đủ điều kiện gần SOS này. Hệ thống chỉ gợi ý đội cùng tổ chức, đang sẵn sàng, có kỹ năng phù hợp,
+                      Chưa có đội đủ điều kiện gần SOS này. Hệ thống chỉ gợi ý đội đang sẵn sàng, có kỹ năng phù hợp,
                       có vị trí được gửi trong 30 phút gần nhất và nằm trong bán kính cho phép. Xem tình trạng từng đội bên dưới;
                       nếu đội đã di chuyển đến gần SOS, hãy nhờ đội gửi lại vị trí và xác nhận sẵn sàng.
                     </p>
@@ -1506,6 +1577,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
               />
             </>}
             </OptionalFold>
+            </fieldset>
             {page === 'queue' && detail.status !== 'VERIFIED' && detail.subject.location && (
               <details className="sos-fold queue-context-map">
                 <summary>Xem vị trí trên bản đồ</summary>

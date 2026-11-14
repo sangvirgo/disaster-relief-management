@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 
 export async function runMissionSmoke({
-  responseDb, responseUrl, reporter, coordinator, otherCoordinator, overdueReader, appTeam, coordinatorTeam, organizationId, call, key, assertVietnameseError,
+  responseDb, responseUrl, reporter, coordinator, otherCoordinator, overdueReader, appTeam, coordinatorTeam, call, key, assertVietnameseError,
 }) {
   await responseDb.query(
     "INSERT INTO incident_category (code,display_name) VALUES ('T9_MISSION','Yêu cầu kiểm thử nhiệm vụ') ON CONFLICT (code) DO NOTHING",

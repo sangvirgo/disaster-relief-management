@@ -106,7 +106,7 @@ export class DriveQueriesService {
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : null;
     if (cursor && !validCursor(cursor)) throw new AppError('CURSOR_INVALID', { status: 400 });
     const values: unknown[] = [];
-    const scope = driveScopeSql(session.grants, values, permissions, 'w');
+    const scope = driveScopeSql(session.grants, values, permissions, 'd');
     const conditions = [scope];
     if (query.status) {
       values.push(query.status);
@@ -119,7 +119,7 @@ export class DriveQueriesService {
     const limit = query.limit ?? 50;
     values.push(limit + 1);
     const rows = await this.dataSource.query(
-      `SELECT d.id,d.organization_id,d.intake_warehouse_id,d.campaign_id,d.campaign_status,d.campaign_status_at,d.status,d.title,d.description,
+      `SELECT d.id,d.intake_warehouse_id,d.campaign_id,d.campaign_status,d.campaign_status_at,d.status,d.title,d.description,
               d.opens_at,d.closes_at,d.version,d.created_at,
               to_char(d.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
          FROM donation_drive d JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE ${conditions.join(' AND ')}

@@ -31,7 +31,7 @@ describe('NeedsQueriesService', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: '88888888-8888-4888-8888-888888888888', identityHeaders: {},
-        grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId, campaign_id: null }],
+        grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM', campaign_id: null }],
       })),
     } as unknown as LogisticsSessionService;
     const service = new NeedsQueriesService(dataSource, sessions);
@@ -85,17 +85,15 @@ describe('NeedsQueriesService', () => {
       { require: jest.fn(async () => ({
         userId: needId,
         identityHeaders: {},
-        grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId, campaign_id: null }],
+        grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM', campaign_id: null }],
       })) } as unknown as LogisticsSessionService,
     );
 
     await expect(service.list({ request_id: requestId, work_cycle: 2, limit: 10 }, {} as Request)).resolves.toMatchObject({ items: [], more: false });
     const [sql, values] = query.mock.calls[0]!;
-    expect(sql).toContain('c.organization_id=$1');
-    expect(sql).toContain('c.request_id=$2');
-    expect(sql).toContain('c.work_cycle=$3');
-    expect(sql).toContain('ORDER BY n.created_at,n.id LIMIT $4');
-    expect(values).toEqual([organizationId, requestId, 2, 11]);
+    expect(sql).toContain('WHERE (TRUE) AND c.request_id=$1 AND c.work_cycle=$2');
+    expect(sql).toContain('ORDER BY n.created_at,n.id LIMIT $3');
+    expect(values).toEqual([requestId, 2, 11]);
   });
 
   it('preserves PostgreSQL microseconds in the needs-list cursor', async () => {
@@ -113,7 +111,7 @@ describe('NeedsQueriesService', () => {
       { require: jest.fn(async () => ({
         userId: needId,
         identityHeaders: {},
-        grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId, campaign_id: null }],
+        grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM', campaign_id: null }],
       })) } as unknown as LogisticsSessionService,
     );
 
@@ -121,8 +119,8 @@ describe('NeedsQueriesService', () => {
     await service.list({ request_id: requestId, work_cycle: 2, limit: 1, cursor: firstPage.cursor as string }, {} as Request);
 
     const values = query.mock.calls[1]?.[1] as unknown[];
-    expect(values[3]).toBe(cursorTime);
-    expect(String(query.mock.calls[1]?.[0])).toContain('(n.created_at,n.id)>($4::timestamptz,$5::uuid)');
+    expect(values[2]).toBe(cursorTime);
+    expect(String(query.mock.calls[1]?.[0])).toContain('(n.created_at,n.id)>($3::timestamptz,$4::uuid)');
   });
 
   it('paginates full commitment contributions with a scoped time and id cursor', async () => {
@@ -143,7 +141,7 @@ describe('NeedsQueriesService', () => {
       { require: jest.fn(async () => ({
         userId: needId,
         identityHeaders: {},
-        grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId, campaign_id: null }],
+        grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM', campaign_id: null }],
       })) } as unknown as LogisticsSessionService,
     );
 
@@ -153,7 +151,7 @@ describe('NeedsQueriesService', () => {
       items: [{ reserved_remaining: '7.00', issued_unsettled: '1.00', created_by_user_id: first.created_by_user_id }],
       cursor: expect.any(String),
     });
-    expect(query.mock.calls[0]?.[0]).toContain('c.organization_id=$2');
+    expect(query.mock.calls[0]?.[0]).toContain('WHERE n.id=$1 AND (TRUE)');
     await expect(service.contributions(needId, { cursor: page.cursor as string, limit: 1 }, {} as Request)).resolves.toMatchObject({ items: [], more: false });
     expect(query.mock.calls[3]?.[0]).toContain('(cm.created_at,cm.id)>($2::timestamptz,$3::uuid)');
     expect((query.mock.calls[3]?.[1] as unknown[])[1]).toBe('2026-10-13T00:00:00.000123Z');

@@ -464,7 +464,7 @@ export class TrackingService {
   private async staffRequest(manager: EntityManager, requestId: string, session: ReporterSession, lock: boolean): Promise<ReporterRequestRow> {
     const rows = await manager.query(
       `SELECT id,tracking_code,tracking_secret_hash,reporter_user_id,status,version,review_lane,received_at,
-              organization_id,campaign_id,description,reporter_declared_danger
+              campaign_id,description,reporter_declared_danger
          FROM assistance_request WHERE id=$1${lock ? ' FOR UPDATE' : ''}`,
       [requestId],
     ) as ReporterRequestRow[];

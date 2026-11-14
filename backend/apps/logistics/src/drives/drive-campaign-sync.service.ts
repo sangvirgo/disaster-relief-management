@@ -10,7 +10,6 @@ const jobName = 'logistics.donation-drive-campaign-sync';
 
 interface OpenDriveRow {
   id: string;
-  organization_id: string;
   campaign_status: string | null;
   version: number | string;
 }
@@ -49,7 +48,7 @@ export class DriveCampaignSyncService implements OnModuleInit, OnModuleDestroy {
 
     await this.dataSource.transaction(async (manager) => {
       const drives = await manager.query(
-        `SELECT id,organization_id,campaign_status,version FROM donation_drive
+        `SELECT id,campaign_status,version FROM donation_drive
           WHERE campaign_id=$1 AND status='OPEN' ORDER BY id FOR UPDATE`,
         [campaignId],
       ) as OpenDriveRow[];
@@ -63,8 +62,8 @@ export class DriveCampaignSyncService implements OnModuleInit, OnModuleDestroy {
           [drive.id, campaign.status, closing],
         );
         if (closing) {
-          const after = { id: drive.id, organization_id: drive.organization_id, status: 'CLOSED', campaign_status: 'CLOSED', version: Number(drive.version) + 1 };
-          const before = { id: drive.id, organization_id: drive.organization_id, status: 'OPEN', campaign_status: drive.campaign_status, version: Number(drive.version) };
+          const after = { id: drive.id, status: 'CLOSED', campaign_status: 'CLOSED', version: Number(drive.version) + 1 };
+          const before = { id: drive.id, status: 'OPEN', campaign_status: drive.campaign_status, version: Number(drive.version) };
           await manager.query(
             `INSERT INTO audit_log (actor_user_id,action,entity_type,entity_id,before_state,after_state,reason)
              VALUES (NULL,'DRIVE_CLOSED_CAMPAIGN','donation_drive',$1,$2::jsonb,$3::jsonb,'CAMPAIGN_CLOSED')`,

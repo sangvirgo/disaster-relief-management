@@ -13,7 +13,6 @@ const identityUrl = requiredEnv('C48_IDENTITY_BASE_URL').replace(/\/+$/u, '');
 const responseDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
 const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DATABASE_URL') });
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
-const organizationId = requiredEnv('DEMO_INTAKE_ORGANIZATION_ID');
 const suffix = randomBytes(5).toString('hex').toUpperCase();
 const categoryCode = `T16_FLOOD_${suffix}`;
 let identityIp = 1 + randomBytes(1)[0] % 250;
@@ -180,8 +179,8 @@ async function registerAndLogin(label, roles = []) {
   await activateEmailRegistration(identityDb, registered);
   for (const role of roles) {
     await identityDb.query(
-      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-       VALUES ($1,$2,'ORGANIZATION',$3)`, [registered.value.user.id, role, organizationId],
+      `INSERT INTO role_grant (user_id,role_code,scope_type)
+       VALUES ($1,$2,'SYSTEM')`, [registered.value.user.id, role],
     );
   }
   const login = await call(identityUrl, 'auth/login', {
@@ -275,10 +274,6 @@ assert.deepEqual(initialSchedulerSettings, ['false', 'false'],
 await Promise.all([responseDb.connect(), logisticsDb.connect(), identityDb.connect(), recoveryLock.connect(), responseLock.connect(), logisticsLock.connect()]);
 try {
   await recoveryFence(true);
-  await identityDb.query(
-    `INSERT INTO organization (id,name,organization_kind)
-     VALUES ($1,$2,'COORDINATION') ON CONFLICT (id) DO NOTHING`, [organizationId, `T16 test organization ${suffix}`],
-  );
   await responseDb.query('INSERT INTO incident_category (code,display_name) VALUES ($1,$2)', [categoryCode, 'Lũ lụt']);
 
   const coordinator = await registerAndLogin('coordinator', ['COORDINATOR', 'OPERATIONS_MANAGER']);

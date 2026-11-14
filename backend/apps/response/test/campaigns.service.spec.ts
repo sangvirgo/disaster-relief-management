@@ -10,8 +10,6 @@ import { CampaignCreateDto } from '../src/campaigns/campaigns.dto';
 import { CampaignsService } from '../src/campaigns/campaigns.service';
 import { campaignNextStatus, campaignScopePredicate } from '../src/campaigns/campaigns.helpers';
 
-const organizationA = '00000000-0000-4000-8000-000000000001';
-const organizationB = '00000000-0000-4000-8000-000000000002';
 const campaignId = '00000000-0000-4000-8000-000000000003';
 const userId = '00000000-0000-4000-8000-000000000004';
 const request = {} as never;
@@ -40,13 +38,10 @@ function fixture(grants: ReporterSession['grants'] = []) {
 
 describe('CampaignsService', () => {
 
-  it('rejects campaign creation when zero or multiple organizations match', async () => {
+  it('requires a system grant to create a campaign', async () => {
     for (const grants of [
       [],
-      [
-        { role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationA, campaign_id: null },
-        { role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationB, campaign_id: null },
-      ] as ReporterSession['grants'],
+      [{ role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId }] as ReporterSession['grants'],
     ]) {
       const { service, idempotency } = fixture(grants);
       await expect(service.create({ name: 'Cứu trợ' }, idemKey, request))
@@ -69,36 +64,38 @@ describe('CampaignsService', () => {
     }
   });
 
-  it('keeps campaign-scoped list predicates bound to the grant organization', () => {
+  it('keeps campaign-scoped list predicates bound to the granted campaign', () => {
     const values: unknown[] = [];
     const predicate = campaignScopePredicate([{
-      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', organization_id: organizationA,
+      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN',
       campaign_id: campaignId,
     }], 'CAMPAIGN_READ', values);
 
-    expect(values).toEqual([organizationA, campaignId]);
-    expect(predicate).toBe('((organization_id = $1 AND id = $2))');
+    expect(values).toEqual([campaignId]);
+    expect(predicate).toBe('(id = $1)');
+    expect(campaignScopePredicate([{
+      role_code: 'COORDINATOR', scope_type: 'SYSTEM',
+    }], 'CAMPAIGN_READ', [])).toBe('(TRUE)');
   });
 
-  it('rejects organization_id as an extra create-body field and accepts nullable contract fields', async () => {
+  it('rejects unknown create-body fields and accepts nullable contract fields', async () => {
     const valid = plainToInstance(CampaignCreateDto, {
       name: 'Cứu trợ', objective: null, starts_at: null, ends_at: null,
     });
     expect(await validate(valid as object, { whitelist: true, forbidNonWhitelisted: true })).toHaveLength(0);
 
-    const invalid = plainToInstance(CampaignCreateDto, { name: 'Cứu trợ', organization_id: organizationA });
+    const invalid = plainToInstance(CampaignCreateDto, { name: 'Cứu trợ', unexpected_field: 'value' });
     expect(await validate(invalid as object, { whitelist: true, forbidNonWhitelisted: true })).toEqual(
-      expect.arrayContaining([expect.objectContaining({ property: 'organization_id' })]),
+      expect.arrayContaining([expect.objectContaining({ property: 'unexpected_field' })]),
     );
   });
 
   it('locks the campaign before rejecting close while canonical requests remain open', async () => {
     const { service, managerQuery } = fixture([{
-      role_code: 'CAMPAIGN_MANAGER', scope_type: 'ORGANIZATION', organization_id: organizationA,
-      campaign_id: null,
+      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId,
     }]);
     managerQuery.mockResolvedValueOnce([{
-      id: campaignId, organization_id: organizationA, name: 'Cứu trợ', objective: null,
+      id: campaignId, name: 'Cứu trợ', objective: null,
       status: 'ACTIVE', starts_at: null, ends_at: null, version: 3, created_at: new Date('2026-01-01T00:00:00.000Z'),
     }]).mockResolvedValueOnce([{ '?column?': 1 }]);
 
@@ -112,11 +109,10 @@ describe('CampaignsService', () => {
 
   it('reads the returned campaign row from TypeORM UPDATE results when transitioning status', async () => {
     const { service, managerQuery } = fixture([{
-      role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationA,
-      campaign_id: null,
+      role_code: 'COORDINATOR', scope_type: 'SYSTEM',
     }]);
     const campaign = {
-      id: campaignId, organization_id: organizationA, name: 'Cứu trợ', objective: null,
+      id: campaignId, name: 'Cứu trợ', objective: null,
       status: 'DRAFT', starts_at: null, ends_at: null, version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'),
     };
     const activated = { ...campaign, status: 'ACTIVE', version: 2 };
@@ -130,11 +126,10 @@ describe('CampaignsService', () => {
 
   it('reads the returned campaign row from TypeORM UPDATE results when patching a draft', async () => {
     const { service, managerQuery } = fixture([{
-      role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationA,
-      campaign_id: null,
+      role_code: 'COORDINATOR', scope_type: 'SYSTEM',
     }]);
     const campaign = {
-      id: campaignId, organization_id: organizationA, name: 'Cứu trợ', objective: null,
+      id: campaignId, name: 'Cứu trợ', objective: null,
       status: 'DRAFT', starts_at: null, ends_at: null, version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'),
     };
     const patched = { ...campaign, objective: 'Hỗ trợ người dân', version: 2 };
@@ -149,12 +144,12 @@ describe('CampaignsService', () => {
   it('returns the exact internal allowlist projection', async () => {
     const { service, dataSourceQuery } = fixture();
     dataSourceQuery.mockResolvedValueOnce([{
-      id: campaignId, organization_id: organizationA, name: 'Cứu trợ', objective: 'Đồ ăn',
+      id: campaignId, name: 'Cứu trợ', objective: 'Đồ ăn',
       status: 'ACTIVE', starts_at: null, ends_at: null, version: '7', created_at: new Date('2026-01-01T00:00:00.000Z'),
     }]);
 
     expect(await service.internal(campaignId)).toEqual({
-      id: campaignId, status: 'ACTIVE', organization_id: organizationA, version: 7,
+      id: campaignId, status: 'ACTIVE', version: 7,
     });
   });
 });

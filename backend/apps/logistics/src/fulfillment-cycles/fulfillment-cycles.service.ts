@@ -15,7 +15,6 @@ interface FulfillmentCycleRow {
   id: string;
   request_id: string;
   work_cycle: number;
-  organization_id: string;
   campaign_id: string | null;
   state: CycleState;
 }
@@ -46,7 +45,6 @@ function invalidInput(): AppError {
 
 function sameAttribution(cycle: FulfillmentCycleRow, intent: ResponseCycleIntent): boolean {
   return cycle.request_id === intent.request_id && Number(cycle.work_cycle) === intent.work_cycle &&
-    cycle.organization_id === intent.organization_id &&
     cycle.campaign_id === intent.campaign_id;
 }
 
@@ -183,12 +181,12 @@ export class FulfillmentCyclesService {
 
   private async lockCycle(manager: EntityManager, intent: ResponseCycleIntent): Promise<FulfillmentCycleRow> {
     await manager.query(
-      `INSERT INTO fulfillment_cycle (request_id,work_cycle,organization_id,campaign_id)
-       VALUES ($1,$2,$3,$4,$5) ON CONFLICT (request_id,work_cycle) DO NOTHING`,
-      [intent.request_id, intent.work_cycle, intent.organization_id, intent.campaign_id],
+      `INSERT INTO fulfillment_cycle (request_id,work_cycle,campaign_id)
+       VALUES ($1,$2,$3) ON CONFLICT (request_id,work_cycle) DO NOTHING`,
+      [intent.request_id, intent.work_cycle, intent.campaign_id],
     );
     const rows = await manager.query(
-      `SELECT id,request_id,work_cycle,organization_id,campaign_id,state
+      `SELECT id,request_id,work_cycle,campaign_id,state
          FROM fulfillment_cycle WHERE request_id=$1 AND work_cycle=$2 FOR UPDATE`,
       [intent.request_id, intent.work_cycle],
     ) as FulfillmentCycleRow[];

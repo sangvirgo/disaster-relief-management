@@ -2,7 +2,7 @@ import { jest } from '@jest/globals';
 import { AssetsQueriesService } from '../src/assets/assets-queries.service';
 
 describe('Logistics asset lists', () => {
-  it('applies the live scope in SQL and omits private notes from list rows', async () => {
+  it('applies SYSTEM scope in SQL and omits private notes from list rows', async () => {
     const dataSource = { query: jest.fn().mockResolvedValue([{
       id: '33333333-3333-4333-8333-333333333333',
       organization_id: '22222222-2222-4222-8222-222222222222',
@@ -17,7 +17,7 @@ describe('Logistics asset lists', () => {
     }]) };
     const sessions = { require: jest.fn().mockResolvedValue({
       userId: '11111111-1111-4111-8111-111111111111',
-      grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: '22222222-2222-4222-8222-222222222222' }],
+      grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}],
     }) };
     const service = new AssetsQueriesService(dataSource as never, sessions as never);
 
@@ -26,6 +26,7 @@ describe('Logistics asset lists', () => {
     };
     expect(result.items[0]).not.toHaveProperty('contact_note');
     expect(result.items[0]).not.toHaveProperty('operating_note');
-    expect(dataSource.query.mock.calls[0]?.[0]).toContain('a.organization_id=$1');
+    expect(dataSource.query.mock.calls[0]?.[0]).toContain('WHERE TRUE');
+    expect(dataSource.query.mock.calls[0]?.[1]).toEqual([51]);
   });
 });

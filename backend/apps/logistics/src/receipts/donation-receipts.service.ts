@@ -27,7 +27,7 @@ interface ReceiptContext {
   version: number | string;
   delivery_status: string;
   donor_user_id: string | null;
-  organization_id: string;
+  campaign_id: string | null;
   drive_id: string;
 }
 
@@ -37,10 +37,9 @@ interface DeliveryCreateContext {
   version: number | string;
   drive_id: string;
   drive_status: string;
-  organization_id: string;
+  campaign_id: string | null;
   intake_warehouse_id: string;
   selected_warehouse_id: string | null;
-  selected_organization_id: string | null;
   selected_warehouse_status: string | null;
 }
 
@@ -51,10 +50,10 @@ interface CountLine extends ReceiptLineFacts {
 function requireReceiptPermission(
   grants: Parameters<typeof hasWarehouseScope>[0],
   permission: 'DONATION_INTAKE' | 'DONATION_REVIEW',
-  scope: Pick<ReceiptContext, 'organization_id'>,
+  scope: Pick<ReceiptContext, 'campaign_id'>,
 ): void {
-  if (!hasWarehouseScope(grants, scope.organization_id)) throw new AppError('NOT_FOUND', { status: 404 });
-  requireWarehousePermission(grants, permission, scope.organization_id);
+  if (!hasWarehouseScope(grants, scope)) throw new AppError('NOT_FOUND', { status: 404 });
+  requireWarehousePermission(grants, permission, scope);
 }
 
 function expectVersion(actual: number | string, expected: number): void {
@@ -320,20 +319,20 @@ export class DonationReceiptsService {
 
   private assertCreateScope(grants: Parameters<typeof hasWarehouseScope>[0], delivery: DeliveryCreateContext): void {
     const target = delivery.selected_warehouse_id;
-    if (!target || delivery.selected_organization_id !== delivery.organization_id) {
+    if (!target) {
       throw new AppError('VALIDATION_FAILED', { status: 400 });
     }
     if (delivery.selected_warehouse_status !== 'ACTIVE' && delivery.selected_warehouse_id !== delivery.intake_warehouse_id) {
       throw new AppError('VALIDATION_FAILED', { status: 400 });
     }
-    if (!hasWarehouseScope(grants, delivery.organization_id)) throw new AppError('NOT_FOUND', { status: 404 });
-    requireWarehousePermission(grants, 'DONATION_INTAKE', delivery.organization_id);
+    if (!hasWarehouseScope(grants, delivery)) throw new AppError('NOT_FOUND', { status: 404 });
+    requireWarehousePermission(grants, 'DONATION_INTAKE', delivery);
   }
 
   private async deliveryForCreate(query: Pick<DataSource | EntityManager, 'query'>, deliveryId: string, warehouseId: string, lock = false): Promise<DeliveryCreateContext> {
     const rows = await query.query(
-      `SELECT dd.id,dd.status,dd.version,d.id AS drive_id,d.status AS drive_status,d.organization_id,
-              d.intake_warehouse_id,tw.id AS selected_warehouse_id,tw.organization_id AS selected_organization_id,
+      `SELECT dd.id,dd.status,dd.version,d.id AS drive_id,d.status AS drive_status,d.campaign_id,
+              d.intake_warehouse_id,tw.id AS selected_warehouse_id,
               tw.status AS selected_warehouse_status
          FROM donation_delivery dd JOIN donation_drive d ON d.id=dd.drive_id
          JOIN warehouse iw ON iw.id=d.intake_warehouse_id LEFT JOIN warehouse tw ON tw.id=$2
@@ -347,7 +346,7 @@ export class DonationReceiptsService {
   private async receiptContext(query: Pick<DataSource | EntityManager, 'query'>, id: string, lock = false): Promise<ReceiptContext> {
     const rows = await query.query(
       `SELECT r.id,r.delivery_id,r.warehouse_id,r.version,dd.status AS delivery_status,dd.donor_user_id,
-              w.organization_id,d.id AS drive_id
+              d.campaign_id,d.id AS drive_id
          FROM donation_receipt r JOIN donation_delivery dd ON dd.id=r.delivery_id
          JOIN donation_drive d ON d.id=dd.drive_id JOIN warehouse w ON w.id=r.warehouse_id
         WHERE r.id=$1${lock ? ' FOR UPDATE OF r' : ''}`,
@@ -359,7 +358,7 @@ export class DonationReceiptsService {
 
   private async disputeContext(query: Pick<DataSource | EntityManager, 'query'>, id: string, lock = false): Promise<ReceiptContext & { status: string }> {
     const rows = await query.query(
-      `SELECT dis.id,dis.status,dd.id AS delivery_id,dd.donor_user_id,w.organization_id,d.id AS drive_id
+      `SELECT dis.id,dis.status,dd.id AS delivery_id,dd.donor_user_id,d.campaign_id,d.id AS drive_id
          FROM donation_dispute dis JOIN donation_delivery dd ON dd.id=dis.delivery_id
          JOIN donation_drive d ON d.id=dd.drive_id JOIN warehouse w ON w.id=d.intake_warehouse_id
         WHERE dis.id=$1${lock ? ' FOR UPDATE OF dis,dd' : ''}`,

@@ -21,8 +21,7 @@ export interface User {
 export interface RoleGrant {
   id: string;
   role_code: UserRole;
-  scope_type: 'SYSTEM' | 'ORGANIZATION' | 'CAMPAIGN';
-  organization_id?: string | null;
+  scope_type: 'SYSTEM' | 'CAMPAIGN';
   campaign_id?: string | null;
 }
 

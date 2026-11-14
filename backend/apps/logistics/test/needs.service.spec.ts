@@ -10,22 +10,20 @@ import type { ResponseAdmissionClient } from '../src/needs/response-admission.cl
 import type { IdempotencyService } from '@c48/technical/idempotency/idempotency';
 
 const requestId = '11111111-1111-4111-8111-111111111111';
-const organizationId = '22222222-2222-4222-8222-222222222222';
 const cycleId = '33333333-3333-4333-8333-333333333333';
 const itemId = '44444444-4444-4444-8444-444444444444';
 const needId = '55555555-5555-4555-8555-555555555555';
 const actorId = '66666666-6666-4666-8666-666666666666';
 
 const coordinatorGrant: Grant = {
-  role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId,
-};
+  role_code: 'COORDINATOR', scope_type: 'SYSTEM', };
 const admission = {
   request_id: requestId, work_cycle: 2, version: 5, status: 'TRIAGED',
-  organization_id: organizationId, campaign_id: null,
+  campaign_id: null,
 };
 const needRow = {
   id: needId, cycle_id: cycleId, request_id: requestId, work_cycle: 2,
-  organization_id: organizationId, campaign_id: null,
+  campaign_id: null,
   item_id: itemId, item_name: 'Nước uống', unit_code: 'L', unit_name: 'Lít',
   original_quantity: '3', requested_quantity: '3', cancelled_remaining: null,
   designated_point_id: null, status: 'OPEN', version: 1,
@@ -35,7 +33,7 @@ const needRow = {
 function setup(overrides: Partial<{
   cycleState: string;
   itemStatus: string;
-  point: { id: string; organization_id: string; status: string } | null;
+  point: { id: string; status: string } | null;
   grants: Grant[];
   admissionError: Error;
   existingReplay: boolean;
@@ -43,7 +41,7 @@ function setup(overrides: Partial<{
   const calls: Array<{ sql: string; values?: unknown[] }> = [];
   const order: string[] = [];
   const cycle = {
-    id: cycleId, request_id: requestId, work_cycle: 2, organization_id: organizationId,
+    id: cycleId, request_id: requestId, work_cycle: 2,
     campaign_id: null, state: overrides.cycleState ?? 'OPEN',
   };
   const manager = {
@@ -113,17 +111,17 @@ describe('NeedsService.create', () => {
   it('admits through Response before opening the local idempotency transaction and uses canonical attribution', async () => {
     const { service, calls, order, response, idempotency } = setup();
 
-    const result = await service.create({ ...dto, organization_id: 'untrusted' } as CreateNeedDto, request);
+    const result = await service.create({ ...dto, campaign_id: 'untrusted' } as unknown as CreateNeedDto, request);
 
     expect(order.indexOf('response-admission')).toBeLessThan(order.indexOf('transaction'));
     expect(response.admit).toHaveBeenCalledWith(requestId, 2, { authorization: 'Bearer identity.signed.actor' });
     expect(result.value).toMatchObject({
-      id: needId, request_id: requestId, work_cycle: 2, organization_id: organizationId,
+      id: needId, request_id: requestId, work_cycle: 2,
       campaign_id: null, item_id: itemId, original_quantity: '3',
       requested_quantity: '3', delivery_target_kind: 'FINAL_RECIPIENT', status: 'OPEN', version: 1,
     });
     const cycleInsert = calls.find(({ sql }) => sql.includes('INSERT INTO fulfillment_cycle'));
-    expect(cycleInsert?.values).toEqual([requestId, 2, organizationId, null]);
+    expect(cycleInsert?.values).toEqual([requestId, 2, null]);
     expect(calls.some(({ sql }) => sql.includes('INSERT INTO stock_movement'))).toBe(false);
     expect(idempotency.execute).toHaveBeenCalledTimes(1);
   });
@@ -154,12 +152,12 @@ describe('NeedsService.create', () => {
     expect(calls.some(({ sql }) => sql.includes('INSERT INTO relief_need'))).toBe(false);
   });
 
-  it('enforces grant scope on an admission-failure replay', async () => {
+  it('enforces campaign scope on an admission-failure replay for an unassigned request', async () => {
     const admissionError = new AppError('REQUEST_NOT_VERIFIED', { status: 409 });
     const outsideScope = setup({
       admissionError,
       existingReplay: true,
-      grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: '88888888-8888-4888-8888-888888888888' }],
+      grants: [{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: '99999999-9999-4999-8999-999999999999' }],
     });
     await expect(outsideScope.service.create(dto, request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
     expect(outsideScope.idempotency.execute).toHaveBeenCalledTimes(1);
@@ -167,8 +165,7 @@ describe('NeedsService.create', () => {
 
   it('requires a live request-scoped NEED_MANAGE grant before opening the local transaction', async () => {
     const { service, idempotency } = setup({ grants: [{
-      role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: '88888888-8888-4888-8888-888888888888',
-    }] });
+      role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: '99999999-9999-4999-8999-999999999999' }] });
 
     await expect(service.create(dto, request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
 
@@ -194,14 +191,14 @@ describe('NeedsService.create', () => {
     expect(calls.some(({ sql }) => sql.includes('FROM item i JOIN unit u'))).toBe(false);
   });
 
-  it('requires an active relief point in the request organization and scoped need grant', async () => {
+  it('requires an active relief point before creating a need', async () => {
     const pointId = '99999999-9999-4999-8999-999999999999';
     const { service, calls } = setup({ point: {
-      id: pointId, organization_id: '88888888-8888-4888-8888-888888888888', status: 'ACTIVE',
+      id: pointId, status: 'INACTIVE',
     } });
 
     await expect(service.create({ ...dto, designated_point_id: pointId, reason: 'Giao tại điểm.' }, request))
-      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 });
+      .rejects.toMatchObject({ code: 'POINT_INACTIVE', status: 409 });
     expect(calls.some(({ sql }) => sql.includes('INSERT INTO relief_need'))).toBe(false);
   });
 

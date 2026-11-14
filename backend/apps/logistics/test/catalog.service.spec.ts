@@ -25,7 +25,7 @@ describe('Logistics catalog permissions', () => {
     const sessions = {
       require: jest.fn().mockResolvedValue({
         userId: '11111111-1111-4111-8111-111111111111',
-        grants: [{ role_code: 'INTAKE_STAFF', scope_type: 'ORGANIZATION', organization_id: '22222222-2222-4222-8222-222222222222' }],
+        grants: [{ role_code: 'INTAKE_STAFF', scope_type: 'SYSTEM',}],
         identityHeaders: { authorization: 'Bearer verified-token' },
       }),
     };
@@ -41,7 +41,7 @@ describe('Logistics catalog permissions', () => {
   it('maps invalid Vietnamese catalog text to the existing validation error', async () => {
     const sessions = { require: jest.fn().mockResolvedValue({
       userId: '11111111-1111-4111-8111-111111111111',
-      grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: '22222222-2222-4222-8222-222222222222' }],
+      grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}],
       identityHeaders: { authorization: 'Bearer verified-token' },
     }) };
     const idempotency = { execute: jest.fn() };
@@ -53,15 +53,14 @@ describe('Logistics catalog permissions', () => {
     expect(idempotency.execute).not.toHaveBeenCalled();
   });
 
-  it('allows catalog management only through an operations-manager organization grant', () => {
-    const organizationGrant = {
+  it('allows catalog management only through an operations-manager system grant', () => {
+    const systemGrant = {
       role_code: 'OPERATIONS_MANAGER',
-      scope_type: 'ORGANIZATION',
-      organization_id: '22222222-2222-4222-8222-222222222222',
+      scope_type: 'SYSTEM',
       campaign_id: null,
     } as const;
-    expect(hasCatalogManageGrant([organizationGrant])).toBe(true);
-    expect(hasCatalogManageGrant([{ ...organizationGrant, scope_type: 'SYSTEM', organization_id: null }])).toBe(false);
-    expect(hasCatalogManageGrant([{ ...organizationGrant, role_code: 'ADMIN' }])).toBe(false);
+    expect(hasCatalogManageGrant([systemGrant])).toBe(true);
+    expect(hasCatalogManageGrant([{ ...systemGrant, scope_type: 'CAMPAIGN', campaign_id: '22222222-2222-4222-8222-222222222222' }])).toBe(false);
+    expect(hasCatalogManageGrant([{ ...systemGrant, role_code: 'ADMIN' }])).toBe(false);
   });
 });

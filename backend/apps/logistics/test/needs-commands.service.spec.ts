@@ -15,8 +15,7 @@ const itemId = '44444444-4444-4444-8444-444444444444';
 const warehouseId = '88888888-8888-4888-8888-888888888888';
 
 const coordinatorGrant: Grant = {
-  role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId,
-};
+  role_code: 'COORDINATOR', scope_type: 'SYSTEM', };
 
 const baseNeed = {
   id: needId,
@@ -104,10 +103,9 @@ function setup(options: SetupOptions = {}) {
 
 describe('NeedCommandsService', () => {
   it.each(['increase', 'reduce', 'cancel'] as const)(
-    'rejects an outside-organization grant for %s before opening the transaction', async (action) => {
+    'rejects a campaign grant on an unassigned need for %s before opening the transaction', async (action) => {
       const outsideGrant: Grant = {
-        role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: '99999999-9999-4999-8999-999999999999',
-      };
+        role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: '99999999-9999-4999-8999-999999999999' };
       const { service, request, dataSource, manager, idempotency } = setup({ grants: [outsideGrant] });
       const commands = {
         increase: () => service.increase(needId, { expected_version: 1, quantity: '4', reason: 'Tăng.' }, request),

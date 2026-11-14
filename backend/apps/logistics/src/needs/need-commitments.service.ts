@@ -18,21 +18,18 @@ interface NeedContext {
   item_id: string;
   status: 'OPEN' | 'PARTIALLY_FULFILLED' | 'FULFILLED' | 'CANCELLED';
   requested_quantity: string;
-  organization_id: string;
   campaign_id: string | null;
   unit_scale: number | string;
 }
 
 interface CycleRow {
   id: string;
-  organization_id: string;
   campaign_id: string | null;
   state: 'OPEN' | 'FROZEN' | 'SEALED';
 }
 
 interface WarehouseRow {
   id: string;
-  organization_id: string;
   status: 'ACTIVE' | 'INACTIVE';
 }
 
@@ -61,7 +58,7 @@ interface BalanceRow {
 async function loadNeedContext(source: Pick<DataSource | EntityManager, 'query'>, id: string): Promise<NeedContext> {
   const rows = await source.query(
     `SELECT n.id,n.cycle_id,n.item_id,n.status,n.requested_quantity::text,
-            c.organization_id,c.campaign_id,u.scale AS unit_scale
+            c.campaign_id,u.scale AS unit_scale
        FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id
        JOIN item i ON i.id=n.item_id JOIN unit u ON u.code=i.unit_code WHERE n.id=$1`,
     [id],
@@ -72,7 +69,7 @@ async function loadNeedContext(source: Pick<DataSource | EntityManager, 'query'>
 
 async function loadWarehouse(source: Pick<DataSource | EntityManager, 'query'>, id: string): Promise<WarehouseRow> {
   const rows = await source.query(
-    'SELECT id,organization_id,status FROM warehouse WHERE id=$1',
+    'SELECT id,status FROM warehouse WHERE id=$1',
     [id],
   ) as WarehouseRow[];
   if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
@@ -81,7 +78,7 @@ async function loadWarehouse(source: Pick<DataSource | EntityManager, 'query'>, 
 
 async function lockCycle(manager: Pick<EntityManager, 'query'>, cycleId: string): Promise<CycleRow> {
   const rows = await manager.query(
-    `SELECT id,organization_id,campaign_id,state
+    `SELECT id,campaign_id,state
        FROM fulfillment_cycle WHERE id=$1 FOR UPDATE`,
     [cycleId],
   ) as CycleRow[];
@@ -92,7 +89,7 @@ async function lockCycle(manager: Pick<EntityManager, 'query'>, cycleId: string)
 async function lockNeed(manager: Pick<EntityManager, 'query'>, needId: string, cycleId: string): Promise<NeedContext> {
   const rows = await manager.query(
     `SELECT n.id,n.cycle_id,n.item_id,n.status,n.requested_quantity::text,
-            c.organization_id,c.campaign_id,u.scale AS unit_scale
+            c.campaign_id,u.scale AS unit_scale
        FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id
        JOIN item i ON i.id=n.item_id JOIN unit u ON u.code=i.unit_code
       WHERE n.id=$1 AND n.cycle_id=$2 FOR UPDATE OF n`,
@@ -119,7 +116,7 @@ async function readCommitmentContext(
     `SELECT cm.id,cm.relief_need_id,cm.item_id,cm.warehouse_id,cm.quantity::text,
             cm.released_quantity::text,cm.issued_quantity::text,cm.delivered_quantity::text,
             cm.returned_quantity::text,cm.lost_quantity::text,cm.version,
-            n.cycle_id,n.status,n.requested_quantity::text,c.organization_id,c.campaign_id,
+            n.cycle_id,n.status,n.requested_quantity::text,c.campaign_id,
             u.scale AS unit_scale
        FROM commitment cm JOIN relief_need n ON n.id=cm.relief_need_id
        JOIN fulfillment_cycle c ON c.id=n.cycle_id
@@ -132,11 +129,9 @@ async function readCommitmentContext(
 
 function assertWarehouseScope(
   grants: Awaited<ReturnType<LogisticsSessionService['require']>>['grants'],
-  warehouse: WarehouseRow,
-  organizationId: string,
+  campaignId: string | null,
 ): void {
-  requireWarehousePermission(grants, 'COMMITMENT_MANAGE', warehouse.organization_id);
-  if (warehouse.organization_id !== organizationId) throw new AppError('VALIDATION_FAILED', { status: 400 });
+  requireWarehousePermission(grants, 'COMMITMENT_MANAGE', { campaign_id: campaignId });
 }
 
 function assertCreateCycle(cycle: CycleRow): void {
@@ -203,8 +198,8 @@ export class NeedCommitmentsService {
     const session = await this.sessions.require(request);
     const key = needCommandKey(request);
     const need = await loadNeedContext(this.dataSource, needId);
-    const warehouse = await loadWarehouse(this.dataSource, dto.warehouse_id);
-    assertWarehouseScope(session.grants, warehouse, need.organization_id);
+    await loadWarehouse(this.dataSource, dto.warehouse_id);
+    assertWarehouseScope(session.grants, need.campaign_id);
 
     let campaign: ResponseCampaign | null = null;
     let campaignFailure: unknown;
@@ -227,8 +222,8 @@ export class NeedCommitmentsService {
         assertCreateCycle(cycle);
         const lockedNeed = await lockNeed(manager, needId, cycle.id);
         if (lockedNeed.status === 'CANCELLED') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
-        const lockedWarehouse = await loadWarehouse(manager, dto.warehouse_id);
-        assertWarehouseScope(session.grants, lockedWarehouse, cycle.organization_id);
+        await loadWarehouse(manager, dto.warehouse_id);
+        assertWarehouseScope(session.grants, cycle.campaign_id);
         if (cycle.campaign_id !== need.campaign_id || lockedNeed.campaign_id !== cycle.campaign_id) {
           throw new AppError('INTERNAL_ERROR', { status: 500 });
         }
@@ -294,8 +289,8 @@ export class NeedCommitmentsService {
       replay: async (manager, resource: ResourceRef | null) => {
         if (resource?.type !== 'commitment') throw new AppError('INTERNAL_ERROR', { status: 500 });
         const row = await readCommitmentContext(manager, resource.id);
-        const currentWarehouse = await loadWarehouse(manager, row.warehouse_id);
-        assertWarehouseScope(session.grants, currentWarehouse, row.organization_id);
+        await loadWarehouse(manager, row.warehouse_id);
+        assertWarehouseScope(session.grants, row.campaign_id);
         return commitmentValue(row, Number(row.unit_scale));
       },
     });
@@ -309,8 +304,8 @@ export class NeedCommitmentsService {
     const session = await this.sessions.require(request);
     const key = needCommandKey(request);
     const context = await readCommitmentContext(this.dataSource, commitmentId);
-    const warehouse = await loadWarehouse(this.dataSource, context.warehouse_id);
-    assertWarehouseScope(session.grants, warehouse, context.organization_id);
+    await loadWarehouse(this.dataSource, context.warehouse_id);
+    assertWarehouseScope(session.grants, context.campaign_id);
 
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `user:${session.userId}`,
@@ -326,8 +321,8 @@ export class NeedCommitmentsService {
         const cycle = await lockCycle(manager, needCycle[0].cycle_id);
         assertReleaseCycle(cycle);
         const need = await lockNeed(manager, context.relief_need_id, cycle.id);
-        const lockedWarehouse = await loadWarehouse(manager, context.warehouse_id);
-        assertWarehouseScope(session.grants, lockedWarehouse, cycle.organization_id);
+        await loadWarehouse(manager, context.warehouse_id);
+        assertWarehouseScope(session.grants, cycle.campaign_id);
         const commitments = await lockCommitments(manager, need.id);
         const row = commitments.find((item) => item.id === commitmentId);
         if (!row) throw new AppError('NOT_FOUND', { status: 404 });
@@ -374,8 +369,8 @@ export class NeedCommitmentsService {
       replay: async (manager, resource: ResourceRef | null) => {
         if (resource?.type !== 'commitment') throw new AppError('INTERNAL_ERROR', { status: 500 });
         const row = await readCommitmentContext(manager, resource.id);
-        const currentWarehouse = await loadWarehouse(manager, row.warehouse_id);
-        assertWarehouseScope(session.grants, currentWarehouse, row.organization_id);
+        await loadWarehouse(manager, row.warehouse_id);
+        assertWarehouseScope(session.grants, row.campaign_id);
         return commitmentValue(row, Number(row.unit_scale));
       },
     });
@@ -387,6 +382,5 @@ export class NeedCommitmentsService {
     if (!campaign || campaign.id !== cycle.campaign_id) throw new AppError('RESPONSE_UNAVAILABLE', { status: 503, retryAfterSeconds: 1 });
     if (campaign.status === 'PAUSED') throw new AppError('CAMPAIGN_PAUSED', { status: 409 });
     if (campaign.status !== 'ACTIVE') throw new AppError('CAMPAIGN_NOT_ACTIVE', { status: 409 });
-    if (campaign.organization_id !== cycle.organization_id) throw new AppError('VALIDATION_FAILED', { status: 400 });
   }
 }

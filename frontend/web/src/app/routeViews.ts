@@ -5,4 +5,4 @@ export const assetViews = ['relief-points', 'vehicles', 'warehouses'] as const;
 export const reportViews = ['stock-summary', 'fulfillment', 'reconciliation'] as const;
 export const intakeSteps = ['intake', 'review'] as const;
 export const reviewViews = ['receipts', 'disputes'] as const;
-export const auditTypes = ['app_user', 'role_grant', 'organization'] as const;
+export const auditTypes = ['app_user', 'role_grant'] as const;

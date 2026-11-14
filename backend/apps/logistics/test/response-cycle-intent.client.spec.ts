@@ -5,7 +5,6 @@ import { ResponseCycleIntentClient } from '../src/integrations/response/response
 
 const intentId = '22222222-2222-4222-8222-222222222222';
 const requestId = '11111111-1111-4111-8111-111111111111';
-const organizationId = '33333333-3333-4333-8333-333333333333';
 const intentValue = {
   id: intentId,
   kind: 'RESOLUTION',
@@ -13,7 +12,6 @@ const intentValue = {
   request_id: requestId,
   work_cycle: 3,
   request_status: 'RESOLVING',
-  organization_id: organizationId,
   campaign_id: null,
   outcome_basis: 'RESCUE_COMPLETED',
 };
@@ -48,7 +46,7 @@ describe('ResponseCycleIntentClient', () => {
   });
 
   it('fails closed when attribution is incomplete or malformed', async () => {
-    const { service } = setup({ status: 200, headers: {}, body: { ...intentValue, organization_id: 'bad' } });
+    const { service } = setup({ status: 200, headers: {}, body: { ...intentValue, campaign_id: 'bad' } });
 
     await expect(service.getIntent(intentId)).rejects.toMatchObject({ code: 'RESPONSE_UNAVAILABLE', status: 503 });
   });

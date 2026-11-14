@@ -1554,6 +1554,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/requests/{id}/staff-evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * EvidenceController.uploadStaff
+         * @description Route exported from backend/apps/response/src/evidence/evidence.controller.ts#EvidenceController.uploadStaff. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        post: operations["responseEvidenceUploadStaff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/{id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * RequestOperationsController.claim
+         * @description Route exported from backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.claim. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        post: operations["responseRequestOperationsClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/{id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * RequestOperationsController.release
+         * @description Route exported from backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.release. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        post: operations["responseRequestOperationsRelease"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1780,6 +1840,9 @@ export interface components {
                 human_review_required: true;
                 review_status: ("ACCEPTED" | "ADJUSTED" | "REJECTED") | null;
             } | null;
+            handled_by: string | null;
+            handled_at: string | null;
+            handled_by_name: string | null;
         };
         RequestQueuePage: {
             items: components["schemas"]["RequestQueueItem"][];
@@ -1928,6 +1991,9 @@ export interface components {
                 human_review_required: true;
                 review_status: ("ACCEPTED" | "ADJUSTED" | "REJECTED") | null;
             } | null;
+            handled_by: string | null;
+            handled_at: string | null;
+            handled_by_name: string | null;
         } & {
             [key: string]: unknown;
         };
@@ -2287,8 +2353,6 @@ export interface components {
         Campaign: {
             /** Format: uuid */
             id: string;
-            /** Format: uuid */
-            organization_id: string;
             name: string;
             objective: string | null;
             /** @enum {string} */
@@ -2352,8 +2416,6 @@ export interface components {
             id: string;
             /** @enum {string} */
             status: "DRAFT" | "ACTIVE" | "PAUSED" | "CLOSED";
-            /** Format: uuid */
-            organization_id: string;
             version: number;
         };
         /** @description GeoJSON point with WGS 84 longitude and latitude coordinates. */
@@ -2495,6 +2557,7 @@ export interface operations {
                 overdue?: string;
                 cursor?: components["parameters"]["Cursor"];
                 limit?: components["parameters"]["PageLimit"];
+                unassigned?: string;
             };
             header?: never;
             path?: never;
@@ -5917,8 +5980,6 @@ export interface operations {
                         request_id?: string;
                         work_cycle?: number;
                         request_status?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         campaign_id?: string | null;
                         outcome_basis?: string | null;
                     };
@@ -5969,8 +6030,6 @@ export interface operations {
                         version?: number;
                         /** @enum {string} */
                         status?: "VERIFIED" | "TRIAGED" | "DISPATCHED" | "IN_PROGRESS";
-                        /** Format: uuid */
-                        organization_id?: string;
                         campaign_id?: string | null;
                     };
                 };
@@ -6591,8 +6650,6 @@ export interface operations {
                         items?: {
                             /** Format: uuid */
                             id: string;
-                            /** Format: uuid */
-                            organization_id: string;
                             name: string;
                             /** @enum {string} */
                             kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
@@ -6662,8 +6719,6 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
-                    /** Format: uuid */
-                    organization_id: string;
                     team_kind: string;
                     /** @enum {string} */
                     reporting_mode: "APP" | "COORDINATOR";
@@ -6684,8 +6739,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id: string;
-                        /** Format: uuid */
-                        organization_id: string;
                         name: string;
                         /** @enum {string} */
                         kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
@@ -6752,8 +6805,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id: string;
-                        /** Format: uuid */
-                        organization_id: string;
                         name: string;
                         /** @enum {string} */
                         kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
@@ -6829,8 +6880,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id: string;
-                        /** Format: uuid */
-                        organization_id: string;
                         name: string;
                         /** @enum {string} */
                         kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
@@ -7756,8 +7805,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id: string;
-                        /** Format: uuid */
-                        organization_id: string;
                         name: string;
                         /** @enum {string} */
                         kind: "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
@@ -8006,6 +8053,222 @@ export interface operations {
             };
             /** @description Documented error response; clients branch on the stable code. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseEvidenceUploadStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/03-response-api.md for the documented response shape. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseRequestOperationsClaim: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["RequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request after claiming it for handling (nhận xử lý). The claim lasts 15 minutes without coordination activity. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
+                    "Idempotent-Replay": components["headers"]["IdempotentReplay"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": "00000000-0000-4000-8000-000000000001",
+                     *       "status": "VERIFIED",
+                     *       "version": 8,
+                     *       "campaign_id": "00000000-0000-4000-8000-000000000003",
+                     *       "handled_by": "00000000-0000-4000-8000-000000000101",
+                     *       "handled_at": "2026-11-14T10:00:00.000Z"
+                     *     }
+                     */
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        status: string;
+                        version: number;
+                        campaign_id: string | null;
+                        handled_by: string | null;
+                        handled_at: string | null;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseRequestOperationsRelease: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["RequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request after releasing the claim (nhả xử lý). */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
+                    "Idempotent-Replay": components["headers"]["IdempotentReplay"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": "00000000-0000-4000-8000-000000000001",
+                     *       "status": "VERIFIED",
+                     *       "version": 8,
+                     *       "campaign_id": "00000000-0000-4000-8000-000000000003",
+                     *       "handled_by": null,
+                     *       "handled_at": null
+                     *     }
+                     */
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        status: string;
+                        version: number;
+                        campaign_id: string | null;
+                        handled_by: string | null;
+                        handled_at: string | null;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

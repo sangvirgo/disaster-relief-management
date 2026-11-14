@@ -1965,7 +1965,8 @@ function App() {
                 ) : workspace === 'coordinator' &&
                   ['queue', 'verify', 'triage', 'assign'].includes(selected.id) ? (
                   <Coordinator key={`${selected.id}:${selectedRequestId}`} page={selected.id} currentUserId={user!.id}
-                    initialRequestId={selectedRequestId} />
+                    initialRequestId={selectedRequestId}
+                    canSeeUnassigned={user!.grants.some((grant) => grant.role_code === 'COORDINATOR' && grant.scope_type === 'SYSTEM' && !grant.campaign_id)} />
                 ) : workspace === 'coordinator' && selected.id === 'needs' && user ? (
                   <Operations page="needs" user={user} />
                 ) : ['volunteer', 'coordinator'].includes(workspace) &&

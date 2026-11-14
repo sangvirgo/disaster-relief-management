@@ -46,8 +46,6 @@ Every error the API can return has one row here. The implementation loads this t
 | `SESSION_REAUTH_REQUIRED` | 403 | Identity | Vui lòng đăng nhập lại trước khi liên kết Google. |
 | `LAST_ADMIN` | 409 | Identity | Không thể thực hiện vì đây là quản trị viên cuối cùng. |
 | `GRANT_EXISTS` | 409 | Identity | Quyền này đã được cấp cho người dùng. |
-| `ORGANIZATION_NAME_TAKEN` | 409 | Identity | Tên tổ chức đã tồn tại. |
-| `ORGANIZATION_IN_USE` | 409 | Identity | Tổ chức đang được sử dụng nên chưa thể ngừng hoạt động. |
 | **Response — intake / tracking** | | | |
 | `COORDINATES_OUT_OF_RANGE` | 400 | Response | Tọa độ không hợp lệ. |
 | `ACCURACY_REQUIRED` | 400 | Response | Vị trí GPS cần có độ chính xác và thời điểm ghi nhận. |
@@ -129,6 +127,7 @@ Notes: `REQUEST_STATE_INVALID` and `IDEMPOTENCY_IN_PROGRESS` from earlier drafts
 | code | HTTP | Owner | Vietnamese message |
 |---|---|---|---|
 | `ATTRIBUTION_LOCKED` | 409 | Response | Phạm vi xử lý đã được cố định cho chu kỳ này. |
+| `REQUEST_ALREADY_CLAIMED` | 409 | Response | Hồ sơ đang do người khác xử lý. Vui lòng chờ hết thời gian giữ hoặc liên hệ người đang xử lý. |
 
 ## Round-2 codes (plan §28)
 

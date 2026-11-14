@@ -11,13 +11,18 @@ import {
   SupplementReviewDto, TriageRequestDto, VerifyRequestDto, FastTrackRequestDto,
 } from './request-operations.dto';
 import { RequestOperationsService } from './request-operations.service';
+import { RequestClaimService } from './request-claims.service';
 import { noStore, requireIdempotencyKey as key, markIdempotentReplay as replay } from '@c48/technical/http/response-headers';
 
 type OperationRequest = Request & { idempotencyKey?: string };
 
 @Controller()
 export class RequestOperationsController {
-  constructor(private readonly operations: RequestOperationsService, private readonly aiAdvisory: RequestOperationsAiAdvisoryService) {}
+  constructor(
+    private readonly operations: RequestOperationsService,
+    private readonly aiAdvisory: RequestOperationsAiAdvisoryService,
+    private readonly claims: RequestClaimService,
+  ) {}
 
   @Get('requests')
   async queue(@Query() query: RequestQueueQueryDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
@@ -242,6 +247,26 @@ export class RequestOperationsController {
   ) {
     noStore(response);
     const result = await this.operations.reviewSupplement(id, eventId, dto, key(request), request);
+    replay(response, result.replay);
+    return result.value;
+  }
+
+  @Post('requests/:id/claim')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async claim(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Req() request: OperationRequest, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    const result = await this.claims.claim(id, key(request), request);
+    replay(response, result.replay);
+    return result.value;
+  }
+
+  @Post('requests/:id/release')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async release(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Req() request: OperationRequest, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    const result = await this.claims.release(id, key(request), request);
     replay(response, result.replay);
     return result.value;
   }

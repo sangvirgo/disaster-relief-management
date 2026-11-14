@@ -11,8 +11,6 @@ const responseUrl = process.env.C48_RESPONSE_BASE_URL;
 const identityUrl = process.env.C48_IDENTITY_BASE_URL;
 const responseDb = new Client({ connectionString: process.env.C48_RESPONSE_DATABASE_URL });
 const identityDb = new Client({ connectionString: process.env.C48_IDENTITY_DATABASE_URL });
-const organizationId = process.env.DEMO_INTAKE_ORGANIZATION_ID;
-assert.ok(organizationId, 'DEMO_INTAKE_ORGANIZATION_ID is required');
 const runSuffix = randomBytes(5).toString('hex').toUpperCase();
 let identityIpSequence = 32 + randomBytes(1)[0] % 160;
 
@@ -84,9 +82,9 @@ async function registerAndLogin(label, grantCoordinator = label === 'coordinator
   const userId = registered.value.user.id;
   if (grantCoordinator) {
     await identityDb.query(
-      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-       VALUES ($1,'COORDINATOR','ORGANIZATION',$2)`,
-      [userId, organizationId],
+      `INSERT INTO role_grant (user_id,role_code,scope_type)
+       VALUES ($1,'COORDINATOR','SYSTEM')`,
+      [userId],
     );
   }
   const login = await call(identityUrl, 'auth/login', {
@@ -101,7 +99,7 @@ async function createAppTeam(coordinatorToken, leaderUserId, name = `Đội ứn
   return call(responseUrl, 'teams', {
     method: 'POST',
     body: {
-      name, organization_id: organizationId,
+      name,
       team_kind: 'VOLUNTEER', reporting_mode: 'APP', leader_user_id: leaderUserId, skill_codes: ['T8_A'],
     },
     headers: { Authorization: `Bearer ${coordinatorToken}`, 'Idempotency-Key': key() },
@@ -116,10 +114,6 @@ async function setPosition(teamId, token, body) {
 
 await Promise.all([responseDb.connect(), identityDb.connect()]);
 try {
-  await identityDb.query(
-    `INSERT INTO organization (id,name,organization_kind) VALUES ($1,'T8 test organization','COORDINATION') ON CONFLICT (id) DO NOTHING`,
-    [organizationId],
-  );
   await responseDb.query(
     `INSERT INTO skill (code,display_name) VALUES ('T8_A','Kỹ năng A'),('T8_B','Kỹ năng B'),('T8_C','Kỹ năng C') ON CONFLICT (code) DO NOTHING`,
   );
@@ -129,14 +123,9 @@ try {
   const otherCoordinator = await registerAndLogin('other');
   const overdueReader = await registerAndLogin('overdue-reader');
   await identityDb.query(
-    `INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)
-     ON CONFLICT (user_id,organization_id) DO UPDATE SET status='ACTIVE'`,
-    [reporter.id, organizationId],
-  );
-  await identityDb.query(
-    `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-     VALUES ($1,'VOLUNTEER','ORGANIZATION',$2)`,
-    [reporter.id, organizationId],
+    `INSERT INTO role_grant (user_id,role_code,scope_type)
+     VALUES ($1,'VOLUNTEER','SYSTEM')`,
+    [reporter.id],
   );
 
   const unauthenticatedSkills = await call(responseUrl, 'skills');
@@ -155,7 +144,6 @@ try {
   const externalContact = 'Số điện thoại chỉ lưu nội bộ: 0900 123 456';
   const createBody = {
     name: 'Đội cứu hộ không dùng ứng dụng',
-    organization_id: organizationId,
     team_kind: 'GOVERNMENT',
     reporting_mode: 'COORDINATOR',
     external_contact_note: externalContact,
@@ -185,7 +173,7 @@ try {
   });
   assert.equal(teamPage.status, 200, JSON.stringify(teamPage.value));
   assert.equal(teamPage.headers.get('cache-control'), 'no-store');
-  assert.equal(teamPage.value.items.length, 1);
+  assert.ok(teamPage.value.items.some((item) => item.id === created.value.id));
   assert.equal(teamPage.value.items[0].id, created.value.id);
   assert.deepEqual(teamPage.value.items[0].skills, ['T8_A', 'T8_C']);
   assert.equal(teamPage.value.items[0].position, null);
@@ -375,33 +363,21 @@ try {
   assert.equal(coordinatorPositionAudit.rows[0].after_state.note, coordinatorPositionBody.note);
 
   const systemVolunteer = await registerAndLogin('system-volunteer');
-  await identityDb.query('INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)', [systemVolunteer.id, organizationId]);
   await identityDb.query("INSERT INTO role_grant (user_id,role_code,scope_type) VALUES ($1,'VOLUNTEER','SYSTEM')", [systemVolunteer.id]);
   const systemScopeTeam = await createAppTeam(coordinator.token, systemVolunteer.id);
   assert.equal(systemScopeTeam.status, 201, JSON.stringify(systemScopeTeam.value));
 
-  const activeNonmember = await registerAndLogin('active-nonmember');
-  await identityDb.query(
-    `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-     VALUES ($1,'VOLUNTEER','ORGANIZATION',$2)`,
-    [activeNonmember.id, organizationId],
-  );
-  assertVietnameseError(await createAppTeam(coordinator.token, activeNonmember.id), 409, 'LEADER_REQUIRED');
+  const activeWithoutVolunteerGrant = await registerAndLogin('active-without-volunteer-grant');
+  assertVietnameseError(await createAppTeam(coordinator.token, activeWithoutVolunteerGrant.id), 409, 'LEADER_REQUIRED');
 
   const disabledUser = await registerAndLogin('disabled');
-  await identityDb.query('INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)', [disabledUser.id, organizationId]);
-  await identityDb.query(
-    `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-     VALUES ($1,'VOLUNTEER','ORGANIZATION',$2)`,
-    [disabledUser.id, organizationId],
-  );
+  await identityDb.query("INSERT INTO role_grant (user_id,role_code,scope_type) VALUES ($1,'VOLUNTEER','SYSTEM')", [disabledUser.id]);
   await identityDb.query("UPDATE app_user SET status='DISABLED' WHERE id=$1", [disabledUser.id]);
   const disabledLeader = await createAppTeam(coordinator.token, disabledUser.id);
   assertVietnameseError(disabledLeader, 409, 'TEAM_NOT_ELIGIBLE');
   assert.equal(disabledLeader.value.details?.reason, 'INACTIVE');
 
   const activeNonvolunteer = await registerAndLogin('active-nonvolunteer');
-  await identityDb.query('INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)', [activeNonvolunteer.id, organizationId]);
   assertVietnameseError(await createAppTeam(coordinator.token, activeNonvolunteer.id), 409, 'LEADER_REQUIRED');
 
   const nonexistentLeaderId = randomUUID();
@@ -426,11 +402,11 @@ try {
   const storedContact = await responseDb.query('SELECT external_contact_note FROM rescue_team WHERE id=$1', [created.value.id]);
   assert.equal(storedContact.rows[0].external_contact_note, externalContact);
   await runTeamCandidatesSmoke({
-    responseDb, responseUrl, reporter, coordinator, otherCoordinator, organizationId, appTeam, call, key,
+    responseDb, responseUrl, reporter, coordinator, otherCoordinator, appTeam, call, key,
   });
   await runMissionSmoke({
     responseDb, responseUrl, reporter, coordinator, otherCoordinator, overdueReader, appTeam,
-    coordinatorTeam: created, organizationId, call, key, assertVietnameseError,
+    coordinatorTeam: created, call, key, assertVietnameseError,
   });
 
   const activeMember = await registerAndLogin('active-member-without-grants');
@@ -552,13 +528,10 @@ try {
   );
   assert.deepEqual(preservedLeader.rows[0], { member_role: 'LEADER', left_at: null });
 
-  const eligibleLeader = await registerAndLogin('membership-leader');
+  const eligibleLeader = await registerAndLogin('volunteer-leader');
   await identityDb.query(
-    `INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)`, [eligibleLeader.id, organizationId],
-  );
-  await identityDb.query(
-    `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-     VALUES ($1,'VOLUNTEER','ORGANIZATION',$2)`, [eligibleLeader.id, organizationId],
+    `INSERT INTO role_grant (user_id,role_code,scope_type)
+     VALUES ($1,'VOLUNTEER','SYSTEM')`, [eligibleLeader.id],
   );
   const leaderMember = await call(responseUrl, `teams/${appTeam.value.id}/members`, {
     method: 'POST', body: { user_id: eligibleLeader.id },
@@ -617,11 +590,8 @@ try {
 
   const concurrentLeader = await registerAndLogin('concurrent-leader');
   await identityDb.query(
-    'INSERT INTO membership (user_id,organization_id) VALUES ($1,$2)', [concurrentLeader.id, organizationId],
-  );
-  await identityDb.query(
-    `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-     VALUES ($1,'VOLUNTEER','ORGANIZATION',$2)`, [concurrentLeader.id, organizationId],
+    `INSERT INTO role_grant (user_id,role_code,scope_type)
+     VALUES ($1,'VOLUNTEER','SYSTEM')`, [concurrentLeader.id],
   );
   const concurrentLeaderMember = await call(responseUrl, `teams/${appTeam.value.id}/members`, {
     method: 'POST', body: { user_id: concurrentLeader.id },

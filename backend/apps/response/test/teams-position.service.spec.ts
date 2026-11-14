@@ -21,7 +21,7 @@ const stored = (overrides: Partial<Current> = {}): Current => ({
 
 function build(current?: Current) {
   const query = jest.fn(async (sql: string) => {
-    if (sql.includes('FROM rescue_team')) return [{ organization_id: 'o', reporting_mode: 'APP', status: 'ACTIVE' }];
+    if (sql.includes('FROM rescue_team')) return [{ reporting_mode: 'APP', status: 'ACTIVE' }];
     if (sql.includes('FROM team_member')) return [{ '?column?': 1 }];
     if (sql.includes('FROM team_position')) return current ? [current] : [];
     return [];

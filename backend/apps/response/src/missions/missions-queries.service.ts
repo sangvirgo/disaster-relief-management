@@ -23,7 +23,6 @@ interface MissionRow extends Record<string, unknown> {
   version: number;
   created_at: Date | string;
   cursor_created_at: string;
-  organization_id: string;
   campaign_id: string | null;
   approved_facts: unknown;
   member_role?: 'LEADER' | 'MEMBER';
@@ -77,7 +76,7 @@ export class MissionsQueriesService {
     const rows = await this.dataSource.query(
       `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,t.status AS team_status,t.reporting_mode AS team_reporting_mode,m.work_cycle,m.status,m.mission_kind,m.version,m.created_at,
               to_char(m.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
-              r.organization_id,r.campaign_id,e.payload->'approved_facts' AS approved_facts,
+              r.campaign_id,e.payload->'approved_facts' AS approved_facts,
               tm.member_role
          FROM mission m JOIN rescue_team t ON t.id=m.team_id
          JOIN assistance_request r ON r.id=m.request_id
@@ -177,7 +176,7 @@ export class MissionsQueriesService {
     const rows = await queryable.query(
       `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,t.status AS team_status,t.reporting_mode AS team_reporting_mode,m.work_cycle,m.status,m.mission_kind,m.version,m.created_at,
               to_char(m.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
-              r.organization_id,r.campaign_id,e.payload->'approved_facts' AS approved_facts
+              r.campaign_id,e.payload->'approved_facts' AS approved_facts
          FROM mission m JOIN rescue_team t ON t.id=m.team_id
          JOIN assistance_request r ON r.id=m.request_id
          JOIN request_event e ON e.id=m.verification_revision AND e.request_id=m.request_id

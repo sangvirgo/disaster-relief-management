@@ -16,7 +16,7 @@ describe('FulfillmentReportService', () => {
     const dataSource = { query } as unknown as DataSource;
     const sessions = {
       require: jest.fn<(request: Request) => Promise<{ userId: string; grants: Array<Record<string, unknown>> }>>().mockResolvedValue({
-        userId: 'user-1', grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: 'org-1' }],
+        userId: 'user-1', grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM',}],
       }),
     } as unknown as LogisticsSessionService;
     const reports = new FulfillmentReportService(dataSource, sessions);

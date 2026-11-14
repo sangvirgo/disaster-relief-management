@@ -24,7 +24,6 @@ interface DeliveryRow {
   public_code: string;
   donor_user_id: string | null;
   capability_hash: string | null;
-  organization_id: string;
   campaign_id: string | null;
 }
 
@@ -131,7 +130,7 @@ export class DonationAttachmentsService {
     const rows = await this.dataSource.query(
       `SELECT a.id AS attachment_id,a.delivery_id AS attachment_delivery_id,a.dispute_id AS attachment_dispute_id,
               a.object_key,a.state,a.size_bytes,a.detected_mime,a.checksum,a.created_at,
-              dd.id,dd.public_code,dd.donor_user_id,dd.capability_hash,dd.organization_id,
+              dd.id,dd.public_code,dd.donor_user_id,dd.capability_hash,
               d.campaign_id
          FROM logistics_attachment a
          LEFT JOIN donation_dispute dispute ON dispute.id=a.dispute_id
@@ -147,9 +146,9 @@ export class DonationAttachmentsService {
       verifyDonationCapability(secret, attachment.capability_hash, this.secretConfig);
     const staffAllowed = session && (
       hasPermission(session.grants, 'DONATION_INTAKE', {
-        organizationId: attachment.organization_id, campaignId: attachment.campaign_id,
+        campaignId: attachment.campaign_id,
       }) || hasPermission(session.grants, 'DONATION_REVIEW', {
-        organizationId: attachment.organization_id, campaignId: attachment.campaign_id,
+        campaignId: attachment.campaign_id,
       })
     );
     if (!donorAllowed && !staffAllowed) {
@@ -227,7 +226,7 @@ export class DonationAttachmentsService {
     forUpdate = false,
   ): Promise<DeliveryRow> {
     const rows = await query.query(
-      `SELECT dd.id,dd.public_code,dd.donor_user_id,dd.capability_hash,dd.organization_id,d.campaign_id
+      `SELECT dd.id,dd.public_code,dd.donor_user_id,dd.capability_hash,d.campaign_id
          FROM donation_delivery dd JOIN donation_drive d ON d.id=dd.drive_id
          JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE dd.id=$1${forUpdate ? ' FOR UPDATE OF dd' : ''}`,
       [id],

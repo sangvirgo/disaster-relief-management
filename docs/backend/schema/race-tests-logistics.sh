@@ -14,14 +14,14 @@ FAILS=0
 q()     { psql -X -q -At -v ON_ERROR_STOP=1 -d "$DB" "$@"; }
 
 U() { printf '00000000-0000-0000-0000-%012x' "$1"; }   # deterministic uuids
-ORG=$(U 1); WH=$(U 2); ITEM=$(U 3)
+WH=$(U 2); ITEM=$(U 3)
 
 # ---- shared fixtures ----
 q <<SQL
 INSERT INTO item_type VALUES ('FOOD','Lương thực'); INSERT INTO unit VALUES ('PIECE','cái',0);
 INSERT INTO item (id,item_type_code,unit_code,name) VALUES ('$ITEM','FOOD','PIECE','Mì gói');
-INSERT INTO warehouse (id,organization_id,name) VALUES ('$WH','$ORG','Kho 1');
-INSERT INTO fulfillment_cycle (id,request_id,work_cycle,organization_id) VALUES ('$(U 10)',gen_random_uuid(),1,'$ORG');
+INSERT INTO warehouse (id,name) VALUES ('$WH','Kho 1');
+INSERT INTO fulfillment_cycle (id,request_id,work_cycle) VALUES ('$(U 10)',gen_random_uuid(),1);
 INSERT INTO relief_need (id,cycle_id,item_id,original_quantity,requested_quantity) VALUES ('$(U 11)','$(U 10)','$ITEM',50,50);
 INSERT INTO commitment (id,relief_need_id,item_id,warehouse_id,quantity,created_by_user_id) VALUES ('$(U 12)','$(U 11)','$ITEM','$WH',50,gen_random_uuid());
 SQL
@@ -73,8 +73,8 @@ verdict "(b) same approved adjustment applied twice" $ok "on_hand=$ONH adjustmen
 # ---------- (c) two RECEIPT movements for the same receipt + balance ----------
 BC=$(U 120); DRV=$(U 121); DLV=$(U 122); RCP=$(U 123)
 q <<SQL
-INSERT INTO donation_drive (id,organization_id,intake_warehouse_id,title) VALUES ('$DRV','$ORG','$WH','Đợt 1');
-INSERT INTO donation_delivery (id,public_code,drive_id,organization_id,donor_name,donor_phone) VALUES ('$DLV','RC000001','$DRV','$ORG','An','0900000001');
+INSERT INTO donation_drive (id,intake_warehouse_id,title) VALUES ('$DRV','$WH','Đợt 1');
+INSERT INTO donation_delivery (id,public_code,drive_id,donor_name,donor_phone) VALUES ('$DLV','RC000001','$DRV','An','0900000001');
 INSERT INTO donation_declaration (delivery_id,revision,created_by_kind) VALUES ('$DLV',1,'DONOR');
 INSERT INTO donation_line VALUES ('$DLV',1,'$ITEM',20);
 INSERT INTO donation_receipt (id,delivery_id,warehouse_id) VALUES ('$RCP','$DLV','$WH');
@@ -93,7 +93,7 @@ verdict "(c) same receipt posted twice (different operation_ref)" $ok "on_hand=$
 # ---------- (d) two concurrent LOSS reviews on one handoff ----------
 DIS=$(U 130); HO=$(U 131)
 q <<SQL
-INSERT INTO distribution (id,warehouse_id,organization_id,purpose,preparer_user_id) VALUES ('$DIS','$WH','$ORG','CAMPAIGN_DISTRIBUTION','$(U 909)');
+INSERT INTO distribution (id,warehouse_id,purpose,preparer_user_id) VALUES ('$DIS','$WH','CAMPAIGN_DISTRIBUTION','$(U 909)');
 INSERT INTO handoff_record (id,distribution_id,handoff_kind,source_stage,recorder_user_id,confirmation_basis,occurred_at) VALUES ('$HO','$DIS','LOSS','IN_TRANSIT','$(U 910)','mất hàng',now());
 SQL
 race d "INSERT INTO handoff_loss_review (handoff_id,reviewer_user_id,decision,reason) VALUES ('$HO','$(U 911)','APPROVE','đã xác minh');" \

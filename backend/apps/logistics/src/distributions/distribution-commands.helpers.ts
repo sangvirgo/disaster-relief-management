@@ -9,7 +9,7 @@ export interface CommitmentContext {
   cycle_id: string;
   item_id: string;
   warehouse_id: string;
-  organization_id: string;
+  campaign_id: string | null;
   cycle_state: string;
   need_status: string;
   delivery_target_kind: 'FINAL_RECIPIENT' | 'RELIEF_POINT';
@@ -37,7 +37,7 @@ export async function lockCommitmentContexts(
   manager: Pick<EntityManager, 'query'>,
   lines: readonly DistributionLineDto[],
   warehouseId: string,
-  organizationId: string,
+  distributionCampaignId: string | null,
   purpose: string,
   reliefPointId: string | null,
   mode: 'PREPARATION' | 'DISPATCH' = 'PREPARATION',
@@ -60,7 +60,7 @@ export async function lockCommitmentContexts(
   await manager.query('SELECT id FROM commitment WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE', [commitmentIds]);
 
   const rows = await manager.query(
-    `SELECT cm.id,cm.relief_need_id,n.cycle_id,cm.item_id,cm.warehouse_id,c.organization_id,c.state AS cycle_state,
+    `SELECT cm.id,cm.relief_need_id,n.cycle_id,cm.item_id,cm.warehouse_id,c.campaign_id,c.state AS cycle_state,
             n.status AS need_status,
             CASE WHEN n.designated_point_id IS NULL THEN 'FINAL_RECIPIENT' ELSE 'RELIEF_POINT' END AS delivery_target_kind,
             n.designated_point_id,
@@ -75,7 +75,8 @@ export async function lockCommitmentContexts(
 
   for (const line of lines) {
     const commitment = byId.get(line.commitment_id!);
-    if (!commitment || commitment.item_id !== line.item_id || commitment.warehouse_id !== warehouseId || commitment.organization_id !== organizationId) {
+    if (!commitment || commitment.item_id !== line.item_id || commitment.warehouse_id !== warehouseId ||
+        (distributionCampaignId !== null && commitment.campaign_id !== distributionCampaignId)) {
       throw new AppError('LINE_ITEM_MISMATCH', { status: 400 });
     }
     if (commitment.cycle_state === 'SEALED') throw new AppError('CYCLE_SEALED', { status: 409 });

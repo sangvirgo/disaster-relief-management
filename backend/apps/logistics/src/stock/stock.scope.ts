@@ -1,29 +1,27 @@
 import { hasPermission, Grant, Permission } from '@c48/identity-contracts/permissions';
 import { AppError } from '@c48/technical/errors/errors';
 
-export function hasWarehouseScope(grants: readonly Grant[], organizationId: string): boolean {
-  return grants.some((grant) => grant.scope_type === 'ORGANIZATION' && !grant.campaign_id && grant.organization_id === organizationId);
+/** Warehouses and stock are SYSTEM resources; a campaign-attached operation (for example a distribution) passes its campaign. */
+export interface WarehouseScope {
+  campaign_id?: string | null;
+}
+
+export function hasWarehouseScope(grants: readonly Grant[], scope: WarehouseScope = {}): boolean {
+  const campaignId = scope.campaign_id ?? null;
+  return grants.some((grant) => grant.scope_type === 'SYSTEM' || (campaignId !== null && grant.campaign_id === campaignId));
 }
 
 export function requireWarehousePermission(
   grants: readonly Grant[],
   permission: Permission,
-  organizationId: string,
+  scope: WarehouseScope = {},
 ): void {
-  if (!hasPermission(grants, permission, { organizationId })) {
+  if (!hasPermission(grants, permission, { campaignId: scope.campaign_id ?? null })) {
     throw new AppError('FORBIDDEN', { status: 403 });
   }
 }
 
-export function stockWarehouseScopeSql(grants: readonly Grant[], values: unknown[], warehouseAlias = 'w'): string {
-  const branches: string[] = [];
-  for (const grant of grants) {
-    if (!grant.organization_id) continue;
-    if (grant.scope_type === 'ORGANIZATION' && !grant.campaign_id) {
-      values.push(grant.organization_id);
-      branches.push(`${warehouseAlias}.organization_id=$${values.length}`);
-    }
-  }
-  if (branches.length === 0) throw new AppError('FORBIDDEN', { status: 403 });
-  return `(${branches.join(' OR ')})`;
+export function stockWarehouseScopeSql(grants: readonly Grant[], _values: unknown[], _warehouseAlias = 'w'): string {
+  if (!hasWarehouseScope(grants)) throw new AppError('FORBIDDEN', { status: 403 });
+  return 'TRUE';
 }

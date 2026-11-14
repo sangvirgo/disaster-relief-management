@@ -14,7 +14,6 @@ if (!databaseUrl || !clientId || !clientSecret) throw new Error('The primary C48
 const database = new Client({ connectionString: databaseUrl });
 const userIds = [];
 const familyIds = [];
-const createdIds = [];
 const keys = [];
 let ipSequence = 1;
 const adminPassword = `Admin field account ${randomBytes(6).toString('hex')}!`;
@@ -87,25 +86,14 @@ try {
   assert.equal(introspected.body.active, true);
   assert.equal(introspected.body.user_id, adminId);
   assert.equal(introspected.body.grants[0].role_code, 'ADMIN');
-
-  const organizationPayload = { name: `Đội điều phối ${randomBytes(4).toString('hex')}`, organization_kind: 'COORDINATION' };
-  const organization = await call('/organizations', {
-    method: 'POST', token: adminToken, body: organizationPayload, headers: { 'Idempotency-Key': idem() },
-  });
-  assert.equal(organization.status, 201, JSON.stringify(organization.body));
-  const organizationId = organization.body.id;
-  createdIds.push(organizationId);
-  const duplicateOrganization = await call('/organizations', {
-    method: 'POST', token: adminToken, body: organizationPayload, headers: { 'Idempotency-Key': idem() },
-  });
-  expectError(duplicateOrganization, 409, 'ORGANIZATION_NAME_TAKEN');
+  assert.ok(introspected.body.grants.every((grant) => ['SYSTEM', 'CAMPAIGN'].includes(grant.scope_type)));
+  assert.ok(introspected.body.grants.every((grant) => !Object.hasOwn(grant, 'organization_id')));
 
   const temporaryPassword = `Temporary field password ${randomBytes(6).toString('hex')}!`;
   const userPayload = {
     username: `staff${randomBytes(5).toString('hex')}`,
     display_name: 'Nhân viên cứu trợ',
     temporary_password: temporaryPassword,
-    organization_id: organizationId,
   };
   const createUserKey = idem();
   const createdUser = await call('/users', {
@@ -131,23 +119,22 @@ try {
   assert.equal(createReplay.body.id, userId);
   const userDetail = await call(`/users/${userId}`, { token: adminToken });
   assert.equal(userDetail.status, 200, JSON.stringify(userDetail.body));
-  assert.ok(userDetail.body.memberships.some((membership) => membership.organization_id === organizationId));
   assert.ok(!Object.hasOwn(userDetail.body, 'password_hash'));
 
   const selfGrant = await call(`/users/${adminId}/grants`, {
     method: 'POST', token: adminToken,
-    body: { role_code: 'VOLUNTEER', scope_type: 'ORGANIZATION', organization_id: organizationId, reason: 'Không được tự cấp quyền' },
+    body: { role_code: 'VOLUNTEER', scope_type: 'SYSTEM', reason: 'Không được tự cấp quyền' },
     headers: { 'Idempotency-Key': idem() },
   });
   expectError(selfGrant, 403, 'FORBIDDEN');
   const uppercaseSelfGrant = await call(`/users/${adminId.toUpperCase()}/grants`, {
     method: 'POST', token: adminToken,
-    body: { role_code: 'VOLUNTEER', scope_type: 'ORGANIZATION', organization_id: organizationId, reason: 'Không được tự cấp quyền' },
+    body: { role_code: 'VOLUNTEER', scope_type: 'SYSTEM', reason: 'Không được tự cấp quyền' },
     headers: { 'Idempotency-Key': idem() },
   });
   expectError(uppercaseSelfGrant, 403, 'FORBIDDEN');
 
-  const grantPayload = { role_code: 'VOLUNTEER', scope_type: 'ORGANIZATION', organization_id: organizationId, reason: 'Thử nghiệm quyền' };
+  const grantPayload = { role_code: 'VOLUNTEER', scope_type: 'SYSTEM', reason: 'Thử nghiệm quyền' };
   const grant = await call(`/users/${userId}/grants`, {
     method: 'POST', token: adminToken, body: grantPayload, headers: { 'Idempotency-Key': idem() },
   });
@@ -198,55 +185,11 @@ try {
   assert.equal(revokedGrant.status, 200, JSON.stringify(revokedGrant.body));
   expectError(await call('/me', { token: freshLogin.body.access_token }), 401, 'SESSION_EXPIRED');
 
-  const membershipLogin = await call('/auth/login', {
-    method: 'POST', body: { username: userPayload.username, password: temporaryPassword, client_kind: 'NATIVE' },
-    headers: { 'X-Forwarded-For': nextIp() },
-  });
-  assert.equal(membershipLogin.status, 200, JSON.stringify(membershipLogin.body));
-  const membershipClaims = jwtClaims(membershipLogin.body.access_token);
-  familyIds.push(membershipClaims.sid);
-  const removeMembership = await call(`/organizations/${organizationId}/members/${userId}/remove`, {
-    method: 'POST', token: adminToken, headers: { 'Idempotency-Key': idem() },
-  });
-  assert.equal(removeMembership.status, 204, JSON.stringify(removeMembership.body));
-  expectError(await call('/me', { token: membershipLogin.body.access_token }), 401, 'SESSION_EXPIRED');
-  const organizationGrantAudits = await database.query(
-    `SELECT g.revoked_at, a.after_state->>'revoked_at' AS audit_revoked_at
-       FROM role_grant g JOIN audit_log a ON a.entity_type = 'role_grant' AND a.entity_id = g.id::text AND a.action = 'GRANT_REVOKED'
-      WHERE g.user_id = $1 AND g.organization_id = $2 AND g.revoked_at IS NOT NULL`,
-    [userId, organizationId],
-  );
-  assert.ok(organizationGrantAudits.rows.length > 0);
-  for (const row of organizationGrantAudits.rows) assert.equal(new Date(row.revoked_at).toISOString(), row.audit_revoked_at);
-  const liveOrganizationGrants = await database.query(
-    "SELECT count(*)::int AS count FROM role_grant WHERE user_id = $1 AND organization_id = $2 AND revoked_at IS NULL",
-    [userId, organizationId],
-  );
-  assert.equal(liveOrganizationGrants.rows[0].count, 0);
-  const readdedMember = await call(`/organizations/${organizationId}/members`, {
-    method: 'POST', token: adminToken, body: { user_id: userId }, headers: { 'Idempotency-Key': idem() },
-  });
-  assert.equal(readdedMember.status, 201, JSON.stringify(readdedMember.body));
-  const organizationInUse = await call(`/organizations/${organizationId}/deactivate`, {
-    method: 'POST', token: adminToken, body: { expected_version: 1, reason: 'Không thể đóng khi còn thành viên' },
-    headers: { 'Idempotency-Key': idem() },
-  });
-  expectError(organizationInUse, 409, 'ORGANIZATION_IN_USE');
-  const removeReaddedMember = await call(`/organizations/${organizationId}/members/${userId}/remove`, {
-    method: 'POST', token: adminToken, headers: { 'Idempotency-Key': idem() },
-  });
-  assert.equal(removeReaddedMember.status, 204, JSON.stringify(removeReaddedMember.body));
-
   const grantsWithHistory = await call(`/users/${userId}/grants?include_revoked=true&limit=1`, { token: adminToken });
   assert.equal(grantsWithHistory.status, 200, JSON.stringify(grantsWithHistory.body));
   assert.equal(grantsWithHistory.body.items[0].revoked_at !== null, true);
   assert.ok(grantsWithHistory.body.next_cursor);
 
-  const organizationDeactivate = await call(`/organizations/${organizationId}/deactivate`, {
-    method: 'POST', token: adminToken, body: { expected_version: 1, reason: 'Đóng tổ chức thử nghiệm' },
-    headers: { 'Idempotency-Key': idem() },
-  });
-  assert.equal(organizationDeactivate.status, 200, JSON.stringify(organizationDeactivate.body));
   const lastAdmin = await call(`/users/${adminId}/disable`, {
     method: 'POST', token: adminToken,
     body: { expected_version: 1, reason: 'Kiểm tra quản trị viên cuối cùng' },
@@ -272,11 +215,6 @@ try {
   assert.ok(!JSON.stringify(audit.body).includes(temporaryPassword));
   const grantAudit = await call(`/audit-logs?entity_type=role_grant&entity_id=${grant.body.id}&limit=100`, { token: adminToken });
   assert.ok(grantAudit.body.items.some((item) => item.action === 'GRANT_CREATED'));
-
-  const internalOrganization = await call(`/internal/organizations/${organizationId}`, { token: serviceToken.body.access_token });
-  assert.equal(internalOrganization.status, 200, JSON.stringify(internalOrganization.body));
-  assert.equal(internalOrganization.body.status, 'INACTIVE');
-  expectError(await call('/internal/organizations/not-a-uuid', { token: serviceToken.body.access_token }), 400, 'VALIDATION_FAILED');
 
   const beforeDisable = await call(`/users/${userId}`, { token: adminToken });
   const disabled = await call(`/users/${userId}/disable`, {
@@ -342,11 +280,7 @@ try {
   if (userIds.length) {
     await database.query('DELETE FROM session_family WHERE user_id = ANY($1::uuid[])', [userIds]).catch(() => undefined);
     await database.query('DELETE FROM role_grant WHERE user_id = ANY($1::uuid[])', [userIds]).catch(() => undefined);
-    await database.query('DELETE FROM membership WHERE user_id = ANY($1::uuid[])', [userIds]).catch(() => undefined);
     await database.query('DELETE FROM app_user WHERE id = ANY($1::uuid[])', [userIds]).catch(() => undefined);
-  }
-  if (createdIds.length) {
-    await database.query('DELETE FROM organization WHERE id = ANY($1::uuid[])', [createdIds]).catch(() => undefined);
   }
   if (keys.length) await database.query('DELETE FROM idempotency_record WHERE idempotency_key = ANY($1::uuid[])', [keys]).catch(() => undefined);
   await database.end();

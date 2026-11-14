@@ -2,7 +2,6 @@ import { jest } from '@jest/globals';
 import { StockService } from '../src/stock/stock.service';
 
 const actorId = '11111111-1111-4111-8111-111111111111';
-const organizationId = '22222222-2222-4222-8222-222222222222';
 const warehouseId = '33333333-3333-4333-8333-333333333333';
 const balanceId = '44444444-4444-4444-8444-444444444444';
 const adjustmentId = '55555555-5555-4555-8555-555555555555';
@@ -16,17 +15,16 @@ function request() {
 }
 
 describe('Logistics stock command scope', () => {
-  it('rejects an out-of-scope balance before claiming idempotency', async () => {
+  it('rejects a campaign grant on a warehouse without campaign scope before claiming idempotency', async () => {
     const dataSource = { query: jest.fn().mockResolvedValue([{
       id: balanceId,
       warehouse_id: warehouseId,
-      organization_id: '77777777-7777-4777-8777-777777777777',
       scale: 2,
     }]) };
     const idempotency = { execute: jest.fn() };
     const sessions = { require: jest.fn().mockResolvedValue({
       userId: actorId,
-      grants: [{ role_code: 'INTAKE_STAFF', scope_type: 'ORGANIZATION', organization_id: organizationId }],
+      grants: [{ role_code: 'INTAKE_STAFF', scope_type: 'CAMPAIGN', campaign_id: '99999999-9999-4999-8999-999999999999' }],
     }) };
     const service = new StockService(dataSource as never, idempotency as never, sessions as never);
 
@@ -41,12 +39,11 @@ describe('Logistics stock command scope', () => {
       balance_id: balanceId,
       requested_by_user_id: actorId,
       status: 'PENDING',
-      organization_id: organizationId,
     }]) };
     const idempotency = { execute: jest.fn() };
     const sessions = { require: jest.fn().mockResolvedValue({
       userId: actorId,
-      grants: [{ role_code: 'REVIEWER', scope_type: 'ORGANIZATION', organization_id: organizationId }],
+      grants: [{ role_code: 'REVIEWER', scope_type: 'SYSTEM',}],
     }) };
     const service = new StockService(dataSource as never, idempotency as never, sessions as never);
 
@@ -60,7 +57,7 @@ describe('Logistics stock command scope', () => {
     const idempotency = { execute: jest.fn() };
     const sessions = { require: jest.fn().mockResolvedValue({
       userId: actorId,
-      grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: organizationId }],
+      grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}],
     }) };
     const service = new StockService(dataSource as never, idempotency as never, sessions as never);
     const lines = Array.from({ length: 51 }, (_, index) => ({
@@ -79,12 +76,12 @@ describe('Logistics stock command scope', () => {
     const balanceA = 'aaaaaaaa-1111-4111-8111-111111111111';
     const balanceB = 'bbbbbbbb-2222-4222-8222-222222222222';
     const dataSource = { query: jest.fn()
-      .mockResolvedValueOnce([{ id: warehouseId, organization_id: organizationId, status: 'ACTIVE' }])
+      .mockResolvedValueOnce([{ id: warehouseId, status: 'ACTIVE' }])
       .mockResolvedValueOnce([{ id: itemB, status: 'ACTIVE', scale: 2 }, { id: itemA, status: 'ACTIVE', scale: 2 }]) };
     const idempotency = { execute: jest.fn() };
     const sessions = { require: jest.fn().mockResolvedValue({
       userId: actorId,
-      grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: organizationId }],
+      grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}],
     }) };
     const service = new StockService(dataSource as never, idempotency as never, sessions as never);
     const dto = {
@@ -97,8 +94,8 @@ describe('Logistics stock command scope', () => {
       execute(manager: never): Promise<unknown>;
     };
     const manager = { query: jest.fn(async (sql: string, _values?: unknown[]) => {
-      if (sql.includes('SELECT id,organization_id,status FROM warehouse')) {
-        return [{ id: warehouseId, organization_id: organizationId, status: 'ACTIVE' }];
+      if (sql.includes('SELECT id,status FROM warehouse')) {
+        return [{ id: warehouseId, status: 'ACTIVE' }];
       }
       if (sql.includes('SELECT i.id,i.status,u.scale')) {
         return [{ id: itemA, status: 'ACTIVE', scale: 2 }, { id: itemB, status: 'ACTIVE', scale: 2 }];
@@ -143,12 +140,11 @@ describe('Logistics stock command scope', () => {
       balance_id: balanceId,
       requested_by_user_id: requesterId,
       status: 'PENDING',
-      organization_id: organizationId,
     }]) };
     const idempotency = { execute: jest.fn() };
     const sessions = { require: jest.fn().mockResolvedValue({
       userId: actorId,
-      grants: [{ role_code: 'REVIEWER', scope_type: 'ORGANIZATION', organization_id: organizationId }],
+      grants: [{ role_code: 'REVIEWER', scope_type: 'SYSTEM',}],
     }) };
     const service = new StockService(dataSource as never, idempotency as never, sessions as never);
     await service.reviewAdjustment(adjustmentId, { decision: 'APPROVE' }, request());

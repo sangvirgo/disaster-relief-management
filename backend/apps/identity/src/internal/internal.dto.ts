@@ -53,12 +53,9 @@ export class ActiveUserCheckDto {
 export class TeamLeaderEligibilityDto {
   @IsUUID('all')
   user_id!: string;
-
-  @IsUUID('all')
-  organization_id!: string;
 }
 
 export class RequestCoordinatorQueryDto {
-  @IsUUID('all')
-  organization_id!: string;
+  @IsOptional() @IsUUID('all')
+  campaign_id?: string;
 }

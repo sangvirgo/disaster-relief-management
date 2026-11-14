@@ -23,7 +23,7 @@ describe('RequestResolutionFinalizer', () => {
           id: intentId, request_id: requestId, work_cycle: 2, kind: 'RESOLUTION', state: 'PENDING',
           actor_user_id: '60000000-0000-4000-8000-000000000001', expected_request_version: 9, previous_status: 'TRIAGED', reason: 'Hoàn tất',
           request_status: 'RESOLVING', request_version: 9, logistics_admitted_at: new Date(),
-          organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+          campaign_id: null,
           reporter_user_id: null, outcome_basis: 'RESCUE_COMPLETED',
         }];
       }),
@@ -38,8 +38,8 @@ describe('RequestResolutionFinalizer', () => {
       unseal: jest.fn(async () => undefined),
     };
     const sessions = { requestCoordinatorGrants: jest.fn(async () => [{
-      user_id: '60000000-0000-4000-8000-000000000001', role_code: 'COORDINATOR', scope_type: 'ORGANIZATION',
-      organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+      user_id: '60000000-0000-4000-8000-000000000001', role_code: 'COORDINATOR', scope_type: 'SYSTEM',
+      campaign_id: null,
     }]) };
     const finalizer = new RequestResolutionFinalizer(dataSource as never, logistics as never, sessions as never);
 
@@ -76,15 +76,15 @@ describe('RequestResolutionFinalizer', () => {
         id: intentId, request_id: requestId, work_cycle: 2, kind: 'RESOLUTION', state: 'PENDING',
         actor_user_id: '60000000-0000-4000-8000-000000000001', expected_request_version: 9, previous_status: 'TRIAGED', reason: 'Hoàn tất',
         request_status: 'RESOLVING', request_version: 9, logistics_admitted_at: new Date(),
-        organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+        campaign_id: null,
         reporter_user_id: '60000000-0000-4000-8000-000000000002', outcome_basis: 'RESCUE_COMPLETED',
       }]),
       transaction: jest.fn(async (callback: (value: typeof manager) => Promise<unknown>) => callback(manager)),
     };
     const logistics = { seal: jest.fn(), freeze: jest.fn(), unseal: jest.fn() };
     const sessions = { requestCoordinatorGrants: jest.fn(async () => [{
-      user_id: '60000000-0000-4000-8000-000000000001', role_code: 'COORDINATOR', scope_type: 'ORGANIZATION',
-      organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+      user_id: '60000000-0000-4000-8000-000000000001', role_code: 'COORDINATOR', scope_type: 'SYSTEM',
+      campaign_id: null,
     }]) };
     const finalizer = new RequestResolutionFinalizer(dataSource as never, logistics as never, sessions as never);
 
@@ -104,7 +104,7 @@ describe('RequestResolutionFinalizer', () => {
         id: intentId, request_id: requestId, work_cycle: 2, kind: 'RESOLUTION', state: 'PENDING',
         actor_user_id: '60000000-0000-4000-8000-000000000001', expected_request_version: 9, previous_status: 'TRIAGED', reason: 'Hoàn tất',
         request_status: 'RESOLVING', request_version: 9, logistics_admitted_at: new Date(),
-        organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+        campaign_id: null,
         reporter_user_id: null, outcome_basis: 'RESCUE_COMPLETED',
       }]),
       transaction: jest.fn()
@@ -115,8 +115,8 @@ describe('RequestResolutionFinalizer', () => {
       seal: jest.fn(), freeze: jest.fn(), unseal: jest.fn(),
     };
     const sessions = { requestCoordinatorGrants: jest.fn(async () => [{
-      user_id: '60000000-0000-4000-8000-000000000001', role_code: 'COORDINATOR', scope_type: 'ORGANIZATION',
-      organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+      user_id: '60000000-0000-4000-8000-000000000001', role_code: 'COORDINATOR', scope_type: 'SYSTEM',
+      campaign_id: null,
     }]) };
     const finalizer = new RequestResolutionFinalizer(dataSource as never, logistics as never, sessions as never);
 
@@ -134,15 +134,15 @@ describe('RequestResolutionFinalizer', () => {
         id: intentId, request_id: requestId, work_cycle: 1, kind: 'RESOLUTION', state: 'PENDING',
         actor_user_id: '60000000-0000-4000-8000-000000000001', expected_request_version: 9, previous_status: 'TRIAGED', reason: 'Không cần hỗ trợ',
         request_status: 'RESOLVING', request_version: 9, logistics_admitted_at: null,
-        organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+        campaign_id: null,
         reporter_user_id: null, outcome_basis: 'NO_ACTION_REQUIRED',
       }]),
       transaction: jest.fn(async (callback: (value: typeof manager) => Promise<unknown>) => callback(manager)),
     };
     const logistics = { seal: jest.fn(), freeze: jest.fn(), unseal: jest.fn() };
     const sessions = { requestCoordinatorGrants: jest.fn(async () => [{
-      user_id: '60000000-0000-4000-8000-000000000001', role_code: 'COORDINATOR', scope_type: 'ORGANIZATION',
-      organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+      user_id: '60000000-0000-4000-8000-000000000001', role_code: 'COORDINATOR', scope_type: 'SYSTEM',
+      campaign_id: null,
     }]) };
     const finalizer = new RequestResolutionFinalizer(dataSource as never, logistics as never, sessions as never);
 
@@ -159,7 +159,7 @@ describe('RequestResolutionFinalizer', () => {
         id: intentId, request_id: requestId, work_cycle: 1, kind: 'RESOLUTION', state: 'PENDING',
         actor_user_id: '60000000-0000-4000-8000-000000000001', expected_request_version: 9, previous_status: 'TRIAGED', reason: 'Hoàn tất',
         request_status: 'RESOLVING', request_version: 9, logistics_admitted_at: new Date(),
-        organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+        campaign_id: null,
         reporter_user_id: null, outcome_basis: 'RESCUE_COMPLETED',
       }]),
       transaction: jest.fn(async (callback: (value: typeof manager) => Promise<unknown>) => callback(manager)),
@@ -182,7 +182,7 @@ describe('RequestResolutionFinalizer', () => {
         id: intentId, request_id: requestId, work_cycle: 3, kind: 'CANCELLATION', state: 'ABORTING',
         actor_user_id: '60000000-0000-4000-8000-000000000001', expected_request_version: 9, previous_status: 'IN_PROGRESS', reason: 'Hủy yêu cầu',
         request_status: 'RESOLVING', request_version: 9, logistics_admitted_at: new Date(),
-        organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+        campaign_id: null,
         reporter_user_id: null, outcome_basis: null,
       }]),
       transaction: jest.fn(async (callback: (value: typeof manager) => Promise<unknown>) => { order.push('begin-transaction'); return callback(manager); }),
@@ -224,7 +224,7 @@ describe('RequestResolutionFinalizer', () => {
         id: intentId, request_id: requestId, work_cycle: 2, kind: 'RESOLUTION', state: 'ABORTING',
         actor_user_id: '60000000-0000-4000-8000-000000000001', expected_request_version: 10, previous_status: 'IN_PROGRESS', reason: 'Hoàn tất',
         abort_reason: 'Lý do hủy đã ghi nhận', request_status: 'RESOLVING', request_version: 10, logistics_admitted_at: null,
-        organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+        campaign_id: null,
         reporter_user_id: null, outcome_basis: null,
       }]),
       transaction: jest.fn(async (callback: (value: typeof manager) => Promise<unknown>) => callback(manager)),
@@ -275,15 +275,15 @@ describe('RequestResolutionFinalizer', () => {
         id: intentId, request_id: requestId, work_cycle: 2, kind: 'CANCELLATION', state: 'PENDING',
         actor_user_id: '60000000-0000-4000-8000-000000000001', expected_request_version: 10, previous_status: 'IN_PROGRESS', reason: 'Hủy yêu cầu',
         request_status: 'RESOLVING', request_version: 10, logistics_admitted_at: null,
-        organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+        campaign_id: null,
         reporter_user_id: null, outcome_basis: null,
       }]),
       transaction: jest.fn(async (callback: (value: typeof manager) => Promise<unknown>) => callback(manager)),
     };
     const logistics = { seal: jest.fn(), freeze: jest.fn(), unseal: jest.fn() };
     const sessions = { requestCoordinatorGrants: jest.fn(async () => [{
-      user_id: '60000000-0000-4000-8000-000000000001', role_code: 'COORDINATOR', scope_type: 'ORGANIZATION',
-      organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+      user_id: '60000000-0000-4000-8000-000000000001', role_code: 'COORDINATOR', scope_type: 'SYSTEM',
+      campaign_id: null,
     }]) };
     const finalizer = new RequestResolutionFinalizer(dataSource as never, logistics as never, sessions as never);
 

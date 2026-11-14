@@ -16,7 +16,6 @@ export interface OperationRequestRow {
   review_lane: string;
   received_at: Date | string;
   verifying_since: Date | string | null;
-  organization_id: string;
   campaign_id: string | null;
   description: string | null;
   incident_category_code: string;

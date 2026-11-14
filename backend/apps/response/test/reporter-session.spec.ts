@@ -15,7 +15,6 @@ const auth = loadReporterTokenConfig({
 });
 const intakeConfig: RequestIntakeConfig = {
   auth,
-  organizationId: '00000000-0000-4000-8000-000000000004',
   peppers: { v1: 'test-pepper-not-for-deployment-0001' },
   globalLimitPerMinute: 300,
   softLimitPerMinute: 30,

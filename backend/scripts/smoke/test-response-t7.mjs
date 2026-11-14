@@ -9,7 +9,6 @@ const responseUrl = process.env.C48_RESPONSE_BASE_URL;
 const identityUrl = process.env.C48_IDENTITY_BASE_URL;
 const responseDb = new Client({ connectionString: process.env.C48_RESPONSE_DATABASE_URL });
 const identityDb = new Client({ connectionString: process.env.C48_IDENTITY_DATABASE_URL });
-const organizationId = process.env.DEMO_INTAKE_ORGANIZATION_ID ?? '40000000-0000-4000-8000-000000000004';
 const requestIds = [];
 let identityIpSequence = 1;
 
@@ -52,9 +51,9 @@ async function registerAndLogin(label, role = 'CITIZEN') {
   const userId = registered.value.user.id;
   if (role === 'COORDINATOR') {
     await identityDb.query(
-      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-       VALUES ($1,'COORDINATOR','ORGANIZATION',$2)`,
-      [userId, organizationId],
+      `INSERT INTO role_grant (user_id,role_code,scope_type)
+       VALUES ($1,'COORDINATOR','SYSTEM')`,
+      [userId],
     );
   }
   const login = await call(identityUrl, 'auth/login', {
@@ -133,10 +132,6 @@ async function waitForRequestRowLockWaits(database, blockerPid, minimum) {
 
 await Promise.all([responseDb.connect(), identityDb.connect()]);
 try {
-  await identityDb.query(
-    `INSERT INTO organization (id,name,organization_kind) VALUES ($1,'T7 test organization','COORDINATION') ON CONFLICT (id) DO NOTHING`,
-    [organizationId],
-  );
   await responseDb.query("INSERT INTO incident_category (code,display_name) VALUES ('T7_FLOOD','Lũ lụt') ON CONFLICT (code) DO NOTHING");
 
   const reporter = await registerAndLogin('reporter');
@@ -176,7 +171,7 @@ try {
   });
   assert.equal(scopedEvents.status, 200, JSON.stringify(scopedEvents.value));
   const scopedFixture = scopedEvents.value.items.find((event) => event.event_type === 'STAFF_SCOPE_FIXTURE');
-  assert.ok(scopedFixture, 'organization coordinator can read an in-scope event');
+  assert.ok(scopedFixture, 'SYSTEM coordinator can read an in-scope event');
   assert.equal(Object.hasOwn(scopedFixture.payload, 'canonical_request_id'), false, 'out-of-scope request references are removed from event payloads');
 
   const detail = await call(responseUrl, `requests/${self.id}`, { headers: { Authorization: `Bearer ${coordinator.token}` } });

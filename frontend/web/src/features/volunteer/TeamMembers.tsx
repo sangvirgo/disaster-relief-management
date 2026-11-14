@@ -201,7 +201,7 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
     {addOpen && <DetailSurface modal open onClose={closeAddDialog} label="Thêm thành viên vào đội" heading="Thêm thành viên" className="team-member-dialog"><div className="team-member-add">
       {!loading && !canManage && <p className="notice error" role="alert">Bạn không có quyền thêm thành viên vào đội này.</p>}
       {canManage && <>
-      <p className="muted team-member-add__intro">Tìm theo tên hoặc tài khoản. Tài khoản phải đang hoạt động và chưa thuộc đội khác. Để làm đội trưởng, người đó còn cần quyền Tình nguyện viên trong tổ chức của đội.</p>
+      <p className="muted team-member-add__intro">Tìm theo tên hoặc tài khoản. Tài khoản phải đang hoạt động và chưa thuộc đội khác. Để làm đội trưởng, người đó còn cần quyền Tình nguyện viên toàn hệ thống.</p>
       <form className="team-member-search" noValidate onSubmit={(event) => void search(event)}>
         <label htmlFor="team-member-query">Tìm người tham gia</label>
         <div className="team-member-search-row">

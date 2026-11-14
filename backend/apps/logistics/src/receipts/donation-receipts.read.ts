@@ -7,7 +7,7 @@ type Queryable = Pick<DataSource | EntityManager, 'query'>;
 interface ReceiptRow extends Record<string, unknown> {
   id: string;
   delivery_id: string;
-  organization_id: string;
+  campaign_id: string | null;
   version: number | string;
   created_at: Date | string;
   count_revision: number | null;
@@ -37,13 +37,13 @@ const lineSql = `
    ORDER BY i.name,COALESCE(cc.item_id,cd.item_id)`;
 
 export async function readReceiptView(query: Queryable, id: string): Promise<{
-  organization_id: string;
+  campaign_id: string | null;
   value: Record<string, unknown>;
 }> {
   const rows = await query.query(
     `SELECT r.id,r.delivery_id,r.warehouse_id,r.version,r.created_at,
             dd.public_code,dd.donor_name,dd.donor_phone,dd.status AS delivery_status,dd.drive_id,d.title AS drive_title,
-            w.organization_id,w.name AS warehouse_name,
+            d.campaign_id,w.name AS warehouse_name,
             (SELECT max(revision) FROM receipt_count WHERE receipt_id=r.id) AS count_revision,
             (SELECT max(revision) FROM donation_declaration WHERE delivery_id=r.delivery_id) AS declaration_revision,
             (SELECT note FROM receipt_count WHERE receipt_id=r.id ORDER BY revision DESC LIMIT 1) AS count_note
@@ -58,11 +58,11 @@ export async function readReceiptView(query: Queryable, id: string): Promise<{
     query, id, Number(receipt.count_revision), Number(receipt.declaration_revision),
   );
   const {
-    organization_id, count_revision: countRevision, declaration_revision: declarationRevision, count_note: countNote,
+    campaign_id, count_revision: countRevision, declaration_revision: declarationRevision, count_note: countNote,
     ...value
   } = receipt;
   return {
-    organization_id,
+    campaign_id,
     value: {
       ...value,
       version: Number(receipt.version),

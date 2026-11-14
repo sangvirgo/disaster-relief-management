@@ -63,7 +63,7 @@ export class RequestOperationsFastTrackService {
           ruleAdvisory: ruleAdvisory(facts),
           aiAdvisory: aiPriorityAdvisory(currentAiAdvisory(aiRows[0], facts, Number(row.work_cycle))),
           pendingSupplement: await hasPendingSupplement(manager, row.id),
-          possibleDuplicate: await hasPossibleDuplicate(manager, row.id),
+          possibleDuplicate: await hasPossibleDuplicate(manager, row.id, session.grants),
         });
         if (!assessment.eligible) {
           throw new AppError('FAST_TRACK_NOT_ELIGIBLE', { status: 409, details: { blockers: assessment.blockers } });

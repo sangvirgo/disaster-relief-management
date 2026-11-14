@@ -54,9 +54,9 @@ export class DriveSuggestionsService {
   async suggestions(request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     const warehouseValues: unknown[] = [];
-    const warehouseScope = reportScopeSql(session.grants, ['REPORT_READ'], warehouseValues, 'w', ['SYSTEM', 'ORGANIZATION']);
+    const warehouseScope = reportScopeSql(session.grants, ['REPORT_READ'], warehouseValues, 'w', ['SYSTEM']);
     const needValues: unknown[] = [];
-    const needScope = reportScopeSql(session.grants, ['REPORT_READ'], needValues, 'c', ['SYSTEM', 'ORGANIZATION']);
+    const needScope = reportScopeSql(session.grants, ['REPORT_READ'], needValues, 'c', ['SYSTEM', 'CAMPAIGN']);
 
     const [stockRows, driveRows, weather] = await Promise.all([
       this.dataSource.query(`

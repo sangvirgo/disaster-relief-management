@@ -16,14 +16,11 @@ interface IntrospectionRow {
   grant_id: string | null;
   role_code: string | null;
   scope_type: string | null;
-  organization_id: string | null;
   campaign_id: string | null;
 }
-
-type TeamLeaderEligibilityReason = 'USER_NOT_FOUND' | 'USER_INACTIVE' | 'MEMBERSHIP_REQUIRED' | 'VOLUNTEER_GRANT_REQUIRED';
-
-type TeamLeaderEligibility = { eligible: true } | { eligible: false; reason: TeamLeaderEligibilityReason };
 type ActiveUserCheck = { active: true } | { active: false; reason: 'USER_NOT_FOUND' | 'USER_INACTIVE' };
+type TeamLeaderEligibilityReason = 'USER_NOT_FOUND' | 'USER_INACTIVE' | 'VOLUNTEER_GRANT_REQUIRED';
+type TeamLeaderEligibility = { eligible: true } | { eligible: false; reason: TeamLeaderEligibilityReason };
 type ActiveUserSearchRow = { id: string; username: string; display_name: string; created_at: Date | string };
 
 const userIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
@@ -63,7 +60,7 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
     const rows = await this.introspectionDataSource.query(
       `SELECT sf.user_id, u.display_name, u.status, u.authz_version AS user_authz_version,
               sf.authz_version AS family_authz_version, sf.revoked_at, sf.absolute_expires_at,
-              g.id AS grant_id, g.role_code, g.scope_type, g.organization_id, g.campaign_id
+              g.id AS grant_id, g.role_code, g.scope_type, g.campaign_id
          FROM session_family sf JOIN app_user u ON u.id = sf.user_id
          LEFT JOIN role_grant g ON g.user_id = u.id AND g.revoked_at IS NULL
         WHERE sf.id = $1 AND sf.user_id = $2
@@ -76,7 +73,6 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
       id: row.grant_id,
       role_code: row.role_code,
       scope_type: row.scope_type,
-      organization_id: row.organization_id,
       campaign_id: row.campaign_id,
     }] : []);
     const active = first.status === 'ACTIVE' && !first.revoked_at &&
@@ -150,47 +146,34 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
     return rows[0].status === 'ACTIVE' ? { active: true } : { active: false, reason: 'USER_INACTIVE' };
   }
 
-  async teamLeaderEligibility(userId: string, organizationId: string): Promise<TeamLeaderEligibility> {
+  async teamLeaderEligibility(userId: string): Promise<TeamLeaderEligibility> {
     const rows = await this.introspectionDataSource.query(
       `SELECT CASE
                 WHEN u.id IS NULL THEN 'USER_NOT_FOUND'
                 WHEN u.status <> 'ACTIVE' THEN 'USER_INACTIVE'
-                WHEN o.id IS NULL OR m.user_id IS NULL THEN 'MEMBERSHIP_REQUIRED'
                 WHEN NOT EXISTS (
                   SELECT 1 FROM role_grant g
-                   WHERE g.user_id = u.id AND g.role_code = 'VOLUNTEER' AND g.revoked_at IS NULL
-                     AND ((g.scope_type = 'SYSTEM' AND g.organization_id IS NULL AND g.campaign_id IS NULL)
-                       OR (g.scope_type = 'ORGANIZATION' AND g.organization_id = o.id AND g.campaign_id IS NULL))
+                   WHERE g.user_id = u.id AND g.role_code = 'VOLUNTEER' AND g.scope_type = 'SYSTEM' AND g.revoked_at IS NULL
                 ) THEN 'VOLUNTEER_GRANT_REQUIRED'
                 ELSE NULL
               END AS reason
-         FROM (SELECT $1::uuid AS user_id, $2::uuid AS organization_id) requested
-         LEFT JOIN app_user u ON u.id = requested.user_id
-         LEFT JOIN organization o ON o.id = requested.organization_id AND o.status = 'ACTIVE'
-         LEFT JOIN membership m ON m.user_id = u.id AND m.organization_id = o.id AND m.status = 'ACTIVE'`,
-      [userId, organizationId],
+         FROM (SELECT $1::uuid AS user_id) requested
+         LEFT JOIN app_user u ON u.id = requested.user_id`,
+      [userId],
     ) as Array<{ reason: TeamLeaderEligibilityReason | null }>;
     const reason = rows[0]?.reason;
     return reason ? { eligible: false, reason } : { eligible: true };
   }
 
-  async requestCoordinators(organizationId: string): Promise<{ items: Array<Record<string, unknown>> }> {
+  async requestCoordinators(campaignId: string | null): Promise<{ items: Array<Record<string, unknown>> }> {
     const items = await this.introspectionDataSource.query(
-      `SELECT g.user_id,g.role_code,g.scope_type,g.organization_id,g.campaign_id
+      `SELECT g.user_id,g.role_code,g.scope_type,g.campaign_id
          FROM role_grant g JOIN app_user u ON u.id=g.user_id
-        WHERE g.organization_id=$1 AND g.revoked_at IS NULL AND u.status='ACTIVE'
-          AND (g.role_code='COORDINATOR' OR (g.role_code='OPERATIONS_MANAGER' AND g.scope_type='ORGANIZATION'))
+        WHERE g.revoked_at IS NULL AND u.status='ACTIVE' AND g.role_code='COORDINATOR'
+          AND (g.scope_type='SYSTEM' OR ($1::uuid IS NOT NULL AND g.scope_type='CAMPAIGN' AND g.campaign_id=$1))
         ORDER BY g.user_id,g.role_code,g.scope_type,g.campaign_id`,
-      [organizationId],
+      [campaignId],
     ) as Array<Record<string, unknown>>;
     return { items };
-  }
-
-  async organization(id: string): Promise<{ id: string; organization_kind: string; status: string }> {
-    const rows = await this.introspectionDataSource.query(
-      'SELECT id, organization_kind, status FROM organization WHERE id = $1', [id],
-    ) as Array<{ id: string; organization_kind: string; status: string }>;
-    if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
-    return rows[0];
   }
 }

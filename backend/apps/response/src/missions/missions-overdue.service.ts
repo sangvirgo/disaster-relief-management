@@ -9,7 +9,6 @@ import { MISSIONS_CONFIG, MissionsConfig } from './missions.config';
 interface OverdueMissionRow {
   id: string;
   version: number;
-  organization_id: string;
   campaign_id: string | null;
 }
 
@@ -41,7 +40,7 @@ export class MissionsOverdueService implements OnModuleInit, OnModuleDestroy {
     let rows: OverdueMissionRow[] = [];
     const ran = await this.jobs.runOnce('response.missions.overdue.scan', async (manager) => {
       rows = await manager.query(
-        `SELECT m.id,m.version,r.organization_id,r.campaign_id
+        `SELECT m.id,m.version,r.campaign_id
            FROM mission m JOIN assistance_request r ON r.id=m.request_id
           WHERE m.status='OFFERED'
             AND m.created_at<=statement_timestamp()-($1::int*interval '1 minute')
@@ -51,13 +50,13 @@ export class MissionsOverdueService implements OnModuleInit, OnModuleDestroy {
     });
     if (!ran || !rows.length) return 0;
 
-    const grants = new Map<string, RequestCoordinatorGrant[]>();
-    for (const organizationId of new Set(rows.map((row) => row.organization_id))) {
-      grants.set(organizationId, await this.sessions.requestCoordinatorGrants(organizationId));
+    const grants = new Map<string | null, RequestCoordinatorGrant[]>();
+    for (const campaignId of new Set(rows.map((row) => row.campaign_id))) {
+      grants.set(campaignId, await this.sessions.requestCoordinatorGrants(campaignId));
     }
     const notices: Array<{ missionId: string; version: number; recipient: string }> = [];
     for (const row of rows) {
-      const recipients = new Set((grants.get(row.organization_id) ?? []).filter((grant) => grantCovers(grant, row)).map((grant) => grant.user_id));
+      const recipients = new Set((grants.get(row.campaign_id) ?? []).filter((grant) => grantCovers(grant, row)).map((grant) => grant.user_id));
       for (const recipient of recipients) notices.push({ missionId: row.id, version: Number(row.version), recipient });
     }
     if (!notices.length) return 0;

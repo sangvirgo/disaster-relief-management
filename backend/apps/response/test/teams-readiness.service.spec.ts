@@ -9,7 +9,6 @@ import type { ConfirmTeamReadinessDto } from '../src/teams/teams.dto';
 import { TeamsProfileService } from '../src/teams/teams-profile.service';
 
 const teamId = '00000000-0000-4000-8000-000000000001';
-const organizationId = '00000000-0000-4000-8000-000000000002';
 const userId = '00000000-0000-4000-8000-000000000003';
 const dto: ConfirmTeamReadinessDto = {
   expected_version: 6, confirmation_basis: 'SELF', occurred_at: '2026-11-08T01:00:00.000Z',
@@ -17,7 +16,7 @@ const dto: ConfirmTeamReadinessDto = {
 
 function fixture(options: { leader?: boolean; manager?: boolean; active?: boolean; validTime?: boolean;
   missing?: boolean; replay?: boolean; team?: Partial<TeamRow> } = {}) {
-  let row = { id: teamId, organization_id: organizationId,
+  let row = { id: teamId,
     name: 'Đội kiểm thử', team_kind: 'VOLUNTEER', reporting_mode: 'APP', status: 'ACTIVE',
     availability: 'UNAVAILABLE', readiness_required: true, version: 6, skills: [], position_source: null,
     ...options.team } as TeamRow;
@@ -36,7 +35,7 @@ function fixture(options: { leader?: boolean; manager?: boolean; active?: boolea
   const findTeam = jest.fn<(...args: unknown[]) => Promise<TeamRow | undefined>>()
     .mockImplementation(async () => options.missing ? undefined : { ...row });
   const sessions = { require: jest.fn(async () => ({ userId, grants: options.manager
-    ? [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId }] : [],
+    ? [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM',}] : [],
   } as ReporterSession)) } as unknown as ReporterSessionService;
   const idempotency = { execute: jest.fn(async (_: DataSource, command: Parameters<IdempotencyService['execute']>[1]) => {
     if (options.replay) return { value: await command.replay!(manager, { type: 'rescue_team', id: teamId }), replay: true, status: 200 };

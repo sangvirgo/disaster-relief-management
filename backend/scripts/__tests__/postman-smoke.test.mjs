@@ -92,12 +92,11 @@ test('seed IDs come from GET requests and login requests have credentials', () =
       script(request, 'test').includes(`collectionVariables.set('${variable}'`));
     assert.ok(item, `GET ${operationId} must populate ${variable}`);
   };
-  discover('listIdentityOrganizations', 'intakeOrganizationId');
   discover('listRequestQueue', 'requestId');
   discover('logisticsDrivesPublicList', 'donationDriveId');
   discover('logisticsDrivesPublicList', 'donationItemId');
   discover('logisticsDrivesList', 'donationWarehouseId');
-  for (const key of ['intakeOrganizationId', 'donationDriveId', 'donationItemId', 'donationWarehouseId']) {
+  for (const key of ['donationDriveId', 'donationItemId', 'donationWarehouseId']) {
     assert.equal(collection.variable.find((variable) => variable.key === key)?.value, '', `${key} must not be hardcoded`);
   }
   assert.ok(String(collection.variable.find((variable) => variable.key === 'seedPassword')?.value).length >= 10);
@@ -110,10 +109,8 @@ test('seed IDs come from GET requests and login requests have credentials', () =
     assert.equal(body.client_kind, 'NATIVE');
   }
 });
-test('GET setup requests populate organization, AI SOS and donation IDs from API results', () => {
+test('GET setup requests populate AI SOS and donation IDs from API results', () => {
   const cases = [
-    ['listIdentityOrganizations', 'intakeOrganizationId',
-      { items: [{ id: 'org-id', name: 'Trung tâm điều phối C48 (demo)', status: 'ACTIVE' }] }, 'org-id'],
     ['listRequestQueue', 'requestId',
       { items: [{ id: 'request-id', tracking_code: 'C48DEM0009', status: 'SUBMITTED' }] }, 'request-id'],
     ['logisticsDrivesPublicList', 'donationDriveId',
@@ -190,7 +187,7 @@ test('main verification is a location/information/image review with no phone-con
 test('main scenario explicitly changes actors and finishes the rescue before resolving', () => {
   const operations = main.map((item) => meta(item).operationId);
   assert.deepEqual(operations, [
-    'login', 'listIdentityOrganizations', 'createIdentityUser', 'createIdentityUserGrant', 'login', 'createSelfRequest', 'trackSelfRequest', 'supplementSelfRequest',
+    'login', 'createIdentityUser', 'createIdentityUserGrant', 'login', 'createSelfRequest', 'trackSelfRequest', 'supplementSelfRequest',
     'login', 'getStaffRequestDetail', 'startRequestVerification', 'verifyRequest', 'triageRequest',
     'responseTeamsCreate', 'createMissionOffer', 'login', 'getMission', 'acceptMission', 'transitionMission', 'transitionMission', 'transitionMission',
     'login', 'getStaffRequestDetail', 'responseRequestResolutionResolve', 'responseRequestResolutionOperation', 'login', 'trackSelfRequest',
@@ -219,7 +216,7 @@ test('SOS creation commits its generated capability only on success; detail neve
   runner.send(create, { id: 'sos-a', tracking_code: 'ABC1234567', review_lane: 'NORMAL' });
   assert.equal(runner.values.get('requestId'), 'sos-a');
   assert.equal(runner.values.get('trackingSecret'), 'q'.repeat(43));
-  runner.send(op(main, 'getStaffRequestDetail'), { id: 'sos-a', version: 4, organization_id: 'org' });
+  runner.send(op(main, 'getStaffRequestDetail'), { id: 'sos-a', version: 4 });
   assert.equal(runner.values.get('requestVersion'), '4');
   assert.equal(runner.values.get('requestId'), 'sos-a');
   runner.send(op(main, 'getStaffRequestDetail'), { id: 'unrelated', version: 99 });
@@ -317,7 +314,6 @@ test('all scenarios contain public ingress routes and stop at their own end', ()
 test('complete main script chain carries actor tokens, IDs and versions without missing inputs', () => {
   const runner = sandbox(); let version = 1; let missionVersion = 1; let detailCalls = 0;
   const responses = {
-    listIdentityOrganizations: () => ({ items: [{ id: 'intake-org-a', name: 'Trung tâm điều phối C48 (demo)', status: 'ACTIVE' }] }),
     createIdentityUser: () => ({ id: 'leader-a' }), createIdentityUserGrant: () => ({ id: 'grant-a' }),
     createSelfRequest: () => ({ id: 'sos-a', tracking_code: 'ABC1234567', review_lane: 'NORMAL' }),
     trackSelfRequest: () => ({ id: 'sos-a', version, status: version === 10 ? 'RESOLVED' : 'SUBMITTED' }),
@@ -340,10 +336,10 @@ test('complete main script chain carries actor tokens, IDs and versions without 
     assert.equal(runner.skipped, false, item.name);
     assert.equal(runner.failures.length, 0, item.name + ': ' + runner.failures.map(({ error }) => error.message).join(', '));
     if (operation === 'login') { actor = runner.body.username; actors.push(actor); }
-    if (operation === 'createIdentityUser') assert.equal(runner.body.organization_id, runner.values.get('intakeOrganizationId'));
+    if (operation === 'createIdentityUser') assert.equal(runner.body.organization_id, undefined);
     if (operation === 'responseTeamsCreate') {
       assert.equal(runner.body.leader_user_id, 'leader-a');
-      assert.equal(runner.body.organization_id, runner.values.get('intakeOrganizationId'));
+      assert.equal(runner.body.organization_id, undefined);
     }
     if (operation === 'responseRequestResolutionResolve') assert.equal(runner.body.expected_version, 9);
     if (operation === 'transitionMission') assert.equal(actor, runner.values.get('demoLeaderUsername'));

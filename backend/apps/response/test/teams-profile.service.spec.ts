@@ -7,7 +7,6 @@ import type { TeamRow } from '../src/teams/teams.helpers';
 import type { TeamsQueriesService } from '../src/teams/teams-queries.service';
 import { TeamsProfileService } from '../src/teams/teams-profile.service';
 
-const organizationId = '00000000-0000-4000-8000-000000000001';
 const teamId = '00000000-0000-4000-8000-000000000002';
 const userId = '00000000-0000-4000-8000-000000000003';
 const idempotencyKey = '00000000-0000-4000-8000-000000000004';
@@ -15,7 +14,6 @@ const request = {} as never;
 
 const team: TeamRow = {
   id: teamId,
-  organization_id: organizationId,
   name: 'Đội cứu hộ',
   team_kind: 'VOLUNTEER',
   reporting_mode: 'APP',
@@ -48,7 +46,7 @@ function fixture(activeMissions: unknown[] = [], currentTeam: TeamRow = team) {
   const sessions = {
     require: jest.fn<(...args: unknown[]) => Promise<ReporterSession>>().mockResolvedValue({
       userId,
-      grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId }],
+      grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM',}],
     }),
   } as unknown as ReporterSessionService;
   const idempotency = {

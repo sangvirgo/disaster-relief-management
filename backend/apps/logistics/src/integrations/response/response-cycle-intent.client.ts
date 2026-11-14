@@ -14,7 +14,6 @@ export interface ResponseCycleIntent {
   request_id: string;
   work_cycle: number;
   request_status: string;
-  organization_id: string;
   campaign_id: string | null;
   outcome_basis: ResolutionOutcomeBasis | null;
 }
@@ -81,7 +80,7 @@ export class ResponseCycleIntentClient implements OnModuleDestroy {
     if (row.id !== expectedId || typeof row.kind !== 'string' || !['RESOLUTION', 'CANCELLATION'].includes(row.kind) ||
         typeof row.state !== 'string' || typeof row.request_id !== 'string' || !uuidPattern.test(row.request_id) ||
         typeof row.work_cycle !== 'number' || !Number.isSafeInteger(row.work_cycle) || row.work_cycle < 1 ||
-        typeof row.request_status !== 'string' || typeof row.organization_id !== 'string' || !uuidPattern.test(row.organization_id) ||
+        typeof row.request_status !== 'string' ||
         !(row.campaign_id === null || (typeof row.campaign_id === 'string' && uuidPattern.test(row.campaign_id))) ||
         !(row.outcome_basis === null || (typeof row.outcome_basis === 'string' && outcomeBases.has(row.outcome_basis as ResolutionOutcomeBasis)))) {
       throw unavailable();

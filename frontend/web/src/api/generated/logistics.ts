@@ -1778,8 +1778,6 @@ export interface operations {
                             id?: string;
                             /** Format: uuid */
                             warehouse_id?: string;
-                            /** Format: uuid */
-                            organization_id?: string;
                             relief_point_id?: string | null;
                             vehicle_id?: string | null;
                             campaign_id?: string | null;
@@ -1905,8 +1903,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         relief_point_id?: string | null;
                         vehicle_id?: string | null;
                         campaign_id?: string | null;
@@ -2026,8 +2022,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         relief_point_id?: string | null;
                         vehicle_id?: string | null;
                         campaign_id?: string | null;
@@ -2126,8 +2120,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         relief_point_id?: string | null;
                         vehicle_id?: string | null;
                         campaign_id?: string | null;
@@ -2235,8 +2227,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         relief_point_id?: string | null;
                         vehicle_id?: string | null;
                         campaign_id?: string | null;
@@ -2344,8 +2334,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         relief_point_id?: string | null;
                         vehicle_id?: string | null;
                         campaign_id?: string | null;
@@ -2667,8 +2655,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         relief_point_id?: string | null;
                         vehicle_id?: string | null;
                         campaign_id?: string | null;
@@ -2785,8 +2771,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         relief_point_id?: string | null;
                         vehicle_id?: string | null;
                         campaign_id?: string | null;
@@ -2903,8 +2887,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         relief_point_id?: string | null;
                         vehicle_id?: string | null;
                         campaign_id?: string | null;
@@ -3331,8 +3313,6 @@ export interface operations {
                             /** Format: uuid */
                             id?: string;
                             /** Format: uuid */
-                            organization_id?: string;
-                            /** Format: uuid */
                             intake_warehouse_id?: string;
                             campaign_id?: string | null;
                             campaign_status?: string | null;
@@ -3437,8 +3417,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         /** Format: uuid */
                         intake_warehouse_id?: string;
                         campaign_id?: string | null;
@@ -3558,8 +3536,6 @@ export interface operations {
                         /** Format: uuid */
                         id?: string;
                         /** Format: uuid */
-                        organization_id?: string;
-                        /** Format: uuid */
                         intake_warehouse_id?: string;
                         campaign_id?: string | null;
                         campaign_status?: string | null;
@@ -3662,8 +3638,6 @@ export interface operations {
                         /** Format: uuid */
                         id?: string;
                         /** Format: uuid */
-                        organization_id?: string;
-                        /** Format: uuid */
                         intake_warehouse_id?: string;
                         campaign_id?: string | null;
                         campaign_status?: string | null;
@@ -3746,8 +3720,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         /** Format: uuid */
                         intake_warehouse_id?: string;
                         campaign_id?: string | null;
@@ -3842,8 +3814,6 @@ export interface operations {
                         /** Format: uuid */
                         id?: string;
                         /** Format: uuid */
-                        organization_id?: string;
-                        /** Format: uuid */
                         intake_warehouse_id?: string;
                         campaign_id?: string | null;
                         campaign_status?: string | null;
@@ -3926,8 +3896,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         /** Format: uuid */
                         intake_warehouse_id?: string;
                         campaign_id?: string | null;
@@ -5438,8 +5406,6 @@ export interface operations {
                         /** Format: uuid */
                         request_id: string;
                         work_cycle: number;
-                        /** Format: uuid */
-                        organization_id: string;
                         campaign_id: string | null;
                         /** Format: uuid */
                         item_id: string;
@@ -5539,8 +5505,6 @@ export interface operations {
                         /** Format: uuid */
                         request_id?: string;
                         work_cycle?: number;
-                        /** Format: uuid */
-                        organization_id?: string;
                         campaign_id?: string | null;
                         /** Format: uuid */
                         item_id?: string;
@@ -5801,8 +5765,6 @@ export interface operations {
                         /** Format: uuid */
                         request_id?: string;
                         work_cycle?: number;
-                        /** Format: uuid */
-                        organization_id?: string;
                         campaign_id?: string | null;
                         /** Format: uuid */
                         item_id?: string;
@@ -5903,8 +5865,6 @@ export interface operations {
                         /** Format: uuid */
                         request_id?: string;
                         work_cycle?: number;
-                        /** Format: uuid */
-                        organization_id?: string;
                         campaign_id?: string | null;
                         /** Format: uuid */
                         item_id?: string;
@@ -6680,8 +6640,6 @@ export interface operations {
                         items?: {
                             /** Format: uuid */
                             id?: string;
-                            /** Format: uuid */
-                            organization_id?: string;
                             /** @enum {string} */
                             status?: "ACTIVE" | "INACTIVE";
                             version?: number;
@@ -6738,8 +6696,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** Format: uuid */
-                    organization_id: string;
                     name: string;
                     contact_note?: string;
                     operating_note?: string;
@@ -6761,8 +6717,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -6828,8 +6782,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         status?: string;
                         version?: number;
                         /** Format: date-time */
@@ -6899,8 +6851,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -6972,8 +6922,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -7853,8 +7801,6 @@ export interface operations {
                         items?: {
                             /** Format: uuid */
                             id?: string;
-                            /** Format: uuid */
-                            organization_id?: string;
                             /** @enum {string} */
                             status?: "ACTIVE" | "INACTIVE";
                             version?: number;
@@ -7909,8 +7855,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** Format: uuid */
-                    organization_id: string;
                     identifier: string;
                     vehicle_type: string;
                     capacity?: string | null;
@@ -7928,8 +7872,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -8001,8 +7943,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -8070,8 +8010,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -8136,8 +8074,6 @@ export interface operations {
                         items?: {
                             /** Format: uuid */
                             id?: string;
-                            /** Format: uuid */
-                            organization_id?: string;
                             /** @enum {string} */
                             status?: "ACTIVE" | "INACTIVE";
                             version?: number;
@@ -8195,8 +8131,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** Format: uuid */
-                    organization_id: string;
                     name: string;
                     address_note?: string;
                     location?: {
@@ -8218,8 +8152,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -8290,8 +8222,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -8363,8 +8293,6 @@ export interface operations {
                     "application/json": {
                         /** Format: uuid */
                         id?: string;
-                        /** Format: uuid */
-                        organization_id?: string;
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;

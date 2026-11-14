@@ -9,13 +9,13 @@ import { ReporterSessionService, type ReporterSession } from '../requests/report
 import type { ReopenRequestDto, RequestVersionDto } from './request-resolution.dto';
 import { enqueueAiAdvisory } from '../ai/ai-advisory-input';
 import { assertRequestPermission } from '../requests/request-scope';
+import { hasPermission } from '@c48/identity-contracts/permissions';
 
 interface RequestStateRow {
   id: string;
   status: string;
   version: number;
   work_cycle: number;
-  organization_id: string;
   campaign_id: string | null;
   reporter_user_id: string | null;
 }
@@ -23,7 +23,6 @@ interface RequestStateRow {
 interface CampaignRow {
   id: string;
   status: string;
-  organization_id: string;
 }
 
 @Injectable()
@@ -93,7 +92,7 @@ export class RequestResolutionStateService {
     const campaigns = new Map<string, CampaignRow>();
     for (const campaignId of campaignIds) {
       const rows = await manager.query(
-        `SELECT id,status,organization_id FROM campaign WHERE id=$1 FOR SHARE`, [campaignId],
+        `SELECT id,status FROM campaign WHERE id=$1 FOR SHARE`, [campaignId],
       ) as CampaignRow[];
       if (rows[0]) campaigns.set(campaignId, rows[0]);
     }
@@ -110,11 +109,8 @@ export class RequestResolutionStateService {
     } else if (campaignId !== null) {
       const campaign = campaigns.get(campaignId);
       if (!campaign || campaign.status !== 'ACTIVE') throw new AppError('CAMPAIGN_NOT_ACTIVE', { status: 409 });
-      if (campaign.organization_id !== row.organization_id) {
-        throw new AppError('VALIDATION_FAILED', {
-          status: 400, fieldErrors: { campaign_id: ['Chiến dịch không phù hợp với tổ chức của yêu cầu.'] },
-        });
-      }
+      if (dto.campaign_id !== undefined &&
+          !hasPermission(session.grants, 'CAMPAIGN_MANAGE', { campaignId })) throw new AppError('FORBIDDEN', { status: 403 });
     }
 
     const [updated] = await manager.query(
@@ -123,7 +119,7 @@ export class RequestResolutionStateService {
               attribution_locked_at=NULL,logistics_admitted_at=NULL,resolution_seal_id=NULL,resolved_at=NULL,
               version=version+1
         WHERE id=$1 AND version=$2 AND status=ANY($5::request_status[])
-        RETURNING id,status,version,work_cycle,organization_id,campaign_id,reporter_user_id`,
+        RETURNING id,status,version,work_cycle,campaign_id,reporter_user_id`,
       [requestId, dto.expected_version, campaignId, ['RESOLVED', 'CLOSED']],
     ) as [Array<RequestStateRow>, number];
     const result = updated?.[0];
@@ -143,7 +139,7 @@ export class RequestResolutionStateService {
 
   private async loadRequest(query: Pick<DataSource | EntityManager, 'query'>, requestId: string, forUpdate = false): Promise<RequestStateRow> {
     const rows = await query.query(
-      `SELECT id,status,version,work_cycle,organization_id,campaign_id,reporter_user_id
+      `SELECT id,status,version,work_cycle,campaign_id,reporter_user_id
          FROM assistance_request WHERE id=$1${forUpdate ? ' FOR UPDATE' : ''}`, [requestId],
     ) as RequestStateRow[];
     if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });

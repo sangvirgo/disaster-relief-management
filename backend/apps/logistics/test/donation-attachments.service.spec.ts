@@ -130,7 +130,7 @@ describe('donation attachment access and upload', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: donorId,
-        grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: attachment.organization_id }],
+        grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}],
         identityHeaders: {},
       })),
     };
@@ -141,7 +141,7 @@ describe('donation attachment access and upload', () => {
     expect(storage.signedGetUrl).toHaveBeenCalledWith(attachment.object_key, 'image/png', 60);
   });
 
-  it('denies a loss reviewer from another organization', async () => {
+  it('denies a campaign-scoped loss reviewer access to an organization-only handoff', async () => {
     const handoffAttachment = {
       ...attachment,
       attachment_delivery_id: null,
@@ -156,7 +156,7 @@ describe('donation attachment access and upload', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: donorId,
-        grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: '99999999-9999-4999-8999-999999999999' }],
+        grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN', campaign_id: '99999999-9999-4999-8999-999999999999' }],
         identityHeaders: {},
       })),
     };
@@ -201,7 +201,7 @@ describe('donation attachment access and upload', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: donorId,
-        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'ORGANIZATION', organization_id: attachment.organization_id }],
+        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'SYSTEM',}],
         identityHeaders: {},
       })),
     };
@@ -222,7 +222,7 @@ describe('donation attachment access and upload', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: donorId,
-        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'ORGANIZATION', organization_id: attachment.organization_id }],
+        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'SYSTEM',}],
         identityHeaders: {},
       })),
     };
@@ -261,7 +261,7 @@ describe('donation attachment access and upload', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: donorId,
-        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'ORGANIZATION', organization_id: attachment.organization_id }],
+        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'SYSTEM',}],
         identityHeaders: {},
       })),
     };

@@ -24,7 +24,7 @@ describe('RequestResolutionService', () => {
       query: jest.fn(async (sql: string, parameters: unknown[] = []) => {
         statements.push({ sql, parameters });
         if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
-          id: requestId, status: 'TRIAGED', version: 8, work_cycle: 2, organization_id: '70000000-0000-4000-8000-000000000001',
+          id: requestId, status: 'TRIAGED', version: 8, work_cycle: 2,
           campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
         }];
         if (sql.includes('FROM request_event') && sql.includes('pending_review')) return [];
@@ -35,7 +35,7 @@ describe('RequestResolutionService', () => {
       }),
     };
     const dataSource = { query: jest.fn(async () => [{
-      id: requestId, status: 'TRIAGED', version: 8, work_cycle: 2, organization_id: '70000000-0000-4000-8000-000000000001',
+      id: requestId, status: 'TRIAGED', version: 8, work_cycle: 2,
       campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
     }]) };
     const idempotency = {
@@ -44,7 +44,7 @@ describe('RequestResolutionService', () => {
         return { status: result.status, value: result.value, replay: false };
       }),
     };
-    const sessions = { require: jest.fn(async () => ({ userId, grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: '70000000-0000-4000-8000-000000000001' }] })) };
+    const sessions = { require: jest.fn(async () => ({ userId, grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM',}] })) };
     const logistics = { fulfillment: jest.fn(async () => []) };
     const finalizer = { completePending: jest.fn(async () => true) };
     const service = new RequestResolutionService(dataSource as never, idempotency as never, sessions as never, logistics as never, finalizer as never);
@@ -80,7 +80,7 @@ describe('RequestResolutionService', () => {
         if (sql.includes('FROM idempotency_record')) return [{ present: true }];
         return [{
           id: requestId, status: 'RESOLVED', version: 10, work_cycle: 2,
-          organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+          campaign_id: null,
           reporter_user_id: userId, logistics_admitted_at: new Date(),
         }];
       }),
@@ -88,7 +88,7 @@ describe('RequestResolutionService', () => {
     const replayManager = {
       query: jest.fn(async () => [{
         id: intentId, kind: 'RESOLUTION', state: 'COMPLETED', request_id: requestId, work_cycle: 2, version: 2,
-        request_status: 'RESOLVED', organization_id: '70000000-0000-4000-8000-000000000001', campaign_id: null,
+        request_status: 'RESOLVED', campaign_id: null,
       }]),
     };
     const idempotency = {
@@ -99,8 +99,7 @@ describe('RequestResolutionService', () => {
       })),
     };
     const sessions = { require: jest.fn(async () => ({ userId, grants: [{
-      role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: '70000000-0000-4000-8000-000000000001',
-    }] })) };
+      role_code: 'COORDINATOR', scope_type: 'SYSTEM', }] })) };
     const logistics = { fulfillment: jest.fn(async () => { throw new Error('Logistics unavailable'); }) };
     const finalizer = { completePending: jest.fn() };
     const service = new RequestResolutionService(dataSource as never, idempotency as never, sessions as never, logistics as never, finalizer as never);

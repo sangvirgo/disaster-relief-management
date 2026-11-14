@@ -31,7 +31,6 @@ describe('RequestResolutionModule registration', () => {
       JWT_AUDIENCE: 'c48-response-test',
       JWT_PUBLIC_KEY: Buffer.from(publicKey.export({ type: 'spki', format: 'pem' }).toString()).toString('base64'),
       WEB_ALLOWED_ORIGINS: 'http://localhost:3000',
-      DEMO_INTAKE_ORGANIZATION_ID: '40000000-0000-4000-8000-000000000004',
       SECRET_HASH_PEPPER_SOS: 's'.repeat(40),
       IDENTITY_BASE_URL: 'http://identity:3001',
       RESPONSE_SERVICE_CLIENT_ID: 'c48-response-test',

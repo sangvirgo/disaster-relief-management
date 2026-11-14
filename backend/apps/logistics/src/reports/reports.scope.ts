@@ -2,16 +2,13 @@ import { AppError } from '@c48/technical/errors/errors';
 import { hasPermission, ROLE_PERMISSIONS } from '@c48/identity-contracts/permissions';
 import type { Grant, Permission, ScopeType } from '@c48/identity-contracts/permissions';
 
-type ReportScope = Extract<ScopeType, 'SYSTEM' | 'ORGANIZATION' | 'CAMPAIGN'>;
+type ReportScope = ScopeType;
 
 function permissionMatches(grant: Grant, permissions: readonly Permission[]): boolean {
-  const target = grant.scope_type === 'SYSTEM'
-    ? (permission: Permission) => ({ systemAction: permission })
-    : grant.scope_type === 'CAMPAIGN'
-        ? (permission: Permission) => ({ organizationId: grant.organization_id!, campaignId: grant.campaign_id!, systemAction: permission })
-        : (permission: Permission) => ({ organizationId: grant.organization_id!, systemAction: permission });
   const rolePermissions: readonly string[] = ROLE_PERMISSIONS[grant.role_code];
-  return permissions.some((permission) => rolePermissions.includes(permission) && hasPermission([grant], permission, target(permission)));
+  return permissions.some((permission) => rolePermissions.includes(permission) && hasPermission(
+    [grant], permission, grant.scope_type === 'CAMPAIGN' ? { campaignId: grant.campaign_id ?? null } : { systemAction: permission },
+  ));
 }
 
 export function reportScopeSql(
@@ -19,21 +16,18 @@ export function reportScopeSql(
   permissions: readonly Permission[],
   values: unknown[],
   alias: string,
-  allowedScopes: readonly ReportScope[] = ['SYSTEM', 'ORGANIZATION', 'CAMPAIGN'],
+  allowedScopes: readonly ReportScope[] = ['SYSTEM', 'CAMPAIGN'],
 ): string {
   if (!/^[a-z][a-z0-9_]*$/u.test(alias)) throw new TypeError('Invalid report scope alias');
   const branches = new Set<string>();
 
   for (const grant of grants) {
     if (!allowedScopes.includes(grant.scope_type as ReportScope) || !permissionMatches(grant, permissions)) continue;
-    if (grant.scope_type === 'SYSTEM' && grant.organization_id === null && !grant.campaign_id) {
+    if (grant.scope_type === 'SYSTEM' && !grant.campaign_id) {
       branches.add('TRUE');
-    } else if (grant.scope_type === 'ORGANIZATION' && grant.organization_id && !grant.campaign_id) {
-      values.push(grant.organization_id);
-      branches.add(`(${alias}.organization_id=$${values.length})`);
-    } else if (grant.scope_type === 'CAMPAIGN' && grant.organization_id && grant.campaign_id) {
-      values.push(grant.organization_id, grant.campaign_id);
-      branches.add(`(${alias}.organization_id=$${values.length - 1} AND ${alias}.campaign_id=$${values.length})`);
+    } else if (grant.scope_type === 'CAMPAIGN' && grant.campaign_id) {
+      values.push(grant.campaign_id);
+      branches.add(`(${alias}.campaign_id=$${values.length})`);
     }
   }
 

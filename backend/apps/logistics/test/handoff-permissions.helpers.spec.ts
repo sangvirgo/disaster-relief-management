@@ -3,7 +3,7 @@ import { requireHandoffPermission } from '../src/distributions/handoff-permissio
 
 const distribution = { organization_id: 'organization-1' };
 const scopedCoordinator: Grant[] = [
-  { role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: 'organization-1' },
+  { role_code: 'COORDINATOR', scope_type: 'SYSTEM',},
 ];
 
 function thrownBy(operation: () => void): unknown {

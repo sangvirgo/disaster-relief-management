@@ -1,5 +1,8 @@
 # Reliva Business and AI Blueprint Review
 
+> **Lưu ý (2026-11-14):** Tài liệu lịch sử này đã lỗi thời sau 2026-11-14: tổ chức (organization) và membership đã bị gỡ khỏi hệ thống; phạm vi hiện tại chỉ còn SYSTEM và CAMPAIGN. Xem [05-permissions](backend/05-permissions.md).
+
+
 Research date: 2026-09-30. Baseline: `c48-technology-and-delivery-plan.md` v2.2 and `c48-project-context.md`. External proposal: `Cuu_tro_thien_tai.pdf`, 73 pages. The Reliva plan remains authoritative; the PDF supplies candidate research ideas, not replacement architecture or approved operational policy. This review does not establish executed product tests or real-world rescue suitability.
 
 **Follow-up:** the user requested incorporation of the AI integration recommendations into the main plan. Version 2.3 now records them in Section 12, including Section 12.10 and TC-AI-17..22. The business findings below remain review recommendations; this note records the earlier review evidence.

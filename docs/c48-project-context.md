@@ -23,7 +23,7 @@ The following rows preserve the original information strings. The source does no
 
 ## 2. Background and problem
 
-Floods, storms, landslides, and other disasters affect citizens, local authorities, rescue personnel, and volunteer organizations. Relief information can be fragmented across channels, making it difficult to verify urgent requests, coordinate resources, assign rescue teams, and monitor progress.
+Floods, storms, landslides, and other disasters affect citizens, local authorities, rescue personnel, and volunteer groups. Relief information can be fragmented across channels, making it difficult to verify urgent requests, coordinate resources, assign rescue teams, and monitor progress.
 
 The project proposes a centralized information system through which stakeholders receive and process SOS requests, coordinate rescue missions, manage relief resources, and track assistance distribution.
 
@@ -57,7 +57,7 @@ The project proposes a centralized information system through which stakeholders
 
 4. **Operations Manager**
    - Manage relief points, warehouses, and vehicles.
-   - Coordinate resources across organizations and manage relief campaigns.
+   - Coordinate shared resources across the system and manage relief campaigns.
 
 5. **System Administrator**
    - Manage accounts and access permissions.
@@ -167,3 +167,7 @@ Section 25 of the [technical plan](c48-technology-and-delivery-plan.md) defines 
 ## 12. User-authorized delivery focus (2026-10-27)
 
 The user directed the team to reduce emphasis on donations and Logistics and prioritize SOS intake, coordinator decision support, human verification/priority, rescue-team missions, and resolution. Keep a short optional donation intake/count/independent-review/posting demonstration; advanced donation and warehouse scenarios are outside the default demonstration. Existing APIs and their accounting, privacy, and authorization safeguards remain intact. This changes delivery and demonstration emphasis rather than deleting the original project requirements or weakening any invariant. Postman should model actual scenarios and may repeat login, version reads, and transitions when required; one request per public operation is not an acceptance criterion.
+
+## 13. User-authorized access and SOS workflow model (2026-11-14)
+
+The deployed C48 model has no organization or membership entity. A role grant is scoped only to `SYSTEM` or `CAMPAIGN`. SYSTEM coordinators see the shared intake queue, including SOS requests with no campaign; campaign coordinators see only requests attributed to their campaigns. Coordinators verify an unassigned SOS, choose its priority, and attach a campaign before campaign-scoped dispatch. Rescue teams and operational resources are shared system-wide; campaign attribution does not create ownership of teams. Existing inventory accounting, independent review, ownership checks, and completion guards remain required.

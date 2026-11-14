@@ -9,7 +9,7 @@ import { AuditService } from '../src/audit/audit.service';
 
 const admin = {
   userId: '00000000-0000-4000-8000-000000000001',
-  grants: [{ role_code: 'ADMIN', scope_type: 'SYSTEM', organization_id: null }],
+  grants: [{ role_code: 'ADMIN', scope_type: 'SYSTEM',}],
   identityHeaders: {},
 };
 
@@ -17,7 +17,7 @@ describe('Logistics AuditService', () => {
   it('only reads audit rows for a system AUDIT_READ grant', async () => {
     const query = jest.fn(async () => []);
     const sessions = { require: jest.fn(async () => ({ ...admin, grants: [
-      { role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: 'org-1' },
+      { role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',},
     ] })) } as unknown as LogisticsSessionService;
     const service = new AuditService({ query } as unknown as DataSource, sessions);
 

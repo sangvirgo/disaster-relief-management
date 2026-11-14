@@ -51,7 +51,7 @@ describe('distribution cancellation idempotency replay', () => {
     const service = new DistributionCommandsService(
       {} as DataSource,
       { execute: async (_source: unknown, input: { execute: (tx: EntityManager) => Promise<unknown> }) => input.execute(transaction) } as never,
-      { require: async () => ({ userId, grants: [{ role_code: roleCode, scope_type: 'ORGANIZATION', organization_id: 'organization-1' }] }) } as never,
+      { require: async () => ({ userId, grants: [{ role_code: roleCode, scope_type: 'SYSTEM',}] }) } as never,
       {} as never,
     );
     try {
@@ -72,7 +72,7 @@ describe('distribution cancellation idempotency replay', () => {
     const service = new DistributionCommandsService(
       {} as DataSource,
       { execute: async (_source: unknown, input: { execute: (tx: EntityManager) => Promise<unknown> }) => input.execute({ query } as unknown as EntityManager) } as never,
-      { require: async () => ({ userId: 'preparer-1', grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: 'organization-1' }] }) } as never,
+      { require: async () => ({ userId: 'preparer-1', grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}] }) } as never,
       {} as never,
     );
     try {
@@ -87,9 +87,8 @@ describe('distribution cancellation idempotency replay', () => {
   it('allows a reviewer-only approver to replay their cancellation', async () => {
     const grants: Grant[] = [{
       role_code: 'REVIEWER',
-      scope_type: 'ORGANIZATION',
-      organization_id: 'organization-1',
-    }];
+      scope_type: 'SYSTEM',
+      }];
     const session = { userId: 'approver-1', grants, identityHeaders: {} };
     const idempotency = {
       execute: jest.fn(async (_source: unknown, input: {
@@ -120,9 +119,8 @@ describe('distribution cancellation idempotency replay', () => {
   it('replays a created distribution if its campaign and warehouse become inactive', async () => {
     const grants: Grant[] = [{
       role_code: 'OPERATIONS_MANAGER',
-      scope_type: 'ORGANIZATION',
-      organization_id: 'organization-1',
-    }];
+      scope_type: 'SYSTEM',
+      }];
     const session = { userId: 'preparer-1', grants, identityHeaders: {} };
     const dataSource = {
       query: jest.fn().mockResolvedValue([{

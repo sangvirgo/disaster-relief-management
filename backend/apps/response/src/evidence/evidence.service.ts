@@ -68,7 +68,7 @@ function evidenceKey(requestId: string, evidenceId: string, missionId?: string):
   return missionId ? `mission/${missionId}/${evidenceId}` : `req/${requestId}/${evidenceId}`;
 }
 
-interface MissionUploadOwner extends Pick<ReporterRequestRow, 'review_lane' | 'status' | 'organization_id' | 'campaign_id'> {
+interface MissionUploadOwner extends Pick<ReporterRequestRow, 'review_lane' | 'status' | 'campaign_id'> {
   request_id: string;
   team_id: string;
   team_reporting_mode: 'APP' | 'COORDINATOR';
@@ -148,7 +148,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
     lock = false,
   ): Promise<ReporterRequestRow> {
     const rows = await queryable.query(
-      `SELECT id,status,review_lane,organization_id,campaign_id FROM assistance_request WHERE id=$1${lock ? ' FOR UPDATE' : ''}`,
+      `SELECT id,status,review_lane,campaign_id FROM assistance_request WHERE id=$1${lock ? ' FOR UPDATE' : ''}`,
       [requestId],
     ) as ReporterRequestRow[];
     const row = rows[0];
@@ -266,14 +266,14 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
   async download(evidenceId: string, trackingCode: string | undefined, trackingSecret: string | undefined, request: Request): Promise<{ url: string; expires_in: number }> {
     const rows = await this.dataSource.query(
       `SELECT e.id,e.request_id,e.mission_id,e.object_key,e.state,
-              r.tracking_code,r.reporter_user_id,r.organization_id,r.campaign_id,m.team_id
+              r.tracking_code,r.reporter_user_id,r.campaign_id,m.team_id
          FROM evidence_metadata e
          LEFT JOIN mission m ON m.id=e.mission_id
          JOIN assistance_request r ON r.id=coalesce(e.request_id,m.request_id)
         WHERE e.id=$1 AND e.state='READY'`, [evidenceId],
     ) as Array<{
       id: string; request_id: string | null; mission_id: string | null; object_key: string; state: string;
-      tracking_code: string; reporter_user_id: string | null; organization_id: string;
+      tracking_code: string; reporter_user_id: string | null;
       campaign_id: string | null; team_id: string | null;
     }>;
     const evidence = rows[0];
@@ -394,7 +394,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
   ): Promise<MissionUploadOwner> {
     const rows = await queryable.query(
       `SELECT m.request_id,m.team_id,m.status AS mission_status,
-              r.review_lane,r.status,r.organization_id,r.campaign_id,
+              r.review_lane,r.status,r.campaign_id,
               t.reporting_mode AS team_reporting_mode,t.status AS team_status
          FROM mission m
          JOIN assistance_request r ON r.id=m.request_id
