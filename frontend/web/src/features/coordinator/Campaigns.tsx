@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
-import { appendPage } from '../../api/pagination';
+import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
+import { ListNav } from '../../components/ui/Pager';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { DetailCloseButton } from '../../components/DetailCloseButton';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -21,7 +22,7 @@ type Campaign = {
 type Region = { code: string; name: string; status: string };
 export function Campaigns() {
   const [items, setItems] = useState<Campaign[]>([]);
-  const [cursor, setCursor] = useState('');
+  const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [next, setNext] = useState('');
   const [selected, setSelected] = useState<Campaign | null>(null);
   const [error, setError] = useState('');
@@ -64,11 +65,11 @@ export function Campaigns() {
     setLoading(true);
     api<{ items: Campaign[]; more: boolean; cursor?: string }>(
       'response',
-      `/campaigns${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`
+      `/campaigns?limit=${LIST_PAGE_SIZE}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
     )
       .then((value) => {
         if (live) {
-          setItems((current) => cursor ? appendPage(current, value.items, (item) => item.id) : value.items);
+          setItems(value.items);
           setSelected(current => current ? value.items.find(item => item.id === current.id) || (cursor ? current : null) : null);
           setNext(value.more ? value.cursor || '' : '');
         }
@@ -208,11 +209,7 @@ export function Campaigns() {
         {!loading && items.length > 0 && visibleItems.length === 0 && (
           <div className="empty">Không có chiến dịch ở trạng thái này trên trang hiện tại.</div>
         )}
-        {next && (
-          <button className="button secondary" disabled={loading} onClick={() => setCursor(next)}>
-            Xem thêm
-          </button>
-        )}
+        <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} noun="chiến dịch" />
       </section>
       <section
         className={`card campaign-detail-panel detail-panel-card ${selected ? 'is-open' : ''}`}

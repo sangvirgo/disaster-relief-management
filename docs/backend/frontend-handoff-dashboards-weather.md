@@ -1,6 +1,6 @@
 # Frontend handoff: dashboards, weather alerts, drive suggestions, validation errors
 
-Date: 2026-11-14. Source: backend work in this session. Everything below is implemented, built into the running Compose stack, and checked with real calls against the seeded demo data. **No frontend code is part of this change.** Contracts are exported in `contracts/openapi/*.json` (218 operations: 39 Identity, 89 Response, 90 Logistics).
+Date: 2026-11-14. Source: backend work in this session. Everything below is implemented, built into the running Compose stack, and checked with real calls against the seeded demo data. **No frontend code is part of this change.** Contracts are exported in `contracts/openapi/*.json` (217 operations: 39 Identity, 88 Response, 90 Logistics).
 
 ## 0. Conventions that apply to every endpoint
 
@@ -35,8 +35,9 @@ Before: `400 VALIDATION_FAILED` with no hint which field failed. Now:
 - `skill_codes` is now **optional** (default `[]`). It was the cause of the generic 400 when a client omitted it.
 - Required: `name`, `organization_id`, `operating_region_code`, `team_kind` (`VOLUNTEER|MILITARY|GOVERNMENT|OTHER`), `reporting_mode` (`APP|COORDINATOR`).
 - `reporting_mode=APP` requires `leader_user_id` (active volunteer member of that organization who is not already on a team) else `409 LEADER_REQUIRED`. `COORDINATOR` requires `external_contact_note` else `400`.
-- Permission `TEAM_MANAGE_ANY` (coordinators, scoped to their organization/region). Admin cannot create teams.
-- There is currently **no team-creation screen** in the web app. Needed inputs: organization (from the user's grant), region, kind, mode, leader picker (use `GET /teams/{id}/member-candidates`-style search or `/users` search available to the coordinator), contact note, skills (`GET /skills`).
+- Permission `TEAM_MANAGE_ANY`: coordinators (scoped to their organization/region) and, since the later team-setup change, system administrators (any organization; admins still cannot assign missions or read SOS details).
+- `nationwide_coverage` (boolean, default false) lets a team be offered for SOS in any region of its organization; `operating_region_code` and `nationwide_coverage` can be changed with `PATCH /teams/{id}` (version-checked; `409 TEAM_BUSY` while the team has an active mission).
+- The web app has a team-creation form (`TeamSetupForms.tsx`) that shows `field_errors` next to inputs.
 - Requires header `Idempotency-Key: <uuid>`; reuse the key only for a retry of the same submission.
 
 ## 3. Dashboards by role
@@ -71,26 +72,10 @@ Open = not `RESOLVED|REJECTED|DUPLICATE|CANCELLED`. Missing `priority`/`region_c
 
 Suggested tiles: SOS đang mở, Quá hạn xác minh (warning), Khai báo nguy hiểm đang chờ (warning), Chờ giao đội, Nhiệm vụ đang chạy (+ `overdue_offers`), Đội sẵn sàng `available/total`, Đội thiếu vị trí mới (warning). Then breakdown grids for status/priority/category/region/mission status and the recent list.
 
-### 3.2 `GET /response/dashboard/mine` – any signed-in user (citizen page)
-```json
-{"requests": {"total": 3, "active": 2, "resolved": 1, "by_status": {"IN_PROGRESS": 1, "RESOLVED": 1, "VERIFYING": 1}, "latest_received_at": "ISO|null"}, "generated_at": "ISO"}
-```
-Only SOS the caller reported (matched by `reporter_user_id`). Guests (not signed in) get 401: hide the page for guests.
+### 3.2 Removed: citizen and volunteer dashboards
+The planned `GET /response/dashboard/mine` and `GET /response/dashboard/team` were dropped: citizens and volunteers have no statistics page. Do not call them.
 
-### 3.3 `GET /response/dashboard/team` – volunteer page
-```json
-{
-  "team": {"id": "uuid", "name": "…", "availability": "AVAILABLE|UNAVAILABLE", "reporting_mode": "APP|COORDINATOR",
-           "status": "ACTIVE", "my_role": "LEADER|MEMBER", "member_count": 2,
-           "position_age_s": 1450, "position_fresh": true},
-  "missions": {"total": 1, "active": 1, "completed": 0, "completed_last_30d": 0, "by_status": {"ACCEPTED": 1}},
-  "thresholds": {"team_position_fresh_minutes": 30},
-  "generated_at": "ISO"
-}
-```
-`team` is `null` (and `missions` absent) when the caller is on no team: show "Bạn chưa thuộc đội cứu hộ nào…". `position_age_s` is `null` when the team never reported a position. For `reporting_mode=APP` and `position_fresh=false`, show a warning that the leader must refresh the position (teams without a fresh position are not offered missions).
-
-### 3.4 `GET /logistics/dashboard/operations` – all operations roles
+### 3.3 `GET /logistics/dashboard/operations` – all operations roles
 Sections appear **only if the caller's grants carry the matching permission**, and are limited to the grant's organization (admin: all). The frontend must treat each section as optional. `403` when nothing is visible (citizens, volunteers).
 
 ```json
@@ -106,7 +91,7 @@ Sections appear **only if the caller's grants carry the matching permission**, a
 Observed visibility with demo accounts: `admin`, `coord1`, `ops_mgr`, `campaign_mgr` → intake, distribution, stock, needs; `intake1`, `reviewer1` → intake, distribution, stock; `dist1` → distribution, stock; `citizen1`, `vol_*` → 403.
 A "line" in `stock` is one item in one warehouse. `low_threshold_units` echoes the server setting (`STOCK_LOW_THRESHOLD`, default 50).
 
-### 3.5 `GET /identity/dashboard/admin` – admin only (`USER_MANAGE`)
+### 3.4 `GET /identity/dashboard/admin` – admin only (`USER_MANAGE`)
 ```json
 {
   "users": {"total": 30, "by_status": {"ACTIVE": 30}, "pending_email_verification": 0, "must_change_password": 30, "active_last_24h": 2},
@@ -131,7 +116,8 @@ Query: `region_code` (e.g. `DEMO_B`, pattern `[A-Z0-9_]{2,32}`), `active_only=tr
   "locations": [{
     "id": "ca-mau", "name": "Cà Mau", "region_code": "DEMO_A", "latitude": 9.176, "longitude": 105.15,
     "rain_24h_mm": 5.5, "peak_rain_1h_mm": 2.1, "max_gust_kmh": 29.5,
-    "alerts": [{"code": "THUNDERSTORM", "level": "WATCH", "message": "Có dông, sét, …", "value": null}]
+    "alerts": [{"code": "THUNDERSTORM", "level": "WATCH", "message": "Có dông, sét, …", "value": null}],
+    "hourly": {"time": ["2026-11-14T14:00", "…"], "rain_mm": [0.2, 0], "gust_kmh": [29.5, 31]}
   }]
 }
 ```
@@ -139,8 +125,18 @@ Query: `region_code` (e.g. `DEMO_B`, pattern `[A-Z0-9_]{2,32}`), `active_only=tr
 - Thresholds: rain 24 h ≥ 50 / 100 / 200 mm (or ≥ 30 mm in one hour → WATCH); gust ≥ 50 / 62 / 89 km/h; thunderstorm weather codes ≥ 95.
 - `message` is already Vietnamese and safe to display as-is. `stale: true` means the provider failed and the last good result is returned: show "Dữ liệu có thể đã cũ". If the provider never succeeded: `503 RESPONSE_UNAVAILABLE`: show "Chưa tải được cảnh báo thời tiết" and keep the rest of the page working.
 - **Always show `disclaimer` and `attribution`** wherever alerts appear (Open-Meteo licence requires attribution).
-- Map use: each location has `latitude/longitude`; draw a marker per location that has alerts, colour by the highest level (suggest vàng/cam/đỏ), popup = name, `rain_24h_mm`, `max_gust_kmh`, and all `alert.message`. Optional toggle layer on the coordinator heatmap; citizen page can list the same alerts without a map.
+- Map use (implemented in `HeatmapPanel.tsx` with a show/hide checkbox): each location has `latitude/longitude`; draw a marker per location that has alerts, colour by the highest level (suggest vàng/cam/đỏ), popup = name, `rain_24h_mm`, `max_gust_kmh`, and all `alert.message`. The citizen SOS page shows the same alerts as a banner (`SosWeatherAlerts.tsx`).
 - Cached 30 min on the server, `Cache-Control: public, max-age=300` for browsers.
+
+### 4.1 Forecast for one point: `GET /response/weather/at?latitude=&longitude=` (public)
+Returns the same fields as one location above (no `id`/`name`/`region_code`) plus `latitude`, `longitude` (echo), `source`, `attribution`, `disclaimer`, `horizon_hours`, `fetched_at`, `stale`. Latitude must be 7.5–24.5 and longitude 101.5–112, otherwise `400 VALIDATION_FAILED` (show "vị trí nằm ngoài vùng có dự báo"). `503 RESPONSE_UNAVAILABLE` when the provider is down and nothing is cached. Privacy: the backend snaps coordinates to a 0.1° cell (~11 km) before calling Open-Meteo and caches per cell for 30 min.
+
+Used by the citizen SOS form: the banner no longer shows national city alerts (it could not know where the user is). It shows weather only for the position the person confirmed on the form, with the 24 h rain/gust chart, and a neutral hint while no position is chosen.
+
+### 4.2 Chart and map layers (implemented in the web app)
+- `components/WeatherChart.tsx` draws the hourly series as an SVG (rain bars mm/h, gust line km/h); it is used in the SOS form banner and in the coordinator map popups.
+- Coordinator heatmap (`HeatmapPanel.tsx`): checkbox layers for weather markers (all 15 cities; coloured when alerts exist, grey-blue otherwise, popup with stats, messages and chart) and for the RainViewer rain radar. The radar and its tile host need `https://api.rainviewer.com` (connect-src) and `https://tilecache.rainviewer.com` (img-src) in the Nginx CSP, already added; reload Nginx after pulling (`docker exec reliva-nginx nginx -s reload`).
+- The SOS location picker places the pin where the person clicks; panning does not change the chosen point.
 
 ## 5. Donation-drive suggestions (`GET /logistics/reports/drive-suggestions`)
 
@@ -169,14 +165,13 @@ Needs `REPORT_READ` in scope (operations manager, coordinator, admin; others 403
 
 | Workspace / role | Landing "Thống kê" page calls |
 |---|---|
-| Citizen (signed in) | `GET /response/dashboard/mine` + `GET /response/weather/alerts?active_only=true` |
-| Volunteer / team leader | `GET /response/dashboard/team` |
-| Coordinator | `GET /response/dashboard/overview` (+ weather layer on the existing map) |
+| Citizen, volunteer | no statistics page; the citizen SOS page shows the weather banner (`GET /response/weather/alerts?active_only=true`) |
+| Coordinator | `GET /response/dashboard/overview`, plus the weather layer on the heatmap |
 | Operations manager, campaign manager | `GET /logistics/dashboard/operations` + existing report cards + `GET /logistics/reports/drive-suggestions` |
 | Intake staff, reviewer, distribution staff | `GET /logistics/dashboard/operations` only (they lack `REPORT_READ`: do not call `reports/summary`, `reports/stock-summary` or `drive-suggestions`, they return 403) |
 | Admin | `GET /identity/dashboard/admin` + `GET /response/dashboard/overview` |
 
-Notes for the existing web navigation (`app/catalog.ts`): the operations `overview` page is currently hidden from intake/reviewer/distribution staff (it falls through to a manager-only rule), so those roles have no landing page; the existing `OperationsDashboard` would also 403 for them. Make the staff section independent of the report cards. Adding a page as the first entry of a workspace changes the default landing page (`allowedPages(...)[0]`).
+Notes for the existing web navigation (`app/catalog.ts`): the operations `overview` page is currently hidden from intake/reviewer/distribution staff (it falls through to a manager-only rule), so those roles have no landing page; the existing `OperationsDashboard` would also 403 for them. This is implemented: the staff section is independent of the report cards. The dashboard pages are deliberately not the first entry of the coordinator and admin workspaces, so the default landing page is unchanged (`reports` and `users`; `allowedPages(...)[0]`).
 
 ## 7. Vietnamese label tables to add (enum → text)
 

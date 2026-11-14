@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, newCommandKey } from '../../api/client';
-import { appendPage } from '../../api/pagination';
+import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
+import { ListNav, LoadMore } from '../../components/ui/Pager';
 import { confirmAction } from '../../components/confirmAction';
 import { DetailSurface } from '../../components/DetailSurface';
 
@@ -12,7 +13,7 @@ type CandidatePage = { items: Candidate[]; cursor?: string; more: boolean };
 export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { teamId: string; onManageChange: (allowed: boolean) => void; addOpen: boolean; onCloseAdd: () => void }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [canManage, setCanManage] = useState(false);
-  const [memberCursor, setMemberCursor] = useState('');
+  const [memberCursor, setMemberCursor, prevMembers, memberPage] = useCursorNav<string>('');
   const [memberNext, setMemberNext] = useState('');
   const [query, setQuery] = useState('');
   const [queryTouched, setQueryTouched] = useState(false);
@@ -36,10 +37,10 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
     let live = true;
     setLoading(true);
     setError('');
-    api<MemberPage>('response', `/teams/${teamId}/members${memberCursor ? `?cursor=${encodeURIComponent(memberCursor)}` : ''}`)
+    api<MemberPage>('response', `/teams/${teamId}/members?limit=${LIST_PAGE_SIZE}${memberCursor ? `&cursor=${encodeURIComponent(memberCursor)}` : ''}`)
       .then((page) => {
         if (!live) return;
-        setMembers((current) => memberCursor ? appendPage(current, page.items, (item) => item.user_id) : page.items);
+        setMembers(page.items);
         setCanManage(page.can_manage_members);
         onManageChange(page.can_manage_members);
         setMemberNext(page.cursor || '');
@@ -72,11 +73,11 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
     setSearchError('');
     const generation = ++searchGeneration.current;
     try {
-      const params = new URLSearchParams({ query: searchTerm });
+      const params = new URLSearchParams({ query: searchTerm, limit: String(LIST_PAGE_SIZE) });
       if (nextCursor) params.set('cursor', nextCursor);
       const page = await api<CandidatePage>('response', `/teams/${teamId}/member-candidates?${params}`);
       if (generation !== searchGeneration.current) return;
-      setCandidates((current) => nextCursor ? appendPage(current, page.items, (item) => item.user_id) : page.items);
+      setCandidates((current) => nextCursor ? [...current, ...page.items.filter((item) => !current.some((existing) => existing.user_id === item.user_id))] : page.items);
       setCandidateNext(page.cursor || '');
       setSearched(true);
     } catch (cause) {
@@ -143,7 +144,7 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
         {canManage && member.member_role !== 'LEADER' && <button type="button" className="button secondary team-member-remove" aria-label={`Đưa ${member.display_name} ra khỏi đội`} disabled={Boolean(busyId)} onClick={() => void remove(member)}>Đưa ra khỏi đội</button>}
       </article>)}
     </div>
-    {memberNext && <button type="button" className="button secondary" disabled={loading} onClick={() => setMemberCursor(memberNext)}>Xem thêm thành viên</button>}
+    <ListNav page={memberPage} hasNext={Boolean(memberNext)} loading={loading} onPrev={prevMembers} onNext={() => memberNext && setMemberCursor(memberNext)} count={members.length} noun="thành viên" />
     {message && <p className="notice success" role="status">{message}</p>}
     {addOpen && <DetailSurface modal open onClose={onCloseAdd} label="Thêm thành viên vào đội" className="team-member-dialog"><div className="team-member-add">
       <h4>Thêm thành viên</h4>
@@ -172,7 +173,7 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
           <button type="button" className="button team-member-add-button" aria-label={`Thêm ${candidate.display_name} vào đội`} disabled={Boolean(busyId)} onClick={() => void add(candidate)}>{busyId === candidate.user_id ? 'Đang thêm…' : 'Thêm vào đội'}</button>
         </article>)}
       </div>
-      {candidateNext && <button type="button" className="button secondary" disabled={searching} onClick={() => void search(undefined, candidateNext)}>Xem thêm kết quả</button>}
+      {candidates.length > 0 && <LoadMore hasMore={Boolean(candidateNext)} loading={searching} onClick={() => void search(undefined, candidateNext)} shown={candidates.length} noun="kết quả" />}
       </>}
     </div></DetailSurface>}
   </section>;

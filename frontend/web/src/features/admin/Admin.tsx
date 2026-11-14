@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
-import { appendPage } from '../../api/pagination';
+import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
+import { ListNav } from '../../components/ui/Pager';
 import { fetchAll } from '../../api/fetchAll';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { DetailSurface } from '../../components/DetailSurface';
@@ -52,7 +53,7 @@ const types: Record<string, string> = {
 
 export function Admin({ page }: { page: string }) {
   const [items, setItems] = useState<Row[]>([]);
-  const [cursor, setCursor] = useState('');
+  const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [next, setNext] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -110,16 +111,14 @@ export function Admin({ page }: { page: string }) {
       setLoading(false);
       return;
     }
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ limit: String(LIST_PAGE_SIZE) });
     if (cursor) params.set('cursor', cursor);
     if (searchTerm && listPath === '/users') params.set('query', searchTerm);
     const path = listPath + (params.size ? `${listPath.includes('?') ? '&' : '?'}${params}` : '');
     api<Page>('identity', path)
       .then((value) => {
         if (live) {
-          setItems((current) => cursor
-            ? appendPage(current, value.items, (item) => String(item.id || item.code))
-            : value.items);
+          setItems(value.items);
           setNext(value.next_cursor || null);
         }
       })
@@ -305,11 +304,7 @@ export function Admin({ page }: { page: string }) {
             </article>
           })}
         </div>
-        {next && (
-          <button className="button secondary" onClick={() => setCursor(next)}>
-            Xem thêm
-          </button>
-        )}
+        <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} />
       </section>
       <DetailSurface modal open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); setShowTeamAssignment(false); setUserAction(null); setRevokeGrantId(''); }} label={selected ? 'Chi tiết bản ghi' : createTitle} className={showCreate && page === 'users' ? 'admin-create-dialog' : ''}>
         {showCreate && page === 'users' && (

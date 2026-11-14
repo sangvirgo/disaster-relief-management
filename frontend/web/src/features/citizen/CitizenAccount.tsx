@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
+import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
+import { ListNav } from '../../components/ui/Pager';
 import type { Me } from '../../auth/session';
 import { GoogleLink } from '../../auth/GoogleLink';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
@@ -32,7 +34,7 @@ export function CitizenRequests({
   onManualLookup?: () => void;
 }) {
   const [items, setItems] = useState<OwnedRequest[]>([]);
-  const [cursor, setCursor] = useState('');
+  const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [next, setNext] = useState('');
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -44,13 +46,11 @@ export function CitizenRequests({
     setError('');
     api<OwnedPage>(
       'response',
-      `/requests/mine${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`
+      `/requests/mine?limit=${LIST_PAGE_SIZE}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
     )
       .then((result) => {
         if (!active) return;
-        setItems((current) => cursor
-          ? [...current, ...result.items.filter((item) => !current.some((existing) => existing.id === item.id))]
-          : result.items);
+        setItems(result.items);
         setNext(result.more ? result.cursor || '' : '');
       })
       .catch((cause) => {
@@ -104,11 +104,7 @@ export function CitizenRequests({
           </button>
         ))}
       </div>
-      {next && (
-        <button className="button secondary" type="button" disabled={loading} onClick={() => setCursor(next)}>
-          Xem thêm yêu cầu
-        </button>
-      )}
+      <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} noun="yêu cầu" />
       {onManualLookup && (
         <button className="text-button account-manual-lookup" type="button" onClick={onManualLookup}>
           Có SOS đã gửi khi chưa đăng nhập? Tra cứu bằng mã

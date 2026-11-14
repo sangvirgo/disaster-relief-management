@@ -13,16 +13,4 @@ export class DashboardController {
     noStore(response);
     return this.dashboard.overview(request);
   }
-
-  @Get('dashboard/mine')
-  mine(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    noStore(response);
-    return this.dashboard.mine(request);
-  }
-
-  @Get('dashboard/team')
-  team(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    noStore(response);
-    return this.dashboard.team(request);
-  }
 }

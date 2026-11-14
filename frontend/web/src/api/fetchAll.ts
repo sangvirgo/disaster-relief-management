@@ -1,10 +1,16 @@
 import { api, type Service } from './client';
 
-export async function fetchAll<T>(service: Service, path: string): Promise<T[]> {
+/**
+ * Only for bounded lookup catalogs (select options). Display lists must use useCursorPages/useLoadMore.
+ * Stops after `maxPages` pages (100 items each) so a growing collection can never be pulled in full.
+ */
+export async function fetchAll<T>(service: Service, path: string, maxPages = 10): Promise<T[]> {
   const items: T[] = [];
   const seen = new Set<string>();
   let cursor = '';
+  let pages = 0;
   do {
+    if (pages++ >= maxPages) break;
     if (cursor && seen.has(cursor)) throw new Error('Phân trang trả về mã lặp. Vui lòng thử lại.');
     if (cursor) seen.add(cursor);
     const query = new URLSearchParams({ limit: '100' });

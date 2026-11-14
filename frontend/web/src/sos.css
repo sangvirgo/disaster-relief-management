@@ -1,9 +1,7 @@
 /* SOS Form & Citizen Location Styling đồng bộ Mobile THEME */
 .sos-form {
-  max-width: 900px;
-  margin-inline: auto;
+  max-width: none;
 }
-.content--sos > .heading { max-width: 900px; margin-inline: auto; }
 
 .sos-form textarea,
 .sos-form select {
@@ -382,3 +380,7 @@
     height: 340px;
   }
 }
+
+/* Pin placed by clicking the map (OSM engine). */
+.location-pin-icon { background: transparent; border: 0; }
+.location-pin-marker { position: relative; display: block; width: 36px; height: 38px; pointer-events: none; }

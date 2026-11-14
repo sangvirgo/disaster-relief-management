@@ -8,6 +8,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { api } from '../../api/client';
 import type { components } from '../../api/generated/response';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
+import { weatherChartSvg, type WeatherHourly } from '../../components/WeatherChart';
 
 setWorkerUrl(workerUrl);
 
@@ -94,23 +95,47 @@ function bindMapButton(marker: L.Marker, name: string): void {
   });
 }
 
+type WeatherPoint = {
+  id: string; name: string; latitude: number; longitude: number; rain_24h_mm: number; max_gust_kmh: number;
+  hourly?: WeatherHourly;
+  alerts: { code: string; level: 'WATCH' | 'WARNING' | 'SEVERE'; message: string }[];
+};
+type WeatherData = { locations: WeatherPoint[]; attribution: string; disclaimer: string; stale: boolean };
+const weatherColor = { WATCH: '#d4a017', WARNING: '#e8710a', SEVERE: '#c5221f' } as const;
+const weatherRank = { WATCH: 1, WARNING: 2, SEVERE: 3 } as const;
+const calmWeatherColor = '#5b7c99';
+
+/** Newest observed radar frame from RainViewer (free, no key). Returns a Leaflet tile URL template. */
+async function fetchRadarTemplate(signal: AbortSignal): Promise<string | null> {
+  const response = await fetch('https://api.rainviewer.com/public/weather-maps.json', { signal });
+  if (!response.ok) return null;
+  const body = await response.json() as { host?: string; radar?: { past?: { path: string }[] } };
+  const frame = body.radar?.past?.at(-1);
+  return body.host && frame ? `${body.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png` : null;
+}
+
 function HeatmapCanvas({
   cells,
   selected,
   onResolutionChange,
   onZoomChange,
   heatOpacity,
+  weather,
+  radarUrl,
 }: {
   cells: HeatmapCell[];
   selected: SelectedSos | null;
   onResolutionChange: (resolution: 250 | 500 | 1000 | 5000) => void;
   onZoomChange: (zoom: number) => void;
   heatOpacity: number;
+  weather: WeatherPoint[];
+  radarUrl: string | null;
 }) {
   const elementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const dotLayerRef = useRef<L.LayerGroup | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
+  const weatherLayerRef = useRef<L.LayerGroup | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [tileError, setTileError] = useState(false);
 
@@ -141,6 +166,7 @@ function HeatmapCanvas({
     }
     dotLayerRef.current = L.layerGroup().addTo(map);
     markerLayerRef.current = L.layerGroup().addTo(map);
+    weatherLayerRef.current = L.layerGroup().addTo(map);
     const canvas = document.createElement('canvas');
     canvas.className = 'heatmap-soft-layer';
     elementRef.current.appendChild(canvas);
@@ -159,6 +185,7 @@ function HeatmapCanvas({
       mapRef.current = null;
       dotLayerRef.current = null;
       markerLayerRef.current = null;
+      weatherLayerRef.current = null;
       canvasRef.current = null;
     };
   }, []);
@@ -332,6 +359,47 @@ function HeatmapCanvas({
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !radarUrl) return;
+    const radar = L.tileLayer(radarUrl, {
+      opacity: 0.6, maxNativeZoom: 7, maxZoom: 19, zIndex: 3, attribution: 'Radar: RainViewer.com',
+    }).addTo(map);
+    return () => { radar.remove(); };
+  }, [radarUrl]);
+
+  useEffect(() => {
+    const layer = weatherLayerRef.current;
+    if (!layer) return;
+    layer.clearLayers();
+    for (const point of weather) {
+      if (!Number.isFinite(point.latitude) || !Number.isFinite(point.longitude)) continue;
+      const top = [...point.alerts].sort((x, y) => weatherRank[y.level] - weatherRank[x.level])[0];
+      const popup = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = top ? `${point.name} · ${label(top.level)}` : `${point.name} · Không có cảnh báo`;
+      const stats = document.createElement('p');
+      stats.textContent = `Mưa 24 giờ tới: ${point.rain_24h_mm} mm · Gió giật tối đa: ${point.max_gust_kmh} km/h`;
+      popup.append(title, stats);
+      for (const alert of point.alerts) {
+        const line = document.createElement('p');
+        line.textContent = alert.message;
+        popup.append(line);
+      }
+      if (point.hourly) {
+        const chart = document.createElement('div');
+        chart.innerHTML = weatherChartSvg(point.hourly);
+        popup.append(chart);
+      }
+      L.circleMarker([point.latitude, point.longitude], top
+        ? { radius: 11, color: '#fff', weight: 2, fillColor: weatherColor[top.level], fillOpacity: 0.9 }
+        : { radius: 6, color: '#fff', weight: 1.5, fillColor: calmWeatherColor, fillOpacity: 0.75 })
+        .bindPopup(popup, { className: 'weather-popup', maxWidth: 340, minWidth: 300 })
+        .bindTooltip(top ? `${point.name}: ${label(top.level)}` : `${point.name}: ${point.rain_24h_mm} mm · ${point.max_gust_kmh} km/h`)
+        .addTo(layer);
+    }
+  }, [weather]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     const markerLayer = markerLayerRef.current;
     if (!map || !markerLayer) return;
     markerLayer.clearLayers();
@@ -374,6 +442,30 @@ export function HeatmapPanel({
 }) {
   const [layer, setLayer] = useState<'confirmed' | 'unverified'>('unverified');
   const [category, setCategory] = useState('');
+  const [showWeather, setShowWeather] = useState(true);
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [weatherError, setWeatherError] = useState(false);
+  const [showRadar, setShowRadar] = useState(true);
+  const [radarTemplate, setRadarTemplate] = useState<string | null>(null);
+  const [radarError, setRadarError] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = () => fetchRadarTemplate(controller.signal)
+      .then((template) => { setRadarTemplate(template); setRadarError(!template); })
+      .catch(() => { if (!controller.signal.aborted) setRadarError(true); });
+    void load();
+    const timer = window.setInterval(load, 10 * 60_000);
+    return () => { controller.abort(); window.clearInterval(timer); };
+  }, []);
+  useEffect(() => {
+    let live = true;
+    const load = () => api<WeatherData>('response', '/weather/alerts')
+      .then((value) => { if (live) { setWeatherData(value); setWeatherError(false); } })
+      .catch(() => { if (live) setWeatherError(true); });
+    void load();
+    const timer = window.setInterval(load, 10 * 60_000);
+    return () => { live = false; window.clearInterval(timer); };
+  }, []);
   useEffect(() => {
     if (compact && selected?.status)
       setLayer(['SUBMITTED', 'VERIFYING'].includes(selected.status) ? 'unverified' : 'confirmed');
@@ -471,7 +563,24 @@ export function HeatmapPanel({
         {loading && <p role="status">Đang cập nhật bản đồ nhiệt…</p>}
         {error && <p className="notice error" role="alert">{error}</p>}
         {warning && <p className="notice warning" role="status">{warning}</p>}
-        <HeatmapCanvas key={regionKey} cells={visibleCells} selected={selected} onResolutionChange={onResolutionChange} onZoomChange={onZoomChange} heatOpacity={heatOpacity} />
+        <HeatmapCanvas key={regionKey} cells={visibleCells} selected={selected} onResolutionChange={onResolutionChange} onZoomChange={onZoomChange} heatOpacity={heatOpacity}
+          weather={showWeather ? weatherData?.locations ?? [] : []}
+          radarUrl={showRadar ? radarTemplate : null} />
+        <div className="weather-layer-control">
+          <label><input type="checkbox" checked={showWeather} onChange={(event) => setShowWeather(event.target.checked)} />
+            {' '}Hiện cảnh báo thời tiết trên bản đồ</label>
+          <label><input type="checkbox" checked={showRadar} onChange={(event) => setShowRadar(event.target.checked)} />
+            {' '}Hiện radar mưa (vùng màu xanh đến đỏ là mưa nhẹ đến rất mạnh)</label>
+          {radarError && showRadar && <p className="notice warning" role="status">Chưa tải được radar mưa.</p>}
+          {weatherError && !weatherData && <p className="notice warning" role="status">Chưa tải được cảnh báo thời tiết.</p>}
+          {weatherData && showWeather && <small className="muted">
+            {weatherData.locations.some((place) => place.alerts.length)
+              ? `${weatherData.locations.filter((place) => place.alerts.length).length} khu vực có cảnh báo trong 24 giờ tới (vàng: lưu ý, cam: cảnh báo, đỏ: nguy hiểm). Chấm xám xanh là nơi chưa có cảnh báo; bấm vào để xem lượng mưa và gió dự báo.`
+              : 'Không có cảnh báo thời tiết trong 24 giờ tới. Bấm vào chấm xám xanh để xem lượng mưa và gió dự báo.'}
+            {showRadar ? ' Radar mưa: RainViewer.com.' : ''}
+            {weatherData.stale ? ' Dữ liệu có thể đã cũ.' : ''} {weatherData.disclaimer} {weatherData.attribution}
+          </small>}
+        </div>
         {data && <>
           {zoom > 10 && <label className="heatmap-opacity-control">
             <span>Độ đậm vùng nhiệt</span>

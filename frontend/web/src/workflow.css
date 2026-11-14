@@ -902,3 +902,28 @@
 .coordinator-layout .queue-filter-toolbar { justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
 .team-readiness-results { flex-basis: 100%; min-width: 0; }
 .team-readiness-results > p { margin: 0; }
+
+.weather-layer-control { margin: 8px 0 12px; display: grid; gap: 4px; }
+.weather-popup p { margin: 4px 0 0; }
+
+/* Coordinator SOS queue: focused detail panel */
+.sos-hero { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--border, #e2e8f0); border-radius: 12px; background: var(--surface, #fff); margin-bottom: 12px; }
+.sos-hero[data-danger="true"] { border-color: #dc2626; box-shadow: inset 4px 0 0 #dc2626; }
+.sos-hero__top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.sos-hero__top h3 { margin: 0; font-size: 1.35rem; margin-right: auto; }
+.sos-hero__nopriority { font-size: .85rem; color: var(--muted, #64748b); }
+.sos-hero__danger { margin: 0; padding: 8px 12px; border-radius: 8px; background: #fee2e2; color: #991b1b; font-weight: 700; }
+.sos-hero__flag { margin: 0; padding: 6px 10px; border-radius: 8px; background: #fef3c7; color: #92400e; font-size: .9rem; }
+.sos-hero__step { margin: 0; color: #1d4ed8; font-weight: 600; }
+.sos-hero__desc { margin: 0; font-size: 1.05rem; line-height: 1.5; }
+.sos-hero__facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 16px; margin: 0; }
+.sos-hero__facts div { display: grid; gap: 2px; }
+.sos-hero__facts dt { font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted, #64748b); }
+.sos-hero__facts dd { margin: 0; font-weight: 600; }
+.sos-actions { margin: 4px 0 16px; }
+.sos-fold { border: 1px solid var(--border, #e2e8f0); border-radius: 10px; margin: 8px 0; padding: 0 14px; background: var(--surface, #fff); }
+.sos-fold > summary { cursor: pointer; padding: 12px 0; font-weight: 600; }
+.sos-fold[open] > summary { border-bottom: 1px solid var(--border, #e2e8f0); margin-bottom: 10px; }
+.sos-fold--advisory > summary { font-weight: 500; }
+.queue-danger-chip { color: #991b1b; background: #fee2e2; border-radius: 999px; padding: 1px 8px; font-weight: 700; width: fit-content; }
+.queue-detail-card .detail-grid { margin-top: 0; }

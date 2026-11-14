@@ -1,4 +1,4 @@
-import { deriveAlerts, summarizeForecast, WEATHER_LOCATIONS } from '../src/weather/weather.service';
+import { deriveAlerts, summarizeForecast, summarizeHourly, WEATHER_LOCATIONS } from '../src/weather/weather.service';
 import { validationExceptionFactory } from '@c48/technical/http/validation-errors';
 import type { ValidationError } from 'class-validator';
 
@@ -38,6 +38,23 @@ describe('weather alert derivation', () => {
     expect(forecast.rain_24h_mm).toBe(69);
     expect(forecast.max_gust_kmh).toBe(40);
     expect(forecast.alerts.map((alert) => alert.code)).toEqual(['HEAVY_RAIN', 'THUNDERSTORM']);
+  });
+});
+
+describe('hourly series for charts', () => {
+  it('keeps aligned 24 h arrays, replaces missing values with 0 and rounds to 0.1', () => {
+    const time = Array.from({ length: 30 }, (_, i) => `2026-11-14T${String(i % 24).padStart(2, '0')}:00`);
+    const summary = summarizeHourly({
+      time,
+      precipitation: [1.04, null, 2.26, ...Array<number | null>(27).fill(0)],
+      wind_gusts_10m: [10, 20, null, ...Array<number | null>(27).fill(5)],
+      weather_code: Array<number | null>(30).fill(1),
+    });
+    expect(summary.hourly.time).toHaveLength(24);
+    expect(summary.hourly.rain_mm).toHaveLength(24);
+    expect(summary.hourly.gust_kmh).toHaveLength(24);
+    expect(summary.hourly.rain_mm.slice(0, 3)).toEqual([1, 0, 2.3]);
+    expect(summary.hourly.gust_kmh.slice(0, 3)).toEqual([10, 20, 0]);
   });
 });
 

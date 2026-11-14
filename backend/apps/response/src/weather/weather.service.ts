@@ -19,11 +19,33 @@ export interface WeatherLocation {
   longitude: number;
 }
 
-export interface WeatherLocationForecast extends WeatherLocation {
+/** Hour-by-hour series for charts; index i is the same hour in every array (local time, Asia/Bangkok). */
+export interface WeatherHourly {
+  time: string[];
+  rain_mm: number[];
+  gust_kmh: number[];
+}
+
+export interface ForecastSummary {
   rain_24h_mm: number;
   peak_rain_1h_mm: number;
   max_gust_kmh: number;
   alerts: WeatherAlert[];
+  hourly: WeatherHourly;
+}
+
+export interface WeatherLocationForecast extends WeatherLocation, ForecastSummary {}
+
+/** Forecast for one arbitrary point (a citizen's chosen location). */
+export interface WeatherPointForecast extends ForecastSummary {
+  latitude: number;
+  longitude: number;
+  source: string;
+  attribution: string;
+  disclaimer: string;
+  horizon_hours: number;
+  fetched_at: string;
+  stale: boolean;
 }
 
 export interface WeatherSnapshot {
@@ -61,6 +83,13 @@ const CACHE_MS = 30 * 60_000;
 const FETCH_TIMEOUT_MS = 8_000;
 const ENDPOINT = 'https://api.open-meteo.com/v1/forecast';
 
+const CACHE_MAX_AGE_MS = CACHE_MS;
+const PROVIDER_NOTICE = {
+  source: 'Open-Meteo',
+  attribution: 'Dữ liệu dự báo: Open-Meteo.com (CC BY 4.0).',
+  disclaimer: 'Đây là dự báo mô hình tham khảo, không thay thế cảnh báo chính thức của Trung tâm Dự báo khí tượng thủy văn quốc gia và chính quyền địa phương.',
+} as const;
+
 const LEVEL_ORDER: Record<WeatherLevel, number> = { WATCH: 1, WARNING: 2, SEVERE: 3 };
 
 interface HourlyBlock {
@@ -70,6 +99,9 @@ interface HourlyBlock {
   weather_code: (number | null)[];
 }
 
+const isHourly = (value: HourlyBlock | undefined): value is HourlyBlock =>
+  Boolean(value) && Array.isArray(value!.time) && Array.isArray(value!.precipitation)
+  && Array.isArray(value!.wind_gusts_10m) && Array.isArray(value!.weather_code);
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const round1 = (value: number): number => Math.round(value * 10) / 10;
 
@@ -104,27 +136,44 @@ export function deriveAlerts(rain24h: number, peakRain1h: number, maxGust: numbe
   return alerts.sort((a, b) => LEVEL_ORDER[b.level] - LEVEL_ORDER[a.level]);
 }
 
-export function summarizeForecast(location: WeatherLocation, hourly: HourlyBlock): WeatherLocationForecast {
+export function summarizeHourly(hourly: HourlyBlock): ForecastSummary {
   const rain = hourly.precipitation.slice(0, HORIZON_HOURS).filter(finite);
   const gusts = hourly.wind_gusts_10m.slice(0, HORIZON_HOURS).filter(finite);
   const codes = hourly.weather_code.slice(0, HORIZON_HOURS).filter(finite);
   const rain24h = rain.reduce((sum, value) => sum + value, 0);
   const peakRain = rain.length ? Math.max(...rain) : 0;
   const maxGust = gusts.length ? Math.max(...gusts) : 0;
+  const hours = Math.min(HORIZON_HOURS, hourly.time.length);
   return {
-    ...location,
     rain_24h_mm: round1(rain24h),
     peak_rain_1h_mm: round1(peakRain),
     max_gust_kmh: round1(maxGust),
     alerts: deriveAlerts(rain24h, peakRain, maxGust, codes.some((code) => code >= 95)),
+    hourly: {
+      time: hourly.time.slice(0, hours),
+      rain_mm: Array.from({ length: hours }, (_, i) => round1(finite(hourly.precipitation[i]) ? hourly.precipitation[i]! : 0)),
+      gust_kmh: Array.from({ length: hours }, (_, i) => round1(finite(hourly.wind_gusts_10m[i]) ? hourly.wind_gusts_10m[i]! : 0)),
+    },
   };
 }
+
+export function summarizeForecast(location: WeatherLocation, hourly: HourlyBlock): WeatherLocationForecast {
+  return { ...location, ...summarizeHourly(hourly) };
+}
+
+/** Rounding to 0.1° (about 11 km) lets nearby citizens share one provider call and one cache entry. */
+const POINT_GRID = 10;
+const POINT_CACHE_MAX = 500;
+const snap = (value: number): number => Math.round(value * POINT_GRID) / POINT_GRID;
+const gridKey = (latitude: number, longitude: number): string => `${snap(latitude)},${snap(longitude)}`;
 
 @Injectable()
 export class WeatherService {
   private readonly logger = new Logger(WeatherService.name);
   private cache: { at: number; snapshot: WeatherSnapshot } | null = null;
   private inflight: Promise<WeatherSnapshot> | null = null;
+  private readonly pointCache = new Map<string, { at: number; forecast: WeatherPointForecast }>();
+  private readonly pointInflight = new Map<string, Promise<WeatherPointForecast>>();
 
   /** Public alerts, optionally limited to one region. Serves the cached forecast for 30 minutes. */
   async alerts(regionCode?: string, onlyActive = false): Promise<WeatherSnapshot> {
@@ -133,6 +182,42 @@ export class WeatherService {
       .filter((location) => !regionCode || location.region_code === regionCode)
       .filter((location) => !onlyActive || location.alerts.length > 0);
     return { ...snapshot, locations, alert_count: locations.reduce((sum, location) => sum + location.alerts.length, 0) };
+  }
+
+  /**
+   * Forecast for the citizen's own location, cached per 0.1° cell for 30 minutes. Only the snapped cell
+   * centre is sent to the provider, never the caller's exact coordinates.
+   */
+  async forecastAt(latitude: number, longitude: number): Promise<WeatherPointForecast> {
+    const key = gridKey(latitude, longitude);
+    const cached = this.pointCache.get(key);
+    if (cached && Date.now() - cached.at < CACHE_MAX_AGE_MS) return { ...cached.forecast, latitude, longitude };
+    let pending = this.pointInflight.get(key);
+    if (!pending) {
+      pending = this.fetchPoint(snap(latitude), snap(longitude)).finally(() => { this.pointInflight.delete(key); });
+      this.pointInflight.set(key, pending);
+    }
+    try {
+      const forecast = await pending;
+      this.pointCache.delete(key);
+      this.pointCache.set(key, { at: Date.now(), forecast });
+      if (this.pointCache.size > POINT_CACHE_MAX) this.pointCache.delete(this.pointCache.keys().next().value as string);
+      return { ...forecast, latitude, longitude };
+    } catch (error) {
+      this.logger.warn(`WEATHER_POINT_FAILED ${error instanceof Error ? error.name : 'unknown'}`);
+      if (cached) return { ...cached.forecast, latitude, longitude, stale: true };
+      throw new AppError('RESPONSE_UNAVAILABLE', { status: 503 });
+    }
+  }
+
+  private async fetchPoint(latitude: number, longitude: number): Promise<WeatherPointForecast> {
+    const [result] = await this.requestForecast([latitude], [longitude]);
+    const hourly = (result as { hourly?: HourlyBlock } | undefined)?.hourly;
+    if (!isHourly(hourly)) throw new Error('provider hourly block malformed');
+    return {
+      latitude, longitude, ...summarizeHourly(hourly),
+      ...PROVIDER_NOTICE, horizon_hours: HORIZON_HOURS, fetched_at: new Date().toISOString(), stale: false,
+    };
   }
 
   private async snapshot(): Promise<WeatherSnapshot> {
@@ -149,10 +234,10 @@ export class WeatherService {
     }
   }
 
-  private async fetchSnapshot(): Promise<WeatherSnapshot> {
+  private async requestForecast(latitudes: number[], longitudes: number[]): Promise<unknown[]> {
     const url = new URL(ENDPOINT);
-    url.searchParams.set('latitude', WEATHER_LOCATIONS.map((location) => location.latitude).join(','));
-    url.searchParams.set('longitude', WEATHER_LOCATIONS.map((location) => location.longitude).join(','));
+    url.searchParams.set('latitude', latitudes.join(','));
+    url.searchParams.set('longitude', longitudes.join(','));
     url.searchParams.set('hourly', 'precipitation,wind_gusts_10m,weather_code');
     url.searchParams.set('forecast_hours', String(HORIZON_HOURS));
     url.searchParams.set('timezone', 'Asia/Bangkok');
@@ -163,26 +248,32 @@ export class WeatherService {
       if (!response.ok) throw new Error(`provider status ${response.status}`);
       const body = await response.json() as unknown;
       const results = Array.isArray(body) ? body : [body];
-      if (results.length !== WEATHER_LOCATIONS.length) throw new Error('provider result count mismatch');
-      const locations = WEATHER_LOCATIONS.map((location, index) => {
-        const hourly = (results[index] as { hourly?: HourlyBlock } | undefined)?.hourly;
-        if (!hourly || !Array.isArray(hourly.precipitation) || !Array.isArray(hourly.wind_gusts_10m) || !Array.isArray(hourly.weather_code)) {
-          throw new Error('provider hourly block malformed');
-        }
-        return summarizeForecast(location, hourly);
-      });
-      return {
-        source: 'Open-Meteo',
-        attribution: 'Dữ liệu dự báo: Open-Meteo.com (CC BY 4.0).',
-        disclaimer: 'Đây là dự báo mô hình tham khảo, không thay thế cảnh báo chính thức của Trung tâm Dự báo khí tượng thủy văn quốc gia và chính quyền địa phương.',
-        horizon_hours: HORIZON_HOURS,
-        fetched_at: new Date().toISOString(),
-        stale: false,
-        alert_count: locations.reduce((sum, location) => sum + location.alerts.length, 0),
-        locations,
-      };
+      if (results.length !== latitudes.length) throw new Error('provider result count mismatch');
+      return results;
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  private async fetchSnapshot(): Promise<WeatherSnapshot> {
+    const results = await this.requestForecast(
+      WEATHER_LOCATIONS.map((location) => location.latitude),
+      WEATHER_LOCATIONS.map((location) => location.longitude),
+    );
+    const locations = WEATHER_LOCATIONS.map((location, index) => {
+      const hourly = (results[index] as { hourly?: HourlyBlock } | undefined)?.hourly;
+      if (!isHourly(hourly)) throw new Error('provider hourly block malformed');
+      return summarizeForecast(location, hourly);
+    });
+    return {
+      source: PROVIDER_NOTICE.source,
+      attribution: PROVIDER_NOTICE.attribution,
+      disclaimer: PROVIDER_NOTICE.disclaimer,
+      horizon_hours: HORIZON_HOURS,
+      fetched_at: new Date().toISOString(),
+      stale: false,
+      alert_count: locations.reduce((sum, location) => sum + location.alerts.length, 0),
+      locations,
+    };
   }
 }

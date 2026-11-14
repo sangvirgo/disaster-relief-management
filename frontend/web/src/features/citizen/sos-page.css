@@ -1,15 +1,85 @@
 .sos-form {
   width: 100%;
-  max-width: 720px;
+  max-width: none;
+  margin-inline: 0;
   gap: var(--space-5);
 }
 .sos-location-card,
-.sos-information-card {
+.sos-step-card {
   display: grid;
   align-content: start;
   gap: var(--space-4);
 }
-.content--sos { max-width: 980px; }
+.content--sos { max-width: var(--content-max); }
+
+/* Two-column layout: where (map) on the left, what happened and who to call on the right. */
+.sos-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+.sos-col-map,
+.sos-col-form {
+  display: grid;
+  gap: var(--space-5);
+  align-content: start;
+  min-width: 0;
+}
+@media (min-width: 1080px) {
+  .sos-layout { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+  .sos-form .location-map-wrap { height: clamp(420px, calc(100dvh - 360px), 640px); }
+}
+.sos-step-card > h2,
+.sos-location-card .location-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.sos-step-number {
+  display: inline-grid;
+  flex: 0 0 24px;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+}
+.sos-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* The map is always shown on this page, so the show/hide toggle is dropped. */
+.sos-form .location-picker > .button { display: none; }
+.sos-form .location-map-panel { margin-top: 0; }
+.sos-needs { display: grid; gap: var(--space-2); }
+.sos-needs .radio,
+.sos-danger-check {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-surface-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-card);
+}
+.sos-needs .radio:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+}
+.sos-danger-check {
+  border-color: var(--color-emergency-border);
+  background: var(--color-emergency-bg);
+  color: var(--color-emergency-dark);
+  font-weight: 600;
+}
+.sos-ai-note {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+}
 .sos-weather-banner.card {
   display: flex;
   align-items: flex-start;
@@ -82,11 +152,14 @@
 }
 .sos-submit-bar .ui-button {
   flex: none;
+  min-width: 320px;
 }
 @media (max-width: 719px) {
-  .sos-form .form-grid {
+  .sos-form .form-grid,
+  .sos-form .sos-grid-3 {
     grid-template-columns: minmax(0, 1fr);
   }
+  .sos-submit-bar .ui-button { min-width: 0; }
   .sos-form .location-heading {
     align-items: stretch;
     flex-direction: column;
@@ -98,3 +171,16 @@
     width: 100%;
   }
 }
+
+/* Aligned count inputs: labels may wrap, inputs stay on one baseline. */
+.sos-grid-3 { align-items: end; }
+.sos-grid-3 > label { display: grid; grid-template-rows: minmax(2.8em, auto) auto; align-content: end; }
+.sos-grid-3 > label > input { align-self: end; }
+
+/* Rain radar control on the location map. */
+.rain-control { position: absolute; z-index: 500; top: 10px; right: 10px; display: grid; gap: 6px; justify-items: end; max-width: calc(100% - 70px); }
+.rain-control button { padding: 6px 12px; border: 1px solid var(--color-surface-border); border-radius: 999px; background: var(--color-surface-card); color: var(--color-text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-sm); }
+.rain-control button.active { background: #1d6fd6; border-color: #1d6fd6; color: #fff; }
+.rain-control small, .rain-legend { padding: 4px 10px; border-radius: 8px; background: #ffffffee; color: var(--color-text-secondary); font-size: 12px; line-height: 16px; }
+.rain-legend { display: grid; grid-template-columns: repeat(3, auto); gap: 2px 10px; }
+.rain-legend i { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #9bd3ff, #2f8cf0, #1646c8, #7a2fd0); }

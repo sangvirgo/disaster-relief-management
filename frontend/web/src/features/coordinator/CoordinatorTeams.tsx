@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchAll } from '../../api/fetchAll';
-import { api } from '../../api/client';
+import { useCursorPages } from '../../api/useCursorPages';
+import { Pager } from '../../components/ui/Pager';
 import { CommandForm } from '../../components/CommandForm';
 import { label } from '../../i18n/labels';
 import type { Me } from '../../auth/session';
@@ -17,9 +18,6 @@ type Team = { id: string; name: string; organization_id: string; operating_regio
   nationwide_coverage: boolean; availability: string; status: string; version: number; skills: string[]; position: { age_s: number } | null };
 type Region = { code: string; name: string; status: string };
 type Member = { user_id: string; display_name: string; member_role: string };
-type UserDetail = { memberships?: { organization_id: string; status: string }[];
-  grants?: { role_code: string; scope_type: string; organization_id: string | null }[] };
-const apiUserDetail = (id: string) => api<UserDetail>('identity', `/users/${id}`);
 
 function positionAge(ageSeconds: number): string {
   const minutes = Math.max(0, Math.round(ageSeconds / 60));
@@ -28,23 +26,21 @@ function positionAge(ageSeconds: number): string {
 }
 
 export function CoordinatorTeams({ user }: { user: Me }) {
-  const [teams, setTeams] = useState<Team[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [organizations, setOrganizations] = useState<{ value: string; label: string }[]>([]);
-  const [users, setUsers] = useState<{ value: string; label: string; organizationIds: string[] }[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState('');
-  const [page, setPage] = useState(0);
+  const teamPages = useCursorPages<Team>('response', '/teams', 10);
+  const teams = teamPages.items;
   const [members, setMembers] = useState<Member[]>([]);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [lookupError, setLookupError] = useState('');
+  const loading = teamPages.loading;
+  const error = teamPages.error || lookupError;
   const selected = teams.find((team) => team.id === selectedId);
-  const pageSize = 8;
-  const pageCount = Math.max(1, Math.ceil(teams.length / pageSize));
-  const visibleTeams = teams.slice(page * pageSize, (page + 1) * pageSize);
+  const visibleTeams = teams;
   const isAdmin = user.grants.some((grant) => grant.role_code === 'ADMIN');
   const canManageNationwide = Boolean(selected && user.grants.some((grant) =>
     (grant.role_code === 'ADMIN' && grant.scope_type === 'SYSTEM') ||
@@ -52,41 +48,21 @@ export function CoordinatorTeams({ user }: { user: Me }) {
 
   useEffect(() => {
     let live = true;
-    setLoading(true);
-    setError('');
-    void Promise.all([fetchAll<Team>('response', '/teams'), fetchAll<Region>('identity', '/regions'), fetchAll<Skill>('response', '/skills')])
-      .then(([teamRows, regionRows, skillRows]) => { if (live) { setTeams(teamRows); setRegions(regionRows); setSkills(skillRows); } })
-      .catch((cause) => { if (live) setError(cause instanceof Error ? cause.message : 'Không tải được danh sách đội.'); })
-      .finally(() => { if (live) setLoading(false); });
+    setLookupError('');
+    void Promise.all([fetchAll<Region>('identity', '/regions'), fetchAll<Skill>('response', '/skills')])
+      .then(([regionRows, skillRows]) => { if (live) { setRegions(regionRows); setSkills(skillRows); } })
+      .catch((cause) => { if (live) setLookupError(cause instanceof Error ? cause.message : 'Không tải được danh mục khu vực và kỹ năng.'); });
     return () => { live = false; };
   }, [revision]);
 
   useEffect(() => {
     if (!isAdmin || !showCreate) return;
     let live = true;
-    void Promise.all([fetchAll<{ id: string; name: string; status: string }>('identity', '/organizations'),
-      fetchAll<{ id: string; username: string; display_name: string; status: string }>('identity', '/users')])
-      .then(async ([orgRows, userRows]) => {
-        const activeUsers = userRows.filter((row) => row.status === 'ACTIVE');
-        const [details, rosters] = await Promise.all([
-          Promise.all(activeUsers.map((row) => apiUserDetail(row.id))),
-          Promise.all(teams.map((team) => fetchAll<Member>('response', `/teams/${team.id}/members`))),
-        ]);
-        const assigned = new Set(rosters.flat().map((member) => member.user_id));
-        if (live) {
-        setOrganizations(orgRows.filter((row) => row.status === 'ACTIVE').map((row) => ({ value: row.id, label: row.name })));
-        setUsers(activeUsers.flatMap((row, index) => {
-          if (assigned.has(row.id)) return [];
-          const detail = details[index];
-          const organizationIds = detail.memberships?.filter((membership) => membership.status === 'ACTIVE' &&
-            detail.grants?.some((grant) => grant.role_code === 'VOLUNTEER' &&
-              (grant.scope_type === 'SYSTEM' || grant.organization_id === membership.organization_id)))
-            .map((membership) => membership.organization_id) || [];
-          return organizationIds.length ? [{ value: row.id, label: `${row.display_name} · ${row.username}`, organizationIds }] : [];
-        }));
-      } }).catch(() => { if (live) { setOrganizations([]); setUsers([]); } });
+    void fetchAll<{ id: string; name: string; status: string }>('identity', '/organizations')
+      .then((orgRows) => { if (live) setOrganizations(orgRows.filter((row) => row.status === 'ACTIVE').map((row) => ({ value: row.id, label: row.name }))); })
+      .catch(() => { if (live) setOrganizations([]); });
     return () => { live = false; };
-  }, [isAdmin, showCreate, teams]);
+  }, [isAdmin, showCreate]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -97,7 +73,7 @@ export function CoordinatorTeams({ user }: { user: Me }) {
     return () => { live = false; };
   }, [selectedId, revision]);
 
-  const refresh = () => setRevision((current) => current + 1);
+  const refresh = () => { setRevision((current) => current + 1); teamPages.reload(); };
   const closeDetail = () => { setSelectedId(''); setAddMemberOpen(false); };
   return <div className="admin-team-management">
     <Card id="coordinator-team-list" className="coordinator-team-list-card">
@@ -106,7 +82,7 @@ export function CoordinatorTeams({ user }: { user: Me }) {
         <Button type="button" variant="secondary" onClick={refresh}>Cập nhật</Button></div></div>
       <p>Phạm vi hoạt động quyết định SOS nào có thể giao; GPS cho biết đội đang ở đâu. Đội toàn quốc vẫn phải thuộc cùng tổ chức với SOS.</p>
       {isAdmin && showCreate && <TeamCreateForm organizations={organizations} regions={regions.filter((row) => row.status === 'ACTIVE').map((row) => ({ value: row.code, label: row.name }))}
-        users={users} skills={skills} onSuccess={(id) => { setShowCreate(false); setSelectedId(id); refresh(); }} />}
+        skills={skills} onSuccess={(id) => { setShowCreate(false); setSelectedId(id); refresh(); }} />}
       {loading && <Skeleton label="Đang tải đội cứu hộ…" />}
       {error && <div className="notice error" role="alert">{error} <Button type="button" variant="secondary" onClick={refresh}>Thử lại</Button></div>}
       {!loading && teams.length > 0 && <><div className="team-table-scroll"><table className="team-table">
@@ -120,11 +96,8 @@ export function CoordinatorTeams({ user }: { user: Me }) {
           <td><span className={`team-status-dot${team.status !== 'ACTIVE' || team.availability !== 'AVAILABLE' ? ' is-inactive' : ''}`} />{team.status === 'ACTIVE' ? label(team.availability) : label(team.status)}
             <small>{team.position ? positionAge(team.position.age_s) : 'Chưa có vị trí'}</small></td>
         </tr>)}</tbody>
-      </table></div><div className="team-table-pagination"><span>Hiển thị {page * pageSize + 1}–{Math.min((page + 1) * pageSize, teams.length)} / {teams.length} đội</span>
-        <div><Button type="button" variant="secondary" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Trang trước</Button>
-          <span>Trang {page + 1}/{pageCount}</span>
-          <Button type="button" variant="secondary" disabled={page + 1 >= pageCount} onClick={() => setPage((value) => value + 1)}>Trang sau</Button></div></div></>}
-      {!loading && !teams.length && !error && <EmptyState title="Chưa có đội cứu hộ" description="Hiện chưa có đội trong phạm vi quản lý của bạn." />}
+      </table></div><Pager page={teamPages.page} hasNext={teamPages.hasNext} loading={teamPages.loading} onPrev={teamPages.prev} onNext={teamPages.next} count={teams.length} noun="đội" /></>}
+      {!loading && !teams.length && !error && teamPages.page === 0 && <EmptyState title="Chưa có đội cứu hộ" description="Hiện chưa có đội trong phạm vi quản lý của bạn." />}
     </Card>
     {selected && <DetailSurface key={selected.id} modal open onClose={closeDetail} label={`Chi tiết đội ${selected.name}`} heading={selected.name} className="team-detail-dialog">
       <p>Khu vực gốc: <strong>{regions.find((region) => region.code === selected.operating_region_code)?.name || selected.operating_region_code}</strong>. Phạm vi: <strong>{selected.nationwide_coverage ? 'Toàn quốc' : 'Theo khu vực gốc'}</strong>. Đội phải không có nhiệm vụ đang hoạt động khi đổi phạm vi.</p>

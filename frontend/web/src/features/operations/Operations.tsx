@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
-import { appendPage } from '../../api/pagination';
+import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
+import { ListNav } from '../../components/ui/Pager';
 import { roles, type Me } from '../../auth/session';
 import { CommandForm, type CommandSpec, type Field } from '../../components/CommandForm';
 import { dateLabel, label, requestStatusLabel, timeLabel } from '../../i18n/labels';
@@ -121,7 +122,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const [region, setRegion] = useState(() => readReportFilters(user.id).region || '');
   const initialReportFilters = useRef({ warehouse: false, region: false });
   const [items, setItems] = useState<Row[]>([]);
-  const [cursor, setCursor] = useState('');
+  const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [pageSize, setPageSize] = useState(() => readReportFilters(user.id).pageSize || 50);
   useEffect(() => {
     try { sessionStorage.setItem(`operations-filters:${user.id}`, JSON.stringify({ warehouse, region, pageSize })); }
@@ -288,7 +289,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           ? '/donation-disputes'
           : routes[page];
   const params = new URLSearchParams();
-  if (page === 'stock' || page === 'reports') params.set('limit', String(pageSize));
+  params.set('limit', String(page === 'stock' || page === 'reports' ? pageSize : LIST_PAGE_SIZE));
   if ((page === 'stock' || (page === 'reports' && report === 'stock-summary')) && warehouse)
     params.set('warehouse_id', warehouse);
   if (cursor) params.set('cursor', cursor);
@@ -321,9 +322,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     api<List>('logistics', path)
       .then((value) => {
         if (live) {
-          setItems((current) => cursor
-            ? appendPage(current, value.items || [], operationRecordKey)
-            : value.items || []);
+          setItems(value.items || []);
           setSelected(current => current
             ? value.items?.find(item => operationRecordKey(item) === operationRecordKey(current)) || (cursor ? current : null)
             : null);
@@ -700,11 +699,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             ))}
           </div>
         )}
-        {next && (
-          <button className="button secondary" disabled={loading} onClick={() => setCursor(next)}>
-            Xem thêm
-          </button>
-        )}
+        <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} />
       </section>
       {page === 'distribution' && commitmentsError && <p role="alert" className="notice error">{commitmentsError} Hãy tải lại trước khi lập phiếu hỗ trợ SOS.</p>}
       {(selected || showCreate) && <DetailSurface key={selected?.id || 'create'} className={`operations-detail-transition ${distributionPages.has(page) && !showCreate ? 'distribution-detail-panel' : ''}`} heading={selected && distributionPages.has(page) ? 'Chi tiết phiếu phân phối' : undefined} modal={page === 'review' || showCreate || stockDetail || (['intake', 'assets'].includes(page) && compact) || (distributionPages.has(page) && stackedDistribution)} explicitCloseOnly={page === 'review'} open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? distributionPages.has(page) ? 'Chi tiết phiếu phân phối' : 'Chi tiết bản ghi' : createTitle}>

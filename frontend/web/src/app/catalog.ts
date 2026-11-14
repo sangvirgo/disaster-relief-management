@@ -119,8 +119,8 @@ export const pages: Record<Workspace, Page[]> = {
   ],
   admin: [
     { id: 'dashboard', title: 'Thống kê', icon: 'report' },
-    { id: 'teams', title: 'Đội cứu hộ', icon: 'team', service: 'response', path: '/teams' },
     { id: 'users', title: 'Người dùng', icon: 'users', service: 'identity', path: '/users' },
+    { id: 'teams', title: 'Đội cứu hộ', icon: 'team', service: 'response', path: '/teams' },
     {
       id: 'organizations',
       title: 'Tổ chức',
@@ -161,6 +161,16 @@ export function allowedWorkspaces(user: Me | null): Workspace[] {
     result.push('operations');
   if (r.has('ADMIN')) result.push('admin');
   return result;
+}
+const operationsRoles = ['OPERATIONS_MANAGER', 'CAMPAIGN_MANAGER', 'INTAKE_STAFF', 'REVIEWER', 'DISTRIBUTION_STAFF'];
+/** Role codes of the user that grant access to a workspace (for display only). */
+export function workspaceRoleCodes(workspace: Workspace, user: Me | null): string[] {
+  const r = roles(user);
+  if (workspace === 'citizen') return ['CITIZEN'];
+  if (workspace === 'volunteer') return ['VOLUNTEER'];
+  if (workspace === 'coordinator') return ['COORDINATOR'];
+  if (workspace === 'admin') return ['ADMIN'];
+  return operationsRoles.filter((role) => r.has(role));
 }
 export function allowedPages(workspace: Workspace, user: Me | null): Page[] {
   const r = roles(user);

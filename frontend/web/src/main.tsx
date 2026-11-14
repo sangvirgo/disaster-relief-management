@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api, ApiError, newCommandKey } from './api/client';
-import { appendPage } from './api/pagination';
+import { useCursorNav, LIST_PAGE_SIZE } from './api/useCursorNav';
+import { ListNav } from './components/ui/Pager';
 import {
   changePassword,
   googleLogin,
@@ -19,6 +20,7 @@ import {
   allowedWorkspaces,
   pages,
   workspaceLabels,
+  workspaceRoleCodes,
   type Page,
   type Workspace,
 } from './app/catalog';
@@ -65,7 +67,6 @@ const commonPasswords = new Set([
 ]);
 
 const SosForm = React.lazy(() => import('./features/citizen/SosForm').then((module) => ({ default: module.SosForm })));
-const SosWeatherAlerts = React.lazy(() => import('./features/citizen/SosWeatherAlerts').then((module) => ({ default: module.SosWeatherAlerts })));
 const Donations = React.lazy(() => import('./features/citizen/Donations').then((module) => ({ default: module.Donations })));
 const TrackingActions = React.lazy(() => import('./features/citizen/TrackingActions').then((module) => ({ default: module.TrackingActions })));
 const Coordinator = React.lazy(() => import('./features/coordinator/Coordinator').then((module) => ({ default: module.Coordinator })));
@@ -1279,7 +1280,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
   const [error, setError] = useState('');
   const [forbidden, setForbidden] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [cursor, setCursor] = useState<string | null>(null);
+  const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string | null>(null);
   const [detailPath, setDetailPath] = useState<string | null>(null);
   const [selectedPublicCampaign, setSelectedPublicCampaign] = useState<Record<string, unknown> | null>(null);
   function openDetail(item: Record<string, unknown>): void {
@@ -1332,18 +1333,13 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
           generated_at: summaries.map((summary) => summary.generated_at).filter(Boolean).sort().at(-1),
         };
       }
-      const path = page.path! +
-        (cursor ? `${page.path!.includes('?') ? '&' : '?'}cursor=${encodeURIComponent(cursor)}` : '');
+      const path = page.path! + `${page.path!.includes('?') ? '&' : '?'}limit=${LIST_PAGE_SIZE}` +
+        (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
       return api<DataPage>(page.service!, path);
     };
     load()
       .then((result) => {
-        if (active) setData((current) => ({
-          ...result,
-          items: cursor && current?.items && result.items
-            ? appendPage(current.items, result.items, (item) => String(item.id))
-            : result.items,
-        }));
+        if (active) setData(result);
       })
       .catch((cause) => {
         if (active) {
@@ -1486,14 +1482,7 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
           {page.path === '/public/campaigns' && selectedPublicCampaign && (
             <PublicCampaignDialog campaign={selectedPublicCampaign} onClose={() => setSelectedPublicCampaign(null)} />
           )}
-          {(data.next_cursor || (data.more && data.cursor)) && (
-            <button
-              className="button secondary"
-              onClick={() => setCursor(data.next_cursor || data.cursor || null)}
-            >
-              Xem thêm
-            </button>
-          )}
+          <ListNav page={pageIndex} hasNext={Boolean(data.next_cursor || (data.more && data.cursor))} loading={loading} onPrev={prevPage} onNext={() => setCursor(data.next_cursor || data.cursor || null)} count={data.items?.length || 0} />
         </>
       )}
       {detailPath && page.service && (
@@ -1584,6 +1573,18 @@ function App() {
   const [workspace, setWorkspace] = useState<Workspace>('citizen');
   const [pageId, setPageId] = useState('sos');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [wsMenuOpen, setWsMenuOpen] = useState(false);
+  const wsMenuRef = useRef<HTMLDivElement>(null);
+  const [prevWorkspace, setPrevWorkspace] = useState<Workspace | null>(() => {
+    try { return sessionStorage.getItem('c48:prev-workspace') as Workspace | null; } catch { return null; }
+  });
+  useEffect(() => {
+    if (!wsMenuOpen) return;
+    const close = (event: MouseEvent) => { if (!wsMenuRef.current?.contains(event.target as Node)) setWsMenuOpen(false); };
+    const esc = (event: KeyboardEvent) => { if (event.key === 'Escape') setWsMenuOpen(false); };
+    document.addEventListener('mousedown', close); document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
+  }, [wsMenuOpen]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutError, setLogoutError] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -1630,7 +1631,7 @@ function App() {
   }
 
   function routeAfterLogin(value: Me, preferRoleDefault = false) {
-    const pendingUrl = pendingRouteRef.current ? new URL(pendingRouteRef.current) : null;
+    const pendingUrl = pendingRouteRef.current && !preferRoleDefault ? new URL(pendingRouteRef.current) : null;
     const requested = pendingUrl ? routeFromUrl(pendingUrl) : preferRoleDefault ? null : routeFromUrl();
     const route = permittedRoute(value, requested);
     setWorkspace(route.workspace);
@@ -1803,6 +1804,8 @@ function App() {
 
   function changeWorkspace(next: Workspace) {
     pendingRouteRef.current = null;
+    if (next !== workspace) { setPrevWorkspace(workspace); try { sessionStorage.setItem('c48:prev-workspace', workspace); } catch {} }
+    setWsMenuOpen(false);
     setWorkspace(next);
     const nextPage = allowedPages(next, user)[0]?.id || 'sos';
     setPageId(nextPage);
@@ -1873,16 +1876,27 @@ function App() {
           </div>
 
           <p className="nav-label">Xem theo vai trò</p>
-          <div className="workspace-switch" role="group" aria-label="Chọn vai trò">
-            {workspaces.map((item) => (
-              <button
-                key={item}
-                className={workspace === item ? 'active' : ''}
-                onClick={() => changeWorkspace(item)}
-              >
-                {workspaceLabels[item]}
-              </button>
-            ))}
+          <div className="ws-picker" ref={wsMenuRef}>
+            <button type="button" className="ws-picker__current" aria-haspopup="listbox" aria-expanded={wsMenuOpen}
+              onClick={() => setWsMenuOpen(!wsMenuOpen)}>
+              <span className="ws-picker__text">
+                <strong>{workspaceLabels[workspace]}</strong>
+                <small>{workspaceRoleCodes(workspace, user).map((code) => label(code)).join(' · ')}</small>
+              </span>
+              {workspaces.length > 1 && <span className="ws-picker__chevron" aria-hidden="true">▾</span>}
+            </button>
+            {workspaces.length > 1 && prevWorkspace && prevWorkspace !== workspace && workspaces.includes(prevWorkspace) &&
+              <button type="button" className="ws-picker__quick" onClick={() => changeWorkspace(prevWorkspace)}
+                title={`Chuyển nhanh về ${workspaceLabels[prevWorkspace]}`} aria-label={`Chuyển nhanh về ${workspaceLabels[prevWorkspace]}`}>⇄</button>}
+            {wsMenuOpen && workspaces.length > 1 && <div className="ws-picker__menu" role="listbox" aria-label="Chọn vai trò">
+              {workspaces.map((item) => (
+                <button key={item} type="button" role="option" aria-selected={workspace === item}
+                  className={workspace === item ? 'active' : ''} onClick={() => changeWorkspace(item)}>
+                  <strong>{workspaceLabels[item]}</strong>
+                  <small>{workspaceRoleCodes(item, user).map((code) => label(code)).join(' · ')}</small>
+                </button>
+              ))}
+            </div>}
           </div>
 
           <p className="nav-label">Chức năng</p>
@@ -1933,8 +1947,12 @@ function App() {
                 </span>
                 <span className="user-info">
                   <span className="user-name">{user.display_name}</span>
-                  <span className="user-role-badge">
-                    {label(user.grants[0]?.role_code || 'CITIZEN')}
+                  <span className="user-role-badge" title={[...new Set(user.grants.map((grant) => label(grant.role_code)))].join(', ')}>
+                    {(() => {
+                      const codes = [...new Set(user.grants.map((grant) => grant.role_code))];
+                      if (!codes.length) return label('CITIZEN');
+                      return codes.length > 1 ? `${label(codes[0])} +${codes.length - 1} vai trò` : label(codes[0]);
+                    })()}
                   </span>
                 </span>
               </button>
@@ -2001,7 +2019,7 @@ function App() {
                     onChangePassword={() => setShowPasswordModal(true)}
                   />
                 ) : workspace === 'citizen' && selected.id === 'sos' ? (
-                  <><SosWeatherAlerts /><SosForm key={user?.id || 'guest'} user={user} onTrack={trackOwnedRequest} /></>
+                  <SosForm key={user?.id || 'guest'} user={user} onTrack={trackOwnedRequest} />
                 ) : selected.id === 'track' ? (
                   <Tracking
                     key={selectedTrackingCode}

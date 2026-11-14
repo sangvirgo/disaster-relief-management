@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
-import { fetchAll } from '../../api/fetchAll';
+import { useLoadMore } from '../../api/useCursorPages';
+import { LoadMore } from '../../components/ui/Pager';
 import { label } from '../../i18n/labels';
 import { formatQuantity, quantityFitsScale, remainingQuantity } from '../../i18n/quantity';
 import { evidenceFileError as donationEvidenceError } from '../../i18n/evidence';
@@ -100,7 +101,8 @@ export function Donations({ user }: { user: Me | null }) {
   }
   const [dialogOffset, setDialogOffset] = useState({ x: 0, y: 0 });
   const dragStart = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
-  const [drives, setDrives] = useState<Drive[]>([]);
+  const drivePages = useLoadMore<Drive>('logistics', '/public/donation-drives', 10);
+  const drives = drivePages.items;
   const [selected, setSelected] = useState<Drive | null>(null);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [donorName, setDonorName] = useState('');
@@ -286,24 +288,6 @@ export function Donations({ user }: { user: Me | null }) {
       setLoading(false);
     }
   }
-  useEffect(() => {
-    let live = true;
-    setLoading(true);
-    setError('');
-    fetchAll<Drive>('logistics', '/public/donation-drives')
-      .then((items) => {
-        if (live) setDrives(items);
-      })
-      .catch((cause) => {
-        if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải đợt quyên góp.');
-      })
-      .finally(() => {
-        if (live) setLoading(false);
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
   async function choose(id: string, openDeclaration = false) {
     if (selected?.id === id) {
       if (openDeclaration) { setShowDeclaration(true); setDialogOffset({ x: 0, y: 0 }); }
@@ -904,13 +888,13 @@ export function Donations({ user }: { user: Me | null }) {
     <div className="donation-layout">
       <section className="card">
         <h2>Các đợt quyên góp</h2>
-        {loading && <p role="status">Đang tải…</p>}
-        {error && (
+        {(loading || drivePages.loading) && <p role="status">Đang tải…</p>}
+        {(error || drivePages.error) && (
           <p className="notice error" role="alert">
-            {error}
+            {error || drivePages.error}
           </p>
         )}
-        {!loading && !drives.length && (
+        {!drivePages.loading && !drivePages.error && !drives.length && (
           <div className="empty">Hiện chưa có đợt quyên góp đang mở.</div>
         )}
         <div className="record-list">
@@ -957,6 +941,7 @@ export function Donations({ user }: { user: Me | null }) {
             </article>
           ))}
         </div>
+        {drives.length > 0 && <LoadMore hasMore={drivePages.hasMore} loading={drivePages.loading} onClick={drivePages.loadMore} shown={drives.length} noun="đợt" />}
       </section>
       {selected && showDeclaration && <div className={`donation-modal-backdrop ${closingDeclaration ? 'is-closing' : ''}`} onMouseDown={(event) => { if (event.target === event.currentTarget) closeDeclaration(); }}>
             <section className="donation-modal" role="dialog" aria-modal="true" aria-label="Khai báo vật phẩm" style={{ transform: `translate(${dialogOffset.x}px, ${dialogOffset.y}px)` }}>

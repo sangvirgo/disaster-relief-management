@@ -21,6 +21,13 @@ const tileAttribution =
   (import.meta.env.VITE_OSM_TILE_ATTRIBUTION as string | undefined)?.trim() ||
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
+const pinIcon = L.divIcon({
+  className: 'location-pin-icon',
+  html: '<span class="location-pin-marker"><span class="location-center-pin-head"><span></span></span><span class="location-center-pin-shadow"></span></span>',
+  iconSize: [36, 38],
+  iconAnchor: [18, 38],
+});
+
 function pointLabel(point: Point) {
   return `${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}`;
 }
@@ -94,9 +101,12 @@ export function LocationPicker({
   const searchOnTypingRef = useRef(false);
   const [selectedAddress, setSelectedAddress] = useState('');
   const [draftPoint, setDraftPoint] = useState<Point | null>(null);
+  const pinMarkerRef = useRef<L.Marker | null>(null);
   const [moving, setMoving] = useState(false);
   const [pinDropKey, setPinDropKey] = useState(0);
   const [tileError, setTileError] = useState(false);
+  const [rainOn, setRainOn] = useState(true);
+  const [rainState, setRainState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [error, setError] = useState('');
 
   function lookupAddress(point: Point, confirmed = false) {
@@ -170,7 +180,7 @@ export function LocationPicker({
     if (addressTimerRef.current !== null) window.clearTimeout(addressTimerRef.current);
   }, [open, mapEngine]);
 
-  // The pin is fixed over the map center. Moving the map changes the draft point.
+  // OSM engine: click to place the pin.
   useEffect(() => {
     if (!open || mapEngine !== 'osm' || !leafletContainerRef.current) return;
 
@@ -208,38 +218,17 @@ export function LocationPicker({
       lookupAddress(value, true);
     }
 
-    let frame = 0;
-    let userMovedMap = false;
-    const updateCenter = () => {
-      if (suppressMoveRef.current || frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        const center = map.getCenter();
-        const point = { latitude: center.lat, longitude: center.lng };
-        setDraftPoint(point);
-        setSelectedAddress('Đang cập nhật vị trí ghim…');
-        if (confirmedPointRef.current && !samePoint(point, confirmedPointRef.current)) {
-          confirmedPointRef.current = null;
-          selectRef.current(null);
-        }
-      });
-    };
-    map.on('dragstart', () => { userMovedMap = true; chosenSearchRef.current = null; setMoving(true); });
-    map.on('zoomstart', () => { if (!suppressMoveRef.current) { userMovedMap = true; chosenSearchRef.current = null; } });
-    map.on('move', updateCenter);
-    map.on('moveend', () => {
-      setMoving(false);
-      updateCenter();
-      if (!suppressMoveRef.current && userMovedMap) {
-        userMovedMap = false;
-        const center = map.getCenter();
-        lookupAddress({ latitude: center.lat, longitude: center.lng });
-      }
-    });
+    // Clicking the map places the pin there; panning or zooming never changes the chosen point.
     map.on('click', (event: L.LeafletMouseEvent) => {
-      userMovedMap = true;
+      const point = { latitude: event.latlng.lat, longitude: event.latlng.lng };
       chosenSearchRef.current = null;
-      map.setView(event.latlng, map.getZoom(), { animate: false });
+      setDraftPoint(point);
+      setSelectedAddress('Đang cập nhật vị trí ghim…');
+      if (confirmedPointRef.current && !samePoint(point, confirmedPointRef.current)) {
+        confirmedPointRef.current = null;
+        selectRef.current(null);
+      }
+      lookupAddress(point);
     });
 
     // Ép Leaflet render lại kích thước sau khi container xuất hiện
@@ -248,11 +237,51 @@ export function LocationPicker({
     }, 200);
 
     return () => {
-      cancelAnimationFrame(frame);
+      pinMarkerRef.current = null;
       map.remove();
       leafletMapRef.current = null;
     };
   }, [open, mapEngine]);
+
+  // Observed rain radar (RainViewer, no key). Blue = rain; darker/violet = heavier rain, so flooding risk is visible at a glance.
+  useEffect(() => {
+    const map = leafletMapRef.current;
+    if (!open || mapEngine !== 'osm' || !map || !rainOn) return;
+    const controller = new AbortController();
+    let layer: L.TileLayer | null = null;
+    setRainState('loading');
+    (async () => {
+      try {
+        const response = await fetch('https://api.rainviewer.com/public/weather-maps.json', { signal: controller.signal });
+        if (!response.ok) throw new Error('radar');
+        const body = await response.json() as { host?: string; radar?: { past?: { path: string }[] } };
+        const frame = body.radar?.past?.at(-1);
+        if (!body.host || !frame || controller.signal.aborted) throw new Error('radar');
+        if (!map.getPane('rain')) { const pane = map.createPane('rain'); pane.style.zIndex = '350'; pane.style.pointerEvents = 'none'; }
+        layer = L.tileLayer(`${body.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`, {
+          pane: 'rain', opacity: 0.65, maxNativeZoom: 7, maxZoom: 19, attribution: 'Radar mưa: RainViewer.com',
+        }).addTo(map);
+        setRainState('ready');
+      } catch {
+        if (!controller.signal.aborted) setRainState('unavailable');
+      }
+    })();
+    return () => { controller.abort(); layer?.remove(); };
+  }, [open, mapEngine, rainOn]);
+
+  // The red pin follows the chosen point (clicked, searched or typed).
+  useEffect(() => {
+    const map = leafletMapRef.current;
+    if (!open || mapEngine !== 'osm' || !map) return;
+    if (!draftPoint) {
+      pinMarkerRef.current?.remove();
+      pinMarkerRef.current = null;
+      return;
+    }
+    const position: L.LatLngTuple = [draftPoint.latitude, draftPoint.longitude];
+    if (pinMarkerRef.current) pinMarkerRef.current.setLatLng(position);
+    else pinMarkerRef.current = L.marker(position, { icon: pinIcon, interactive: false, keyboard: false }).addTo(map);
+  }, [draftPoint, open, mapEngine]);
 
   // Recenter when coordinates are edited outside the picker.
   useEffect(() => {
@@ -558,16 +587,14 @@ export function LocationPicker({
 
   async function confirmCenter() {
     searchOnTypingRef.current = false;
-    const center =
-      mapEngine === 'osm' ? leafletMapRef.current?.getCenter() : googleMapRef.current?.getCenter();
-    if (!center) return;
-    const centerPoint =
-      mapEngine === 'osm'
-        ? { latitude: (center as L.LatLng).lat, longitude: (center as L.LatLng).lng }
-        : {
-            latitude: (center as google.maps.LatLng).lat(),
-            longitude: (center as google.maps.LatLng).lng(),
-          };
+    let centerPoint: Point | null = null;
+    if (mapEngine === 'osm') {
+      centerPoint = draftPoint;
+    } else {
+      const center = googleMapRef.current?.getCenter();
+      if (center) centerPoint = { latitude: center.lat(), longitude: center.lng() };
+    }
+    if (!centerPoint) return;
     const point = chosenSearchRef.current?.point ?? centerPoint;
     confirmedPointRef.current = point;
     setDraftPoint(point);
@@ -597,17 +624,9 @@ export function LocationPicker({
 
       {open && (
         <div className="location-map-panel">
-          <div className="map-engine-switch">
-            <div>
-              <p style={{ margin: 0, fontWeight: 700, color: 'var(--color-primary-dark)' }}>
-                {mapEngine === 'google' ? 'Google Maps' : 'Bản đồ OpenStreetMap · OpenFreeMap'}
-              </p>
-              <small style={{ color: 'var(--color-text-secondary)' }}>
-                Tìm địa chỉ hoặc kéo bản đồ để đặt ghim đỏ vào đúng vị trí, rồi xác nhận.
-              </small>
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {activeGoogleKey && (
+          {activeGoogleKey && (
+            <div className="map-engine-switch">
+              <div style={{ display: 'flex', gap: 6 }}>
                 <button
                   type="button"
                   className={`button secondary ${mapEngine === 'google' ? 'active' : ''}`}
@@ -616,17 +635,17 @@ export function LocationPicker({
                 >
                   Google Maps
                 </button>
-              )}
-              <button
-                type="button"
-                className={`button secondary ${mapEngine === 'osm' ? 'active' : ''}`}
-                style={{ minHeight: 34, padding: '4px 10px', fontSize: 12 }}
-                onClick={() => setMapEngine('osm')}
-              >
-                Bản đồ Mở (OSM)
-              </button>
+                <button
+                  type="button"
+                  className={`button secondary ${mapEngine === 'osm' ? 'active' : ''}`}
+                  style={{ minHeight: 34, padding: '4px 10px', fontSize: 12 }}
+                  onClick={() => setMapEngine('osm')}
+                >
+                  Bản đồ Mở (OSM)
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Gợi ý địa chỉ xuất hiện khi nhập */}
           {mapEngine === 'osm' && (
@@ -662,7 +681,7 @@ export function LocationPicker({
                   }
                 }}
               />
-              <small className="location-search-hint">Gợi ý địa chỉ xuất hiện khi nhập. Chọn một địa chỉ để đưa ghim đến đó, rồi kiểm tra và xác nhận.</small>
+              <small className="location-search-hint">Nhập địa chỉ rồi chọn một gợi ý, hoặc nhấn thẳng lên bản đồ để đặt ghim, rồi bấm “Xác nhận vị trí”.</small>
               {searching && (
                 <span className="location-search-status" role="status">
                   Đang tìm địa điểm…
@@ -694,6 +713,18 @@ export function LocationPicker({
 
           <div className="location-map-wrap">
             {mapEngine === 'osm' && (
+              <div className="rain-control">
+                <button type="button" className={rainOn ? 'active' : ''} aria-pressed={rainOn} onClick={() => setRainOn(!rainOn)}>
+                  🌧 Lớp mưa
+                </button>
+                {rainOn && rainState === 'ready' && <div className="rain-legend" aria-label="Chú giải cường độ mưa">
+                  <i /> <span>Nhẹ</span><span>Vừa</span><span>Lớn (nguy cơ ngập)</span>
+                </div>}
+                {rainOn && rainState === 'loading' && <small role="status">Đang tải radar mưa…</small>}
+                {rainOn && rainState === 'unavailable' && <small role="status">Chưa tải được radar mưa.</small>}
+              </div>
+            )}
+            {mapEngine === 'osm' && (
               <div
                 ref={leafletContainerRef}
                 className="location-map"
@@ -711,7 +742,7 @@ export function LocationPicker({
                 style={{ width: '100%', height: '100%' }}
               />
             )}
-            <div
+            {mapEngine === 'google' && <div
               key={pinDropKey}
               className={`location-center-pin${moving ? ' is-moving' : ''}${pinDropKey ? ' is-confirmed' : ''}`}
               aria-hidden="true"
@@ -720,7 +751,7 @@ export function LocationPicker({
                 <span />
               </span>
               <span className="location-center-pin-shadow" />
-            </div>
+            </div>}
             <button
               type="button"
               className="location-confirm-button"

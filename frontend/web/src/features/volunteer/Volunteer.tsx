@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
-import { appendPage } from '../../api/pagination';
 import { fetchAll } from '../../api/fetchAll';
+import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
+import { ListNav } from '../../components/ui/Pager';
 import { label, timeLabel } from '../../i18n/labels';
 import { evidenceFileError as missionEvidenceError } from '../../i18n/evidence';
 import type { components as ResponseComponents } from '../../api/generated/response';
@@ -62,7 +63,7 @@ export function Notices({ onOpenMission, onOpenRequest }: {
   const [items, setItems] = useState<Notice[]>([]);
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
   const [loading, setLoading] = useState(true);
-  const [cursor, setCursor] = useState('');
+  const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [next, setNext] = useState('');
   const [error, setError] = useState('');
   const [filter, setFilter] = useUrlView('view', noticeViews, 'all');
@@ -79,7 +80,7 @@ export function Notices({ onOpenMission, onOpenRequest }: {
     setLoading(true);
     setError('');
     if (!cursor) setItems([]);
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ limit: String(LIST_PAGE_SIZE) });
     if (cursor) params.set('cursor', cursor);
     if (filter === 'unread') params.set('unread', 'true');
     const path = `/notices${params.size ? `?${params}` : ''}`;
@@ -87,7 +88,7 @@ export function Notices({ onOpenMission, onOpenRequest }: {
     api<{ items: Notice[]; cursor?: string }>('response', path)
       .then((value) => {
         if (live) {
-          setItems((current) => cursor ? appendPage(current, value.items, (item) => item.id) : value.items);
+          setItems(value.items);
           setNext(value.cursor || '');
         }
       })
@@ -244,11 +245,7 @@ export function Notices({ onOpenMission, onOpenRequest }: {
           </div>
         </div>}
       </DetailSurface>
-      {next && (
-        <button className="button secondary" disabled={loading || markingAll || readingIds.length > 0} onClick={() => setCursor(next)}>
-          Xem thêm
-        </button>
-      )}
+      <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading || markingAll || readingIds.length > 0} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} noun="thông báo" />
     </section>
   );
 }
@@ -260,7 +257,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
   const isTeam = page === 'team';
   const [items, setItems] = useState<Mission[] | Team[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cursor, setCursor] = useState('');
+  const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [next, setNext] = useState('');
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
@@ -387,16 +384,12 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
     const path = isTeam ? '/teams' : '/missions/mine';
     api<{ items: Mission[] | Team[]; cursor?: string }>(
       'response',
-      `${path}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`
+      `${path}?limit=${LIST_PAGE_SIZE}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
     )
       .then((value) => {
         if (live) {
-          if (isTeam) setItems((current) => cursor
-            ? appendPage(current as Team[], value.items as Team[], (item) => item.id)
-            : value.items as Team[]);
-          else setItems((current) => (cursor
-            ? appendPage(current as Mission[], value.items as Mission[], (item) => item.id)
-            : value.items as Mission[]).sort((a, b) =>
+          if (isTeam) setItems(value.items as Team[]);
+          else setItems((value.items as Mission[]).sort((a, b) =>
             Date.parse(b.created_at) - Date.parse(a.created_at)
           ));
           setNext(value.cursor || '');
@@ -830,11 +823,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                 </article>
               ))}
         </div>
-        {next && (
-          <button className="button secondary" onClick={() => setCursor(next)}>
-            Xem thêm
-          </button>
-        )}
+        <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} noun={isTeam ? 'đội' : 'nhiệm vụ'} />
       </section>
 
       {/* Cột phải: Bảng điều hành chi tiết */}

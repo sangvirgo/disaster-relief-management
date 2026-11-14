@@ -1,30 +1,22 @@
 import { useEffect, useState } from 'react';
-import { fetchAll } from '../../api/fetchAll';
+import { useLoadMore } from '../../api/useCursorPages';
+import { LoadMore } from '../../components/ui/Pager';
 import { TeamReadinessForm } from '../volunteer/TeamReadinessForm';
 
 type Team = { id: string; name: string; version: number; readiness_required: boolean };
 
 export function TeamReadinessQueue({ refreshRevision, onChanged }: { refreshRevision: number; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [revision, setRevision] = useState(0);
-  useEffect(() => {
-    if (!open) return;
-    let live = true;
-    setLoading(true);
-    setError('');
-    fetchAll<Team>('response', '/teams?availability=UNAVAILABLE&status=ACTIVE').then(items => {
-      if (live) setTeams(items.filter(team => team.readiness_required));
-    }).catch(cause => { if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải đội cần xác nhận sẵn sàng.'); })
-      .finally(() => { if (live) setLoading(false); });
-    return () => { live = false; };
-  }, [open, revision, refreshRevision]);
+  const list = useLoadMore<Team>('response', '/teams?availability=UNAVAILABLE&status=ACTIVE', 10, open);
+  const teams = list.items.filter(team => team.readiness_required);
+  const loading = list.loading;
+  const error = list.error;
+  useEffect(() => { if (open) list.reload(); }, [revision, refreshRevision]);
   return <>
     <button type="button" className="button secondary" disabled={loading}
-      onClick={() => { setLoading(true); setMessage(''); setRevision(value => value + 1); setOpen(true); }}>Cập nhật danh sách đội</button>
+      onClick={() => { setMessage(''); setRevision(value => value + 1); setOpen(true); }}>Cập nhật danh sách đội</button>
     {open && <section className="team-readiness-results" aria-label="Kết quả cập nhật danh sách đội" aria-busy={loading}>
     {message && <p role="status" className="notice">{message}</p>}
     {loading && <p role="status">Đang tải các đội cần xác nhận…</p>}
@@ -40,6 +32,7 @@ export function TeamReadinessQueue({ refreshRevision, onChanged }: { refreshRevi
         onStale={() => { setRevision(value => value + 1); onChanged(); }} />
     </details>)}
     </fieldset>
+    <LoadMore hasMore={list.hasMore} loading={list.loading} onClick={list.loadMore} shown={teams.length} noun="đội" />
     </>}
     </section>}
   </>;

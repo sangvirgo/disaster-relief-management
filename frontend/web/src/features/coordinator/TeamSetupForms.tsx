@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
 
 export type Skill = { code: string; display_name: string };
@@ -49,8 +49,41 @@ export function TeamSkillsForm({ teamId, version, current, skills, onSuccess }: 
   </form>;
 }
 
-export function TeamCreateForm({ organizations, regions, users, skills, onSuccess }: {
-  organizations: SelectOption[]; regions: SelectOption[]; users: (SelectOption & { organizationIds: string[] })[]; skills: Skill[];
+type UserDetail = { memberships?: { organization_id: string; status: string }[];
+  grants?: { role_code: string; scope_type: string; organization_id: string | null }[] };
+
+/** Search eligible leaders on the server (max 20 per search) instead of loading every account. */
+function useLeaderSearch(organizationId: string, term: string) {
+  const [options, setOptions] = useState<SelectOption[]>([]);
+  const [searching, setSearching] = useState(false);
+  useEffect(() => {
+    const text = term.trim();
+    if (!organizationId || text.length < 2) { setOptions([]); setSearching(false); return; }
+    let live = true;
+    setSearching(true);
+    const timer = window.setTimeout(() => {
+      void api<{ items: { id: string; username: string; display_name: string; status: string }[] }>(
+        'identity', `/users?query=${encodeURIComponent(text)}&status=ACTIVE&limit=20`)
+        .then(async (page) => {
+          const details = await Promise.all(page.items.map((row) => api<UserDetail>('identity', `/users/${row.id}`).catch(() => null)));
+          if (!live) return;
+          setOptions(page.items.flatMap((row, index) => {
+            const detail = details[index];
+            const eligible = detail?.memberships?.some((membership) => membership.status === 'ACTIVE' && membership.organization_id === organizationId &&
+              detail.grants?.some((grant) => grant.role_code === 'VOLUNTEER' && (grant.scope_type === 'SYSTEM' || grant.organization_id === organizationId)));
+            return eligible ? [{ value: row.id, label: `${row.display_name} · ${row.username}` }] : [];
+          }));
+        })
+        .catch(() => { if (live) setOptions([]); })
+        .finally(() => { if (live) setSearching(false); });
+    }, 350);
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [organizationId, term]);
+  return { options, searching };
+}
+
+export function TeamCreateForm({ organizations, regions, skills, onSuccess }: {
+  organizations: SelectOption[]; regions: SelectOption[]; skills: Skill[];
   onSuccess: (id: string) => void;
 }) {
   const [name, setName] = useState('');
@@ -59,6 +92,8 @@ export function TeamCreateForm({ organizations, regions, users, skills, onSucces
   const [teamKind, setTeamKind] = useState('VOLUNTEER');
   const [reportingMode, setReportingMode] = useState('APP');
   const [leaderId, setLeaderId] = useState('');
+  const [leaderTerm, setLeaderTerm] = useState('');
+  const leaders = useLeaderSearch(organizationId, leaderTerm);
   const [contactNote, setContactNote] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -96,15 +131,19 @@ export function TeamCreateForm({ organizations, regions, users, skills, onSucces
       <option value="MILITARY">Lực lượng vũ trang</option><option value="GOVERNMENT">Cơ quan nhà nước</option><option value="OTHER">Khác</option></select></label>
     <label>Chế độ báo cáo *<select value={reportingMode} onChange={(e) => { setReportingMode(e.target.value); changed(); }}><option value="APP">Qua ứng dụng</option>
       <option value="COORDINATOR">Điều phối viên ghi nhận</option></select></label>
-    {reportingMode === 'APP' ? <label>Đội trưởng *<select required value={leaderId} onChange={(e) => { setLeaderId(e.target.value); changed(); }}><option value="">Chọn tài khoản</option>
-      {users.filter((option) => option.organizationIds.includes(organizationId)).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
-      <small>Đội trưởng phải là thành viên tổ chức này, có quyền Tình nguyện viên và chưa thuộc đội khác.</small>{fieldError('leader_user_id') && <small className="field-error">{fieldError('leader_user_id')}</small>}</label>
+    {reportingMode === 'APP' ? <div className="form-stack">
+      <label>Tìm đội trưởng *<input type="search" value={leaderTerm} disabled={!organizationId} placeholder={organizationId ? 'Nhập tên hoặc tên đăng nhập (ít nhất 2 ký tự)' : 'Chọn tổ chức trước'}
+        onChange={(e) => { setLeaderTerm(e.target.value); setLeaderId(''); changed(); }} /></label>
+      <label>Đội trưởng *<select required value={leaderId} onChange={(e) => { setLeaderId(e.target.value); changed(); }}>
+        <option value="">{leaders.searching ? 'Đang tìm…' : 'Chọn tài khoản'}</option>
+        {leaders.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+      <small>Đội trưởng phải là thành viên tổ chức này, có quyền Tình nguyện viên và chưa thuộc đội khác.</small>{fieldError('leader_user_id') && <small className="field-error">{fieldError('leader_user_id')}</small>}</label></div>
       : <label>Đầu mối liên hệ *<textarea required maxLength={1000} value={contactNote} onChange={(e) => { setContactNote(e.target.value); changed(); }} />{fieldError('external_contact_note') && <small className="field-error">{fieldError('external_contact_note')}</small>}</label>}
     <SkillChoices skills={skills} selected={selectedSkills} onChange={(codes) => { setSelectedSkills(codes); changed(); }} />
-    {reportingMode === 'APP' && organizationId && !users.some((option) => option.organizationIds.includes(organizationId)) &&
-      <p className="notice warning">Chưa có tài khoản đủ điều kiện trong tổ chức này. Ở trang Người dùng, hãy thêm tài khoản vào tổ chức và cấp quyền Tình nguyện viên, sau đó quay lại.</p>}
+    {reportingMode === 'APP' && organizationId && leaderTerm.trim().length >= 2 && !leaders.searching && !leaders.options.length &&
+      <p className="notice warning">Không tìm thấy tài khoản đủ điều kiện (cần thuộc tổ chức này và có quyền Tình nguyện viên).</p>}
     {fieldError('skill_codes') && <p className="field-error">{fieldError('skill_codes')}</p>}
     {error && <p className="notice error" role="alert">{error}</p>}
-    <button type="submit" className="button" disabled={busy || !organizations.length || !regions.length || (reportingMode === 'APP' && !users.some((option) => option.organizationIds.includes(organizationId)))}>{busy ? 'Đang tạo…' : 'Tạo đội cứu hộ'}</button>
+    <button type="submit" className="button" disabled={busy || !organizations.length || !regions.length || (reportingMode === 'APP' && !leaderId)}>{busy ? 'Đang tạo…' : 'Tạo đội cứu hộ'}</button>
   </form>;
 }

@@ -5,6 +5,7 @@ import { me } from '../../auth/session';
 import type { components as ResponseComponents } from '../../api/generated/response';
 import { requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { LocationPicker } from '../../maps/LocationPicker';
+import { SosWeatherAlerts } from './SosWeatherAlerts';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { clearSosDraft, readSosDraft, writeSosDraft, type SosDraft } from './sosDraft';
@@ -357,292 +358,309 @@ export function SosForm({
         <strong>Đã khôi phục bản nháp chưa gửi.</strong> Kiểm tra lại tình huống và vị trí trước khi gửi.
         <button type="button" className="button secondary" onClick={discardDraft}>Bỏ bản nháp</button>
       </div>}
-      <Card className="sos-location-card" aria-labelledby="sos-location-title">
-        <div className="location-heading" id="sos-location">
-          <h2 id="sos-location-title">Vị trí cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></h2>
-          {mode === 'SELF' && <Button type="button" variant="secondary" onClick={locate}>
-            Dùng vị trí hiện tại
-          </Button>}
+      <div className="sos-layout">
+        <div className="sos-col-map">
+          <Card className="sos-location-card" aria-labelledby="sos-location-title">
+            <div className="location-heading" id="sos-location">
+              <h2 id="sos-location-title"><span className="sos-step-number" aria-hidden="true">1</span>Vị trí cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></h2>
+              {mode === 'SELF' && <Button type="button" variant="secondary" onClick={locate}>
+                Dùng vị trí hiện tại
+              </Button>}
+            </div>
+            {fieldMessage('location')}
+            <LocationPicker
+              initiallyOpen
+              value={longitude && latitude ? { longitude: Number(longitude), latitude: Number(latitude) } : null}
+              onSelect={chooseMapPoint}
+            />
+            {longitude && latitude && <p className="sos-selected-coordinates">Vị trí đã chọn: {Number(latitude).toFixed(5)}, {Number(longitude).toFixed(5)}</p>}
+            <SosWeatherAlerts point={longitude && latitude && Number.isFinite(Number(longitude)) && Number.isFinite(Number(latitude))
+              ? { longitude: Number(longitude), latitude: Number(latitude) } : null} />
+          </Card>
         </div>
-        {fieldMessage('location')}
-        <LocationPicker
-          initiallyOpen
-          value={longitude && latitude ? { longitude: Number(longitude), latitude: Number(latitude) } : null}
-          onSelect={chooseMapPoint}
-        />
-        {longitude && latitude && <p className="sos-selected-coordinates">Vị trí đã chọn: {Number(latitude).toFixed(5)}, {Number(longitude).toFixed(5)}</p>}
-      </Card>
-      <Card className="sos-information-card" aria-labelledby="sos-information-title">
-      <h2 id="sos-information-title">Thông tin yêu cầu hỗ trợ</h2>
-      {user && (
-        <fieldset>
-          <legend>Người cần hỗ trợ</legend>
-          <label className="radio">
-            <input
-              type="radio"
-              checked={mode === 'SELF'}
-              onChange={() => {
-                setMode('SELF');
-                pending.current = null;
-              }}
-            />{' '}
-            Tôi hoặc người trong gia đình
-          </label>
-          <label className="radio">
-            <input
-              type="radio"
-              checked={mode === 'PROXY'}
-              onChange={() => {
-                setMode('PROXY');
-                locationAttempt.current += 1;
-                if (source === 'GPS') {
-                  setLongitude(''); setLatitude(''); setAccuracy(null); setCaptured(null); setSource('MANUAL_PIN');
-                }
-                pending.current = null;
-              }}
-            />{' '}
-            Tôi báo hộ gia đình khác
-          </label>
-        </fieldset>
-      )}
-      <div className="form-grid">
-        <label>
-          <span>Loại sự cố <span className="required-mark" aria-hidden="true">*</span></span>
-          <select
-            data-sos-field="category"
-            aria-invalid={fieldInvalid('category')}
-            required
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value);
-              pending.current = null;
-            }}
-          >
-            <option value="">Chọn loại sự cố</option>
-            {categories.map(([code, title]) => (
-              <option key={code} value={code}>
-                {title}
-              </option>
-            ))}
-          </select>
-          {fieldMessage('category')}
-        </label>
-        <label>
-          Số người cần hỗ trợ (nếu biết)
-          <input
-            data-sos-field="people"
-            aria-invalid={fieldInvalid('people')}
-            type="number"
-            min="1"
-            max="10000"
-            placeholder="Từ 1 đến 10.000"
-            value={people}
-            onChange={(e) => {
-              setPeople(e.target.value);
-              pending.current = null;
-            }}
-          />
-          {fieldMessage('people')}
-        </label>
-        <label>
-          Trẻ em (nếu biết)
-          <input
-            data-sos-field="children"
-            aria-invalid={fieldInvalid('children')}
-            type="number"
-            min="0"
-            max="10000"
-            placeholder="Từ 0 đến 10.000"
-            value={children}
-            onChange={(e) => {
-              setChildren(e.target.value);
-              pending.current = null;
-            }}
-          />
-          {fieldMessage('children')}
-        </label>
-        <label>
-          Người cao tuổi (nếu biết)
-          <input
-            data-sos-field="elderly"
-            aria-invalid={fieldInvalid('elderly')}
-            type="number"
-            min="0"
-            max="10000"
-            placeholder="Từ 0 đến 10.000"
-            value={elderly}
-            onChange={(e) => {
-              setElderly(e.target.value);
-              pending.current = null;
-            }}
-          />
-          {fieldMessage('elderly')}
-        </label>
-        <label>
-          Họ tên người báo (nếu muốn)
-          <input
-            data-sos-field="name"
-            aria-invalid={fieldInvalid('name')}
-            value={name}
-            maxLength={201}
-            onChange={(e) => {
-              setName(e.target.value);
-              pending.current = null;
-            }}
-          />
-          {fieldMessage('name')}
-        </label>
-        <label>
-          {mode === 'PROXY' ? 'Số điện thoại người báo hộ (nếu có)' : 'Số điện thoại liên hệ (nếu có)'}
-          <input
-            data-sos-field="phone"
-            aria-invalid={fieldInvalid('phone')}
-            type="tel"
-            maxLength={33}
-            inputMode="tel"
-            title="Nhập 8–15 chữ số; có thể thêm dấu + ở đầu"
-            placeholder="Ví dụ: 0912345678"
-            value={phone}
-            onChange={(e) => {
-              setPhone(e.target.value);
-              pending.current = null;
-            }}
-          />
-          {fieldMessage('phone')}
-        </label>
+        <div className="sos-col-form">
+          <Card className="sos-step-card" aria-labelledby="sos-situation-title">
+            <h2 id="sos-situation-title"><span className="sos-step-number" aria-hidden="true">2</span>Tình huống</h2>
+            {user && (
+              <fieldset>
+                <legend>Yêu cầu này là</legend>
+                <label className="radio">
+                  <input
+                    type="radio"
+                    checked={mode === 'SELF'}
+                    onChange={() => {
+                      setMode('SELF');
+                      pending.current = null;
+                    }}
+                  />{' '}
+                  Cho chính tôi (tôi đang ở nơi cần cứu nạn)
+                </label>
+                <label className="radio">
+                  <input
+                    type="radio"
+                    checked={mode === 'PROXY'}
+                    onChange={() => {
+                      setMode('PROXY');
+                      locationAttempt.current += 1;
+                      if (source === 'GPS') {
+                        setLongitude(''); setLatitude(''); setAccuracy(null); setCaptured(null); setSource('MANUAL_PIN');
+                      }
+                      pending.current = null;
+                    }}
+                  />{' '}
+                  Cho người thân (tôi không ở đó)
+                </label>
+              </fieldset>
+            )}
+              <label>
+                <span>Loại sự cố <span className="required-mark" aria-hidden="true">*</span></span>
+                <select
+                  data-sos-field="category"
+                  aria-invalid={fieldInvalid('category')}
+                  required
+                  value={category}
+                  onChange={(e) => {
+                    setCategory(e.target.value);
+                    pending.current = null;
+                  }}
+                >
+                  <option value="">Chọn loại sự cố</option>
+                  {categories.map(([code, title]) => (
+                    <option key={code} value={code}>
+                      {title}
+                    </option>
+                  ))}
+                </select>
+                {fieldMessage('category')}
+              </label>
+            <fieldset className="sos-needs" aria-invalid={fieldInvalid('needs')}>
+              <legend>Nhu cầu cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></legend>
+              <label className="radio">
+                <input
+                  type="checkbox"
+                  data-sos-field="needs"
+                  checked={needsRescue}
+                  onChange={(e) => {
+                    setNeedsRescue(e.target.checked);
+                    pending.current = null;
+                  }}
+                />{' '}
+                Cần đội đến cứu hộ tại hiện trường
+              </label>
+              <label className="radio">
+                <input
+                  type="checkbox"
+                  data-sos-field="needs"
+                  checked={needsRelief}
+                  onChange={(e) => {
+                    setNeedsRelief(e.target.checked);
+                    pending.current = null;
+                  }}
+                />{' '}
+                Cần hàng cứu trợ (lương thực, nước uống, vật dụng)
+              </label>
+              {fieldMessage('needs')}
+            </fieldset>
+            <label className="radio sos-danger-check">
+              <input
+                type="checkbox"
+                checked={danger}
+                onChange={(e) => {
+                  setDanger(e.target.checked);
+                  pending.current = null;
+                }}
+              />{' '}
+              Có dấu hiệu nguy hiểm tính mạng theo thông tin tôi biết
+            </label>
+          </Card>
+          <Card className="sos-step-card" aria-labelledby="sos-detail-title">
+            <h2 id="sos-detail-title"><span className="sos-step-number" aria-hidden="true">3</span>Chi tiết thêm</h2>
+            <div className="form-grid sos-grid-3">
+              <label>
+                Số người cần hỗ trợ (nếu biết)
+                <input
+                  data-sos-field="people"
+                  aria-invalid={fieldInvalid('people')}
+                  type="number"
+                  min="1"
+                  max="10000"
+                  placeholder="Từ 1 đến 10.000"
+                  value={people}
+                  onChange={(e) => {
+                    setPeople(e.target.value);
+                    pending.current = null;
+                  }}
+                />
+                {fieldMessage('people')}
+              </label>
+              <label>
+                Trẻ em (nếu biết)
+                <input
+                  data-sos-field="children"
+                  aria-invalid={fieldInvalid('children')}
+                  type="number"
+                  min="0"
+                  max="10000"
+                  placeholder="Từ 0 đến 10.000"
+                  value={children}
+                  onChange={(e) => {
+                    setChildren(e.target.value);
+                    pending.current = null;
+                  }}
+                />
+                {fieldMessage('children')}
+              </label>
+              <label>
+                Người cao tuổi (nếu biết)
+                <input
+                  data-sos-field="elderly"
+                  aria-invalid={fieldInvalid('elderly')}
+                  type="number"
+                  min="0"
+                  max="10000"
+                  placeholder="Từ 0 đến 10.000"
+                  value={elderly}
+                  onChange={(e) => {
+                    setElderly(e.target.value);
+                    pending.current = null;
+                  }}
+                />
+                {fieldMessage('elderly')}
+              </label>
+            </div>
+            <label>
+              Mô tả tình hình (nếu muốn)
+              <textarea
+                data-sos-field="description"
+                maxLength={2001}
+                aria-invalid={fieldInvalid('description')}
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  pending.current = null;
+                }}
+                placeholder="Mô tả ngắn tình trạng và điều cần hỗ trợ"
+              />
+              {fieldMessage('description')}
+            </label>
+            <p className="sos-ai-note">
+              Mô tả giúp điều phối viên hiểu tình huống và có thể được rút gọn để AI hỗ trợ đánh giá.
+              Số điện thoại, tọa độ chính xác và tệp đính kèm không được đưa vào phần đánh giá AI.
+              Không nhập thông tin cá nhân không cần thiết trong mô tả.
+            </p>
+          </Card>
+          <Card className="sos-step-card" aria-labelledby="sos-contact-title">
+            <h2 id="sos-contact-title"><span className="sos-step-number" aria-hidden="true">4</span>Người liên hệ</h2>
+            <div className="form-grid">
+              <label>
+                Họ tên người báo (nếu muốn)
+                <input
+                  data-sos-field="name"
+                  aria-invalid={fieldInvalid('name')}
+                  value={name}
+                  maxLength={201}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    pending.current = null;
+                  }}
+                />
+                {fieldMessage('name')}
+              </label>
+              <label>
+                {mode === 'PROXY' ? 'Số điện thoại người báo hộ (nếu có)' : 'Số điện thoại liên hệ (nếu có)'}
+                <input
+                  data-sos-field="phone"
+                  aria-invalid={fieldInvalid('phone')}
+                  type="tel"
+                  maxLength={33}
+                  inputMode="tel"
+                  title="Nhập 8–15 chữ số; có thể thêm dấu + ở đầu"
+                  placeholder="Ví dụ: 0912345678"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    pending.current = null;
+                  }}
+                />
+                {fieldMessage('phone')}
+              </label>
+            </div>
+          </Card>
+          {mode === 'PROXY' && (
+            <Card className="sos-step-card" aria-labelledby="sos-proxy-title">
+              <h2 id="sos-proxy-title">Thông tin báo hộ</h2>
+              <div className="notice warning">
+                Vị trí ở trên phải là vị trí của gia đình cần hỗ trợ, không phải của người báo hộ.
+              </div>
+              <div className="form-grid sos-proxy-required">
+                <label>
+                  <span>Quan hệ với gia đình cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></span>
+                  <input required data-sos-field="relationship" maxLength={101} aria-invalid={fieldInvalid('relationship')} value={relationship}
+                    onChange={(e) => { setRelationship(e.target.value); pending.current = null; }} />
+                  {fieldMessage('relationship')}
+                </label>
+                <label>
+                  <span>Nguồn thông tin <span className="required-mark" aria-hidden="true">*</span></span>
+                  <input required data-sos-field="informationSource" maxLength={501} aria-invalid={fieldInvalid('informationSource')} value={informationSource}
+                    onChange={(e) => { setInformationSource(e.target.value); pending.current = null; }} />
+                  {fieldMessage('informationSource')}
+                </label>
+                <label>
+                  <span>Thời điểm biết tình hình <span className="required-mark" aria-hidden="true">*</span></span>
+                  <input required data-sos-field="situationAt" aria-invalid={fieldInvalid('situationAt')} type="datetime-local" value={situationAt}
+                    onChange={(e) => { setSituationAt(e.target.value); pending.current = null; }} />
+                  {fieldMessage('situationAt')}
+                </label>
+                <label>
+                  Khả năng liên hệ
+                  <select value={contactability} onChange={(e) => { setContactability(e.target.value); pending.current = null; }}>
+                    <option value="UNKNOWN">Chưa rõ</option>
+                    <option value="REACHABLE">Có thể liên hệ</option>
+                    <option value="UNREACHABLE">Không thể liên hệ</option>
+                  </select>
+                </label>
+              </div>
+              <details className="sos-proxy-contacts" open={proxyContactsOpen}
+                onToggle={(event) => setProxyContactsOpen(event.currentTarget.open)}>
+                <summary>Thêm liên hệ của gia đình hoặc người liên hệ thay thế <span>Không bắt buộc</span></summary>
+              <div className="form-grid">
+                <label>
+                  Số điện thoại gia đình cần hỗ trợ (nếu biết)
+                  <input data-sos-field="beneficiaryPhone" aria-invalid={fieldInvalid('beneficiaryPhone')}
+                    type="tel" inputMode="tel" maxLength={33} value={beneficiaryPhone}
+                    onChange={(e) => { setBeneficiaryPhone(e.target.value); pending.current = null; }}
+                    placeholder="Ví dụ: 0912345678" />
+                  {fieldMessage('beneficiaryPhone')}
+                </label>
+                <label>
+                  <span>Tên người liên hệ thay thế (nếu có){Boolean(alternatePhone.trim()) && <> <span className="required-mark" aria-hidden="true">*</span></>}</span>
+                  <input data-sos-field="alternateName" aria-invalid={fieldInvalid('alternateName')}
+                    maxLength={201} value={alternateName}
+                    onChange={(e) => { setAlternateName(e.target.value); pending.current = null; }} />
+                  {fieldMessage('alternateName')}
+                </label>
+                <label>
+                  Số điện thoại người liên hệ thay thế (nếu có)
+                  <input data-sos-field="alternatePhone" aria-invalid={fieldInvalid('alternatePhone')}
+                    type="tel" inputMode="tel" maxLength={33} value={alternatePhone}
+                    onChange={(e) => { setAlternatePhone(e.target.value); pending.current = null; }}
+                    placeholder="Ví dụ: 0912345678" />
+                  {fieldMessage('alternatePhone')}
+                </label>
+              </div>
+              </details>
+              {fieldMessage('proxy')}
+            </Card>
+          )}
+          {error && (
+            <p role="alert" className="notice error">
+              {error}{' '}
+              {networkError &&
+                'Bạn có thể thử lại với cùng yêu cầu; ứng dụng giữ khóa gửi lại khi trang còn mở.'}
+            </p>
+          )}
+        </div>
       </div>
-      <label>
-        Mô tả tình hình (nếu muốn)
-        <textarea
-          data-sos-field="description"
-          maxLength={2001}
-          aria-invalid={fieldInvalid('description')}
-          value={description}
-          onChange={(e) => {
-            setDescription(e.target.value);
-            pending.current = null;
-          }}
-          placeholder="Mô tả ngắn tình trạng và điều cần hỗ trợ"
-        />
-        {fieldMessage('description')}
-      </label>
-      <div className="notice warning">
-        Mô tả giúp điều phối viên hiểu tình huống và có thể được rút gọn để AI hỗ trợ đánh giá.
-        Số điện thoại, tọa độ chính xác và tệp đính kèm không được đưa vào phần đánh giá AI.
-        Không nhập thông tin cá nhân không cần thiết trong mô tả.
-      </div>
-      <fieldset className="sos-needs" aria-invalid={fieldInvalid('needs')}>
-        <legend>Nhu cầu cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></legend>
-        <label className="radio">
-          <input
-            type="checkbox"
-            data-sos-field="needs"
-            checked={needsRescue}
-            onChange={(e) => {
-              setNeedsRescue(e.target.checked);
-              pending.current = null;
-            }}
-          />{' '}
-          Cần đội đến cứu hộ tại hiện trường
-        </label>
-        <label className="radio">
-          <input
-            type="checkbox"
-            data-sos-field="needs"
-            checked={needsRelief}
-            onChange={(e) => {
-              setNeedsRelief(e.target.checked);
-              pending.current = null;
-            }}
-          />{' '}
-          Cần hàng cứu trợ (lương thực, nước uống, vật dụng)
-        </label>
-        {fieldMessage('needs')}
-      </fieldset>
-      <label className="radio">
-        <input
-          type="checkbox"
-          checked={danger}
-          onChange={(e) => {
-            setDanger(e.target.checked);
-            pending.current = null;
-          }}
-        />{' '}
-        Có dấu hiệu nguy hiểm tính mạng theo thông tin tôi biết
-      </label>
-      {mode === 'PROXY' && (
-        <>
-          <div className="notice warning">
-            Vị trí ở trên phải là vị trí của gia đình cần hỗ trợ, không phải của người báo hộ.
-          </div>
-          <div className="form-grid sos-proxy-required">
-            <label>
-              <span>Quan hệ với gia đình cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></span>
-              <input required data-sos-field="relationship" maxLength={101} aria-invalid={fieldInvalid('relationship')} value={relationship}
-                onChange={(e) => { setRelationship(e.target.value); pending.current = null; }} />
-              {fieldMessage('relationship')}
-            </label>
-            <label>
-              <span>Nguồn thông tin <span className="required-mark" aria-hidden="true">*</span></span>
-              <input required data-sos-field="informationSource" maxLength={501} aria-invalid={fieldInvalid('informationSource')} value={informationSource}
-                onChange={(e) => { setInformationSource(e.target.value); pending.current = null; }} />
-              {fieldMessage('informationSource')}
-            </label>
-            <label>
-              <span>Thời điểm biết tình hình <span className="required-mark" aria-hidden="true">*</span></span>
-              <input required data-sos-field="situationAt" aria-invalid={fieldInvalid('situationAt')} type="datetime-local" value={situationAt}
-                onChange={(e) => { setSituationAt(e.target.value); pending.current = null; }} />
-              {fieldMessage('situationAt')}
-            </label>
-            <label>
-              Khả năng liên hệ
-              <select value={contactability} onChange={(e) => { setContactability(e.target.value); pending.current = null; }}>
-                <option value="UNKNOWN">Chưa rõ</option>
-                <option value="REACHABLE">Có thể liên hệ</option>
-                <option value="UNREACHABLE">Không thể liên hệ</option>
-              </select>
-            </label>
-          </div>
-          <details className="sos-proxy-contacts" open={proxyContactsOpen}
-            onToggle={(event) => setProxyContactsOpen(event.currentTarget.open)}>
-            <summary>Thêm liên hệ của gia đình hoặc người liên hệ thay thế <span>Không bắt buộc</span></summary>
-          <div className="form-grid">
-            <label>
-              Số điện thoại gia đình cần hỗ trợ (nếu biết)
-              <input data-sos-field="beneficiaryPhone" aria-invalid={fieldInvalid('beneficiaryPhone')}
-                type="tel" inputMode="tel" maxLength={33} value={beneficiaryPhone}
-                onChange={(e) => { setBeneficiaryPhone(e.target.value); pending.current = null; }}
-                placeholder="Ví dụ: 0912345678" />
-              {fieldMessage('beneficiaryPhone')}
-            </label>
-            <label>
-              <span>Tên người liên hệ thay thế (nếu có){Boolean(alternatePhone.trim()) && <> <span className="required-mark" aria-hidden="true">*</span></>}</span>
-              <input data-sos-field="alternateName" aria-invalid={fieldInvalid('alternateName')}
-                maxLength={201} value={alternateName}
-                onChange={(e) => { setAlternateName(e.target.value); pending.current = null; }} />
-              {fieldMessage('alternateName')}
-            </label>
-            <label>
-              Số điện thoại người liên hệ thay thế (nếu có)
-              <input data-sos-field="alternatePhone" aria-invalid={fieldInvalid('alternatePhone')}
-                type="tel" inputMode="tel" maxLength={33} value={alternatePhone}
-                onChange={(e) => { setAlternatePhone(e.target.value); pending.current = null; }}
-                placeholder="Ví dụ: 0912345678" />
-              {fieldMessage('alternatePhone')}
-            </label>
-          </div>
-          </details>
-          {fieldMessage('proxy')}
-        </>
-      )}
-      {error && (
-        <p role="alert" className="notice error">
-          {error}{' '}
-          {networkError &&
-            'Bạn có thể thử lại với cùng yêu cầu; ứng dụng giữ khóa gửi lại khi trang còn mở.'}
-        </p>
-      )}
-      </Card>
       <div className="sos-submit-bar">
       <Button type="submit" variant="emergency" size="lg" disabled={busy} loading={busy}>
         {busy ? 'Đang gửi…' : 'Gửi yêu cầu SOS'}

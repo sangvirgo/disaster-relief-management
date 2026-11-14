@@ -1,6 +1,7 @@
+import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
+import { ListNav } from '../../components/ui/Pager';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
-import { appendPage } from '../../api/pagination';
 import { DetailSurface } from '../../components/DetailSurface';
 import { PriorityBadge } from '../../components/PriorityBadge';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -489,7 +490,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
   if (!restoredView.current) restoredView.current = readQueueView(currentUserId, page);
   const [queue, setQueue] = useState<Queue | null>(null);
   const [queueStatus, setQueueStatus] = useState(restoredView.current.status);
-  const [cursor, setCursor] = useState('');
+  const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [selected, setSelected] = useState<string | null>(initialRequestId || restoredView.current.selected);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [candidates, setCandidates] = useState<Candidates | null>(null);
@@ -607,17 +608,14 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
     let live = true;
     setLoading(true);
     setError('');
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ limit: String(LIST_PAGE_SIZE) });
     if (queueStatus) params.set('status', queueStatus);
     if (cursor) params.set('cursor', cursor);
     if (reviewLane) params.set('review_lane', reviewLane);
     if (overdue) params.set('overdue', 'true');
     api<Queue>('response', `/requests${params.size ? '?' + params : ''}`)
       .then((value) => {
-        if (live) setQueue((current) => ({
-          ...value,
-          items: cursor && current ? appendPage(current.items, value.items, (item) => item.id) : value.items,
-        }));
+        if (live) setQueue(value);
       })
       .catch((cause) => {
         if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải hàng đợi.');
@@ -797,7 +795,6 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
     <div className="coordinator-layout">
       <section className="card">
         <h2>{title[page] || title.queue}</h2>
-        <p>Yêu cầu mới nhất ở trên cùng. Chọn một yêu cầu để xem và xử lý.</p>
         <div className="queue-filter-toolbar">
           <button
             type="button"
@@ -895,43 +892,16 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   }}
                   key={item.id}
                   details={<>
-                    {item.tracking_code.startsWith('C48HM') && <small className="chip">SOS mô phỏng · bản đồ nhiệt</small>}
-                    {item.priority_advisory && (
-                      <small>
-                        Đánh giá ban đầu:{' '}
-                        {advisoryScoreLabel(
-                          item.priority_advisory.score,
-                          item.priority_advisory.level
-                        )}
-                      </small>
+                    {item.declared_danger && <small className="queue-danger-chip">Nguy hiểm tính mạng</small>}
+                    {item.tracking_code.startsWith('C48HM') && <small className="chip">SOS mô phỏng</small>}
+                    {item.priority_advisory?.level && (
+                      <small>Đánh giá: {advisoryScoreLabel(item.priority_advisory.score, item.priority_advisory.level)}</small>
                     )}
-                    {item.ai_priority_advisory && (
-                      <small>
-                        {item.ai_priority_advisory.source === 'DEMO_FIXTURE'
-                          ? 'AI minh họa'
-                          : 'Kết quả AI'}
-                        {' · '}
-                        {item.ai_priority_advisory.review_status === 'REJECTED'
-                          ? 'Đã bác bỏ, không sử dụng gợi ý'
-                          : item.ai_priority_advisory.status !== 'COMPLETED'
-                            ? advisoryStatusLabels[item.ai_priority_advisory.status] ||
-                              'Chưa rõ trạng thái đánh giá AI'
-                            : advisoryScoreLabel(
-                                item.ai_priority_advisory.score,
-                                item.ai_priority_advisory.level
-                              )}
-                      </small>
-                    )}
-                    {item.declared_danger && <small>Có khai báo nguy hiểm tính mạng</small>}
                   </>}
                 />
               ))}
             </div>
-            {queue.more && queue.cursor && (
-              <button className="button secondary" onClick={() => setCursor(queue.cursor!)}>
-                Xem thêm
-              </button>
-            )}
+            <ListNav page={pageIndex} hasNext={Boolean(queue.more && queue.cursor)} loading={loading} onPrev={prevPage} onNext={() => queue.cursor && setCursor(queue.cursor)} count={queue.items.length} noun="SOS" />
           </>
         )}
       </section>
@@ -963,43 +933,48 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
         {selected && !detail && !detailError && <p role="status">Đang tải hồ sơ…</p>}
         {detail && (
           <>
-            {['SUBMITTED', 'VERIFYING'].includes(detail.status) && (
-              <div className="verification-summary">
-                <span className="eyebrow">{detail.status === 'SUBMITTED' ? 'BƯỚC 1 · MỞ XÁC MINH' : 'BƯỚC 2 · KIỂM TRA THÔNG TIN'}</span>
-                <h3>{detail.tracking_code} · {label(detail.category)}</h3>
-                {detail.tracking_code.startsWith('C48HM') && <p className="notice warning">Đây là SOS mô phỏng để hiển thị bản đồ nhiệt, không phải tín hiệu cứu hộ thực tế.</p>}
-                <p>{detail.description || 'Chưa có mô tả tình huống.'}</p>
-                <div className="verification-facts">
-                  <span>{detail.subject.people_affected ?? 'Chưa rõ số'} người cần hỗ trợ</span>
-                  <span>{detail.needs_rescue ? 'Cần cứu hộ' : 'Không yêu cầu cứu hộ'}</span>
-                  <span>{detail.reporter.name || 'Người báo chưa ghi tên'} · {detail.reporter.contact_phone || 'Chưa có số liên hệ'}</span>
-                  <span>Vị trí: <NearbyAddress coordinates={detail.subject.location?.coordinates} /></span>
-                </div>
-                {detail.status === 'VERIFYING' && (
-                  <p className="verification-progress">
-                    Đối chiếu vị trí, tình trạng và minh chứng nếu có. Ghi rõ điều đã kiểm tra trước khi xác nhận SOS.
-                  </p>
-                )}
-                <a href="#request-actions">Đi đến thao tác xử lý ↓</a>
-                <a href="#request-full-detail">Xem toàn bộ hồ sơ và lịch sử ↓</a>
+            <section className="sos-hero" data-danger={detail.declared_danger ? 'true' : undefined}>
+              <div className="sos-hero__top">
+                <h3>{detail.tracking_code}</h3>
+                <StatusBadge status={detail.status} />
+                {detail.priority
+                  ? <PriorityBadge priority={detail.priority as 'P1' | 'P2' | 'P3' | 'P4'} />
+                  : <span className="sos-hero__nopriority">Chưa chọn ưu tiên</span>}
               </div>
-            )}
-            {!['SUBMITTED', 'VERIFYING'].includes(detail.status) && (
-              <section className="verification-summary">
-                <h3>{detail.tracking_code} · {requestStatusLabel(detail.status)}</h3>
-                {detail.status === 'DUPLICATE' && (detail.canonical ? (
-                  <>
-                    <p>Hồ sơ gốc: {detail.canonical.tracking_code} · {requestStatusLabel(detail.canonical.status)}. Theo dõi việc xử lý tại hồ sơ gốc.</p>
-                    <button type="button" className="button secondary" onClick={() => {
-                      setUpdateMessage('');
-                      setSelected(detail.canonical!.id);
-                    }}>Mở hồ sơ gốc {detail.canonical.tracking_code}</button>
-                  </>
-                ) : <p>Không có thông tin hồ sơ gốc trong phạm vi truy cập hiện tại.</p>)}
-                {!['DUPLICATE', 'REJECTED', 'CANCELLED'].includes(detail.status) && <a href="#request-actions">Đi đến thao tác xử lý ↓</a>}
-                <a href="#request-full-detail">Xem toàn bộ hồ sơ và lịch sử ↓</a>
-              </section>
-            )}
+              {detail.declared_danger && (
+                <p className="sos-hero__danger" role="alert">Người báo cho biết có nguy hiểm tính mạng — kiểm tra ngay.</p>
+              )}
+              {detail.proxy_activity_flags.length > 0 && (
+                <p className="sos-hero__flag">Có tín hiệu báo hộ cần rà soát (không phải kết luận gian lận).</p>
+              )}
+              {detail.tracking_code.startsWith('C48HM') && <p className="notice warning">Đây là SOS mô phỏng để hiển thị bản đồ nhiệt, không phải tín hiệu cứu hộ thực tế.</p>}
+              {detail.status === 'SUBMITTED' && <p className="sos-hero__step">Bước tiếp theo: bắt đầu xác minh.</p>}
+              {detail.status === 'VERIFYING' && <p className="sos-hero__step">Bước tiếp theo: đối chiếu vị trí, tình trạng, minh chứng rồi ghi rõ điều đã kiểm tra.</p>}
+              <p className="sos-hero__desc">{detail.description || 'Chưa có mô tả tình huống.'}</p>
+              <dl className="sos-hero__facts">
+                <div><dt>Loại sự cố</dt><dd>{label(detail.category)}</dd></div>
+                <div><dt>Cần hỗ trợ</dt><dd>
+                  {detail.subject.people_affected == null ? 'Chưa rõ số người' : `${detail.subject.people_affected} người`}
+                  {detail.subject.children_count ? ` · ${detail.subject.children_count} trẻ em` : ''}
+                  {detail.subject.elderly_count ? ` · ${detail.subject.elderly_count} người cao tuổi` : ''}
+                </dd></div>
+                <div><dt>Nhu cầu</dt><dd>{[
+                  ...(detail.needs_rescue ? ['Cứu hộ'] : []),
+                  ...(detail.needs_relief_supplies ? ['Hàng cứu trợ'] : []),
+                ].join(' · ') || 'Chưa khai báo'}</dd></div>
+                <div><dt>Vị trí</dt><dd><NearbyAddress coordinates={detail.subject.location?.coordinates} /></dd></div>
+                <div><dt>Người báo</dt><dd>{detail.reporter.name || 'Chưa có tên'} · {detail.reporter.contact_phone || 'Chưa có số liên hệ'}</dd></div>
+              </dl>
+              {detail.status === 'DUPLICATE' && (detail.canonical ? (
+                <>
+                  <p>Hồ sơ gốc: {detail.canonical.tracking_code} · {requestStatusLabel(detail.canonical.status)}. Theo dõi việc xử lý tại hồ sơ gốc.</p>
+                  <button type="button" className="button secondary" onClick={() => {
+                    setUpdateMessage('');
+                    setSelected(detail.canonical!.id);
+                  }}>Mở hồ sơ gốc {detail.canonical.tracking_code}</button>
+                </>
+              ) : <p>Không có thông tin hồ sơ gốc trong phạm vi truy cập hiện tại.</p>)}
+            </section>
             {pendingSupplements.map((event) => {
               const facts = event.payload?.reported_facts;
               const changes = facts && typeof facts === 'object' && !Array.isArray(facts)
@@ -1025,523 +1000,6 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                 </section>
               );
             })}
-            {page === 'queue' && detail.status !== 'VERIFIED' && detail.subject.location && (
-              <div className="queue-context-map">
-                <h3>Vị trí SOS đang chọn</h3>
-                <HeatmapPanel
-                  region={detail.region_code || ''}
-                  showLayers={false}
-                  compact
-                  selected={{
-                    id: detail.id,
-                    trackingCode: detail.tracking_code,
-                    status: detail.status,
-                    longitude: detail.subject.location.coordinates[0],
-                    latitude: detail.subject.location.coordinates[1],
-                  }}
-                />
-              </div>
-            )}
-            {(page === 'triage' || (page === 'queue' && detail.status === 'VERIFIED')) && (
-              <div className="triage-context">
-                <div className="triage-context-summary">
-                  <h3>Thông tin để quyết định ưu tiên</h3>
-                  <strong>{detail.tracking_code}</strong>
-                  <p>{detail.description || 'Người báo chưa cung cấp mô tả tình huống.'}</p>
-                  <p><b>{label(detail.category)}</b> · {detail.subject.people_affected ?? 'Chưa rõ số'} người cần hỗ trợ</p>
-                  <p>{detail.declared_danger ? 'Có khai báo nguy hiểm tính mạng' : 'Chưa khai báo nguy hiểm tính mạng'}</p>
-                  <p>{detail.needs_rescue ? 'Cần cứu hộ' : 'Không khai báo cần cứu hộ'}
-                    {detail.needs_relief_supplies ? ' · Cần hàng cứu trợ' : ''}</p>
-                  <small>Ghim đỏ nhấp nháy là SOS đang chọn; vùng nhiệt cho biết mật độ SOS gần đó.</small>
-                </div>
-                <div className="triage-context-map">
-                  <h3>Vị trí trên bản đồ nhiệt</h3>
-                  <HeatmapPanel
-                    region={detail.region_code || ''}
-                    showLayers={false}
-                    compact
-                    selected={detail.subject.location ? {
-                      id: detail.id,
-                      trackingCode: detail.tracking_code,
-                    status: detail.status,
-                      longitude: detail.subject.location.coordinates[0],
-                      latitude: detail.subject.location.coordinates[1],
-                    } : null}
-                  />
-                </div>
-              </div>
-            )}
-            <div className="detail-grid" id="request-full-detail">
-              <p>
-                <strong>Mã</strong>
-                <span className="detail-value">
-                  {detail.tracking_code}
-                </span>
-              </p>
-              <p>
-                <strong>Trạng thái</strong>
-                <span className="detail-value queue-detail-status" data-status={detail.status}>
-                  {requestStatusLabel(detail.status)}
-                </span>
-              </p>
-              <p>
-                <strong>Loại sự cố</strong>
-                <span className="detail-value">
-                  {label(detail.category)}
-                </span>
-              </p>
-              <p>
-                <strong>Ưu tiên</strong>
-                <span className="detail-value">
-                  {detail.priority ? <PriorityBadge priority={detail.priority as 'P1' | 'P2' | 'P3' | 'P4'} /> : 'Chưa quyết định'}
-                </span>
-              </p>
-              <p>
-                <strong>Hình thức gửi</strong>
-                <span className="detail-value">
-                  {detail.report_mode === 'PROXY'
-                    ? 'Báo hộ người ở nơi khác'
-                    : 'Báo cho bản thân hoặc gia đình'}
-                </span>
-              </p>
-              <p>
-                <strong>Người cần hỗ trợ</strong>
-                <span className="detail-value">
-                  {detail.subject.people_affected == null ? 'Chưa rõ số người' : `${detail.subject.people_affected} người`}
-                </span>
-              </p>
-              <p>
-                <strong>Trẻ em / người cao tuổi</strong>
-                <span className="detail-value">
-                  {detail.subject.children_count == null ? 'Chưa rõ số trẻ em' : `${detail.subject.children_count} trẻ em`} ·{' '}
-                  {detail.subject.elderly_count == null ? 'Chưa rõ số người cao tuổi' : `${detail.subject.elderly_count} người cao tuổi`}
-                </span>
-              </p>
-              <p>
-                <strong>Nhu cầu</strong>
-                <span className="detail-value">
-                  {[
-                    ...(detail.needs_rescue ? ['Cứu hộ'] : []),
-                    ...(detail.needs_relief_supplies ? ['Hàng cứu trợ'] : []),
-                  ].join(' · ') || 'Chưa khai báo'}
-                </span>
-              </p>
-              <p>
-                <strong>Người báo</strong>
-                <span className="detail-value">
-                  {detail.reporter.name || 'Chưa có tên'}
-                </span>
-              </p>
-              <p>
-                <strong>Liên hệ</strong>
-                <span className="detail-value">
-                  {detail.reporter.contact_phone || 'Chưa có số liên hệ'}
-                </span>
-              </p>
-              <p>
-                <strong>Vị trí</strong>
-                <span className="detail-value">
-                  <NearbyAddress coordinates={detail.subject.location?.coordinates} />
-                </span>
-              </p>
-              <p>
-                <strong>Quan hệ với người cần hỗ trợ</strong>
-                <span className="detail-value">
-                  {detail.subject.reporter_relationship || 'Tự báo / chưa ghi rõ'}
-                </span>
-              </p>
-              <p>
-                <strong>Số liên hệ người cần hỗ trợ</strong>
-                <span className="detail-value">
-                  {detail.subject.beneficiary_contact_phone || 'Chưa có'}
-                </span>
-              </p>
-              <p>
-                <strong>Liên hệ thay thế</strong>
-                <span className="detail-value">
-                  {[detail.subject.alternate_contact?.name, detail.subject.alternate_contact?.phone]
-                    .filter(Boolean)
-                    .join(' · ') || 'Chưa có'}
-                </span>
-              </p>
-              <p>
-                <strong>Nguồn thông tin / khả năng liên lạc</strong>
-                <span className="detail-value">
-                  {[detail.subject.information_source, detail.subject.contactability ? label(detail.subject.contactability) : null]
-                    .filter(Boolean)
-                    .join(' · ') || 'Chưa ghi rõ'}
-                </span>
-              </p>
-              {detail.subject.last_known_situation_at && (
-                <p>
-                  <strong>Thời điểm biết tình hình gần nhất</strong>
-                  <span className="detail-value">
-                    {timeLabel(detail.subject.last_known_situation_at)}
-                  </span>
-                </p>
-              )}
-              {detail.work_cycle != null && <p>
-                <strong>Chu kỳ xử lý hiện tại</strong>
-                <span className="detail-value">{detail.work_cycle}</span>
-              </p>}
-              <p>
-                <strong>Phiên bản</strong>
-                <span className="detail-value">
-                  {detail.version}
-                </span>
-              </p>
-              <p>
-                <strong>Chiến dịch</strong>
-                <span className="detail-value">
-                  {detail.campaign_id
-                    ? campaignOptions.find((campaign) => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn'
-                    : 'Chưa gắn'}
-                </span>
-              </p>
-            </div>
-            {detail.description && <p>{detail.description}</p>}
-            {detail.subject.household_reference_note && (
-              <p>
-                <strong>Ghi chú nhận diện nơi ở:</strong> {detail.subject.household_reference_note}
-              </p>
-            )}
-            {detail.declared_danger && (
-              <p className="notice warning">
-                Người báo cho biết có nguy hiểm tính mạng; cần kiểm tra ngay.
-              </p>
-            )}
-            {detail.proxy_activity_flags.length > 0 && (
-              <p className="notice warning">
-                Có tín hiệu hoạt động báo hộ cần rà soát. Đây không phải kết luận gian lận.
-              </p>
-            )}
-            {detail.priority_advisory && (
-              <section className="notice warning">
-                <h3>Đánh giá ban đầu từ thông tin SOS</h3>
-                <p>
-                  <strong>
-                    {advisoryScoreLabel(
-                      detail.priority_advisory.score,
-                      detail.priority_advisory.level
-                    )}
-                  </strong>
-                </p>
-                <p>
-                  <strong>Dấu hiệu:</strong>{' '}
-                  {detail.priority_advisory.reason_codes
-                    .map((code) => advisoryReasonLabels[code] || 'Có thông tin cần kiểm tra')
-                    .join(' · ') || 'Chưa ghi nhận dấu hiệu cần chú ý.'}
-                </p>
-                <p>
-                  Hệ thống tự nhận diện các dấu hiệu cần chú ý từ thông tin đã khai. Điều phối viên
-                  vẫn phải xác minh, chọn mức ưu tiên P1–P4 và quyết định giao đội.
-                </p>
-                {detail.priority_advisory.outcome === 'INSUFFICIENT_DATA' && (
-                  <p>
-                    Chưa đủ thông tin để kết luận mức nguy cơ. Thiếu thông tin không có nghĩa là tình
-                    huống ít khẩn cấp; cần tiếp tục xác minh.
-                  </p>
-                )}
-                {detail.declared_danger && (
-                  <p>
-                    <strong>Cần kiểm tra ngay:</strong> người báo cho biết có nguy hiểm tính mạng.
-                    Thông tin này không tự làm tăng điểm đánh giá.
-                  </p>
-                )}
-              </section>
-            )}
-            {detail.ai_priority_advisory && detail.ai_advisory?.status !== 'COMPLETED' && (
-              <section className="notice">
-                <h3>
-                  {detail.ai_priority_advisory.source === 'DEMO_FIXTURE'
-                    ? 'Đánh giá AI minh họa'
-                    : 'Đánh giá hỗ trợ từ AI (Gemini)'}
-                </h3>
-                <p>
-                  <strong>Trạng thái:</strong>{' '}
-                  {advisoryStatusLabels[detail.ai_priority_advisory.status] || 'Chưa rõ trạng thái'}
-                </p>
-                {detail.ai_priority_advisory.review_status === 'REJECTED' && (
-                  <p>
-                    <strong>Điều phối viên đã bác bỏ gợi ý này.</strong> Nội dung chỉ được giữ trong
-                    lịch sử để đối chiếu, không phải gợi ý đang sử dụng.
-                  </p>
-                )}
-                {detail.ai_priority_advisory.status === 'COMPLETED' &&
-                  detail.ai_priority_advisory.review_status !== 'REJECTED' &&
-                  detail.ai_priority_advisory.score !== null && (
-                    <>
-                      <p>
-                        <strong>
-                          {advisoryScoreLabel(
-                            detail.ai_priority_advisory.score,
-                            detail.ai_priority_advisory.level
-                          )}
-                        </strong>
-                      </p>
-                      <p>
-                        <strong>Lý do AI đưa ra:</strong>{' '}
-                        {detail.ai_priority_advisory.reasons.join(' · ') ||
-                          'Không có lý do kèm theo.'}
-                      </p>
-                      {detail.ai_priority_advisory.confidence !== null && (
-                        <p>
-                        <strong>Độ tin cậy do AI ước tính:</strong>{' '}
-                          {Math.round(detail.ai_priority_advisory.confidence * 100)}% (chỉ tham
-                          khảo)
-                        </p>
-                      )}
-                    </>
-                  )}
-                {detail.ai_priority_advisory.status === 'STALE' && (
-                  <p>
-                    Thông tin SOS đã thay đổi sau lần đánh giá. Kết quả cũ không còn phù hợp;
-                    hãy kiểm tra thông tin mới và tiếp tục xác minh.
-                  </p>
-                )}
-                {['FAILED', 'SKIPPED'].includes(detail.ai_priority_advisory.status) && (
-                  <p>AI chưa đánh giá được yêu cầu này. Hãy kiểm tra thông tin SOS và xử lý theo quy trình thủ công.</p>
-                )}
-                {detail.ai_priority_advisory.status === 'COMPLETED' &&
-                  detail.ai_priority_advisory.review_status !== 'REJECTED' &&
-                  detail.ai_priority_advisory.score === null && (
-                    <p>
-                      AI chưa đề xuất điểm nguy cơ; không coi đây là mức nguy cơ thấp.{' '}
-                      {detail.ai_priority_advisory.reasons.join(' · ')} Hãy tiếp tục xác minh thủ công.
-                    </p>
-                  )}
-                <p>
-                  {detail.ai_priority_advisory.source === 'DEMO_FIXTURE'
-                    ? 'Đây là dữ liệu minh họa giao diện; không phải kết quả Gemini chạy thật.'
-                    : 'AI chỉ hỗ trợ xem xét. Điều phối viên vẫn quyết định mức ưu tiên và giao đội.'}
-                </p>
-              </section>
-            )}
-            {detail.ai_advisory?.status === 'FAILED' && !detail.ai_advisory.review_status &&
-              detail.ai_priority_advisory?.source === 'GEMINI' && command({
-                title: 'Thử đánh giá AI lại',
-                service: 'response',
-                path: `/requests/${detail.id}/ai-advisories/${detail.ai_advisory.id}/retry`,
-                version: detail.version,
-                warning: 'Gửi lại yêu cầu đánh giá AI? Kết quả vẫn chỉ để tham khảo; bạn tiếp tục xử lý SOS theo thông tin đã xác minh.',
-              })}
-            {detail.ai_advisory && detail.ai_advisory.status === 'COMPLETED' && (
-              <section className="notice">
-                <h3>
-                  {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
-                    ? 'Thông tin AI minh họa'
-                    : 'Thông tin AI ghi nhận'}
-                </h3>
-                <p>
-                  {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
-                    ? 'Dữ liệu này dùng để minh họa và không phải phản hồi từ Gemini.'
-                    : 'AI có thể nhận bản mô tả đã được rút gọn cùng các thông tin tình huống. Số điện thoại, tọa độ chính xác và tệp đính kèm không được đưa vào phần đánh giá. Hãy đối chiếu với hồ sơ SOS trước khi sử dụng.'}
-                </p>
-                <p>
-                  <strong>Trạng thái:</strong>{' '}
-                  {advisoryStatusLabels[
-                    detail.ai_priority_advisory?.status || detail.ai_advisory.status
-                  ] || 'Chưa rõ trạng thái đánh giá AI'}
-                </p>
-                {detail.ai_priority_advisory?.status === 'COMPLETED' && (
-                  <>
-                    {detail.ai_advisory.risk_score !== null && (
-                      <p>
-                        <strong>Điểm rủi ro tham khảo:</strong> {detail.ai_advisory.risk_score}/100
-                      </p>
-                    )}
-                    {detail.ai_advisory.reason_codes.length > 0 && (
-                      <p>
-                        <strong>Dấu hiệu cần chú ý:</strong>{' '}
-                        {detail.ai_advisory.reason_codes
-                          .map((code) => advisoryReasonLabels[code] || 'Có dấu hiệu cần rà soát')
-                          .join(' · ')}
-                      </p>
-                    )}
-                    {detail.ai_advisory.extracted_json?.summary && (
-                      <p>
-                        <strong>Tóm tắt:</strong> {detail.ai_advisory.extracted_json.summary}
-                      </p>
-                    )}
-                    {detail.ai_advisory.extracted_json?.indicators &&
-                      detail.ai_advisory.extracted_json.indicators.length > 0 && (
-                        <p>
-                          <strong>Dấu hiệu AI ghi nhận:</strong>{' '}
-                          {detail.ai_advisory.extracted_json.indicators.join(' · ')}
-                        </p>
-                      )}
-                    {detail.ai_advisory.extracted_json?.facts && (
-                      <div>
-                        <strong>Dữ kiện trích xuất cần đối chiếu</strong>
-                        {Object.entries(detail.ai_advisory.extracted_json.facts)
-                          .filter(([key]) => advisoryFactLabels[key])
-                          .map(([key, value]) => (
-                            <p key={key}>
-                              {advisoryFactLabels[key]}:{' '}
-                              {typeof value === 'boolean'
-                                ? value
-                                  ? 'Có'
-                                  : 'Không'
-                                : String(value)}
-                            </p>
-                          ))}
-                      </div>
-                    )}
-                    {aiNeedsMismatch && (
-                      <p role="status">
-                        <strong>Cần đối chiếu:</strong> AI ghi nhận nhu cầu cứu hộ hoặc hàng cứu trợ
-                        khác với phần người báo đã chọn. Giữ dữ liệu gốc và xác minh trước khi quyết định.
-                      </p>
-                    )}
-                    {aiCountMismatches.length > 0 && (
-                      <div className="notice warning" role="status">
-                        <strong>Cần đối chiếu số người:</strong>
-                        {aiCountMismatches.map(key => <p key={key}>
-                          {advisoryFactLabels[key]} — hồ sơ: {detail.subject[key] ?? 'Chưa rõ'}; AI: {String(aiFacts?.[key])}.
-                        </p>)}
-                        <p>Số chưa rõ không có nghĩa là 0. Giữ dữ liệu gốc và xác minh trước khi sử dụng số AI ghi nhận.</p>
-                      </div>
-                    )}
-                    <p>
-                      <strong>Độ tin cậy do AI ước tính:</strong>{' '}
-                      {Math.round((detail.ai_advisory.extracted_json?.confidence ?? 0) * 100)}% (chỉ
-                      tham khảo)
-                    </p>
-                    {detail.ai_advisory.review_status ? (
-                      <p>
-                        <strong>Quyết định của điều phối viên:</strong>{' '}
-                        {advisoryReviewLabels[detail.ai_advisory.review_status] || 'Đã rà soát'}
-                        {detail.ai_advisory.review_status === 'REJECTED'
-                          ? ' · Chỉ lưu lịch sử, không sử dụng.'
-                          : ''}
-                        {detail.ai_advisory.review_note
-                          ? ` · ${detail.ai_advisory.review_note}`
-                          : ''}
-                      </p>
-                    ) : (
-                      <div>
-                        <label className="ai-review-note">
-                          <span>Ghi chú khi điều chỉnh hoặc bác bỏ</span>
-                          <textarea
-                            rows={4}
-                            value={aiReviewNote}
-                            onChange={(event) => setAiReviewNote(event.target.value)}
-                            maxLength={1000}
-                          />
-                        </label>
-                        <div className="action-grid">
-                          <button
-                            className="button"
-                            disabled={aiReviewBusy}
-                            onClick={() => void reviewAiAdvisory('ACCEPTED')}
-                          >
-                            Ghi nhận gợi ý
-                          </button>
-                          <button
-                            className="button secondary"
-                            disabled={aiReviewBusy}
-                            onClick={() => void reviewAiAdvisory('ADJUSTED')}
-                          >
-                            Điều chỉnh và ghi nhận
-                          </button>
-                          <button
-                            className="button secondary"
-                            disabled={aiReviewBusy}
-                            onClick={() => void reviewAiAdvisory('REJECTED')}
-                          >
-                            Không sử dụng gợi ý
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </section>
-            )}
-            {completedInCurrentCycle && Boolean(detail.active_missions?.items.length) &&
-              <p className="notice warning" role="status">
-                SOS này đã có nhiệm vụ hoàn thành nhưng vẫn còn nhiệm vụ đang giao. Hãy đối chiếu nhu cầu còn lại và trạng thái đội bên dưới. Nếu lần giao thêm là nhầm, dùng “Hủy giao nhiệm vụ” cho nhiệm vụ đang chờ trước khi kết thúc SOS.
-              </p>}
-            {detail.active_missions && detail.active_missions.items.length > 0 && (
-              <section>
-                <h3>Nhiệm vụ đang giao ({detail.active_missions.items.length})</h3>
-                <div className="record-list">
-                  {detail.active_missions.items.map((m) => (
-                    <div className="candidate" key={m.id}>
-                      <strong>Mã nhiệm vụ: {m.id.slice(0, 8)}</strong>
-                      <p>
-                        Trạng thái: {label(m.status)} · Đội: {detail.mission_history?.items.find((mission) => mission.team_id === m.team_id)?.team_name ?? 'Đội cứu hộ'} ·{' '}
-                        {timeLabel(m.created_at)}
-                      </p>
-                      <CoordinatorMissionControl missionId={m.id} teamId={m.team_id}
-                        revision={revision} onSuccess={done} onStale={refreshAfterConflict} />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-            {detail.mission_history && detail.mission_history.items.length > 0 && (
-              <section>
-                <h3>Lịch sử nhiệm vụ ({detail.mission_history.items.length})</h3>
-                <div className="record-list">
-                  {detail.mission_history.items.map((mission) => (
-                    <div className="candidate" key={mission.id}>
-                      <strong>
-                        {mission.team_name} · {label(mission.mission_kind)}
-                      </strong>
-                      <p>
-                        {label(mission.status)} · {timeLabel(mission.created_at)}
-                        {mission.last_status ? ` · Cập nhật: ${label(mission.last_status)}` : ''}
-                      </p>
-                      <MissionOutcome key={mission.id + mission.status} id={mission.id} />
-                      {mission.override_reason && (
-                        <p>Lý do chọn đội khác đề xuất: {mission.override_reason}</p>
-                      )}
-                      {mission.status === 'FAILED' &&
-                        ['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(detail.status) &&
-                        !detail.timeline.items.some((event) =>
-                          event.event_type === 'MISSION_FAILURE_REVIEW' && event.payload?.mission_id === mission.id
-                        ) && command({
-                          title: 'Rà soát nhiệm vụ thất bại',
-                          service: 'response',
-                          path: `/missions/${mission.id}/review-failure`,
-                          version: detail.version,
-                          fields: [
-                            { name: 'disposition', label: 'Kết luận xử lý', type: 'select', required: true,
-                              options: [
-                                { value: 'REPLACED', label: 'Đã thay bằng nhiệm vụ hoàn thành' },
-                                { value: 'NO_FURTHER_ACTION', label: 'Không cần giao thêm đội' },
-                                { value: 'REFERRED', label: 'Đã chuyển cơ quan có thẩm quyền' },
-                              ] },
-                            { name: 'replacement_mission_id', label: 'Nhiệm vụ thay thế đã hoàn thành', type: 'select', required: true,
-                              visibleWhen: { field: 'disposition', value: 'REPLACED' },
-                              options: detail.mission_history?.items.filter((item) => item.status === 'COMPLETED' && item.id !== mission.id)
-                                .map((item) => ({ value: item.id, label: `${item.team_name} · ${item.id.slice(0, 8)}` })) || [] },
-                            { name: 'reason', label: 'Căn cứ rà soát', type: 'textarea', required: true, maxLength: 2000 },
-                          ],
-                        })}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-            <RequestEvidencePanel items={detail.evidence?.items ?? []} />
-            <ContactAttemptPanel
-              key={`contacts-${detail.id}-${detail.version}`}
-              requestId={detail.id}
-              status={detail.status}
-              version={detail.version}
-              currentUserId={currentUserId}
-              reporterUserId={detail.reporter.user_id}
-              initial={detail.contact_attempts}
-              onSuccess={done}
-              onStale={refreshAfterConflict}
-            />
-            <RequestTimeline
-              key={`timeline-${detail.id}-${detail.version}-${detail.timeline.items[0]?.id ?? 'empty'}`}
-              requestId={detail.id}
-              initial={detail.timeline}
-            />
             {detail.status === 'RESOLVING' && (pendingOperationId ? (
               <ResolutionOperationPanel
                 key={pendingOperationId}
@@ -1557,7 +1015,7 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                 <button type="button" className="button secondary" onClick={refreshAfterConflict}>Tải lại hồ sơ</button>
               </section>
             ))}
-            <div className="action-grid" id="request-actions" tabIndex={-1}>
+            <div className="action-grid sos-actions" id="request-actions" tabIndex={-1}>
               {!['RESOLVING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
                 secondaryCommand({
                   title: 'Ghi nhận chuyển cơ quan chức năng',
@@ -1917,6 +1375,502 @@ export function Coordinator({ page, initialRequestId, currentUserId }: { page: s
                   ],
                 })}
             </div>
+            {page === 'queue' && detail.status !== 'VERIFIED' && detail.subject.location && (
+              <details className="sos-fold queue-context-map">
+                <summary>Xem vị trí trên bản đồ</summary>
+                <HeatmapPanel
+                  region={detail.region_code || ''}
+                  showLayers={false}
+                  compact
+                  selected={{
+                    id: detail.id,
+                    trackingCode: detail.tracking_code,
+                    status: detail.status,
+                    longitude: detail.subject.location.coordinates[0],
+                    latitude: detail.subject.location.coordinates[1],
+                  }}
+                />
+              </details>
+            )}
+            {(page === 'triage' || (page === 'queue' && detail.status === 'VERIFIED')) && (
+              <div className="triage-context">
+                <div className="triage-context-summary">
+                  <h3>Thông tin để quyết định ưu tiên</h3>
+                  <strong>{detail.tracking_code}</strong>
+                  <p>{detail.description || 'Người báo chưa cung cấp mô tả tình huống.'}</p>
+                  <p><b>{label(detail.category)}</b> · {detail.subject.people_affected ?? 'Chưa rõ số'} người cần hỗ trợ</p>
+                  <p>{detail.declared_danger ? 'Có khai báo nguy hiểm tính mạng' : 'Chưa khai báo nguy hiểm tính mạng'}</p>
+                  <p>{detail.needs_rescue ? 'Cần cứu hộ' : 'Không khai báo cần cứu hộ'}
+                    {detail.needs_relief_supplies ? ' · Cần hàng cứu trợ' : ''}</p>
+                  <small>Ghim đỏ nhấp nháy là SOS đang chọn; vùng nhiệt cho biết mật độ SOS gần đó.</small>
+                </div>
+                <div className="triage-context-map">
+                  <h3>Vị trí trên bản đồ nhiệt</h3>
+                  <HeatmapPanel
+                    region={detail.region_code || ''}
+                    showLayers={false}
+                    compact
+                    selected={detail.subject.location ? {
+                      id: detail.id,
+                      trackingCode: detail.tracking_code,
+                    status: detail.status,
+                      longitude: detail.subject.location.coordinates[0],
+                      latitude: detail.subject.location.coordinates[1],
+                    } : null}
+                  />
+                </div>
+              </div>
+            )}
+            <details className="sos-fold" id="request-full-detail">
+            <summary>Thông tin đầy đủ của hồ sơ</summary>
+            <div className="detail-grid">
+              <p>
+                <strong>Mã</strong>
+                <span className="detail-value">
+                  {detail.tracking_code}
+                </span>
+              </p>
+              <p>
+                <strong>Trạng thái</strong>
+                <span className="detail-value queue-detail-status" data-status={detail.status}>
+                  {requestStatusLabel(detail.status)}
+                </span>
+              </p>
+              <p>
+                <strong>Loại sự cố</strong>
+                <span className="detail-value">
+                  {label(detail.category)}
+                </span>
+              </p>
+              <p>
+                <strong>Ưu tiên</strong>
+                <span className="detail-value">
+                  {detail.priority ? <PriorityBadge priority={detail.priority as 'P1' | 'P2' | 'P3' | 'P4'} /> : 'Chưa quyết định'}
+                </span>
+              </p>
+              <p>
+                <strong>Hình thức gửi</strong>
+                <span className="detail-value">
+                  {detail.report_mode === 'PROXY'
+                    ? 'Báo hộ người ở nơi khác'
+                    : 'Báo cho bản thân hoặc gia đình'}
+                </span>
+              </p>
+              <p>
+                <strong>Người cần hỗ trợ</strong>
+                <span className="detail-value">
+                  {detail.subject.people_affected == null ? 'Chưa rõ số người' : `${detail.subject.people_affected} người`}
+                </span>
+              </p>
+              <p>
+                <strong>Trẻ em / người cao tuổi</strong>
+                <span className="detail-value">
+                  {detail.subject.children_count == null ? 'Chưa rõ số trẻ em' : `${detail.subject.children_count} trẻ em`} ·{' '}
+                  {detail.subject.elderly_count == null ? 'Chưa rõ số người cao tuổi' : `${detail.subject.elderly_count} người cao tuổi`}
+                </span>
+              </p>
+              <p>
+                <strong>Nhu cầu</strong>
+                <span className="detail-value">
+                  {[
+                    ...(detail.needs_rescue ? ['Cứu hộ'] : []),
+                    ...(detail.needs_relief_supplies ? ['Hàng cứu trợ'] : []),
+                  ].join(' · ') || 'Chưa khai báo'}
+                </span>
+              </p>
+              <p>
+                <strong>Người báo</strong>
+                <span className="detail-value">
+                  {detail.reporter.name || 'Chưa có tên'}
+                </span>
+              </p>
+              <p>
+                <strong>Liên hệ</strong>
+                <span className="detail-value">
+                  {detail.reporter.contact_phone || 'Chưa có số liên hệ'}
+                </span>
+              </p>
+              <p>
+                <strong>Vị trí</strong>
+                <span className="detail-value">
+                  <NearbyAddress coordinates={detail.subject.location?.coordinates} />
+                </span>
+              </p>
+              <p>
+                <strong>Quan hệ với người cần hỗ trợ</strong>
+                <span className="detail-value">
+                  {detail.subject.reporter_relationship || 'Tự báo / chưa ghi rõ'}
+                </span>
+              </p>
+              <p>
+                <strong>Số liên hệ người cần hỗ trợ</strong>
+                <span className="detail-value">
+                  {detail.subject.beneficiary_contact_phone || 'Chưa có'}
+                </span>
+              </p>
+              <p>
+                <strong>Liên hệ thay thế</strong>
+                <span className="detail-value">
+                  {[detail.subject.alternate_contact?.name, detail.subject.alternate_contact?.phone]
+                    .filter(Boolean)
+                    .join(' · ') || 'Chưa có'}
+                </span>
+              </p>
+              <p>
+                <strong>Nguồn thông tin / khả năng liên lạc</strong>
+                <span className="detail-value">
+                  {[detail.subject.information_source, detail.subject.contactability ? label(detail.subject.contactability) : null]
+                    .filter(Boolean)
+                    .join(' · ') || 'Chưa ghi rõ'}
+                </span>
+              </p>
+              {detail.subject.last_known_situation_at && (
+                <p>
+                  <strong>Thời điểm biết tình hình gần nhất</strong>
+                  <span className="detail-value">
+                    {timeLabel(detail.subject.last_known_situation_at)}
+                  </span>
+                </p>
+              )}
+              {detail.work_cycle != null && <p>
+                <strong>Chu kỳ xử lý hiện tại</strong>
+                <span className="detail-value">{detail.work_cycle}</span>
+              </p>}
+              <p>
+                <strong>Phiên bản</strong>
+                <span className="detail-value">
+                  {detail.version}
+                </span>
+              </p>
+              <p>
+                <strong>Chiến dịch</strong>
+                <span className="detail-value">
+                  {detail.campaign_id
+                    ? campaignOptions.find((campaign) => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn'
+                    : 'Chưa gắn'}
+                </span>
+              </p>
+            </div>
+            </details>
+            {detail.subject.household_reference_note && (
+              <p>
+                <strong>Ghi chú nhận diện nơi ở:</strong> {detail.subject.household_reference_note}
+              </p>
+            )}
+            {detail.priority_advisory && (
+              <details className="sos-fold sos-fold--advisory" open={detail.priority_advisory.outcome !== 'INSUFFICIENT_DATA' && detail.status !== 'TRIAGED' ? true : undefined}>
+                <summary>
+                  Đánh giá ban đầu: <strong>{advisoryScoreLabel(detail.priority_advisory.score, detail.priority_advisory.level)}</strong>
+                </summary>
+                <p>
+                  <strong>Dấu hiệu:</strong>{' '}
+                  {detail.priority_advisory.reason_codes
+                    .map((code) => advisoryReasonLabels[code] || 'Có thông tin cần kiểm tra')
+                    .join(' · ') || 'Chưa ghi nhận dấu hiệu cần chú ý.'}
+                </p>
+                <p className="muted">
+                  Chỉ để tham khảo. {detail.priority_advisory.outcome === 'INSUFFICIENT_DATA' ? 'Thiếu thông tin không có nghĩa là ít khẩn cấp. ' : ''}
+                  Điều phối viên xác minh, chọn P1–P4 và quyết định giao đội.
+                </p>
+              </details>
+            )}
+            {detail.ai_priority_advisory && detail.ai_advisory?.status !== 'COMPLETED' && (
+              <details className="sos-fold"><summary>Đánh giá AI hỗ trợ</summary><section className="notice">
+                <h3>
+                  {detail.ai_priority_advisory.source === 'DEMO_FIXTURE'
+                    ? 'Đánh giá AI minh họa'
+                    : 'Đánh giá hỗ trợ từ AI (Gemini)'}
+                </h3>
+                <p>
+                  <strong>Trạng thái:</strong>{' '}
+                  {advisoryStatusLabels[detail.ai_priority_advisory.status] || 'Chưa rõ trạng thái'}
+                </p>
+                {detail.ai_priority_advisory.review_status === 'REJECTED' && (
+                  <p>
+                    <strong>Điều phối viên đã bác bỏ gợi ý này.</strong> Nội dung chỉ được giữ trong
+                    lịch sử để đối chiếu, không phải gợi ý đang sử dụng.
+                  </p>
+                )}
+                {detail.ai_priority_advisory.status === 'COMPLETED' &&
+                  detail.ai_priority_advisory.review_status !== 'REJECTED' &&
+                  detail.ai_priority_advisory.score !== null && (
+                    <>
+                      <p>
+                        <strong>
+                          {advisoryScoreLabel(
+                            detail.ai_priority_advisory.score,
+                            detail.ai_priority_advisory.level
+                          )}
+                        </strong>
+                      </p>
+                      <p>
+                        <strong>Lý do AI đưa ra:</strong>{' '}
+                        {detail.ai_priority_advisory.reasons.join(' · ') ||
+                          'Không có lý do kèm theo.'}
+                      </p>
+                      {detail.ai_priority_advisory.confidence !== null && (
+                        <p>
+                        <strong>Độ tin cậy do AI ước tính:</strong>{' '}
+                          {Math.round(detail.ai_priority_advisory.confidence * 100)}% (chỉ tham
+                          khảo)
+                        </p>
+                      )}
+                    </>
+                  )}
+                {detail.ai_priority_advisory.status === 'STALE' && (
+                  <p>
+                    Thông tin SOS đã thay đổi sau lần đánh giá. Kết quả cũ không còn phù hợp;
+                    hãy kiểm tra thông tin mới và tiếp tục xác minh.
+                  </p>
+                )}
+                {['FAILED', 'SKIPPED'].includes(detail.ai_priority_advisory.status) && (
+                  <p>AI chưa đánh giá được yêu cầu này. Hãy kiểm tra thông tin SOS và xử lý theo quy trình thủ công.</p>
+                )}
+                {detail.ai_priority_advisory.status === 'COMPLETED' &&
+                  detail.ai_priority_advisory.review_status !== 'REJECTED' &&
+                  detail.ai_priority_advisory.score === null && (
+                    <p>
+                      AI chưa đề xuất điểm nguy cơ; không coi đây là mức nguy cơ thấp.{' '}
+                      {detail.ai_priority_advisory.reasons.join(' · ')} Hãy tiếp tục xác minh thủ công.
+                    </p>
+                  )}
+                <p>
+                  {detail.ai_priority_advisory.source === 'DEMO_FIXTURE'
+                    ? 'Đây là dữ liệu minh họa giao diện; không phải kết quả Gemini chạy thật.'
+                    : 'AI chỉ hỗ trợ xem xét. Điều phối viên vẫn quyết định mức ưu tiên và giao đội.'}
+                </p>
+              </section></details>
+            )}
+            {detail.ai_advisory?.status === 'FAILED' && !detail.ai_advisory.review_status &&
+              detail.ai_priority_advisory?.source === 'GEMINI' && command({
+                title: 'Thử đánh giá AI lại',
+                service: 'response',
+                path: `/requests/${detail.id}/ai-advisories/${detail.ai_advisory.id}/retry`,
+                version: detail.version,
+                warning: 'Gửi lại yêu cầu đánh giá AI? Kết quả vẫn chỉ để tham khảo; bạn tiếp tục xử lý SOS theo thông tin đã xác minh.',
+              })}
+            {detail.ai_advisory && detail.ai_advisory.status === 'COMPLETED' && (
+              <details className="sos-fold" open={!detail.ai_advisory.review_status ? true : undefined}><summary>Gợi ý từ AI{detail.ai_advisory.review_status ? ' · đã rà soát' : ' · chờ rà soát'}</summary><section className="notice">
+                <h3>
+                  {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
+                    ? 'Thông tin AI minh họa'
+                    : 'Thông tin AI ghi nhận'}
+                </h3>
+                <p>
+                  {detail.ai_priority_advisory?.source === 'DEMO_FIXTURE'
+                    ? 'Dữ liệu này dùng để minh họa và không phải phản hồi từ Gemini.'
+                    : 'AI có thể nhận bản mô tả đã được rút gọn cùng các thông tin tình huống. Số điện thoại, tọa độ chính xác và tệp đính kèm không được đưa vào phần đánh giá. Hãy đối chiếu với hồ sơ SOS trước khi sử dụng.'}
+                </p>
+                <p>
+                  <strong>Trạng thái:</strong>{' '}
+                  {advisoryStatusLabels[
+                    detail.ai_priority_advisory?.status || detail.ai_advisory.status
+                  ] || 'Chưa rõ trạng thái đánh giá AI'}
+                </p>
+                {detail.ai_priority_advisory?.status === 'COMPLETED' && (
+                  <>
+                    {detail.ai_advisory.risk_score !== null && (
+                      <p>
+                        <strong>Điểm rủi ro tham khảo:</strong> {detail.ai_advisory.risk_score}/100
+                      </p>
+                    )}
+                    {detail.ai_advisory.reason_codes.length > 0 && (
+                      <p>
+                        <strong>Dấu hiệu cần chú ý:</strong>{' '}
+                        {detail.ai_advisory.reason_codes
+                          .map((code) => advisoryReasonLabels[code] || 'Có dấu hiệu cần rà soát')
+                          .join(' · ')}
+                      </p>
+                    )}
+                    {detail.ai_advisory.extracted_json?.summary && (
+                      <p>
+                        <strong>Tóm tắt:</strong> {detail.ai_advisory.extracted_json.summary}
+                      </p>
+                    )}
+                    {detail.ai_advisory.extracted_json?.indicators &&
+                      detail.ai_advisory.extracted_json.indicators.length > 0 && (
+                        <p>
+                          <strong>Dấu hiệu AI ghi nhận:</strong>{' '}
+                          {detail.ai_advisory.extracted_json.indicators.join(' · ')}
+                        </p>
+                      )}
+                    {detail.ai_advisory.extracted_json?.facts && (
+                      <div>
+                        <strong>Dữ kiện trích xuất cần đối chiếu</strong>
+                        {Object.entries(detail.ai_advisory.extracted_json.facts)
+                          .filter(([key]) => advisoryFactLabels[key])
+                          .map(([key, value]) => (
+                            <p key={key}>
+                              {advisoryFactLabels[key]}:{' '}
+                              {typeof value === 'boolean'
+                                ? value
+                                  ? 'Có'
+                                  : 'Không'
+                                : String(value)}
+                            </p>
+                          ))}
+                      </div>
+                    )}
+                    {aiNeedsMismatch && (
+                      <p role="status">
+                        <strong>Cần đối chiếu:</strong> AI ghi nhận nhu cầu cứu hộ hoặc hàng cứu trợ
+                        khác với phần người báo đã chọn. Giữ dữ liệu gốc và xác minh trước khi quyết định.
+                      </p>
+                    )}
+                    {aiCountMismatches.length > 0 && (
+                      <div className="notice warning" role="status">
+                        <strong>Cần đối chiếu số người:</strong>
+                        {aiCountMismatches.map(key => <p key={key}>
+                          {advisoryFactLabels[key]} — hồ sơ: {detail.subject[key] ?? 'Chưa rõ'}; AI: {String(aiFacts?.[key])}.
+                        </p>)}
+                        <p>Số chưa rõ không có nghĩa là 0. Giữ dữ liệu gốc và xác minh trước khi sử dụng số AI ghi nhận.</p>
+                      </div>
+                    )}
+                    <p>
+                      <strong>Độ tin cậy do AI ước tính:</strong>{' '}
+                      {Math.round((detail.ai_advisory.extracted_json?.confidence ?? 0) * 100)}% (chỉ
+                      tham khảo)
+                    </p>
+                    {detail.ai_advisory.review_status ? (
+                      <p>
+                        <strong>Quyết định của điều phối viên:</strong>{' '}
+                        {advisoryReviewLabels[detail.ai_advisory.review_status] || 'Đã rà soát'}
+                        {detail.ai_advisory.review_status === 'REJECTED'
+                          ? ' · Chỉ lưu lịch sử, không sử dụng.'
+                          : ''}
+                        {detail.ai_advisory.review_note
+                          ? ` · ${detail.ai_advisory.review_note}`
+                          : ''}
+                      </p>
+                    ) : (
+                      <div>
+                        <label className="ai-review-note">
+                          <span>Ghi chú khi điều chỉnh hoặc bác bỏ</span>
+                          <textarea
+                            rows={4}
+                            value={aiReviewNote}
+                            onChange={(event) => setAiReviewNote(event.target.value)}
+                            maxLength={1000}
+                          />
+                        </label>
+                        <div className="action-grid">
+                          <button
+                            className="button"
+                            disabled={aiReviewBusy}
+                            onClick={() => void reviewAiAdvisory('ACCEPTED')}
+                          >
+                            Ghi nhận gợi ý
+                          </button>
+                          <button
+                            className="button secondary"
+                            disabled={aiReviewBusy}
+                            onClick={() => void reviewAiAdvisory('ADJUSTED')}
+                          >
+                            Điều chỉnh và ghi nhận
+                          </button>
+                          <button
+                            className="button secondary"
+                            disabled={aiReviewBusy}
+                            onClick={() => void reviewAiAdvisory('REJECTED')}
+                          >
+                            Không sử dụng gợi ý
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </section></details>
+            )}
+            {completedInCurrentCycle && Boolean(detail.active_missions?.items.length) &&
+              <p className="notice warning" role="status">
+                SOS này đã có nhiệm vụ hoàn thành nhưng vẫn còn nhiệm vụ đang giao. Hãy đối chiếu nhu cầu còn lại và trạng thái đội bên dưới. Nếu lần giao thêm là nhầm, dùng “Hủy giao nhiệm vụ” cho nhiệm vụ đang chờ trước khi kết thúc SOS.
+              </p>}
+            {detail.active_missions && detail.active_missions.items.length > 0 && (
+              <section>
+                <h3>Nhiệm vụ đang giao ({detail.active_missions.items.length})</h3>
+                <div className="record-list">
+                  {detail.active_missions.items.map((m) => (
+                    <div className="candidate" key={m.id}>
+                      <strong>Mã nhiệm vụ: {m.id.slice(0, 8)}</strong>
+                      <p>
+                        Trạng thái: {label(m.status)} · Đội: {detail.mission_history?.items.find((mission) => mission.team_id === m.team_id)?.team_name ?? 'Đội cứu hộ'} ·{' '}
+                        {timeLabel(m.created_at)}
+                      </p>
+                      <CoordinatorMissionControl missionId={m.id} teamId={m.team_id}
+                        revision={revision} onSuccess={done} onStale={refreshAfterConflict} />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+            {detail.mission_history && detail.mission_history.items.length > 0 && (
+              <details className="sos-fold"><summary>Lịch sử nhiệm vụ ({detail.mission_history.items.length})</summary>
+              <section>
+                <div className="record-list">
+                  {detail.mission_history.items.map((mission) => (
+                    <div className="candidate" key={mission.id}>
+                      <strong>
+                        {mission.team_name} · {label(mission.mission_kind)}
+                      </strong>
+                      <p>
+                        {label(mission.status)} · {timeLabel(mission.created_at)}
+                        {mission.last_status ? ` · Cập nhật: ${label(mission.last_status)}` : ''}
+                      </p>
+                      <MissionOutcome key={mission.id + mission.status} id={mission.id} />
+                      {mission.override_reason && (
+                        <p>Lý do chọn đội khác đề xuất: {mission.override_reason}</p>
+                      )}
+                      {mission.status === 'FAILED' &&
+                        ['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(detail.status) &&
+                        !detail.timeline.items.some((event) =>
+                          event.event_type === 'MISSION_FAILURE_REVIEW' && event.payload?.mission_id === mission.id
+                        ) && command({
+                          title: 'Rà soát nhiệm vụ thất bại',
+                          service: 'response',
+                          path: `/missions/${mission.id}/review-failure`,
+                          version: detail.version,
+                          fields: [
+                            { name: 'disposition', label: 'Kết luận xử lý', type: 'select', required: true,
+                              options: [
+                                { value: 'REPLACED', label: 'Đã thay bằng nhiệm vụ hoàn thành' },
+                                { value: 'NO_FURTHER_ACTION', label: 'Không cần giao thêm đội' },
+                                { value: 'REFERRED', label: 'Đã chuyển cơ quan có thẩm quyền' },
+                              ] },
+                            { name: 'replacement_mission_id', label: 'Nhiệm vụ thay thế đã hoàn thành', type: 'select', required: true,
+                              visibleWhen: { field: 'disposition', value: 'REPLACED' },
+                              options: detail.mission_history?.items.filter((item) => item.status === 'COMPLETED' && item.id !== mission.id)
+                                .map((item) => ({ value: item.id, label: `${item.team_name} · ${item.id.slice(0, 8)}` })) || [] },
+                            { name: 'reason', label: 'Căn cứ rà soát', type: 'textarea', required: true, maxLength: 2000 },
+                          ],
+                        })}
+                    </div>
+                  ))}
+                </div>
+              </section></details>
+            )}
+            <details className="sos-fold" open={detail.status === 'VERIFYING' ? true : undefined}>
+            <summary>Minh chứng{detail.evidence?.items.length ? ` (${detail.evidence.items.length})` : ''} và liên hệ</summary>
+            <RequestEvidencePanel items={detail.evidence?.items ?? []} />
+            <ContactAttemptPanel
+              key={`contacts-${detail.id}-${detail.version}`}
+              requestId={detail.id}
+              status={detail.status}
+              version={detail.version}
+              currentUserId={currentUserId}
+              reporterUserId={detail.reporter.user_id}
+              initial={detail.contact_attempts}
+              onSuccess={done}
+              onStale={refreshAfterConflict}
+            />
+            </details>
+            <details className="sos-fold"><summary>Lịch sử xử lý</summary>
+            <RequestTimeline
+              key={`timeline-${detail.id}-${detail.version}-${detail.timeline.items[0]?.id ?? 'empty'}`}
+              requestId={detail.id}
+              initial={detail.timeline}
+            />
+            </details>
           </>
         )}
       </section></DetailSurface>

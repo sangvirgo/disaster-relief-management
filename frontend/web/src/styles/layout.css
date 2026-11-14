@@ -126,7 +126,8 @@ textarea:focus-visible {
 .topbar {
   position: sticky;
   top: 0;
-  z-index: var(--z-sticky);
+  /* One step above the emergency bar so the profile menu opens over it. */
+  z-index: calc(var(--z-sticky) + 1);
   height: 56px;
   min-height: 56px;
   padding: 0 var(--space-6);
@@ -171,13 +172,11 @@ textarea:focus-visible {
   border-color: var(--color-surface-border);
 }
 .content {
+  width: 100%;
   max-width: var(--content-max);
+  margin-inline: auto;
   padding: var(--space-6) var(--space-6) var(--space-7);
   overflow-wrap: anywhere;
-}
-.content--sos,
-.content--tracking {
-  max-width: 784px;
 }
 .card {
   min-width: 0;
@@ -564,3 +563,50 @@ tr:hover td {
     transition: none;
   }
 }
+
+/* Multi-role switcher: one workspace per row, with the roles that grant it. */
+.workspace-switch { display: grid; grid-template-columns: minmax(0, 1fr); }
+.workspace-switch button { display: grid; justify-items: start; align-content: center; gap: 0; padding-block: var(--space-2); text-align: left; }
+.workspace-switch__roles { color: var(--color-text-secondary); font-size: 12px; line-height: 16px; font-weight: 400; overflow-wrap: anywhere; }
+
+/* Larger type and forms: uniform scale across every page. */
+html { zoom: 1.1; }
+
+/* Workspace dropdown with quick switch. */
+.ws-picker { position: relative; display: flex; gap: var(--space-2); align-items: stretch; }
+.ws-picker__current, .ws-picker__quick {
+  border: 1px solid var(--color-surface-border); background: var(--color-surface-card);
+  border-radius: var(--radius-sm); color: var(--color-text-primary); cursor: pointer;
+}
+.ws-picker__current { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); text-align: left; }
+.ws-picker__text { display: grid; min-width: 0; }
+.ws-picker__text strong, .ws-picker__menu strong { font-size: 14px; line-height: 20px; font-weight: 600; }
+.ws-picker small { color: var(--color-text-secondary); font-size: 12px; line-height: 16px; font-weight: 400; overflow-wrap: anywhere; }
+.ws-picker__chevron { color: var(--color-text-secondary); }
+.ws-picker__quick { width: 40px; font-size: 18px; color: var(--color-primary); }
+.ws-picker__quick:hover, .ws-picker__current:hover { background: var(--color-surface-subtle); }
+.ws-picker__menu {
+  position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; right: 0; display: grid; padding: var(--space-1);
+  background: var(--color-surface-card); border: 1px solid var(--color-surface-border); border-radius: var(--radius-md); box-shadow: var(--shadow-md, 0 10px 28px #172b4d30);
+}
+.ws-picker__menu button { display: grid; justify-items: start; gap: 0; padding: var(--space-2) var(--space-3); border: 0; background: transparent; border-radius: var(--radius-sm); text-align: left; cursor: pointer; }
+.ws-picker__menu button:hover { background: var(--color-surface-subtle); }
+.ws-picker__menu button.active { background: var(--color-surface-subtle); box-shadow: inset 3px 0 0 var(--color-primary); }
+.ws-picker__menu button.active strong { color: var(--color-primary); }
+
+/* Pagination: one look for every list. */
+.pager, .load-more {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3);
+  margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--color-surface-border);
+}
+.pager__info, .pager-summary { color: var(--color-text-secondary); font-size: 14px; line-height: 20px; margin: 0; }
+.pager-summary { margin-top: var(--space-4); }
+.pager__info strong { color: var(--color-text-primary); }
+.pager__buttons { display: flex; gap: var(--space-2); }
+.pager__btn {
+  min-height: 40px; padding: 0 var(--space-4); border: 1px solid var(--color-surface-border); border-radius: var(--radius-sm);
+  background: var(--color-surface-card); color: var(--color-text-primary); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.pager__btn:hover:not(:disabled) { background: var(--color-surface-subtle); border-color: var(--color-primary); color: var(--color-primary); }
+.pager__btn:disabled { opacity: .45; cursor: not-allowed; }
