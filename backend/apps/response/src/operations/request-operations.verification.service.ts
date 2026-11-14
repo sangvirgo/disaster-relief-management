@@ -87,7 +87,7 @@ export class RequestOperationsVerificationService {
     const reason = cleanText(dto.reason ?? undefined);
     const sourceNote = cleanText(dto.source_note ?? undefined);
     const currentCoordinators = dto.basis === 'TWO_COORDINATOR_JUDGMENT'
-      ? await this.sessions.requestCoordinatorGrants((await this.persistence.staffRequest(this.dataSource, requestId, session, 'REQUEST_VERIFY')).organization_id)
+      ? await this.sessions.requestCoordinatorGrants((await this.persistence.staffRequest(this.dataSource, requestId, session, 'REQUEST_VERIFY')).campaign_id)
       : undefined;
     return this.commandRunner.runCommand(requestId, session, key, 'response.requests.verify', dto,
       async (manager) => {
@@ -182,22 +182,22 @@ export class RequestOperationsVerificationService {
     const reasonKind = dto.reason_kind ?? 'OTHER';
     await this.persistence.staffRequest(this.dataSource, requestId, session, 'REQUEST_VERIFY');
     const knownChildren = await this.dataSource.query(
-      'SELECT id,organization_id FROM assistance_request WHERE canonical_request_id=$1 ORDER BY id', [requestId],
-    ) as Array<{ id: string; organization_id: string }>;
-    const coordinatorGrants = new Map<string, RequestCoordinatorGrant[]>();
-    for (const organizationId of new Set(knownChildren.map((child) => child.organization_id))) {
-      coordinatorGrants.set(organizationId, await this.sessions.requestCoordinatorGrants(organizationId));
+      'SELECT id,campaign_id FROM assistance_request WHERE canonical_request_id=$1 ORDER BY id', [requestId],
+    ) as Array<{ id: string; campaign_id: string | null }>;
+    const coordinatorGrants = new Map<string | null, RequestCoordinatorGrant[]>();
+    for (const campaignId of new Set(knownChildren.map((child) => child.campaign_id))) {
+      coordinatorGrants.set(campaignId, await this.sessions.requestCoordinatorGrants(campaignId));
     }
     return this.commandRunner.runCommand(requestId, session, key, 'response.requests.reject', dto,
       async (manager) => {
         const lockedRows = new Map<string, Pick<OperationRequestRow,
-          'id' | 'reporter_user_id' | 'status' | 'version' | 'organization_id' | 'campaign_id' | 'canonical_request_id'>>();
+          'id' | 'reporter_user_id' | 'status' | 'version' | 'campaign_id' | 'canonical_request_id'>>();
         for (const id of [...new Set([requestId, ...knownChildren.map((child) => child.id)])].sort()) {
           const rows = await manager.query(
-            `SELECT id,reporter_user_id,status,version,organization_id,campaign_id,canonical_request_id
+            `SELECT id,reporter_user_id,status,version,campaign_id,canonical_request_id
                FROM assistance_request WHERE id=$1 FOR UPDATE`, [id],
           ) as Array<Pick<OperationRequestRow,
-            'id' | 'reporter_user_id' | 'status' | 'version' | 'organization_id' | 'campaign_id' | 'canonical_request_id'>>;
+            'id' | 'reporter_user_id' | 'status' | 'version' | 'campaign_id' | 'canonical_request_id'>>;
           if (rows[0]) lockedRows.set(id, rows[0]);
         }
         const row = lockedRows.get(requestId);
@@ -205,15 +205,13 @@ export class RequestOperationsVerificationService {
         assertRequestPermission(session, 'REQUEST_VERIFY', row);
         const childRows = [...lockedRows.values()].filter((child) => child.canonical_request_id === requestId);
         const currentChildren = await manager.query(
-          'SELECT id,organization_id FROM assistance_request WHERE canonical_request_id=$1 ORDER BY id', [requestId],
-        ) as Array<{ id: string; organization_id: string }>;
-        const knownIds = new Set(knownChildren.map((child) => child.id));
-        if (currentChildren.length !== childRows.length || currentChildren.some((child) => !knownIds.has(child.id))) {
+          'SELECT id,campaign_id FROM assistance_request WHERE canonical_request_id=$1 ORDER BY id', [requestId],
+        ) as Array<{ id: string; campaign_id: string | null }>;
+        const knownCampaigns = new Map(knownChildren.map((child) => [child.id, child.campaign_id]));
+        if (currentChildren.length !== childRows.length || currentChildren.some((child) => knownCampaigns.get(child.id) !== child.campaign_id)) {
           throw new AppError('DUPLICATE_SET_CHANGED', { status: 409 });
         }
-        if (currentChildren.some((child) => !coordinatorGrants.has(child.organization_id))) {
-          throw new AppError('DUPLICATE_SET_CHANGED', { status: 409 });
-        }
+        for (const child of childRows) assertRequestPermission(session, 'REQUEST_VERIFY', child);
         checkVersion(Number(row.version), dto.expected_version);
         if (!unverifiedStatuses.has(row.status)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         if (reasonKind === 'UNREACHABLE') {
@@ -251,7 +249,7 @@ export class RequestOperationsVerificationService {
           if (!childUpdate[0]) throw new AppError('DUPLICATE_SET_CHANGED', { status: 409 });
           const version = Number(childUpdate[0].version);
           await this.persistence.notifyReporter(manager, child.reporter_user_id, child.id, version, 'REQUEST_STATUS_CHANGED', 'DUPLICATE_ORPHANED');
-          const recipients = [...new Set((coordinatorGrants.get(child.organization_id) ?? [])
+          const recipients = [...new Set((coordinatorGrants.get(child.campaign_id) ?? [])
             .filter((grant) => grantCovers(grant, child)).map((grant) => grant.user_id))];
           if (recipients.length) await manager.query(
             `INSERT INTO notice (source_id,source_version,recipient_user_id,notice_type,payload)
@@ -274,11 +272,11 @@ export class RequestOperationsVerificationService {
         const events = await manager.query(
           `SELECT orphan.request_id AS id,orphan.to_status AS status,
                   (orphan.payload->>'resulting_version')::int AS version,
-                  child.organization_id,child.child.campaign_id
+                  child.campaign_id
              FROM request_event orphan JOIN assistance_request child ON child.id=orphan.request_id
             WHERE orphan.event_type='DUPLICATE_ORPHANED' AND orphan.payload->>'rejection_decision_id'=$1
             ORDER BY orphan.occurred_at,orphan.id`, [rows[0].id],
-        ) as Array<{ id: string; status: string; version: number; organization_id: string; campaign_id: string | null }>;
+        ) as Array<{ id: string; status: string; version: number; campaign_id: string | null }>;
         const visible = events.filter((child) => canAccessRequest(session, 'REQUEST_DETAIL_READ', child));
         return { ...current, decision_id: rows[0].id, orphaned_duplicates: { items: visible.slice(0, 20).map(({ id, status, version }) => ({ id, status, version })), more: visible.length > 20 } };
       },

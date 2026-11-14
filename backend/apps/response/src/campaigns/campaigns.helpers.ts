@@ -6,7 +6,6 @@ export type CampaignAction = 'activate' | 'pause' | 'resume' | 'close';
 
 export interface CampaignRow extends Record<string, unknown> {
   id: string;
-  organization_id: string;
   name: string;
   objective: string | null;
   status: CampaignStatus;
@@ -20,7 +19,6 @@ export interface CampaignRow extends Record<string, unknown> {
 export function campaignView(row: CampaignRow): Record<string, unknown> {
   return {
     id: row.id,
-    organization_id: row.organization_id,
     name: row.name,
     objective: row.objective,
     status: row.status,
@@ -57,16 +55,11 @@ export function campaignNextStatus(status: CampaignStatus, action: CampaignActio
 export function campaignScopePredicate(grants: readonly Grant[], permission: Permission, values: unknown[]): string {
   const branches = new Set<string>();
   for (const grant of grants) {
-    const organizationId = grant.organization_id;
-    if (!organizationId) continue;
-    if (grant.scope_type === 'ORGANIZATION' && hasPermission([grant], permission, { organizationId })) {
-      values.push(organizationId);
-      branches.add(`organization_id = $${values.length}`);
-    } else if (grant.scope_type === 'CAMPAIGN' && grant.campaign_id && hasPermission([grant], permission, {
-      organizationId, campaignId: grant.campaign_id,
-    })) {
-      values.push(organizationId, grant.campaign_id);
-      branches.add(`(organization_id = $${values.length - 1} AND id = $${values.length})`);
+    if (grant.scope_type === 'SYSTEM' && hasPermission([grant], permission, { campaignId: null })) branches.add('TRUE');
+    else if (grant.scope_type === 'CAMPAIGN' && grant.campaign_id &&
+      hasPermission([grant], permission, { campaignId: grant.campaign_id })) {
+      values.push(grant.campaign_id);
+      branches.add(`id = $${values.length}`);
     }
   }
   return branches.size ? `(${[...branches].join(' OR ')})` : 'FALSE';

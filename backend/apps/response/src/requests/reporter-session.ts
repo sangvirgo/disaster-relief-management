@@ -25,13 +25,12 @@ export interface ReporterSession {
 
 export interface RequestCoordinatorGrant {
   user_id: string;
-  role_code: 'COORDINATOR' | 'OPERATIONS_MANAGER';
-  scope_type: 'ORGANIZATION' | 'CAMPAIGN';
-  organization_id: string;
+  role_code: 'COORDINATOR';
+  scope_type: 'SYSTEM' | 'CAMPAIGN';
   campaign_id: string | null;
 }
 
-export type TeamLeaderEligibilityReason = 'USER_NOT_FOUND' | 'USER_INACTIVE' | 'MEMBERSHIP_REQUIRED' | 'VOLUNTEER_GRANT_REQUIRED';
+export type TeamLeaderEligibilityReason = 'USER_NOT_FOUND' | 'USER_INACTIVE' | 'VOLUNTEER_GRANT_REQUIRED';
 
 export type TeamLeaderEligibility =
   | { eligible: true }
@@ -102,11 +101,11 @@ export class ReporterSessionService implements OnModuleDestroy {
     return this.serviceTokens.get(audience);
   }
 
-  async requestCoordinatorGrants(organizationId: string): Promise<RequestCoordinatorGrant[]> {
+  async requestCoordinatorGrants(campaignId: string | null): Promise<RequestCoordinatorGrant[]> {
     const token = await this.serviceTokens.get();
     let result;
     try {
-      result = await this.client.post<unknown>('/api/v1/identity/internal/request-coordinators', { organization_id: organizationId }, {
+      result = await this.client.post<unknown>('/api/v1/identity/internal/request-coordinators', { campaign_id: campaignId }, {
         headers: { authorization: `Bearer ${token}` },
       });
     } catch (error) {
@@ -121,23 +120,19 @@ export class ReporterSessionService implements OnModuleDestroy {
       if (!item || typeof item !== 'object') return false;
       const value = item as Record<string, unknown>;
       return typeof value.user_id === 'string' && uuidPattern.test(value.user_id) &&
-        (value.role_code === 'COORDINATOR' || value.role_code === 'OPERATIONS_MANAGER') &&
-        ['ORGANIZATION', 'CAMPAIGN'].includes(String(value.scope_type)) &&
-        value.organization_id === organizationId &&
-        (value.campaign_id === null || (typeof value.campaign_id === 'string' && uuidPattern.test(value.campaign_id)));
+        value.role_code === 'COORDINATOR' && ['SYSTEM', 'CAMPAIGN'].includes(String(value.scope_type)) &&
+        (value.scope_type === 'SYSTEM' ? value.campaign_id === null :
+          (typeof value.campaign_id === 'string' && uuidPattern.test(value.campaign_id) && value.campaign_id === campaignId));
     });
     if (!valid) throw unavailable();
     return items as RequestCoordinatorGrant[];
   }
 
-  async teamLeaderEligibility(userId: string, organizationId: string): Promise<TeamLeaderEligibility> {
+  async teamLeaderEligibility(userId: string): Promise<TeamLeaderEligibility> {
     const token = await this.serviceTokens.get();
     let result;
     try {
-      result = await this.client.post<unknown>('/api/v1/identity/internal/team-leader-eligibility', {
-        user_id: userId,
-        organization_id: organizationId,
-      }, {
+      result = await this.client.post<unknown>('/api/v1/identity/internal/team-leader-eligibility', { user_id: userId }, {
         headers: { authorization: `Bearer ${token}` },
       });
     } catch (error) {
@@ -150,7 +145,7 @@ export class ReporterSessionService implements OnModuleDestroy {
     const value = result.body as Record<string, unknown>;
     const keys = Object.keys(value).sort().join(',');
     if (value.eligible === true && keys === 'eligible') return { eligible: true };
-    const reasons: TeamLeaderEligibilityReason[] = ['USER_NOT_FOUND', 'USER_INACTIVE', 'MEMBERSHIP_REQUIRED', 'VOLUNTEER_GRANT_REQUIRED'];
+    const reasons: TeamLeaderEligibilityReason[] = ['USER_NOT_FOUND', 'USER_INACTIVE', 'VOLUNTEER_GRANT_REQUIRED'];
     if (value.eligible === false && keys === 'eligible,reason' && reasons.includes(value.reason as TeamLeaderEligibilityReason)) {
       return { eligible: false, reason: value.reason as TeamLeaderEligibilityReason };
     }

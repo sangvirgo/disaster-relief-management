@@ -64,7 +64,7 @@ describe('reporter advisory scheduling', () => {
 
   it('enqueues a new input revision when the coordinator reopens a work cycle', async () => {
     const requestId = 'request';
-    const row = { id: requestId, status: 'CLOSED', version: 4, work_cycle: 1, organization_id: 'organization', campaign_id: null, reporter_user_id: null };
+    const row = { id: requestId, status: 'CLOSED', version: 4, work_cycle: 1, campaign_id: null, reporter_user_id: null };
     const facts = { version: 5, workCycle: 2, incidentCategoryCode: 'FLOOD', description: 'Nước dâng cao.', needsRescue: true };
     const query = jest.fn(async (sql: string): Promise<unknown[]> => {
       if (sql.includes('SELECT r.version')) return [facts];
@@ -72,7 +72,7 @@ describe('reporter advisory scheduling', () => {
       if (sql.includes('UPDATE assistance_request')) return [[{ ...row, status: 'TRIAGED', version: 5, work_cycle: 2 }], 1];
       return [];
     });
-    const session = { userId: 'coordinator', grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: 'organization' }] };
+    const session = { userId: 'coordinator', grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM',}] };
     const service = new RequestResolutionStateService({ query } as never,
       { execute: async (_source: unknown, command: { execute: (manager: unknown) => Promise<unknown> }) => command.execute({ query }) } as never,
       { require: async () => session } as never);

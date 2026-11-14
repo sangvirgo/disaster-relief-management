@@ -33,7 +33,7 @@ export class DonationReceiptsQueriesService {
     if (cursor && !validTimeCursor(cursor)) throw new AppError('CURSOR_INVALID', { status: 400 });
 
     const values: unknown[] = [];
-    const conditions = [driveScopeSql(session.grants, values, permissions, 'w')];
+    const conditions = [driveScopeSql(session.grants, values, permissions, 'd')];
     if (query.drive_id) conditions.push(`d.id=$${values.push(query.drive_id)}`);
     if (query.status) conditions.push(`dd.status=$${values.push(query.status)}`);
     if (cursor) {
@@ -57,7 +57,7 @@ export class DonationReceiptsQueriesService {
   async receipt(id: string, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     const receipt = await readReceiptView(this.dataSource, id);
-    assertReceiptRead(session.grants, receipt.organization_id);
+    assertReceiptRead(session.grants, { campaign_id: receipt.campaign_id });
     return { ...receipt.value, generated_at: new Date().toISOString() };
   }
 
@@ -70,7 +70,7 @@ export class DonationReceiptsQueriesService {
     if (cursor && !validTimeCursor(cursor)) throw new AppError('CURSOR_INVALID', { status: 400 });
 
     const values: unknown[] = [];
-    const conditions = [driveScopeSql(session.grants, values, permissions, 'w')];
+    const conditions = [driveScopeSql(session.grants, values, permissions, 'd')];
     if (query.status) conditions.push(`dis.status=$${values.push(query.status)}`);
     if (cursor) {
       values.push(cursor.sort[0], cursor.id);
@@ -93,10 +93,10 @@ export class DonationReceiptsQueriesService {
 
 }
 
-function assertReceiptRead(grants: readonly Grant[], organizationId: string): void {
-  if (!hasWarehouseScope(grants, organizationId)) throw new AppError('NOT_FOUND', { status: 404 });
-  if (!hasPermission(grants, 'DONATION_INTAKE', { organizationId }) &&
-      !hasPermission(grants, 'DONATION_REVIEW', { organizationId })) {
+function assertReceiptRead(grants: readonly Grant[], scope: { campaign_id: string | null }): void {
+  if (!hasWarehouseScope(grants, scope)) throw new AppError('NOT_FOUND', { status: 404 });
+  if (!hasPermission(grants, 'DONATION_INTAKE', { campaignId: scope.campaign_id }) &&
+      !hasPermission(grants, 'DONATION_REVIEW', { campaignId: scope.campaign_id })) {
     throw new AppError('FORBIDDEN', { status: 403 });
   }
 }

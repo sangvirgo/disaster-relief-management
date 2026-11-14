@@ -14,7 +14,7 @@ function managerFor(overrides: Partial<Record<string, unknown>> = {}) {
     cycle_id: cycleId,
     item_id: itemId,
     warehouse_id: 'warehouse-1',
-    organization_id: 'organization-1',
+    campaign_id: 'campaign-1',
     cycle_state: 'OPEN',
     need_status: 'OPEN',
     delivery_target_kind: 'RELIEF_POINT',
@@ -41,7 +41,7 @@ describe('lockCommitmentContexts', () => {
   it('derives the delivery target from the designated relief point column', async () => {
     const { manager, query } = managerFor();
 
-    await lockCommitmentContexts(manager, [line], 'warehouse-1', 'organization-1', 'REQUEST_AID', 'point-designated');
+    await lockCommitmentContexts(manager, [line], 'warehouse-1', 'campaign-1', 'REQUEST_AID', 'point-designated');
 
     const contextQuery = query.mock.calls.find(([sql]) => String(sql).includes('cm.item_id'))?.[0];
     expect(contextQuery).toContain("CASE WHEN n.designated_point_id IS NULL THEN 'FINAL_RECIPIENT' ELSE 'RELIEF_POINT' END AS delivery_target_kind");
@@ -52,7 +52,7 @@ describe('lockCommitmentContexts', () => {
     const { manager } = managerFor();
 
     await expect(lockCommitmentContexts(
-      manager, [line], 'warehouse-1', 'organization-1', 'REQUEST_AID', 'point-other',
+      manager, [line], 'warehouse-1', 'campaign-1', 'REQUEST_AID', 'point-other',
     )).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
   });
 
@@ -60,7 +60,7 @@ describe('lockCommitmentContexts', () => {
     const { manager } = managerFor({ quantity: '5.00', designated_point_id: null, delivery_target_kind: 'FINAL_RECIPIENT' });
 
     await expect(lockCommitmentContexts(
-      manager, [{ ...line, quantity: '6.00' }], 'warehouse-1', 'organization-1', 'REQUEST_AID', null, 'DISPATCH',
+      manager, [{ ...line, quantity: '6.00' }], 'warehouse-1', 'campaign-1', 'REQUEST_AID', null, 'DISPATCH',
     )).rejects.toMatchObject({ code: 'INSUFFICIENT_STOCK' });
   });
 
@@ -68,7 +68,7 @@ describe('lockCommitmentContexts', () => {
     const { manager } = managerFor({ cycle_state: 'FROZEN' });
 
     await expect(lockCommitmentContexts(
-      manager, [line], 'warehouse-1', 'organization-1', 'REQUEST_AID', 'point-designated', 'DISPATCH',
+      manager, [line], 'warehouse-1', 'campaign-1', 'REQUEST_AID', 'point-designated', 'DISPATCH',
     )).rejects.toMatchObject({ code: 'CYCLE_FROZEN' });
   });
 
@@ -76,7 +76,7 @@ describe('lockCommitmentContexts', () => {
     const { manager } = managerFor({ cycle_state: 'FROZEN' });
 
     await expect(lockCommitmentContexts(
-      manager, [line], 'warehouse-1', 'organization-1', 'REQUEST_AID', 'point-designated', 'PREPARATION',
+      manager, [line], 'warehouse-1', 'campaign-1', 'REQUEST_AID', 'point-designated', 'PREPARATION',
     )).rejects.toMatchObject({ code: 'CYCLE_FROZEN' });
   });
 });

@@ -19,8 +19,7 @@ const balanceId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const request = { idempotencyKey: '77777777-7777-4777-8777-777777777777' } as NeedCommandRequest;
 
 const managerGrant: Grant = {
-  role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: organizationId,
-};
+  role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM', };
 
 const need = {
   id: needId, cycle_id: cycleId, request_id: '11111111-1111-4111-8111-111111111111', work_cycle: 2,

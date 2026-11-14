@@ -5,34 +5,34 @@ import { reportScopeSql } from '../src/reports/reports.scope';
 const reportPermissions: Permission[] = ['REPORT_READ'];
 
 describe('reportScopeSql', () => {
-  it('limits warehouse reports to organization grants', () => {
+  it('allows warehouse reports to SYSTEM grants', () => {
     const grants: Grant[] = [
-      { role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: 'org-1' },
+      { role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' },
     ];
     const values: unknown[] = [];
 
-    const scope = reportScopeSql(grants, reportPermissions, values, 'w', ['ORGANIZATION', 'SYSTEM']);
+    const scope = reportScopeSql(grants, reportPermissions, values, 'w', ['SYSTEM']);
 
-    expect(scope).toBe('((w.organization_id=$1))');
-    expect(values).toEqual(['org-1']);
+    expect(scope).toBe('(TRUE)');
+    expect(values).toEqual([]);
   });
 
   it('keeps campaign grants on campaign-owned report rows', () => {
     const grants: Grant[] = [
-      { role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', organization_id: 'org-3', campaign_id: 'campaign-3' },
+      { role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: '33333333-3333-4333-8333-333333333333' },
     ];
     const values: unknown[] = [];
 
     const scope = reportScopeSql(grants, reportPermissions, values, 'c');
 
-    expect(scope).toBe('((c.organization_id=$1 AND c.campaign_id=$2))');
-    expect(values).toEqual(['org-3', 'campaign-3']);
+    expect(scope).toBe('((c.campaign_id=$1))');
+    expect(values).toEqual(['33333333-3333-4333-8333-333333333333']);
   });
 
   it('supports system-scoped permissions and rejects grants without report access', () => {
     const systemValues: unknown[] = [];
     expect(reportScopeSql([
-      { role_code: 'ADMIN', scope_type: 'SYSTEM', organization_id: null },
+      { role_code: 'ADMIN', scope_type: 'SYSTEM' },
     ], reportPermissions, systemValues, 'c')).toBe('(TRUE)');
 
     expect(() => reportScopeSql([], reportPermissions, [], 'c')).toThrow(AppError);
@@ -40,13 +40,13 @@ describe('reportScopeSql', () => {
 
   it('accepts either documented permission for reconciliation', () => {
     const grants: Grant[] = [
-      { role_code: 'REVIEWER', scope_type: 'ORGANIZATION', organization_id: 'org-review' },
+      { role_code: 'REVIEWER', scope_type: 'SYSTEM' },
     ];
     const values: unknown[] = [];
 
     const scope = reportScopeSql(grants, ['REPORT_READ', 'DISTRIBUTION_REVIEW'], values, 'w');
 
-    expect(scope).toBe('((w.organization_id=$1))');
-    expect(values).toEqual(['org-review']);
+    expect(scope).toBe('(TRUE)');
+    expect(values).toEqual([]);
   });
 });

@@ -25,10 +25,10 @@ function requestKey(request: AssetRequest): string {
   return request.idempotencyKey;
 }
 
-function assertCanManageRow(session: AuthenticatedLogisticsSession, row: AssetRow): void {
-  if (!row.organization_id || !session.grants.some((grant) => {
+function assertCanManageRow(session: AuthenticatedLogisticsSession, _row: AssetRow): void {
+  if (!session.grants.some((grant) => {
     try {
-      requireAssetManage({ ...session, grants: [grant] }, row.organization_id);
+      requireAssetManage({ ...session, grants: [grant] });
       return true;
     } catch {
       return false;
@@ -138,7 +138,7 @@ export class AssetsService {
 
   private async create(kind: AssetKind, dto: AssetCreateDto, request: AssetRequest): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    requireAssetManage(session, dto.organization_id);
+    requireAssetManage(session);
     validateAssetCreateText(kind, dto);
     if (kind === 'vehicle') {
       const vehicle = dto as CreateVehicleDto;
@@ -179,22 +179,22 @@ export class AssetsService {
     let values: unknown[];
     if (kind === 'warehouse') {
       const warehouse = dto as CreateWarehouseDto;
-      values = [dto.organization_id, warehouse.name, warehouse.address_note ?? null,
+      values = [warehouse.name, warehouse.address_note ?? null,
         coordinates?.[0] ?? null, coordinates?.[1] ?? null, warehouse.location_public ?? false];
-      sql = `INSERT INTO warehouse (organization_id,name,address_note,location,location_public)
-             VALUES ($1,$2,$3,CASE WHEN $4::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($4,$5),4326)::geography END,$6)
+      sql = `INSERT INTO warehouse (name,address_note,location,location_public)
+             VALUES ($1,$2,CASE WHEN $3::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($3,$4),4326)::geography END,$5)
              RETURNING id`;
     } else if (kind === 'relief_point') {
       const point = dto as CreateReliefPointDto;
       if (!coordinates) throw new AppError('VALIDATION_FAILED', { status: 400 });
-      values = [dto.organization_id, point.name, point.contact_note ?? null, point.operating_note ?? null, coordinates[0], coordinates[1]];
-      sql = `INSERT INTO relief_point (organization_id,name,contact_note,operating_note,location)
-             VALUES ($1,$2,$3,$4,ST_SetSRID(ST_MakePoint($5,$6),4326)::geography) RETURNING id`;
+      values = [point.name, point.contact_note ?? null, point.operating_note ?? null, coordinates[0], coordinates[1]];
+      sql = `INSERT INTO relief_point (name,contact_note,operating_note,location)
+             VALUES ($1,$2,$3,ST_SetSRID(ST_MakePoint($4,$5),4326)::geography) RETURNING id`;
     } else {
       const vehicle = dto as CreateVehicleDto;
-      values = [dto.organization_id, vehicle.identifier, vehicle.vehicle_type, vehicle.capacity ?? null, vehicle.capacity_unit ?? null];
-      sql = `INSERT INTO vehicle (organization_id,identifier,vehicle_type,capacity,capacity_unit)
-             VALUES ($1,$2,$3,$4::numeric,$5) RETURNING id`;
+      values = [vehicle.identifier, vehicle.vehicle_type, vehicle.capacity ?? null, vehicle.capacity_unit ?? null];
+      sql = `INSERT INTO vehicle (identifier,vehicle_type,capacity,capacity_unit)
+             VALUES ($1,$2,$3::numeric,$4) RETURNING id`;
     }
     const rows = await manager.query(sql, values) as Array<{ id: string }>;
     const id = rows[0]?.id;

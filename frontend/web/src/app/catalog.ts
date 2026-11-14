@@ -122,17 +122,10 @@ export const pages: Record<Workspace, Page[]> = {
     { id: 'users', title: 'Người dùng', icon: 'users', service: 'identity', path: '/users' },
     { id: 'teams', title: 'Đội cứu hộ', icon: 'team', service: 'response', path: '/teams' },
     {
-      id: 'organizations',
-      title: 'Tổ chức',
-      icon: 'organization',
-      service: 'identity',
-      path: '/organizations',
-    },
-    {
       id: 'audit',
       title: 'Lịch sử thao tác',
       icon: 'audit',
-      note: 'Xem lịch sử thay đổi người dùng, quyền truy cập và tổ chức.',
+      note: 'Xem lịch sử thay đổi người dùng và quyền truy cập.',
     },
   ],
 };

@@ -18,6 +18,8 @@ import { RequestOperationsPersistenceService } from './request-operations.persis
 import { canAccessRequest } from '../requests/request-scope';
 
 type ScoredQueueRow = QueueRow & {
+  handled_by: string | null;
+  handled_at: Date | string | null;
   description: string | null;
   children_count: number | null;
   elderly_count: number | null;
@@ -61,6 +63,7 @@ export class RequestOperationsQueriesService {
     if (query.from) add((index) => `r.received_at >= $${index}::timestamptz`, query.from);
     if (query.to) add((index) => `r.received_at <= $${index}::timestamptz`, query.to);
     if (query.declared_danger) add((index) => `r.reporter_declared_danger=$${index}`, query.declared_danger === 'true');
+    if (query.unassigned === 'true') conditions.push('r.campaign_id IS NULL');
     const bbox = parseBbox(query.bbox);
     if (bbox) {
       values.push(...bbox);
@@ -74,7 +77,7 @@ export class RequestOperationsQueriesService {
     conditions.push(`($${values.length - 1}::timestamptz IS NULL OR (r.received_at,r.id)<($${values.length - 1}::timestamptz,$${values.length}::uuid))`);
     values.push(limit + 1);
     const rows = await this.dataSource.query(
-      `SELECT r.id,r.tracking_code,r.status,r.priority,r.review_lane,r.report_mode,r.incident_category_code AS category,
+      `SELECT r.id,r.tracking_code,r.status,r.priority,r.handled_by,r.handled_at,r.review_lane,r.report_mode,r.incident_category_code AS category,
               r.description,r.needs_rescue,r.needs_relief_supplies,r.work_cycle,
               s.people_affected,s.children_count,s.elderly_count,r.received_at,
               to_char(r.received_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_received_at,
@@ -96,6 +99,7 @@ export class RequestOperationsQueriesService {
     ) as ScoredQueueRow[];
     const more = rows.length > limit;
     const page = rows.slice(0, limit);
+    const holderNames = await this.holderNames(page.map((row) => row.handled_by));
     const items = page.map((row) => {
       const facts = {
         incidentCategoryCode: row.category,
@@ -116,6 +120,8 @@ export class RequestOperationsQueriesService {
       } : undefined, facts, Number(row.work_cycle)));
       return {
         id: row.id, tracking_code: row.tracking_code, status: row.status, priority: row.priority,
+        handled_by: row.handled_by ?? null, handled_at: row.handled_at ? toIso(row.handled_at) : null,
+        handled_by_name: row.handled_by ? holderNames.get(row.handled_by) ?? null : null,
         review_lane: row.review_lane, category: row.category, people_affected: row.people_affected,
         received_at: toIso(row.received_at), declared_danger: row.declared_danger,
         priority_advisory: ruleView,
@@ -200,7 +206,14 @@ export class RequestOperationsQueriesService {
       recent_request_ids: asObject(event.payload).recent_request_ids ?? [],
       rejected_request_ids: asObject(event.payload).rejected_request_ids ?? [],
     }));
+    const [claim] = await this.dataSource.query(
+      'SELECT handled_by,handled_at FROM assistance_request WHERE id=$1', [row.id],
+    ) as Array<{ handled_by: string | null; handled_at: Date | string | null }>;
+    const holderName = claim?.handled_by ? (await this.holderNames([claim.handled_by])).get(claim.handled_by) ?? null : null;
     return {
+      handled_by: claim?.handled_by ?? null,
+      handled_at: claim?.handled_at ? toIso(claim.handled_at) : null,
+      handled_by_name: holderName,
       id: row.id, tracking_code: row.tracking_code, report_mode: row.report_mode,
       status: row.status, version: Number(row.version), work_cycle: Number(row.work_cycle),
       priority: row.priority, priority_basis: row.priority_basis, review_lane: row.review_lane,
@@ -215,7 +228,7 @@ export class RequestOperationsQueriesService {
         proxyFlagCount: Array.isArray(flagViews[0]?.flags) ? (flagViews[0]!.flags as unknown[]).length : 0, peopleAffected: countOrNull(subject.people_affected), declaredDanger: row.reporter_declared_danger,
         ruleAdvisory: requestPriorityAdvisory, aiAdvisory: aiView,
         pendingSupplement: await hasPendingSupplement(this.dataSource, row.id),
-        possibleDuplicate: await hasPossibleDuplicate(this.dataSource, row.id),
+        possibleDuplicate: await hasPossibleDuplicate(this.dataSource, row.id, session.grants),
       }),
       reporter: { user_id: row.reporter_user_id, name: row.reporter_name, contact_phone: row.reporter_contact_phone },
       subject: {
@@ -347,12 +360,24 @@ export class RequestOperationsQueriesService {
 
   private async scopedRequestSummary(requestId: string, session: ReporterSession): Promise<Array<Record<string, unknown>>> {
     const rows = await this.dataSource.query(
-      `SELECT id,tracking_code,status,campaign_id,organization_id FROM assistance_request WHERE id=$1`, [requestId],
-    ) as Array<Record<string, unknown> & { organization_id: string; campaign_id: string | null }>;
+      `SELECT id,tracking_code,status,campaign_id FROM assistance_request WHERE id=$1`, [requestId],
+    ) as Array<Record<string, unknown> & { campaign_id: string | null }>;
     const row = rows[0];
     if (!row) return [];
     if (!canAccessRequest(session, 'REQUEST_DETAIL_READ', row)) return [];
     return [{ id: row.id, tracking_code: row.tracking_code, status: row.status, campaign_id: row.campaign_id }];
+  }
+
+  /** Resolves display names of claim holders through Identity; a lookup failure leaves names empty rather than failing the read. */
+  private async holderNames(ids: ReadonlyArray<string | null>): Promise<Map<string, string>> {
+    const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))];
+    if (unique.length === 0) return new Map();
+    try {
+      const profiles = await this.sessions.lookupUsers(unique);
+      return new Map(profiles.map(({ id, display_name }) => [id, display_name]));
+    } catch {
+      return new Map();
+    }
   }
 
   private async staffEvents(

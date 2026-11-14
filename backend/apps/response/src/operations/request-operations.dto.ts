@@ -49,6 +49,9 @@ export class RequestQueueQueryDto extends RequestOperationPageDto {
 
   @IsOptional() @IsIn(['true', 'false'])
   declare overdue?: string;
+
+  @IsOptional() @IsIn(['true', 'false'])
+  declare unassigned?: string;
 }
 
 export class RequestVersionDto {

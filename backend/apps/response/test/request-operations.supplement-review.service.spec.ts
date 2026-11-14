@@ -9,14 +9,13 @@ const requestId = '40000000-0000-4000-8000-000000000001';
 const eventId = '50000000-0000-4000-8000-000000000001';
 const reviewId = '50000000-0000-4000-8000-000000000002';
 const userId = '60000000-0000-4000-8000-000000000001';
-const organizationId = '70000000-0000-4000-8000-000000000001';
 
 function fixture(options: { locked?: boolean } = {}) {
   const row: OperationRequestRow = {
     id: requestId, tracking_code: '01HJKMNPQR', tracking_secret_hash: null, reporter_user_id: userId,
     reporter_name: null, reporter_contact_phone: null, source_ip_hash: null, report_mode: 'SELF',
     status: 'IN_PROGRESS', version: 4, review_lane: 'NORMAL', received_at: '2026-10-26T00:00:00Z',
-    verifying_since: null, organization_id: organizationId, campaign_id: null,
+    verifying_since: null, campaign_id: null,
     description: 'Nước ngập.', incident_category_code: 'FLOOD', reporter_declared_danger: false,
     needs_rescue: true, needs_relief_supplies: false, priority: 'P1', priority_basis: 'LIFE_THREATENING',
     work_cycle: 1, canonical_request_id: null,
@@ -36,14 +35,13 @@ function fixture(options: { locked?: boolean } = {}) {
     }),
   };
   const sessions = { require: async () => ({ userId, grants: [{
-    role_code: 'COORDINATOR', scope_type: 'ORGANIZATION',
-    organization_id: organizationId,
-  }] }) };
+    role_code: 'COORDINATOR', scope_type: 'SYSTEM',
+    }] }) };
   const idempotency = { execute: async (_source: unknown, command: IdempotentCommand<Record<string, unknown>>) => {
     const outcome = await command.execute(manager as never);
     return { status: outcome.status, value: outcome.value, replay: false };
   } };
-  const runner = new RequestOperationsCommandRunner({} as never, idempotency as never);
+  const runner = new RequestOperationsCommandRunner({} as never, idempotency as never, { assertCanCoordinate: jest.fn(async () => undefined) } as never);
   const service = new RequestOperationsSupplementReviewService(sessions as never, new RequestOperationsPersistenceService(), runner);
   const review = (decision: 'ACCEPT' | 'REJECT' = 'ACCEPT') => service.reviewSupplement(requestId, eventId, {
     expected_version: 4, decision, reason: 'Đã xác minh vị trí cập nhật.',

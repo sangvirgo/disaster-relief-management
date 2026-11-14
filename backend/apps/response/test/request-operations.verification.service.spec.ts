@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import type { Grant } from '@c48/identity-contracts/permissions';
 import type { IdempotentCommand } from '@c48/technical/idempotency/idempotency';
 import { RequestOperationsCommandRunner } from '../src/operations/request-operations.command-runner.service';
 import { RequestOperationsPersistenceService } from '../src/operations/request-operations.persistence.service';
@@ -7,15 +8,14 @@ import type { OperationRequestRow } from '../src/operations/request-operations.t
 
 const requestId = '40000000-0000-4000-8000-000000000001';
 const userId = '60000000-0000-4000-8000-000000000001';
-const organizationId = '70000000-0000-4000-8000-000000000001';
 const evidenceId = '90000000-0000-4000-8000-000000000001';
 
-function fixture(options: { reportMode?: 'SELF' | 'PROXY'; evidenceReady?: boolean } = {}) {
+function fixture(options: { reportMode?: 'SELF' | 'PROXY'; evidenceReady?: boolean; grants?: Grant[] } = {}) {
   const row: OperationRequestRow = {
     id: requestId, tracking_code: '01HJKMNPQR', tracking_secret_hash: null, reporter_user_id: null,
     reporter_name: null, reporter_contact_phone: null, source_ip_hash: null, report_mode: options.reportMode ?? 'SELF',
     status: 'VERIFYING', version: 2, review_lane: 'NORMAL', received_at: '2026-10-26T00:00:00Z',
-    verifying_since: '2026-10-26T00:01:00Z', organization_id: organizationId, campaign_id: null,
+    verifying_since: '2026-10-26T00:01:00Z', campaign_id: null,
     description: 'Nước ngập.', incident_category_code: 'FLOOD', reporter_declared_danger: false,
     needs_rescue: true, needs_relief_supplies: false, priority: null, priority_basis: null,
     work_cycle: 1, canonical_request_id: null, attribution_locked_at: null,
@@ -34,12 +34,12 @@ function fixture(options: { reportMode?: 'SELF' | 'PROXY'; evidenceReady?: boole
       return [];
     }),
   };
-  const sessions = { require: async () => ({ userId, grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId }] }) };
+  const sessions = { require: async () => ({ userId, grants: options.grants ?? [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }] }) };
   const idempotency = { execute: async (_source: unknown, command: IdempotentCommand<Record<string, unknown>>) => {
     const outcome = await command.execute(manager as never);
     return { status: outcome.status, value: outcome.value, replay: false };
   } };
-  const runner = new RequestOperationsCommandRunner({} as never, idempotency as never);
+  const runner = new RequestOperationsCommandRunner({} as never, idempotency as never, { assertCanCoordinate: jest.fn(async () => undefined) } as never);
   const service = new RequestOperationsVerificationService({} as never, sessions as never, new RequestOperationsPersistenceService(), runner);
   const verify = (body: Record<string, unknown>) => service.verify(requestId, { expected_version: 2, ...body } as never, '80000000-0000-4000-8000-000000000001', {} as never);
   return { manager, verify };
@@ -57,6 +57,16 @@ describe('request verification without a phone-contact step', () => {
     const { verify } = fixture({ evidenceReady: true });
     const result = await verify({ basis: 'EVIDENCE_REVIEWED', source_refs: { evidence_ids: [evidenceId] } });
     expect(result.value.status).toBe('VERIFIED');
+  });
+
+  it('denies campaign-only verification of an unassigned request before writing', async () => {
+    const { manager, verify } = fixture({ grants: [{
+      role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: '00000000-0000-4000-8000-000000000009',
+    }] });
+
+    await expect(verify({ basis: 'EVIDENCE_REVIEWED', reason: 'Đã đối chiếu.' }))
+      .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+    expect(manager.query.mock.calls.filter(([sql]) => /^\s*(INSERT|UPDATE)/u.test(sql))).toEqual([]);
   });
 
   it('rejects an empty review: no evidence and no stated reason', async () => {

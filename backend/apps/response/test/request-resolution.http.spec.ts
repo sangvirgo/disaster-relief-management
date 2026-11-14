@@ -21,8 +21,7 @@ describe('RequestResolutionController HTTP', () => {
     operation: jest.fn(async () => ({ operation_id: operationId, state: 'COMPLETED' })),
     internalOperation: jest.fn(async () => ({
       id: operationId, kind: 'RESOLUTION', state: 'PENDING', request_id: requestId, work_cycle: 2,
-      request_status: 'RESOLVING', organization_id: '70000000-0000-4000-8000-000000000001',
-      campaign_id: null, outcome_basis: 'RESCUE_COMPLETED',
+      request_status: 'RESOLVING', campaign_id: null, outcome_basis: 'RESCUE_COMPLETED',
     })),
   };
   const lifecycle = {

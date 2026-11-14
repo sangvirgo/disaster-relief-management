@@ -37,24 +37,24 @@ INSERT INTO incident_category_skill (category_code, skill_code) VALUES
   ('FLOOD', 'BOAT'), ('TRAPPED', 'BOAT'), ('MEDICAL', 'FIRST_AID'), ('LANDSLIDE', 'CLIMBING')
 ON CONFLICT DO NOTHING;
 
-INSERT INTO rescue_team (id, organization_id, name, team_kind, reporting_mode, external_contact_note,
+INSERT INTO rescue_team (id, name, team_kind, reporting_mode, external_contact_note,
                          readiness_required, affiliation_verified_at, affiliation_verified_by, availability) VALUES
-  ('00000000-0000-4000-8000-0000000000a9', '00000000-0000-4000-8000-000000000002',
+  ('00000000-0000-4000-8000-0000000000a9',
    'Đội xuồng cứu hộ Bắc (demo)', 'VOLUNTEER', 'APP', NULL, false, now() - interval '2 days',
    '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
-  ('00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-000000000002',
+  ('00000000-0000-4000-8000-0000000000aa',
    'Đội sơ cứu lưu động Nam (demo)', 'VOLUNTEER', 'APP', NULL, false, now() - interval '2 days',
    '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
-  ('00000000-0000-4000-8000-0000000000ab', '00000000-0000-4000-8000-000000000001',
+  ('00000000-0000-4000-8000-0000000000ab',
    'Đội hỗ trợ cơ động Trung (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập.', false,
    now() - interval '2 days', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
-  ('00000000-0000-4000-8000-0000000000ac', '00000000-0000-4000-8000-000000000001',
+  ('00000000-0000-4000-8000-0000000000ac',
    'Đội y tế cộng đồng Bắc (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập.', false,
    now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
-  ('00000000-0000-4000-8000-0000000000ad', '00000000-0000-4000-8000-000000000001',
+  ('00000000-0000-4000-8000-0000000000ad',
    'Đội xuồng cứu hộ Nam (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội xuồng giả lập.', false,
    now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
-  ('00000000-0000-4000-8000-0000000000ae', '00000000-0000-4000-8000-000000000001',
+  ('00000000-0000-4000-8000-0000000000ae',
    'Đội cứu hộ cơ động Bắc (demo)', 'VOLUNTEER', 'APP', NULL, false,
    now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE')
 ON CONFLICT DO NOTHING;
@@ -62,14 +62,13 @@ ON CONFLICT DO NOTHING;
 INSERT INTO team_member (team_id, user_id, member_role)
 SELECT team.id, fixture.user_id, fixture.member_role
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000114'::uuid, 'LEADER'),
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000115'::uuid, 'MEMBER'),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000116'::uuid, 'LEADER'),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000117'::uuid, 'MEMBER'),
-    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000119'::uuid, 'LEADER')
-  ) AS fixture(team_id, team_name, organization_id, team_kind, reporting_mode, user_id, member_role)
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000114'::uuid, 'LEADER'),
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000115'::uuid, 'MEMBER'),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000116'::uuid, 'LEADER'),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000117'::uuid, 'MEMBER'),
+    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc (demo)', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000119'::uuid, 'LEADER')
+  ) AS fixture(team_id, team_name, team_kind, reporting_mode, user_id, member_role)
   JOIN rescue_team team ON team.id = fixture.team_id AND team.name = fixture.team_name
-                       AND team.organization_id = fixture.organization_id
                        AND team.team_kind = fixture.team_kind AND team.reporting_mode = fixture.reporting_mode
  WHERE true
 ON CONFLICT DO NOTHING;
@@ -77,19 +76,18 @@ ON CONFLICT DO NOTHING;
 INSERT INTO team_skill (team_id, skill_code)
 SELECT team.id, fixture.skill_code
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'VOLUNTEER', 'APP', 'BOAT'),
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'VOLUNTEER', 'APP', 'FIRST_AID'),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'VOLUNTEER', 'APP', 'FIRST_AID'),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'VOLUNTEER', 'APP', 'TRUCK_DRIVER'),
-    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'GOVERNMENT', 'COORDINATOR', 'RADIO'),
-    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'GOVERNMENT', 'COORDINATOR', 'TRUCK_DRIVER'),
-    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'GOVERNMENT', 'COORDINATOR', 'FIRST_AID'),
-    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'GOVERNMENT', 'COORDINATOR', 'CLIMBING'),
-    ('00000000-0000-4000-8000-0000000000ad'::uuid, 'Đội xuồng cứu hộ Nam (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'GOVERNMENT', 'COORDINATOR', 'BOAT'),
-    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'VOLUNTEER', 'APP', 'BOAT')
-  ) AS fixture(team_id, team_name, organization_id, team_kind, reporting_mode, skill_code)
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', 'VOLUNTEER', 'APP', 'BOAT'),
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', 'VOLUNTEER', 'APP', 'FIRST_AID'),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', 'VOLUNTEER', 'APP', 'FIRST_AID'),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', 'VOLUNTEER', 'APP', 'TRUCK_DRIVER'),
+    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung (demo)', 'GOVERNMENT', 'COORDINATOR', 'RADIO'),
+    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung (demo)', 'GOVERNMENT', 'COORDINATOR', 'TRUCK_DRIVER'),
+    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc (demo)', 'GOVERNMENT', 'COORDINATOR', 'FIRST_AID'),
+    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc (demo)', 'GOVERNMENT', 'COORDINATOR', 'CLIMBING'),
+    ('00000000-0000-4000-8000-0000000000ad'::uuid, 'Đội xuồng cứu hộ Nam (demo)', 'GOVERNMENT', 'COORDINATOR', 'BOAT'),
+    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc (demo)', 'VOLUNTEER', 'APP', 'BOAT')
+  ) AS fixture(team_id, team_name, team_kind, reporting_mode, skill_code)
   JOIN rescue_team team ON team.id = fixture.team_id AND team.name = fixture.team_name
-                       AND team.organization_id = fixture.organization_id
                        AND team.team_kind = fixture.team_kind AND team.reporting_mode = fixture.reporting_mode
  WHERE true
 ON CONFLICT DO NOTHING;
@@ -98,28 +96,27 @@ INSERT INTO team_position (team_id, location, accuracy_m, captured_at, source, s
 SELECT team.id, ST_SetSRID(ST_MakePoint(fixture.longitude, fixture.latitude), 4326)::geography,
        NULL, now() - interval '5 minutes', 'COORDINATOR_REPORTED', '00000000-0000-4000-8000-000000000118'
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'VOLUNTEER', 'APP', 105.8500::float8, 21.0300::float8),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', '00000000-0000-4000-8000-000000000002'::uuid, 'VOLUNTEER', 'APP', 106.7000::float8, 10.7800::float8),
-    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'GOVERNMENT', 'COORDINATOR', 107.6000::float8, 16.0700::float8),
-    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'GOVERNMENT', 'COORDINATOR', 105.8700::float8, 21.0500::float8),
-    ('00000000-0000-4000-8000-0000000000ad'::uuid, 'Đội xuồng cứu hộ Nam (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'GOVERNMENT', 'COORDINATOR', 106.7000::float8, 10.7800::float8),
-    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc (demo)', '00000000-0000-4000-8000-000000000001'::uuid, 'VOLUNTEER', 'APP', 105.8600::float8, 21.0400::float8)
-  ) AS fixture(team_id, team_name, organization_id, team_kind, reporting_mode, longitude, latitude)
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', 'VOLUNTEER', 'APP', 105.8500::float8, 21.0300::float8),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', 'VOLUNTEER', 'APP', 106.7000::float8, 10.7800::float8),
+    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung (demo)', 'GOVERNMENT', 'COORDINATOR', 107.6000::float8, 16.0700::float8),
+    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc (demo)', 'GOVERNMENT', 'COORDINATOR', 105.8700::float8, 21.0500::float8),
+    ('00000000-0000-4000-8000-0000000000ad'::uuid, 'Đội xuồng cứu hộ Nam (demo)', 'GOVERNMENT', 'COORDINATOR', 106.7000::float8, 10.7800::float8),
+    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc (demo)', 'VOLUNTEER', 'APP', 105.8600::float8, 21.0400::float8)
+  ) AS fixture(team_id, team_name, team_kind, reporting_mode, longitude, latitude)
   JOIN rescue_team team ON team.id = fixture.team_id AND team.name = fixture.team_name
-                       AND team.organization_id = fixture.organization_id
                        AND team.team_kind = fixture.team_kind AND team.reporting_mode = fixture.reporting_mode
  WHERE true
 ON CONFLICT DO NOTHING;
 
 -- Three additional APP-led northern teams for the terrain-rescue demo.
 -- Positions are initial synthetic fixtures; leaders must refresh them after 30 minutes.
-INSERT INTO rescue_team (id, organization_id, name, team_kind, reporting_mode,
+INSERT INTO rescue_team (id, name, team_kind, reporting_mode,
                          readiness_required, affiliation_verified_at, affiliation_verified_by, availability) VALUES
-  ('00000000-0000-4000-8000-0000000000af', '00000000-0000-4000-8000-000000000001',
+  ('00000000-0000-4000-8000-0000000000af',
    'Đội cứu hộ địa hình Bắc 1 (demo)', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
-  ('00000000-0000-4000-8000-0000000000b0', '00000000-0000-4000-8000-000000000001',
+  ('00000000-0000-4000-8000-0000000000b0',
    'Đội cứu hộ địa hình Bắc 2 (demo)', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
-  ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-000000000001',
+  ('00000000-0000-4000-8000-0000000000b1',
    'Đội cứu hộ đa năng Bắc (demo)', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE')
 ON CONFLICT DO NOTHING;
 
@@ -131,7 +128,6 @@ SELECT t.id, fixture.leader_id, 'LEADER'
     ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc (demo)', '00000000-0000-4000-8000-000000000122'::uuid)
   ) AS fixture(team_id, team_name, leader_id)
   JOIN rescue_team t ON t.id=fixture.team_id AND t.name=fixture.team_name
-    AND t.organization_id='00000000-0000-4000-8000-000000000001'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO team_skill (team_id, skill_code)
@@ -144,7 +140,6 @@ SELECT t.id, fixture.skill_code
     ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc (demo)', 'BOAT')
   ) AS fixture(team_id, team_name, skill_code)
   JOIN rescue_team t ON t.id=fixture.team_id AND t.name=fixture.team_name
-    AND t.organization_id='00000000-0000-4000-8000-000000000001'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO team_position (team_id, location, accuracy_m, captured_at, source, set_by_user_id)
@@ -156,15 +151,14 @@ SELECT t.id, ST_SetSRID(ST_MakePoint(fixture.longitude, fixture.latitude), 4326)
     ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc (demo)', 105.8500::float8, 21.0350::float8)
   ) AS fixture(team_id, team_name, longitude, latitude)
   JOIN rescue_team t ON t.id=fixture.team_id AND t.name=fixture.team_name
-    AND t.organization_id='00000000-0000-4000-8000-000000000001'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO assistance_request (id, tracking_code, tracking_secret_hash, campaign_id, incident_category_code, report_mode,
-                                reporter_user_id, reporter_name, reporter_contact_phone, description, organization_id,
+                                reporter_user_id, reporter_name, reporter_contact_phone, description,
                                 status, verifying_since, received_at)
 SELECT fixture.id, fixture.tracking_code, fixture.tracking_secret_hash, fixture.campaign_id, fixture.category_code, 'SELF',
        fixture.reporter_user_id, fixture.reporter_name, fixture.phone, fixture.description,
-       '00000000-0000-4000-8000-000000000001', fixture.status::request_status, fixture.verifying_since, fixture.received_at
+       fixture.status::request_status, fixture.verifying_since, fixture.received_at
   FROM (VALUES
     ('00000000-0000-4000-8000-00000000f101'::uuid, 'C48SEED0001', NULL::text, '00000000-0000-4000-8000-0000000000c3'::uuid, 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '3 hours', 'Ngập vào sân nhà, cần hỗ trợ di chuyển đồ dùng.', '0900000301', '00000000-0000-4000-8000-000000000113'::uuid, 'Người dân 3 (demo)'),
     ('00000000-0000-4000-8000-00000000f102'::uuid, 'C48SEED0002', 'demo$seed-expansion$0002', '00000000-0000-4000-8000-0000000000c4'::uuid, 'STORM', 'SUBMITTED', NULL::timestamptz, now() - interval '160 minutes', 'Mái tôn bị tốc sau gió lớn, gia đình đang ở nơi an toàn.', '0900000302', NULL::uuid, 'Người báo 02 (demo)'),
@@ -181,7 +175,6 @@ SELECT fixture.id, fixture.tracking_code, fixture.tracking_secret_hash, fixture.
   ) AS fixture(id, tracking_code, tracking_secret_hash, campaign_id, category_code, status, verifying_since,
                received_at, description, phone, reporter_user_id, reporter_name)
   JOIN campaign ON campaign.id = fixture.campaign_id
-               AND campaign.organization_id = '00000000-0000-4000-8000-000000000001'
                AND campaign.name = CASE fixture.campaign_id
                  WHEN '00000000-0000-4000-8000-0000000000c3'::uuid THEN 'Hỗ trợ khẩn cấp Nam'
                  WHEN '00000000-0000-4000-8000-0000000000c4'::uuid THEN 'Tiếp tế vùng duyên hải Trung'

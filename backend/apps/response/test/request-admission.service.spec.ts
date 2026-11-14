@@ -5,7 +5,6 @@ import { RequestAdmissionService } from '../src/operations/request-admission.ser
 import type { ReporterSession } from '../src/requests/reporter-session';
 
 const requestId = '11111111-1111-4111-8111-111111111111';
-const organizationId = '22222222-2222-4222-8222-222222222222';
 const actorId = '33333333-3333-4333-8333-333333333333';
 
 function setup(overrides: Partial<{
@@ -22,7 +21,6 @@ function setup(overrides: Partial<{
     status: overrides.status ?? 'TRIAGED',
     work_cycle: overrides.workCycle ?? 2,
     version: overrides.version ?? 4,
-    organization_id: organizationId,
     campaign_id: null,
     attribution_locked_at: overrides.lockedAt ?? null,
     logistics_admitted_at: overrides.admittedAt ?? null,
@@ -47,8 +45,7 @@ function setup(overrides: Partial<{
     require: jest.fn().mockResolvedValue({
       userId: actorId,
       grants: overrides.grants ?? [{
-        role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId,
-        campaign_id: null,
+        role_code: 'COORDINATOR', scope_type: 'SYSTEM', campaign_id: null,
       }],
     }),
   };
@@ -63,7 +60,6 @@ describe('RequestAdmissionService', () => {
       request_id: requestId,
       work_cycle: 2,
       status: 'TRIAGED',
-      organization_id: organizationId,
       campaign_id: null,
       version: 5,
     });
@@ -79,7 +75,7 @@ describe('RequestAdmissionService', () => {
 
     await expect(service.admit(requestId, 2, {} as Request)).resolves.toMatchObject({
       work_cycle: 2, status: 'IN_PROGRESS', version: 8,
-      organization_id: organizationId, campaign_id: null,
+      campaign_id: null,
     });
 
     expect(calls).toHaveLength(2);
@@ -96,7 +92,7 @@ describe('RequestAdmissionService', () => {
 
   it('rejects a live actor without request attribution scope', async () => {
     const { service, manager } = setup({ grants: [{
-      role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: '44444444-4444-4444-8444-444444444444',
+      role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: '22222222-2222-4222-8222-222222222222',
     }] });
 
     await expect(service.admit(requestId, 2, {} as Request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });

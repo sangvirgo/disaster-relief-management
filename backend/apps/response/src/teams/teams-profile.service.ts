@@ -50,7 +50,7 @@ export class TeamsProfileService {
 
   async create(dto: CreateTeamDto, key: string, request: TeamCommandRequest): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', { organizationId: dto.organization_id })) {
+    if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', { campaignId: null })) {
       throw new AppError('FORBIDDEN', { status: 403 });
     }
 
@@ -64,7 +64,7 @@ export class TeamsProfileService {
 
     const skillCodes = [...(dto.skill_codes ?? [])].sort();
     await this.assertSkills(skillCodes);
-    if (dto.leader_user_id) await this.assertEligibleLeader(dto.leader_user_id, dto.organization_id);
+    if (dto.leader_user_id) await this.assertEligibleLeader(dto.leader_user_id);
 
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `response.team:create:${session.userId}`,
@@ -75,9 +75,9 @@ export class TeamsProfileService {
       execute: async (manager) => {
         const inserted = await manager.query(
           `INSERT INTO rescue_team
-             (organization_id,name,team_kind,reporting_mode,external_contact_note)
-           VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-          [dto.organization_id, name, dto.team_kind, dto.reporting_mode, dto.external_contact_note ?? null],
+             (name,team_kind,reporting_mode,external_contact_note)
+           VALUES ($1,$2,$3,$4) RETURNING id`,
+          [name, dto.team_kind, dto.reporting_mode, dto.external_contact_note ?? null],
         ) as Array<{ id: string }>;
         const teamId = inserted[0]?.id;
         if (!teamId) throw new AppError('INTERNAL_ERROR', { status: 500 });
@@ -222,7 +222,7 @@ export class TeamsProfileService {
       ) as unknown[] : [];
       if (!leaders.length) throw new AppError('FORBIDDEN', { status: 403 });
     } else {
-      if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', { organizationId: team.organization_id })) {
+      if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', { campaignId: null })) {
         throw new AppError('FORBIDDEN', { status: 403 });
       }
       if (!dto.reported_by?.trim()) throw new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: {
@@ -237,8 +237,8 @@ export class TeamsProfileService {
     if (rows.length !== codes.length) throw new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: { skill_codes: ['Mã kỹ năng không hợp lệ hoặc không tồn tại.'] } });
   }
 
-  private async assertEligibleLeader(userId: string, organizationId: string): Promise<void> {
-    const result = await this.sessions.teamLeaderEligibility(userId, organizationId);
+  private async assertEligibleLeader(userId: string): Promise<void> {
+    const result = await this.sessions.teamLeaderEligibility(userId);
     if (result.eligible) return;
     if (result.reason === 'USER_NOT_FOUND') throw new AppError('NOT_FOUND', { status: 404 });
     if (result.reason === 'USER_INACTIVE') {
@@ -248,7 +248,7 @@ export class TeamsProfileService {
   }
 
   private async assertCanManage(team: TeamRow, session: ReporterSession, queryable: Pick<DataSource | EntityManager, 'query'> = this.dataSource): Promise<void> {
-    if (hasPermission(session.grants, 'TEAM_MANAGE_ANY', { organizationId: team.organization_id })) return;
+    if (hasPermission(session.grants, 'TEAM_MANAGE_ANY', { campaignId: null })) return;
     const leaders = await queryable.query(
       `SELECT 1 FROM team_member WHERE team_id=$1 AND user_id=$2 AND member_role='LEADER' AND left_at IS NULL LIMIT 1`,
       [team.id, session.userId],

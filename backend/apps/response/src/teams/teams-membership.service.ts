@@ -286,7 +286,7 @@ export class TeamsMembershipService {
       requestHash: canonicalRequestHash({ team_id: teamId, actor_user_id: session.userId, dto }),
       databaseErrorMappings: memberErrorMappings,
       execute: async (manager) => {
-        await this.assertEligibleLeader(dto.user_id, team.organization_id);
+        await this.assertEligibleLeader(dto.user_id);
         const lockedTeam = await this.findTeam(manager, teamId, true);
         this.assertCanTransfer(lockedTeam, session);
         validateExpectedVersion(Number(lockedTeam.version), dto.expected_version);
@@ -359,9 +359,7 @@ export class TeamsMembershipService {
     session: ReporterSession,
     queryable: Pick<DataSource | EntityManager, 'query'> = this.dataSource,
   ): Promise<boolean> {
-    if (hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
-      organizationId: team.organization_id,
-    })) return true;
+    if (hasPermission(session.grants, 'TEAM_MANAGE_ANY', { campaignId: null })) return true;
     const leaders = await queryable.query(
       `SELECT 1 FROM team_member WHERE team_id=$1 AND user_id=$2 AND member_role='LEADER' AND left_at IS NULL LIMIT 1`,
       [team.id, session.userId],
@@ -370,9 +368,7 @@ export class TeamsMembershipService {
   }
 
   private async assertCanRead(team: TeamRow, session: ReporterSession): Promise<void> {
-    if (hasPermission(session.grants, 'TEAM_READ', {
-      organizationId: team.organization_id,
-    })) return;
+    if (hasPermission(session.grants, 'TEAM_READ', { campaignId: null })) return;
     const members = await this.dataSource.query(
       'SELECT 1 FROM team_member WHERE team_id=$1 AND user_id=$2 AND left_at IS NULL LIMIT 1',
       [team.id, session.userId],
@@ -381,13 +377,11 @@ export class TeamsMembershipService {
   }
 
   private assertCanTransfer(team: TeamRow, session: ReporterSession): void {
-    if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', {
-      organizationId: team.organization_id,
-    })) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!hasPermission(session.grants, 'TEAM_MANAGE_ANY', { campaignId: null })) throw new AppError('FORBIDDEN', { status: 403 });
   }
 
-  private async assertEligibleLeader(userId: string, organizationId: string): Promise<void> {
-    const result = await this.sessions.teamLeaderEligibility(userId, organizationId);
+  private async assertEligibleLeader(userId: string): Promise<void> {
+    const result = await this.sessions.teamLeaderEligibility(userId);
     if (result.eligible) return;
     if (result.reason === 'USER_NOT_FOUND') throw new AppError('NOT_FOUND', { status: 404 });
     throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });

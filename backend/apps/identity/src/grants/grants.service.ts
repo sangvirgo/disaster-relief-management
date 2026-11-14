@@ -14,7 +14,6 @@ interface GrantRow {
   user_id: string;
   role_code: string;
   scope_type: string;
-  organization_id: string | null;
   campaign_id: string | null;
   created_at: Date;
   revoked_at: Date | null;
@@ -26,7 +25,7 @@ function publicGrant(row: GrantRow): Record<string, unknown> {
 
 async function readGrant(manager: Pick<EntityManager, 'query'>, id: string): Promise<Record<string, unknown>> {
   const rows = await manager.query(
-    `SELECT id, user_id, role_code, scope_type, organization_id, campaign_id, created_at, revoked_at
+    `SELECT id, user_id, role_code, scope_type, campaign_id, created_at, revoked_at
        FROM role_grant WHERE id = $1`, [id],
   ) as GrantRow[];
   if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
@@ -62,7 +61,7 @@ export class GrantsService {
     }
     values.push(Math.min(dto.limit ?? 50, 100) + 1);
     const rows = await this.dataSource.query(
-      `SELECT id, user_id, role_code, scope_type, organization_id, campaign_id, created_at, revoked_at
+      `SELECT id, user_id, role_code, scope_type, campaign_id, created_at, revoked_at
          FROM role_grant WHERE ${where}
         ORDER BY (revoked_at IS NOT NULL) ASC, created_at DESC, id DESC LIMIT $${values.length}`,
       values,
@@ -82,7 +81,7 @@ export class GrantsService {
     const actorId = actor.auth!.userId;
     if (isSelfGrant(actorId, userId)) throw new AppError('FORBIDDEN', { status: 403 });
     if (!grantScopeIsValid(dto)) throw new AppError('SCOPE_INVALID', { status: 400 });
-    if (dto.scope_type === 'CAMPAIGN') await this.campaigns.assertActiveCampaign(dto.campaign_id!, dto.organization_id!);
+    if (dto.scope_type === 'CAMPAIGN') await this.campaigns.assertActiveCampaign(dto.campaign_id!);
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `user:${actorId}`, command: 'identity.grants.create', key: actor.idempotencyKey!,
       requestHash: canonicalRequestHash({ userId, ...dto }), databaseErrorMappings: { unique: { role_grant_live_uq: 'GRANT_EXISTS' } },
@@ -90,14 +89,10 @@ export class GrantsService {
         await this.support.lockAdminChanges(manager);
         await this.support.bumpAuthzVersion(manager, userId);
         await this.support.revokeSessions(manager, userId, 'ROLE_CHANGE');
-        if (dto.organization_id) {
-          const organizations = await manager.query("SELECT id FROM organization WHERE id = $1 AND status = 'ACTIVE' FOR SHARE", [dto.organization_id]) as Array<{ id: string }>;
-          if (!organizations[0]) throw new AppError('SCOPE_INVALID', { status: 400 });
-        }
         const rows = await manager.query(
-          `INSERT INTO role_grant (user_id, role_code, scope_type, organization_id, campaign_id)
-           VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-          [userId, dto.role_code, dto.scope_type, dto.organization_id ?? null, dto.campaign_id ?? null],
+          `INSERT INTO role_grant (user_id, role_code, scope_type, campaign_id)
+           VALUES ($1, $2, $3, $4) RETURNING id`,
+          [userId, dto.role_code, dto.scope_type, dto.campaign_id ?? null],
         ) as Array<{ id: string }>;
         const id = rows[0]!.id;
         const value = await readGrant(manager, id);

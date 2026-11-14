@@ -6,7 +6,6 @@ import { RequestResolutionLifecycleService } from '../src/resolution/request-res
 const requestId = '40000000-0000-4000-8000-000000000001';
 const intentId = '50000000-0000-4000-8000-000000000001';
 const userId = '60000000-0000-4000-8000-000000000001';
-const organizationId = '70000000-0000-4000-8000-000000000001';
 
 describe('RequestResolutionLifecycleService', () => {
   it('creates cancellation intent and barrier atomically before freezing Logistics', async () => {
@@ -15,7 +14,7 @@ describe('RequestResolutionLifecycleService', () => {
       query: jest.fn(async (sql: string) => {
         statements.push(sql);
         if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
-          id: requestId, status: 'IN_PROGRESS', version: 5, work_cycle: 2, organization_id: organizationId,
+          id: requestId, status: 'IN_PROGRESS', version: 5, work_cycle: 2,
           campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
         }];
         if (sql.includes('INSERT INTO resolution_intent')) return [{ id: intentId }];
@@ -24,7 +23,7 @@ describe('RequestResolutionLifecycleService', () => {
       }),
     };
     const dataSource = { query: jest.fn(async () => [{
-      id: requestId, status: 'IN_PROGRESS', version: 5, work_cycle: 2, organization_id: organizationId,
+      id: requestId, status: 'IN_PROGRESS', version: 5, work_cycle: 2,
       campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
     }]) };
     const idempotency = {
@@ -33,7 +32,7 @@ describe('RequestResolutionLifecycleService', () => {
         return { status: result.status, value: result.value, replay: false };
       }),
     };
-    const sessions = { require: jest.fn(async () => ({ userId, grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId }] })) };
+    const sessions = { require: jest.fn(async () => ({ userId, grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM',}] })) };
     const finalizer = { completePending: jest.fn(async () => true), abortIntent: jest.fn(async () => true) };
     const service = new RequestResolutionLifecycleService(dataSource as never, idempotency as never, sessions as never, finalizer as never);
 
@@ -52,14 +51,14 @@ describe('RequestResolutionLifecycleService', () => {
   it('replays the original pending cancellation response after finalization', async () => {
     const dataSource = {
       query: jest.fn(async (): Promise<unknown[]> => [{
-        id: requestId, status: 'CANCELLED', version: 7, work_cycle: 2, organization_id: organizationId,
+        id: requestId, status: 'CANCELLED', version: 7, work_cycle: 2,
         campaign_id: null, reporter_user_id: userId, logistics_admitted_at: null,
       }]),
     };
     const replayManager = {
       query: jest.fn(async () => [{
         id: intentId, request_id: requestId, kind: 'CANCELLATION', state: 'COMPLETED', version: 2,
-        work_cycle: 2, request_status: 'CANCELLED', request_version: 7, organization_id: organizationId,
+        work_cycle: 2, request_status: 'CANCELLED', request_version: 7,
         campaign_id: null,
       }]),
     };
@@ -75,8 +74,7 @@ describe('RequestResolutionLifecycleService', () => {
       }),
     };
     const sessions = { require: jest.fn(async () => ({ userId, grants: [{
-      role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId,
-    }] })) };
+      role_code: 'COORDINATOR', scope_type: 'SYSTEM', }] })) };
     const finalizer = { completePending: jest.fn(), abortIntent: jest.fn() };
     const service = new RequestResolutionLifecycleService(dataSource as never, idempotency as never, sessions as never, finalizer as never);
     const key = '80000000-0000-4000-8000-000000000002';
@@ -105,12 +103,12 @@ describe('RequestResolutionLifecycleService', () => {
       id: intentId, request_id: requestId, work_cycle: 2, kind: 'RESOLUTION', state: 'PENDING',
       actor_user_id: userId, expected_request_version: 9, previous_status: 'TRIAGED', reason: 'Hoàn tất',
       request_status: 'RESOLVING', request_version: 9, logistics_admitted_at: new Date(),
-      organization_id: organizationId, campaign_id: null,
+      campaign_id: null,
       reporter_user_id: null, outcome_basis: 'RESCUE_COMPLETED',
     };
     const operation = () => ({
       id: intentId, request_id: requestId, kind: 'RESOLUTION', state: intentState, version: 1, work_cycle: 2,
-      request_status: 'RESOLVING', request_version: 9, organization_id: organizationId,
+      request_status: 'RESOLVING', request_version: 9,
       campaign_id: null,
     });
     const manager = {
@@ -137,11 +135,10 @@ describe('RequestResolutionLifecycleService', () => {
     };
     const sessions = {
       require: jest.fn(async () => ({ userId, grants: [{
-        role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId,
-      }] })),
+        role_code: 'COORDINATOR', scope_type: 'SYSTEM', }] })),
       requestCoordinatorGrants: jest.fn(async () => [{
-        user_id: userId, role_code: 'COORDINATOR', scope_type: 'ORGANIZATION',
-        organization_id: organizationId, campaign_id: null,
+        user_id: userId, role_code: 'COORDINATOR', scope_type: 'SYSTEM',
+        campaign_id: null,
       }]),
     };
     const logistics = { seal: jest.fn(async () => { startSeal(); await sealGate; }), freeze: jest.fn(), unseal: jest.fn() };
@@ -174,7 +171,7 @@ describe('RequestResolutionLifecycleService', () => {
   it('rejects abort after the finalizer has committed the winning transition', async () => {
     const completedOperation = {
       id: intentId, request_id: requestId, kind: 'RESOLUTION', state: 'COMPLETED', version: 2, work_cycle: 2,
-      request_status: 'RESOLVED', request_version: 10, organization_id: organizationId,
+      request_status: 'RESOLVED', request_version: 10,
       campaign_id: null,
     };
     const manager = {
@@ -193,8 +190,7 @@ describe('RequestResolutionLifecycleService', () => {
     };
     const sessions = {
       require: jest.fn(async () => ({ userId, grants: [{
-        role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId,
-      }] })),
+        role_code: 'COORDINATOR', scope_type: 'SYSTEM', }] })),
     };
     const finalizer = { abortIntent: jest.fn(async () => true) };
     const service = new RequestResolutionLifecycleService(

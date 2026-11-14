@@ -5,7 +5,6 @@ import { decimalFromUnits, quantityUnits } from '../common/quantity';
 export interface DistributionContext {
   id: string;
   warehouse_id: string;
-  organization_id: string;
   warehouse_status: 'ACTIVE' | 'INACTIVE';
   relief_point_id: string | null;
   relief_point_status: 'ACTIVE' | 'INACTIVE' | null;
@@ -38,7 +37,7 @@ export async function loadDistribution(source: Queryable, id: string, lock = fal
 export async function loadDistributions(source: Queryable, ids: readonly string[], lock = false): Promise<DistributionContext[]> {
   if (ids.length === 0) return [];
   const rows = await source.query(
-    `SELECT d.id,d.warehouse_id,d.organization_id,w.status AS warehouse_status,
+    `SELECT d.id,d.warehouse_id,w.status AS warehouse_status,
             d.relief_point_id,rp.status AS relief_point_status,d.vehicle_id,v.status AS vehicle_status,
             v.capacity::text AS vehicle_capacity,v.capacity_unit AS vehicle_capacity_unit,vcu.scale AS vehicle_capacity_scale,
             d.campaign_id,d.purpose,d.status,
@@ -120,7 +119,6 @@ export function distributionView(distribution: DistributionContext, lines: reado
   return {
     id: distribution.id,
     warehouse_id: distribution.warehouse_id,
-    organization_id: distribution.organization_id,
     relief_point_id: distribution.relief_point_id,
     vehicle_id: distribution.vehicle_id,
     campaign_id: distribution.campaign_id,

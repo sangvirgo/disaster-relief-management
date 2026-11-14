@@ -6,6 +6,42 @@ Read [AGENTS.md](../../AGENTS.md), [project context](../c48-project-context.md),
 
 **Current Compose contract:** `backend/infra/compose.yaml` is the only Compose file. Integration and smoke checks run from the host against the main `c48` APIs and the primary `c48_identity`, `c48_response`, and `c48_logistics` databases. SQL checks use the existing `postgres` service. There are no test database, helper/runner container, API variant, or integration profile. Only explicit `bash scripts/db/test-db --reset` or `bash scripts/db/reset-demo --reset` may remove the `c48_pgdata` volume; both preserve `c48_minio-data` and all MinIO objects.
 
+## Organization removal and request claim — 2026-11-14 (Wave 2 and Wave 3)
+
+**Done and checked**
+- Logistics: migration `RemoveOrganizationLogistics1794787200000` (up/down) drops `organization_id` from `warehouse`, `relief_point`, `vehicle`, `donation_drive`, `donation_delivery`, `fulfillment_cycle`, `distribution`, their composite keys/FKs, and the two `*_org_guard` triggers with their functions. Scope is now SYSTEM (shared resources) or CAMPAIGN (campaign-attached drives, cycles, distributions). Stock accounting, reviewer/counter independence, and the completion guards are unchanged. Application code, DTOs, SQL, seeds (`seed-logistics.sql`, `seed-expansion-logistics.sql`), race script, OpenAPI details, and tests were updated.
+- Response: claim migration `AddRequestClaim1794873600000` (up/down) adds `handled_by`/`handled_at` with a pair check and a partial index. Endpoints `POST requests/:id/claim` and `POST requests/:id/release` (Idempotency-Key). Coordination commands in `CLAIM_GUARDED_COMMANDS` (start-verification, verify, concur, reject, triage, fast-track, attach/detach campaign) and mission offer check the claim inside their transaction. Another coordinator's active claim returns `409 REQUEST_ALREADY_CLAIMED` with a Vietnamese message naming the holder (`AppError.userMessage`). A SYSTEM coordinator may take over (`CLAIM_TAKEN_OVER`); claim/release write `CLAIMED`, `CLAIM_RELEASED` to `request_event`. Queue and detail include `handled_by`, `handled_at`, `handled_by_name`.
+- Identity: organization endpoints/grants removed in Wave 1 (`RemoveOrganizationIdentity1794787200000`).
+- Contracts: `contracts/openapi/*.json` pruned of organization schemas; `contracts:check` passes. Web generated types regenerated.
+- Web: organization fields/sources removed from Operations; "Hàng chờ chung" toggle (`unassigned=true`, COORDINATOR SYSTEM only); claim/release panel and a disabled action fieldset for non-holders; queue rows show the holder.
+- Postman: organization lookup/grant/team fields removed; unassigned queue, claim, and release requests added.
+
+**Checks actually run (2026-11-14)**
+- `npm test` (backend): 132/132 jest suites, 716/716 tests; `node --test scripts/__tests__/*.test.mjs`: 113/113.
+- `npm run lint`: 0 errors, 14 pre-existing warnings. `tsc --noEmit` for identity, response, logistics app configs: clean.
+- `frontend/web`: `tsc --noEmit` clean; `vite build` succeeded. `mobile`: `tsc --noEmit` clean (before the Wave 3 web change; mobile has no claim UI).
+- `npm run check:compose-env`: pass. `git diff --check`: clean.
+- Stack: `docker compose ... --profile storage up --build -d` (migrations for identity, response, logistics exit 0; all APIs healthy). psql confirms no `organization_id` column and no `organization`/`membership` table in `c48_identity`, `c48_response`, `c48_logistics`; migrations recorded in `typeorm_migrations`.
+- `reset-demo --reset` ran with the Wave 2 code; seed jobs exit 0 with the transformed seeds.
+- HTTP smoke through nginx (`127.0.0.1:8080`): unassigned queue 200, attach-campaign on an unassigned SOS 200, replay with stale version 409, claim conflict 409 with holder name, holder release 200, SYSTEM takeover 200 with `CLAIM_TAKEN_OVER` audit and holder change.
+
+**Known gaps (not verified or not done)**
+- `scripts/dev/up` returns 1 on Compose 5.6.1 because `--wait` treats the completed one-shot `minio-init` as a failure (pre-existing; `nginx`-only wait returns 0). Not changed.
+- Non-SYSTEM blocking (a campaign-only coordinator refused by another's claim) is covered by unit tests only: every demo coordinator also holds a SYSTEM grant.
+- No browser check of the web claim panel or the unassigned toggle.
+- Historical schema baselines `docs/backend/schema/logistics.sql`, `test-logistics.sql`, `explain-logistics.sql` still contain organization columns. Baselines are the DDL of the initial migration and are not edited; `test-logistics.sql` and `explain-logistics.sql` are documentation-only and not run by `test-db`.
+- Not updated: `02-identity-api.md`, `04-logistics-api.md`, `01-schema-review.md`, `c48-technology-and-delivery-plan.md` (+ `-vi`), `diagrams/c48-implemented-system.md`, ERD images in `report/images`, `frontend-handoff-dashboards-weather.md`, and the frontend/web README. Historical documents received an obsolescence note.
+- Logistics `campaign` attribution on the distribution-to-commitment path: a distribution with a campaign only accepts commitments from cycles on the same campaign; a distribution without a campaign accepts any cycle (kept to avoid breaking REQUEST_AID flows). Confirm this rule.
+
+**Decisions**
+- Warehouses, relief points, vehicles, and stock are SYSTEM-only; campaign-attached operations use `campaign_id` for scope.
+- Claim is soft: 15 minutes without the holder's coordination action; expired claims are ignored, not cleaned up. Takeover by SYSTEM is atomic with the command (a failed command rolls back the takeover).
+- Migration down restores structure only; organization values are not recoverable and the re-added columns are nullable.
+
+**Next concrete task**
+- Update the remaining API and plan documents listed above, then do a browser check of the coordinator queue (`/` as `coord1`, "Hàng chờ chung", claim/release).
+- Review the Logistics scope change, especially the distribution-to-cycle campaign rule and the donation receipt scope (`d.campaign_id`), against 01 §7 and the reviewer/counter independence rule.
+
 ## Region concept removed — 2026-11-14
 
 - Region concept removed (date 2026-11-14): team suggestions use organization+distance only.
@@ -436,5 +472,14 @@ Place a valid AIStor Free license at the configured `AISTOR_LICENSE_PATH` and st
 - Per the user's direction, a coordinator now verifies by reviewing whether the flagged location, information and images match the report; no call is required. `POST /requests/{id}/verify` no longer returns `NO_CONTACT_ATTEMPT`; `EVIDENCE_REVIEWED` needs ready `evidence_ids` or a `reason`, otherwise `VERIFICATION_BASIS_REQUIRED` 400. PROXY still needs independent corroboration or two distinct coordinators. AI stays advisory: `priority` is empty until a coordinator triages.
 - Kept on purpose: `POST/GET /requests/{id}/contact-attempts`, the `contact_attempt` table, `CONTACT_CONFIRMED` (legacy rows) and `REJECT ... UNREACHABLE` thresholds. Tracking-code recovery (`/recovery`) still needs a `REACHED` reporter attempt by another coordinator, and the coordinator UI no longer creates attempts, so the recovery button is not reachable from the UI. Removing the table/endpoint/recovery dependency is a separate decision. ERDs are unchanged for that reason.
 - Changed: `request-operations.verification.service.ts`, coordinator web UI (`Coordinator.tsx`), Postman main/PROXY folders and `postman-smoke.test.mjs`, smoke tests T5/T6/T7/T8/T10/T11–T17, new unit spec `request-operations.verification.service.spec.ts`, `03-response-api.md`, `07-error-catalog.md`, the plan (EN/VI) and the overall use-case diagram.
-- Smoke tests now create accounts through `scripts/smoke/lib/email-registration.mjs` (registration needs an email OTP the tests cannot read, so the pending `email_registration` is completed in the Identity DB). This fixes the earlier `auth/register` `400 VALIDATION_FAILED`. Smokes read `DEMO_INTAKE_ORGANIZATION_ID` instead of a fixed organization, and T7 counts lock waiters through `pg_locks` because `pg_stat_activity` hides other roles' queries from the migrator login.
+- Smoke tests create accounts through `scripts/smoke/lib/email-registration.mjs` (registration needs an email OTP the tests cannot read, so the pending `email_registration` is completed in the Identity DB). This fixes the earlier `auth/register` `400 VALIDATION_FAILED`. T7 counts lock waiters through `pg_locks` because `pg_stat_activity` hides other roles' queries from the migrator login.
 - Checks run: unit `apps/response` suite, Postman `node --test` (19), `contracts:check`, web `tsc`; smoke PASS: response T6, T10, T16, logistics T14. T7 passes verification, concurrency and triage, then stops at the scheduled-overdue assertion because `SCHEDULER_ENABLED=false`. Not passing for unrelated reasons: intake and T5 (stale seed expectations), T8 and logistics T15 (need MinIO/`storage` profile).
+
+## 2026-11-14 — Identity and Response organization removal (Phase 1)
+
+- Identity grants now use only `SYSTEM` and `CAMPAIGN`; the new `RemoveOrganizationIdentity1794787200000` migration promotes legacy organization grants to `SYSTEM`, deduplicates live grants, and removes the Identity organization/membership structures. Response requests start unassigned (`campaign_id IS NULL`); `RemoveOrganizationResponse1794787200000` removes organization columns and replaces queue indexes with shared, campaign and unassigned indexes. SYSTEM coordinators receive both SYSTEM and CAMPAIGN demo grants through the additive seed.
+- Response access is centralized around grant scope: SYSTEM sees assigned and unassigned requests; CAMPAIGN sees only requests attached to that campaign. Assignment, detail, map/report, mission and evidence paths use the same scope. Shared rescue-team suggestions remain independent of organization/campaign.
+- The declared Compose seed job was rerun additively; `coord_seed` has a SYSTEM grant and CAMPAIGN grant for the demo campaign. No reset or volume deletion was used. Logistics authorization compatibility now accepts the new grant shape; Logistics schema removal, Web/mobile cleanup, Postman and broader documentation cleanup remain Phase 2. SOS claim remains Phase 3.
+- Checks: `npm test` passed 130 Jest suites / 694 tests and 113 Node tests; `npm run lint` passed with 14 unused-variable/argument warnings; `npx tsc --noEmit` passed for Identity, Response, Logistics and Web. `npm run check:compose-env` passed for 13 services; changed smoke scripts passed `node --check`.
+- The required `docker compose -f infra/compose.yaml --env-file .env --profile storage up --build -d` completed. PostgreSQL, MinIO, Web, Nginx and all three APIs are healthy; all three migration jobs exited 0. Psql confirms both new migrations are recorded, Identity has no organization/membership tables or `organization_id` columns, `coord_seed` has both grants, Response has no `organization_id` on `assistance_request`, `campaign` or `rescue_team`, and all five replacement request indexes exist. Migration `down` paths are covered by migration unit specs; no live rollback was run against the primary databases.
+- Next task after owner review: Phase 2 Logistics schema removal and Web/mobile/Postman/documentation updates. No commit or push was made.

@@ -29,7 +29,7 @@ type OperationsOverview = {
 type AdminOverview = {
   users: { total: number; by_status: Counts; pending_email_verification: number; must_change_password: number;
     active_last_24h: number };
-  active_users_by_role: Counts; active_organizations_by_kind: Counts;
+  active_users_by_role: Counts;
   recent_audit: { action: string; entity_type: string; created_at: string }[];
   generated_at: string;
 };
@@ -67,7 +67,7 @@ function Metric({ title, value, warning }: { title: string; value: number | stri
 
 const chartColors = ['#2563eb', '#0d9488', '#f59e0b', '#8b5cf6', '#e11d48', '#0891b2', '#65a30d', '#ea580c', '#4f46e5', '#64748b'];
 
-function Breakdown({ title, counts, requestStatuses = false, organizationKinds = false }: { title: string; counts: Counts; requestStatuses?: boolean; organizationKinds?: boolean }) {
+function Breakdown({ title, counts, requestStatuses = false }: { title: string; counts: Counts; requestStatuses?: boolean }) {
   const rows = Object.entries(counts).filter(([, count]) => count > 0);
   const total = rows.reduce((sum, [, count]) => sum + count, 0);
   let cursor = 0;
@@ -83,7 +83,7 @@ function Breakdown({ title, counts, requestStatuses = false, organizationKinds =
       </div>
       <div className="dashboard-chart-legend">{rows.map(([code, count], index) =>
         <div className="dashboard-chart-row" key={code}><i aria-hidden="true" style={{ backgroundColor: chartColors[index % chartColors.length] }} />
-          <span>{organizationKinds && code === 'VOLUNTEER' ? 'Tình nguyện' : requestStatuses ? requestStatusLabel(code) : label(code)}</span>
+          <span>{requestStatuses ? requestStatusLabel(code) : label(code)}</span>
           <strong>{count}</strong></div>)}</div>
     </div> : <p className="muted">Chưa có số liệu.</p>}
   </section>;

@@ -69,7 +69,7 @@ function queriesForHandoff(kind: string | null, grants: Grant[]) {
 }
 
 function organizationGrant(role_code: Grant['role_code']): Grant {
-  return { role_code, scope_type: 'ORGANIZATION', organization_id: organizationId };
+  return { role_code, scope_type: 'SYSTEM',};
 }
 
 describe('DistributionQueriesService handoff detail', () => {
@@ -106,7 +106,7 @@ describe('DistributionQueriesService handoff detail', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: distribution.preparer_user_id,
-        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'ORGANIZATION', organization_id: organizationId }],
+        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'SYSTEM',}],
         identityHeaders: {},
       })),
     };
@@ -126,7 +126,7 @@ describe('DistributionQueriesService handoff detail', () => {
     expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM logistics_attachment a'), [handoffId, distributionId]);
   });
 
-  it('does not read handoff evidence outside the caller organization scope', async () => {
+  it('does not read handoff evidence with a campaign grant when the handoff has no campaign scope', async () => {
     const query = jest.fn(async (sql: string) => {
       if (sql.includes('WHERE d.id=ANY($1::uuid[])')) return [distribution];
       throw new Error(`Unexpected query: ${sql}`);
@@ -134,7 +134,7 @@ describe('DistributionQueriesService handoff detail', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: '11111111-1111-4111-8111-111111111111',
-        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'ORGANIZATION', organization_id: '99999999-9999-4999-8999-999999999999' }],
+        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'CAMPAIGN', campaign_id: '99999999-9999-4999-8999-999999999999' }],
         identityHeaders: {},
       })),
     };

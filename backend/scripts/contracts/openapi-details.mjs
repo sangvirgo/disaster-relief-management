@@ -30,7 +30,6 @@ const point = object({
 }, ['type', 'coordinates']);
 const teamViewSchema = object({
   id,
-  organization_id: id,
   name: text,
   kind: { type: 'string', enum: ['VOLUNTEER', 'MILITARY', 'GOVERNMENT', 'OTHER'] },
   reporting_mode: { type: 'string', enum: ['APP', 'COORDINATOR'] },
@@ -48,7 +47,7 @@ const teamViewSchema = object({
     }, ['age_s', 'accuracy_m', 'source']),
   ] },
   version,
-}, ['id', 'organization_id', 'name', 'kind', 'reporting_mode', 'availability', 'readiness_required', 'status', 'skills', 'position', 'version']);
+}, ['id', 'name', 'kind', 'reporting_mode', 'availability', 'readiness_required', 'status', 'skills', 'position', 'version']);
 const teamPageSchema = object({ items: array(teamViewSchema), more: boolean(), cursor: text });
 const idempotentCommandResponseHeaders = {
   'Cache-Control': { $ref: '#/components/headers/CacheControlNoStore' },
@@ -62,6 +61,12 @@ const requestCampaignAssociationViewSchema = object({
   id, status: text, version,
   campaign_id: { anyOf: [id, { type: 'null' }] },
 }, ['id', 'status', 'version', 'campaign_id']);
+const requestClaimViewSchema = object({
+  id, status: text, version,
+  campaign_id: { anyOf: [id, { type: 'null' }] },
+  handled_by: { anyOf: [id, { type: 'null' }] },
+  handled_at: { anyOf: [dateTime, { type: 'null' }] },
+}, ['id', 'status', 'version', 'campaign_id', 'handled_by', 'handled_at']);
 const identityDetails = {
   registerCitizen: {
     summary: 'Start a citizen registration and send an email verification code.',
@@ -120,7 +125,7 @@ const identityDetails = {
     }),
   },
   identityInternalTeamLeaderEligibility: {
-    request: request(object({ user_id: id, organization_id: id }, ['user_id', 'organization_id'])),
+    request: request(object({ user_id: id }, ['user_id'])),
     response: response({ oneOf: [object({ eligible: { type: 'boolean', const: true } }, ['eligible']), object({ eligible: { type: 'boolean', const: false }, reason: { type: 'string', enum: ['USER_NOT_FOUND', 'USER_INACTIVE', 'MEMBERSHIP_REQUIRED', 'VOLUNTEER_GRANT_REQUIRED'] } }, ['eligible', 'reason'])] }),
   },
 };
@@ -128,7 +133,6 @@ const identityDetails = {
 const identityPaginationQueries = {
   listIdentityUsers: ['cursor', 'limit'],
   listIdentityUserGrants: ['cursor', 'limit'],
-  listIdentityOrganizations: ['cursor', 'limit'],
   listIdentityAuditLogs: ['cursor', 'limit'],
 };
 
@@ -201,6 +205,27 @@ const responseDetails = {
       campaign_id: '00000000-0000-4000-8000-000000000003',
     }, idempotentCommandResponseHeaders),
   },
+  responseRequestOperationsClaim: {
+    parameters: [
+      { $ref: '#/components/parameters/RequestId' },
+      { $ref: '#/components/parameters/IdempotencyKey' },
+    ],
+    response: response(requestClaimViewSchema, 'Request after claiming it for handling (nhận xử lý). The claim lasts 15 minutes without coordination activity.', {
+      id: '00000000-0000-4000-8000-000000000001', status: 'VERIFIED', version: 8,
+      campaign_id: '00000000-0000-4000-8000-000000000003',
+      handled_by: '00000000-0000-4000-8000-000000000101', handled_at: '2026-11-14T10:00:00.000Z',
+    }, idempotentCommandResponseHeaders),
+  },
+  responseRequestOperationsRelease: {
+    parameters: [
+      { $ref: '#/components/parameters/RequestId' },
+      { $ref: '#/components/parameters/IdempotencyKey' },
+    ],
+    response: response(requestClaimViewSchema, 'Request after releasing the claim (nhả xử lý).', {
+      id: '00000000-0000-4000-8000-000000000001', status: 'VERIFIED', version: 8,
+      campaign_id: '00000000-0000-4000-8000-000000000003', handled_by: null, handled_at: null,
+    }, idempotentCommandResponseHeaders),
+  },
   responseRequestOperationsDetachCampaign: {
     parameters: [
       { $ref: '#/components/parameters/RequestId' },
@@ -213,11 +238,11 @@ const responseDetails = {
     }, idempotentCommandResponseHeaders),
   },
   responseRequestResolutionInternalOperation: {
-    response: response(object({ id, kind: text, state: text, request_id: id, work_cycle: integer(), request_status: text, organization_id: id, campaign_id: { anyOf: [id, { type: 'null' }] }, outcome_basis: { anyOf: [text, { type: 'null' }] } })),
+    response: response(object({ id, kind: text, state: text, request_id: id, work_cycle: integer(), request_status: text, campaign_id: { anyOf: [id, { type: 'null' }] }, outcome_basis: { anyOf: [text, { type: 'null' }] } })),
   },
   responseRequestAdmissionAdmit: {
     noBody: true,
-    response: response(object({ request_id: id, work_cycle: integer(), version, status: { type: 'string', enum: ['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'] }, organization_id: id, campaign_id: { anyOf: [id, { type: 'null' }] } })),
+    response: response(object({ request_id: id, work_cycle: integer(), version, status: { type: 'string', enum: ['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'] }, campaign_id: { anyOf: [id, { type: 'null' }] } })),
   },
   responseMissionsReviewFailure: {
     request: request(object({ expected_version: version, disposition: { type: 'string', enum: ['REPLACED', 'NO_FURTHER_ACTION', 'REFERRED'] }, reason: text, replacement_mission_id: id }, ['expected_version', 'disposition', 'reason'])),
@@ -262,7 +287,7 @@ const responseDetails = {
     response: response(teamPageSchema),
   },
   responseTeamsCreate: {
-    request: request(object({ name: text, organization_id: id, team_kind: text, reporting_mode: { type: 'string', enum: ['APP', 'COORDINATOR'] }, leader_user_id: id, external_contact_note: text, skill_codes: array(text) }, ['name', 'organization_id', 'team_kind', 'reporting_mode', 'skill_codes'])),
+    request: request(object({ name: text, team_kind: text, reporting_mode: { type: 'string', enum: ['APP', 'COORDINATOR'] }, leader_user_id: id, external_contact_note: text, skill_codes: array(text) }, ['name', 'team_kind', 'reporting_mode', 'skill_codes'])),
     response: response(teamViewSchema),
   },
   responseTeamsDetail: {
@@ -318,7 +343,7 @@ const responseDetails = {
 };
 
 const responsePaginationQueries = {
-  listRequestQueue: ['cursor', 'limit'],
+  listRequestQueue: ['cursor', 'limit', 'unassigned'],
   listUnassignedRequests: ['cursor', 'limit'],
   listRequestContactAttempts: ['cursor', 'limit'],
   listRequestDuplicates: ['cursor', 'limit'],
@@ -341,13 +366,13 @@ const logisticsDetails = {
   logisticsCatalogCreateUnit: { request: request(object({ code: text, display_name: text, scale: { type: 'integer', minimum: 0, maximum: 3 } }, ['code', 'display_name', 'scale'])) },
   logisticsCatalogCreateItem: { request: request(object({ item_type_code: text, unit_code: text, name: text }, ['item_type_code', 'unit_code', 'name'])) },
   logisticsCatalogDeactivateItem: { request: request(object({ expected_version: version }, ['expected_version'])) },
-  logisticsAssetsCreateWarehouse: { request: request(object({ organization_id: id, name: text, address_note: text, location: object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }), location_public: boolean() }, ['organization_id', 'name'])) },
+  logisticsAssetsCreateWarehouse: { request: request(object({ name: text, address_note: text, location: object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }), location_public: boolean() }, ['name'])) },
   logisticsAssetsPatchWarehouse: { request: request(versionBody({ name: text, address_note: { anyOf: [text, { type: 'null' }] }, location: { anyOf: [object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }), { type: 'null' }] }, location_public: boolean() })) },
   logisticsAssetsDeactivateWarehouse: { request: request(object({ expected_version: version }, ['expected_version'])) },
-  logisticsAssetsCreateReliefPoint: { request: request(object({ organization_id: id, name: text, contact_note: text, operating_note: text, location: object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }) }, ['organization_id', 'name', 'location'])) },
+  logisticsAssetsCreateReliefPoint: { request: request(object({ name: text, contact_note: text, operating_note: text, location: object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }) }, ['name', 'location'])) },
   logisticsAssetsPatchReliefPoint: { request: request(versionBody({ name: text, contact_note: text, operating_note: text, location: object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }) })) },
   logisticsAssetsDeactivateReliefPoint: { request: request(object({ expected_version: version }, ['expected_version'])) },
-  logisticsAssetsCreateVehicle: { request: request(object({ organization_id: id, identifier: text, vehicle_type: text, capacity: { anyOf: [quantity, { type: 'null' }] }, capacity_unit: { anyOf: [text, { type: 'null' }] } }, ['organization_id', 'identifier', 'vehicle_type'])) },
+  logisticsAssetsCreateVehicle: { request: request(object({ identifier: text, vehicle_type: text, capacity: { anyOf: [quantity, { type: 'null' }] }, capacity_unit: { anyOf: [text, { type: 'null' }] } }, ['identifier', 'vehicle_type'])) },
   logisticsAssetsPatchVehicle: { request: request(versionBody({ identifier: text, vehicle_type: text, capacity: { anyOf: [quantity, { type: 'null' }] }, capacity_unit: { anyOf: [text, { type: 'null' }] } })) },
   logisticsAssetsDeactivateVehicle: { request: request(object({ expected_version: version }, ['expected_version'])) },
   logisticsStockOpening: { request: request(object({ warehouse_id: id, lines: item({ item_id: id, quantity }, ['item_id', 'quantity']), note: text }, ['warehouse_id', 'lines', 'note'])) },
@@ -425,7 +450,6 @@ const logisticsDetails = {
       cycle_id: id,
       request_id: id,
       work_cycle: integer(),
-      organization_id: id,
       campaign_id: { anyOf: [id, { type: 'null' }] },
       item_id: id,
       item: object({
@@ -441,7 +465,7 @@ const logisticsDetails = {
       status: { type: 'string', enum: ['OPEN', 'PARTIALLY_FULFILLED', 'FULFILLED', 'CANCELLED'] },
       version,
       created_at: dateTime,
-    }, ['id', 'cycle_id', 'request_id', 'work_cycle', 'organization_id', 'campaign_id', 'item_id', 'item', 'original_quantity', 'requested_quantity', 'cancelled_remaining', 'delivery_target_kind', 'designated_point_id', 'status', 'version', 'created_at']), 'Created need projection returned by the needs query mapper.'),
+    }, ['id', 'cycle_id', 'request_id', 'work_cycle', 'campaign_id', 'item_id', 'item', 'original_quantity', 'requested_quantity', 'cancelled_remaining', 'delivery_target_kind', 'designated_point_id', 'status', 'version', 'created_at']), 'Created need projection returned by the needs query mapper.'),
   },
   logisticsNeedsIncrease: { request: request(object({ expected_version: version, quantity, reason: text }, ['expected_version', 'quantity', 'reason'])) },
   logisticsNeedsReduce: { request: request(object({ expected_version: version, quantity, reason: text }, ['expected_version', 'quantity', 'reason'])) },
@@ -499,7 +523,7 @@ const distributionLineSchema = object({
   pending_loss_count: integer(), in_transit: quantity, at_point: quantity,
 });
 const distributionViewSchema = object({
-  id, warehouse_id: id, organization_id: id,
+  id, warehouse_id: id,
   relief_point_id: nullableValue(id), vehicle_id: nullableValue(id), campaign_id: nullableValue(id),
   purpose: text, status: text, preparer_user_id: id, approver_user_id: nullableValue(id),
   approved_version: nullableValue(integer()), dispatch_actor_user_id: nullableValue(id),
@@ -533,7 +557,7 @@ const commitmentValueSchema = object({
 });
 const needItemSchema = object({ id, name: text, unit: catalogUnitSchema });
 const needValueSchema = object({
-  id, cycle_id: id, request_id: id, work_cycle: integer(), organization_id: id,
+  id, cycle_id: id, request_id: id, work_cycle: integer(),
   campaign_id: nullableValue(id), item_id: id, item: needItemSchema, original_quantity: quantity,
   requested_quantity: quantity, cancelled_remaining: nullableValue(quantity),
   delivery_target_kind: { type: 'string', enum: ['FINAL_RECIPIENT', 'RELIEF_POINT'] },
@@ -564,13 +588,13 @@ const publicDriveViewSchema = object({
   items: array(driveItemSchema), created_at: dateTime,
 });
 const driveValueSchema = object({
-  id, organization_id: id, intake_warehouse_id: id, campaign_id: nullableValue(id),
+  id, intake_warehouse_id: id, campaign_id: nullableValue(id),
   campaign_status: nullableValue(text), campaign_status_at: nullableValue(dateTime), status: text,
   title: text, description: nullableValue(text), opens_at: nullableValue(dateTime), closes_at: nullableValue(dateTime),
   version, created_at: dateTime, items: array(driveCommandItemSchema),
 });
 const assetCommonProperties = {
-  id, organization_id: id,
+  id,
   status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] }, version, created_at: dateTime,
 };
 const warehouseCommandSchema = object({
@@ -626,7 +650,6 @@ const sharedLogisticsResponses = {
   logisticsDrivesClose: driveValueSchema,
   logisticsAssetsReliefPointDetail: object({
     id,
-    organization_id: id,
     status: text,
     version,
     created_at: dateTime,
@@ -637,7 +660,6 @@ const sharedLogisticsResponses = {
   }),
   logisticsAssetsWarehouses: page({
     id,
-    organization_id: id,
     status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] },
     version,
     created_at: dateTime,
@@ -647,7 +669,6 @@ const sharedLogisticsResponses = {
   }),
   logisticsAssetsReliefPoints: page({
     id,
-    organization_id: id,
     status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] },
     version,
     created_at: dateTime,
@@ -656,7 +677,6 @@ const sharedLogisticsResponses = {
   }),
   logisticsAssetsVehicles: page({
     id,
-    organization_id: id,
     status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] },
     version,
     created_at: dateTime,
@@ -827,8 +847,6 @@ const routeErrorCodes = {
   resetIdentityPassword: ['LAST_ADMIN', 'PASSWORD_WEAK'],
   createIdentityUserGrant: ['GRANT_EXISTS', 'SCOPE_INVALID', 'RESPONSE_UNAVAILABLE'],
   revokeIdentityGrant: ['LAST_ADMIN'],
-  createIdentityOrganization: ['ORGANIZATION_NAME_TAKEN'],
-  deactivateIdentityOrganization: ['ORGANIZATION_IN_USE'],
   createSelfRequest: ['VALIDATION_FAILED', 'TRACKING_SECRET_INVALID', 'TRACKING_SECRET_IN_USE', 'IDEMPOTENCY_KEY_REUSED', 'SOS_RATE_CEILING'],
   createProxyRequest: ['VALIDATION_FAILED', 'IDENTITY_UNAVAILABLE', 'SESSION_EXPIRED'],
   trackSelfRequest: ['NOT_FOUND', 'RATE_LIMITED'],
@@ -851,7 +869,9 @@ const routeErrorCodes = {
   recordMissionOnBehalf: ['RECORDED_BASIS_REQUIRED', 'MISSION_NOT_LEADER', 'STATE_TRANSITION_INVALID'],
   createCampaign: ['FORBIDDEN', 'VERSION_CONFLICT'],
   closeCampaign: ['CAMPAIGN_HAS_OPEN_REQUESTS', 'VERSION_CONFLICT'],
-  responseRequestOperationsAttachCampaign: ['NOT_FOUND', 'CAMPAIGN_NOT_ACTIVE', 'ATTRIBUTION_LOCKED', 'VERSION_CONFLICT', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID'],
+  responseRequestOperationsAttachCampaign: ['NOT_FOUND', 'CAMPAIGN_NOT_ACTIVE', 'ATTRIBUTION_LOCKED', 'VERSION_CONFLICT', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID', 'REQUEST_ALREADY_CLAIMED', 'FORBIDDEN'],
+  responseRequestOperationsClaim: ['NOT_FOUND', 'FORBIDDEN', 'REQUEST_ALREADY_CLAIMED', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID'],
+  responseRequestOperationsRelease: ['NOT_FOUND', 'FORBIDDEN', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID'],
   responseRequestOperationsDetachCampaign: ['NOT_FOUND', 'ATTRIBUTION_LOCKED', 'VERSION_CONFLICT', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID'],
   getRequestHeatmap: ['TOO_MANY_CELLS', 'VALIDATION_FAILED'],
   responseRequestAdmissionAdmit: ['ATTRIBUTION_LOCKED', 'PENDING_SUPPLEMENT_REVIEW', 'REQUEST_NOT_VERIFIED'],
@@ -1212,18 +1232,24 @@ export function applyOpenApiDetails(document, service) {
     }, ['status', 'score', 'level', 'reasons', 'confidence', 'source', 'human_review_required', 'review_status']);
     const queueItem = document.components.schemas.RequestQueueItem;
     if (queueItem) {
-      queueItem.required = [...new Set([...(queueItem.required ?? []), 'priority_advisory', 'ai_priority_advisory'])];
+      queueItem.required = [...new Set([...(queueItem.required ?? []), 'priority_advisory', 'ai_priority_advisory', 'handled_by', 'handled_at', 'handled_by_name'])];
       queueItem.properties = {
         ...queueItem.properties,
         priority_advisory: priorityAdvisory,
         ai_priority_advisory: nullableAdvisory(aiPriorityAdvisory),
+        handled_by: nullableValue(id),
+        handled_at: nullableValue(dateTime),
+        handled_by_name: nullableValue(text),
       };
     }
     const staffDetail = document.components.schemas.StaffRequestDetail;
     if (staffDetail) {
-      staffDetail.required = [...new Set([...(staffDetail.required ?? []), 'priority_advisory', 'ai_priority_advisory'])];
+      staffDetail.required = [...new Set([...(staffDetail.required ?? []), 'priority_advisory', 'ai_priority_advisory', 'handled_by', 'handled_at', 'handled_by_name'])];
       staffDetail.properties = {
         ...staffDetail.properties,
+        handled_by: nullableValue(id),
+        handled_at: nullableValue(dateTime),
+        handled_by_name: nullableValue(text),
         report_mode: text,
         category: text,
         description: { anyOf: [text, { type: 'null' }] },

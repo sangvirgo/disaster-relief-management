@@ -7,7 +7,6 @@ import type { TeamRow } from '../src/teams/teams.helpers';
 import type { TeamsQueriesService } from '../src/teams/teams-queries.service';
 import { TeamsMembershipService } from '../src/teams/teams-membership.service';
 
-const organizationId = '00000000-0000-4000-8000-000000000001';
 const teamId = '00000000-0000-4000-8000-000000000002';
 const userId = '00000000-0000-4000-8000-000000000003';
 const actorId = '00000000-0000-4000-8000-000000000004';
@@ -17,7 +16,6 @@ const joinedAt = new Date('2026-10-14T01:02:03.000Z');
 
 const initialTeam: TeamRow = {
   id: teamId,
-  organization_id: organizationId,
   name: 'Đội cứu hộ',
   team_kind: 'VOLUNTEER',
   reporting_mode: 'APP',
@@ -125,7 +123,7 @@ function fixture(options: { members?: Record<string, Member>; activeTeamId?: str
   const sessions = {
     require: jest.fn(async () => ({
       userId: actorId,
-      grants: options.grants ?? [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId }],
+      grants: options.grants ?? [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM',}],
     })),
     activeUserCheck: jest.fn(async () => ({ active: true as const })),
     teamLeaderEligibility: jest.fn(async () => ({ eligible: true as const })),
@@ -354,7 +352,6 @@ describe('TeamsMembershipService', () => {
   it.each([
     ['USER_NOT_FOUND', 'NOT_FOUND'],
     ['USER_INACTIVE', 'STATE_TRANSITION_INVALID'],
-    ['MEMBERSHIP_REQUIRED', 'STATE_TRANSITION_INVALID'],
     ['VOLUNTEER_GRANT_REQUIRED', 'STATE_TRANSITION_INVALID'],
   ] as const)('maps Identity leader eligibility reason %s to %s', async (reason, code) => {
     const oldLeader = '00000000-0000-4000-8000-000000000006';
@@ -369,7 +366,7 @@ describe('TeamsMembershipService', () => {
     await expect(service.transferLeader(teamId, { user_id: userId, expected_version: 4 }, idempotencyKey, request))
       .rejects.toMatchObject({ code, status: code === 'NOT_FOUND' ? 404 : 409 });
     expect(managerQuery).not.toHaveBeenCalled();
-    expect(sessions.teamLeaderEligibility).toHaveBeenCalledWith(userId, organizationId);
+    expect(sessions.teamLeaderEligibility).toHaveBeenCalledWith(userId);
   });
 
   it('rejects a stale team version without changing either membership', async () => {
@@ -388,7 +385,7 @@ describe('TeamsMembershipService', () => {
 
   it('requires TEAM_MANAGE_ANY for leadership transfer', async () => {
     const { service, managerQuery } = fixture({
-      grants: [{ role_code: 'VOLUNTEER', scope_type: 'SYSTEM', organization_id: null }],
+      grants: [{ role_code: 'VOLUNTEER', scope_type: 'SYSTEM',}],
     });
 
     await expect(service.transferLeader(teamId, { user_id: userId, expected_version: 4 }, idempotencyKey, request))
@@ -399,7 +396,7 @@ describe('TeamsMembershipService', () => {
   it('lets a system administrator transfer leadership to an eligible active member', async () => {
     const oldLeader = '00000000-0000-4000-8000-000000000006';
     const { service, state, sessions } = fixture({
-      grants: [{ role_code: 'ADMIN', scope_type: 'SYSTEM', organization_id: null }],
+      grants: [{ role_code: 'ADMIN', scope_type: 'SYSTEM',}],
       members: {
         [oldLeader]: { member_role: 'LEADER', left_at: null },
         [userId]: { member_role: 'MEMBER', left_at: null },
@@ -410,6 +407,6 @@ describe('TeamsMembershipService', () => {
       .resolves.toMatchObject({ status: 200, value: { leader_user_id: userId, version: 5 } });
     expect(state.members.get(oldLeader)?.member_role).toBe('MEMBER');
     expect(state.members.get(userId)?.member_role).toBe('LEADER');
-    expect(sessions.teamLeaderEligibility).toHaveBeenCalledWith(userId, organizationId);
+    expect(sessions.teamLeaderEligibility).toHaveBeenCalledWith(userId);
   });
 });

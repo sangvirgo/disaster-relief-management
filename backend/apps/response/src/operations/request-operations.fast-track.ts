@@ -1,4 +1,6 @@
 import type { EntityManager } from 'typeorm';
+import type { Grant } from '@c48/identity-contracts/permissions';
+import { requestScopeFilter } from '../requests/request-scope';
 import { riskAttentionLevel, scoreRequestRisk } from '../ai/ai-risk';
 import type { RiskAttentionLevel, RiskFacts } from '../ai/ai-risk';
 import type { AiPriorityAdvisory } from '../ai/ai-priority-advisory';
@@ -103,18 +105,21 @@ export function assessFastTrack(input: FastTrackInput): FastTrackAssessment {
   };
 }
 
-/** Nearby open reports of the same incident type in the same organization; a coordinator must compare these. */
-export async function hasPossibleDuplicate(manager: Pick<EntityManager, 'query'>, requestId: string): Promise<boolean> {
+/** Nearby in-scope open reports of the same incident type; a coordinator must compare these. */
+export async function hasPossibleDuplicate(manager: Pick<EntityManager, 'query'>, requestId: string, grants: readonly Grant[]): Promise<boolean> {
+  const values: unknown[] = [requestId];
+  const candidateScope = requestScopeFilter(grants, 'REQUEST_VERIFY', values, 'candidate');
   const rows = await manager.query(
     `SELECT 1
        FROM assistance_request target JOIN request_subject ts ON ts.request_id=target.id
-       JOIN assistance_request candidate ON candidate.id<>target.id AND candidate.organization_id=target.organization_id
+       JOIN assistance_request candidate ON candidate.id<>target.id
        JOIN request_subject cs ON cs.request_id=candidate.id
-      WHERE target.id=$1 AND candidate.status NOT IN ('DUPLICATE','REJECTED','CANCELLED','CLOSED','RESOLVED')
+      WHERE target.id=$1 AND ${candidateScope}
+        AND candidate.status NOT IN ('DUPLICATE','REJECTED','CANCELLED','CLOSED','RESOLVED')
         AND candidate.incident_category_code=target.incident_category_code
         AND candidate.received_at BETWEEN target.received_at-interval '24 hours' AND target.received_at+interval '24 hours'
         AND ST_DWithin(ts.location,cs.location,1000)
-      LIMIT 1`, [requestId],
+      LIMIT 1`, values,
   ) as unknown[];
   return rows.length > 0;
 }

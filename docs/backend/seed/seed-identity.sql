@@ -1,37 +1,8 @@
--- C48 Identity service — SYNTHETIC DEMO SEED (organizations, users, memberships, grants).
--- Target: an EMPTY database that already has docs/backend/schema/identity.sql applied.
--- Load:   psql -v ON_ERROR_STOP=1 -v seed_password_hash='<argon2id hash made by the app>' -f seed-identity.sql
---
--- PASSWORD RULE: this file never contains a real credential. The seeder (application bootstrap script) MUST supply
--- the password hash through the psql variable :seed_password_hash. When it is not supplied the placeholder
--- 'CHANGE_ME_HASH_FROM_APP' is stored, which can never verify, so those accounts cannot log in until reset.
--- Every account has must_change_password = true and status ACTIVE.
--- Demo addresses use a stable unique suffix at the reserved example.test domain and are marked verified.
---
--- All data is fictional. Phones elsewhere in the demo use the 0900000xxx style; no real people are represented.
--- IDs: UUID prefix 00000000-0000-4000-8000- + the 12-hex-digit suffix shown below (shared with the Response and Logistics seeds).
---
---  suffix        username        role               scope / organization          display_name
---  ...000000000001  (ORG_COORD)     COORDINATION organization  'Trung tâm điều phối C48 (demo)'
---  ...000000000002  (ORG_VOLUNTEER) VOLUNTEER organization     'Hội tình nguyện miền Nam (demo)'
---  ...000000000101  admin           ADMIN              SYSTEM                        Quản trị hệ thống (demo)
---  ...000000000102  coord1          COORDINATOR        ORGANIZATION ORG_COORD        Điều phối viên 1 (demo)
---  ...000000000103  coord2          COORDINATOR        ORGANIZATION ORG_COORD        Điều phối viên 2 (demo)
---  ...000000000104  campaign_mgr    CAMPAIGN_MANAGER   ORGANIZATION ORG_COORD        Quản lý chiến dịch (demo)
---  ...000000000105  ops_mgr         OPERATIONS_MANAGER ORGANIZATION ORG_COORD        Quản lý vận hành (demo)
---  ...000000000106  intake1         INTAKE_STAFF       ORGANIZATION ORG_COORD        Nhân viên tiếp nhận 1 (demo)
---  ...000000000107  intake2         INTAKE_STAFF       ORGANIZATION ORG_COORD        Nhân viên tiếp nhận 2 (demo)
---  ...000000000108  reviewer1       REVIEWER           ORGANIZATION ORG_COORD        Người xác minh 1 (demo)
---  ...000000000109  reviewer2       REVIEWER           ORGANIZATION ORG_COORD        Người xác minh 2 (demo)
---  ...00000000010a  dist1           DISTRIBUTION_STAFF ORGANIZATION ORG_COORD        Nhân viên phân phát 1 (demo)
---  ...00000000010b  dist2           DISTRIBUTION_STAFF ORGANIZATION ORG_COORD        Nhân viên phân phát 2 (demo)
---  ...00000000010c  vol_leader1     VOLUNTEER          ORGANIZATION ORG_VOLUNTEER    Đội trưởng tình nguyện 1 (demo)
---  ...00000000010d  vol_leader2     VOLUNTEER          ORGANIZATION ORG_VOLUNTEER    Đội trưởng tình nguyện 2 (demo)
---  ...00000000010e  vol_member1     VOLUNTEER          ORGANIZATION ORG_VOLUNTEER    Tình nguyện viên 1 (demo)
---  ...00000000010f  citizen1        CITIZEN            SYSTEM                        Người dân 1 (demo)
---  ...000000000110  citizen2        CITIZEN            SYSTEM                        Người dân 2 (demo)
---  ...000000000111  coord_extra     COORDINATOR        ORGANIZATION ORG_COORD        Điều phối viên bổ sung (demo)
--- Memberships: staff and coord_extra -> ORG_COORD; vol_* -> ORG_VOLUNTEER; admin and citizens have none.
+-- C48 Identity service — synthetic demo users and grants.
+-- Target: an EMPTY database migrated to the current Identity schema.
+-- Load: psql -v ON_ERROR_STOP=1 -v seed_password_hash='<argon2id hash made by the app>' -f seed-identity.sql
+-- The application bootstrap script supplies the password hash; this file contains no credentials.
+-- When the psql variable is absent, the unusable placeholder prevents demo accounts from logging in.
 
 \if :{?seed_password_hash}
 \else
@@ -42,11 +13,6 @@ BEGIN;
 
 CREATE FUNCTION pg_temp.u(h text) RETURNS uuid LANGUAGE sql IMMUTABLE AS
 $$ SELECT ('00000000-0000-4000-8000-' || lpad(h, 12, '0'))::uuid $$;
-
--- @include campaign support
-INSERT INTO organization (id, name, organization_kind) VALUES
-  (pg_temp.u('2'), 'Hội tình nguyện miền Nam (demo)', 'VOLUNTEER')
-ON CONFLICT DO NOTHING;
 
 INSERT INTO app_user (id, username, display_name, email, email_verified_at, password_hash, status, must_change_password)
 SELECT pg_temp.u(v.suffix), v.username, v.display_name,
@@ -69,46 +35,42 @@ FROM (VALUES
   ('10e', 'vol_member1',    'Tình nguyện viên 1 (demo)'),
   ('10f', 'citizen1',       'Người dân 1 (demo)'),
   ('110', 'citizen2',       'Người dân 2 (demo)'),
-  ('111', 'coord_extra', 'Điều phối viên bổ sung (demo)')
+  ('111', 'coord_extra',    'Điều phối viên bổ sung (demo)')
 ) AS v(suffix, username, display_name)
 ON CONFLICT DO NOTHING;
 
--- organization rosters
-INSERT INTO membership (user_id, organization_id)
-SELECT pg_temp.u(s), pg_temp.u('1') FROM unnest(ARRAY['102','103','104','105','106','107','108','109','10a','10b','111']) AS s
-ON CONFLICT DO NOTHING;
-INSERT INTO membership (user_id, organization_id)
-SELECT pg_temp.u(s), pg_temp.u('2') FROM unnest(ARRAY['10c','10d','10e']) AS s
-ON CONFLICT DO NOTHING;
-
--- role grants (one live grant per user/role/scope; the unique index is partial so re-runs are guarded by the NOT EXISTS)
-INSERT INTO role_grant (user_id, role_code, scope_type, organization_id)
-SELECT pg_temp.u(g.suffix), g.role_code, g.scope_type,
-       CASE g.scope_type WHEN 'SYSTEM' THEN NULL WHEN 'ORGANIZATION' THEN pg_temp.u(g.org) END
+INSERT INTO role_grant (user_id, role_code, scope_type, campaign_id)
+SELECT pg_temp.u(g.suffix), g.role_code, g.scope_type, g.campaign_id
 FROM (VALUES
-  ('101', 'ADMIN',              'SYSTEM',       NULL),
-  ('102', 'COORDINATOR',        'ORGANIZATION', '1'),
-  ('103', 'COORDINATOR',        'ORGANIZATION', '1'),
-  ('104', 'CAMPAIGN_MANAGER',   'ORGANIZATION', '1'),
-  ('105', 'OPERATIONS_MANAGER', 'ORGANIZATION', '1'),
-  ('106', 'INTAKE_STAFF',       'ORGANIZATION', '1'),
-  ('107', 'INTAKE_STAFF',       'ORGANIZATION', '1'),
-  ('108', 'REVIEWER',           'ORGANIZATION', '1'),
-  ('109', 'REVIEWER',           'ORGANIZATION', '1'),
-  ('10a', 'DISTRIBUTION_STAFF', 'ORGANIZATION', '1'),
-  ('10b', 'DISTRIBUTION_STAFF', 'ORGANIZATION', '1'),
-  ('10c', 'VOLUNTEER',          'ORGANIZATION', '2'),
-  ('10d', 'VOLUNTEER',          'ORGANIZATION', '2'),
-  ('10e', 'VOLUNTEER',          'ORGANIZATION', '2'),
-  ('10f', 'CITIZEN',            'SYSTEM',       NULL),
-  ('110', 'CITIZEN',            'SYSTEM',       NULL),
-  ('111', 'COORDINATOR',        'ORGANIZATION',       '1')
-) AS g(suffix, role_code, scope_type, org)
-WHERE NOT EXISTS (SELECT 1 FROM role_grant r WHERE r.user_id = pg_temp.u(g.suffix) AND r.role_code = g.role_code AND r.revoked_at IS NULL);
+  ('101', 'ADMIN',              'SYSTEM',   NULL::uuid),
+  ('102', 'COORDINATOR',        'SYSTEM',   NULL::uuid),
+  ('102', 'COORDINATOR',        'CAMPAIGN', pg_temp.u('c3')),
+  ('103', 'COORDINATOR',        'SYSTEM',   NULL::uuid),
+  ('103', 'COORDINATOR',        'CAMPAIGN', pg_temp.u('c3')),
+  ('104', 'CAMPAIGN_MANAGER',   'CAMPAIGN', pg_temp.u('c3')),
+  ('105', 'OPERATIONS_MANAGER', 'SYSTEM',   NULL::uuid),
+  ('106', 'INTAKE_STAFF',       'SYSTEM',   NULL::uuid),
+  ('107', 'INTAKE_STAFF',       'SYSTEM',   NULL::uuid),
+  ('108', 'REVIEWER',           'SYSTEM',   NULL::uuid),
+  ('109', 'REVIEWER',           'SYSTEM',   NULL::uuid),
+  ('10a', 'DISTRIBUTION_STAFF', 'SYSTEM',   NULL::uuid),
+  ('10b', 'DISTRIBUTION_STAFF', 'SYSTEM',   NULL::uuid),
+  ('10c', 'VOLUNTEER',          'SYSTEM',   NULL::uuid),
+  ('10d', 'VOLUNTEER',          'SYSTEM',   NULL::uuid),
+  ('10e', 'VOLUNTEER',          'SYSTEM',   NULL::uuid),
+  ('10f', 'CITIZEN',            'SYSTEM',   NULL::uuid),
+  ('110', 'CITIZEN',            'SYSTEM',   NULL::uuid),
+  ('111', 'COORDINATOR',        'SYSTEM',   NULL::uuid),
+  ('111', 'COORDINATOR',        'CAMPAIGN', pg_temp.u('c3'))
+) AS g(suffix, role_code, scope_type, campaign_id)
+JOIN app_user u ON u.id = pg_temp.u(g.suffix)
+WHERE NOT EXISTS (
+  SELECT 1 FROM role_grant r
+   WHERE r.user_id = u.id AND r.role_code = g.role_code AND r.scope_type = g.scope_type
+     AND r.campaign_id IS NOT DISTINCT FROM g.campaign_id AND r.revoked_at IS NULL
+);
 
--- @include demo expansion
-
--- minimal audit: the bootstrap seed is the only permitted self-grant (see role_grant comment in identity.sql)
+-- The bootstrap seed is the only permitted self-grant.
 INSERT INTO audit_log (actor_user_id, action, entity_type, entity_id, reason)
 VALUES (NULL, 'SEED_LOADED', 'SYSTEM', 'seed-identity', 'Dữ liệu demo tổng hợp, không phải người thật');
 

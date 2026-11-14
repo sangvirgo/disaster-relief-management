@@ -13,7 +13,7 @@ import { ResponseAdmission, ResponseAdmissionClient } from './response-admission
 
 export type { NeedCommandRequest } from './needs.helpers';
 
-interface CycleRow extends Pick<ResponseAdmission, 'request_id' | 'work_cycle' | 'organization_id' | 'campaign_id'> {
+interface CycleRow extends Pick<ResponseAdmission, 'request_id' | 'work_cycle' | 'campaign_id'> {
   id: string;
   state: 'OPEN' | 'FROZEN' | 'SEALED';
 }
@@ -29,7 +29,6 @@ interface ItemRow {
 
 interface ReliefPointRow {
   id: string;
-  organization_id: string;
   status: 'ACTIVE' | 'INACTIVE';
 }
 
@@ -47,7 +46,6 @@ function requestHash(dto: CreateNeedDto): string {
 
 function sameAttribution(cycle: CycleRow, admission: ResponseAdmission): boolean {
   return cycle.request_id === admission.request_id && cycle.work_cycle === admission.work_cycle &&
-    cycle.organization_id === admission.organization_id &&
     cycle.campaign_id === admission.campaign_id;
 }
 
@@ -56,12 +54,12 @@ async function lockCycle(
   admission: ResponseAdmission,
 ): Promise<CycleRow> {
   await manager.query(
-    `INSERT INTO fulfillment_cycle (request_id,work_cycle,organization_id,campaign_id)
-     VALUES ($1,$2,$3,$4,$5) ON CONFLICT (request_id,work_cycle) DO NOTHING`,
-    [admission.request_id, admission.work_cycle, admission.organization_id, admission.campaign_id],
+    `INSERT INTO fulfillment_cycle (request_id,work_cycle,campaign_id)
+     VALUES ($1,$2,$3) ON CONFLICT (request_id,work_cycle) DO NOTHING`,
+    [admission.request_id, admission.work_cycle, admission.campaign_id],
   );
   const rows = await manager.query(
-    `SELECT id,request_id,work_cycle,organization_id,campaign_id,state
+    `SELECT id,request_id,work_cycle,campaign_id,state
        FROM fulfillment_cycle WHERE request_id=$1 AND work_cycle=$2 FOR UPDATE`,
     [admission.request_id, admission.work_cycle],
   ) as CycleRow[];
@@ -87,7 +85,7 @@ async function loadItem(manager: Pick<EntityManager, 'query'>, itemId: string): 
 
 async function loadReliefPoint(manager: Pick<EntityManager, 'query'>, id: string): Promise<ReliefPointRow> {
   const rows = await manager.query(
-    'SELECT id,organization_id,status FROM relief_point WHERE id=$1 FOR SHARE',
+    'SELECT id,status FROM relief_point WHERE id=$1 FOR SHARE',
     [id],
   ) as ReliefPointRow[];
   const point = rows[0];
@@ -124,7 +122,7 @@ export class NeedsService {
     const replay = async (manager: EntityManager, resource: ResourceRef | null): Promise<Record<string, unknown>> => {
       if (resource?.type !== 'relief_need') throw new AppError('INTERNAL_ERROR', { status: 500 });
       const value = await readNeed(manager, resource.id);
-      requireNeedManage(session.grants, value as Pick<ResponseAdmission, 'organization_id' | 'campaign_id'>);
+      requireNeedManage(session.grants, value as Pick<ResponseAdmission, 'campaign_id'>);
       return value;
     };
 
@@ -151,9 +149,7 @@ export class NeedsService {
         let designatedPointId: string | null = null;
         if (dto.designated_point_id) {
           const point = await loadReliefPoint(manager, dto.designated_point_id);
-          if (point.organization_id !== cycle.organization_id) throw new AppError('VALIDATION_FAILED', { status: 400 });
           requireNeedManage(session.grants, {
-            organization_id: point.organization_id,
             campaign_id: cycle.campaign_id,
           });
           designatedPointId = point.id;

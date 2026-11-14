@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource } from 'typeorm';
 import type { Grant } from '@c48/identity-contracts/permissions';
+import { hasPermission } from '@c48/identity-contracts/permissions';
 import { scopeSql } from '../operations/request-operations.helpers';
 import { ReporterSessionService } from '../requests/reporter-session';
 import { MISSIONS_CONFIG } from '../missions/missions.config';
@@ -48,7 +49,10 @@ export class DashboardService {
 
     const rq = this.scoped(session.grants, 'r');
     const mq = this.scoped(session.grants, 'r');
-    const tq = this.scoped(session.grants, 't');
+    const tq = {
+      where: hasPermission(session.grants, 'REPORT_READ', { campaignId: null }) ? 'TRUE' : 'FALSE',
+      values: [] as unknown[],
+    };
     const cq = this.scoped(session.grants, 'r');
     const verifyParam = `$${rq.values.length + 1}`;
     const offerParam = `$${mq.values.length + 1}`;
@@ -84,7 +88,7 @@ export class DashboardService {
         [...mq.values, offerOverdue]),
       this.dataSource.query(`
         WITH teams AS (
-          SELECT t.id, t.organization_id, t.availability, t.readiness_required
+          SELECT t.id, t.availability, t.readiness_required
             FROM rescue_team t WHERE t.status = 'ACTIVE'
         ), scoped AS (SELECT * FROM teams t WHERE ${tq.where})
         SELECT COUNT(*)::int AS total,

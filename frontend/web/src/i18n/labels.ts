@@ -92,8 +92,6 @@ export const statusLabels: Record<string, string> = {
   SYSTEM: 'Toàn hệ thống',
   app_user: 'Người dùng',
   role_grant: 'Quyền truy cập',
-  organization: 'Tổ chức',
-  ORGANIZATION: 'Tổ chức',
   CAMPAIGN: 'Chiến dịch',
   COORDINATION: 'Điều phối',
   MILITARY: 'Lực lượng vũ trang',

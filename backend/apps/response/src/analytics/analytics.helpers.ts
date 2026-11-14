@@ -51,10 +51,9 @@ export function analyticsCacheKey(
   grants: readonly Grant[],
   filters: Record<string, unknown>,
 ): string {
-  const normalizedGrants = grants.map(({ role_code, scope_type, organization_id, campaign_id }) => ({
+  const normalizedGrants = grants.map(({ role_code, scope_type, campaign_id }) => ({
     role_code,
     scope_type,
-    organization_id,
     campaign_id: campaign_id ?? null,
   })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
   return JSON.stringify([userId, normalizedGrants, filters]);

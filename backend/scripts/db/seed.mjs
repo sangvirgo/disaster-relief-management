@@ -56,7 +56,6 @@ function prepareSql(
 ) {
   let source = readFileSync(resolve('seed', filename), 'utf8');
   for (const [marker, include] of [
-    ['-- @include campaign support', 'seed-campaign-support.sql'],
     ['-- @include demo campaigns', 'seed-campaigns.sql'],
     ['-- @include demo expansion', 'seed-expansion-' + service + '.sql'],
   ]) {
@@ -162,38 +161,37 @@ try {
     }
   } else {
     passwordHash = await createPasswordHash();
-    await runTransaction(clients.get('identity'), prepareSql('identity', 'seed-campaign-support.sql'));
     await runTransaction(clients.get('identity'), prepareSql('identity', 'seed-expansion-identity.sql'));
     const identityPrerequisites = await clients.get('identity').query(`
-      WITH fixture(user_id, username, role_code, scope_type, organization_id, requires_membership) AS (VALUES
-        ('00000000-0000-4000-8000-000000000112'::uuid, 'ops_seed', 'OPERATIONS_MANAGER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, true),
-        ('00000000-0000-4000-8000-000000000113'::uuid, 'citizen3', 'CITIZEN', 'SYSTEM', NULL::uuid, false),
-        ('00000000-0000-4000-8000-000000000114'::uuid, 'vol_leader3', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000002'::uuid, true),
-        ('00000000-0000-4000-8000-000000000115'::uuid, 'vol_member3', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000002'::uuid, true),
-        ('00000000-0000-4000-8000-000000000116'::uuid, 'vol_leader4', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000002'::uuid, true),
-        ('00000000-0000-4000-8000-000000000117'::uuid, 'vol_member4', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000002'::uuid, true),
-        ('00000000-0000-4000-8000-000000000118'::uuid, 'coord_seed', 'COORDINATOR', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, true),
-        ('00000000-0000-4000-8000-000000000120'::uuid, 'vol_climb_north1', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, true),
-        ('00000000-0000-4000-8000-000000000121'::uuid, 'vol_climb_north2', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, true),
-        ('00000000-0000-4000-8000-000000000122'::uuid, 'vol_climb_north3', 'VOLUNTEER', 'ORGANIZATION', '00000000-0000-4000-8000-000000000001'::uuid, true)
+      WITH fixture(user_id, username, role_code) AS (VALUES
+        ('00000000-0000-4000-8000-000000000112'::uuid, 'ops_seed', 'OPERATIONS_MANAGER'),
+        ('00000000-0000-4000-8000-000000000113'::uuid, 'citizen3', 'CITIZEN'),
+        ('00000000-0000-4000-8000-000000000114'::uuid, 'vol_leader3', 'VOLUNTEER'),
+        ('00000000-0000-4000-8000-000000000115'::uuid, 'vol_member3', 'VOLUNTEER'),
+        ('00000000-0000-4000-8000-000000000116'::uuid, 'vol_leader4', 'VOLUNTEER'),
+        ('00000000-0000-4000-8000-000000000117'::uuid, 'vol_member4', 'VOLUNTEER'),
+        ('00000000-0000-4000-8000-000000000118'::uuid, 'coord_seed', 'COORDINATOR'),
+        ('00000000-0000-4000-8000-000000000120'::uuid, 'vol_climb_north1', 'VOLUNTEER'),
+        ('00000000-0000-4000-8000-000000000121'::uuid, 'vol_climb_north2', 'VOLUNTEER'),
+        ('00000000-0000-4000-8000-000000000122'::uuid, 'vol_climb_north3', 'VOLUNTEER')
       )
       SELECT
         (SELECT count(*)::int
            FROM fixture f
            JOIN app_user u ON u.id = f.user_id AND u.username::text = f.username
                           AND u.status = 'ACTIVE'
-           JOIN role_grant g ON g.user_id = f.user_id AND g.role_code = f.role_code AND g.scope_type = f.scope_type
-                            AND g.organization_id IS NOT DISTINCT FROM f.organization_id
-                            AND g.campaign_id IS NULL AND g.revoked_at IS NULL
-           LEFT JOIN membership m ON m.user_id = f.user_id AND m.organization_id = f.organization_id AND m.status = 'ACTIVE'
-          WHERE NOT f.requires_membership OR m.user_id IS NOT NULL) AS users_ready,
-        (SELECT count(*)::int FROM organization WHERE status = 'ACTIVE' AND (
-            (id = '00000000-0000-4000-8000-000000000001' AND name = 'Trung tâm điều phối C48 (demo)' AND organization_kind = 'COORDINATION') OR
-            (id = '00000000-0000-4000-8000-000000000002' AND name = 'Hội tình nguyện miền Nam (demo)' AND organization_kind = 'VOLUNTEER'))) AS organizations_ready
+           JOIN role_grant g ON g.user_id = f.user_id AND g.role_code = f.role_code
+                            AND g.scope_type = 'SYSTEM' AND g.campaign_id IS NULL AND g.revoked_at IS NULL) AS users_ready,
+        (SELECT count(*)::int FROM role_grant g JOIN app_user u ON u.id = g.user_id
+          WHERE u.id = '00000000-0000-4000-8000-000000000118'
+            AND u.username::text = 'coord_seed' AND u.status = 'ACTIVE'
+            AND g.role_code = 'COORDINATOR' AND g.scope_type = 'CAMPAIGN'
+            AND g.campaign_id = '00000000-0000-4000-8000-0000000000c3'
+            AND g.revoked_at IS NULL) AS coordinator_campaign_ready
     `);
     const identityReady = identityPrerequisites.rows[0];
-    if (identityReady.users_ready !== 10 || identityReady.organizations_ready !== 2) {
-      throw new Error('Demo fixture ID or scope conflicts in Identity; dependent Response and Logistics fixtures were not seeded.');
+    if (identityReady.users_ready !== 10 || identityReady.coordinator_campaign_ready !== 1) {
+      throw new Error('Demo fixture ID or grant conflicts in Identity; dependent Response and Logistics fixtures were not seeded.');
     }
     const creators = await clients.get('identity').query(
       "SELECT id FROM app_user WHERE status = 'ACTIVE' ORDER BY created_at, id LIMIT 1",
@@ -203,7 +201,6 @@ try {
     const logisticsCampaign = await clients.get('response').query(
       `SELECT 1 FROM campaign
         WHERE id = '00000000-0000-4000-8000-0000000000c3'
-          AND organization_id = '00000000-0000-4000-8000-000000000001'
           AND name = 'Hỗ trợ khẩn cấp Nam'
           AND status = 'ACTIVE'`,
     );

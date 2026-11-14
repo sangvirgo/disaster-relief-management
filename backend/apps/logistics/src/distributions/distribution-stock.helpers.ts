@@ -38,10 +38,10 @@ export async function availableCommitmentLines(
     `SELECT cm.id,cm.item_id,cm.warehouse_id,cm.quantity::text,cm.released_quantity::text,cm.issued_quantity::text,u.scale AS unit_scale
        FROM commitment cm JOIN relief_need n ON n.id=cm.relief_need_id
        JOIN fulfillment_cycle c ON c.id=n.cycle_id JOIN item i ON i.id=cm.item_id JOIN unit u ON u.code=i.unit_code
-      WHERE cm.warehouse_id=$1 AND c.organization_id=$2 AND c.state='OPEN' AND n.status NOT IN ('CANCELLED','FULFILLED')
+      WHERE cm.warehouse_id=$1 AND ($2::uuid IS NULL OR c.campaign_id=$2::uuid) AND c.state='OPEN' AND n.status NOT IN ('CANCELLED','FULFILLED')
         AND cm.quantity > cm.released_quantity + cm.issued_quantity
       ORDER BY c.id,n.id,cm.id LIMIT 51`,
-    [distribution.warehouse_id, distribution.organization_id],
+    [distribution.warehouse_id, distribution.campaign_id],
   ) as Array<CommitmentContext & { unit_scale: number }>;
   if (rows.length > 50) throw new AppError('TOO_MANY_LINES', { status: 400 });
   return rows.map((row) => ({

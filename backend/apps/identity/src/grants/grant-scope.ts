@@ -3,7 +3,6 @@ import { Role, ScopeType } from '@c48/identity-contracts/permissions';
 export interface GrantScopeInput {
   role_code: Role;
   scope_type: ScopeType;
-  organization_id?: string | null;
   campaign_id?: string | null;
 }
 
@@ -12,17 +11,10 @@ export function isSelfGrant(actorId: string, userId: string): boolean {
 }
 
 export function grantScopeIsValid(grant: GrantScopeInput): boolean {
-  const organization = grant.organization_id ?? null;
   const campaign = grant.campaign_id ?? null;
-  const shape = grant.scope_type === 'SYSTEM'
-    ? organization === null && campaign === null
-    : grant.scope_type === 'ORGANIZATION'
-      ? organization !== null && campaign === null
-      : organization !== null && campaign !== null;
+  const shape = grant.scope_type === 'SYSTEM' ? campaign === null : campaign !== null;
   if (!shape) return false;
   if (grant.role_code === 'ADMIN') return grant.scope_type === 'SYSTEM';
-  if (grant.role_code === 'CITIZEN' || grant.role_code === 'VOLUNTEER') {
-    return grant.scope_type === 'SYSTEM' || grant.scope_type === 'ORGANIZATION';
-  }
-  return grant.scope_type !== 'SYSTEM';
+  if (grant.role_code === 'CITIZEN' || grant.role_code === 'VOLUNTEER') return grant.scope_type === 'SYSTEM';
+  return true;
 }

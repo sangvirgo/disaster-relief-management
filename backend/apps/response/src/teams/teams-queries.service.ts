@@ -9,7 +9,7 @@ import { ReporterSessionService } from '../requests/reporter-session';
 import { TeamPageQueryDto } from './teams.dto';
 import { teamView, TeamRow } from './teams.helpers';
 
-const teamSelect = `SELECT t.id,t.organization_id,t.name,t.team_kind,t.reporting_mode,
+const teamSelect = `SELECT t.id,t.name,t.team_kind,t.reporting_mode,
                            t.availability,t.status,t.readiness_required,t.version,t.created_at,
                            COALESCE(s.skills,ARRAY[]::text[]) AS skills,
                            CASE WHEN p.team_id IS NULL THEN NULL ELSE greatest(0,floor(extract(epoch FROM clock_timestamp()-p.captured_at)))::int END AS position_age_s,
@@ -26,17 +26,13 @@ function listFilters(route: string, userId: string, grants: unknown[], query: ob
   return { route, user_id: userId, grants, query: queryFilters };
 }
 
-function readScopeSql(grants: readonly { role_code: keyof typeof ROLE_PERMISSIONS; scope_type: string; organization_id: string | null; campaign_id?: string | null }[], userId: string, values: unknown[], alias = 't'): string {
+function readScopeSql(grants: readonly { role_code: keyof typeof ROLE_PERMISSIONS; scope_type: string }[], userId: string, values: unknown[], alias = 't'): string {
   const branches: string[] = [];
   for (const grant of grants) {
-    if (grant.role_code === 'ADMIN' && grant.scope_type === 'SYSTEM') {
+    const permissions: readonly string[] = ROLE_PERMISSIONS[grant.role_code];
+    if (grant.scope_type === 'SYSTEM' && permissions.includes('TEAM_READ')) {
       branches.push('TRUE');
       continue;
-    }
-    if (!ROLE_PERMISSIONS[grant.role_code].includes('TEAM_READ' as never) || !grant.organization_id) continue;
-    if (grant.scope_type === 'ORGANIZATION') {
-      values.push(grant.organization_id);
-      branches.push(`${alias}.organization_id=$${values.length}`);
     }
   }
   values.push(userId);
@@ -83,7 +79,7 @@ export class TeamsQueriesService {
     const items = rows.slice(0, limit);
     const next = more ? items.at(-1) : undefined;
     return {
-      items: items.map((row) => teamView(row, hasPermission(session.grants, 'TEAM_READ', { organizationId: row.organization_id }))),
+      items: items.map((row) => teamView(row, hasPermission(session.grants, 'TEAM_READ', { campaignId: null }))),
       more,
       ...(next ? { cursor: encodeKeysetCursor([next.id], next.id, filters) } : {}),
     };
@@ -93,7 +89,7 @@ export class TeamsQueriesService {
     const session = await this.sessions.require(request);
     const row = await this.findTeam(this.dataSource, teamId);
     if (!row) throw new AppError('NOT_FOUND', { status: 404 });
-    const coordinatorRead = hasPermission(session.grants, 'TEAM_READ', { organizationId: row.organization_id });
+    const coordinatorRead = hasPermission(session.grants, 'TEAM_READ', { campaignId: null });
     if (!coordinatorRead) {
       const members = await this.dataSource.query(
         'SELECT 1 FROM team_member WHERE team_id=$1 AND user_id=$2 AND left_at IS NULL LIMIT 1',

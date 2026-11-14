@@ -12,7 +12,7 @@
 
 This document provides the proposed technical baseline for the SRS, SDD, database/API design, test cases, and user guide. The three-service architecture and adapted workflows below are Reliva design proposals, not requirements imposed by the department or approved rescue policy.
 
-**For implementation and further research:** this is the full technical plan. **Section 28 (round-2 review, 2026-10-09) governs wherever it differs from older text.** Section27 records focused logic corrections and their schema/API acceptance gates while preserving all earlier sections and diagram assets. Appendix A adds execution guidance and remaining slice-specific contract gates. Sections 22 and 23 define the backend structure, business invariants, and resolved architecture-review decisions; Section 25 defines the reduced in-kind donation and delivery scope. Section 26 records supervisor feedback, unresolved interpretations and new acceptance cases; it governs scope where older detailed examples differ. Section 12 specifies the optional AI decision-support extension; Section 6.3 records the object-storage choice. This plan does not claim implementation benchmarks or executed product tests.
+**For implementation and further research:** this is the full technical plan. **Section 29 (no-organization authorization model, 2026-11-14) is the current authority for scope and ownership wherever it differs from earlier text; Sections 22–28 remain dated decision and evidence history.** Section 28 records the 2026-10-09 round-2 review and its prior organization-based assumptions. Section 27 records focused logic corrections and their schema/API acceptance gates. Appendix A adds execution guidance and remaining slice-specific contract gates. Sections 22 and 23 preserve backend structure and safeguards; Section 25 defines the reduced in-kind donation and delivery scope. Section 26 records supervisor feedback and acceptance cases. Section 12 specifies the optional AI decision-support extension; Section 6.3 records the object-storage choice. This plan does not claim implementation benchmarks or executed product tests.
 
 ## 1. Reading guide and confidence levels
 
@@ -32,7 +32,7 @@ Read the system overview and container architecture in Section 5, conceptual and
 
 | Current scope | Commitment |
 |---|---|
-| Core | SOS intake; signed-in proxy reporting; human verification and duplicate review; scoped authorization; nearby eligible team candidates with workload balance; missions; operational heatmap; campaigns; guest in-kind donations; independent receipt approval; basic stock/partial delivery and reports |
+| Core | SOS intake; signed-in proxy reporting; human verification and duplicate review; SYSTEM/CAMPAIGN authorization; nearby eligible team candidates with workload balance; missions; operational heatmap; campaigns; guest in-kind donations; independent receipt approval; basic stock/partial delivery and reports |
 | Deferred | Future pledges; inter-warehouse transfers; receipt-source allocation across pooled stock; FEFO automation; full stocktakes; multi-leg forwarding and source-level reconciliation; push/offline queues/AI remain conditional |
 | Excluded | Cash, bank transfers, payment gateways, checkout/order/payment flows, procurement, warehouse ERP, autonomous rescue triage/dispatch |
 
@@ -239,7 +239,7 @@ Response is the central emergency workflow owner. Each database has separate cre
 
 | Service | Owns | Example API surface |
 |---|---|---|
-| **Identity** | Accounts, credentials, organizations, memberships, scoped role grants, refresh sessions | Registration/login/session, user/role administration |
+| **Identity** | Accounts, credentials, SYSTEM/CAMPAIGN role grants, refresh sessions | Registration/login/session, user/grant administration |
 | **Response** | Campaigns, assistance requests and their incident categories, verification and priority history, teams, missions/progress, request evidence, request timeline | Intake, verification, duplicate review, triage, assignment, mission actions, scoped map/queue |
 | **Logistics** | Item/type/unit catalog, intake sites/basic stock, drives/declarations/receipts/reviews, opaque request-linked needs/commitments, vehicles, points and distributions | Guest in-kind intake, independently approved receipts, stock/issues, partial fulfillment and basic reconciliation; transfers/source batches/stocktakes deferred |
 
@@ -257,7 +257,7 @@ This is the main workflow adaptation from Sahana ShaRe's partial commitments and
 
 1. Response receives a request and keeps it in an internal verification queue. A coordinator records VERIFIED, REJECTED with reason, or DUPLICATE with a canonical request and reason. A possible duplicate search may suggest nearby reports by time, category, and location, but a person makes the decision.
 2. After verification, an authorized coordinator records structured assistance needs in Logistics. Logistics links each need to an opaque `request_id` and request work-cycle identifier; the request and need can be read together through the board without sharing tables.
-3. A need records requested quantity and item/unit. One or more warehouse/organization contributions can be committed. Under a transaction that locks the need row, delivered + committed/reserved + issued-but-not-delivered cannot exceed requested quantity. A cancellation releases an unissued commitment; an issued quantity must be delivered, returned, or recorded as loss.
+3. A need records requested quantity and item/unit. One or more global warehouses can contribute. Under a transaction that locks the need row, delivered + committed/reserved + issued-but-not-delivered cannot exceed requested quantity. A cancellation releases an unissued commitment; an issued quantity must be delivered, returned, or recorded as loss.
 4. Track quantities separately: requested, committed/reserved, issued, delivered, and outstanding. For a need that is not CANCELLED, `outstanding = requested - delivered`, where `requested` is the current effective quantity after any authorized reduction (original and every change stay in history); partial delivery never makes the need complete. A CANCELLED need contributes 0 to outstanding/backlog; its undelivered remainder is reported separately as `cancelled_remaining = requested_at_cancellation - delivered`. A coordinator can explicitly reduce/cancel a need with a reason, preserving its history.
 5. The request status, mission status, and fulfillment status remain separate. A mission completion does not close a request; a delivery does not mark a rescue mission complete. The coordinator confirms overall resolution after reviewing current mission and fulfillment evidence.
 

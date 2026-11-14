@@ -4,11 +4,10 @@ import type { DataSource } from 'typeorm';
 import type { Grant } from '@c48/identity-contracts/permissions';
 import { MapService } from '../src/map/map.service';
 
-const organizationId = '00000000-0000-4000-8000-000000000001';
 const userId = '00000000-0000-4000-8000-000000000002';
 const from = '2026-01-01T00:00:00Z';
 const to = '2026-01-02T00:00:00Z';
-const coordinatorGrant: Grant = { role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId };
+const coordinatorGrant: Grant = { role_code: 'COORDINATOR', scope_type: 'SYSTEM',};
 
 function setup(rows: unknown[] = [], projectionEpsg = 32648) {
   const query = jest.fn(async () => rows);
@@ -42,16 +41,28 @@ describe('MapService heatmap', () => {
     expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 
-  it('requires queue scope as well as map scope for the unverified layer', async () => {
-    const { service, dataSource, sessions } = setup();
+  it('keeps the unverified layer empty when the caller has no queue permission', async () => {
+    const { service, query, dataSource, sessions } = setup();
     sessions.require.mockResolvedValue({
       userId,
-      grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: organizationId }],
+      grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}],
     });
 
-    await expect(service.heatmap({ from, to, status_layer: 'unverified', campaign_id: '00000000-0000-4000-8000-000000000003' }, {} as Request))
-      .rejects.toMatchObject({ code: 'FORBIDDEN' });
-    expect(dataSource.transaction).not.toHaveBeenCalled();
+    const result = await service.heatmap({ from, to, status_layer: 'unverified' }, {} as Request);
+    expect(result).toMatchObject({ items: [], filters: { campaign_id: null } });
+    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[1]![0]).toContain('AND (FALSE)');
+  });
+
+  it('runs a system heatmap without campaign_id', async () => {
+    const { service, query } = setup();
+
+    const result = await service.heatmap({ from, to }, {} as Request);
+
+    expect(result).toMatchObject({ items: [], filters: { campaign_id: null } });
+    const sql = query.mock.calls[1]![0] as string;
+    expect(sql).toContain('(TRUE)');
+    expect(sql).not.toMatch(/r\.campaign_id=\$\d+::uuid/);
   });
 
   it('returns only aggregate GeoJSON and applies scope before bounded aggregation', async () => {
@@ -77,7 +88,7 @@ describe('MapService heatmap', () => {
     expect(sql).toContain('ST_ForcePolygonCCW');
     expect(sql).toContain('ST_Transform(center, 4326)');
     expect(sql).toContain('LIMIT 5001');
-    expect(sql).toContain('r.organization_id=$');
+    expect(sql).toContain('r.campaign_id=$');
     expect(sql).not.toMatch(/\bSELECT\s+(?:r\.)?id\b|reporter_contact_phone|tracking_code/i);
   });
 

@@ -154,7 +154,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     }
     let live = true;
     const sources = [
-      ['organizations', 'identity', '/organizations'],
       ['warehouses', 'logistics', '/warehouses'],
       ['drives', 'logistics', '/donation-drives'],
       ['items', 'logistics', '/items'],
@@ -178,7 +177,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         if (key === 'items') options.itemUnits = result.value.filter(item => item.id && string((item.unit as Row | undefined)?.display_name))
           .map(item => ({ value: item.id!, label: string((item.unit as Row).display_name) }));
         options[key] = result.value
-          .filter((item) => (key !== 'requests' || ['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(string(item.status))) && (item.id || item.code) && (!['campaigns', 'organizations', 'reliefPoints', 'warehouses', 'vehicles', 'items'].includes(key) || item.status === 'ACTIVE'))
+          .filter((item) => (key !== 'requests' || ['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(string(item.status))) && (item.id || item.code) && (!['campaigns', 'reliefPoints', 'warehouses', 'vehicles', 'items'].includes(key) || item.status === 'ACTIVE'))
           .map((item) => ({
             value: item.id!,
             label: key === 'requests'
@@ -235,10 +234,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       .finally(() => { if (live) setCommitmentsLoading(false); });
     return () => { live = false; };
   }, [page, revision, user.id]);
-  const organizationOptions = references.organizations?.length
-    ? references.organizations
-    : [...new Set(user.grants.map((grant) => grant.organization_id).filter((id): id is string => Boolean(id)))]
-        .map((id) => ({ value: id, label: `Tổ chức trong quyền của tôi · …${id.slice(-8)}` }));
   const warehouseOptions = [...(references.warehouses || [])];
   const campaignOptions = references.campaignNames || [];
   useEffect(() => {
@@ -266,7 +261,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     label: title,
     type: 'reference',
     required,
-    options: source === 'organizations' ? organizationOptions : source === 'warehouses' ? warehouseOptions : references[source] || [],
+    options: source === 'warehouses' ? warehouseOptions : references[source] || [],
     placeholder: `Dán mã ${title.toLocaleLowerCase('vi-VN')}`,
   });
   const route =
@@ -712,7 +707,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               </>}
               {page === 'assets' && <>
                 {asset !== 'vehicles' && <p><strong>{asset === 'warehouses' ? 'Tên kho' : 'Tên điểm cứu trợ'}</strong><span className="detail-value">{string(detail.name) || 'Chưa có tên'}</span></p>}
-                <p><strong>Tổ chức</strong><span className="detail-value">{organizationOptions.find(option => option.value === detail.organization_id)?.label || string(detail.organization_id) || 'Chưa có thông tin'}</span></p>
                 {asset === 'vehicles' && <>
                   <p><strong>Loại phương tiện</strong><span className="detail-value">{string(detail.vehicle_type) || 'Chưa có thông tin'}</span></p>
                   <p><strong>Sức chứa</strong><span className="detail-value">{detail.capacity == null ? 'Chưa khai báo' : `${quantity(detail.capacity)} ${label(detail.capacity_unit)}`}</span></p>
@@ -1276,7 +1270,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       rights.has('OPERATIONS_MANAGER')) &&
                     <>
                       <p>
-                        Thao tác này lấy mọi cam kết còn hiệu lực trong cùng kho và tổ chức, kể cả
+                        Thao tác này lấy mọi cam kết còn hiệu lực trong cùng kho, kể cả
                         cam kết của yêu cầu SOS khác. Kiểm tra các dòng hàng trước khi duyệt.
                       </p>
                       {command({
@@ -1285,7 +1279,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                         path: `/distributions/${id}/prepare-from-commitments`,
                         version,
                         warning:
-                          'Thay các dòng phiếu bằng mọi cam kết còn hiệu lực trong cùng kho và tổ chức, kể cả từ SOS khác?',
+                          'Thay các dòng phiếu bằng mọi cam kết còn hiệu lực trong cùng kho, kể cả từ SOS khác?',
                       })}
                     </>}
                   {['DRAFT', 'APPROVED'].includes(status) &&
@@ -1427,24 +1421,20 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             fields:
               asset === 'vehicles'
                 ? [
-                    referenceField('organization_id', 'Tổ chức', 'organizations', true),
                     { name: 'identifier', label: 'Biển số hoặc mã xe', required: true, maxLength: 100 },
                     { name: 'vehicle_type', label: 'Loại phương tiện', required: true, maxLength: 80 },
                   ]
                 : asset === 'warehouses'
                   ? [
-                      referenceField('organization_id', 'Tổ chức', 'organizations', true),
                       { name: 'name', label: 'Tên kho', required: true, maxLength: 200 },
                     ]
                   : [
-                      referenceField('organization_id', 'Tổ chức', 'organizations', true),
                       { name: 'name', label: 'Tên điểm cứu trợ', required: true, maxLength: 200 },
                       { name: 'location', label: 'Địa chỉ hoặc vị trí trên bản đồ', type: 'location', required: true },
                     ],
             build:
               asset === 'relief-points'
                 ? (values) => ({
-                    organization_id: values.organization_id,
                     name: values.name,
                     location: {
                       type: 'Point',

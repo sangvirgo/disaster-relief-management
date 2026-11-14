@@ -1,11 +1,12 @@
 import { validGrant } from '../src/permissions';
-const grant = { role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: '00000000-0000-4000-8000-000000000001' };
+const grant = { role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: '00000000-0000-4000-8000-000000000001' };
 it('accepts the shared Identity grant transport without making authorization decisions', () => {
   expect(validGrant(grant)).toBe(true);
 });
 it.each([
   null, [], {}, { ...grant, role_code: 'UNKNOWN' }, { ...grant, scope_type: 'UNKNOWN' },
-  { ...grant, organization_id: 'not-a-uuid' }, { ...grant, campaign_id: 'not-a-uuid' },
+  { ...grant, scope_type: 'ORGANIZATION' }, { ...grant, organization_id: '00000000-0000-4000-8000-000000000002' },
+  { ...grant, campaign_id: 'not-a-uuid' }, { ...grant, scope_type: 'SYSTEM' },
 ])('rejects malformed grants at both service boundaries: %j', (value) => {
   expect(validGrant(value)).toBe(false);
 });

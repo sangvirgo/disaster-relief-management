@@ -40,7 +40,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const safeEntry = entry ?? { status: 500, message: 'Hệ thống gặp lỗi. Vui lòng thử lại sau.' };
     const envelope: ErrorEnvelope = {
       code: safeCode,
-      message: safeEntry.message,
+      message: appError?.userMessage ?? safeEntry.message,
       correlation_id: correlationId,
       ...(appError?.fieldErrors ? { field_errors: appError.fieldErrors } : {}),
       ...(appError?.details ? { details: appError.details } : {}),

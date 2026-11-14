@@ -5,7 +5,7 @@ import type { DataSource } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
 import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
-import { hasWarehouseScope, stockWarehouseScopeSql } from '../stock/stock.scope';
+import { hasWarehouseScope, stockWarehouseScopeSql, type WarehouseScope } from '../stock/stock.scope';
 import { DistributionListQueryDto } from './distributions.dto';
 import type { DistributionHandoffKind } from './distributions.helpers';
 import { distributionView, loadDistribution, loadDistributions, readDistributionLines } from './distributions.read';
@@ -24,8 +24,8 @@ function validCursor(cursor: ReturnType<typeof decodeKeysetCursor>): boolean {
   return Number.isFinite(date.getTime()) && date.toISOString() === cursor.sort[0];
 }
 
-function requireReadScope(grants: Parameters<typeof hasWarehouseScope>[0], organizationId: string): void {
-  if (!hasWarehouseScope(grants, organizationId)) throw new AppError('NOT_FOUND', { status: 404 });
+function requireReadScope(grants: Parameters<typeof hasWarehouseScope>[0], scope: WarehouseScope): void {
+  if (!hasWarehouseScope(grants, scope)) throw new AppError('NOT_FOUND', { status: 404 });
 }
 
 @Injectable()
@@ -82,7 +82,7 @@ export class DistributionQueriesService {
   async detail(id: string, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     const distribution = await loadDistribution(this.dataSource, id);
-    requireReadScope(session.grants, distribution.organization_id);
+    requireReadScope(session.grants, distribution);
     const groupedLines = await readDistributionLines(this.dataSource, [id]);
     return distributionView(distribution, groupedLines.get(id) ?? []);
   }
@@ -90,7 +90,7 @@ export class DistributionQueriesService {
   async handoffDetail(distributionId: string, handoffId: string, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     const distribution = await loadDistribution(this.dataSource, distributionId);
-    requireReadScope(session.grants, distribution.organization_id);
+    requireReadScope(session.grants, distribution);
     const handoffs = await this.dataSource.query(
       'SELECT h.handoff_kind FROM handoff_record h WHERE h.distribution_id=$1 AND h.id=$2',
       [distributionId, handoffId],

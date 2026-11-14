@@ -421,7 +421,7 @@ test('text export refreshes only generated operations with documented schemas', 
   assert.deepEqual(merged.paths['/distributions'].post.requestBody.content['application/json'].schema.required, ['warehouse_id', 'purpose', 'lines']);
   assert.equal(merged.paths['/distributions'].post.requestBody.content['application/json'].schema.properties.purpose.enum.includes('REQUEST_AID'), true);
   assert.equal(merged.paths['/distributions'].post['x-c48-contract-gap'], undefined);
-  assert.ok(merged.paths['/distributions'].post.responses['201'].content['application/json'].schema.properties.organization_id);
+  assert.ok(merged.paths['/distributions'].post.responses['201'].content['application/json'].schema.properties.campaign_id);
 });
 
 test('OpenAPI detail application removes stale gaps after schemas are documented', () => {
@@ -743,7 +743,6 @@ test('documented pagination, evidence, stock movement, and relief point projecti
     identity: {
       listIdentityUsers: ['cursor', 'limit'],
       listIdentityUserGrants: ['cursor', 'limit'],
-      listIdentityOrganizations: ['cursor', 'limit'],
       listIdentityAuditLogs: ['cursor', 'limit'],
     },
     response: {
@@ -828,7 +827,7 @@ test('documented pagination, evidence, stock movement, and relief point projecti
 
   const reliefPoint = operationAt(logistics, 'get', '/relief-points/{id}');
   const reliefPointFields = reliefPoint.responses['200'].content['application/json'].schema.properties;
-  for (const field of ['id', 'organization_id', 'status', 'version', 'created_at', 'name', 'location', 'contact_note', 'operating_note']) {
+  for (const field of ['id', 'status', 'version', 'created_at', 'name', 'location', 'contact_note', 'operating_note']) {
     assert.ok(reliefPointFields[field], `relief point includes ${field}`);
   }
   assert.equal(reliefPoint['x-c48-contract-gap'], undefined);
@@ -986,7 +985,7 @@ test('documented request and report fields are carried in the per-service contra
   assert.equal(requestSchema.required?.includes('delivery_target_kind') ?? false, false, 'delivery_target_kind is optional');
   assert.ok(responseSchema.properties.delivery_target_kind);
   assert.equal(needs['x-c48-contract-gap'], undefined);
-  for (const field of ['id', 'cycle_id', 'request_id', 'work_cycle', 'organization_id', 'campaign_id', 'item_id', 'item', 'original_quantity', 'requested_quantity', 'cancelled_remaining', 'delivery_target_kind', 'designated_point_id', 'status', 'version', 'created_at']) {
+  for (const field of ['id', 'cycle_id', 'request_id', 'work_cycle', 'campaign_id', 'item_id', 'item', 'original_quantity', 'requested_quantity', 'cancelled_remaining', 'delivery_target_kind', 'designated_point_id', 'status', 'version', 'created_at']) {
     assert.ok(responseSchema.properties[field], `created need includes ${field}`);
   }
 
@@ -1074,9 +1073,9 @@ test('source-defined resolution, team, and asset projections have complete schem
   }
 
   const assetFields = {
-    '/warehouses': ['id', 'organization_id', 'status', 'version', 'created_at', 'name', 'location', 'location_public'],
-    '/relief-points': ['id', 'organization_id', 'status', 'version', 'created_at', 'name', 'location'],
-    '/vehicles': ['id', 'organization_id', 'status', 'version', 'created_at', 'identifier', 'vehicle_type', 'capacity', 'capacity_unit'],
+    '/warehouses': ['id', 'status', 'version', 'created_at', 'name', 'location', 'location_public'],
+    '/relief-points': ['id', 'status', 'version', 'created_at', 'name', 'location'],
+    '/vehicles': ['id', 'status', 'version', 'created_at', 'identifier', 'vehicle_type', 'capacity', 'capacity_unit'],
   };
   for (const [routePath, fields] of Object.entries(assetFields)) {
     const operation = operationAt(logistics, 'get', routePath);
@@ -1100,7 +1099,7 @@ test('source-defined Logistics projections and collection envelopes match their 
   };
 
   const distributionFields = [
-    'id', 'warehouse_id', 'organization_id', 'relief_point_id', 'vehicle_id', 'campaign_id', 'purpose', 'status',
+    'id', 'warehouse_id', 'relief_point_id', 'vehicle_id', 'campaign_id', 'purpose', 'status',
     'preparer_user_id', 'approver_user_id', 'approved_version', 'dispatch_actor_user_id', 'dispatched_at',
     'reconciled_at', 'created_at', 'version', 'vehicle_capacity_exceeded', 'lines',
   ];
@@ -1188,7 +1187,7 @@ test('source-defined Logistics projections and collection envelopes match their 
   }
 
   const needFields = [
-    'id', 'cycle_id', 'request_id', 'work_cycle', 'organization_id', 'campaign_id', 'item_id', 'item',
+    'id', 'cycle_id', 'request_id', 'work_cycle', 'campaign_id', 'item_id', 'item',
     'original_quantity', 'requested_quantity', 'cancelled_remaining', 'delivery_target_kind', 'designated_point_id', 'status', 'version', 'created_at',
   ];
   for (const operationId of ['logisticsNeedsCancel', 'logisticsNeedsIncrease', 'logisticsNeedsReduce']) {
@@ -1228,15 +1227,15 @@ test('source-defined Logistics projections and collection envelopes match their 
   expectFields('logisticsDonationsTrack', ['progress'], ['status']);
 
   const assetCommandFields = {
-    logisticsAssetsCreateWarehouse: ['id', 'organization_id', 'status', 'version', 'created_at', 'name', 'location', 'location_public', 'address_note'],
-    logisticsAssetsPatchWarehouse: ['id', 'organization_id', 'status', 'version', 'created_at', 'name', 'location', 'location_public', 'address_note'],
-    logisticsAssetsDeactivateWarehouse: ['id', 'organization_id', 'status', 'version', 'created_at', 'name', 'location', 'location_public', 'address_note'],
-    logisticsAssetsCreateReliefPoint: ['id', 'organization_id', 'status', 'version', 'created_at', 'name', 'location', 'contact_note', 'operating_note'],
-    logisticsAssetsPatchReliefPoint: ['id', 'organization_id', 'status', 'version', 'created_at', 'name', 'location', 'contact_note', 'operating_note'],
-    logisticsAssetsDeactivateReliefPoint: ['id', 'organization_id', 'status', 'version', 'created_at', 'name', 'location', 'contact_note', 'operating_note'],
-    logisticsAssetsCreateVehicle: ['id', 'organization_id', 'status', 'version', 'created_at', 'identifier', 'vehicle_type', 'capacity', 'capacity_unit'],
-    logisticsAssetsPatchVehicle: ['id', 'organization_id', 'status', 'version', 'created_at', 'identifier', 'vehicle_type', 'capacity', 'capacity_unit'],
-    logisticsAssetsDeactivateVehicle: ['id', 'organization_id', 'status', 'version', 'created_at', 'identifier', 'vehicle_type', 'capacity', 'capacity_unit'],
+    logisticsAssetsCreateWarehouse: ['id', 'status', 'version', 'created_at', 'name', 'location', 'location_public', 'address_note'],
+    logisticsAssetsPatchWarehouse: ['id', 'status', 'version', 'created_at', 'name', 'location', 'location_public', 'address_note'],
+    logisticsAssetsDeactivateWarehouse: ['id', 'status', 'version', 'created_at', 'name', 'location', 'location_public', 'address_note'],
+    logisticsAssetsCreateReliefPoint: ['id', 'status', 'version', 'created_at', 'name', 'location', 'contact_note', 'operating_note'],
+    logisticsAssetsPatchReliefPoint: ['id', 'status', 'version', 'created_at', 'name', 'location', 'contact_note', 'operating_note'],
+    logisticsAssetsDeactivateReliefPoint: ['id', 'status', 'version', 'created_at', 'name', 'location', 'contact_note', 'operating_note'],
+    logisticsAssetsCreateVehicle: ['id', 'status', 'version', 'created_at', 'identifier', 'vehicle_type', 'capacity', 'capacity_unit'],
+    logisticsAssetsPatchVehicle: ['id', 'status', 'version', 'created_at', 'identifier', 'vehicle_type', 'capacity', 'capacity_unit'],
+    logisticsAssetsDeactivateVehicle: ['id', 'status', 'version', 'created_at', 'identifier', 'vehicle_type', 'capacity', 'capacity_unit'],
   };
   for (const [operationId, fields] of Object.entries(assetCommandFields)) expectFields(operationId, [], fields);
 
@@ -1259,13 +1258,13 @@ test('source-defined Logistics projections and collection envelopes match their 
   ]);
   expectFields('logisticsDrivesList', [], ['items', 'more', 'cursor']);
   expectFields('logisticsDrivesList', ['items', '[]'], [
-    'id', 'organization_id', 'intake_warehouse_id', 'campaign_id', 'campaign_status', 'campaign_status_at', 'status',
+    'id', 'intake_warehouse_id', 'campaign_id', 'campaign_status', 'campaign_status_at', 'status',
     'title', 'description', 'opens_at', 'closes_at', 'version', 'created_at', 'cursor_created_at', 'items',
   ]);
   expectFields('logisticsDrivesList', ['items', '[]', 'items', '[]'], ['drive_id', 'item_id', 'item_name', 'item_type_name', 'unit_code', 'unit_name', 'scale', 'target_quantity', 'acceptance_note', 'accepted_total']);
   for (const operationId of ['logisticsDrivesCreate', 'logisticsDrivesPatch', 'logisticsDrivesOpen', 'logisticsDrivesPause', 'logisticsDrivesResume', 'logisticsDrivesClose']) {
     expectFields(operationId, [], [
-      'id', 'organization_id', 'intake_warehouse_id', 'campaign_id', 'campaign_status', 'campaign_status_at', 'status',
+      'id', 'intake_warehouse_id', 'campaign_id', 'campaign_status', 'campaign_status_at', 'status',
       'title', 'description', 'opens_at', 'closes_at', 'version', 'created_at', 'items',
     ]);
     expectFields(operationId, ['items', '[]'], ['item_id', 'item_name', 'target_quantity', 'acceptance_note', 'item_type_name', 'unit_code', 'unit_name', 'scale']);

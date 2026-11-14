@@ -37,9 +37,6 @@ export class CreateTeamDto {
   @IsString() @MaxLength(200) @Matches(/\S/u)
   name!: string;
 
-  @IsUUID('all')
-  organization_id!: string;
-
   @IsIn(['VOLUNTEER', 'MILITARY', 'GOVERNMENT', 'OTHER'])
   team_kind!: 'VOLUNTEER' | 'MILITARY' | 'GOVERNMENT' | 'OTHER';
 

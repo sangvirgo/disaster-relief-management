@@ -16,56 +16,47 @@ export const ROLE_PERMISSIONS = {
   INTAKE_STAFF: ['REQUEST_CREATE_PROXY', 'DONATION_INTAKE', 'DISTRIBUTION_PREPARE', 'DISTRIBUTION_DISPATCH', 'STOCK_ADJUST_REQUEST'],
   REVIEWER: ['DONATION_REVIEW', 'DISTRIBUTION_REVIEW', 'LOSS_APPROVE', 'ADJUSTMENT_REVIEW'],
   DISTRIBUTION_STAFF: ['REQUEST_CREATE_PROXY', 'DISTRIBUTION_PREPARE', 'DISTRIBUTION_DISPATCH', 'HANDOFF_RECORD', 'STOCK_ADJUST_REQUEST'],
-  ADMIN: ['USER_MANAGE', 'GRANT_MANAGE', 'ORG_MANAGE', 'AUDIT_READ', 'REQUEST_CREATE_PROXY', 'REPORT_READ', 'TEAM_READ', 'TEAM_MANAGE_ANY'],
+  ADMIN: ['USER_MANAGE', 'GRANT_MANAGE', 'AUDIT_READ', 'REQUEST_CREATE_PROXY', 'REPORT_READ', 'TEAM_READ', 'TEAM_MANAGE_ANY'],
 } as const;
 
 export type Role = keyof typeof ROLE_PERMISSIONS;
 export type Permission = (typeof ROLE_PERMISSIONS)[Role][number];
-export type ScopeType = 'SYSTEM' | 'ORGANIZATION' | 'CAMPAIGN';
+export type ScopeType = 'SYSTEM' | 'CAMPAIGN';
 
 export interface Grant {
   role_code: Role;
   scope_type: ScopeType;
-  organization_id: string | null;
   campaign_id?: string | null;
 }
 
 export interface ScopeTarget {
-  organizationId?: string;
   campaignId?: string | null;
   systemAction?: Permission;
 }
 
-function matchesScope(grant: Grant, target: ScopeTarget, permission: Permission): boolean {
-  if (grant.role_code === 'ADMIN') return grant.scope_type === 'SYSTEM' && grant.organization_id === null && !grant.campaign_id &&
-    (target.systemAction === permission || ((permission === 'TEAM_READ' || permission === 'TEAM_MANAGE_ANY') && Boolean(target.organizationId)));
-  if (grant.role_code === 'CITIZEN' || grant.role_code === 'VOLUNTEER') {
-    if (!['SYSTEM', 'ORGANIZATION'].includes(grant.scope_type)) return false;
-  } else if (grant.scope_type === 'SYSTEM') {
-    return false;
-  }
-  if (grant.scope_type === 'SYSTEM') return grant.organization_id === null && !grant.campaign_id && target.systemAction === permission;
-  if (!target.organizationId || grant.organization_id !== target.organizationId) return false;
-  if (grant.scope_type === 'ORGANIZATION') return !grant.campaign_id;
+function matchesScope(grant: Grant, target: ScopeTarget): boolean {
+  if ((grant.role_code === 'CITIZEN' || grant.role_code === 'VOLUNTEER') && grant.scope_type !== 'SYSTEM') return false;
+  if (grant.role_code === 'ADMIN' && grant.scope_type !== 'SYSTEM') return false;
+  if (grant.scope_type === 'SYSTEM') return !grant.campaign_id;
   return Boolean(grant.campaign_id) && grant.campaign_id === target.campaignId;
 }
 
 export function hasPermission(grants: readonly Grant[], permission: Permission, target: ScopeTarget): boolean {
   return grants.some((grant) => {
     const permissions: readonly string[] = ROLE_PERMISSIONS[grant.role_code];
-    return permissions.includes(permission) && matchesScope(grant, target, permission);
+    return permissions.includes(permission) && matchesScope(grant, target);
   });
 }
 
-const scopes = new Set(['SYSTEM', 'ORGANIZATION', 'CAMPAIGN']);
+const scopes = new Set(['SYSTEM', 'CAMPAIGN']);
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 /** Validate transport shape only; authorization still evaluates role, action and scope. */
 export function validGrant(value: unknown): value is Grant {
   if (!value || typeof value !== 'object') return false;
   const grant = value as Record<string, unknown>;
-  return typeof grant.role_code === 'string' && Object.hasOwn(ROLE_PERMISSIONS, grant.role_code) &&
-    typeof grant.scope_type === 'string' && scopes.has(grant.scope_type) &&
-    (grant.organization_id === null || (typeof grant.organization_id === 'string' && uuidPattern.test(grant.organization_id))) &&
-    (grant.campaign_id === null || grant.campaign_id === undefined || (typeof grant.campaign_id === 'string' && uuidPattern.test(grant.campaign_id)));
+  if (Object.hasOwn(grant, 'organization_id') || typeof grant.role_code !== 'string' || !Object.hasOwn(ROLE_PERMISSIONS, grant.role_code) ||
+      typeof grant.scope_type !== 'string' || !scopes.has(grant.scope_type)) return false;
+  if (grant.scope_type === 'SYSTEM') return grant.campaign_id === null || grant.campaign_id === undefined;
+  return typeof grant.campaign_id === 'string' && uuidPattern.test(grant.campaign_id);
 }

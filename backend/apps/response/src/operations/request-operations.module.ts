@@ -18,6 +18,8 @@ import { RequestAdmissionService } from './request-admission.service';
 import { RequestCampaignAssociationService } from './request-campaign-association.service';
 import { ResponseServiceTokenGuard } from '../campaigns/service-token.guard';
 import { RequestOperationsAiAdvisoryService } from './request-operations.ai-advisory.service';
+import { RequestClaimService } from './request-claims.service';
+import { RequestClaimGuard } from './request-claims.guard';
 
 @Module({
   imports: [RequestIntakeModule],
@@ -37,9 +39,11 @@ import { RequestOperationsAiAdvisoryService } from './request-operations.ai-advi
     RequestOperationsTeamCandidatesService,
     RequestOperationsAiAdvisoryService,
     RequestCampaignAssociationService,
+    RequestClaimGuard,
+    RequestClaimService,
     RequestAdmissionService,
     ResponseServiceTokenGuard,
   ],
-  exports: [RequestOperationsService],
+  exports: [RequestOperationsService, RequestClaimGuard],
 })
 export class RequestOperationsModule {}

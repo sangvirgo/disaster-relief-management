@@ -11,6 +11,8 @@ export interface AppErrorOptions {
   fieldErrors?: Record<string, string[]>;
   details?: Record<string, unknown>;
   retryAfterSeconds?: number;
+  /** Vietnamese message built at the application boundary (for example, naming the current holder). Overrides the catalog message. */
+  userMessage?: string;
   cause?: unknown;
 }
 
@@ -20,6 +22,7 @@ export class AppError extends Error {
   readonly fieldErrors?: Record<string, string[]>;
   readonly details?: Record<string, unknown>;
   readonly retryAfterSeconds?: number;
+  readonly userMessage?: string;
 
   constructor(code: string, options: AppErrorOptions = {}) {
     super(code, options.cause === undefined ? undefined : { cause: options.cause });
@@ -29,5 +32,6 @@ export class AppError extends Error {
     if (options.fieldErrors !== undefined) this.fieldErrors = options.fieldErrors;
     if (options.details !== undefined) this.details = options.details;
     if (options.retryAfterSeconds !== undefined) this.retryAfterSeconds = options.retryAfterSeconds;
+    if (options.userMessage !== undefined) this.userMessage = options.userMessage;
   }
 }

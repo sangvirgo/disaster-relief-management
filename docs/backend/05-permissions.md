@@ -1,21 +1,21 @@
 # 05 — Roles, permissions and scope rules
 
-Roles are a **code catalog** (`role_grant.role_code` CHECK in [identity.sql](schema/identity.sql)); the role → permission map below is a TypeScript constant shared by the three services through `packages/technical` (data only, no logic). Identity introspection returns the user's live grants; each service evaluates `permission ∧ scope ∧ object relationship`. Hidden UI is never a control.
+Roles are a code catalog (`role_grant.role_code` CHECK in [identity.sql](schema/identity.sql)); the role-to-permission map is shared by the three services through `@c48/identity-contracts`. Identity introspection returns the user's live grants; each service evaluates `permission ∧ scope ∧ object relationship`. Hidden UI is never a control.
 
-## 1. Role → permission map
+## 1. Role-to-permission map
 
-● = granted. Team leader/member is **not** a role: it is the `team_member` relationship in Response. Citizen/guest rights are ownership/capability based, not grants.
+● = granted. Team leader/member is an explicit `team_member` relationship in Response. Citizen rights are based on ownership or a valid capability, not staff permissions.
 
 | Permission | CITIZEN | VOLUNTEER | COORDINATOR | CAMPAIGN_MANAGER | OPERATIONS_MANAGER | INTAKE_STAFF | REVIEWER | DISTRIBUTION_STAFF | ADMIN |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| `USER_MANAGE`, `GRANT_MANAGE`, `ORG_MANAGE` (session revocation happens as a side effect of these) |  |  |  |  |  |  |  |  | ● |
+| `USER_MANAGE`, `GRANT_MANAGE` |  |  |  |  |  |  |  |  | ● |
 | `AUDIT_READ` (Identity and Logistics audit) |  |  |  |  |  |  |  |  | ● |
 | `REQUEST_CREATE_PROXY` (needs live session) | ● | ● | ● | ● | ● | ● | ● | ● | ● |
 | `REQUEST_QUEUE_READ`, `REQUEST_DETAIL_READ`, `TEAM_READ`, `MISSION_OVERDUE_READ`, `CAMPAIGN_READ` |  |  | ● |  |  |  |  |  |  |
 | `REQUEST_VERIFY`, `REQUEST_TRIAGE`, `REQUEST_CANCEL`, `REQUEST_REOPEN`, `REQUEST_RESOLVE` |  |  | ● |  |  |  |  |  |  |
 | `MISSION_ASSIGN`, `MISSION_RECORD_ON_BEHALF`, `TEAM_MANAGE_ANY`, `TEAM_POSITION_SET_ANY` |  |  | ● |  |  |  |  |  |  |
 | `MAP_READ` (heatmap, grouped queue) |  |  | ● |  | ● |  |  |  |  |
-| `CAMPAIGN_READ` (also granted independently to managers) |  |  | ● | ● | ● |  |  |  |  |
+| `CAMPAIGN_READ` |  |  | ● | ● | ● |  |  |  |  |
 | `CAMPAIGN_MANAGE` |  |  | ● | ● | ● |  |  |  |  |
 | `REPORT_READ` (Response/Logistics aggregates) |  |  | ● | ● | ● |  |  |  | ● |
 | `CATALOG_MANAGE`, `ASSET_MANAGE` (items, warehouses, vehicles, points) |  |  |  |  | ● |  |  |  |  |
@@ -27,45 +27,46 @@ Roles are a **code catalog** (`role_grant.role_code` CHECK in [identity.sql](sch
 | `DISTRIBUTION_PREPARE` |  |  |  |  | ● | ● |  | ● |  |
 | `DISTRIBUTION_REVIEW` (approve) |  |  |  |  | ● |  | ● |  |  |
 | `DISTRIBUTION_DISPATCH` (issue stock) |  |  |  |  |  | ● |  | ● |  |
-| `HANDOFF_RECORD` (DIRECT_HOUSEHOLD, POINT_RECEIPT, HOUSEHOLD_HANDOUT, and LOSS recording) |  |  |  |  |  |  |  | ● |  |
-| RETURN handoff recording (`DONATION_INTAKE` or `DISTRIBUTION_DISPATCH`) |  |  |  |  |  | ● |  | ● |  |
+| `HANDOFF_RECORD` (direct delivery, point receipt, household handout, return and loss recording) |  |  |  |  |  |  |  | ● |  |
 | `LOSS_APPROVE`, `ADJUSTMENT_REVIEW` |  |  |  |  | ● |  | ● |  |  |
 | `STOCK_ADJUST_REQUEST` |  |  |  |  |  | ● |  | ● |  |
 
-○ = only when the grant row carries the explicit extra permission `DONATION_REVIEW` (stored as an additional `role_grant` with role `REVIEWER`; there is no implicit review right for managers or intake staff). ADMIN has **no** request/victim/donor detail permission.
-
-Role/scope pairs are enforced by the `role_scope` CHECK in `identity.sql`: ADMIN only `SYSTEM`; CITIZEN/VOLUNTEER `SYSTEM` or `ORGANIZATION`; every staff role `ORGANIZATION` or `CAMPAIGN` (never `SYSTEM`). Self-grant is refused by the service. `GET` endpoints with no row above need only a valid session plus object scope (e.g. own notices, own team).
+○ = only when a separate `REVIEWER` grant is present; there is no implicit review right for managers or intake staff. ADMIN has no request, victim or donor detail permission. Self-grant is refused by Identity.
 
 ## 2. Scope matching
 
-A grant is `(role, scope_type, organization, campaign?)`.
+A grant is `(role_code, scope_type, campaign_id?)`. The only `scope_type` values are `SYSTEM` and `CAMPAIGN`.
 
-1. Alternative grants combine with **OR**; within one grant, action ∧ owning organization ∧ selected scope combine with **AND**.
-2. `ORGANIZATION` scope covers all campaigns, requests and assets of that organization; `CAMPAIGN` covers objects whose `campaign_id` matches. `SYSTEM` is an explicit, named-action exception, never implied by ADMIN.
-3. Campaign grants always carry the parent organization; no grant crosses organizations.
-4. Campaign values in a grant are validated through the owning API at grant time.
+A soft request claim (`handled_by`, 15-minute inactivity window) does not change scope: a coordinator may claim only requests inside the coordinator's own campaign scope (or unattached requests with a SYSTEM grant). Another coordinator's active claim blocks coordination commands except for a SYSTEM coordinator, whose takeover is audited (`CLAIM_TAKEN_OVER`).
 
-## 3. Object-level rules (checked in addition to permission)
+1. Alternative grants combine with **OR**. Each grant must independently match the action and object scope.
+2. `SYSTEM` is an explicit grant that covers all eligible objects, including SOS requests without a campaign. It is not implied by ADMIN.
+3. `CAMPAIGN` covers only objects whose `campaign_id` matches the grant. It never covers an SOS request whose `campaign_id` is `NULL`.
+4. A user may receive both SYSTEM and CAMPAIGN grants; the demo coordinator does so to exercise both queues.
+5. Campaign identifiers are validated by the owning API. They are opaque references without cross-service foreign keys.
+6. Logistics assets without campaign attribution are shared catalog resources and require a SYSTEM grant. Campaign-attributed drives, fulfillment cycles and distributions may be accessed through the matching campaign grant or SYSTEM.
+
+The coordinator's shared intake queue is filtered by `unassigned=true` and contains only rows where `campaign_id IS NULL`. The request scope predicate is still applied first: a campaign-only coordinator receives no unassigned rows.
+
+## 3. Object-level rules
 
 | Object | Rule |
 |---|---|
-| Assistance request | Reporter (account owner or valid tracking secret) sees own request, REPORTER-visibility timeline, may supplement in permitted states. Staff need `REQUEST_*` + scope. Assigned team leader/members see only the task fields in 03 §"Mission view". Contact phones: reporter, scoped coordinators, assigned team **leader** only. |
-| Mission | Read: active team members and scoped coordinators. Accept/decline/advance/result: **active leader only**. Cancel/fail/record-on-behalf: scoped coordinator with reason. |
-| Team | Edit own team: active leader. `TEAM_MANAGE_ANY`: scoped coordinator. |
-| Evidence | Download requires current authorization on the owning request/mission/donation/handoff; signed URL TTL 60 s. Handoff access also requires matching warehouse scope. RETURN handoffs require `DONATION_INTAKE` or `DISTRIBUTION_DISPATCH`; other handoff detail/evidence reads require `HANDOFF_RECORD`, except LOSS reads also allow `LOSS_APPROVE` so an independent reviewer can inspect evidence. Recording or uploading LOSS evidence still requires `HANDOFF_RECORD`. |
-| Donation | Account owner or valid donation secret; staff via drive/intake-site scope. Receipt number/name/phone alone grants nothing. |
-| Distribution | Approver differs from preparer and dispatcher; preparer may dispatch (DB CHECK + service). Recorder of a handoff ≠ its receiver. LOSS approver ≠ recorder. |
-| Receipt | Reviewer ≠ every count author (service rule + test). |
+| Assistance request | Reporter (account owner or valid tracking secret) sees their own request, reporter-visible timeline and permitted supplements. Staff need the relevant `REQUEST_*` permission and matching scope. An unassigned request is visible only through SYSTEM scope. |
+| Mission | Read: active team members and appropriately scoped coordinators. Accept, decline, advance and report result: active leader only. Cancel, fail and record-on-behalf: authorized coordinator with a reason. |
+| Team | Team resources are shared system-wide. Membership and active-leader checks remain separate from campaign access. Mission suggestions use skills, distance, availability and active-mission capacity; they never assign a team. |
+| Evidence | Download requires current authorization on the owning request, mission, donation or handoff; signed URL TTL is 60 seconds. RETURN evidence needs `DONATION_INTAKE` or `DISTRIBUTION_DISPATCH`; other handoff reads need `HANDOFF_RECORD`, except LOSS reads also allow `LOSS_APPROVE` for independent review. Recording or uploading LOSS evidence still needs `HANDOFF_RECORD`. |
+| Donation | Account owner or valid donation capability may use public tracking. Staff need the drive's campaign scope or SYSTEM. Receipt number, name and phone grant no access. |
+| Distribution | Approver differs from preparer and dispatcher; preparer may dispatch (database CHECK plus service). A handoff recorder differs from its receiver. LOSS approver differs from recorder. |
+| Receipt | Reviewer differs from every count author (service rule and test). |
 | Notices | Only the recipient. |
 
-## 4. PII inventory (never in logs, maps, heatmap cells, dashboards, AI input, signed-URL names)
+## 4. PII inventory
 
-`assistance_request.reporter_name/reporter_contact_phone`, `request_subject.*contact*`, `alternate_contact_*`, `location` (exact), `contact_attempt.note`, `donation_delivery.donor_name/donor_phone`, `handoff_record.receiver_label`, `rescue_team.external_contact_note` (commander/unit phone; never in list rows), free-text descriptions. Public endpoints expose none of these.
+Never log or expose in maps, heatmap cells, dashboards, AI input or signed-URL names: `assistance_request.reporter_name/reporter_contact_phone`, `request_subject.*contact*`, `alternate_contact_*`, exact `location`, `contact_attempt.note`, `donation_delivery.donor_name/donor_phone`, `handoff_record.receiver_label`, `rescue_team.external_contact_note`, and free-text descriptions. Public endpoints expose none of these.
 
-## 5. Guest and public surface (the only unauthenticated routes)
+## 5. Guest and public surface
 
 `POST /identity/auth/register|login|refresh` · `POST /response/requests` (SELF) · `GET /response/requests/track` · `POST /response/requests/{id}/supplements` · `POST /response/requests/{id}/evidence` (guest, secret) · `GET /response/public/campaigns` · `GET /logistics/public/donation-drives[/{id}]` · `POST /logistics/public/donation-drives/{id}/deliveries` · `GET|POST /logistics/public/donations/{id}…` (capability). Everything else requires a session.
 
-Focused logic: COORDINATOR teams need no account/leader; scoped coordinator records sourced progress. APP direct actions retain active-leader guards. Ready cannot bypass the active-cancel latch. RETURN warehouse recorder may use DONATION_INTAKE or DISTRIBUTION_DISPATCH + receiving-site scope, distinct from dispatcher. LOSS_APPROVE is exercised through authenticated independent review, never a supplied actor id. Public request-category catalog contains no victim data; recovery redemption requires a live session plus purpose-bound code.
-
-Round-2 (plan §28): `MISSION_CLAIM_DELIVERY` is an object relationship (active leader of an eligible APP team), not a role grant. Coordinator `record-on-behalf` also covers DECLINE and delivery handoffs through Response; the carrier needs no Logistics grant (Response calls Logistics with the signed actor). System actor `SYSTEM` appears only in automatic events (cascades only) and holds no login.
+Coordinator teams need no account or leader; scoped coordinators record sourced progress. APP direct actions retain active-leader guards. Readiness cannot bypass the active-cancel latch. RETURN warehouse recording requires `DONATION_INTAKE` or `DISTRIBUTION_DISPATCH`; LOSS approval is an independent authenticated review, never a supplied actor ID. Public request-category catalogs contain no victim data; recovery redemption requires a live session plus a purpose-bound code.

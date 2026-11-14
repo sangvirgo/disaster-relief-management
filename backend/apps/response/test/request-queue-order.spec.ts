@@ -6,8 +6,7 @@ import { filtersHash } from '../src/operations/request-operations.helpers';
 const requestId = '00000000-0000-4000-8000-000000000001';
 const userId = '00000000-0000-4000-8000-000000000002';
 const grants = [{
-  role_code: 'COORDINATOR', scope_type: 'ORGANIZATION',
-  organization_id: '00000000-0000-4000-8000-000000000003',
+  role_code: 'COORDINATOR', scope_type: 'SYSTEM',
   campaign_id: null,
 }] as const;
 
@@ -36,5 +35,14 @@ describe('coordinator queue order', () => {
     expect(sql).toMatch(/\(r\.received_at,r\.id\)<\(\$\d+::timestamptz,\$\d+::uuid\)/);
     expect(values).toContain('2026-10-28T12:34:56.123456Z');
     expect(values).toContain(requestId);
+  });
+
+  it('filters the shared queue to requests without a campaign', async () => {
+    const { service, dataSource } = makeService();
+
+    await service.queue({ unassigned: 'true' }, {} as never);
+
+    const [sql] = dataSource.query.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sql).toContain('r.campaign_id IS NULL');
   });
 });

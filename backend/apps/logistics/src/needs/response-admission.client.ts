@@ -16,7 +16,6 @@ export interface ResponseAdmission {
   work_cycle: number;
   version: number;
   status: 'VERIFIED' | 'TRIAGED' | 'DISPATCHED' | 'IN_PROGRESS';
-  organization_id: string;
   campaign_id: string | null;
 }
 
@@ -118,7 +117,7 @@ export class ResponseAdmissionClient implements OnModuleDestroy {
     if (row.request_id !== requestId || row.work_cycle !== workCycle ||
         typeof row.version !== 'number' || !Number.isSafeInteger(row.version) || row.version < 1 ||
         typeof row.status !== 'string' || !eligibleStatuses.has(row.status as ResponseAdmission['status']) ||
-        typeof row.organization_id !== 'string' || !uuidPattern.test(row.organization_id) ||
+
         !(row.campaign_id === null || (typeof row.campaign_id === 'string' && uuidPattern.test(row.campaign_id)))) {
       throw unavailable();
     }

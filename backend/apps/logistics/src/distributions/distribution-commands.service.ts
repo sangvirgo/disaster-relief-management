@@ -21,18 +21,17 @@ type DistributionRequest = Request & { idempotencyKey?: string };
 
 interface WarehouseContext {
   id: string;
-  organization_id: string;
 }
 
 function requireScope(
   grants: Parameters<typeof hasWarehouseScope>[0],
   permission: 'DISTRIBUTION_PREPARE' | 'DISTRIBUTION_REVIEW' | 'DISTRIBUTION_DISPATCH',
-  distribution: Pick<DistributionContext, 'organization_id'>,
+  distribution: Pick<DistributionContext, 'campaign_id'>,
 ): void {
-  if (!hasWarehouseScope(grants, distribution.organization_id)) {
+  if (!hasWarehouseScope(grants, distribution)) {
     throw new AppError('NOT_FOUND', { status: 404 });
   }
-  requireWarehousePermission(grants, permission, distribution.organization_id);
+  requireWarehousePermission(grants, permission, distribution);
 }
 
 function distributionState(row: DistributionContext): Record<string, unknown> {
@@ -51,15 +50,13 @@ export class DistributionCommandsService {
   async create(dto: CreateDistributionDto, request: DistributionRequest): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
     const key = idempotencyKey(request);
-    const warehouse = await this.loadWarehouse(this.dataSource, dto.warehouse_id);
-    requireScope(session.grants, 'DISTRIBUTION_PREPARE', {
-      organization_id: warehouse.organization_id,
-    });
+    await this.loadWarehouse(this.dataSource, dto.warehouse_id);
+    requireScope(session.grants, 'DISTRIBUTION_PREPARE', { campaign_id: dto.campaign_id ?? null });
     this.assertPurpose(dto.purpose, dto.campaign_id, dto.relief_point_id);
     assertLinePurpose(dto.purpose, dto.lines);
     let campaignError: AppError | undefined;
     try {
-      await this.assertCampaign(dto, warehouse.organization_id);
+      await this.assertCampaign(dto);
     } catch (error) {
       if (!(error instanceof AppError)) throw error;
       campaignError = error;
@@ -72,19 +69,17 @@ export class DistributionCommandsService {
       requestHash: canonicalRequestHash(dto),
       databaseErrorMappings: { check: { stock_balance_check: 'INSUFFICIENT_STOCK' } },
       execute: async (manager) => {
-        const lockedWarehouse = await lockDistributionAssets(manager, {
+        await lockDistributionAssets(manager, {
           warehouse_id: dto.warehouse_id,
           relief_point_id: dto.relief_point_id ?? null,
           vehicle_id: dto.vehicle_id ?? null,
         });
-        requireScope(session.grants, 'DISTRIBUTION_PREPARE', {
-          organization_id: lockedWarehouse.organization_id,
-        });
+        requireScope(session.grants, 'DISTRIBUTION_PREPARE', { campaign_id: dto.campaign_id ?? null });
         if (campaignError) throw campaignError;
         const inserted = await manager.query(
-          `INSERT INTO distribution (warehouse_id,organization_id,relief_point_id,vehicle_id,campaign_id,purpose,preparer_user_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-          [dto.warehouse_id, lockedWarehouse.organization_id, dto.relief_point_id ?? null, dto.vehicle_id ?? null,
+          `INSERT INTO distribution (warehouse_id,relief_point_id,vehicle_id,campaign_id,purpose,preparer_user_id)
+           VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+          [dto.warehouse_id, dto.relief_point_id ?? null, dto.vehicle_id ?? null,
             dto.campaign_id ?? null, dto.purpose, session.userId],
         ) as Array<{ id: string }>;
         const id = inserted[0]?.id;
@@ -261,7 +256,7 @@ export class DistributionCommandsService {
     const session = await this.sessions.require(request);
     const key = idempotencyKey(request);
     const current = await loadDistribution(this.dataSource, id);
-    if (!hasWarehouseScope(session.grants, current.organization_id)) throw new AppError('NOT_FOUND', { status: 404 });
+    if (!hasWarehouseScope(session.grants, current)) throw new AppError('NOT_FOUND', { status: 404 });
 
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `user:${session.userId}`,
@@ -270,13 +265,13 @@ export class DistributionCommandsService {
       requestHash: canonicalRequestHash({ distribution_id: id, dto }),
       execute: async (manager) => {
         const locked = await loadDistribution(manager, id, true);
-        if (!hasWarehouseScope(session.grants, locked.organization_id)) throw new AppError('NOT_FOUND', { status: 404 });
+        if (!hasWarehouseScope(session.grants, locked)) throw new AppError('NOT_FOUND', { status: 404 });
         assertExpectedVersion(locked.version, dto.expected_version);
         if (locked.status === 'DISPATCHED' || locked.status === 'RECONCILED') throw new AppError('ALREADY_DISPATCHED', { status: 409 });
         if (locked.status !== 'DRAFT' && locked.status !== 'APPROVED') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         if (session.userId !== locked.preparer_user_id && session.userId !== locked.approver_user_id) throw new AppError('FORBIDDEN', { status: 403 });
-        if (session.userId === locked.preparer_user_id) requireWarehousePermission(session.grants, 'DISTRIBUTION_PREPARE', locked.organization_id);
-        else requireWarehousePermission(session.grants, 'DISTRIBUTION_REVIEW', locked.organization_id);
+        if (session.userId === locked.preparer_user_id) requireWarehousePermission(session.grants, 'DISTRIBUTION_PREPARE', locked);
+        else requireWarehousePermission(session.grants, 'DISTRIBUTION_REVIEW', locked);
         const before = distributionState(locked);
         await manager.query(
           'UPDATE distribution SET status=\'CANCELLED\',version=version+1 WHERE id=$1 AND version=$2',
@@ -298,7 +293,7 @@ export class DistributionCommandsService {
   ): Promise<{ commitments: CommitmentContext[]; scales: Map<string, number> }> {
     assertLinePurpose(distribution.purpose, lines);
     const commitments = await lockCommitmentContexts(
-      manager, lines, distribution.warehouse_id, distribution.organization_id, distribution.purpose,
+      manager, lines, distribution.warehouse_id, distribution.campaign_id, distribution.purpose,
       distribution.relief_point_id, mode,
     );
     const scales = await activeItemScales(manager, lines);
@@ -307,7 +302,7 @@ export class DistributionCommandsService {
 
   private async loadWarehouse(source: Pick<DataSource | EntityManager, 'query'>, id: string): Promise<WarehouseContext> {
     const rows = await source.query(
-      'SELECT id,organization_id FROM warehouse WHERE id=$1',
+      'SELECT id FROM warehouse WHERE id=$1',
       [id],
     ) as WarehouseContext[];
     if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
@@ -321,7 +316,7 @@ export class DistributionCommandsService {
     }
   }
 
-  private async assertCampaign(dto: CreateDistributionDto, organizationId: string): Promise<void> {
+  private async assertCampaign(dto: CreateDistributionDto): Promise<void> {
     if (!dto.campaign_id) return;
     let campaign: ResponseCampaign;
     try {
@@ -329,7 +324,6 @@ export class DistributionCommandsService {
     } catch {
       throw new AppError('RESPONSE_UNAVAILABLE', { status: 503, retryAfterSeconds: 1 });
     }
-    if (campaign.organization_id !== organizationId) throw new AppError('VALIDATION_FAILED', { status: 400 });
     if (campaign.status === 'PAUSED') throw new AppError('CAMPAIGN_PAUSED', { status: 409 });
     if (campaign.status !== 'ACTIVE') throw new AppError('CAMPAIGN_NOT_ACTIVE', { status: 409 });
   }
@@ -356,13 +350,13 @@ export class DistributionCommandsService {
   ): Promise<Record<string, unknown>> {
     if (resource?.type !== 'distribution') throw new AppError('INTERNAL_ERROR', { status: 500 });
     const current = await loadDistribution(manager, resource.id);
-    if (!hasWarehouseScope(grants, current.organization_id)) {
+    if (!hasWarehouseScope(grants, current)) {
       throw new AppError('NOT_FOUND', { status: 404 });
     }
     if (userId === current.preparer_user_id) {
-      requireWarehousePermission(grants, 'DISTRIBUTION_PREPARE', current.organization_id);
+      requireWarehousePermission(grants, 'DISTRIBUTION_PREPARE', current);
     } else if (userId === current.approver_user_id) {
-      requireWarehousePermission(grants, 'DISTRIBUTION_REVIEW', current.organization_id);
+      requireWarehousePermission(grants, 'DISTRIBUTION_REVIEW', current);
     } else {
       throw new AppError('FORBIDDEN', { status: 403 });
     }

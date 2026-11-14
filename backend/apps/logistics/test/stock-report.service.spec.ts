@@ -20,7 +20,7 @@ describe('StockReportService', () => {
     ]);
     const dataSource = { query } as unknown as DataSource;
     const requireSession = jest.fn<() => Promise<{ userId: string; grants: Array<Record<string, unknown>> }>>().mockResolvedValue({
-        userId: 'user-1', grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: 'org-1' }],
+        userId: 'user-1', grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}],
       });
     const sessions = { require: requireSession } as unknown as LogisticsSessionService;
     const reports = new StockReportService(dataSource, sessions);
@@ -54,7 +54,7 @@ describe('StockReportService', () => {
       .mockResolvedValueOnce([]);
     const dataSource = { query } as unknown as DataSource;
     const requireSession = jest.fn<() => Promise<{ userId: string; grants: Array<Record<string, unknown>> }>>().mockResolvedValue({
-        userId: 'user-1', grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'ORGANIZATION', organization_id: 'org-1' }],
+        userId: 'user-1', grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}],
       });
     const sessions = { require: requireSession } as unknown as LogisticsSessionService;
     const reports = new StockReportService(dataSource, sessions);

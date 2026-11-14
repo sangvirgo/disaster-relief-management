@@ -28,7 +28,7 @@ export class RequestOperationsDedupReferralService {
         for (const id of ids) {
           const rows = await manager.query(
             `SELECT id,tracking_code,reporter_user_id,reporter_name,reporter_contact_phone,report_mode,status,version,
-                    review_lane,received_at,verifying_since,organization_id,campaign_id,description,
+                    review_lane,received_at,verifying_since,campaign_id,description,
                     reporter_declared_danger,priority,priority_basis,work_cycle,canonical_request_id,incident_category_code
                FROM assistance_request WHERE id=$1 FOR UPDATE`, [id],
           ) as OperationRequestRow[];

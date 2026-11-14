@@ -437,7 +437,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     const user = users[0];
     if (!user) throw new AppError('SESSION_EXPIRED', { status: 401 });
     const grants = await this.dataSource.query(
-      `SELECT id, role_code, scope_type, organization_id, campaign_id
+      `SELECT id, role_code, scope_type, campaign_id
          FROM role_grant WHERE user_id = $1 AND revoked_at IS NULL
         ORDER BY created_at, id`,
       [userId],

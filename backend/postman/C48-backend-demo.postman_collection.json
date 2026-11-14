@@ -27,11 +27,6 @@
       "type": "string"
     },
     {
-      "key": "intakeOrganizationId",
-      "value": "",
-      "type": "string"
-    },
-    {
       "key": "pollLimit",
       "value": "10",
       "type": "string"
@@ -98,11 +93,6 @@
     },
     {
       "key": "contactAttemptId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "requestOrganizationId",
       "value": "",
       "type": "string"
     },
@@ -255,7 +245,7 @@
       "item": [
         {
           "name": "01 · Chuẩn bị đội riêng cho mỗi lần chạy",
-          "description": "Ba bước API tạo một tài khoản đội trưởng có membership/quyền VOLUNTEER trong intakeOrganizationId. Không thay đổi các đội seed đang bận. Tài khoản mới dùng mật khẩu tạm; backend cho phép thao tác với must_change_password trong bản demo này. Mỗi lần chạy tạo tài khoản/đội mới và lưu lại trên DB chính.",
+          "description": "Ba bước API tạo một tài khoản đội trưởng có quyền VOLUNTEER toàn hệ thống (SYSTEM). Không thay đổi các đội seed đang bận. Tài khoản mới dùng mật khẩu tạm; backend cho phép thao tác với must_change_password trong bản demo này. Mỗi lần chạy tạo tài khoản/đội mới và lưu lại trên DB chính.",
           "item": [
             {
               "id": "main-01",
@@ -317,56 +307,8 @@
               ]
             },
             {
-              "id": "main-org-lookup",
-              "name": "01b · Lấy ID tổ chức điều phối từ danh sách",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Accept",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{activeAccessToken}}"
-                  }
-                ],
-                "url": "{{identityBaseUrl}}/organizations?limit=100",
-                "description": "GET danh sách tổ chức; tự lấy ID tổ chức điều phối C48 cho bước tạo đội trưởng."
-              },
-              "event": [
-                {
-                  "listen": "prerequest",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.variables.set('_c48', \"{\\\"service\\\":\\\"identity\\\",\\\"operationId\\\":\\\"listIdentityOrganizations\\\",\\\"expectedStatus\\\":200}\");",
-                      "(function () {\n\nconst source = pm.request.url.toString() + ' ' + (pm.request.body?.raw || '') + ' ' + ['Authorization','X-Tracking-Code','X-Tracking-Secret','X-Donation-Secret','X-Recovery-Code'].map(k => pm.request.headers.get(k) || '').join(' ');\nconst missing = [...source.matchAll(/\\{\\{([A-Za-z][A-Za-z0-9_]*)\\}\\}/g)].map(match => match[1]).filter(key => !String(pm.variables.get(key) ?? '').trim());\nif (missing.length) { pm.test('Đã có dữ liệu cho bước này', function () { throw new Error('Thiếu biến: ' + [...new Set(missing)].join(', ')); }); pm.execution.setNextRequest(null); pm.execution.skipRequest(); }\n})();"
-                    ]
-                  }
-                },
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "(function () {",
-                      "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
-                      "const body = pm.response.json();",
-                      "try {",
-                      "const organization = (body.items || []).find((row) => row.name === 'Trung tâm điều phối C48 (demo)' && row.status === 'ACTIVE');",
-                      "if (!organization?.id) throw new Error('Không tìm thấy tổ chức điều phối C48 đang hoạt động.');",
-                      "pm.collectionVariables.set('intakeOrganizationId', organization.id);",
-                      "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
-                      "})();"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
               "id": "main-02",
-              "name": "02 · Tạo đội trưởng mới trong tổ chức tiếp nhận",
+              "name": "02 · Tạo đội trưởng mới",
               "request": {
                 "method": "POST",
                 "header": [
@@ -391,7 +333,7 @@
                 "description": "Tạo đội trưởng mới trong tổ chức tiếp nhận\n\nChạy theo thứ tự trong kịch bản. Lệnh ghi thay đổi dữ liệu demo chính; lỗi sẽ dừng Runner. Các lần đăng nhập, đọc chi tiết và chuyển trạng thái lặp có mục đích.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"username\": \"{{demoLeaderUsername}}\",\n  \"display_name\": \"Đội trưởng phiên demo {{runSuffix}}\",\n  \"temporary_password\": \"{{demoLeaderPassword}}\",\n  \"organization_id\": \"{{intakeOrganizationId}}\"\n}",
+                  "raw": "{\n  \"username\": \"{{demoLeaderUsername}}\",\n  \"display_name\": \"Đội trưởng phiên demo {{runSuffix}}\",\n  \"temporary_password\": \"{{demoLeaderPassword}}\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -454,7 +396,7 @@
                 "description": "Cấp quyền tình nguyện viên cho đội trưởng mới\n\nChạy theo thứ tự trong kịch bản. Lệnh ghi thay đổi dữ liệu demo chính; lỗi sẽ dừng Runner. Các lần đăng nhập, đọc chi tiết và chuyển trạng thái lặp có mục đích.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"role_code\": \"VOLUNTEER\",\n  \"scope_type\": \"ORGANIZATION\",\n  \"organization_id\": \"{{intakeOrganizationId}}\",\n  \"reason\": \"Chuẩn bị đội riêng cho kịch bản SOS demo.\"\n}",
+                  "raw": "{\n  \"role_code\": \"VOLUNTEER\",\n  \"scope_type\": \"SYSTEM\",\n  \"reason\": \"Chuẩn bị đội riêng cho kịch bản SOS demo.\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -843,7 +785,7 @@
                       "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
                       "const body = pm.response.json();",
                       "try {",
-                      "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); const organizationId = body.organization_id || pm.collectionVariables.get('intakeOrganizationId'); if (organizationId) pm.collectionVariables.set('requestOrganizationId', organizationId); ",
+                      "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); ",
                       "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                       "})();"
                     ]
@@ -1067,7 +1009,7 @@
                 "description": "Tạo đội APP riêng, có đội trưởng và kỹ năng xuồng\n\nChạy theo thứ tự trong kịch bản. Lệnh ghi thay đổi dữ liệu demo chính; lỗi sẽ dừng Runner. Các lần đăng nhập, đọc chi tiết và chuyển trạng thái lặp có mục đích.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Đội xuồng phiên demo {{runSuffix}}\",\n  \"organization_id\": \"{{requestOrganizationId}}\",\n  \"team_kind\": \"VOLUNTEER\",\n  \"reporting_mode\": \"APP\",\n  \"leader_user_id\": \"{{leaderUserId}}\",\n  \"skill_codes\": [\n    \"BOAT\"\n  ]\n}",
+                  "raw": "{\n  \"name\": \"Đội xuồng phiên demo {{runSuffix}}\",\n  \"team_kind\": \"VOLUNTEER\",\n  \"reporting_mode\": \"APP\",\n  \"leader_user_id\": \"{{leaderUserId}}\",\n  \"skill_codes\": [\n    \"BOAT\"\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -1621,7 +1563,7 @@
                       "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
                       "const body = pm.response.json();",
                       "try {",
-                      "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); ",
+                      "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); ",
                       "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                       "})();"
                     ]
@@ -1974,6 +1916,103 @@
           ]
         },
         {
+          "id": "ai-seed-lookup",
+          "name": "Hàng chờ chung · chưa gắn chiến dịch (chỉ grant SYSTEM)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{activeAccessToken}}"
+              }
+            ],
+            "url": "{{responseBaseUrl}}/requests?unassigned=true&limit=100",
+            "description": "GET hàng chờ chung (unassigned=true). Chỉ người có grant COORDINATOR SYSTEM được xem; không ghi nhận requestId."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"listRequestQueue\\\",\\\"expectedStatus\\\":200}\");",
+                  "(function () {\n\nconst source = pm.request.url.toString() + ' ' + (pm.request.body?.raw || '') + ' ' + ['Authorization','X-Tracking-Code','X-Tracking-Secret','X-Donation-Secret','X-Recovery-Code'].map(k => pm.request.headers.get(k) || '').join(' ');\nconst missing = [...source.matchAll(/\\{\\{([A-Za-z][A-Za-z0-9_]*)\\}\\}/g)].map(match => match[1]).filter(key => !String(pm.variables.get(key) ?? '').trim());\nif (missing.length) { pm.test('Đã có dữ liệu cho bước này', function () { throw new Error('Thiếu biến: ' + [...new Set(missing)].join(', ')); }); pm.execution.setNextRequest(null); pm.execution.skipRequest(); }\n})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Nhận xử lý SOS (claim) · giữ 15 phút",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{activeAccessToken}}"
+              }
+            ],
+            "url": "{{responseBaseUrl}}/requests/{{requestId}}/claim",
+            "description": "Nhận xử lý hồ sơ. Người khác đang giữ hồ sơ sẽ nhận 409 REQUEST_ALREADY_CLAIMED kèm tên người đang xử lý."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\": \\\"response\\\", \\\"operationId\\\": \\\"responseRequestOperationsClaim\\\", \\\"expectedStatus\\\": 200}\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Nhả xử lý SOS (release)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{activeAccessToken}}"
+              }
+            ],
+            "url": "{{responseBaseUrl}}/requests/{{requestId}}/release",
+            "description": "Nhả hồ sơ. Chỉ người đang nhận hoặc người có quyền SYSTEM được nhả."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\": \\\"response\\\", \\\"operationId\\\": \\\"responseRequestOperationsRelease\\\", \\\"expectedStatus\\\": 200}\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "id": "ai-02",
           "name": "03 · Chờ AI có giới hạn; dừng khi trạng thái kết thúc",
           "request": {
@@ -2007,7 +2046,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "(function () {\nif (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;\nconst body = pm.response.json();\ntry {\nif (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); \nconst advisory = body.ai_advisory;\n['advisoryId','aiAdvisoryStatus','aiAdvisoryReviewStatus'].forEach(key => pm.collectionVariables.unset(key));\nif (advisory) { pm.collectionVariables.set('advisoryId', advisory.id); pm.collectionVariables.set('aiAdvisoryStatus', advisory.status); if (advisory.review_status) pm.collectionVariables.set('aiAdvisoryReviewStatus', advisory.review_status); }\nconst terminalStatuses = ['FAILED', 'SKIPPED', 'STALE'];\nif (!advisory || terminalStatuses.includes(advisory.status) || advisory.review_status) { console.warn('Gợi ý AI đã kết thúc hoặc không còn mới; luồng thủ công không bị ảnh hưởng.'); pm.execution.setNextRequest(null); }\nelse if (advisory.status === 'COMPLETED') { if (String(pm.variables.get('aiReviewDecision') || '').trim()) { pm.execution.setNextRequest('ai-03'); } else { console.warn('Gợi ý đã sẵn sàng; hãy chọn aiReviewDecision rồi chạy tiếp bước ghi nhận quyết định.'); pm.execution.setNextRequest(null); } }\nelse if (['QUEUED', 'PROCESSING'].includes(advisory.status)) {\n const attempt = Number(pm.collectionVariables.get('aiPollCount') || 0) + 1; pm.collectionVariables.set('aiPollCount', String(attempt));\n const limit = Math.min(30, Math.max(1, Number(pm.variables.get('pollLimit')) || 10));\n if (attempt >= limit) { console.warn('Dừng chờ AI sau số lần giới hạn; có thể chạy lại kịch bản khi worker sẵn sàng.'); pm.execution.setNextRequest(null); }\n else setTimeout(function () { pm.execution.setNextRequest(pm.info.requestId); }, Math.min(5000, Math.max(0, Number(pm.variables.get('pollDelayMs')) || 1000)));\n} else { console.warn('Trạng thái gợi ý AI không được hỗ trợ; dừng rà soát.'); pm.execution.setNextRequest(null); }\n\n} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }\n})();"
+                  "(function () {\nif (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;\nconst body = pm.response.json();\ntry {\nif (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); \nconst advisory = body.ai_advisory;\n['advisoryId','aiAdvisoryStatus','aiAdvisoryReviewStatus'].forEach(key => pm.collectionVariables.unset(key));\nif (advisory) { pm.collectionVariables.set('advisoryId', advisory.id); pm.collectionVariables.set('aiAdvisoryStatus', advisory.status); if (advisory.review_status) pm.collectionVariables.set('aiAdvisoryReviewStatus', advisory.review_status); }\nconst terminalStatuses = ['FAILED', 'SKIPPED', 'STALE'];\nif (!advisory || terminalStatuses.includes(advisory.status) || advisory.review_status) { console.warn('Gợi ý AI đã kết thúc hoặc không còn mới; luồng thủ công không bị ảnh hưởng.'); pm.execution.setNextRequest(null); }\nelse if (advisory.status === 'COMPLETED') { if (String(pm.variables.get('aiReviewDecision') || '').trim()) { pm.execution.setNextRequest('ai-03'); } else { console.warn('Gợi ý đã sẵn sàng; hãy chọn aiReviewDecision rồi chạy tiếp bước ghi nhận quyết định.'); pm.execution.setNextRequest(null); } }\nelse if (['QUEUED', 'PROCESSING'].includes(advisory.status)) {\n const attempt = Number(pm.collectionVariables.get('aiPollCount') || 0) + 1; pm.collectionVariables.set('aiPollCount', String(attempt));\n const limit = Math.min(30, Math.max(1, Number(pm.variables.get('pollLimit')) || 10));\n if (attempt >= limit) { console.warn('Dừng chờ AI sau số lần giới hạn; có thể chạy lại kịch bản khi worker sẵn sàng.'); pm.execution.setNextRequest(null); }\n else setTimeout(function () { pm.execution.setNextRequest(pm.info.requestId); }, Math.min(5000, Math.max(0, Number(pm.variables.get('pollDelayMs')) || 1000)));\n} else { console.warn('Trạng thái gợi ý AI không được hỗ trợ; dừng rà soát.'); pm.execution.setNextRequest(null); }\n\n} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }\n})();"
                 ]
               }
             }
@@ -2301,7 +2340,7 @@
                   "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
                   "const body = pm.response.json();",
                   "try {",
-                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); ",
+                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); ",
                   "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                   "})();"
                 ]
@@ -2469,7 +2508,7 @@
                   "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
                   "const body = pm.response.json();",
                   "try {",
-                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); ",
+                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); ",
                   "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                   "})();"
                 ]
@@ -2958,7 +2997,7 @@
                   "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
                   "const body = pm.response.json();",
                   "try {",
-                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); ",
+                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); ",
                   "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                   "})();"
                 ]
@@ -3198,7 +3237,7 @@
                   "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
                   "const body = pm.response.json();",
                   "try {",
-                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); if (body.organization_id) pm.collectionVariables.set('requestOrganizationId', body.organization_id); ",
+                  "if (body.id !== pm.collectionVariables.get('requestId')) throw new Error('Response không thuộc SOS đang chạy.');if (body.version === undefined) throw new Error('Response thiếu version.'); pm.collectionVariables.set('requestVersion', String(body.version)); ",
                   "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                   "})();"
                 ]

@@ -4,7 +4,8 @@ import type { Request } from 'express';
 import type { DataSource } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
 import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
-import { hasPermission, ROLE_PERMISSIONS } from '@c48/identity-contracts/permissions';
+import { hasPermission } from '@c48/identity-contracts/permissions';
+import type { Grant } from '@c48/identity-contracts/permissions';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { AssetPageQueryDto } from './assets.dto';
 import {
@@ -17,18 +18,9 @@ function filtersFor(kind: AssetKind, userId: string, grants: unknown[], status?:
   return { route: `logistics.${kind}`, user_id: userId, grants, status: status ?? null };
 }
 
-function scopeWhere(grants: readonly { role_code: keyof typeof ROLE_PERMISSIONS; scope_type: string; organization_id: string | null; campaign_id?: string | null }[], values: unknown[]): string {
-  const branches: string[] = [];
-  for (const grant of grants) {
-    const permissions: readonly string[] = ROLE_PERMISSIONS[grant.role_code];
-    if (!permissions.includes('ASSET_MANAGE') || !grant.organization_id) continue;
-    if (grant.scope_type === 'ORGANIZATION' && !grant.campaign_id) {
-      values.push(grant.organization_id);
-      branches.push(`a.organization_id=$${values.length}`);
-    }
-  }
-  if (branches.length === 0) throw new AppError('FORBIDDEN', { status: 403 });
-  return `(${branches.join(' OR ')})`;
+function scopeWhere(grants: readonly Grant[], _values: unknown[]): string {
+  if (!hasPermission(grants, 'ASSET_MANAGE', { campaignId: null })) throw new AppError('FORBIDDEN', { status: 403 });
+  return 'TRUE';
 }
 
 @Injectable()
@@ -77,9 +69,7 @@ export class AssetsQueriesService {
     const session = await this.sessions.require(request);
     requireAnyAssetManage(session);
     const row = await findAsset(this.dataSource, 'relief_point', id);
-    if (!row || !session.grants.some((grant) => hasPermission([grant], 'ASSET_MANAGE', {
-      organizationId: row.organization_id,
-    }))) throw new AppError('NOT_FOUND', { status: 404 });
+    if (!row || !hasPermission(session.grants, 'ASSET_MANAGE', { campaignId: null })) throw new AppError('NOT_FOUND', { status: 404 });
     return assetView('relief_point', row, true);
   }
 }

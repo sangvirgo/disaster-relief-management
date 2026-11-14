@@ -143,17 +143,20 @@ describe('T1 technical package', () => {
     expect(() => interceptor.intercept({ switchToHttp: () => ({ getRequest: () => internal }) } as never, next)).not.toThrow();
   });
 
-  it('enforces role, permission, organization, and named SYSTEM-scope rules', () => {
+  it('enforces role, permission, campaign, and named SYSTEM-scope rules', () => {
     expect(ROLE_PERMISSIONS.ADMIN).not.toContain('REQUEST_DETAIL_READ');
     expect(ROLE_PERMISSIONS.INTAKE_STAFF).not.toContain('DONATION_REVIEW');
-    const grant = { role_code: 'COORDINATOR' as const, scope_type: 'ORGANIZATION' as const, organization_id: 'org-1' };
-    expect(hasPermission([grant], 'REQUEST_VERIFY', { organizationId: 'org-1' })).toBe(true);
-    expect(hasPermission([grant], 'REQUEST_VERIFY', { organizationId: 'org-2' })).toBe(false);
-    const admin = { role_code: 'ADMIN' as const, scope_type: 'SYSTEM' as const, organization_id: null };
-    expect(hasPermission([admin], 'USER_MANAGE', { organizationId: 'org-1' })).toBe(false);
+    const grant = { role_code: 'COORDINATOR' as const, scope_type: 'CAMPAIGN' as const, campaign_id: 'campaign-1' };
+    expect(hasPermission([grant], 'REQUEST_VERIFY', { campaignId: 'campaign-1' })).toBe(true);
+    expect(hasPermission([grant], 'REQUEST_VERIFY', { campaignId: 'campaign-2' })).toBe(false);
+    expect(hasPermission([grant], 'REQUEST_VERIFY', { campaignId: null })).toBe(false);
+    const admin = { role_code: 'ADMIN' as const, scope_type: 'SYSTEM' as const };
+    expect(hasPermission([admin], 'USER_MANAGE', { campaignId: 'campaign-1' })).toBe(true);
     expect(hasPermission([admin], 'USER_MANAGE', { systemAction: 'USER_MANAGE' })).toBe(true);
-    const invalidCitizenGrant = { role_code: 'CITIZEN' as const, scope_type: 'CAMPAIGN' as const, organization_id: 'org-1', campaign_id: 'campaign-1' };
-    expect(hasPermission([invalidCitizenGrant], 'REQUEST_CREATE_PROXY', { organizationId: 'org-1' })).toBe(false);
+    const invalidCitizenGrant = { role_code: 'CITIZEN' as const, scope_type: 'CAMPAIGN' as const, campaign_id: 'campaign-1' };
+    expect(hasPermission([invalidCitizenGrant], 'REQUEST_CREATE_PROXY', { campaignId: 'campaign-1' })).toBe(false);
+    const legacyOrganizationGrant = { role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: 'org-1' } as never;
+    expect(hasPermission([legacyOrganizationGrant], 'REQUEST_VERIFY', { campaignId: 'campaign-1' })).toBe(false);
   });
 
   it('encodes keyset cursors with filter binding and rejects changed filters', () => {

@@ -5,11 +5,10 @@ import type { Grant } from '@c48/identity-contracts/permissions';
 import { ReportsService } from '../src/reports/reports.service';
 import { MissionsConfig } from '../src/missions/missions.config';
 
-const organizationId = '00000000-0000-4000-8000-000000000001';
 const userId = '00000000-0000-4000-8000-000000000002';
 const from = '2026-01-01T00:00:00Z';
 const to = '2026-01-02T00:00:00Z';
-const coordinatorGrant: Grant = { role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId };
+const coordinatorGrant: Grant = { role_code: 'COORDINATOR', scope_type: 'SYSTEM',};
 
 function setup(row: unknown = {
   status_counts: { VERIFIED: '2' },
@@ -61,7 +60,7 @@ describe('ReportsService summary', () => {
     const [sql, values] = query.mock.calls[0]! as unknown as [string, unknown[]];
     expect(sql).toContain('r.received_at >= $');
     expect(sql).toContain('r.received_at < $');
-    expect(sql).toContain('r.organization_id=$');
+    expect(sql).toContain('r.campaign_id=$');
     expect(sql).toContain('MIN(m.created_at)');
     expect(sql).toContain('GROUP BY m.request_id');
     expect(sql).toContain("m.status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE')");
@@ -70,16 +69,31 @@ describe('ReportsService summary', () => {
     expect(values).toContain(10);
   });
 
-  it('rejects a caller without REPORT_READ before reading data', async () => {
-    const { service, query, sessions } = setup();
+  it('returns empty aggregates for a caller without REPORT_READ', async () => {
+    const { service, query, sessions } = setup({
+      status_counts: {}, priority_counts: {}, median_verified_seconds: null, median_offered_seconds: null,
+      active_missions: '0', overdue_missions: '0',
+    });
     sessions.require.mockResolvedValue({
       userId,
-      grants: [{ role_code: 'VOLUNTEER', scope_type: 'ORGANIZATION', organization_id: organizationId }],
+      grants: [{ role_code: 'VOLUNTEER', scope_type: 'SYSTEM',}],
     });
 
-    await expect(service.summary({ from, to, campaign_id: '00000000-0000-4000-8000-000000000003' }, {} as Request))
-      .rejects.toMatchObject({ code: 'FORBIDDEN' });
-    expect(query).not.toHaveBeenCalled();
+    const result = await service.summary({ from, to }, {} as Request);
+    expect(result).toMatchObject({ status_counts: {}, priority_counts: {}, active_missions: 0, overdue_missions: 0 });
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0]![0]).toContain('AND FALSE');
+  });
+
+  it('runs a system report without campaign_id', async () => {
+    const { service, query } = setup();
+
+    const result = await service.summary({ from, to }, {} as Request);
+
+    expect(result).toMatchObject({ filters: { from, to, campaign_id: null } });
+    const sql = query.mock.calls[0]![0] as string;
+    expect(sql).toContain('AND (TRUE)');
+    expect(sql).not.toMatch(/r\.campaign_id=\$\d+::uuid/);
   });
 
   it('reuses results only after requiring the caller session', async () => {

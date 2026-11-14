@@ -49,16 +49,15 @@ export function TeamSkillsForm({ teamId, version, current, skills, onSuccess }: 
   </form>;
 }
 
-type UserDetail = { memberships?: { organization_id: string; status: string }[];
-  grants?: { role_code: string; scope_type: string; organization_id: string | null }[] };
+type UserDetail = { grants?: { role_code: string; scope_type: string; revoked_at: string | null }[] };
 
 /** Search eligible leaders on the server (max 20 per search) instead of loading every account. */
-function useLeaderSearch(organizationId: string, term: string) {
+function useLeaderSearch(term: string) {
   const [options, setOptions] = useState<SelectOption[]>([]);
   const [searching, setSearching] = useState(false);
   useEffect(() => {
     const text = term.trim();
-    if (!organizationId || text.length < 2) { setOptions([]); setSearching(false); return; }
+    if (text.length < 2) { setOptions([]); setSearching(false); return; }
     let live = true;
     setSearching(true);
     const timer = window.setTimeout(() => {
@@ -69,8 +68,7 @@ function useLeaderSearch(organizationId: string, term: string) {
           if (!live) return;
           setOptions(page.items.flatMap((row, index) => {
             const detail = details[index];
-            const eligible = detail?.memberships?.some((membership) => membership.status === 'ACTIVE' && membership.organization_id === organizationId &&
-              detail.grants?.some((grant) => grant.role_code === 'VOLUNTEER' && (grant.scope_type === 'SYSTEM' || grant.organization_id === organizationId)));
+            const eligible = detail?.grants?.some((grant) => !grant.revoked_at && grant.role_code === 'VOLUNTEER' && grant.scope_type === 'SYSTEM');
             return eligible ? [{ value: row.id, label: `${row.display_name} · ${row.username}` }] : [];
           }));
         })
@@ -78,22 +76,20 @@ function useLeaderSearch(organizationId: string, term: string) {
         .finally(() => { if (live) setSearching(false); });
     }, 350);
     return () => { live = false; window.clearTimeout(timer); };
-  }, [organizationId, term]);
+  }, [term]);
   return { options, searching };
 }
 
-export function TeamCreateForm({ organizations, regions, skills, onSuccess }: {
-  organizations: SelectOption[]; regions: SelectOption[]; skills: Skill[];
+export function TeamCreateForm({ skills, onSuccess }: {
+  skills: Skill[];
   onSuccess: (id: string) => void;
 }) {
   const [name, setName] = useState('');
-  const [organizationId, setOrganizationId] = useState('');
-  const [regionCode, setRegionCode] = useState('');
   const [teamKind, setTeamKind] = useState('VOLUNTEER');
   const [reportingMode, setReportingMode] = useState('APP');
   const [leaderId, setLeaderId] = useState('');
   const [leaderTerm, setLeaderTerm] = useState('');
-  const leaders = useLeaderSearch(organizationId, leaderTerm);
+  const leaders = useLeaderSearch(leaderTerm);
   const [contactNote, setContactNote] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -106,7 +102,7 @@ export function TeamCreateForm({ organizations, regions, skills, onSuccess }: {
     if (reportingMode === 'APP' && !leaderId) { setError('Hãy chọn tài khoản đội trưởng.'); return; }
     if (reportingMode === 'COORDINATOR' && !contactNote.trim()) { setError('Hãy nhập đầu mối liên hệ của đội.'); return; }
     if (!pending.current) pending.current = { key: newCommandKey(), body: {
-      name: name.trim().normalize('NFC'), organization_id: organizationId, operating_region_code: regionCode,
+      name: name.trim().normalize('NFC'),
       team_kind: teamKind, reporting_mode: reportingMode, skill_codes: [...selectedSkills].sort(),
       ...(reportingMode === 'APP' ? { leader_user_id: leaderId } : { external_contact_note: contactNote.trim().normalize('NFC') }),
     } };
@@ -120,7 +116,7 @@ export function TeamCreateForm({ organizations, regions, skills, onSuccess }: {
     } finally { setBusy(false); }
   }
   const fieldError = (name: string) => fieldErrors[name]?.join(' ');
-  const hasInvalidFields = !name.trim() || name.length > 200 || !organizationId || !regionCode
+  const hasInvalidFields = !name.trim() || name.length > 200
     || (reportingMode === 'APP'
       ? !leaderId
       : !contactNote.trim() || contactNote.length > 1000)
@@ -128,27 +124,23 @@ export function TeamCreateForm({ organizations, regions, skills, onSuccess }: {
   return <form className="form-stack command-form" onSubmit={submit}>
     <h3>Tạo đội cứu hộ</h3>
     <label>Tên đội *<input required maxLength={200} value={name} onChange={(e) => { setName(e.target.value); changed(); }} />{fieldError('name') && <small className="field-error">{fieldError('name')}</small>}</label>
-    <label>Tổ chức *<select required value={organizationId} onChange={(e) => { setOrganizationId(e.target.value); setLeaderId(''); changed(); }}><option value="">Chọn tổ chức</option>
-      {organizations.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{fieldError('organization_id') && <small className="field-error">{fieldError('organization_id')}</small>}</label>
-    <label>Khu vực hoạt động *<select required value={regionCode} onChange={(e) => { setRegionCode(e.target.value); changed(); }}><option value="">Chọn khu vực</option>
-      {regions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{fieldError('operating_region_code') && <small className="field-error">{fieldError('operating_region_code')}</small>}</label>
     <label>Loại đội *<select value={teamKind} onChange={(e) => { setTeamKind(e.target.value); changed(); }}><option value="VOLUNTEER">Tình nguyện</option>
       <option value="MILITARY">Lực lượng vũ trang</option><option value="GOVERNMENT">Cơ quan nhà nước</option><option value="OTHER">Khác</option></select></label>
     <label>Chế độ báo cáo *<select value={reportingMode} onChange={(e) => { setReportingMode(e.target.value); changed(); }}><option value="APP">Qua ứng dụng</option>
       <option value="COORDINATOR">Điều phối viên ghi nhận</option></select></label>
     {reportingMode === 'APP' ? <div className="form-stack">
-      <label>Tìm đội trưởng *<input type="search" value={leaderTerm} disabled={!organizationId} placeholder={organizationId ? 'Nhập tên hoặc tên đăng nhập (ít nhất 2 ký tự)' : 'Chọn tổ chức trước'}
+      <label>Tìm đội trưởng *<input type="search" value={leaderTerm} placeholder="Nhập tên hoặc tên đăng nhập (ít nhất 2 ký tự)"
         onChange={(e) => { setLeaderTerm(e.target.value); setLeaderId(''); changed(); }} /></label>
       <label>Đội trưởng *<select required value={leaderId} onChange={(e) => { setLeaderId(e.target.value); changed(); }}>
         <option value="">{leaders.searching ? 'Đang tìm…' : 'Chọn tài khoản'}</option>
         {leaders.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
-      <small>Đội trưởng phải là thành viên tổ chức này, có quyền Tình nguyện viên và chưa thuộc đội khác.</small>{fieldError('leader_user_id') && <small className="field-error">{fieldError('leader_user_id')}</small>}</label></div>
+      <small>Đội trưởng cần tài khoản đang hoạt động, có quyền Tình nguyện viên ở phạm vi hệ thống và chưa thuộc đội khác.</small>{fieldError('leader_user_id') && <small className="field-error">{fieldError('leader_user_id')}</small>}</label></div>
       : <label>Đầu mối liên hệ *<textarea required maxLength={1000} value={contactNote} onChange={(e) => { setContactNote(e.target.value); changed(); }} />{fieldError('external_contact_note') && <small className="field-error">{fieldError('external_contact_note')}</small>}</label>}
     <SkillChoices skills={skills} selected={selectedSkills} onChange={(codes) => { setSelectedSkills(codes); changed(); }} />
-    {reportingMode === 'APP' && organizationId && leaderTerm.trim().length >= 2 && !leaders.searching && !leaders.options.length &&
-      <p className="notice warning">Không tìm thấy tài khoản đủ điều kiện (cần thuộc tổ chức này và có quyền Tình nguyện viên).</p>}
+    {reportingMode === 'APP' && leaderTerm.trim().length >= 2 && !leaders.searching && !leaders.options.length &&
+      <p className="notice warning">Không tìm thấy tài khoản đủ điều kiện (cần đang hoạt động và có quyền Tình nguyện viên ở phạm vi hệ thống).</p>}
     {fieldError('skill_codes') && <p className="field-error">{fieldError('skill_codes')}</p>}
     {error && <p className="notice error" role="alert">{error}</p>}
-    <button type="submit" className="button" disabled={busy || hasInvalidFields || !organizations.length || !regions.length}>{busy ? 'Đang tạo…' : 'Tạo đội cứu hộ'}</button>
+    <button type="submit" className="button" disabled={busy || hasInvalidFields}>{busy ? 'Đang tạo…' : 'Tạo đội cứu hộ'}</button>
   </form>;
 }

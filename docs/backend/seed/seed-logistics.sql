@@ -36,23 +36,23 @@ INSERT INTO item (id, item_type_code, unit_code, name) VALUES
   ('00000000-0000-4000-8000-0000000a1008', 'CHAN_MEN',   'CAI',   'Màn chống muỗi');
 
 -- ---------- assets ----------
-INSERT INTO warehouse (id, organization_id, name, address_note, location, location_public) VALUES
-  ('00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-000000000001', 'Kho trung tâm Demo A',
+INSERT INTO warehouse (id, name, address_note, location, location_public) VALUES
+  ('00000000-0000-4000-8000-0000000a2001', 'Kho trung tâm Demo A',
    'Số 10 đường Mẫu, Demo A (dữ liệu giả lập)', ST_GeogFromText('SRID=4326;POINT(106.6300 10.8200)'), true),
-  ('00000000-0000-4000-8000-0000000a2002', '00000000-0000-4000-8000-000000000001', 'Kho Demo B',
+  ('00000000-0000-4000-8000-0000000a2002', 'Kho Demo B',
    'Số 25 đường Thử nghiệm, Demo B (dữ liệu giả lập)', ST_GeogFromText('SRID=4326;POINT(108.2000 16.0700)'), false);
 
-INSERT INTO relief_point (id, organization_id, name, contact_note, operating_note, location, status) VALUES
-  ('00000000-0000-4000-8000-0000000a3001', '00000000-0000-4000-8000-000000000001', 'Điểm cứu trợ Trường tiểu học Mẫu',
+INSERT INTO relief_point (id, name, contact_note, operating_note, location, status) VALUES
+  ('00000000-0000-4000-8000-0000000a3001', 'Điểm cứu trợ Trường tiểu học Mẫu',
    'Liên hệ qua điều phối viên, số giả lập 0900000201', 'Mở cửa 07:00 đến 19:00', ST_GeogFromText('SRID=4326;POINT(106.6450 10.8300)'), 'ACTIVE'),
-  ('00000000-0000-4000-8000-0000000a3002', '00000000-0000-4000-8000-000000000001', 'Điểm cứu trợ Nhà văn hóa Thử nghiệm',
+  ('00000000-0000-4000-8000-0000000a3002', 'Điểm cứu trợ Nhà văn hóa Thử nghiệm',
    'Liên hệ qua điều phối viên, số giả lập 0900000202', 'Mở cửa 08:00 đến 18:00', ST_GeogFromText('SRID=4326;POINT(108.2100 16.0600)'), 'ACTIVE'),
-  ('00000000-0000-4000-8000-0000000a3003', '00000000-0000-4000-8000-000000000001', 'Điểm cứu trợ cũ (đã ngừng hoạt động)',
+  ('00000000-0000-4000-8000-0000000a3003', 'Điểm cứu trợ cũ (đã ngừng hoạt động)',
    NULL, 'Tạm đóng do ngập sâu', ST_GeogFromText('SRID=4326;POINT(106.6100 10.8100)'), 'INACTIVE');
 
-INSERT INTO vehicle (id, organization_id, identifier, vehicle_type, capacity, capacity_unit) VALUES
-  ('00000000-0000-4000-8000-0000000a4001', '00000000-0000-4000-8000-000000000001', '51D-000.01', 'Xe tải 1,5 tấn', 1500.000, 'KG'),
-  ('00000000-0000-4000-8000-0000000a4002', '00000000-0000-4000-8000-000000000001', '43C-000.02', 'Xe bán tải', NULL, NULL);
+INSERT INTO vehicle (id, identifier, vehicle_type, capacity, capacity_unit) VALUES
+  ('00000000-0000-4000-8000-0000000a4001', '51D-000.01', 'Xe tải 1,5 tấn', 1500.000, 'KG'),
+  ('00000000-0000-4000-8000-0000000a4002', '43C-000.02', 'Xe bán tải', NULL, NULL);
 
 -- ---------- zero balances first (warehouse A: a5a01..a5a08, warehouse B: a5b01..a5b08; item order as in the item table) ----------
 INSERT INTO stock_balance (id, warehouse_id, item_id)
@@ -76,13 +76,11 @@ INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_rese
   ('00000000-0000-4000-8000-0000000a5b08', 'OPENING', 60,      0, 'OPEN:B:MAN',     '00000000-0000-4000-8000-000000000105', 'Tồn đầu kỳ kho B (dữ liệu giả lập)', now() - interval '10 days');
 
 -- ---------- donation drives (intake warehouse A; campaign status is the cached copy from Response) ----------
-INSERT INTO donation_drive (id, campaign_id, campaign_status, campaign_status_at, organization_id, intake_warehouse_id, title, description, status, opens_at, closes_at, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000a6001', '00000000-0000-4000-8000-0000000000c1', 'ACTIVE', now() - interval '1 minute',
-   '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-0000000a2001',
+INSERT INTO donation_drive (id, campaign_id, campaign_status, campaign_status_at, intake_warehouse_id, title, description, status, opens_at, closes_at, created_at) VALUES
+  ('00000000-0000-4000-8000-0000000a6001', '00000000-0000-4000-8000-0000000000c1', 'ACTIVE', now() - interval '1 minute', '00000000-0000-4000-8000-0000000a2001',
    'Quyên góp nhu yếu phẩm cho vùng ngập Demo A', 'Tiếp nhận lương thực, nước uống và chăn màn tại kho trung tâm Demo A. Dữ liệu giả lập phục vụ trình diễn.',
    'OPEN', now() - interval '9 days', now() + interval '20 days', now() - interval '9 days'),
-  ('00000000-0000-4000-8000-0000000a6002', '00000000-0000-4000-8000-0000000000c1', 'ACTIVE', now() - interval '1 minute',
-   '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-0000000a2002',
+  ('00000000-0000-4000-8000-0000000a6002', '00000000-0000-4000-8000-0000000000c1', 'ACTIVE', now() - interval '1 minute', '00000000-0000-4000-8000-0000000a2002',
    'Quyên góp vật tư y tế đợt 2 (bản nháp)', 'Bản nháp chưa công bố: vật tư y tế cho kho Demo B.',
    'DRAFT', NULL, NULL, now() - interval '1 day');
 
@@ -96,14 +94,14 @@ INSERT INTO drive_item (drive_id, item_id, target_quantity, acceptance_note) VAL
 
 -- ---------- donations ----------
 -- IDs: deliveries a7001..a7004, receipts a8002..a8004 (no receipt for the declared-only delivery), dispute a9001.
-INSERT INTO donation_delivery (id, public_code, drive_id, organization_id, donor_name, donor_phone, capability_hash, status, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000a7001', 'GD7K2M01', '00000000-0000-4000-8000-0000000a6001', '00000000-0000-4000-8000-000000000001',
+INSERT INTO donation_delivery (id, public_code, drive_id, donor_name, donor_phone, capability_hash, status, created_at) VALUES
+  ('00000000-0000-4000-8000-0000000a7001', 'GD7K2M01', '00000000-0000-4000-8000-0000000a6001',
    'Nhà hảo tâm giả lập 01', '0900000001', 'demo-capability-hash-0001', 'DECLARED', now() - interval '1 hour'),
-  ('00000000-0000-4000-8000-0000000a7002', 'GD7K2M02', '00000000-0000-4000-8000-0000000a6001', '00000000-0000-4000-8000-000000000001',
+  ('00000000-0000-4000-8000-0000000a7002', 'GD7K2M02', '00000000-0000-4000-8000-0000000a6001',
    'Nhà hảo tâm giả lập 02', '0900000002', 'demo-capability-hash-0002', 'DECLARED', now() - interval '6 days'),
-  ('00000000-0000-4000-8000-0000000a7003', 'GD7K2M03', '00000000-0000-4000-8000-0000000a6001', '00000000-0000-4000-8000-000000000001',
+  ('00000000-0000-4000-8000-0000000a7003', 'GD7K2M03', '00000000-0000-4000-8000-0000000a6001',
    'Nhà hảo tâm giả lập 03', '0900000003', 'demo-capability-hash-0003', 'DECLARED', now() - interval '5 days'),
-  ('00000000-0000-4000-8000-0000000a7004', 'GD7K2M04', '00000000-0000-4000-8000-0000000a6001', '00000000-0000-4000-8000-000000000001',
+  ('00000000-0000-4000-8000-0000000a7004', 'GD7K2M04', '00000000-0000-4000-8000-0000000a6001',
    'Nhà hảo tâm giả lập 04', '0900000004', 'demo-capability-hash-0004', 'DECLARED', now() - interval '3 hours');
 
 INSERT INTO donation_declaration (delivery_id, revision, created_by_kind, created_at) VALUES
@@ -165,8 +163,8 @@ INSERT INTO donation_dispute (id, delivery_id, status, opened_by_kind, opened_by
    'Tôi bàn giao 60 gói nhưng biên nhận ghi đã đếm 58 gói, đề nghị đối chiếu lại.', now() - interval '5 days 10 hours');
 
 -- ---------- fulfillment of the aid request (cycle OPEN, attribution copied from Response) ----------
-INSERT INTO fulfillment_cycle (id, request_id, work_cycle, organization_id, campaign_id, state, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b7001', '00000000-0000-4000-8000-0000000000f5', 1, '00000000-0000-4000-8000-000000000001',
+INSERT INTO fulfillment_cycle (id, request_id, work_cycle, campaign_id, state, created_at) VALUES
+  ('00000000-0000-4000-8000-0000000b7001', '00000000-0000-4000-8000-0000000000f5', 1,
    '00000000-0000-4000-8000-0000000000c1', 'OPEN', now() - interval '4 days');
 
 -- N1: bộ sơ cứu 20 (12 delivered, 8 still reserved => outstanding 8). N2: nước đóng chai 30, 12 delivered, remaining 18 cancelled.
@@ -186,8 +184,8 @@ INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_rese
   ('00000000-0000-4000-8000-0000000a5a03', 'RESERVE', 0, 12, '00000000-0000-4000-8000-0000000b2003', 'RESERVE:00000000-0000-4000-8000-0000000b2003', '00000000-0000-4000-8000-000000000105', now() - interval '4 days');
 
 -- Distribution 1 (REQUEST_AID, direct to a household): preparer dist1, approver ops_mgr, dispatcher dist2, recorder vol_leader1.
-INSERT INTO distribution (id, warehouse_id, organization_id, vehicle_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b3001', '00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-000000000001',
+INSERT INTO distribution (id, warehouse_id, vehicle_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
+  ('00000000-0000-4000-8000-0000000b3001', '00000000-0000-4000-8000-0000000a2001',
    '00000000-0000-4000-8000-0000000a4001', '00000000-0000-4000-8000-0000000000c1', 'REQUEST_AID', 'DRAFT',
    '00000000-0000-4000-8000-00000000010a', now() - interval '3 days 20 hours');
 INSERT INTO distribution_line (id, distribution_id, warehouse_id, item_id, commitment_id, quantity) VALUES
@@ -215,8 +213,8 @@ INSERT INTO issued_line_settlement (handoff_line_id, commitment_id, settlement_t
 
 -- Distribution 2 (plan TC-DIST-02): issue 55 mì gói to a relief point; point receipt 50, loss 5 pending (no loss review row),
 -- handout 35 => 15 held at the point; the 5 under pending loss stay in transit (excluded from custody arithmetic until reviewed).
-INSERT INTO distribution (id, warehouse_id, organization_id, relief_point_id, vehicle_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-000000000001',
+INSERT INTO distribution (id, warehouse_id, relief_point_id, vehicle_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
+  ('00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000a2001',
    '00000000-0000-4000-8000-0000000a3001', '00000000-0000-4000-8000-0000000a4001', '00000000-0000-4000-8000-0000000000c1', 'POINT_REPLENISHMENT', 'DRAFT',
    '00000000-0000-4000-8000-00000000010a', now() - interval '2 days 20 hours');
 INSERT INTO distribution_line (id, distribution_id, warehouse_id, item_id, quantity, in_transit_quantity, at_point_quantity) VALUES
@@ -244,8 +242,8 @@ INSERT INTO handoff_line (id, handoff_id, distribution_id, distribution_line_id,
   ('00000000-0000-4000-8000-0000000b6005', '00000000-0000-4000-8000-0000000b5004', '00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000b4003', 5);
 
 -- Distribution 3: CAMPAIGN_DISTRIBUTION still DRAFT (warehouse B, no commitment, no stock effect yet).
-INSERT INTO distribution (id, warehouse_id, organization_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b3003', '00000000-0000-4000-8000-0000000a2002', '00000000-0000-4000-8000-000000000001',
+INSERT INTO distribution (id, warehouse_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
+  ('00000000-0000-4000-8000-0000000b3003', '00000000-0000-4000-8000-0000000a2002',
    '00000000-0000-4000-8000-0000000000c1', 'CAMPAIGN_DISTRIBUTION', 'DRAFT', '00000000-0000-4000-8000-00000000010b', now() - interval '2 hours');
 INSERT INTO distribution_line (id, distribution_id, warehouse_id, item_id, quantity) VALUES
   ('00000000-0000-4000-8000-0000000b4004', '00000000-0000-4000-8000-0000000b3003', '00000000-0000-4000-8000-0000000a2002', '00000000-0000-4000-8000-0000000a1001', 40.000),

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AppError } from '@c48/technical/errors/errors';
 import { InternalService } from './internal.service';
@@ -69,7 +69,7 @@ export class InternalController {
   ): Promise<Record<string, unknown>> {
     noStore(response);
     if (request.serviceCaller !== 'response') throw new AppError('FORBIDDEN', { status: 403 });
-    return this.internalService.teamLeaderEligibility(dto.user_id, dto.organization_id);
+    return this.internalService.teamLeaderEligibility(dto.user_id);
   }
 
   @Post('request-coordinators')
@@ -82,13 +82,6 @@ export class InternalController {
   ): Promise<Record<string, unknown>> {
     noStore(response);
     if (request.serviceCaller !== 'response') throw new AppError('FORBIDDEN', { status: 403 });
-    return this.internalService.requestCoordinators(dto.organization_id);
-  }
-
-  @Get('organizations/:id')
-  @UseGuards(IdentityServiceGuard)
-  async organization(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Res({ passthrough: true }) response: Response): Promise<Record<string, unknown>> {
-    noStore(response);
-    return this.internalService.organization(id);
+    return this.internalService.requestCoordinators(dto.campaign_id ?? null);
   }
 }

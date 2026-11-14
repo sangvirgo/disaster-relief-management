@@ -1,5 +1,8 @@
 # Usable Seeded Donation for Postman
 
+> **Lưu ý (2026-11-14):** Tài liệu lịch sử này đã lỗi thời sau 2026-11-14: tổ chức (organization) và membership đã bị gỡ khỏi hệ thống; phạm vi hiện tại chỉ còn SYSTEM và CAMPAIGN. Xem [05-permissions](backend/05-permissions.md).
+
+
 ## Goal
 
 Make the existing public in-kind donation fixture usable in the existing Postman collection so the donor can track and claim it with a matching capability secret. Reuse fixture `GD7K2N01`; do not create another donation row or add Postman requests.

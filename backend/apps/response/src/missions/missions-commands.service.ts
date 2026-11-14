@@ -8,6 +8,7 @@ import {
 } from '@c48/technical/idempotency/idempotency';
 import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';
 import { RequestOperationsService } from '../operations/request-operations.service';
+import { RequestClaimGuard } from '../operations/request-claims.guard';
 import { cleanText, checkVersion } from '../operations/request-operations.helpers';
 import { CreateMissionDto, MissionReasonDto, MissionTransitionDto, MissionVersionDto, RecordMissionOnBehalfDto } from './missions.dto';
 import { missionProgressStatus, missionTransitionAllowed, MissionStatus } from './missions.helpers';
@@ -31,7 +32,6 @@ interface RequestRow {
   id: string;
   status: string;
   version: number;
-  organization_id: string;
   campaign_id: string | null;
   incident_category_code: string;
   priority: string | null;
@@ -46,7 +46,6 @@ interface RequestRow {
 
 interface TeamRow {
   id: string;
-  organization_id: string;
   reporting_mode: 'APP' | 'COORDINATOR';
   availability: 'AVAILABLE' | 'UNAVAILABLE';
   status: 'ACTIVE' | 'INACTIVE';
@@ -79,6 +78,7 @@ export class MissionsCommandsService {
     private readonly idempotency: IdempotencyService,
     private readonly sessions: ReporterSessionService,
     private readonly operations: RequestOperationsService,
+    private readonly claimGuard: RequestClaimGuard,
   ) {}
 
   async offer(requestId: string, dto: CreateMissionDto, key: string, request: MissionRequest): Promise<IdempotentResult<MissionCommandView>> {
@@ -87,9 +87,8 @@ export class MissionsCommandsService {
     const candidateItems = Array.isArray(candidatePage.items) ? candidatePage.items as Array<{ suggested?: boolean; team?: { id?: string } }> : [];
     const suggestedTeamId = candidateItems.find((item) => item.suggested && typeof item.team?.id === 'string')?.team?.id ?? null;
     const targetRows = await this.dataSource.query(
-      `SELECT r.organization_id,t.reporting_mode FROM assistance_request r LEFT JOIN rescue_team t ON t.id=$2 WHERE r.id=$1`,
-      [requestId, dto.team_id],
-    ) as Array<{ organization_id: string; reporting_mode: TeamRow['reporting_mode'] | null }>;
+      'SELECT id FROM assistance_request WHERE id=$1', [requestId],
+    ) as Array<{ id: string }>;
     if (!targetRows[0]) throw new AppError('NOT_FOUND', { status: 404 });
 
     return this.idempotency.execute(this.dataSource, {
@@ -143,6 +142,7 @@ export class MissionsCommandsService {
   private async offerInTransaction(
     manager: EntityManager, requestId: string, dto: CreateMissionDto, session: ReporterSession, suggestedTeamId: string | null,
   ): Promise<IdempotentOutcome<MissionCommandView>> {
+    await this.claimGuard.assertCanCoordinate(manager, requestId, session, 'response.missions.offer');
     const row = await this.lockRequest(manager, requestId, session, 'MISSION_ASSIGN', true);
     checkVersion(Number(row.version), dto.expected_version);
     if (!['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(row.status) || !row.priority || !row.priority_basis || !row.verification_revision) {
@@ -150,7 +150,7 @@ export class MissionsCommandsService {
     }
 
     const teamRows = await manager.query(
-      `SELECT id,organization_id,reporting_mode,availability,status,readiness_required,external_contact_note
+      `SELECT id,reporting_mode,availability,status,readiness_required,external_contact_note
          FROM rescue_team WHERE id=$1 FOR SHARE`, [dto.team_id],
     ) as TeamRow[];
     const team = teamRows[0];
@@ -261,7 +261,7 @@ export class MissionsCommandsService {
     const request = await this.lockRequest(manager, requestId, session, permission, change.command === 'accept');
     if (protectedRequestStatuses.includes(request.status)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
     const teams = await manager.query(
-      `SELECT id,organization_id,reporting_mode,availability,status,readiness_required,external_contact_note
+      `SELECT id,reporting_mode,availability,status,readiness_required,external_contact_note
          FROM rescue_team WHERE id=$1 FOR SHARE`, [teamId],
     ) as TeamRow[];
     const team = teams[0];
@@ -332,7 +332,7 @@ export class MissionsCommandsService {
       }
     }
     const rows = await manager.query(
-      `SELECT id,status,version,organization_id,campaign_id,incident_category_code,priority,priority_basis,needs_rescue,needs_relief_supplies,
+      `SELECT id,status,version,campaign_id,incident_category_code,priority,priority_basis,needs_rescue,needs_relief_supplies,
               work_cycle,verification_revision,attribution_locked_at,reporter_user_id
          FROM assistance_request WHERE id=$1 FOR UPDATE`,
       [requestId],

@@ -10,7 +10,6 @@ import { RequestOperationsCommandRunner } from '../src/operations/request-operat
 import { RequestOperationsPersistenceService } from '../src/operations/request-operations.persistence.service';
 import { AttachCampaignDto } from '../src/operations/request-operations.dto';
 
-const organizationId = '00000000-0000-4000-8000-000000000001';
 const campaignId = '00000000-0000-4000-8000-000000000002';
 const requestId = '00000000-0000-4000-8000-000000000003';
 const eventId = '00000000-0000-4000-8000-000000000004';
@@ -20,10 +19,7 @@ const currentCampaignId = '00000000-0000-4000-8000-000000000008';
 const request = {} as Request;
 const key = '00000000-0000-4000-8000-000000000006';
 
-function fixture(grants: ReporterSession['grants'] = [{
-  role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId,
-  campaign_id: null,
-}], replayResource?: { type: string; id: string }) {
+function fixture(grants: ReporterSession['grants'] = [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], replayResource?: { type: string; id: string }) {
   const managerQuery = jest.fn<(...args: unknown[]) => Promise<unknown[]>>();
   const manager = { query: managerQuery } as unknown as EntityManager;
   const dataSource = { query: jest.fn<(...args: unknown[]) => Promise<unknown[]>>() } as unknown as DataSource;
@@ -40,18 +36,18 @@ function fixture(grants: ReporterSession['grants'] = [{
       return { status: outcome.status, value: outcome.value, replay: false };
     }),
   } as unknown as IdempotencyService;
-  const runner = new RequestOperationsCommandRunner(dataSource, idempotency);
+  const runner = new RequestOperationsCommandRunner(dataSource, idempotency, { assertCanCoordinate: jest.fn(async () => undefined) } as never);
   const service = new RequestCampaignAssociationService(sessions, runner, new RequestOperationsPersistenceService());
   return { service, managerQuery, sessions, idempotency };
 }
 
 function activeCampaign(overrides: Record<string, unknown> = {}) {
-  return { id: campaignId, status: 'ACTIVE', organization_id: organizationId, ...overrides };
+  return { id: campaignId, status: 'ACTIVE', ...overrides };
 }
 
 function unlockedRequest(overrides: Record<string, unknown> = {}) {
   return {
-    id: requestId, status: 'VERIFIED', version: 4, organization_id: organizationId,
+    id: requestId, status: 'VERIFIED', version: 4,
     campaign_id: null, attribution_locked_at: null, ...overrides,
   };
 }
@@ -95,8 +91,7 @@ describe('RequestCampaignAssociationService', () => {
 
   it('requires permission for both the current and target campaign when moving attribution', async () => {
     const { service, managerQuery } = fixture([{
-      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', organization_id: organizationId,
-      campaign_id: campaignId,
+      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId,
     }]);
     managerQuery.mockResolvedValueOnce([{ campaign_id: sourceCampaignId }])
       .mockResolvedValueOnce([activeCampaign()])
@@ -119,14 +114,27 @@ describe('RequestCampaignAssociationService', () => {
     expect(managerQuery).toHaveBeenCalledTimes(3);
   });
 
-  it('rejects cross-organization campaign association', async () => {
-    const { service, managerQuery } = fixture();
+  it('allows a campaign grant to attach an unassigned request to that campaign', async () => {
+    const { service, managerQuery } = fixture([{ role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId }]);
     managerQuery.mockResolvedValueOnce([{ campaign_id: null }])
-      .mockResolvedValueOnce([activeCampaign({ organization_id: '99999999-9999-4999-8999-999999999999' })])
-      .mockResolvedValueOnce([unlockedRequest()]);
+      .mockResolvedValueOnce([activeCampaign()])
+      .mockResolvedValueOnce([unlockedRequest()])
+      .mockResolvedValueOnce([[{ id: requestId, status: 'VERIFIED', version: 5, campaign_id: campaignId }], 1])
+      .mockResolvedValueOnce([{ id: eventId }]);
 
     await expect(service.attach(requestId, { campaign_id: campaignId, expected_version: 4 }, key, request))
-      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 });
+      .resolves.toMatchObject({ value: { campaign_id: campaignId } });
+    expect(managerQuery).toHaveBeenCalledTimes(5);
+  });
+
+  it('does not allow a campaign grant to attach an unassigned request to another campaign', async () => {
+    const { service, managerQuery } = fixture([{ role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId }]);
+    managerQuery.mockResolvedValueOnce([{ campaign_id: null }])
+      .mockResolvedValueOnce([activeCampaign({ id: sourceCampaignId })])
+      .mockResolvedValueOnce([unlockedRequest()]);
+
+    await expect(service.attach(requestId, { campaign_id: sourceCampaignId, expected_version: 4 }, key, request))
+      .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
     expect(managerQuery).toHaveBeenCalledTimes(3);
   });
 
@@ -175,8 +183,7 @@ describe('RequestCampaignAssociationService', () => {
 
   it('does not expose a reassigned campaign when replaying an event scoped to the original campaign', async () => {
     const grants: ReporterSession['grants'] = [{
-      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', organization_id: organizationId,
-      campaign_id: campaignId,
+      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId,
     }];
     const { service, managerQuery } = fixture(grants, { type: 'request_event', id: eventId });
     managerQuery.mockResolvedValueOnce([unlockedRequest({ campaign_id: currentCampaignId })])
@@ -202,8 +209,7 @@ describe('RequestCampaignAssociationService', () => {
 
   it('keeps the original event campaign permission check on replay', async () => {
     const grants: ReporterSession['grants'] = [{
-      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', organization_id: organizationId,
-      campaign_id: currentCampaignId,
+      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: currentCampaignId,
     }];
     const { service, managerQuery } = fixture(grants, { type: 'request_event', id: eventId });
     managerQuery.mockResolvedValueOnce([unlockedRequest({ campaign_id: currentCampaignId })])
@@ -246,8 +252,7 @@ describe('RequestCampaignAssociationService', () => {
 
   it('allows a campaign-scoped user to replay a detach after the current association is null', async () => {
     const grants: ReporterSession['grants'] = [{
-      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', organization_id: organizationId,
-      campaign_id: campaignId,
+      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId,
     }];
     const { service, managerQuery } = fixture(grants, { type: 'request_event', id: eventId });
     managerQuery.mockResolvedValueOnce([unlockedRequest()])

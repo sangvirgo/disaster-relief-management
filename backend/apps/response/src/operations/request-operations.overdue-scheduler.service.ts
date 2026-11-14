@@ -33,7 +33,7 @@ export class RequestOperationsOverdueSchedulerService implements OnModuleInit, O
     let rows: OperationRequestRow[] = [];
     const ran = await this.jobs.runOnce('response.requests.overdue.scan', async (manager) => {
       rows = await manager.query(
-        `SELECT r.id,r.version,r.status,r.received_at,r.verifying_since,r.organization_id,r.campaign_id,
+        `SELECT r.id,r.version,r.status,r.received_at,r.verifying_since,r.campaign_id,
                 r.reporter_declared_danger
            FROM assistance_request r
           WHERE ((r.status IN ('SUBMITTED','VERIFYING') AND
@@ -48,12 +48,12 @@ export class RequestOperationsOverdueSchedulerService implements OnModuleInit, O
     });
     if (!ran || !rows.length) return 0;
     const grants = new Map<string, RequestCoordinatorGrant[]>();
-    for (const organizationId of new Set(rows.map((row) => row.organization_id))) {
-      grants.set(organizationId, await this.sessions.requestCoordinatorGrants(organizationId));
+    for (const campaignId of new Set(rows.map((row) => row.campaign_id ?? ''))) {
+      grants.set(campaignId, await this.sessions.requestCoordinatorGrants(campaignId || null));
     }
     const notices: Array<{ sourceId: string; version: number; recipient: string }> = [];
     for (const row of rows) {
-      const recipients = new Set((grants.get(row.organization_id) ?? []).filter((grant) => grantCovers(grant, row)).map((grant) => grant.user_id));
+      const recipients = new Set((grants.get(row.campaign_id ?? '') ?? []).filter((grant) => grantCovers(grant, row)).map((grant) => grant.user_id));
       for (const recipient of recipients) notices.push({ sourceId: row.id, version: Number(row.version), recipient });
     }
     if (!notices.length) return 0;

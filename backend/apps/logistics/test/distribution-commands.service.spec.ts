@@ -16,7 +16,7 @@ describe('DistributionCommandsService line validation lock order', () => {
       cycle_id: cycleId,
       item_id: itemId,
       warehouse_id: 'warehouse-1',
-      organization_id: 'organization-1',
+      campaign_id: null,
       cycle_state: 'OPEN',
       need_status: 'OPEN',
       delivery_target_kind: 'FINAL_RECIPIENT',
@@ -41,7 +41,7 @@ describe('DistributionCommandsService line validation lock order', () => {
     await service.validateLines({ query } as unknown as EntityManager, {
       purpose: 'REQUEST_AID',
       warehouse_id: 'warehouse-1',
-      organization_id: 'organization-1',
+      campaign_id: null,
       relief_point_id: null,
     } as DistributionContext, [{ item_id: itemId, commitment_id: commitmentId, quantity: '1.00' }]);
 
@@ -57,15 +57,14 @@ describe('DistributionCommandsService vehicle capacity warning', () => {
   it('keeps over-capacity prepare and dispatch available and preserves stock outcomes', async () => {
     const distributionId = '55555555-5555-4555-8555-555555555555';
     const warehouseId = '66666666-6666-4666-8666-666666666666';
-    const organizationId = '77777777-7777-4777-8777-777777777777';
     const lineId = '88888888-8888-4888-8888-888888888888';
     const preparerId = '99999999-9999-4999-8999-999999999999';
     const dispatcherId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-    const grants = [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'ORGANIZATION', organization_id: organizationId }];
+    const grants = [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'SYSTEM',}];
     const distribution = {
       id: distributionId,
       warehouse_id: warehouseId,
-      organization_id: organizationId,
+      campaign_id: null,
       warehouse_status: 'ACTIVE',
       relief_point_id: null,
       relief_point_status: null,
@@ -119,10 +118,10 @@ describe('DistributionCommandsService vehicle capacity warning', () => {
     }));
 
     const query = jest.fn(async (sql: string, values: unknown[] = []) => {
-      if (sql.includes('SELECT organization_id,status FROM warehouse')) {
-        return [{ organization_id: organizationId, status: 'ACTIVE' }];
+      if (sql.includes('SELECT status FROM warehouse')) {
+        return [{ status: 'ACTIVE' }];
       }
-      if (sql.includes('SELECT organization_id,status FROM vehicle')) return [{ organization_id: organizationId, status: 'ACTIVE' }];
+      if (sql.includes('SELECT status FROM vehicle')) return [{ status: 'ACTIVE' }];
       if (sql.includes('FROM distribution d JOIN warehouse w')) return [distributionRow()];
       if (sql.includes('SELECT cm.id,cm.item_id,cm.warehouse_id,cm.quantity::text')) return [{ ...commitment }];
       if (sql.includes('SELECT dl.id,dl.item_id,dl.commitment_id,dl.quantity::text')) {

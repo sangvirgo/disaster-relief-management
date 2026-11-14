@@ -17,7 +17,6 @@ type StockRequest = Request & { idempotencyKey?: string };
 
 interface WarehouseContext {
   id: string;
-  organization_id: string;
   status: 'ACTIVE' | 'INACTIVE';
 }
 
@@ -25,7 +24,6 @@ interface BalanceContext {
   id: string;
   warehouse_id: string;
   item_id: string;
-  organization_id: string;
   warehouse_status: 'ACTIVE' | 'INACTIVE';
   scale: number | string;
 }
@@ -41,7 +39,6 @@ interface AdjustmentContext {
   balance_id: string;
   requested_by_user_id: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  organization_id: string;
 }
 
 function requestKey(request: StockRequest): string {
@@ -54,7 +51,7 @@ function cleanReason(value: string): string {
 }
 
 function requireExpectedWarehouse(session: Awaited<ReturnType<LogisticsSessionService['require']>>, warehouse: WarehouseContext): void {
-  requireWarehousePermission(session.grants, 'ASSET_MANAGE', warehouse.organization_id);
+  requireWarehousePermission(session.grants, 'ASSET_MANAGE');
   if (warehouse.status !== 'ACTIVE') throw new AppError('VALIDATION_FAILED', { status: 400 });
 }
 
@@ -90,7 +87,7 @@ function assertUniqueItems(lines: readonly OpeningStockLineDto[]): string[] {
 
 async function readBalanceContext(manager: Pick<DataSource | EntityManager, 'query'>, balanceId: string): Promise<BalanceContext | undefined> {
   const rows = await manager.query(
-    `SELECT b.id,b.warehouse_id,b.item_id,w.organization_id,w.status AS warehouse_status,u.scale
+    `SELECT b.id,b.warehouse_id,b.item_id,w.status AS warehouse_status,u.scale
        FROM stock_balance b JOIN warehouse w ON w.id=b.warehouse_id
        JOIN item i ON i.id=b.item_id JOIN unit u ON u.code=i.unit_code WHERE b.id=$1`,
     [balanceId],
@@ -140,7 +137,7 @@ export class StockService {
     const itemIds = assertUniqueItems(dto.lines);
     const note = cleanReason(dto.note);
     const warehouses = await this.dataSource.query(
-      'SELECT id,organization_id,status FROM warehouse WHERE id=$1',
+      'SELECT id,status FROM warehouse WHERE id=$1',
       [dto.warehouse_id],
     ) as WarehouseContext[];
     const warehouse = warehouses[0];
@@ -156,7 +153,7 @@ export class StockService {
       requestHash: canonicalRequestHash({ actor_user_id: session.userId, dto }),
       async execute(manager) {
         const lockedWarehouses = await manager.query(
-          'SELECT id,organization_id,status FROM warehouse WHERE id=$1 FOR SHARE',
+          'SELECT id,status FROM warehouse WHERE id=$1 FOR SHARE',
           [dto.warehouse_id],
         ) as WarehouseContext[];
         const lockedWarehouse = lockedWarehouses[0];
@@ -212,7 +209,7 @@ export class StockService {
     const session = await this.sessions.require(request);
     const balance = await readBalanceContext(this.dataSource, dto.balance_id);
     if (!balance) throw new AppError('NOT_FOUND', { status: 404 });
-    requireWarehousePermission(session.grants, 'STOCK_ADJUST_REQUEST', balance.organization_id);
+    requireWarehousePermission(session.grants, 'STOCK_ADJUST_REQUEST');
     validateQuantity(dto.delta_on_hand, Number(balance.scale), { allowNegative: true });
     const reason = cleanReason(dto.reason);
     if (dto.compensates_movement_id) await this.assertCompensation(this.dataSource, dto, balance);
@@ -256,15 +253,15 @@ export class StockService {
   ): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
     const adjustments = await this.dataSource.query(
-      `SELECT a.id,a.balance_id,a.requested_by_user_id,a.status,w.organization_id
+      `SELECT a.id,a.balance_id,a.requested_by_user_id,a.status
          FROM stock_adjustment a JOIN stock_balance b ON b.id=a.balance_id
          JOIN warehouse w ON w.id=b.warehouse_id WHERE a.id=$1`,
       [id],
     ) as AdjustmentContext[];
     const adjustment = adjustments[0];
     if (!adjustment) throw new AppError('NOT_FOUND', { status: 404 });
-    if (!hasWarehouseScope(session.grants, adjustment.organization_id)) throw new AppError('NOT_FOUND', { status: 404 });
-    requireWarehousePermission(session.grants, 'ADJUSTMENT_REVIEW', adjustment.organization_id);
+    if (!hasWarehouseScope(session.grants)) throw new AppError('NOT_FOUND', { status: 404 });
+    requireWarehousePermission(session.grants, 'ADJUSTMENT_REVIEW');
     assertIndependentAdjustmentReviewer(adjustment.requested_by_user_id, session.userId);
     const note = dto.note === undefined ? null : cleanReason(dto.note);
     if (dto.decision === 'REJECT' && note === null) throw new AppError('VALIDATION_FAILED', { status: 400 });

@@ -36,12 +36,12 @@ export class RequestOperationsTeamCandidatesService {
     };
     const rows = await this.dataSource.query(
       `WITH target AS (
-         SELECT r.id,r.organization_id,r.incident_category_code,s.location AS request_location,
+         SELECT r.id,r.incident_category_code,s.location AS request_location,
                 statement_timestamp() AS query_time
            FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
-          WHERE r.id=$1 AND r.organization_id=$3
+          WHERE r.id=$1
        ), eligible AS (
-         SELECT t.id,t.organization_id,t.name,t.team_kind,t.reporting_mode,t.availability,t.status,
+         SELECT t.id,t.name,t.team_kind,t.reporting_mode,t.availability,t.status,
                 t.readiness_required,t.version,t.created_at,
                 COALESCE((SELECT array_agg(ts.skill_code ORDER BY ts.skill_code) FROM team_skill ts WHERE ts.team_id=t.id),ARRAY[]::text[]) AS skills,
                 floor(extract(epoch FROM (q.query_time-p.captured_at)))::int AS position_age_s,
@@ -89,14 +89,14 @@ export class RequestOperationsTeamCandidatesService {
                                AND NOT EXISTS (SELECT 1 FROM team_skill ts
                                                 WHERE ts.team_id=t.id AND ts.skill_code=required.skill_code))
        )
-       SELECT id,organization_id,name,team_kind,reporting_mode,availability,status,readiness_required,version,created_at,
+       SELECT id,name,team_kind,reporting_mode,availability,status,readiness_required,version,created_at,
               skills,position_age_s,position_accuracy_m,position_source,longitude,latitude,distance_m,recent_missions_24h,recent_missions_7d,recent_history
          FROM eligible
         WHERE position_team_id IS NULL
            OR captured_at < query_time-interval '30 minutes' OR captured_at > query_time
            OR (captured_at >= query_time-interval '30 minutes' AND captured_at <= query_time
                AND ST_DWithin(request_location,position_location,$2::float8))`,
-      [requestId, radiusM, source.organization_id],
+      [requestId, radiusM],
     ) as TeamCandidateRow[];
 
     const items = rankTeamCandidates(rows.filter((row): row is TeamCandidateRow & { distance_m: number } => row.distance_m !== null)

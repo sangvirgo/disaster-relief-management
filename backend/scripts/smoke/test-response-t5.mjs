@@ -14,7 +14,6 @@ const responseDb = new Client({ connectionString: process.env.C48_RESPONSE_DATAB
 const identityDb = new Client({ connectionString: process.env.C48_IDENTITY_DATABASE_URL });
 const backendRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const composeArgs = ['compose', '--profile', 'storage', '-p', 'c48', '--env-file', resolve(backendRoot, '.env'), '-f', resolve(backendRoot, 'infra/compose.yaml')];
-const intakeOrganizationId = process.env.DEMO_INTAKE_ORGANIZATION_ID ?? '40000000-0000-4000-8000-000000000004';
 let ipSequence = 40;
 
 function requiredEnv(name) {
@@ -133,11 +132,6 @@ async function upload(base, request, trackingSecret, form, idempotencyKey = key(
 await Promise.all([responseDb.connect(), identityDb.connect()]);
 try {
   await responseDb.query("INSERT INTO incident_category (code,display_name) VALUES ('T5_FLOOD','Lũ lụt') ON CONFLICT (code) DO NOTHING");
-  await identityDb.query(
-    `INSERT INTO organization (id,name,organization_kind) VALUES ($1,'T5 test organization','COORDINATION') ON CONFLICT (id) DO NOTHING`,
-    [intakeOrganizationId],
-  );
-
   const reporter = await registerAndLogin('reporter');
   const recoveringReporter = await registerAndLogin('recoverer');
   const coordinator = await registerAndLogin('coordinator');
@@ -146,8 +140,8 @@ try {
   assert.equal(webMine.status, 200, JSON.stringify(webMine.value));
   assert.deepEqual(webMine.value.items, [], 'cookie-authenticated safe reads do not require CSRF headers');
   await identityDb.query(
-    `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id) VALUES ($1,'COORDINATOR','ORGANIZATION',$2)`,
-    [coordinator.id, intakeOrganizationId],
+    `INSERT INTO role_grant (user_id,role_code,scope_type) VALUES ($1,'COORDINATOR','SYSTEM')`,
+    [coordinator.id],
   );
   // The coordinator's live Identity session is introspected on every request, so its grant is immediately visible.
 

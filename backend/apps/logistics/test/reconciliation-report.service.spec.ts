@@ -28,7 +28,7 @@ describe('ReconciliationReportService', () => {
     const dataSource = { query } as unknown as DataSource;
     const sessions = {
       require: jest.fn<(request: Request) => Promise<{ userId: string; grants: Array<Record<string, unknown>> }>>().mockResolvedValue({
-        userId: 'user-1', grants: [{ role_code: 'REVIEWER', scope_type: 'ORGANIZATION', organization_id: 'org-1' }],
+        userId: 'user-1', grants: [{ role_code: 'REVIEWER', scope_type: 'SYSTEM',}],
       }),
     } as unknown as LogisticsSessionService;
     const reports = new ReconciliationReportService(dataSource, sessions);
@@ -73,7 +73,7 @@ describe('ReconciliationReportService', () => {
     const query = jest.fn<(sql: string, parameters?: unknown[]) => Promise<Array<Record<string, unknown>>>>().mockResolvedValue([]);
     const sessions = {
       require: jest.fn<(request: Request) => Promise<{ userId: string; grants: Array<Record<string, unknown>> }>>().mockResolvedValue({
-        userId: 'user-1', grants: [{ role_code: 'REVIEWER', scope_type: 'ORGANIZATION', organization_id: 'org-1' }],
+        userId: 'user-1', grants: [{ role_code: 'REVIEWER', scope_type: 'SYSTEM',}],
       }),
     } as unknown as LogisticsSessionService;
     const reports = new ReconciliationReportService({ query } as unknown as DataSource, sessions);

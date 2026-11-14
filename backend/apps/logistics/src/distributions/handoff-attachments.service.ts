@@ -19,13 +19,13 @@ interface HandoffAttachmentOwner {
   handoff_id: string;
   distribution_id: string;
   handoff_kind: 'DIRECT_HOUSEHOLD' | 'POINT_RECEIPT' | 'HOUSEHOLD_HANDOUT' | 'RETURN' | 'LOSS';
-  organization_id: string;
+  campaign_id: string | null;
 }
 
 interface HandoffEvidenceRow extends Omit<AttachmentRecord, 'detected_mime'> {
   detected_mime: EvidenceMime;
   handoff_kind: HandoffAttachmentOwner['handoff_kind'];
-  organization_id: string;
+  campaign_id: string | null;
 }
 
 @Injectable()
@@ -77,7 +77,7 @@ export class HandoffAttachmentsService {
   async download(attachmentId: string, request: Request): Promise<{ url: string; expires_in: number }> {
     const rows = await this.dataSource.query(
       `SELECT a.id,a.delivery_id,a.dispute_id,a.handoff_id,a.object_key,a.state,a.declared_bytes,
-              a.size_bytes,a.detected_mime,a.checksum,a.created_at,h.handoff_kind,d.organization_id
+              a.size_bytes,a.detected_mime,a.checksum,a.created_at,h.handoff_kind,d.campaign_id
          FROM logistics_attachment a JOIN handoff_record h ON h.id=a.handoff_id
          JOIN distribution d ON d.id=h.distribution_id JOIN warehouse w ON w.id=d.warehouse_id
         WHERE a.id=$1 AND a.state='READY'`, [attachmentId],
@@ -85,21 +85,14 @@ export class HandoffAttachmentsService {
     const attachment = rows[0];
     if (!attachment) throw new AppError('NOT_FOUND', { status: 404 });
     const session = await this.sessions.require(request);
-    const inScope = hasWarehouseScope(session.grants, attachment.organization_id);
+    const inScope = hasWarehouseScope(session.grants, attachment);
     const allowed = inScope && (
       (attachment.handoff_kind === 'RETURN' && (
-        hasPermission(session.grants, 'DONATION_INTAKE', {
-          organizationId: attachment.organization_id,
-        }) || hasPermission(session.grants, 'DISTRIBUTION_DISPATCH', {
-          organizationId: attachment.organization_id,
-        })
+        hasPermission(session.grants, 'DONATION_INTAKE', { campaignId: attachment.campaign_id }) ||
+        hasPermission(session.grants, 'DISTRIBUTION_DISPATCH', { campaignId: attachment.campaign_id })
       )) ||
-      (attachment.handoff_kind !== 'RETURN' && hasPermission(session.grants, 'HANDOFF_RECORD', {
-        organizationId: attachment.organization_id,
-      })) ||
-      (attachment.handoff_kind === 'LOSS' && hasPermission(session.grants, 'LOSS_APPROVE', {
-        organizationId: attachment.organization_id,
-      }))
+      (attachment.handoff_kind !== 'RETURN' && hasPermission(session.grants, 'HANDOFF_RECORD', { campaignId: attachment.campaign_id })) ||
+      (attachment.handoff_kind === 'LOSS' && hasPermission(session.grants, 'LOSS_APPROVE', { campaignId: attachment.campaign_id }))
     );
     if (!allowed) throw new AppError('FORBIDDEN', { status: 403 });
     return this.lifecycle.signedDownload(attachment.object_key, attachment.detected_mime);
@@ -143,7 +136,7 @@ export class HandoffAttachmentsService {
     forUpdate = false,
   ): Promise<HandoffAttachmentOwner> {
     const rows = await query.query(
-      `SELECT h.id AS handoff_id,h.distribution_id,h.handoff_kind,d.organization_id
+      `SELECT h.id AS handoff_id,h.distribution_id,h.handoff_kind,d.campaign_id
          FROM handoff_record h JOIN distribution d ON d.id=h.distribution_id
         WHERE h.distribution_id=$1 AND h.id=$2${forUpdate ? ' FOR UPDATE OF d' : ''}`,
       [distributionId, handoffId],

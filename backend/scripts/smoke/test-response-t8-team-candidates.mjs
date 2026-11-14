@@ -8,16 +8,16 @@ function assertVietnamese(result, status, code) {
   assert.equal(result.headers.get('cache-control'), 'no-store');
 }
 
-async function addCandidateTeam(responseDb, organizationId, coordinatorId, {
-  id = randomUUID(), name, position, skills = ['T8_A', 'T8_C'], teamOrganizationId = organizationId,
+async function addCandidateTeam(responseDb, coordinatorId, {
+  id = randomUUID(), name, position, skills = ['T8_A', 'T8_C'],
   reportingMode = 'COORDINATOR', availability = 'AVAILABLE', status = 'ACTIVE',
   readinessRequired = false, externalContactNote = 'Liên hệ kiểm thử T8',
 }) {
   await responseDb.query(
     `INSERT INTO rescue_team
-       (id,organization_id,name,team_kind,reporting_mode,external_contact_note,availability,status,readiness_required)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [id, teamOrganizationId, `Đội ${name} ${id.slice(0, 8)}`,
+       (id,name,team_kind,reporting_mode,external_contact_note,availability,status,readiness_required)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [id, `Đội ${name} ${id.slice(0, 8)}`,
       reportingMode === 'APP' ? 'VOLUNTEER' : 'OTHER', reportingMode, externalContactNote, availability, status, readinessRequired],
   );
   await responseDb.query('INSERT INTO team_skill (team_id,skill_code) SELECT $1,unnest($2::text[])', [id, skills]);
@@ -31,8 +31,8 @@ async function addCandidateTeam(responseDb, organizationId, coordinatorId, {
   return id;
 }
 
-export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter, coordinator, otherCoordinator, organizationId, appTeam, call, key }) {
-  const addTeam = (options) => addCandidateTeam(responseDb, organizationId, coordinator.id, options);
+export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter, coordinator, otherCoordinator, appTeam, call, key }) {
+  const addTeam = (options) => addCandidateTeam(responseDb, coordinator.id, options);
   await responseDb.query("INSERT INTO incident_category (code,display_name) VALUES ('T8_TEAM_CANDIDATES','Kiểm thử chọn đội') ON CONFLICT (code) DO NOTHING");
   await responseDb.query(
     `INSERT INTO incident_category_skill (category_code,skill_code) VALUES ('T8_TEAM_CANDIDATES','T8_A'),('T8_TEAM_CANDIDATES','T8_C')
@@ -49,9 +49,9 @@ export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter
   });
   assert.equal(request.status, 201, JSON.stringify(request.value));
   const checkedScope = await responseDb.query(
-    'SELECT organization_id FROM assistance_request WHERE id=$1', [request.value.id],
+    'SELECT campaign_id FROM assistance_request WHERE id=$1', [request.value.id],
   );
-  assert.deepEqual(checkedScope.rows, [{ organization_id: organizationId }]);
+  assert.deepEqual(checkedScope.rows, [{ campaign_id: null }]);
 
   const endpoint = `requests/${request.value.id}/team-candidates`;
   assertVietnamese(await call(responseUrl, endpoint), 401, 'UNAUTHENTICATED');
@@ -79,10 +79,6 @@ export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter
   });
   const missingSkillTeam = await addTeam({
     name: 'thiếu kỹ năng', skills: ['T8_A'], position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
-  });
-  const wrongOrganizationTeam = await addTeam({
-    name: 'sai tổ chức', teamOrganizationId: randomUUID(),
-    position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
   });
   const unavailableTeam = await addTeam({
     name: 'không sẵn sàng', availability: 'UNAVAILABLE',
@@ -153,8 +149,7 @@ export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter
   assert.equal(candidates.value.items.some((item) => item.team.id === farTeam), false, 'fresh teams outside radius are omitted');
   assert.equal(candidates.value.items.some((item) => item.team.id === missingSkillTeam), false, 'missing required skills are excluded');
   const eligibilityExcludedTeams = [
-    wrongOrganizationTeam, unavailableTeam, readinessRequiredTeam,
-    inactiveTeam, appTeamWithoutLeader,
+    unavailableTeam, readinessRequiredTeam, inactiveTeam, appTeamWithoutLeader,
   ];
   for (const teamId of eligibilityExcludedTeams) {
     assert.equal(candidates.value.items.some((item) => item.team.id === teamId), false, `${teamId} must not be a candidate`);

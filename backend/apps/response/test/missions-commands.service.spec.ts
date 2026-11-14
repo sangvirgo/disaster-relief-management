@@ -6,7 +6,6 @@ const requestId = '00000000-0000-4000-8000-000000000001';
 const teamId = '00000000-0000-4000-8000-000000000002';
 const missionId = '00000000-0000-4000-8000-000000000003';
 const coordinatorId = '00000000-0000-4000-8000-000000000004';
-const organizationId = '00000000-0000-4000-8000-000000000005';
 const revisionId = '00000000-0000-4000-8000-000000000006';
 const campaignId = '00000000-0000-4000-8000-000000000007';
 
@@ -38,20 +37,40 @@ interface MissionsCommandsTestSurface {
 }
 
 function service(): MissionsCommandsTestSurface {
-  return new MissionsCommandsService({} as never, {} as never, {} as never, {} as never) as unknown as MissionsCommandsTestSurface;
+  return new MissionsCommandsService({} as never, {} as never, {} as never, {} as never, { assertCanCoordinate: jest.fn(async () => undefined) } as never) as unknown as MissionsCommandsTestSurface;
 }
 
 describe('MissionsCommandsService UPDATE RETURNING handling', () => {
+  it('denies campaign-only mission assignment for an unassigned request', async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql === 'SELECT campaign_id FROM assistance_request WHERE id=$1') return [{ campaign_id: null }];
+      if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
+        id: requestId, status: 'TRIAGED', version: 1, campaign_id: null,
+        incident_category_code: 'FLOOD', priority: 'P2', priority_basis: 'COMPLETE',
+        work_cycle: 1, verification_revision: revisionId, attribution_locked_at: null, reporter_user_id: null,
+      }];
+      return [];
+    });
+    const subject = service();
+
+    await expect(subject.offerInTransaction(
+      { query }, requestId, { expected_version: 1, team_id: teamId } as CreateMissionDto,
+      { userId: coordinatorId, grants: [{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignId }] }, null,
+    )).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('FROM rescue_team'))).toBe(false);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO mission'))).toBe(false);
+  });
+
   it('stops the offer when PostgreSQL returns no updated request row', async () => {
     const query = jest.fn(async (sql: string) => {
       if (sql.startsWith('SELECT campaign_id FROM assistance_request')) return [{ campaign_id: null }];
       if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
-        id: requestId, status: 'TRIAGED', version: 1, organization_id: organizationId,
+        id: requestId, status: 'TRIAGED', version: 1,
         campaign_id: null, incident_category_code: 'FLOOD', priority: 'P2', priority_basis: 'COMPLETE',
         work_cycle: 1, verification_revision: revisionId, attribution_locked_at: null, reporter_user_id: null,
       }];
       if (sql.includes('FROM rescue_team WHERE id=$1 FOR SHARE')) return [{
-        id: teamId, organization_id: organizationId, reporting_mode: 'COORDINATOR',
+        id: teamId, reporting_mode: 'COORDINATOR',
         availability: 'AVAILABLE', status: 'ACTIVE', readiness_required: false, external_contact_note: 'Liên hệ điều phối',
       }];
       if (sql.includes('FROM incident_category_skill')) return [];
@@ -71,7 +90,7 @@ describe('MissionsCommandsService UPDATE RETURNING handling', () => {
       manager,
       requestId,
       { expected_version: 1, team_id: teamId } as CreateMissionDto,
-      { userId: coordinatorId, grants: [{ role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: organizationId }] },
+      { userId: coordinatorId, grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM',}] },
       teamId,
     )).rejects.toMatchObject({ code: 'VERSION_CONFLICT', details: { current_version: 1 } });
     expect(query.mock.calls.some(([sql]) => sql.startsWith('INSERT INTO request_event'))).toBe(false);
@@ -122,7 +141,7 @@ describe('MissionsCommandsService UPDATE RETURNING handling', () => {
     const query = jest.fn(async (sql: string) => {
       if (sql === 'SELECT campaign_id FROM assistance_request WHERE id=$1') return [{ campaign_id: null }];
       if (sql.includes('FROM assistance_request WHERE id=$1 FOR UPDATE')) return [{
-        id: requestId, status: 'RESOLVING', version: 5, organization_id: organizationId,
+        id: requestId, status: 'RESOLVING', version: 5,
         campaign_id: null, incident_category_code: 'FLOOD', priority: 'P2', priority_basis: 'COMPLETE',
         work_cycle: 1, verification_revision: revisionId, attribution_locked_at: null, reporter_user_id: null,
       }];

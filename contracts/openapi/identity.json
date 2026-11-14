@@ -2187,629 +2187,6 @@
         "x-c48-controller-source": "backend/apps/identity/src/grants/grants.controller.ts#GrantsController.revoke"
       }
     },
-    "/organizations": {
-      "get": {
-        "operationId": "listIdentityOrganizations",
-        "summary": "List organizations",
-        "security": [
-          {
-            "WebAccessCookie": []
-          },
-          {
-            "NativeBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/Cursor"
-          },
-          {
-            "$ref": "#/components/parameters/Limit"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Organization page.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrganizationPage"
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "400": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "CURSOR_INVALID": {
-                    "summary": "CURSOR_INVALID",
-                    "value": {
-                      "code": "CURSOR_INVALID",
-                      "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "403": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          }
-        },
-        "x-c48-controller-source": "backend/apps/identity/src/organizations/organizations.controller.ts#OrganizationsController.list"
-      },
-      "post": {
-        "operationId": "createIdentityOrganization",
-        "summary": "Create an organization",
-        "security": [
-          {
-            "WebAccessCookie": []
-          },
-          {
-            "NativeBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateOrganizationRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Organization created.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Organization"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "403": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "409": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "ORGANIZATION_NAME_TAKEN": {
-                    "summary": "ORGANIZATION_NAME_TAKEN",
-                    "value": {
-                      "code": "ORGANIZATION_NAME_TAKEN",
-                      "message": "Tên tổ chức đã tồn tại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          }
-        },
-        "x-c48-controller-source": "backend/apps/identity/src/organizations/organizations.controller.ts#OrganizationsController.create"
-      }
-    },
-    "/organizations/{id}/deactivate": {
-      "post": {
-        "operationId": "deactivateIdentityOrganization",
-        "summary": "Deactivate an unused organization",
-        "description": "Requires ORG_MANAGE. Organizations with active memberships or grants cannot be deactivated.",
-        "security": [
-          {
-            "WebAccessCookie": []
-          },
-          {
-            "NativeBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/OrganizationId"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionedReason"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Organization deactivated.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Organization"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "403": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "ORGANIZATION_IN_USE": {
-                    "summary": "ORGANIZATION_IN_USE",
-                    "value": {
-                      "code": "ORGANIZATION_IN_USE",
-                      "message": "Tổ chức đang được sử dụng nên chưa thể ngừng hoạt động.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          }
-        },
-        "x-c48-controller-source": "backend/apps/identity/src/organizations/organizations.controller.ts#OrganizationsController.deactivate"
-      }
-    },
-    "/organizations/{id}/members": {
-      "post": {
-        "operationId": "addIdentityOrganizationMember",
-        "summary": "Add or reactivate an organization member",
-        "security": [
-          {
-            "WebAccessCookie": []
-          },
-          {
-            "NativeBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/OrganizationId"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "user_id"
-                ],
-                "properties": {
-                  "user_id": {
-                    "type": "string",
-                    "format": "uuid"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Membership active.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Membership"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "403": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "x-c48-controller-source": "backend/apps/identity/src/organizations/organizations.controller.ts#OrganizationsController.addMember"
-      }
-    },
-    "/organizations/{id}/members/{userId}/remove": {
-      "post": {
-        "operationId": "removeIdentityOrganizationMember",
-        "summary": "Remove a member and revoke organization grants",
-        "description": "Requires ORG_MANAGE. The operation revokes this user's grants scoped to the organization and all of the user's session families, in the same transaction.",
-        "security": [
-          {
-            "WebAccessCookie": []
-          },
-          {
-            "NativeBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/OrganizationId"
-          },
-          {
-            "$ref": "#/components/parameters/MemberUserId"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Membership removed or replayed.",
-            "headers": {
-              "Idempotent-Replay": {
-                "$ref": "#/components/headers/IdempotentReplay"
-              },
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "401": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "403": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "x-c48-controller-source": "backend/apps/identity/src/organizations/organizations.controller.ts#OrganizationsController.removeMember"
-      }
-    },
     "/audit-logs": {
       "get": {
         "operationId": "listIdentityAuditLogs",
@@ -3271,7 +2648,7 @@
       "post": {
         "operationId": "listRequestCoordinatorGrants",
         "summary": "Resolve active coordinator grants for Response notices and concurrence",
-        "description": "Restricted to a valid Response service token. Returns active users with current COORDINATOR grants and organization-scoped OPERATIONS_MANAGER grants for the supplied organization. Other service clients are forbidden. Response has Cache-Control: no-store.",
+        "description": "Restricted to a valid Response service token. Returns active users with current COORDINATOR grants and OPERATIONS_MANAGER grants for the supplied campaign. Other service clients are forbidden. Response has Cache-Control: no-store.",
         "tags": [
           "Internal"
         ],
@@ -3372,100 +2749,6 @@
           }
         },
         "x-c48-controller-source": "backend/apps/identity/src/internal/internal.controller.ts#InternalController.requestCoordinators"
-      }
-    },
-    "/internal/organizations/{id}": {
-      "get": {
-        "operationId": "getInternalIdentityOrganization",
-        "summary": "Check organization existence and status",
-        "description": "Restricted to Response and Logistics service tokens. Response includes Cache-Control: no-store.",
-        "security": [
-          {
-            "IdentityServiceBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/OrganizationId"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Organization identity fields.",
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalOrganization"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "401": {
-            "description": "Vietnamese error message; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Cache-Control": {
-                "$ref": "#/components/headers/CacheControlNoStore"
-              }
-            }
-          },
-          "403": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "x-c48-controller-source": "backend/apps/identity/src/internal/internal.controller.ts#InternalController.organization"
       }
     },
     "/internal/team-leader-eligibility": {
@@ -3579,15 +2862,10 @@
                   "user_id": {
                     "type": "string",
                     "format": "uuid"
-                  },
-                  "organization_id": {
-                    "type": "string",
-                    "format": "uuid"
                   }
                 },
                 "required": [
-                  "user_id",
-                  "organization_id"
+                  "user_id"
                 ]
               }
             }
@@ -4847,15 +4125,6 @@
           "format": "uuid"
         }
       },
-      "OrganizationId": {
-        "name": "id",
-        "in": "path",
-        "required": true,
-        "schema": {
-          "type": "string",
-          "format": "uuid"
-        }
-      },
       "MemberUserId": {
         "name": "userId",
         "in": "path",
@@ -5209,13 +4478,6 @@
           "scope_type": {
             "type": "string"
           },
-          "organization_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          },
           "campaign_id": {
             "type": [
               "string",
@@ -5281,10 +4543,6 @@
             "minLength": 10,
             "maxLength": 256,
             "writeOnly": true
-          },
-          "organization_id": {
-            "type": "string",
-            "format": "uuid"
           }
         }
       },
@@ -5399,16 +4657,9 @@
           {
             "type": "object",
             "required": [
-              "memberships",
               "grants"
             ],
             "properties": {
-              "memberships": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/MembershipDetail"
-                }
-              },
               "grants": {
                 "type": "array",
                 "items": {
@@ -5420,34 +4671,6 @@
         ],
         "unevaluatedProperties": false
       },
-      "MembershipDetail": {
-        "type": "object",
-        "required": [
-          "organization_id",
-          "name",
-          "organization_kind",
-          "status"
-        ],
-        "properties": {
-          "organization_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "organization_kind": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ACTIVE",
-              "INACTIVE"
-            ]
-          }
-        }
-      },
       "Grant": {
         "type": "object",
         "required": [
@@ -5455,7 +4678,6 @@
           "user_id",
           "role_code",
           "scope_type",
-          "organization_id",
           "campaign_id",
           "created_at",
           "revoked_at"
@@ -5476,16 +4698,8 @@
             "type": "string",
             "enum": [
               "SYSTEM",
-              "ORGANIZATION",
               "CAMPAIGN"
             ]
-          },
-          "organization_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
           },
           "campaign_id": {
             "type": [
@@ -5555,13 +4769,8 @@
             "type": "string",
             "enum": [
               "SYSTEM",
-              "ORGANIZATION",
               "CAMPAIGN"
             ]
-          },
-          "organization_id": {
-            "type": "string",
-            "format": "uuid"
           },
           "campaign_id": {
             "type": "string",
@@ -5585,120 +4794,6 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 500
-          }
-        }
-      },
-      "Organization": {
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "organization_kind",
-          "status",
-          "version",
-          "created_at"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "organization_kind": {
-            "type": "string",
-            "enum": [
-              "COORDINATION",
-              "VOLUNTEER",
-              "MILITARY",
-              "GOVERNMENT",
-              "OTHER"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ACTIVE",
-              "INACTIVE"
-            ]
-          },
-          "version": {
-            "type": "integer"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "OrganizationPage": {
-        "type": "object",
-        "required": [
-          "items",
-          "next_cursor"
-        ],
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Organization"
-            }
-          },
-          "next_cursor": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      },
-      "CreateOrganizationRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "name",
-          "organization_kind"
-        ],
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "organization_kind": {
-            "type": "string",
-            "enum": [
-              "COORDINATION",
-              "VOLUNTEER",
-              "MILITARY",
-              "GOVERNMENT",
-              "OTHER"
-            ]
-          }
-        }
-      },
-      "Membership": {
-        "type": "object",
-        "required": [
-          "user_id",
-          "organization_id",
-          "status"
-        ],
-        "properties": {
-          "user_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "organization_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ACTIVE"
-            ]
           }
         }
       },
@@ -5912,50 +5007,18 @@
           }
         }
       },
-      "InternalOrganization": {
-        "type": "object",
-        "required": [
-          "id",
-          "organization_kind",
-          "status"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "organization_kind": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ACTIVE",
-              "INACTIVE"
-            ]
-          }
-        }
-      },
       "RequestCoordinatorQuery": {
         "type": "object",
-        "required": [
-          "organization_id"
-        ],
+        "required": [],
         "additionalProperties": false,
-        "properties": {
-          "organization_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
+        "properties": {}
       },
       "RequestCoordinatorGrant": {
         "type": "object",
         "required": [
           "user_id",
           "role_code",
-          "scope_type",
-          "organization_id"
+          "scope_type"
         ],
         "properties": {
           "user_id": {
@@ -5972,13 +5035,8 @@
           "scope_type": {
             "type": "string",
             "enum": [
-              "ORGANIZATION",
               "CAMPAIGN"
             ]
-          },
-          "organization_id": {
-            "type": "string",
-            "format": "uuid"
           },
           "campaign_id": {
             "type": [

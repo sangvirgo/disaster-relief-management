@@ -19,7 +19,7 @@ export interface CampaignCommandRequest extends Request {
 
 type CampaignPage = { items: Record<string, unknown>[]; more: boolean; cursor?: string };
 
-const campaignColumns = `id,organization_id,name,objective,status,starts_at,ends_at,version,created_at,
+const campaignColumns = `id,name,objective,status,starts_at,ends_at,version,created_at,
   to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at`;
 
 @Injectable()
@@ -32,7 +32,7 @@ export class CampaignsService {
 
   async create(dto: CampaignCreateDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    const organizationId = this.organizationForCreate(session.grants);
+    this.assertCreatePermission(session.grants);
     const name = cleanCampaignName(dto.name);
     validateCampaignDates(dto.starts_at, dto.ends_at);
 
@@ -40,12 +40,12 @@ export class CampaignsService {
       scopeKey: `user:${session.userId}`,
       command: 'response.campaign.create',
       key,
-      requestHash: canonicalRequestHash({ actor_user_id: session.userId, organization_id: organizationId, dto }),
+      requestHash: canonicalRequestHash({ actor_user_id: session.userId, dto }),
       execute: async (manager) => {
         const rows = await manager.query(
-          `INSERT INTO campaign (organization_id,name,objective,starts_at,ends_at,created_by_user_id)
-           VALUES ($1,$2,$3,$4,$5,$6) RETURNING ${campaignColumns}`,
-          [organizationId, name, dto.objective ?? null, dto.starts_at ?? null, dto.ends_at ?? null, session.userId],
+          `INSERT INTO campaign (name,objective,starts_at,ends_at,created_by_user_id)
+           VALUES ($1,$2,$3,$4,$5) RETURNING ${campaignColumns}`,
+          [name, dto.objective ?? null, dto.starts_at ?? null, dto.ends_at ?? null, session.userId],
         ) as CampaignRow[];
         const row = rows[0];
         if (!row) throw new AppError('INTERNAL_ERROR', { status: 500 });
@@ -202,7 +202,6 @@ export class CampaignsService {
     return {
       id: row.id,
       status: row.status,
-      organization_id: row.organization_id,
       version: Number(row.version),
     };
   }
@@ -235,17 +234,12 @@ export class CampaignsService {
     return row;
   }
 
-  private organizationForCreate(grants: readonly Grant[]): string {
-    const organizations = new Set(grants.flatMap((grant) => grant.organization_id ? [grant.organization_id] : []));
-    const matching = [...organizations].filter((organizationId) => hasPermission(grants, 'CAMPAIGN_MANAGE', { organizationId }));
-    if (matching.length !== 1) throw new AppError('FORBIDDEN', { status: 403 });
-    return matching[0]!;
+  private assertCreatePermission(grants: readonly Grant[]): void {
+    if (!hasPermission(grants, 'CAMPAIGN_MANAGE', { campaignId: null })) throw new AppError('FORBIDDEN', { status: 403 });
   }
 
   private assertCampaignPermission(session: ReporterSession, row: CampaignRow, permission: 'CAMPAIGN_READ' | 'CAMPAIGN_MANAGE'): void {
-    if (!hasPermission(session.grants, permission, {
-      organizationId: row.organization_id, campaignId: row.id,
-    })) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!hasPermission(session.grants, permission, { campaignId: row.id })) throw new AppError('FORBIDDEN', { status: 403 });
   }
 
   private assertVersion(row: CampaignRow, expected: number): void {

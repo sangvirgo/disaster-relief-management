@@ -15,7 +15,6 @@ export type DriveCommandRequest = Request & { idempotencyKey?: string };
 
 interface DriveRow extends Record<string, unknown> {
   id: string;
-  organization_id: string;
   intake_warehouse_id: string;
   campaign_id: string | null;
   campaign_status: string | null;
@@ -31,7 +30,6 @@ interface DriveRow extends Record<string, unknown> {
 
 interface WarehouseRow {
   id: string;
-  organization_id: string;
   status: string;
 }
 
@@ -42,7 +40,6 @@ function iso(value: Date | string | null): string | null {
 function driveValue(row: DriveRow, items: Array<Record<string, unknown>>): Record<string, unknown> {
   return {
     id: row.id,
-    organization_id: row.organization_id,
     intake_warehouse_id: row.intake_warehouse_id,
     campaign_id: row.campaign_id,
     campaign_status: row.campaign_status,
@@ -60,7 +57,7 @@ function driveValue(row: DriveRow, items: Array<Record<string, unknown>>): Recor
 
 async function readDrive(manager: Pick<EntityManager, 'query'>, id: string): Promise<Record<string, unknown>> {
   const rows = await manager.query(
-    `SELECT d.id,d.organization_id,d.intake_warehouse_id,d.campaign_id,d.campaign_status,d.campaign_status_at,d.status,
+    `SELECT d.id,d.intake_warehouse_id,d.campaign_id,d.campaign_status,d.campaign_status_at,d.status,
             d.title,d.description,d.opens_at,d.closes_at,d.version,d.created_at
        FROM donation_drive d JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE d.id=$1`,
     [id],
@@ -104,9 +101,9 @@ export class DrivesService {
 
   async create(dto: CreateDriveDto, request: DriveCommandRequest): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    const warehouse = await this.findWarehouse(this.dataSource, dto.intake_warehouse_id);
-    requireDrivePermission(session, 'DONATION_DRIVE_MANAGE', warehouse);
-    const campaign = dto.campaign_id ? await this.activeCampaign(dto.campaign_id, warehouse.organization_id) : null;
+    await this.findWarehouse(this.dataSource, dto.intake_warehouse_id);
+    requireDrivePermission(session, 'DONATION_DRIVE_MANAGE', { campaign_id: dto.campaign_id ?? null });
+    const campaign = dto.campaign_id ? await this.activeCampaign(dto.campaign_id) : null;
     const title = cleanDriveText(dto.title, true)!;
     const description = cleanDriveText(dto.description);
     this.validateWindow(dto.opens_at ?? null, dto.closes_at ?? null);
@@ -117,15 +114,15 @@ export class DrivesService {
       key: idempotencyKey(request),
       requestHash: canonicalRequestHash(dto),
       execute: async (manager) => {
-        const currentWarehouse = await this.findWarehouse(manager, dto.intake_warehouse_id, true);
-        requireDrivePermission(session, 'DONATION_DRIVE_MANAGE', currentWarehouse);
+        await this.findWarehouse(manager, dto.intake_warehouse_id, true);
+        requireDrivePermission(session, 'DONATION_DRIVE_MANAGE', { campaign_id: dto.campaign_id ?? null });
         const items = await this.validateDriveItems(manager, dto.items);
         const rows = await manager.query(
           `INSERT INTO donation_drive
-             (organization_id,intake_warehouse_id,campaign_id,campaign_status,campaign_status_at,title,description,opens_at,closes_at)
-           VALUES ($1,$2,$3,$4,CASE WHEN $3::uuid IS NULL THEN NULL ELSE clock_timestamp() END,$5,$6,$7,$8)
+             (intake_warehouse_id,campaign_id,campaign_status,campaign_status_at,title,description,opens_at,closes_at)
+           VALUES ($1,$2,$3,CASE WHEN $2::uuid IS NULL THEN NULL ELSE clock_timestamp() END,$4,$5,$6,$7)
            RETURNING id`,
-          [currentWarehouse.organization_id, dto.intake_warehouse_id, campaign?.id ?? null, campaign?.status ?? null,
+          [dto.intake_warehouse_id, campaign?.id ?? null, campaign?.status ?? null,
             title, description, dto.opens_at ?? null, dto.closes_at ?? null],
         ) as Array<{ id: string }>;
         const id = rows[0]!.id;
@@ -142,8 +139,9 @@ export class DrivesService {
     const session = await this.sessions.require(request);
     const before = await this.findDrive(this.dataSource, id);
     requireDrivePermission(session, 'DONATION_DRIVE_MANAGE', before);
+    if (dto.campaign_id) requireDrivePermission(session, 'DONATION_DRIVE_MANAGE', { campaign_id: dto.campaign_id });
     if (before.status !== 'DRAFT') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
-    const campaign = dto.campaign_id ? await this.activeCampaign(dto.campaign_id, before.organization_id) : null;
+    const campaign = dto.campaign_id ? await this.activeCampaign(dto.campaign_id) : null;
     this.validateWindow(dto.opens_at === undefined ? before.opens_at : dto.opens_at, dto.closes_at === undefined ? before.closes_at : dto.closes_at);
     const title = dto.title === undefined ? undefined : cleanDriveText(dto.title, true);
     const description = dto.description === undefined ? undefined : cleanDriveText(dto.description);
@@ -204,7 +202,7 @@ export class DrivesService {
     const before = await this.findDrive(this.dataSource, id);
     requireDrivePermission(session, 'DONATION_DRIVE_MANAGE', before);
     const campaign = action === 'open' || action === 'resume'
-      ? before.campaign_id ? await this.activeCampaign(before.campaign_id, before.organization_id) : null
+      ? before.campaign_id ? await this.activeCampaign(before.campaign_id) : null
       : null;
     this.nextStatus(before.status, action); // rejects an invalid transition before any work starts
 
@@ -247,10 +245,9 @@ export class DrivesService {
     return next;
   }
 
-  private async activeCampaign(id: string, organizationId: string): Promise<ResponseCampaign> {
+  private async activeCampaign(id: string): Promise<ResponseCampaign> {
     const campaign = await this.campaigns.getCampaign(id);
     if (campaign.status !== 'ACTIVE') throw new AppError('CAMPAIGN_NOT_ACTIVE', { status: 409 });
-    if (campaign.organization_id !== organizationId) throw new AppError('VALIDATION_FAILED', { status: 400 });
     return campaign;
   }
 
@@ -292,7 +289,7 @@ export class DrivesService {
 
   private async findWarehouse(query: Pick<DataSource, 'query'> | Pick<EntityManager, 'query'>, id: string, forUpdate = false): Promise<WarehouseRow> {
     const rows = await query.query(
-      `SELECT id,organization_id,status FROM warehouse WHERE id=$1${forUpdate ? ' FOR UPDATE' : ''}`,
+      `SELECT id,status FROM warehouse WHERE id=$1${forUpdate ? ' FOR UPDATE' : ''}`,
       [id],
     ) as WarehouseRow[];
     const warehouse = rows[0];
@@ -302,7 +299,7 @@ export class DrivesService {
 
   private async findDrive(query: Pick<DataSource, 'query'> | Pick<EntityManager, 'query'>, id: string, forUpdate = false): Promise<DriveRow> {
     const rows = await query.query(
-      `SELECT d.id,d.organization_id,d.intake_warehouse_id,d.campaign_id,d.campaign_status,d.status,
+      `SELECT d.id,d.intake_warehouse_id,d.campaign_id,d.campaign_status,d.status,
               d.title,d.description,d.opens_at,d.closes_at,d.version,d.created_at
          FROM donation_drive d JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE d.id=$1${forUpdate ? ' FOR UPDATE OF d' : ''}`,
       [id],
@@ -320,7 +317,7 @@ export class DrivesService {
 
 function beforeState(row: DriveRow): Record<string, unknown> {
   return {
-    id: row.id, organization_id: row.organization_id, status: row.status, campaign_id: row.campaign_id,
+    id: row.id, status: row.status, campaign_id: row.campaign_id,
     title: row.title, version: Number(row.version),
   };
 }

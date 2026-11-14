@@ -271,81 +271,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/organizations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List organizations */
-        get: operations["listIdentityOrganizations"];
-        put?: never;
-        /** Create an organization */
-        post: operations["createIdentityOrganization"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{id}/deactivate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Deactivate an unused organization
-         * @description Requires ORG_MANAGE. Organizations with active memberships or grants cannot be deactivated.
-         */
-        post: operations["deactivateIdentityOrganization"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{id}/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Add or reactivate an organization member */
-        post: operations["addIdentityOrganizationMember"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/organizations/{id}/members/{userId}/remove": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Remove a member and revoke organization grants
-         * @description Requires ORG_MANAGE. The operation revokes this user's grants scoped to the organization and all of the user's session families, in the same transaction.
-         */
-        post: operations["removeIdentityOrganizationMember"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/audit-logs": {
         parameters: {
             query?: never;
@@ -434,29 +359,9 @@ export interface paths {
         put?: never;
         /**
          * Resolve active coordinator grants for Response notices and concurrence
-         * @description Restricted to a valid Response service token. Returns active users with current COORDINATOR grants and organization-scoped OPERATIONS_MANAGER grants for the supplied organization. Other service clients are forbidden. Response has Cache-Control: no-store.
+         * @description Restricted to a valid Response service token. Returns active users with current COORDINATOR grants and OPERATIONS_MANAGER grants for the supplied campaign. Other service clients are forbidden. Response has Cache-Control: no-store.
          */
         post: operations["listRequestCoordinatorGrants"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/organizations/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Check organization existence and status
-         * @description Restricted to Response and Logistics service tokens. Response includes Cache-Control: no-store.
-         */
-        get: operations["getInternalIdentityOrganization"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -710,8 +615,6 @@ export interface components {
             role_code: string;
             scope_type: string;
             /** Format: uuid */
-            organization_id?: string | null;
-            /** Format: uuid */
             campaign_id?: string | null;
         };
         MeResponse: {
@@ -726,8 +629,6 @@ export interface components {
             username: string;
             display_name: string;
             temporary_password: string;
-            /** Format: uuid */
-            organization_id?: string;
         };
         VersionedReason: {
             expected_version: number;
@@ -753,16 +654,7 @@ export interface components {
             next_cursor: string | null;
         };
         UserDetail: components["schemas"]["AdminUser"] & {
-            memberships: components["schemas"]["MembershipDetail"][];
             grants: components["schemas"]["Grant"][];
-        };
-        MembershipDetail: {
-            /** Format: uuid */
-            organization_id: string;
-            name: string;
-            organization_kind: string;
-            /** @enum {string} */
-            status: "ACTIVE" | "INACTIVE";
         };
         Grant: {
             /** Format: uuid */
@@ -771,9 +663,7 @@ export interface components {
             user_id: string;
             role_code: string;
             /** @enum {string} */
-            scope_type: "SYSTEM" | "ORGANIZATION" | "CAMPAIGN";
-            /** Format: uuid */
-            organization_id: string | null;
+            scope_type: "SYSTEM" | "CAMPAIGN";
             /** Format: uuid */
             campaign_id: string | null;
             /** Format: date-time */
@@ -789,44 +679,13 @@ export interface components {
             /** @enum {string} */
             role_code: "CITIZEN" | "VOLUNTEER" | "COORDINATOR" | "CAMPAIGN_MANAGER" | "OPERATIONS_MANAGER" | "INTAKE_STAFF" | "REVIEWER" | "DISTRIBUTION_STAFF" | "ADMIN";
             /** @enum {string} */
-            scope_type: "SYSTEM" | "ORGANIZATION" | "CAMPAIGN";
-            /** Format: uuid */
-            organization_id?: string;
+            scope_type: "SYSTEM" | "CAMPAIGN";
             /** Format: uuid */
             campaign_id?: string;
             reason: string;
         };
         Reason: {
             reason: string;
-        };
-        Organization: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            /** @enum {string} */
-            organization_kind: "COORDINATION" | "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
-            /** @enum {string} */
-            status: "ACTIVE" | "INACTIVE";
-            version: number;
-            /** Format: date-time */
-            created_at: string;
-        };
-        OrganizationPage: {
-            items: components["schemas"]["Organization"][];
-            next_cursor: string | null;
-        };
-        CreateOrganizationRequest: {
-            name: string;
-            /** @enum {string} */
-            organization_kind: "COORDINATION" | "VOLUNTEER" | "MILITARY" | "GOVERNMENT" | "OTHER";
-        };
-        Membership: {
-            /** Format: uuid */
-            user_id: string;
-            /** Format: uuid */
-            organization_id: string;
-            /** @enum {string} */
-            status: "ACTIVE";
         };
         AuditRecord: {
             id: string;
@@ -879,26 +738,14 @@ export interface components {
                 display_name: string;
             }[];
         };
-        InternalOrganization: {
-            /** Format: uuid */
-            id: string;
-            organization_kind: string;
-            /** @enum {string} */
-            status: "ACTIVE" | "INACTIVE";
-        };
-        RequestCoordinatorQuery: {
-            /** Format: uuid */
-            organization_id: string;
-        };
+        RequestCoordinatorQuery: Record<string, never>;
         RequestCoordinatorGrant: {
             /** Format: uuid */
             user_id: string;
             /** @enum {string} */
             role_code: "COORDINATOR" | "OPERATIONS_MANAGER";
             /** @enum {string} */
-            scope_type: "ORGANIZATION" | "CAMPAIGN";
-            /** Format: uuid */
-            organization_id: string;
+            scope_type: "CAMPAIGN";
             /** Format: uuid */
             campaign_id?: string | null;
         };
@@ -927,7 +774,6 @@ export interface components {
         Limit: number;
         UserId: string;
         GrantId: string;
-        OrganizationId: string;
         MemberUserId: string;
     };
     requestBodies: never;
@@ -1867,281 +1713,6 @@ export interface operations {
             };
         };
     };
-    listIdentityOrganizations: {
-        parameters: {
-            query?: {
-                cursor?: components["parameters"]["Cursor"];
-                limit?: components["parameters"]["Limit"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Organization page. */
-            200: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OrganizationPage"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            401: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            403: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    createIdentityOrganization: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateOrganizationRequest"];
-            };
-        };
-        responses: {
-            /** @description Organization created. */
-            201: {
-                headers: {
-                    "Idempotent-Replay": components["headers"]["IdempotentReplay"];
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Organization"];
-                };
-            };
-            400: components["responses"]["Error"];
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            401: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            403: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            409: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    deactivateIdentityOrganization: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                id: components["parameters"]["OrganizationId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VersionedReason"];
-            };
-        };
-        responses: {
-            /** @description Organization deactivated. */
-            200: {
-                headers: {
-                    "Idempotent-Replay": components["headers"]["IdempotentReplay"];
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Organization"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            401: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            403: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            404: components["responses"]["Error"];
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            409: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    addIdentityOrganizationMember: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                id: components["parameters"]["OrganizationId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: uuid */
-                    user_id: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Membership active. */
-            201: {
-                headers: {
-                    "Idempotent-Replay": components["headers"]["IdempotentReplay"];
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Membership"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            401: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            403: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            404: components["responses"]["Error"];
-            409: components["responses"]["Error"];
-        };
-    };
-    removeIdentityOrganizationMember: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                id: components["parameters"]["OrganizationId"];
-                userId: components["parameters"]["MemberUserId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Membership removed or replayed. */
-            204: {
-                headers: {
-                    "Idempotent-Replay": components["headers"]["IdempotentReplay"];
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            401: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            403: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            404: components["responses"]["Error"];
-            409: components["responses"]["Error"];
-        };
-    };
     listIdentityAuditLogs: {
         parameters: {
             query: {
@@ -2386,50 +1957,6 @@ export interface operations {
             500: components["responses"]["Error"];
         };
     };
-    getInternalIdentityOrganization: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["parameters"]["OrganizationId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Organization identity fields. */
-            200: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InternalOrganization"];
-                };
-            };
-            400: components["responses"]["Error"];
-            /** @description Vietnamese error message; clients branch on the stable code. */
-            401: {
-                headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            404: components["responses"]["Error"];
-        };
-    };
     identityInternalTeamLeaderEligibility: {
         parameters: {
             query?: never;
@@ -2442,8 +1969,6 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     user_id: string;
-                    /** Format: uuid */
-                    organization_id: string;
                 };
             };
         };

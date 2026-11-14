@@ -6,5 +6,6 @@ import { AddPendingEmailRegistration1792953600001 } from './migrations/AddPendin
 import { AddAuthEmailOtpGoogle1792953600000 } from './migrations/AddAuthEmailOtpGoogle1792953600000';
 import { GrantExternalIdentitySelect1794144543000 } from './migrations/GrantExternalIdentitySelect1794144543000';
 import { RemoveRegionScope1794700800000 } from './migrations/RemoveRegionScope1794700800000';
+import { RemoveOrganizationIdentity1794787200000 } from './migrations/RemoveOrganizationIdentity1794787200000';
 
-export default new DataSource(postgresOptions([InitialIdentity1710000000000, AddAuthEmailOtpGoogle1792953600000, AddPendingEmailRegistration1792953600001, GrantExternalIdentitySelect1794144543000, RemoveRegionScope1794700800000], 'identity'));
+export default new DataSource(postgresOptions([InitialIdentity1710000000000, AddAuthEmailOtpGoogle1792953600000, AddPendingEmailRegistration1792953600001, GrantExternalIdentitySelect1794144543000, RemoveRegionScope1794700800000, RemoveOrganizationIdentity1794787200000], 'identity'));
