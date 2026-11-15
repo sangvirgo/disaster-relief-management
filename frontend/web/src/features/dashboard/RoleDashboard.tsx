@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
+import { statusTone } from '../../components/statusTone';
 import { OperationsDashboard } from '../operations/Dashboard';
 import './role-dashboard.css';
 
@@ -61,8 +62,8 @@ function SnapshotState({ loading, error, onRetry }: { loading: boolean; error: s
   return null;
 }
 
-function Metric({ title, value, warning }: { title: string; value: number | string; warning?: boolean }) {
-  return <div className={`metric-tile${warning ? ' metric-tile-warning' : ''}`}><span>{title}</span><strong>{value}</strong></div>;
+function Metric({ title, value, warning, danger }: { title: string; value: number | string; warning?: boolean; danger?: boolean }) {
+  return <div className={`metric-tile${danger ? ' metric-tile-danger' : warning ? ' metric-tile-warning' : ''}`}><span>{title}</span><strong>{value}</strong></div>;
 }
 
 const chartColors = ['#2563eb', '#0d9488', '#f59e0b', '#8b5cf6', '#e11d48', '#0891b2', '#65a30d', '#ea580c', '#4f46e5', '#64748b'];
@@ -101,7 +102,7 @@ function ResponseDashboard({ onOpenRequest, showRecentOpenRequests = true }: {
       <div className="report-metrics dashboard-highlight-metrics">
         <Metric title="SOS đang mở" value={data.requests.open_total} />
         <Metric title="Quá hạn xác minh" value={data.requests.verification_overdue} warning={data.requests.verification_overdue > 0} />
-        <Metric title="Khai báo nguy hiểm đang chờ" value={data.requests.declared_danger_waiting} warning={data.requests.declared_danger_waiting > 0} />
+        <Metric title="Khai báo nguy hiểm đang chờ" value={data.requests.declared_danger_waiting} danger={data.requests.declared_danger_waiting > 0} />
         <Metric title="Chờ giao đội" value={data.requests.awaiting_team_assignment} />
         <Metric title="Nhiệm vụ đang chạy" value={Object.values(data.missions.active_by_status).reduce((sum, count) => sum + count, 0)} />
         <Metric title="Đề nghị nhiệm vụ quá hạn" value={data.missions.overdue_offers} warning={data.missions.overdue_offers > 0} />
@@ -153,14 +154,12 @@ function OperationsSnapshot({ showReports }: { showReports: boolean }) {
     {data && !snapshot.error && <><p className="muted">Cập nhật lúc {timeLabel(data.generated_at)}</p>
       {data.intake && <><h3>Tiếp nhận quyên góp</h3><div className="report-metrics"><Metric title="Chờ kiểm đếm hoặc duyệt" value={data.intake.awaiting_count_or_review} />
         <Metric title="Chờ duyệt" value={data.intake.pending_review} /><Metric title="Tranh chấp đang mở" value={data.intake.open_disputes} /></div>
-        <Breakdown title="Bản giao nhận" counts={data.intake.deliveries_by_status} /><Breakdown title="Đợt quyên góp" counts={data.intake.drives_by_status} />
-        <Breakdown title="Duyệt trong 7 ngày" counts={data.intake.reviews_last_7d} /></>}
+        <Breakdown title="Bản giao nhận" counts={data.intake.deliveries_by_status} /><Breakdown title="Đợt quyên góp" counts={data.intake.drives_by_status} /></>}
       {data.distribution && <><h3>Phân phối</h3><div className="report-metrics"><Metric title="Đã xuất kho, chờ đối soát" value={data.distribution.dispatched_not_reconciled} />
         <Metric title="Lượt bàn giao trong 7 ngày" value={data.distribution.handoffs_last_7d} /></div><Breakdown title="Trạng thái phân phối" counts={data.distribution.by_status} /></>}
       {data.stock && <><h3>Kho và vật phẩm</h3><div className="report-metrics"><Metric title="Kho" value={data.stock.warehouses} />
-        <Metric title="Dòng vật phẩm" value={data.stock.tracked_item_lines} /><Metric title="Hết hàng" value={data.stock.out_of_stock_lines} warning={data.stock.out_of_stock_lines > 0} />
-        <Metric title="Tồn thấp" value={data.stock.low_stock_lines} warning={data.stock.low_stock_lines > 0} /><Metric title="Điều chỉnh chờ duyệt" value={data.stock.pending_adjustments} /></div>
-        <p className="muted">Ngưỡng tồn thấp: {data.stock.low_threshold_units} đơn vị.</p></>}
+        <Metric title="Vật phẩm" value={data.stock.tracked_item_lines} /><Metric title="Hết hàng" value={data.stock.out_of_stock_lines} danger={data.stock.out_of_stock_lines > 0} />
+        <Metric title="Tồn kho" value={data.stock.low_stock_lines} warning={data.stock.low_stock_lines > 0} /><Metric title="Điều chỉnh chờ duyệt" value={data.stock.pending_adjustments} warning={data.stock.pending_adjustments > 0} /></div></>}
       {data.needs && <><h3>Nhu cầu vật tư</h3><div className="report-metrics"><Metric title="Nhu cầu còn thiếu" value={data.needs.outstanding} /></div>
         <Breakdown title="Trạng thái nhu cầu" counts={data.needs.by_status} /></>}
     </>}
@@ -172,12 +171,12 @@ function OperationsSnapshot({ showReports }: { showReports: boolean }) {
 function DriveSuggestions() {
   const snapshot = useSnapshot<Suggestions>('logistics', '/reports/drive-suggestions');
   const { data } = snapshot;
-  return <section className="card dashboard-section"><div className="section-header"><h2>Gợi ý đợt quyên góp</h2><button type="button" className="button secondary" onClick={snapshot.refresh}>Cập nhật</button></div>
+  return <section className="card dashboard-section dashboard-suggestions"><div className="section-header"><h2>Gợi ý đợt quyên góp</h2><button type="button" className="button secondary" onClick={snapshot.refresh}>Cập nhật</button></div>
     <p>Các gợi ý dựa trên tồn kho, nhu cầu và thời tiết; người phụ trách quyết định có mở đợt mới hay không.</p>
     <SnapshotState {...snapshot} onRetry={snapshot.refresh} />
     {data && !snapshot.error && <>{!data.weather_available && <p className="notice warning">Chưa có dữ liệu thời tiết; gợi ý về kho vẫn có hiệu lực.</p>}
       {data.suggestions.length ? <div className="record-list">{data.suggestions.map((item, index) =>
-        <article className="record" key={`${item.code}:${index}`}><div><strong>{label(item.severity)} · {label(item.code)}</strong>
+        <article className="record dashboard-suggestion" data-tone={statusTone(item.code)} key={`${item.code}:${index}`}><div><strong>{label(item.severity)} · {label(item.code)}</strong>
           <p>{item.message}</p></div></article>)}</div> : <p>Chưa có gợi ý mới.</p>}
       <p className="muted">Đợt đang mở: {data.open_drives.length}.</p></>}
   </section>;

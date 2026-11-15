@@ -3,7 +3,8 @@ import { api } from '../../api/client';
 import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
 import { ListNav } from '../../components/ui/Pager';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
-import { DetailCloseButton } from '../../components/DetailCloseButton';
+import { DetailSurface } from '../../components/DetailSurface';
+import { Tabs } from '../../components/ui/Tabs';
 import { StatusBadge } from '../../components/StatusBadge';
 import { SuccessBanner } from '../../components/SuccessBanner';
 import { label, timeLabel } from '../../i18n/labels';
@@ -23,6 +24,8 @@ export function Campaigns() {
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [next, setNext] = useState('');
   const [selected, setSelected] = useState<Campaign | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [detailTab, setDetailTab] = useState('overview');
   const [error, setError] = useState('');
   const [conflictNotice, setConflictNotice] = useState('');
   const [loading, setLoading] = useState(false);
@@ -61,6 +64,7 @@ export function Campaigns() {
   }, [cursor, revision]);
   function done() {
     setCursor('');
+    setDetailTab('overview');
     setRevision((value) => value + 1);
   }
   function changeStatusFilter(value: string) {
@@ -116,18 +120,21 @@ export function Campaigns() {
       />
     );
   return (
-    <div className="campaign-layout">
+    <div className="campaign-layout campaign-table-layout">
       <section className="card campaign-list-panel">
         {createdName && <div className="campaign-success-toast"><SuccessBanner title="Đã tạo chiến dịch thành công" description={`Chiến dịch “${createdName}” đã được lưu. Bạn có thể chọn trong danh sách để kích hoạt.`} /></div>}
         <div className="section-header">
           <div>
-            <span className="eyebrow">Điều phối cứu trợ</span>
+            <span className="eyebrow">Vận hành cứu trợ</span>
             <h2>Danh sách chiến dịch</h2>
           </div>
-          <span className="chip">Đã tải {items.length} chiến dịch</span>
+          <div className="list-header-actions">
+            <span className="chip">Đã tải {items.length} chiến dịch</span>
+            <button type="button" className="button secondary" disabled={loading} onClick={done}>Cập nhật</button>
+            <button type="button" className="button primary" onClick={() => setShowCreate(true)}>Tạo chiến dịch</button>
+          </div>
         </div>
         <p>Chọn chiến dịch để xem mục tiêu, thời gian và thao tác được cấp quyền.</p>
-        <button type="button" className="button secondary" disabled={loading} onClick={done}>Cập nhật</button>
         {conflictNotice && <p className="notice warning" role="status">{conflictNotice}</p>}
         <div className="campaign-filters" role="group" aria-label="Lọc chiến dịch theo trạng thái">
           <button
@@ -159,38 +166,27 @@ export function Campaigns() {
         {!loading && !error && !items.length && (
           <div className="empty">Chưa có chiến dịch trong phạm vi được cấp quyền.</div>
         )}
-        <div className="campaign-list">
-          {visibleItems.map((item) => (
-            <button
-              className={`campaign-card ${selected?.id === item.id ? 'selected' : ''}`}
-              onClick={() => { setConflictNotice(''); setSelected(item); }}
-              key={item.id}
-            >
-              <span className="campaign-card-main">
-                <strong>{item.name}</strong>
-                <small>{item.objective || 'Chưa có mô tả mục tiêu.'}</small>
-                <span>
-                  Tạo {timeLabel(item.created_at)}
-                </span>
-              </span>
-              <StatusBadge status={item.status} />
-            </button>
-          ))}
-        </div>
+        {visibleItems.length > 0 && <div className="operations-table-scroll" role="region" aria-label="Bảng chiến dịch" tabIndex={0}>
+          <table className="operations-record-table">
+            <thead><tr><th scope="col">Chiến dịch</th><th scope="col">Mục tiêu</th><th scope="col">Ngày tạo</th><th scope="col">Trạng thái</th></tr></thead>
+            <tbody>{visibleItems.map((item) => <tr key={item.id}>
+              <th scope="row"><button type="button" className="table-row-link" onClick={() => { setConflictNotice(''); setDetailTab('overview'); setSelected(item); }}>{item.name}</button></th>
+              <td>{item.objective || 'Chưa ghi mục tiêu'}</td>
+              <td>{timeLabel(item.created_at)}</td>
+              <td><StatusBadge status={item.status} /></td>
+            </tr>)}</tbody>
+          </table>
+        </div>}
         {!loading && items.length > 0 && visibleItems.length === 0 && (
           <div className="empty">Không có chiến dịch ở trạng thái này trên trang hiện tại.</div>
         )}
         <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} noun="chiến dịch" />
       </section>
-      <section
-        className={`card campaign-detail-panel detail-panel-card ${selected ? 'is-open' : ''}`}
-      >
-        {selected && <DetailCloseButton onClick={() => setSelected(null)} />}
-        <span className="eyebrow">{selected ? 'Hồ sơ chiến dịch' : 'Chiến dịch mới'}</span>
-        <h2>{selected ? selected.name : 'Thiết lập chiến dịch mới'}</h2>
-        {selected ? (
-          <>
-            <p className="campaign-objective">{selected.objective || 'Chưa có mô tả mục tiêu.'}</p>
+      {selected && <DetailSurface key={selected.id} modal open onClose={() => setSelected(null)} label={`Chi tiết chiến dịch ${selected.name}`} heading={selected.name} className="campaign-management-dialog">
+        <Tabs items={[{ id: 'overview', label: 'Thông tin' }, ...(['DRAFT', 'ACTIVE', 'PAUSED'].includes(selected.status) ? [{ id: 'actions', label: 'Quản lý' }] : [])]} value={detailTab} onChange={setDetailTab} ariaLabel="Nội dung chiến dịch" idBase="campaign-detail" />
+        <div role="tabpanel" id="campaign-detail-tabpanel" aria-labelledby={`campaign-detail-tab-${detailTab}`}>
+          <div hidden={detailTab !== 'overview'}>
+            <p className="campaign-objective">{selected.objective || 'Chưa ghi mục tiêu cho chiến dịch.'}</p>
             <dl className="fact-list">
               <div>
                 <dt>Trạng thái</dt>
@@ -200,13 +196,16 @@ export function Campaigns() {
               </div>
               <div>
                 <dt>Bắt đầu</dt>
-                <dd>{selected.starts_at ? timeLabel(selected.starts_at) : 'Chưa ấn định'}</dd>
+                <dd>{selected.starts_at ? timeLabel(selected.starts_at) : 'Chưa đặt thời gian'}</dd>
               </div>
               <div>
                 <dt>Kết thúc</dt>
-                <dd>{selected.ends_at ? timeLabel(selected.ends_at) : 'Chưa ấn định'}</dd>
+                <dd>{selected.ends_at ? timeLabel(selected.ends_at) : 'Chưa đặt thời gian'}</dd>
               </div>
             </dl>
+          </div>
+          <div hidden={detailTab !== 'actions'}>
+            <p>Chọn thao tác phù hợp với trạng thái hiện tại của chiến dịch.</p>
             <div className="action-grid">
               {selected.status === 'DRAFT' && action('Kích hoạt chiến dịch', 'activate')}
               {selected.status === 'ACTIVE' && (
@@ -221,14 +220,14 @@ export function Campaigns() {
                   {action('Kết thúc chiến dịch', 'close', true)}
                 </>
               )}
+              {!['DRAFT', 'ACTIVE', 'PAUSED'].includes(selected.status) && <p className="muted">Chiến dịch đã kết thúc, không còn thao tác quản lý.</p>}
             </div>
-          </>
-        ) : (
-          <>
-            <CommandForm key={revision} spec={create} onSuccess={(result) => { setCreatedName((result as Campaign | undefined)?.name || 'mới'); done(); }} />
-          </>
-        )}
-      </section>
+          </div>
+        </div>
+      </DetailSurface>}
+      <DetailSurface modal open={showCreate} onClose={() => setShowCreate(false)} label="Tạo chiến dịch" heading="Tạo chiến dịch" className="campaign-management-dialog">
+        {showCreate && <CommandForm key={revision} spec={create} onSuccess={(result) => { setCreatedName((result as Campaign | undefined)?.name || 'mới'); setShowCreate(false); done(); }} />}
+      </DetailSurface>
     </div>
   );
 }

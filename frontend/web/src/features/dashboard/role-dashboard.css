@@ -1,5 +1,15 @@
 .dashboard-stack { display: grid; gap: 1.25rem; }
 .dashboard-section { min-width: 0; }
+.dashboard-suggestions { background: var(--color-surface-card); border-color: var(--color-surface-border); }
+.dashboard-suggestions .record-list { gap: var(--space-3); }
+.dashboard-suggestions .record { padding: var(--space-4); border-radius: var(--radius-md); align-items: flex-start; }
+.dashboard-suggestions .record:first-child { border-top-width: 1px; }
+.dashboard-suggestions .dashboard-suggestion { border: 1px solid var(--color-primary-border); border-left: 4px solid var(--color-primary); background: var(--color-primary-bg); }
+.dashboard-suggestions .dashboard-suggestion strong { color: var(--color-primary-dark); }
+.dashboard-suggestions .dashboard-suggestion[data-tone='danger'] { border-color: var(--color-emergency-border); border-left-color: var(--color-emergency); background: var(--color-emergency-bg); }
+.dashboard-suggestions .dashboard-suggestion[data-tone='danger'] strong { color: var(--color-emergency-dark); }
+.dashboard-suggestions .dashboard-suggestion[data-tone='warning'] { border-color: var(--color-warning-border); border-left-color: var(--color-warning); background: var(--color-warning-bg); }
+.dashboard-suggestions .dashboard-suggestion[data-tone='warning'] strong { color: var(--color-warning-dark); }
 .dashboard-section .report-metrics { margin: 1rem 0; }
 .dashboard-breakdowns { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
 .dashboard-breakdown { min-width: 0; }
@@ -7,19 +17,12 @@
 .dashboard-section .record p { margin: .35rem 0; }
 .dashboard-section .report-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .dashboard-section .metric-tile { min-height: 108px; }
-.dashboard-section .report-metrics .metric-tile:nth-child(6n + 1) { background: #eef5ff; border-color: #bfd6ff; }
-.dashboard-section .report-metrics .metric-tile:nth-child(6n + 1) strong { color: #1d4ed8; }
-.dashboard-section .report-metrics .metric-tile:nth-child(6n + 2) { background: #edfaf7; border-color: #99ded2; }
-.dashboard-section .report-metrics .metric-tile:nth-child(6n + 2) strong { color: #0f766e; }
-.dashboard-section .report-metrics .metric-tile:nth-child(6n + 3) { background: #fff8e8; border-color: #f9d889; }
-.dashboard-section .report-metrics .metric-tile:nth-child(6n + 3) strong { color: #b45309; }
-.dashboard-section .report-metrics .metric-tile:nth-child(6n + 4) { background: #f4efff; border-color: #d4bfff; }
-.dashboard-section .report-metrics .metric-tile:nth-child(6n + 4) strong { color: #6d28d9; }
-.dashboard-section .report-metrics .metric-tile:nth-child(6n + 5) { background: #fff0f3; border-color: #ffc1ce; }
-.dashboard-section .report-metrics .metric-tile:nth-child(6n + 5) strong { color: #be123c; }
-.dashboard-section .report-metrics .metric-tile:nth-child(6n) { background: #edf9fc; border-color: #a7deeb; }
-.dashboard-section .report-metrics .metric-tile:nth-child(6n) strong { color: #0e7490; }
-.dashboard-section .report-metrics .metric-tile-warning { box-shadow: inset 0 0 0 2px #fbbf24; }
+.dashboard-section .report-metrics .metric-tile { background: var(--color-surface-card); border-color: var(--color-surface-border); box-shadow: none; }
+.dashboard-section .report-metrics .metric-tile strong { color: var(--color-text-primary); }
+.dashboard-section .report-metrics .metric-tile-warning { background: var(--color-warning-bg); border-color: var(--color-warning-border); }
+.dashboard-section .report-metrics .metric-tile-warning strong { color: var(--color-warning-dark); }
+.dashboard-section .report-metrics .metric-tile-danger { background: var(--color-emergency-bg); border-color: var(--color-emergency-border); }
+.dashboard-section .report-metrics .metric-tile-danger strong { color: var(--color-emergency-dark); }
 .dashboard-breakdowns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .dashboard-breakdown { padding: 1.1rem; border: 1px solid var(--color-surface-border); border-radius: var(--radius-md); background: #fff; }
 .dashboard-breakdown h3 { margin: 0 0 1rem; }

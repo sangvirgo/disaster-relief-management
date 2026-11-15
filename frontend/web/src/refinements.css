@@ -839,6 +839,40 @@
   gap: 20px;
   align-items: start;
 }
+.campaign-table-layout, .operations-workspace { display: block; width: min(100%, 1160px); margin-inline: auto; }
+.campaign-table-layout .campaign-list-panel, .operations-workspace > .card { width: 100%; min-width: 0; }
+.operations-table-scroll { width: 100%; overflow-x: auto; margin: 18px 0; border: 1px solid var(--color-surface-border); border-radius: 14px; }
+.operations-record-table { width: 100%; min-width: 670px; border-collapse: collapse; background: #fff; }
+.operations-record-table thead { background: #f1f5f9; }
+.operations-record-table th, .operations-record-table td { padding: 15px 18px; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--color-surface-border); font-size: 14px; }
+.operations-record-table thead th { color: #475569; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.operations-record-table tbody tr:last-child > * { border-bottom: 0; }
+.operations-record-table tbody tr:hover { background: #f8fbff; }
+.operations-record-table tbody th { max-width: 280px; }
+.operations-record-table tbody td:nth-child(2) { max-width: 400px; overflow-wrap: anywhere; }
+.operations-record-table .table-row-link { font-weight: 700; text-align: left; }
+.record-detail-dialog.operations-management-dialog, .record-detail-dialog.campaign-management-dialog { width: min(900px, calc(100vw - 32px)); }
+.record-detail-dialog.operations-management-dialog:has(> .ui-tabs), .record-detail-dialog.campaign-management-dialog:has(> .ui-tabs) { max-height: min(640px, calc(100dvh - 40px)); box-sizing: border-box; }
+.operations-management-dialog #operations-detail-tabpanel,
+.campaign-management-dialog #campaign-detail-tabpanel { display: grid; grid-template-columns: minmax(0, 1fr); }
+.operations-management-dialog #operations-detail-tabpanel > [role="tabpanel"],
+.campaign-management-dialog #campaign-detail-tabpanel > div { grid-area: 1 / 1; min-width: 0; }
+.operations-management-dialog #operations-detail-tabpanel > [hidden],
+.campaign-management-dialog #campaign-detail-tabpanel > [hidden] { display: block; visibility: hidden; pointer-events: none; }
+.operations-management-dialog > .ui-tabs, .campaign-management-dialog > .ui-tabs { margin: 22px 0 18px; }
+.operations-management-dialog [role="tabpanel"], .campaign-management-dialog [role="tabpanel"] { min-width: 0; }
+.reconciliation-section { width: 100%; }
+.reconciliation-section h3 { margin: 6px 0 14px; }
+.reconciliation-table { width: 100%; min-width: 520px; border-collapse: collapse; background: #fff; }
+.reconciliation-table thead { background: #f1f5f9; }
+.reconciliation-table th, .reconciliation-table td { padding: 13px 18px; border-bottom: 1px solid var(--color-surface-border); text-align: left; }
+.reconciliation-table thead th { color: #475569; font-size: 13px; font-weight: 700; }
+.reconciliation-table tbody th { width: 68%; color: var(--color-text-primary); font-weight: 600; }
+.reconciliation-table tbody td { width: 32%; font-variant-numeric: tabular-nums; text-align: right; font-weight: 650; }
+.reconciliation-table tbody tr:last-child > * { border-bottom: 0; }
+.reconciliation-table tbody tr:nth-child(even) { background: #f8fafc; }
+.reconciliation-result { margin: 14px 0 0; color: var(--color-text-secondary); }
+@media (max-width: 680px) { .operations-record-table { min-width: 590px; } .operations-record-table th, .operations-record-table td { padding: 12px; } }
 .campaign-list-panel {
   background: var(--color-surface-card);
 }
@@ -944,13 +978,6 @@
 .stock-table tbody th {
   color: #0f172a;
   font-weight: 700;
-}
-.stock-table tbody tr:nth-child(even) {
-  background: #f8fafc;
-}
-.stock-table tbody tr:hover,
-.stock-table tbody tr.selected {
-  background: #eff6ff;
 }
 .stock-table tbody tr:last-child th,
 .stock-table tbody tr:last-child td {
@@ -1176,7 +1203,7 @@
   .donation-item-table thead { display: none; }
   .donation-item-table tbody { display: grid; gap: 10px; padding: 10px; }
   .donation-item-table tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--color-surface-border); border-radius: 10px; overflow: hidden; }
-  .donation-item-table tbody th { grid-column: 1 / -1; background: #f8fafc; }
+  .donation-item-table tbody th { grid-column: 1 / -1; }
   .donation-item-table tbody td { text-align: left; border-bottom: 0; padding: 10px 12px; }
   .donation-item-table tbody td::before { content: attr(data-label); display: block; margin-bottom: 4px; color: var(--color-text-secondary); font-size: 11px; font-weight: 700; }
   .donation-item-table tbody td:last-child { grid-column: 1 / -1; border-top: 1px solid var(--color-surface-border); }
@@ -1359,6 +1386,7 @@
 .operations-list-only > .card:first-child { width: 100%; max-width: none; }
 .list-action-header { align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
 .list-action-header h2 { margin: 0; }
+.list-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); margin-left: auto; flex-wrap: wrap; }
 .list-create-button { min-height: 40px; border-radius: 11px; }
 .notice-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
 .button.secondary:hover:not(:disabled), .record-actions .button.secondary:hover:not(:disabled) { background: #e8f1ff; border-color: #75a9ef; color: #174c9b; box-shadow: 0 5px 16px #1c5bc124; }
@@ -1370,6 +1398,7 @@
 @keyframes detailSwitchIn { from { opacity: .55; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @media (min-width: 1051px) { .campaign-detail-panel { position: sticky; top: 20px; max-height: calc(100dvh - 40px); overflow-y: auto; scrollbar-width: thin; } }
 @media (max-width: 600px) { .list-action-header { align-items: stretch; } .list-action-header h2, .list-create-button { width: 100%; } .notice-header-actions { justify-content: flex-start; } }
+@media (max-width: 600px) { .list-header-actions { width: 100%; margin-left: 0; justify-content: flex-end; } }
 @media (max-width: 680px) {
   .volunteer-notices > .notice-page-header { align-items: flex-start; }
   .notice-header-actions { justify-content: flex-start; width: 100%; }

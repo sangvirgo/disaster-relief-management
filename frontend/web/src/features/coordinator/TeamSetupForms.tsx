@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
+import { fetchAll } from '../../api/fetchAll';
 
 export type Skill = { code: string; display_name: string };
 export type SelectOption = { value: string; label: string };
@@ -51,33 +52,47 @@ export function TeamSkillsForm({ teamId, version, current, skills, onSuccess }: 
 
 type UserDetail = { grants?: { role_code: string; scope_type: string; revoked_at: string | null }[] };
 
-/** Search eligible leaders on the server (max 20 per search) instead of loading every account. */
-function useLeaderSearch(term: string) {
+/** Build the selector from active volunteer grants and current team memberships. */
+function useLeaderCandidates() {
   const [options, setOptions] = useState<SelectOption[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [revision, setRevision] = useState(0);
   useEffect(() => {
-    const text = term.trim();
-    if (text.length < 2) { setOptions([]); setSearching(false); return; }
     let live = true;
-    setSearching(true);
-    const timer = window.setTimeout(() => {
-      void api<{ items: { id: string; username: string; display_name: string; status: string }[] }>(
-        'identity', `/users?query=${encodeURIComponent(text)}&status=ACTIVE&limit=20`)
-        .then(async (page) => {
-          const details = await Promise.all(page.items.map((row) => api<UserDetail>('identity', `/users/${row.id}`).catch(() => null)));
+    setLoading(true);
+    setError('');
+    setOptions([]);
+    void (async () => {
+      try {
+        const [users, teams] = await Promise.all([
+          fetchAll<{ id: string; username: string; display_name: string }>('identity', '/users?status=ACTIVE'),
+          fetchAll<{ id: string }>('response', '/teams'),
+        ]);
+        const memberPages = await Promise.all(teams.map((team) =>
+          fetchAll<{ user_id: string }>('response', `/teams/${team.id}/members`)));
+        const assignedIds = new Set(memberPages.flat().map((member) => member.user_id));
+        const available = users.filter((user) => !assignedIds.has(user.id));
+        const eligible: SelectOption[] = [];
+        for (let index = 0; index < available.length; index += 8) {
+          const batch = available.slice(index, index + 8);
+          const details = await Promise.all(batch.map((user) => api<UserDetail>('identity', `/users/${user.id}`)));
           if (!live) return;
-          setOptions(page.items.flatMap((row, index) => {
-            const detail = details[index];
-            const eligible = detail?.grants?.some((grant) => !grant.revoked_at && grant.role_code === 'VOLUNTEER' && grant.scope_type === 'SYSTEM');
-            return eligible ? [{ value: row.id, label: `${row.display_name} · ${row.username}` }] : [];
-          }));
-        })
-        .catch(() => { if (live) setOptions([]); })
-        .finally(() => { if (live) setSearching(false); });
-    }, 350);
-    return () => { live = false; window.clearTimeout(timer); };
-  }, [term]);
-  return { options, searching };
+          batch.forEach((user, offset) => {
+            if (details[offset]?.grants?.some((grant) => !grant.revoked_at && grant.role_code === 'VOLUNTEER' && grant.scope_type === 'SYSTEM'))
+              eligible.push({ value: user.id, label: `${user.display_name} · ${user.username}` });
+          });
+        }
+        if (live) setOptions(eligible.sort((a, b) => a.label.localeCompare(b.label, 'vi')));
+      } catch {
+        if (live) setError('Không tải được danh sách đội trưởng đủ điều kiện.');
+      } finally {
+        if (live) setLoading(false);
+      }
+    })();
+    return () => { live = false; };
+  }, [revision]);
+  return { options, loading, error, reload: () => setRevision((value) => value + 1) };
 }
 
 export function TeamCreateForm({ skills, onSuccess }: {
@@ -88,8 +103,7 @@ export function TeamCreateForm({ skills, onSuccess }: {
   const [teamKind, setTeamKind] = useState('VOLUNTEER');
   const [reportingMode, setReportingMode] = useState('APP');
   const [leaderId, setLeaderId] = useState('');
-  const [leaderTerm, setLeaderTerm] = useState('');
-  const leaders = useLeaderSearch(leaderTerm);
+  const leaders = useLeaderCandidates();
   const [contactNote, setContactNote] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -128,17 +142,19 @@ export function TeamCreateForm({ skills, onSuccess }: {
       <option value="MILITARY">Lực lượng vũ trang</option><option value="GOVERNMENT">Cơ quan nhà nước</option><option value="OTHER">Khác</option></select></label>
     <label>Chế độ báo cáo *<select value={reportingMode} onChange={(e) => { setReportingMode(e.target.value); changed(); }}><option value="APP">Qua ứng dụng</option>
       <option value="COORDINATOR">Điều phối viên ghi nhận</option></select></label>
-    {reportingMode === 'APP' ? <div className="form-stack">
-      <label>Tìm đội trưởng *<input type="search" value={leaderTerm} placeholder="Nhập tên hoặc tên đăng nhập (ít nhất 2 ký tự)"
-        onChange={(e) => { setLeaderTerm(e.target.value); setLeaderId(''); changed(); }} /></label>
-      <label>Đội trưởng *<select required value={leaderId} onChange={(e) => { setLeaderId(e.target.value); changed(); }}>
-        <option value="">{leaders.searching ? 'Đang tìm…' : 'Chọn tài khoản'}</option>
-        {leaders.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
-      <small>Đội trưởng cần tài khoản đang hoạt động, có quyền Tình nguyện viên ở phạm vi hệ thống và chưa thuộc đội khác.</small>{fieldError('leader_user_id') && <small className="field-error">{fieldError('leader_user_id')}</small>}</label></div>
+    {reportingMode === 'APP' ? <label>Đội trưởng *
+      <select required value={leaderId} disabled={leaders.loading || Boolean(leaders.error)} onChange={(event) => { setLeaderId(event.target.value); changed(); }}>
+        <option value="">{leaders.loading ? 'Đang tải tình nguyện viên…' : 'Chọn tình nguyện viên'}</option>
+        {leaders.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+      {leaders.error && <span className="notice error" role="alert">{leaders.error} <button type="button" className="button secondary" onClick={leaders.reload}>Tải lại</button></span>}
+      {!leaders.loading && !leaders.error && leaders.options.length === 0 && <small>Chưa có tình nguyện viên đủ điều kiện và chưa thuộc đội.</small>}
+      {fieldError('leader_user_id') && <small className="field-error">{fieldError('leader_user_id')}</small>}
+    </label>
       : <label>Đầu mối liên hệ *<textarea required maxLength={1000} value={contactNote} onChange={(e) => { setContactNote(e.target.value); changed(); }} />{fieldError('external_contact_note') && <small className="field-error">{fieldError('external_contact_note')}</small>}</label>}
-    <SkillChoices skills={skills} selected={selectedSkills} onChange={(codes) => { setSelectedSkills(codes); changed(); }} />
-    {reportingMode === 'APP' && leaderTerm.trim().length >= 2 && !leaders.searching && !leaders.options.length &&
-      <p className="notice warning">Không tìm thấy tài khoản đủ điều kiện (cần đang hoạt động và có quyền Tình nguyện viên ở phạm vi hệ thống).</p>}
+    <div className="team-create-skills"><h4>Kỹ năng của đội</h4>
+      <SkillChoices skills={skills} selected={selectedSkills} onChange={(codes) => { setSelectedSkills(codes); changed(); }} />
+    </div>
     {fieldError('skill_codes') && <p className="field-error">{fieldError('skill_codes')}</p>}
     {error && <p className="notice error" role="alert">{error}</p>}
     <button type="submit" className="button" disabled={busy || hasInvalidFields}>{busy ? 'Đang tạo…' : 'Tạo đội cứu hộ'}</button>

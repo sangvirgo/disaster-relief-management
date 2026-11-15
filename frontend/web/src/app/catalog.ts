@@ -55,14 +55,6 @@ export const pages: Record<Workspace, Page[]> = {
     { id: 'queue', title: 'Xử lý SOS', icon: 'queue', service: 'response', path: '/requests' },
     { id: 'teams', title: 'Đội cứu hộ', icon: 'team', service: 'response', path: '/teams' },
     { id: 'notices', title: 'Thông báo', icon: 'notice', service: 'response', path: '/notices' },
-    { id: 'needs', title: 'Nhu cầu vật tư', icon: 'needs', service: 'logistics', path: '/needs' },
-    {
-      id: 'campaigns',
-      title: 'Chiến dịch',
-      icon: 'campaign',
-      service: 'response',
-      path: '/campaigns',
-    },
   ],
   operations: [
     {
@@ -96,15 +88,15 @@ export const pages: Record<Workspace, Page[]> = {
     { id: 'stock', title: 'Tồn kho', icon: 'stock', service: 'logistics', path: '/stock' },
     {
       id: 'assets',
-      title: 'Điểm và phương tiện',
+      title: 'Điểm cứu trợ',
       icon: 'assets',
       service: 'logistics',
       path: '/relief-points',
     },
-    { id: 'needs', title: 'Nhu cầu', icon: 'needs', service: 'logistics', path: '/needs' },
+    { id: 'needs', title: 'Nhu cầu vật tư', icon: 'needs', service: 'logistics', path: '/needs' },
     {
       id: 'distribution',
-      title: 'Phân phối',
+      title: 'Phân phối vật tư',
       icon: 'distribution',
       service: 'logistics',
       path: '/distributions',

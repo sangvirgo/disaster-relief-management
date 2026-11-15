@@ -4,6 +4,7 @@ import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
 import { ListNav } from '../../components/ui/Pager';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { DetailSurface } from '../../components/DetailSurface';
+import { StatusBadge } from '../../components/StatusBadge';
 import { label, timeLabel } from '../../i18n/labels';
 import { useUrlView } from '../../app/useUrlView';
 import { auditTypes } from '../../app/routeViews';
@@ -264,9 +265,7 @@ export function Admin({ page }: { page: string }) {
             </p>
             <div className="admin-record-meta">
               <span className="admin-version-badge">V{detail.version}</span>
-              <span className={`admin-status-badge ${detail.status === 'ACTIVE' ? 'is-active' : ''}`}>
-                <span className="admin-status-dot" aria-hidden="true" />{label(detail.status)}
-              </span>
+              {detail.status && <StatusBadge status={detail.status} />}
             </div>
             <>
                 <div className="admin-grants-heading">
@@ -371,8 +370,15 @@ export function Admin({ page }: { page: string }) {
                         resetOnChange: ['campaign_id'],
                       },
                       { name: 'campaign_id', label: 'Chiến dịch', type: 'reference', required: true, visibleWhen: { field: 'scope_type', value: 'CAMPAIGN' }, placeholder: 'Dán mã chiến dịch do quản lý chiến dịch cung cấp' },
-                      { name: 'reason', label: 'Lý do', type: 'textarea', required: true, maxLength: 500 },
+                      { name: 'reason', label: 'Ghi chú (không bắt buộc)', type: 'textarea', maxLength: 500,
+                        placeholder: 'Ghi thêm thông tin nếu cần' },
                     ],
+                    build: (values) => ({
+                      role_code: values.role_code,
+                      scope_type: values.scope_type,
+                      ...(values.scope_type === 'CAMPAIGN' ? { campaign_id: values.campaign_id } : {}),
+                      reason: values.reason?.trim() || 'Cấp quyền theo thao tác của quản trị viên.',
+                    }),
                   }}
                   onSuccess={success}
                 />

@@ -138,6 +138,27 @@ type DataPage = {
 const icon = (name: string) => <img src={`/icons/${name}.svg`} alt="" aria-hidden="true" />;
 const text = (value: unknown) => (typeof value === 'string' ? value : undefined);
 
+function PasswordVisibilityButton({ visible, length, onToggle }: { visible: boolean; length: number; onToggle: () => void }) {
+  return <button type="button" className="auth-password-toggle" onClick={onToggle}
+    aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} aria-pressed={visible}>
+    <svg className="password-peek-icon" viewBox="0 0 44 36" fill="none" aria-hidden="true">
+      <path d="M10 7Q22 1 34 7L37 25Q22 34 7 25Z" fill="#DBEDFF" stroke="#3263A8" strokeWidth="1.5" />
+      <path d="M15 11L18 9M27 9L30 11" stroke="#3263A8" strokeWidth="1.5" strokeLinecap="round" />
+      {visible ? <>
+        <ellipse cx="16" cy="18" rx="4" ry="5" fill="white" stroke="#3263A8" strokeWidth="1.2" />
+        <ellipse cx="28" cy="18" rx="4" ry="5" fill="white" stroke="#3263A8" strokeWidth="1.2" />
+        <circle cx={16 + (length % 5 - 2) * 0.7} cy="19" r="1.7" fill="#173A70" />
+        <circle cx={28 + (length % 5 - 2) * 0.7} cy="19" r="1.7" fill="#173A70" />
+        <path d="M19 26Q22 28 25 26" stroke="#3263A8" strokeWidth="1.3" strokeLinecap="round" />
+      </> : <>
+        <path d="M11 18L18 21M26 21L33 18" stroke="#3263A8" strokeWidth="2" strokeLinecap="round" />
+        <path d="M3 20Q7 14 13 18L18 21L15 29Q8 30 3 25Z" fill="#F7C8A9" stroke="#B87966" strokeWidth="1.2" />
+        <path d="M41 20Q37 14 31 18L26 21L29 29Q36 30 41 25Z" fill="#F7C8A9" stroke="#B87966" strokeWidth="1.2" />
+      </>}
+    </svg>
+  </button>;
+}
+
 function AuthModal({
   isOpen,
   onClose,
@@ -513,29 +534,7 @@ function AuthModal({
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                     placeholder={mode === 'register' ? 'Tối thiểu 10 ký tự' : 'Nhập mật khẩu'}
                   />
-                  <button
-                    type="button"
-                    className="auth-password-toggle"
-                    onClick={() => setShowPassword((value) => !value)}
-                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                    aria-pressed={showPassword}
-                  >
-                    <svg className="password-peek-icon" viewBox="0 0 44 36" fill="none" aria-hidden="true">
-                      <path d="M10 7Q22 1 34 7L37 25Q22 34 7 25Z" fill="#DBEDFF" stroke="#3263A8" strokeWidth="1.5" />
-                      <path d="M15 11L18 9M27 9L30 11" stroke="#3263A8" strokeWidth="1.5" strokeLinecap="round" />
-                      {showPassword ? <>
-                        <ellipse cx="16" cy="18" rx="4" ry="5" fill="white" stroke="#3263A8" strokeWidth="1.2" />
-                        <ellipse cx="28" cy="18" rx="4" ry="5" fill="white" stroke="#3263A8" strokeWidth="1.2" />
-                        <circle cx={16 + (password.length % 5 - 2) * 0.7} cy="19" r="1.7" fill="#173A70" />
-                        <circle cx={28 + (password.length % 5 - 2) * 0.7} cy="19" r="1.7" fill="#173A70" />
-                        <path d="M19 26Q22 28 25 26" stroke="#3263A8" strokeWidth="1.3" strokeLinecap="round" />
-                      </> : <>
-                        <path d="M11 18L18 21M26 21L33 18" stroke="#3263A8" strokeWidth="2" strokeLinecap="round" />
-                        <path d="M3 20Q7 14 13 18L18 21L15 29Q8 30 3 25Z" fill="#F7C8A9" stroke="#B87966" strokeWidth="1.2" />
-                        <path d="M41 20Q37 14 31 18L26 21L29 29Q36 30 41 25Z" fill="#F7C8A9" stroke="#B87966" strokeWidth="1.2" />
-                      </>}
-                    </svg>
-                  </button>
+                  <PasswordVisibilityButton visible={showPassword} length={password.length} onToggle={() => setShowPassword((value) => !value)} />
                 </span>
                 {authErrorFor('password', password) && (
                   <small className="field-error" role="alert">{authErrorFor('password', password)}</small>
@@ -641,6 +640,8 @@ function PasswordChange({
 }) {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -668,15 +669,20 @@ function PasswordChange({
   }
 
   return (
-    <section className="card auth-card">
+    <section className="card auth-card password-change-card">
+      <div className="auth-brand" aria-hidden="true">
+        <span className="auth-logo-frame"><img src="/reliva-logo.png" alt="" /></span>
+        <span className="auth-brand-name">reliva</span>
+      </div>
       <div className="eyebrow">Bảo mật tài khoản</div>
       <h2>Đổi mật khẩu tài khoản</h2>
 
       <form className="form-stack" onSubmit={submit} noValidate>
         <label>
           <span>Mật khẩu hiện tại{forced ? ' (mật khẩu tạm)' : ''} <span className="required-mark" aria-hidden="true">*</span></span>
+          <span className="auth-password-field">
           <input
-            type="password"
+            type={showOldPassword ? 'text' : 'password'}
             required
             maxLength={257}
             aria-invalid={Boolean(touched.oldPassword && oldPasswordError)}
@@ -689,12 +695,15 @@ function PasswordChange({
             autoComplete="current-password"
             placeholder="Nhập mật khẩu Reliva hiện tại"
           />
+          <PasswordVisibilityButton visible={showOldPassword} length={oldPassword.length} onToggle={() => setShowOldPassword((value) => !value)} />
+          </span>
           {touched.oldPassword && oldPasswordError && <small className="field-error" role="alert">{oldPasswordError}</small>}
         </label>
         <label>
           <span>Mật khẩu mới <span className="required-mark" aria-hidden="true">*</span></span>
+          <span className="auth-password-field">
           <input
-            type="password"
+            type={showNewPassword ? 'text' : 'password'}
             required
             minLength={10}
             maxLength={257}
@@ -708,6 +717,8 @@ function PasswordChange({
             autoComplete="new-password"
             placeholder="Tối thiểu 10 ký tự (Ví dụ: MatKhauRieng!2026)"
           />
+          <PasswordVisibilityButton visible={showNewPassword} length={newPassword.length} onToggle={() => setShowNewPassword((value) => !value)} />
+          </span>
           {touched.newPassword && newPasswordError && <small className="field-error" role="alert">{newPasswordError}</small>}
         </label>
         {error && (
@@ -1477,6 +1488,14 @@ function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me
   if (!allowedViews.includes(url.searchParams.get('view') || '')) url.searchParams.delete('view');
   if (!(workspace === 'operations' && page === 'intake' && roles(user).has('REVIEWER')
     && (intakeSteps as readonly string[]).includes(url.searchParams.get('step') || ''))) url.searchParams.delete('step');
+  const sosId = url.searchParams.get('sos_id');
+  if (!(workspace === 'coordinator' && ['queue', 'verify', 'triage', 'assign'].includes(page)
+    && sosId && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(sosId))) {
+    url.searchParams.delete('sos_id');
+    url.searchParams.delete('sos_tab');
+  } else if (!['review', 'dispatch', 'ai', 'history'].includes(url.searchParams.get('sos_tab') || '')) {
+    url.searchParams.delete('sos_tab');
+  }
 }
 
 function writeRoute(workspace: Workspace, page: string, user: Me | null, mode: 'push' | 'replace' = 'push') {
@@ -1488,6 +1507,8 @@ function writeRoute(workspace: Workspace, page: string, user: Me | null, mode: '
     url.hash = '';
     url.searchParams.delete('view');
     url.searchParams.delete('step');
+    url.searchParams.delete('sos_id');
+    url.searchParams.delete('sos_tab');
   } else {
     normalizeSubview(url, workspace, page, user);
   }
@@ -1575,7 +1596,7 @@ function App() {
     } catch { setSelectedTrackingCode(''); }
     if (pendingUrl && requested?.workspace === route.workspace && requested.page === route.page) {
       const url = new URL(window.location.href);
-      for (const key of ['step', 'view']) {
+      for (const key of ['step', 'view', 'sos_id', 'sos_tab']) {
         const parameter = pendingUrl.searchParams.get(key);
         if (parameter) url.searchParams.set(key, parameter);
       }
@@ -1724,6 +1745,13 @@ function App() {
   }, [user]);
 
   const workspaces = allowedWorkspaces(user);
+  const quickWorkspace = workspaces.length > 1
+    ? prevWorkspace && prevWorkspace !== workspace && workspaces.includes(prevWorkspace)
+      ? prevWorkspace
+      : workspace === 'citizen'
+        ? defaultWorkspaceForUser(user)
+        : 'citizen'
+    : null;
   const navigation = allowedPages(workspace, user);
   const selected = pageId === 'account' && user
     ? { id: 'account', title: 'Tài khoản', icon: 'account' }
@@ -1754,6 +1782,15 @@ function App() {
     setSelectedMissionId('');
     setSelectedRequestId('');
     setPageId(id);
+    if (workspace === 'coordinator' && id === pageId && ['queue', 'verify', 'triage', 'assign'].includes(id)) {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('sos_id')) {
+        url.searchParams.delete('sos_id');
+        url.searchParams.delete('sos_tab');
+        window.history.pushState(null, '', url);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
+    }
     writeRoute(workspace, id, user);
     setMenuOpen(false);
     setProfileMenuOpen(false);
@@ -1816,9 +1853,8 @@ function App() {
               </span>
               {workspaces.length > 1 && <span className="ws-picker__chevron" aria-hidden="true">▾</span>}
             </button>
-            {workspaces.length > 1 && prevWorkspace && prevWorkspace !== workspace && workspaces.includes(prevWorkspace) &&
-              <button type="button" className="ws-picker__quick" onClick={() => changeWorkspace(prevWorkspace)}
-                title={`Chuyển nhanh về ${workspaceLabels[prevWorkspace]}`} aria-label={`Chuyển nhanh về ${workspaceLabels[prevWorkspace]}`}>⇄</button>}
+            {quickWorkspace && <button type="button" className="ws-picker__quick" onClick={() => changeWorkspace(quickWorkspace)}
+              title={`Chuyển nhanh sang ${workspaceLabels[quickWorkspace]}`} aria-label={`Chuyển nhanh sang ${workspaceLabels[quickWorkspace]}`}>⇄</button>}
             {wsMenuOpen && workspaces.length > 1 && <div className="ws-picker__menu" role="listbox" aria-label="Chọn vai trò">
               {workspaces.map((item) => (
                 <button key={item} type="button" role="option" aria-selected={workspace === item}
@@ -1967,8 +2003,6 @@ function App() {
                   <Coordinator key={`${selected.id}:${selectedRequestId}`} page={selected.id} currentUserId={user!.id}
                     initialRequestId={selectedRequestId}
                     canSeeUnassigned={user!.grants.some((grant) => grant.role_code === 'COORDINATOR' && grant.scope_type === 'SYSTEM' && !grant.campaign_id)} />
-                ) : workspace === 'coordinator' && selected.id === 'needs' && user ? (
-                  <Operations page="needs" user={user} />
                 ) : ['volunteer', 'coordinator'].includes(workspace) &&
                   selected.id === 'notices' ? (
                   <Notices key={workspace} onOpenRequest={workspace === 'coordinator' ? (requestId) => {
@@ -1980,8 +2014,7 @@ function App() {
                     setPageId('missions');
                     writeRoute('volunteer', 'missions', user);
                   } : undefined} />
-                ) : ['coordinator', 'operations'].includes(workspace) &&
-                  selected.id === 'campaigns' ? (
+                ) : workspace === 'operations' && selected.id === 'campaigns' ? (
                   <Campaigns key={workspace} />
                 ) : workspace === 'volunteer' ? (
                   <Volunteer key={`${selected.id}:${selectedMissionId}`} page={selected.id} currentUserId={user!.id} initialMissionId={selectedMissionId}

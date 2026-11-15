@@ -17,6 +17,8 @@
   }
 }
 .team-header-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.team-create-skills { display: grid; gap: 10px; }
+.team-create-skills h4 { margin: 0; font-size: 16px; }
 .coordinator-team-detail-card .admin-team-actions { margin: 1.25rem 0; }
 .coordinator-team-detail-card > .button { margin: .5rem 0 1rem; }
 .team-skills-panel { display: grid; gap: 1rem; padding: 1.25rem; border: 1px solid var(--color-surface-border); border-radius: var(--radius-md); background: var(--color-surface-subtle); }

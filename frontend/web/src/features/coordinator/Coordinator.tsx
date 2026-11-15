@@ -5,7 +5,6 @@ import { api, ApiError, newCommandKey } from '../../api/client';
 import { DetailSurface } from '../../components/DetailSurface';
 import { PriorityBadge } from '../../components/PriorityBadge';
 import { StatusBadge } from '../../components/StatusBadge';
-import { QueueRow } from '../../components/ui/QueueRow';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
@@ -444,21 +443,31 @@ const queueStatuses = [
   ['CANCELLED', 'Đã hủy'],
 ] as const;
 const reviewLanes = ['NORMAL', 'RATE_LIMITED_REVIEW', 'PROXY_QUOTA_REVIEW'] as const;
-type QueueView = { status: string; selected: string | null; reviewLane: string; overdue: boolean };
+type QueueView = { status: string; reviewLane: string; overdue: boolean };
+const sosTabs = ['overview', 'review', 'dispatch', 'ai', 'history'] as const;
+type SosTab = typeof sosTabs[number];
+
+function sosRoute(page: string): { id: string | null; tab: SosTab } {
+  const params = new URL(window.location.href).searchParams;
+  const id = ['queue', 'verify', 'triage', 'assign'].includes(page) ? params.get('sos_id') : null;
+  const rawTab = params.get('sos_tab');
+  return {
+    id: id && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id) ? id : null,
+    tab: sosTabs.find((tab) => tab === rawTab) ?? 'overview',
+  };
+}
 
 function queueViewKey(userId: string, page: string): string {
   return `c48:coordinator-queue:${userId}:${page}`;
 }
 
 function readQueueView(userId: string, page: string): QueueView {
-  const fallback: QueueView = { status: stateFilter[page] || '', selected: null, reviewLane: 'NORMAL', overdue: false };
+  const fallback: QueueView = { status: stateFilter[page] || '', reviewLane: 'NORMAL', overdue: false };
   try {
     const stored = JSON.parse(window.sessionStorage.getItem(queueViewKey(userId, page)) || 'null') as Partial<QueueView> | null;
     if (!stored || typeof stored !== 'object') return fallback;
     return {
       status: queueStatuses.some(([value]) => value === stored.status) ? stored.status! : fallback.status,
-      selected: typeof stored.selected === 'string' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(stored.selected)
-        ? stored.selected : null,
       reviewLane: reviewLanes.some((value) => value === stored.reviewLane) ? stored.reviewLane! : 'NORMAL',
       overdue: stored.overdue === true,
     };
@@ -536,7 +545,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
   const [queue, setQueue] = useState<Queue | null>(null);
   const [queueStatus, setQueueStatus] = useState(restoredView.current.status);
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
-  const [selected, setSelected] = useState<string | null>(initialRequestId || restoredView.current.selected);
+  const [selected, setSelected] = useState<string | null>(() => initialRequestId || sosRoute(page).id);
+  const [activeTab, setActiveTab] = useState<SosTab>(() => sosRoute(page).tab);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [candidates, setCandidates] = useState<Candidates | null>(null);
   const [candidateError, setCandidateError] = useState('');
@@ -586,14 +596,22 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     return () => { live = false; };
   }, [revision]);
   const refreshReasonRef = useRef<'success' | 'stale' | null>(null);
-  const [compactDetail, setCompactDetail] = useState(() => window.matchMedia('(max-width: 1050px)').matches);
-  useEffect(() => { const media = window.matchMedia('(max-width: 1050px)'); const update = () => setCompactDetail(media.matches); media.addEventListener('change', update); return () => media.removeEventListener('change', update); }, []);
   const detailPanelRef = useRef<HTMLElement | null>(null);
+  const listScrollRef = useRef(0);
   useEffect(() => {
     const restored = readQueueView(currentUserId, page);
     setQueueStatus(restored.status);
     setCursor('');
-    setSelected(initialRequestId || restored.selected);
+    const route = sosRoute(page);
+    const requestId = initialRequestId || route.id;
+    setSelected(requestId);
+    setActiveTab(route.tab);
+    if (initialRequestId && route.id !== initialRequestId) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('sos_id', initialRequestId);
+      url.searchParams.delete('sos_tab');
+      window.history.replaceState(null, '', url);
+    }
     setReviewLane(restored.reviewLane);
     setOverdue(restored.overdue);
     setDetail(null);
@@ -601,14 +619,26 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     refreshReasonRef.current = null;
   }, [page, initialRequestId, currentUserId]);
   useEffect(() => {
+    const restore = () => {
+      const route = sosRoute(page);
+      setSelected(route.id);
+      setActiveTab(route.tab);
+      setDetail(null);
+      setDetailError('');
+      setUpdateMessage('');
+    };
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
+  }, [page]);
+  useEffect(() => {
     try {
       window.sessionStorage.setItem(queueViewKey(currentUserId, page), JSON.stringify({
-        status: queueStatus, selected, reviewLane, overdue,
+        status: queueStatus, reviewLane, overdue,
       } satisfies QueueView));
     } catch {
       // The queue remains usable when session storage is unavailable.
     }
-  }, [currentUserId, page, queueStatus, selected, reviewLane, overdue]);
+  }, [currentUserId, page, queueStatus, reviewLane, overdue]);
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') setRevision((value) => value + 1);
@@ -702,8 +732,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
           setUpdateMessage('');
           setDetail(null);
           if (cause instanceof ApiError && (cause.status === 403 || cause.status === 404)) {
-            setSelected(null);
-            setDetailError('Hồ sơ đã chọn không còn trong phạm vi được phép xem. Hãy chọn hồ sơ khác.');
+            setDetailError('Hồ sơ này không còn trong phạm vi được phép xem. Quay về Danh sách SOS để chọn hồ sơ khác.');
           } else {
             setDetailError(cause instanceof Error ? cause.message : 'Không thể tải lại hồ sơ.');
           }
@@ -854,9 +883,42 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     completionCheck.cycle === detail.work_cycle);
   const showTeamCandidates = !latestCompletedMissionId ||
     (completionCheck && !completionCheck.error && (!completedInCurrentCycle || showAdditionalDispatch));
+  function openRequest(id: string) {
+    if (selected === id) { if (detailError) setDetailRevision(value => value + 1); return; }
+    if (!selected) listScrollRef.current = window.scrollY;
+    const url = new URL(window.location.href);
+    url.searchParams.set('sos_id', id);
+    url.searchParams.delete('sos_tab');
+    window.history.pushState(null, '', url);
+    setSelected(id);
+    setActiveTab('overview');
+    setDetail(null);
+    setDetailError('');
+    setUpdateMessage('');
+    window.scrollTo({ top: 0 });
+  }
+  function returnToList() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('sos_id');
+    url.searchParams.delete('sos_tab');
+    window.history.replaceState(null, '', url);
+    setSelected(null);
+    setDetail(null);
+    setDetailError('');
+    setUpdateMessage('');
+    requestAnimationFrame(() => window.scrollTo({ top: listScrollRef.current }));
+  }
+  function changeTab(tab: SosTab) {
+    setActiveTab(tab);
+    const url = new URL(window.location.href);
+    if (tab === 'overview') url.searchParams.delete('sos_tab');
+    else url.searchParams.set('sos_tab', tab);
+    window.history.replaceState(null, '', url);
+    detailPanelRef.current?.scrollIntoView({ block: 'start' });
+  }
   return (
-    <div className="coordinator-layout">
-      <section className="card">
+    <div className="coordinator-layout coordinator-sos-layout">
+      {!selected && <section className="card">
         <h2>{title[page] || title.queue}</h2>
         <div className="queue-filter-toolbar">
           <button
@@ -877,7 +939,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 onChange={(event) => {
                   setQueueStatus(event.target.value);
                   setCursor('');
-                  setSelected(null);
                 }}
               >
                 {queueStatuses.map(([status, name]) => (
@@ -896,7 +957,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 onChange={(event) => {
                   setReviewLane(event.target.value);
                   setCursor('');
-                  setSelected(null);
                 }}
               >
                 {[
@@ -914,7 +974,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               onChange={(event) => {
                 setOverdue(event.target.checked);
                 setCursor('');
-                setSelected(null);
               }}
             />
             Chỉ xem yêu cầu cần chú ý
@@ -946,48 +1005,38 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             {queue.items.length === 0 && (
               <div className="empty">Không có yêu cầu trong hàng đợi này.</div>
             )}
-            <div className="record-list">
-              {queue.items.map((item) => (
-                <QueueRow
-                  title={item.tracking_code}
-                  meta={item.handled_by_name ? `${label(item.category)} · Đang do ${item.handled_by_name} xử lý` : label(item.category)}
-                  priority={<PriorityBadge priority={item.priority as 'P1' | 'P2' | 'P3' | 'P4' | null | undefined} />}
-                  status={<StatusBadge status={item.status} />}
-                  time={timeLabel(item.received_at)}
-                  selected={selected === item.id}
-                  onClick={() => {
-                    detailPanelRef.current?.closest('.coordinator-detail-surface')?.scrollTo(0, 0);
-                    if (selected === item.id) {
-                      if (detailError) setDetailRevision(value => value + 1);
-                      return;
-                    }
-                    setSelected(item.id);
-                    setDetail(null);
-                    setDetailError('');
-                    setUpdateMessage('');
-                  }}
-                  key={item.id}
-                  details={<>
-                    {item.declared_danger && <small className="queue-danger-chip">Nguy hiểm tính mạng</small>}
-                    {item.tracking_code.startsWith('C48HM') && <small className="chip">Mô phỏng</small>}
+            {queue.items.length > 0 && <div className="sos-table-scroll" role="region" aria-label="Bảng danh sách SOS" tabIndex={0}>
+              <table className="sos-table">
+                <thead><tr><th scope="col">Mã SOS</th><th scope="col">Tín hiệu cần chú ý</th><th scope="col">Loại sự cố</th><th scope="col">Số người</th><th scope="col">Ưu tiên</th><th scope="col">Trạng thái</th><th scope="col">Tiếp nhận</th></tr></thead>
+                <tbody>{queue.items.map((item) => <tr key={item.id} className={selected === item.id ? 'is-selected' : ''}
+                  onClick={() => openRequest(item.id)}>
+                  <td><button type="button" className="sos-table-open" onClick={(event) => { event.stopPropagation(); openRequest(item.id); }}
+                    aria-label={`Mở hồ sơ SOS ${item.tracking_code}`}>{item.tracking_code}</button></td>
+                  <td><div className="sos-table-signals">
+                    {item.declared_danger && <span className="queue-danger-chip">Nguy hiểm tính mạng</span>}
+                    {item.review_lane === 'RATE_LIMITED_REVIEW' && <span className="chip chip--review">Báo lặp cần rà soát</span>}
+                    {item.review_lane === 'PROXY_QUOTA_REVIEW' && <span className="chip chip--review">Báo hộ cần rà soát</span>}
+                    {item.tracking_code.startsWith('C48HM') && <span className="chip">Mô phỏng</span>}
+                    {item.handled_by_name && <span className="chip">Đang do {item.handled_by_name} xử lý</span>}
                     {['SUBMITTED', 'VERIFYING'].includes(item.status) && item.fast_track && <>
-                      <small className="chip chip--suggest" data-priority={item.fast_track.suggested_priority}>
-                        {item.fast_track.suggestion_confidence === 'LOW' ? 'Tạm gợi ý' : 'Gợi ý'} {item.fast_track.suggested_priority}
-                      </small>
-                      {!item.fast_track.eligible && <small className="chip chip--review">Cần rà soát kỹ</small>}
+                      <span className="chip chip--suggest" data-priority={item.fast_track.suggested_priority}>{item.fast_track.suggestion_confidence === 'LOW' ? 'Tạm gợi ý' : 'Gợi ý'} {item.fast_track.suggested_priority}</span>
+                      {!item.fast_track.eligible && <span className="chip chip--review">Cần rà soát kỹ</span>}
                     </>}
-                    {!['SUBMITTED', 'VERIFYING'].includes(item.status) && item.priority_advisory?.level && (
-                      <small>Đánh giá: {advisoryScoreLabel(item.priority_advisory.score, item.priority_advisory.level)}</small>
-                    )}
-                  </>}
-                />
-              ))}
-            </div>
+                    {!['SUBMITTED', 'VERIFYING'].includes(item.status) && item.priority_advisory?.level &&
+                      <span className="muted">Đánh giá: {advisoryScoreLabel(item.priority_advisory.score, item.priority_advisory.level)}</span>}
+                    {!item.declared_danger && item.review_lane === 'NORMAL' && !item.fast_track && !item.priority_advisory?.level && !item.tracking_code.startsWith('C48HM') && <span className="muted">—</span>}
+                  </div></td>
+                  <td>{label(item.category)}</td><td>{item.people_affected == null ? 'Chưa rõ' : item.people_affected}</td>
+                  <td><PriorityBadge priority={item.priority as 'P1' | 'P2' | 'P3' | 'P4' | null | undefined} /></td>
+                  <td><StatusBadge status={item.status} context="sos" /></td><td><time dateTime={item.received_at}>{timeLabel(item.received_at)}</time></td>
+                </tr>)}</tbody>
+              </table>
+            </div>}
             <ListNav page={pageIndex} hasNext={Boolean(queue.more && queue.cursor)} loading={loading} onPrev={prevPage} onNext={() => queue.cursor && setCursor(queue.cursor)} count={queue.items.length} noun="SOS" />
           </>
         )}
-      </section>
-      <DetailSurface className="coordinator-detail-surface" modal={compactDetail} open={Boolean(selected)} label="Hồ sơ yêu cầu" onClose={() => setSelected(null)}><section
+      </section>}
+      {selected && <section className="card coordinator-detail-surface sos-detail-page"><button type="button" className="button secondary sos-back-to-list" onClick={returnToList}>← Danh sách SOS</button><section
         className="queue-detail-card"
         ref={detailPanelRef}
       >
@@ -1018,13 +1067,44 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             <header className="sos-head" data-danger={detail.declared_danger ? 'true' : undefined}>
               <div className="sos-head__title">
                 <h2>{detail.tracking_code}</h2>
-                <StatusBadge status={detail.status} />
+                <StatusBadge status={detail.status} context="sos" />
                 {detail.priority
                   ? <PriorityBadge priority={detail.priority as 'P1' | 'P2' | 'P3' | 'P4'} />
                   : <span className="sos-head__nopriority">Chưa chọn ưu tiên</span>}
               </div>
               <p className="sos-head__sub">{label(detail.category)} · tiếp nhận {timeLabel(detail.received_at)}</p>
             </header>
+            <section className="claim-panel" aria-label="Nhận xử lý hồ sơ">
+              {detail.handled_by && claimActive(detail) ? (
+                <p role="status" className="notice">
+                  {detail.handled_by === currentUserId
+                    ? 'Bạn đang nhận xử lý hồ sơ này. Nhớ nhả khi không còn xử lý.'
+                    : `Hồ sơ đang do ${detail.handled_by_name || 'người khác'} xử lý.`}
+                </p>
+              ) : (
+                <p className="muted">Chưa có người nhận xử lý. Nhận xử lý để các điều phối viên khác biết bạn đang theo dõi hồ sơ này.</p>
+              )}
+              {claimError && <p role="alert" className="notice warning">{claimError}</p>}
+              {detail.handled_by === currentUserId && claimActive(detail) ? (
+                <button type="button" className="button secondary" disabled={claimBusy} onClick={() => void runClaim('release')}>Nhả xử lý</button>
+              ) : (
+                <button type="button" className="button secondary" disabled={claimBusy || claimBlockedBy(detail, currentUserId)} onClick={() => void runClaim('claim')}>Nhận xử lý</button>
+              )}
+            </section>
+            <div className="sos-detail-tabs" role="tablist" aria-label="Thông tin hồ sơ SOS" onKeyDown={(event) => {
+              const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+              const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
+              const next = event.key === 'ArrowRight' ? (current + 1) % tabs.length
+                : event.key === 'ArrowLeft' ? (current - 1 + tabs.length) % tabs.length
+                  : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1;
+              if (next >= 0) { event.preventDefault(); tabs[next].focus(); tabs[next].click(); }
+            }}>
+              {([['overview', 'Tổng quan'], ['review', 'Xác minh & ưu tiên'], ['dispatch', 'Điều phối'], ['ai', 'AI hỗ trợ'], ['history', 'Lịch sử']] as const).map(([id, name]) =>
+                <button key={id} id={`sos-tab-${id}`} type="button" role="tab" aria-selected={activeTab === id}
+                  aria-controls="sos-detail-content" tabIndex={activeTab === id ? 0 : -1} onClick={() => changeTab(id)}>{name}</button>)}
+            </div>
+            <div id="sos-detail-content" role="tabpanel" aria-labelledby={`sos-tab-${activeTab}`} className="sos-detail-content" tabIndex={0}>
+            <div className="sos-tab-group" hidden={activeTab !== 'overview'}>
             {(detail.declared_danger || detail.proxy_activity_flags.length > 0 || detail.tracking_code.startsWith('C48HM')) && (
               <div className="sos-alerts">
                 {detail.declared_danger && <p className="sos-alert sos-alert--danger" role="alert">Người báo cho biết có nguy hiểm tính mạng — kiểm tra ngay.</p>}
@@ -1052,11 +1132,15 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   <p>Hồ sơ gốc: {detail.canonical.tracking_code} · {requestStatusLabel(detail.canonical.status)}. Theo dõi việc xử lý tại hồ sơ gốc.</p>
                   <button type="button" className="button secondary" onClick={() => {
                     setUpdateMessage('');
-                    setSelected(detail.canonical!.id);
+                    openRequest(detail.canonical!.id);
                   }}>Mở hồ sơ gốc {detail.canonical.tracking_code}</button>
                 </>
               ) : <p>Không có thông tin hồ sơ gốc trong phạm vi truy cập hiện tại.</p>)}
             </section>
+            </div>
+            <div className="sos-tab-group" hidden={activeTab !== 'review'}>
+            <h3>Xác minh và quyết định ưu tiên</h3>
+            <p className="muted">Đối chiếu thông tin người báo, minh chứng và gợi ý trước khi ghi nhận quyết định của điều phối viên.</p>
             {detail.fast_track && ['SUBMITTED', 'VERIFYING'].includes(detail.status) && (() => {
               const ft = detail.fast_track;
               const rule = detail.priority_advisory;
@@ -1170,6 +1254,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </section>
               );
             })}
+            </div>
+            <div className="sos-tab-group" hidden={activeTab !== 'dispatch'}>
             {detail.status === 'RESOLVING' && (pendingOperationId ? (
               <ResolutionOperationPanel
                 key={pendingOperationId}
@@ -1185,29 +1271,10 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 <button type="button" className="button secondary" onClick={refreshAfterConflict}>Tải lại hồ sơ</button>
               </section>
             ))}
-            <section className="claim-panel" aria-label="Nhận xử lý hồ sơ">
-              {detail.handled_by && claimActive(detail) ? (
-                <p role="status" className="notice">
-                  {detail.handled_by === currentUserId
-                    ? 'Bạn đang nhận xử lý hồ sơ này. Nhớ nhả khi không còn xử lý.'
-                    : `Hồ sơ đang do ${detail.handled_by_name || 'người khác'} xử lý.`}
-                </p>
-              ) : (
-                <p className="muted">Chưa có người nhận xử lý. Nhận xử lý để các điều phối viên khác biết bạn đang theo dõi hồ sơ này.</p>
-              )}
-              {claimError && <p role="alert" className="notice warning">{claimError}</p>}
-              {detail.handled_by === currentUserId && claimActive(detail) ? (
-                <button type="button" className="button secondary" disabled={claimBusy} onClick={() => void runClaim('release')}>Nhả xử lý</button>
-              ) : (
-                <button type="button" className="button secondary" disabled={claimBusy || claimBlockedBy(detail, currentUserId)} onClick={() => void runClaim('claim')}>Nhận xử lý</button>
-              )}
-            </section>
+            </div>
             <fieldset className="claim-guard" disabled={claimBlockedBy(detail, currentUserId)} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-            <OptionalFold
-              fold={Boolean(detail.fast_track?.eligible) && ['SUBMITTED', 'VERIFYING'].includes(detail.status)}
-              summary="Xác minh từng bước (cách xử lý đầy đủ)"
-            >
-            <div className="action-grid sos-actions" id="request-actions" tabIndex={-1}>
+            <div className="action-grid sos-actions" id="request-actions" tabIndex={-1} hidden={activeTab !== 'review' && activeTab !== 'dispatch'}>
+              <div className="sos-tab-group" hidden={activeTab !== 'dispatch'}>
               {!['RESOLVING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
                 secondaryCommand({
                   title: 'Ghi nhận chuyển cơ quan chức năng',
@@ -1239,6 +1306,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   version: detail.version,
                   warning: 'Xác nhận gỡ yêu cầu này khỏi chiến dịch?',
                 })}
+              </div>
+              <div className="sos-tab-group" hidden={activeTab !== 'review'}>
               {detail.status === 'SUBMITTED' &&
                 command({
                   title: 'Bắt đầu xác minh',
@@ -1425,6 +1494,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     { name: 'reason', label: 'Lý do quyết định', type: 'textarea', required: true, maxLength: 1000 },
                   ],
                 })}
+              </div>
+              <div className="sos-tab-group" hidden={activeTab !== 'dispatch'}>
               {detail.status === 'TRIAGED' && (
                 <section>
                   {latestCompletedMissionId && !completionCheck && <p role="status">Đang đối chiếu nhiệm vụ đã hoàn thành với chu kỳ xử lý hiện tại…</p>}
@@ -1561,7 +1632,10 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     { name: 'reason', label: 'Lý do mở lại', type: 'textarea', required: true, maxLength: 2000 },
                   ],
                 })}
+              </div>
             </div>
+            </fieldset>
+            <div className="sos-tab-group" hidden={activeTab !== 'review'}>
             {['SUBMITTED', 'VERIFYING'].includes(detail.status) && <>
               <RequestEvidencePanel items={detail.evidence?.items ?? []} />
               <ContactAttemptPanel
@@ -1576,8 +1650,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 onStale={refreshAfterConflict}
               />
             </>}
-            </OptionalFold>
-            </fieldset>
+            </div>
+            <div className="sos-tab-group" hidden={activeTab !== 'overview'}>
             {page === 'queue' && detail.status !== 'VERIFIED' && detail.subject.location && (
               <details className="sos-fold queue-context-map">
                 <summary>Xem vị trí trên bản đồ</summary>
@@ -1633,9 +1707,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               </p>
               <p>
                 <strong>Trạng thái</strong>
-                <span className="detail-value queue-detail-status" data-status={detail.status}>
-                  {requestStatusLabel(detail.status)}
-                </span>
+                <span className="detail-value"><StatusBadge status={detail.status} context="sos" /></span>
               </p>
               <p>
                 <strong>Loại sự cố</strong>
@@ -1758,6 +1830,11 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 <strong>Ghi chú nhận diện nơi ở:</strong> {detail.subject.household_reference_note}
               </p>
             )}
+            </div>
+            <div className="sos-tab-group" hidden={activeTab !== 'ai'}>
+            <h3>Gợi ý hỗ trợ từ hệ thống</h3>
+            {!detail.priority_advisory && !detail.ai_priority_advisory && !detail.ai_advisory &&
+              <p className="empty">Chưa có gợi ý cho SOS này. Điều phối viên vẫn xác minh và quyết định theo thông tin đã kiểm tra.</p>}
             {detail.priority_advisory && (
               <details className="sos-fold sos-fold--advisory">
                 <summary>
@@ -1940,6 +2017,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 )}
               </section></details>
             )}
+            </div>
+            <div className="sos-tab-group" hidden={activeTab !== 'dispatch'}>
             {completedInCurrentCycle && Boolean(detail.active_missions?.items.length) &&
               <p className="notice warning" role="status">
                 SOS này đã có nhiệm vụ hoàn thành nhưng vẫn còn nhiệm vụ đang giao. Hãy đối chiếu nhu cầu còn lại và trạng thái đội bên dưới. Nếu lần giao thêm là nhầm, dùng “Hủy giao nhiệm vụ” cho nhiệm vụ đang chờ trước khi kết thúc SOS.
@@ -2007,16 +2086,19 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </div>
               </section></details>
             )}
-            <details className="sos-fold"><summary>Lịch sử xử lý</summary>
+            </div>
+            <div className="sos-tab-group" hidden={activeTab !== 'history'}>
+            <h3>Lịch sử xử lý</h3>
             <RequestTimeline
               key={`timeline-${detail.id}-${detail.version}-${detail.timeline.items[0]?.id ?? 'empty'}`}
               requestId={detail.id}
               initial={detail.timeline}
             />
-            </details>
+            </div>
+            </div>
           </>
         )}
-      </section></DetailSurface>
+      </section></section>}
     </div>
   );
 }

@@ -136,17 +136,24 @@ export function LocationPicker({
     addressAbortRef.current = controller;
     const wait = 150;
     addressTimerRef.current = window.setTimeout(async () => {
-      const timeout = window.setTimeout(() => controller.abort(), 8000);
+      const timeout = window.setTimeout(() => controller.abort(), 11000);
       try {
         let address: string | null = null;
+        const arcgisController = new AbortController();
+        const abortArcgis = () => arcgisController.abort();
+        controller.signal.addEventListener('abort', abortArcgis, { once: true });
+        const arcgisTimeout = window.setTimeout(abortArcgis, 3500);
         try {
           const response = await fetch(
-            `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?location=${encodeURIComponent(`${point.longitude},${point.latitude}`)}&langCode=VI&featureTypes=PointAddress%2CStreetAddress%2CStreetName&forStorage=false&f=json`,
-            { signal: controller.signal }
+            `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?location=${encodeURIComponent(`${point.longitude},${point.latitude}`)}&langCode=VI&forStorage=false&f=json`,
+            { signal: arcgisController.signal }
           );
           if (response.ok) address = arcgisNearbyAddress(await response.json());
         } catch {
           // Try OSM below when the primary reverse lookup is unavailable.
+        } finally {
+          window.clearTimeout(arcgisTimeout);
+          controller.signal.removeEventListener('abort', abortArcgis);
         }
         if (!address && !controller.signal.aborted) {
           const delay = Math.max(0, 1100 - (Date.now() - lastNominatimRequestRef.current));

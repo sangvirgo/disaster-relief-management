@@ -402,7 +402,7 @@ export function SosForm({
           <Card className="sos-step-card" aria-labelledby="sos-situation-title">
             <h2 id="sos-situation-title"><span className="sos-step-number" aria-hidden="true">2</span>Tình huống</h2>
             {user && (
-              <fieldset>
+              <fieldset className="sos-request-mode">
                 <legend>Yêu cầu này là</legend>
                 <label className="radio">
                   <input
@@ -412,8 +412,8 @@ export function SosForm({
                       setMode('SELF');
                       pending.current = null;
                     }}
-                  />{' '}
-                  Cho chính tôi (tôi đang ở nơi cần cứu nạn)
+                  />
+                  <span><strong>Cho chính tôi</strong><small>Tôi đang ở nơi cần cứu nạn</small></span>
                 </label>
                 <label className="radio">
                   <input
@@ -427,8 +427,8 @@ export function SosForm({
                       }
                       pending.current = null;
                     }}
-                  />{' '}
-                  Cho người thân (tôi không ở đó)
+                  />
+                  <span><strong>Cho người thân</strong><small>Tôi không ở đó</small></span>
                 </label>
               </fieldset>
             )}
@@ -453,6 +453,18 @@ export function SosForm({
                 </select>
                 {fieldMessage('category')}
               </label>
+            <label className="sos-danger-check">
+              <span className="sos-danger-symbol" aria-hidden="true">!</span>
+              <span className="sos-danger-copy"><strong>Có dấu hiệu nguy hiểm tính mạng?</strong><small>Đánh dấu theo thông tin bạn biết.</small></span>
+              <input
+                type="checkbox"
+                checked={danger}
+                onChange={(e) => {
+                  setDanger(e.target.checked);
+                  pending.current = null;
+                }}
+              />
+            </label>
             <fieldset className="sos-needs" aria-invalid={fieldInvalid('needs')}>
               <legend>Nhu cầu cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></legend>
               <label className="radio">
@@ -481,17 +493,6 @@ export function SosForm({
               </label>
               {fieldMessage('needs')}
             </fieldset>
-            <label className="radio sos-danger-check">
-              <input
-                type="checkbox"
-                checked={danger}
-                onChange={(e) => {
-                  setDanger(e.target.checked);
-                  pending.current = null;
-                }}
-              />{' '}
-              Có dấu hiệu nguy hiểm tính mạng theo thông tin tôi biết
-            </label>
           </Card>
           <Card className="sos-step-card" aria-labelledby="sos-detail-title">
             <h2 id="sos-detail-title"><span className="sos-step-number" aria-hidden="true">3</span>Chi tiết thêm</h2>
@@ -563,24 +564,22 @@ export function SosForm({
               />
               {fieldMessage('description')}
             </label>
-            <label>
+            <label className="sos-upload-field">
               Ảnh hoặc video hiện trường (không bắt buộc, tối đa 5 tệp)
-              <input type="file" multiple accept="image/jpeg,image/png,video/mp4"
-                onChange={(e) => {
-                  const chosen = Array.from(e.target.files ?? []).slice(0, 5);
-                  const problem = chosen.map(evidenceFileError).find(Boolean) ?? '';
-                  setFileMessage(problem || ((e.target.files?.length ?? 0) > 5 ? 'Chỉ nhận tối đa 5 tệp; các tệp thừa đã bị bỏ qua.' : ''));
-                  setFiles(problem ? [] : chosen);
-                  if (problem) e.target.value = '';
-                }} />
-              {files.length > 0 && <small>Đã chọn {files.length} tệp. Tệp sẽ được tải lên ngay sau khi gửi SOS.</small>}
+              <span className="sos-upload-control">
+                <input type="file" multiple accept="image/jpeg,image/png,video/mp4"
+                  onChange={(e) => {
+                    const chosen = Array.from(e.target.files ?? []).slice(0, 5);
+                    const problem = chosen.map(evidenceFileError).find(Boolean) ?? '';
+                    setFileMessage(problem || ((e.target.files?.length ?? 0) > 5 ? 'Chỉ nhận tối đa 5 tệp; các tệp thừa đã bị bỏ qua.' : ''));
+                    setFiles(problem ? [] : chosen);
+                    if (problem) e.target.value = '';
+                  }} />
+                <span className="sos-upload-button"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4" /><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>Chọn tệp</span>
+                <span className="sos-upload-status" aria-live="polite">{files.length ? `Đã chọn ${files.length}/5 tệp` : 'Chưa chọn tệp'}</span>
+              </span>
               {fileMessage && <span className="sos-field-error" role="alert">{fileMessage}</span>}
             </label>
-            <p className="sos-ai-note">
-              Mô tả giúp điều phối viên hiểu tình huống và có thể được rút gọn để AI hỗ trợ đánh giá.
-              Số điện thoại, tọa độ chính xác và tệp đính kèm không được đưa vào phần đánh giá AI.
-              Không nhập thông tin cá nhân không cần thiết trong mô tả.
-            </p>
           </Card>
           <Card className="sos-step-card" aria-labelledby="sos-contact-title">
             <h2 id="sos-contact-title"><span className="sos-step-number" aria-hidden="true">4</span>Người liên hệ</h2>

@@ -394,7 +394,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
         if (live) {
           const message = cause instanceof Error ? cause.message : 'Không thể tải dữ liệu.';
           setError(!isTeam && cause instanceof ApiError && cause.code === 'FORBIDDEN'
-            ? `${message} Để xem nhiệm vụ, tài khoản cần được thêm vào đội cứu hộ. Nếu bạn vừa được cấp vai trò Tình nguyện viên, hãy nhờ người quản lý đội kiểm tra tư cách thành viên, sau đó bấm Cập nhật.`
+            ? 'Bạn chưa thuộc đội cứu hộ. Hãy nhờ quản trị viên tạo đội và chọn bạn làm đội trưởng, hoặc thêm bạn vào đội hiện có.'
             : message);
         }
       })

@@ -64,7 +64,7 @@ function formatFieldErrors(errors: Record<string, string[]> | undefined): string
   return fields.length ? ` Kiểm tra: ${fields.join(', ')}.` : '';
 }
 function serverError(
-  service: Service,
+  _service: Service,
   status: number,
   payload: ErrorEnvelope,
   fallback: string
@@ -72,11 +72,10 @@ function serverError(
   const code = payload.code || (status === 403 ? 'FORBIDDEN' : 'REQUEST_FAILED');
   const reason =
     messages[code] || (typeof payload.message === 'string' && payload.message.trim()) || fallback;
-  const reference = payload.correlation_id ? ` Mã tham chiếu lỗi: ${payload.correlation_id}.` : '';
   return new ApiError(
     code,
     status,
-    `${serviceNames[service]}: ${reason}${formatFieldErrors(payload.field_errors)}${reference}`,
+    `${reason}${formatFieldErrors(payload.field_errors)}`,
     payload.field_errors,
     payload.correlation_id
   );

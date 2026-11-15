@@ -379,7 +379,7 @@ export function Donations({ user }: { user: Me | null }) {
       if (version === lookupVersion.current) {
         const ownerHelp = cause instanceof ApiError && cause.code === 'DONATION_SECRET_INVALID' && user && !secret;
         setError(ownerHelp
-          ? `Không thể mở phiếu bằng tài khoản hiện tại. Hãy đăng nhập tài khoản đã khai, hoặc nhập mã bảo mật nếu khai với tư cách khách.${cause.correlationId ? ` Mã tham chiếu lỗi: ${cause.correlationId}.` : ''}`
+          ? 'Không thể mở phiếu bằng tài khoản hiện tại. Hãy đăng nhập tài khoản đã khai, hoặc nhập mã bảo mật nếu khai với tư cách khách.'
           : cause instanceof Error ? cause.message : 'Không thể tra cứu đóng góp.');
       }
     } finally {

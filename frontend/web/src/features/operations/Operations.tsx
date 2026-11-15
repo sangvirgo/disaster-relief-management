@@ -13,6 +13,7 @@ import { DriveCreateForm } from './DriveCreateForm';
 import { operationRecordKey } from './recordKey';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { DetailSurface } from '../../components/DetailSurface';
+import { Tabs } from '../../components/ui/Tabs';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useUrlView } from '../../app/useUrlView';
 import { assetViews, reportViews, reviewViews } from '../../app/routeViews';
@@ -53,11 +54,11 @@ const headings: Record<string, string> = {
   intake: 'Tiếp nhận đóng góp',
   review: 'Duyệt biên nhận',
   stock: 'Tồn kho theo kho',
-  assets: 'Danh sách điểm và phương tiện',
-  needs: 'Nhu cầu cứu trợ',
-  distribution: 'Phân phối vật tư',
+  assets: 'Điểm cứu trợ, phương tiện và kho',
+  needs: 'Danh sách nhu cầu vật tư',
+  distribution: 'Danh sách phiếu phân phối',
   handoff: 'Bàn giao vật tư',
-  reports: 'Báo cáo và đối soát',
+  reports: 'Báo cáo vận hành',
 };
 const string = (value: unknown) => (typeof value === 'string' ? value : '');
 const number = (value: unknown) => (typeof value === 'number' ? value : undefined);
@@ -106,15 +107,6 @@ function readReportFilters(userId: string): { warehouse?: string; campaign?: str
 
 export function Operations({ page, user }: { page: string; user: Me }) {
   const rights = roles(user);
-  const [compact, setCompact] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
-  useEffect(() => { const media = window.matchMedia('(max-width: 1023px)'); const update = () => setCompact(media.matches); media.addEventListener('change', update); return () => media.removeEventListener('change', update); }, []);
-  const [stackedDistribution, setStackedDistribution] = useState(() => window.matchMedia('(max-width: 1180px)').matches);
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 1180px)');
-    const update = () => setStackedDistribution(media.matches);
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
   const [asset, setAsset] = useUrlView('view', assetViews, 'relief-points');
   const [reviewTab, setReviewTab] = useUrlView('view', reviewViews, 'receipts');
   const [report, setReport] = useUrlView('view', reportViews, 'stock-summary');
@@ -131,6 +123,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const [next, setNext] = useState<string | null>(null);
   const [generatedAt, setGeneratedAt] = useState('');
   const [selected, setSelected] = useState<Row | null>(null);
+  const [detailTab, setDetailTab] = useState('overview');
   const [lastHandoff, setLastHandoff] = useState<{ distributionId: string; id: string } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
@@ -364,6 +357,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       || ((distributionPages.has(page) || page === 'assets' || page === 'drives' || page === 'needs' || (page === 'review' && reviewTab === 'disputes')) && selected?.id);
     if (!keepDetail) setSelected(null);
     setDetail(null);
+    setDetailTab('overview');
     setShowCreate(false);
     setRevision((value) => value + 1);
   }
@@ -375,6 +369,31 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const id = detail?.id;
   const version = number(detail?.version);
   const status = string(detail?.delivery_status || detail?.status);
+  const distributionActionAvailable = Boolean(id && version != null && detail && (
+    (status === 'DRAFT' && (
+      detail.preparer_user_id === user.id ||
+      (detail.preparer_user_id !== user.id && (rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER'))) ||
+      detail.approver_user_id === user.id
+    )) ||
+    (status === 'APPROVED' && (
+      detail.approver_user_id === user.id ||
+      (detail.approver_user_id !== user.id && (rights.has('DISTRIBUTION_STAFF') || rights.has('INTAKE_STAFF'))) ||
+      detail.preparer_user_id === user.id
+    )) ||
+    (status === 'DISPATCHED' && (
+      detail.dispatch_actor_user_id === user.id ||
+      (Array.isArray(detail.lines) && (detail.lines as Row[]).every((line) => Number(line.in_transit) === 0 && Number(line.at_point) === 0 && Number(line.pending_loss_count) === 0) &&
+        (rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER'))) ||
+      (page === 'distribution' && detail.dispatch_actor_user_id !== user.id && Array.isArray(detail.lines) &&
+        (rights.has('DISTRIBUTION_STAFF') || rights.has('INTAKE_STAFF')))
+    ))
+  ));
+  const showActionsTab = page === 'drives'
+    ? ['DRAFT', 'OPEN', 'PAUSED'].includes(status) && (rights.has('CAMPAIGN_MANAGER') || rights.has('OPERATIONS_MANAGER'))
+    : page === 'needs' ? status !== 'CANCELLED' && (rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR'))
+      : distributionPages.has(page) ? distributionActionAvailable
+        : page === 'intake' ? rights.has('INTAKE_STAFF')
+          : page === 'review' ? rights.has('REVIEWER') : false;
   const stockDetail = page === 'stock' || (page === 'reports' && report === 'stock-summary');
   const needScale = number((detail?.unit as Row | undefined)?.scale);
   const needStep = 10 ** -(needScale ?? 0);
@@ -415,14 +434,14 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     'Tạo phiếu phân phối';
   useEffect(() => { setShowCreate(false); }, [page, asset]);
   return (
-    <div
-      className={`coordinator-layout ${page === 'intake' ? 'operations-intake-layout' : ''} ${!selected ? 'operations-list-only' : ''} ${page === 'review' ? 'operations-review-layout' : ''} ${page === 'stock' || (page === 'reports' && report === 'stock-summary') ? 'operations-table-layout' : ''}`}
-    >
+    <div className="operations-workspace">
       <section className="card">
         <div className="section-header list-action-header">
           <h2>{page === 'review' && reviewTab === 'disputes' ? 'Xử lý khiếu nại' : headings[page]}</h2>
-          <button type="button" className="button secondary" disabled={loading} onClick={() => { setCursor(''); setRevision((value) => value + 1); }}>Cập nhật</button>
-          {canCreatePage && <button type="button" className="button primary list-create-button" onClick={() => { setSelected(null); setDetail(null); setShowCreate(true); }}>{createTitle}</button>}
+          <div className="list-header-actions">
+            <button type="button" className="button secondary" disabled={loading} onClick={() => { setCursor(''); setRevision((value) => value + 1); }}>Cập nhật</button>
+            {canCreatePage && <button type="button" className="button primary list-create-button" onClick={() => { setSelected(null); setDetail(null); setShowCreate(true); }}>{createTitle}</button>}
+          </div>
         </div>
         {page === 'assets' && (
           <div className="tabs">
@@ -476,9 +495,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             <div className="tabs">
               {(
                 [
-                  ['stock-summary', 'Tổng hợp kho'],
-                  ['fulfillment', 'Đáp ứng nhu cầu'],
-                  ['reconciliation', 'Đối soát'],
+                  ['stock-summary', 'Tồn kho'],
+                  ['fulfillment', 'Tiến độ hỗ trợ'],
+                  ['reconciliation', 'Kiểm tra số liệu'],
                 ] as const
               ).map(([value, title]) => (
                 <button
@@ -617,84 +636,40 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             </div>
           </>
         ) : (
-          <div className="record-list">
-            {items.map((item) => (
-              <button
-                type="button"
-                className={`queue-row ${selected && operationRecordKey(selected) === operationRecordKey(item) ? 'selected' : ''}`}
-                key={operationRecordKey(item)}
-                onClick={() => setSelected(item)}
-              >
-                <span>
-                  <strong>{recordTitle(page, item)}</strong>
-                  {distributionPages.has(page) && (
-                    <small>Phiếu phân phối · {distributionItems(item, references.itemUnits)}</small>
-                  )}
-                  {page === 'intake' && (
-                    <small>
-                      {string(item.drive_title) || 'Đợt quyên góp'}
-                      {item.public_code ? ` · Mã ${item.public_code}` : ''}
-                    </small>
-                  )}
-                  {page === 'review' && reviewTab === 'disputes' && Boolean(item.reason) && (
-                    <small>{string(item.reason)}</small>
-                  )}
-                  <small>
-                    {page !== 'intake' && item.donor_name
-                      ? `Người đóng góp: ${item.donor_name} · `
-                      : ''}
-                    {item.created_at
-                      ? timeLabel(item.created_at)
-                      : string(item.warehouse_name)}
-                  </small>
-                  {item.on_hand != null && (
-                    <small>
-                      Tồn: {quantity(item.on_hand)} · Khả dụng: {quantity(item.available)} · Đã giữ:{' '}
-                      {quantity(item.reserved)}
-                    </small>
-                  )}
-                  {item.requested != null && (
-                    <small>
-                      Cần: {quantityWithUnit(item, item.requested)} · Đã giao: {quantityWithUnit(item, item.delivered)} · Còn
-                      thiếu: {quantityWithUnit(item, item.outstanding)}
-                    </small>
-                  )}
-                  {item.active_requested != null && (
-                    <small>
-                      Nhu cầu hiện hành: {quantityWithUnit(item, item.active_requested)} · Đã giao:{' '}
-                      {quantityWithUnit(item, item.delivered)} · Còn thiếu: {quantityWithUnit(item, item.active_outstanding)}
-                    </small>
-                  )}
-                  {item.posted_movements != null && (
-                    <small>
-                      Nhập đã ghi sổ: {quantityWithUnit(item, item.intake_accepted)} · Đang vận chuyển:{' '}
-                      {quantityWithUnit(item, item.issued_in_transit)} · Tại điểm: {quantityWithUnit(item, item.at_point)}
-                    </small>
-                  )}
-                  {item.receipt_id && <small>Đã lập biên nhận</small>}
-                </span>
-                {item.status && (page === 'intake' ? <StatusBadge status={item.status} /> : <span className="chip">{label(item.status)}</span>)}
-              </button>
-            ))}
+          <div className="operations-table-scroll" role="region" aria-label={`Bảng ${headings[page] || 'bản ghi'}`} tabIndex={0}>
+            <table className="operations-record-table">
+              <thead><tr><th scope="col">{page === 'assets' ? asset === 'vehicles' ? 'Phương tiện' : asset === 'warehouses' ? 'Kho' : 'Điểm cứu trợ' : 'Tên bản ghi'}</th>{page !== 'assets' && <th scope="col">Thông tin chính</th>}<th scope="col">Thời gian</th><th scope="col">Trạng thái</th></tr></thead>
+              <tbody>{items.map((item) => <tr key={operationRecordKey(item)}>
+                <th scope="row"><button type="button" className="table-row-link" onClick={() => { setDetailTab('overview'); setSelected(item); }}>{recordTitle(page, item)}</button></th>
+                {page !== 'assets' && <td>{distributionPages.has(page) ? distributionItems(item, references.itemUnits)
+                  : item.requested != null ? `Cần ${quantityWithUnit(item, item.requested)} · Đã giao ${quantityWithUnit(item, item.delivered)}`
+                  : item.active_requested != null ? `Cần ${quantityWithUnit(item, item.active_requested)} · Đã giao ${quantityWithUnit(item, item.delivered)}`
+                  : item.drive_title ? string(item.drive_title)
+                  : item.warehouse_name ? string(item.warehouse_name)
+                  : item.donor_name ? `Người đóng góp: ${string(item.donor_name)}`
+                  : item.receipt_id ? 'Đã lập biên nhận' : '—'}</td>}
+                <td>{item.created_at ? timeLabel(item.created_at) : '—'}</td>
+                <td>{item.status ? <StatusBadge status={item.status} /> : '—'}</td>
+              </tr>)}</tbody>
+            </table>
           </div>
         )}
         <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} />
       </section>
       {page === 'distribution' && commitmentsError && <p role="alert" className="notice error">{commitmentsError} Hãy tải lại trước khi lập phiếu hỗ trợ SOS.</p>}
-      {(selected || showCreate) && <DetailSurface key={selected?.id || 'create'} className={`operations-detail-transition ${distributionPages.has(page) && !showCreate ? 'distribution-detail-panel' : ''}`} heading={selected && distributionPages.has(page) ? 'Chi tiết phiếu phân phối' : undefined} modal={page === 'review' || showCreate || stockDetail || (['intake', 'assets'].includes(page) && compact) || (distributionPages.has(page) && stackedDistribution)} explicitCloseOnly={page === 'review'} open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? distributionPages.has(page) ? 'Chi tiết phiếu phân phối' : 'Chi tiết bản ghi' : createTitle}>
-        {!showCreate && !distributionPages.has(page) && <h2>
-          {selected
-            ? page === 'assets'
-              ? asset === 'vehicles' ? 'Chi tiết phương tiện' : asset === 'warehouses' ? 'Chi tiết kho' : 'Chi tiết điểm cứu trợ'
-              : stockDetail
-              ? 'Chi tiết tồn kho'
-              : 'Chi tiết và thao tác'
-            : createTitle}
-        </h2>}
+      {(selected || showCreate) && <DetailSurface key={selected?.id || 'create'} className={`operations-detail-transition operations-management-dialog ${distributionPages.has(page) && !showCreate ? 'distribution-detail-panel' : ''}`} heading={selected ? recordTitle(page, selected) : createTitle} modal open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? `Chi tiết ${recordTitle(page, selected)}` : createTitle}>
         {selected && !detail && <p role="status">Đang tải chi tiết…</p>}
-            {distributionPages.has(page) && selected?.id && <HandoffDetail key={selected.id + (lastHandoff?.distributionId === selected.id ? lastHandoff.id : '')} distributionId={selected.id} initialId={lastHandoff?.distributionId === selected.id ? lastHandoff.id : undefined} canReview={rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER')} userId={user.id} onChanged={() => setRevision((value) => value + 1)} />}
+        {selected && detail && !['stock', 'assets'].includes(page) && <Tabs items={[
+          { id: 'overview', label: 'Thông tin' },
+          { id: 'details', label: page === 'reports' ? 'Số liệu' : page === 'needs' ? 'Cam kết xuất kho' : page === 'drives' ? 'Vật phẩm tiếp nhận' : 'Chi tiết' },
+          ...(showActionsTab ? [{ id: 'actions', label: 'Thao tác' }] : []),
+          ...(distributionPages.has(page) ? [{ id: 'handoff', label: 'Bàn giao' }] : []),
+        ]} value={detailTab} onChange={setDetailTab} ariaLabel="Nội dung bản ghi" idBase="operations-detail" />}
+        {selected && <div id="operations-detail-tabpanel">
+        {distributionPages.has(page) && selected.id && <div hidden={detailTab !== 'handoff'} role="tabpanel" aria-labelledby="operations-detail-tab-handoff"><HandoffDetail key={selected.id + (lastHandoff?.distributionId === selected.id ? lastHandoff.id : '')} distributionId={selected.id} initialId={lastHandoff?.distributionId === selected.id ? lastHandoff.id : undefined} canReview={rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER')} userId={user.id} onChanged={() => setRevision((value) => value + 1)} /></div>}
         {detail && (
           <>
+            <div hidden={detailTab !== 'overview'} role="tabpanel" aria-labelledby="operations-detail-tab-overview">
             <div className="detail-grid">
               {page === 'drives' && <>
                 <p><strong>Tên đợt quyên góp</strong><span className="detail-value">{string(detail.title) || 'Chưa có tên'}</span></p>
@@ -885,6 +860,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 </p>
               )}
             </div>
+            {page === 'assets' && id && version != null && status === 'ACTIVE' && rights.has('OPERATIONS_MANAGER') &&
+              command({ title: 'Ngừng sử dụng', service: 'logistics', path: `/${asset}/${id}/deactivate`, version,
+                warning: 'Ngừng sử dụng tài sản hoặc địa điểm này? Các phiếu đang liên quan có thể cần xử lý trước.' })}
+            </div>
+            <div hidden={detailTab !== 'details'} role="tabpanel" aria-labelledby="operations-detail-tab-details">
             {page === 'drives' && <section aria-label="Vật phẩm cần tiếp nhận">
               <h3>Vật phẩm cần tiếp nhận</h3>
               {Array.isArray(detail.items) && detail.items.length > 0 ? (detail.items as Row[]).map((item, index) => <article className="candidate" key={string(item.item_id) || index}>
@@ -923,11 +903,15 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               </div>)}
               {!commitmentsLoading && !commitmentsError && !commitments.some((item) => item.need_id === id) && <p>Chưa có cam kết còn số lượng để xuất kho.</p>}
             </section>}
-            {page === 'reports' && report === 'reconciliation' && <section><h3>Đối soát {string((detail.item as Row)?.name)}</h3>
-              <table><thead><tr><th>Chỉ tiêu</th><th>Số lượng ({string((detail.unit as Row)?.display_name)})</th></tr></thead><tbody>
-                {Object.entries({ intake_accepted: 'Đã tiếp nhận', posted_movements: 'Tồn theo sổ', posted_reserved_movements: 'Giữ chỗ theo sổ', reserved: 'Đang giữ chỗ', issued_in_transit: 'Đang vận chuyển', at_point: 'Tại điểm cứu trợ', delivered: 'Đã giao', returned: 'Đã hoàn trả', lost: 'Hao hụt' }).map(([key, title]) => <tr key={key}><th>{title}</th><td>{quantity(detail[key])}</td></tr>)}
-              </tbody></table><p>{Object.values((detail.flags as Row) || {}).some(Boolean) ? 'Có chênh lệch cần rà soát giữa sổ kho và các cam kết.' : 'Chưa ghi nhận chênh lệch đối soát.'}</p>
+            {page === 'reports' && report === 'reconciliation' && <section className="reconciliation-section"><h3>Đối soát {string((detail.item as Row)?.name)}</h3>
+              <div className="operations-table-scroll" role="region" aria-label="Bảng đối soát vật phẩm" tabIndex={0}>
+                <table className="reconciliation-table"><thead><tr><th scope="col">Chỉ tiêu</th><th scope="col">Số lượng ({string((detail.unit as Row)?.display_name)})</th></tr></thead><tbody>
+                  {Object.entries({ intake_accepted: 'Đã tiếp nhận', posted_movements: 'Tồn theo sổ', posted_reserved_movements: 'Giữ chỗ theo sổ', reserved: 'Đang giữ chỗ', issued_in_transit: 'Đang vận chuyển', at_point: 'Tại điểm cứu trợ', delivered: 'Đã giao', returned: 'Đã hoàn trả', lost: 'Hao hụt' }).map(([key, title]) => <tr key={key}><th scope="row">{title}</th><td>{quantity(detail[key])}</td></tr>)}
+                </tbody></table>
+              </div><p className="reconciliation-result">{Object.values((detail.flags as Row) || {}).some(Boolean) ? 'Có chênh lệch cần rà soát giữa sổ kho và các cam kết.' : 'Chưa ghi nhận chênh lệch đối soát.'}</p>
             </section>}
+            {page === 'reports' && report === 'fulfillment' && <p className="muted">So sánh số lượng đang cần với số đã giao và số còn thiếu ở tab Thông tin. Số liệu này phản ánh phạm vi và thời gian báo cáo đã chọn.</p>}
+            {page === 'reports' && report === 'stock-summary' && <p className="muted">Số lượng tồn thực tế, đã giữ và có thể xuất được hiển thị ở tab Thông tin.</p>}
             {count && (
               <div className="candidate">
                 {status === 'POSTED' && !detail.review && <p className="notice warning" role="status">Phiếu đã ghi sổ trước đó. Lần kiểm đếm bổ sung này đang chờ duyệt độc lập; số tiếp nhận mới chưa được cộng vào tồn kho.</p>}
@@ -968,20 +952,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 ) : <p>Chưa có dòng vật phẩm trong lần kiểm đếm này.</p>}
               </div>
             )}
+            {!['drives', 'needs', 'reports', 'distribution', 'handoff', 'intake', 'review'].includes(page) && !Array.isArray(detail.lines) && !count && <p className="muted">Thông tin chi tiết của bản ghi được hiển thị trong tab Thông tin.</p>}
+            </div>
+            <div hidden={detailTab !== 'actions'} role="tabpanel" aria-labelledby="operations-detail-tab-actions">
             <div className="action-grid">
-              {page === 'assets' &&
-                id &&
-                version != null &&
-                status === 'ACTIVE' &&
-                rights.has('OPERATIONS_MANAGER') &&
-                command({
-                  title: 'Ngừng sử dụng',
-                  service: 'logistics',
-                  path: `/${asset}/${id}/deactivate`,
-                  version,
-                  warning:
-                    'Ngừng sử dụng tài sản hoặc địa điểm này? Các phiếu đang liên quan có thể cần xử lý trước.',
-                })}
               {page === 'drives' &&
                 id &&
                 version != null &&
@@ -1396,8 +1370,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     'Chỉ xác nhận khi đã kiểm tra việc bàn giao thực tế. Bản ghi này ảnh hưởng số liệu đối soát.',
                 })}
             </div>
+            </div>
           </>
         )}
+        </div>}
         {!selected &&
           page === 'drives' &&
           (rights.has('CAMPAIGN_MANAGER') || rights.has('OPERATIONS_MANAGER')) &&
