@@ -20,6 +20,7 @@ import {
   TeamSkillOption,
   TeamMemberCandidate,
   TeamMembersPage,
+  WeatherPointForecast,
 } from '../types/api';
 import { generateUUID } from '../utils/secureStore';
 
@@ -53,17 +54,10 @@ export const ResponseApi = {
 
   // === TRA CỨU TIẾN ĐỘ & BỔ SUNG THÔNG TIN ===
 
-  // Tra cứu chi tiết yêu cầu bằng mã và chuỗi bí mật
-  async trackRequest(trackingCode: string, trackingSecret?: string): Promise<RequestTrackingDetail> {
-    const headers: Record<string, string> = {
-      'X-Tracking-Code': trackingCode,
-    };
-    if (trackingSecret) {
-      headers['X-Tracking-Secret'] = trackingSecret;
-    }
-
+  // Tra cứu chi tiết yêu cầu bằng mã theo dõi
+  async trackRequest(trackingCode: string): Promise<RequestTrackingDetail> {
     const response = await apiClient.get<RequestTrackingDetail>('/response/requests/track', {
-      headers,
+      headers: { 'X-Tracking-Code': trackingCode },
     });
     return response.data;
   },
@@ -80,7 +74,6 @@ export const ResponseApi = {
       reporter_declared_danger?: boolean;
     },
     trackingCode?: string,
-    trackingSecret?: string,
     idempotencyKey?: string
   ): Promise<any> {
     const headers: Record<string, string> = {
@@ -88,9 +81,6 @@ export const ResponseApi = {
     };
     if (trackingCode) {
       headers['X-Tracking-Code'] = trackingCode;
-    }
-    if (trackingSecret) {
-      headers['X-Tracking-Secret'] = trackingSecret;
     }
 
     const response = await apiClient.post(`/response/requests/${requestId}/supplements`, payload, {
@@ -115,14 +105,12 @@ export const ResponseApi = {
       needs_relief_supplies?: boolean;
     },
     trackingCode?: string,
-    trackingSecret?: string,
     idempotencyKey?: string,
   ): Promise<{ id: string; version: number }> {
     const headers: Record<string, string> = {
       'Idempotency-Key': idempotencyKey || generateUUID(),
     };
     if (trackingCode) headers['X-Tracking-Code'] = trackingCode;
-    if (trackingSecret) headers['X-Tracking-Secret'] = trackingSecret;
     const response = await apiClient.put<{ id: string; version: number }>(
       `/response/requests/${requestId}/report`,
       payload,
@@ -144,7 +132,6 @@ export const ResponseApi = {
   // Gắn yêu cầu cứu trợ ẩn danh vào tài khoản công dân đã đăng nhập (POST /response/requests/claim)
   async claimRequest(
     trackingCode: string,
-    trackingSecret: string,
     idempotencyKey?: string
   ): Promise<{ id: string; tracking_code: string }> {
     const response = await apiClient.post<{ id: string; tracking_code: string }>(
@@ -155,7 +142,6 @@ export const ResponseApi = {
       {
         headers: {
           'Idempotency-Key': idempotencyKey || generateUUID(),
-          'X-Tracking-Secret': trackingSecret,
         },
       }
     );
@@ -167,7 +153,6 @@ export const ResponseApi = {
     requestId: string,
     file: { uri: string; name: string; type: string },
     trackingCode?: string,
-    trackingSecret?: string,
     idempotencyKey?: string
   ): Promise<any> {
     const formData = new FormData();
@@ -178,7 +163,6 @@ export const ResponseApi = {
       'Idempotency-Key': idempotencyKey || generateUUID(),
     };
     if (trackingCode) headers['X-Tracking-Code'] = trackingCode;
-    if (trackingSecret) headers['X-Tracking-Secret'] = trackingSecret;
 
     const response = await apiClient.post(`/response/requests/${requestId}/evidence`, formData, {
       headers,
@@ -398,6 +382,18 @@ export const ResponseApi = {
     return response.data;
   },
 
+  // Dự báo công khai cho vị trí người dân đã chọn (GET /response/weather/at).
+  async getWeatherAt(latitude: number, longitude: number): Promise<WeatherPointForecast> {
+    const response = await apiClient.get<WeatherPointForecast>('/response/weather/at', {
+      // Dùng cùng ô dự báo 0,1° với backend; không gửi tọa độ SOS chính xác cho dự báo.
+      params: {
+        latitude: Math.round(latitude * 10) / 10,
+        longitude: Math.round(longitude * 10) / 10,
+      },
+    });
+    return response.data;
+  },
+
   async recoverRequest(trackingCode: string, recoveryCode: string, idempotencyKey = generateUUID()): Promise<{ id: string; tracking_code: string }> {
     const response = await apiClient.post<{ id: string; tracking_code: string }>(
       '/response/requests/recover',
@@ -411,13 +407,11 @@ export const ResponseApi = {
   async getRequestEvents(
     requestId: string,
     trackingCode?: string,
-    trackingSecret?: string,
     cursor?: string,
     limit = 50
   ): Promise<ReporterEventPage> {
     const headers: Record<string, string> = {};
     if (trackingCode) headers['X-Tracking-Code'] = trackingCode;
-    if (trackingSecret) headers['X-Tracking-Secret'] = trackingSecret;
 
     const params: Record<string, any> = { limit };
     if (cursor) params.cursor = cursor;
@@ -432,12 +426,10 @@ export const ResponseApi = {
   // Lấy link tải / xem ảnh bằng chứng cứu hộ an toàn 60s (GET /response/evidence/:id/download)
   async getEvidenceDownloadUrl(
     evidenceId: string,
-    trackingCode?: string,
-    trackingSecret?: string
+    trackingCode?: string
   ): Promise<EvidenceDownload> {
     const headers: Record<string, string> = {};
     if (trackingCode) headers['X-Tracking-Code'] = trackingCode;
-    if (trackingSecret) headers['X-Tracking-Secret'] = trackingSecret;
 
     const response = await apiClient.get<EvidenceDownload>(`/response/evidence/${evidenceId}/download`, {
       headers,

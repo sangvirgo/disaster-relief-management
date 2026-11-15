@@ -26,8 +26,7 @@ export class EvidenceController {
     noStore(response);
     if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
     const result = await this.evidence.upload(
-      id, request.idempotencyKey, headerValue(request.headers['x-tracking-code']),
-      headerValue(request.headers['x-tracking-secret']), request,
+      id, request.idempotencyKey, headerValue(request.headers['x-tracking-code']), request,
     );
     if (result.replay) response.setHeader('Idempotent-Replay', 'true');
     return result.value;
@@ -71,7 +70,7 @@ export class EvidenceController {
   ) {
     noStore(response);
     return this.evidence.download(
-      id, headerValue(request.headers['x-tracking-code']), headerValue(request.headers['x-tracking-secret']), request,
+      id, headerValue(request.headers['x-tracking-code']), request,
     );
   }
 }

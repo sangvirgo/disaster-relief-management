@@ -166,7 +166,7 @@ export const NoticesScreen: React.FC = () => {
           <Bell size={48} color={THEME.colors.text.muted} />
           <Text style={styles.emptyTitle}>Chưa có thông báo nào</Text>
           <Text style={styles.emptySubtitle}>
-            Các lệnh điều động và cảnh báo thời tiết khẩn cấp sẽ hiển thị tại đây.
+            Các cập nhật về hồ sơ cứu trợ và nhiệm vụ của đội sẽ hiển thị tại đây.
           </Text>
           {loadMoreControl}
         </View>

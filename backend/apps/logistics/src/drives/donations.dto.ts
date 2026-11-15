@@ -75,6 +75,9 @@ export class MyDonationPageQueryDto {
   @IsOptional() @IsIn(['DECLARED', 'COUNTING', 'PENDING_REVIEW', 'APPROVED', 'POSTED', 'REJECTED', 'CANCELLED'])
   status?: string;
 
+  @IsOptional() @IsString() @MaxLength(120)
+  q?: string;
+
   @IsOptional() @IsString() @MaxLength(2048)
   cursor?: string;
 

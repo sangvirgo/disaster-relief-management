@@ -401,7 +401,7 @@ export const EmergencyHomeScreen: React.FC = () => {
         <Text style={styles.trackingDesc}>
           {isAuthenticated
             ? 'Nhập mã tra cứu 10 ký tự được cấp khi gửi yêu cầu.'
-            : 'Khách vãng lai cần mã tra cứu và khóa bí mật. Trên thiết bị đã gửi SOS, ứng dụng sẽ tự dùng khóa đã lưu.'}
+            : 'Nhập mã tra cứu 10 ký tự được cấp khi gửi yêu cầu.'}
         </Text>
         <View style={styles.searchRow}>
           <TextInput

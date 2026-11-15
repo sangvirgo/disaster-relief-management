@@ -81,7 +81,7 @@ export class DriveQueriesService {
     const rows = await this.dataSource.query(
       `SELECT ${publicDriveColumns}
          FROM donation_drive d JOIN warehouse w ON w.id=d.intake_warehouse_id
-        WHERE d.status='OPEN' ${after}
+        WHERE d.status='OPEN' AND (d.closes_at IS NULL OR d.closes_at > now()) ${after}
         ORDER BY d.created_at DESC,d.id DESC LIMIT $${values.length}`,
       values,
     ) as PublicDriveRow[];
@@ -91,7 +91,7 @@ export class DriveQueriesService {
   async publicDetail(id: string): Promise<Record<string, unknown>> {
     const rows = await this.dataSource.query(
       `SELECT ${publicDriveColumns} FROM donation_drive d JOIN warehouse w ON w.id=d.intake_warehouse_id
-        WHERE d.id=$1 AND d.status='OPEN'`,
+        WHERE d.id=$1 AND d.status='OPEN' AND (d.closes_at IS NULL OR d.closes_at > now())`,
       [id],
     ) as PublicDriveRow[];
     if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });

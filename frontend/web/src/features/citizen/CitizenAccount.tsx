@@ -38,14 +38,19 @@ export function CitizenRequests({
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError('');
+    const params = new URLSearchParams({ limit: String(LIST_PAGE_SIZE) });
+    if (cursor) params.set('cursor', cursor);
+    if (searchTerm) params.set('q', searchTerm);
     api<OwnedPage>(
       'response',
-      `/requests/mine?limit=${LIST_PAGE_SIZE}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
+      `/requests/mine?${params}`
     )
       .then((result) => {
         if (!active) return;
@@ -60,11 +65,21 @@ export function CitizenRequests({
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [cursor, revision, user.id]);
+  }, [cursor, revision, searchTerm, user.id]);
 
   function refresh() {
     setCursor('');
     setRevision((value) => value + 1);
+  }
+
+  function submitSearch(event: React.FormEvent) {
+    event.preventDefault();
+    const nextTerm = search.trim().toUpperCase();
+    setItems([]);
+    setNext('');
+    setCursor('');
+    if (nextTerm === searchTerm) setRevision((value) => value + 1);
+    else setSearchTerm(nextTerm);
   }
 
   return (
@@ -79,12 +94,22 @@ export function CitizenRequests({
         </button>
       </div>
       <p>Chọn một yêu cầu để xem tiến độ. Những SOS đã gắn với tài khoản không cần nhập mã.</p>
+      <form className="account-request-search" onSubmit={submitSearch} role="search">
+        <label htmlFor="account-request-search-input">Tìm SOS theo mã theo dõi</label>
+        <div className="account-request-search-row">
+          <input id="account-request-search-input" type="search" value={search} maxLength={16}
+            onChange={(event) => setSearch(event.target.value)} placeholder="Nhập mã theo dõi SOS" autoComplete="off" />
+          <button type="submit" className="button secondary" disabled={loading}>Tìm kiếm</button>
+          {searchTerm && <button type="button" className="button secondary" disabled={loading}
+            onClick={() => { setSearch(''); setItems([]); setNext(''); setCursor(''); setSearchTerm(''); }}>Xóa lọc</button>}
+        </div>
+      </form>
       {loading && <p role="status">Đang tải yêu cầu…</p>}
       {error && <p className="notice error" role="alert">{error}</p>}
       {!loading && !error && !items.length && (
         <div className="empty">
-          <p>Bạn chưa có yêu cầu SOS nào gắn với tài khoản.</p>
-          {onNewSos && <button className="button" type="button" onClick={onNewSos}>Gửi yêu cầu SOS</button>}
+          {searchTerm ? <><p>Không tìm thấy SOS phù hợp với mã đã nhập.</p><button className="button secondary" type="button" onClick={() => { setSearch(''); setSearchTerm(''); }}>Xóa từ khóa tìm kiếm</button></>
+            : <><p>Bạn chưa có yêu cầu SOS nào gắn với tài khoản.</p>{onNewSos && <button className="button" type="button" onClick={onNewSos}>Gửi yêu cầu SOS</button>}</>}
         </div>
       )}
       <div className="account-request-list">

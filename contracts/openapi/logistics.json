@@ -13538,7 +13538,7 @@
       "get": {
         "operationId": "logisticsDonationsTrack",
         "summary": "DonationsController.track",
-        "description": "Route exported from backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.track. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
+        "description": "Read-only tracking by opaque declaration identifier; no secret is required. Mutating commands still require the owner session or guest capability. Detailed contract: docs/backend/04-logistics-api.md.",
         "parameters": [
           {
             "in": "path",
@@ -13546,6 +13546,16 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Donation-Secret",
+            "required": false,
+            "description": "Optional guest capability for write actions; it does not gate read-only tracking.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{43,128}$"
             }
           }
         ],
@@ -13717,26 +13727,10 @@
                           "type": "string"
                         }
                       }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "DONATION_SECRET_INVALID": {
-                    "summary": "DONATION_SECRET_INVALID",
-                    "value": {
-                      "code": "DONATION_SECRET_INVALID",
-                      "message": "Mã bảo mật quyên góp không hợp lệ.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    },
+                    "can_manage": {
+                      "type": "boolean",
+                      "description": "Whether the caller has the owner session or guest capability required for write actions."
                     }
                   }
                 }
@@ -13793,18 +13787,7 @@
           }
         },
         "x-c48-contract-source": "docs/backend/04-logistics-api.md",
-        "x-c48-controller-source": "backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.track",
-        "security": [
-          {
-            "DonationSecret": []
-          },
-          {
-            "NativeBearer": []
-          },
-          {
-            "WebAccessCookie": []
-          }
-        ]
+        "x-c48-controller-source": "backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.track"
       }
     },
     "/public/donations/{id}/claim": {
@@ -21206,6 +21189,46 @@
         "operationId": "logisticsDonationsListMine",
         "summary": "DonationsController.listMine",
         "description": "Route exported from backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.listMine. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "description": "Substring of declaration ID, public code, or drive title. The page cursor is bound to this query.",
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["DECLARED", "COUNTING", "PENDING_REVIEW", "APPROVED", "POSTED", "REJECTED", "CANCELLED"]
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success response; see docs/backend/04-logistics-api.md for the documented response shape."

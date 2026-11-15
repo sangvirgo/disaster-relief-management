@@ -52,12 +52,10 @@ export const SOSTrackingScreen: React.FC = () => {
   const initialCode = Array.isArray(routeCode) ? routeCode[0] : routeCode;
 
   const [trackingCode, setTrackingCode] = useState<string>(initialCode || '');
-  const [trackingSecret, setTrackingSecret] = useState<string>('');
   const [data, setData] = useState<RequestTrackingDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(Boolean(initialCode));
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [trackingCodeError, setTrackingCodeError] = useState<string | undefined>();
-  const [trackingSecretError, setTrackingSecretError] = useState<string | undefined>();
   const [eventsCursor, setEventsCursor] = useState<string | undefined>();
   const [eventsMore, setEventsMore] = useState(false);
   const [loadingOlderEvents, setLoadingOlderEvents] = useState(false);
@@ -172,7 +170,7 @@ export const SOSTrackingScreen: React.FC = () => {
     }
   };
 
-  const fetchTrackingData = useCallback(async (codeInput?: string, secretInput?: string | null) => {
+  const fetchTrackingData = useCallback(async (codeInput?: string) => {
     const normalizedCode = (codeInput ?? trackingCode).trim().toUpperCase();
     setEventsCursor(undefined);
     setEventsMore(false);
@@ -191,44 +189,15 @@ export const SOSTrackingScreen: React.FC = () => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      // Nếu chưa có secret thì thử lấy từ SecureStore của máy
-      let secret: string | undefined = secretInput === undefined ? trackingSecret : secretInput || undefined;
-      if (!secret && secretInput !== null) {
-        const found = await StorageService.getSecretForTrackingCode(normalizedCode);
-        if (found) {
-          secret = found;
-          setTrackingSecret(found);
-        }
-      }
-
-      if (!isAuthenticated && !secret) {
-        setLoading(false);
-        setData(null);
-        setErrorMsg(null);
-        return;
-      }
-      if (secret && !isValidTrackingSecret(secret)) {
-        setLoading(false);
-        setData(null);
-        setErrorMsg('Khóa bí mật không đúng định dạng. Hãy kiểm tra hoặc khôi phục quyền truy cập.');
-        return;
-      }
       setTrackingCode(normalizedCode);
-      const result = await ResponseApi.trackRequest(normalizedCode, secret);
-      if (secret) {
-        try {
-          await StorageService.saveGuestTrackingSecret(normalizedCode, secret);
-        } catch {
-          // The successful API result remains usable for this screen session.
-        }
-      }
+      const result = await ResponseApi.trackRequest(normalizedCode);
       // The tracking summary returns newest first; render the timeline chronologically.
       setData({ ...result, timeline: [...result.timeline].reverse() });
 
       // Tải danh sách sự kiện chi tiết từ API chuyên biệt GET /requests/:id/events
       if (result?.id) {
         try {
-          const eventsRes = await ResponseApi.getRequestEvents(result.id, normalizedCode, secret);
+          const eventsRes = await ResponseApi.getRequestEvents(result.id, normalizedCode);
           setData((prev) => (prev ? { ...prev, timeline: [...eventsRes.items].reverse() as any } : prev));
           setEventsCursor(eventsRes.cursor);
           setEventsMore(eventsRes.more);
@@ -237,20 +206,18 @@ export const SOSTrackingScreen: React.FC = () => {
         }
       }
     } catch (err: any) {
-      setErrorMsg(getApiErrorMessage(err, 'Không thể tải thông tin. Vui lòng kiểm tra lại mã và khóa tra cứu.'));
+      setErrorMsg(getApiErrorMessage(err, 'Không thể tải thông tin. Vui lòng kiểm tra lại mã tra cứu.'));
     } finally {
       setLoading(false);
     }
-  }, [trackingCode, trackingSecret, isAuthenticated]);
+  }, [trackingCode]);
 
   const loadOlderEvents = async () => {
     if (!data?.id || !eventsMore || !eventsCursor || loadingOlderEvents) return;
     setLoadingOlderEvents(true);
     try {
       const code = trackingCode.trim().toUpperCase();
-      let secret = trackingSecret || undefined;
-      if (!secret) secret = (await StorageService.getSecretForTrackingCode(code)) || undefined;
-      const page = await ResponseApi.getRequestEvents(data.id, code, secret, eventsCursor);
+      const page = await ResponseApi.getRequestEvents(data.id, code, eventsCursor);
       const olderEvents = [...page.items].reverse();
       setData((current) => current
         ? { ...current, timeline: [...(olderEvents as any[]), ...(current.timeline || [])] }
@@ -311,16 +278,6 @@ export const SOSTrackingScreen: React.FC = () => {
     let uploadedCount = 0;
     setIsSubmittingSupplement(true);
     try {
-      // Đảm bảo có trackingSecret từ state hoặc StorageService
-      let secret: string | undefined = trackingSecret;
-      if (!secret && trackingCode) {
-        const found = await StorageService.getSecretForTrackingCode(trackingCode);
-        if (found) {
-          secret = found;
-          setTrackingSecret(found);
-        }
-      }
-
       // Ghi chú là lệnh có phiên bản; giữ nguyên payload và khóa để retry an toàn.
       if (note) {
         const payload = {
@@ -333,7 +290,6 @@ export const SOSTrackingScreen: React.FC = () => {
             data.id,
             pending.payload,
             trackingCode,
-            secret,
             pending.idempotencyKey
           );
         } else {
@@ -341,7 +297,6 @@ export const SOSTrackingScreen: React.FC = () => {
             data.id,
             pending.payload,
             trackingCode,
-            secret,
             pending.idempotencyKey
           );
         }
@@ -377,7 +332,6 @@ export const SOSTrackingScreen: React.FC = () => {
             data.id,
             { uri, name: fileName, type },
             trackingCode,
-            secret,
             idempotencyKey
           );
         } catch (uploadError) {
@@ -456,7 +410,7 @@ export const SOSTrackingScreen: React.FC = () => {
     if (!code) errors.trackingCode = 'Vui lòng nhập mã tra cứu.';
     else if (!isValidTrackingCode(code)) errors.trackingCode = 'Mã tra cứu phải gồm đúng 10 ký tự hợp lệ.';
     if (!token) errors.recoveryCode = 'Vui lòng nhập mã khôi phục.';
-    else if (!isValidTrackingSecret(token)) errors.recoveryCode = 'Mã khôi phục phải gồm đúng 43 ký tự hợp lệ.';
+    else if (!isValidTrackingSecret(token)) errors.recoveryCode = 'Mã hỗ trợ phải gồm đúng 43 ký tự hợp lệ.';
     setRecoveryErrors(errors);
     if (Object.keys(errors).length > 0) {
       return;
@@ -484,9 +438,8 @@ export const SOSTrackingScreen: React.FC = () => {
       setShowRecoveryModal(false);
       setRecoveryCode('');
       setTrackingCode(result.tracking_code || code);
-      setTrackingSecret('');
       Alert.alert('Thành công', 'Yêu cầu cứu trợ đã được khôi phục và liên kết thành công vào tài khoản của bạn.');
-      await fetchTrackingData(result.tracking_code || code, null);
+      await fetchTrackingData(result.tracking_code || code);
     } catch (err: any) {
       Alert.alert('Không thể khôi phục', getApiErrorMessage(err, 'Mã khôi phục không hợp lệ hoặc đã hết hiệu lực.'));
     } finally {
@@ -505,9 +458,7 @@ export const SOSTrackingScreen: React.FC = () => {
     }
   };
 
-  const lookupDisabled = loading || trackingCode.length > 10 || trackingSecret.length > 43 || !isValidTrackingCode(trackingCode) ||
-    (trackingSecret.length > 0 && !isValidTrackingSecret(trackingSecret)) ||
-    (!isAuthenticated && !isValidTrackingSecret(trackingSecret));
+  const lookupDisabled = loading || trackingCode.length > 10 || !isValidTrackingCode(trackingCode);
   const supplementSubmitDisabled = isSubmittingSupplement || (!supplementNote.trim() && selectedImages.length === 0) || supplementNote.length > 2000;
   const recoverySubmitDisabled = isRecovering || recoveryTrackingCode.length > 10 || recoveryCode.length > 43 ||
     !isValidTrackingCode(recoveryTrackingCode) || !isValidTrackingSecret(recoveryCode);
@@ -515,7 +466,7 @@ export const SOSTrackingScreen: React.FC = () => {
   return (
     <ScreenContainer
       title="Tiến Độ Cứu Hộ"
-      subtitle={trackingCode ? `Mã: ${trackingCode}` : 'Tra cứu bằng mã và khóa bí mật'}
+      subtitle={trackingCode ? `Mã: ${trackingCode}` : 'Tra cứu bằng mã theo dõi'}
       onBack={() => goBackOrHome(router)}
       headerRight={
         <TouchableOpacity onPress={() => void fetchTrackingData()} style={styles.refreshBtn}>
@@ -526,11 +477,10 @@ export const SOSTrackingScreen: React.FC = () => {
       {!data && !loading ? (
         <View style={styles.lookupCard}>
           <Text style={styles.lookupTitle}>Tra cứu yêu cầu cứu trợ</Text>
-          {!isAuthenticated && !trackingSecret ? (
+          {!isAuthenticated ? (
             <View style={styles.lookupNotice}>
-              <KeyRound size={18} color={THEME.colors.primary.main} />
               <Text style={styles.lookupNoticeText}>
-                Khách vãng lai cần nhập cả mã tra cứu và khóa bí mật đã được cấp. Mã từ trang trước mới chỉ được kiểm tra định dạng, chưa xác nhận hồ sơ tồn tại.
+                Khách vãng lai chỉ cần nhập mã tra cứu đã nhận khi gửi SOS.
               </Text>
             </View>
           ) : null}
@@ -552,18 +502,6 @@ export const SOSTrackingScreen: React.FC = () => {
                 setTrackingCodeError('Mã tra cứu là bắt buộc.');
               } else if (!isValidTrackingCode(code)) {
                 setTrackingCodeError(getTrackingCodeError(code));
-              } else if (!isAuthenticated && !trackingSecret.trim()) {
-                setTrackingCodeError(undefined);
-                try {
-                  const savedSecret = await StorageService.getSecretForTrackingCode(code);
-                  if (savedSecret) {
-                    setTrackingSecret(savedSecret);
-                    setTrackingSecretError(undefined);
-                    setErrorMsg(null);
-                  }
-                } catch {
-                  setErrorMsg('Không thể đọc khóa bí mật đã lưu trên thiết bị.');
-                }
               } else {
                 setTrackingCodeError(undefined);
               }
@@ -573,30 +511,6 @@ export const SOSTrackingScreen: React.FC = () => {
             maxLength={11}
           />
           <FormFieldError message={trackingCodeError} />
-          <Text style={styles.inputLabel}>
-            Khóa bí mật{isAuthenticated ? ' (nếu có)' : ' '}
-            {!isAuthenticated ? <RequiredAsterisk /> : null}
-          </Text>
-          <TextInput
-            style={styles.lookupInput}
-            placeholder="Khóa bí mật (bắt buộc nếu chưa đăng nhập)"
-            placeholderTextColor={THEME.colors.text.muted}
-            value={trackingSecret}
-            onChangeText={(value) => {
-              setTrackingSecret(value);
-              setTrackingSecretError(getTrackingSecretError(value));
-              setErrorMsg(null);
-            }}
-            onBlur={() => {
-              if (!isAuthenticated && !trackingSecret.trim()) setTrackingSecretError('Khóa bí mật là bắt buộc khi chưa đăng nhập.');
-              else setTrackingSecretError(getTrackingSecretError(trackingSecret));
-            }}
-            autoCapitalize="none"
-            autoCorrect={false}
-            maxLength={44}
-            secureTextEntry
-          />
-          <FormFieldError message={trackingSecretError} />
           <FormFieldError message={errorMsg ?? undefined} />
           <TouchableOpacity
             style={[styles.retryBtn, lookupDisabled && { opacity: 0.5 }]}
@@ -613,7 +527,7 @@ export const SOSTrackingScreen: React.FC = () => {
             }}
           >
             <KeyRound size={16} color={THEME.colors.primary.main} style={{ marginRight: 6 }} />
-            <Text style={styles.recoveryLinkText}>Mất khóa bí mật? Khôi phục bằng mã hỗ trợ</Text>
+            <Text style={styles.recoveryLinkText}>Liên kết SOS vào tài khoản bằng mã hỗ trợ</Text>
           </TouchableOpacity>
         </View>
       ) : loading ? (
@@ -973,7 +887,7 @@ export const SOSTrackingScreen: React.FC = () => {
             />
             <FormFieldError message={recoveryErrors.trackingCode} />
 
-            <Text style={styles.inputLabel}>MÃ KHÔI PHỤC BÍ MẬT (43 KÝ TỰ) <RequiredAsterisk /></Text>
+            <Text style={styles.inputLabel}>MÃ HỖ TRỢ (43 KÝ TỰ) <RequiredAsterisk /></Text>
             <TextInput
               style={styles.modalInputSingle}
               placeholder="Mã một lần do điều phối viên cấp"
@@ -983,15 +897,15 @@ export const SOSTrackingScreen: React.FC = () => {
                 setRecoveryCode(value);
                 setRecoveryErrors((current) => ({
                   ...current,
-                  recoveryCode: getTrackingSecretError(value, 'Mã khôi phục bí mật'),
+                  recoveryCode: getTrackingSecretError(value, 'Mã hỗ trợ'),
                 }));
               }}
               onBlur={() => {
                 setRecoveryErrors((current) => ({
                   ...current,
                   recoveryCode: !recoveryCode.trim()
-                    ? 'Mã khôi phục bí mật là bắt buộc.'
-                    : getTrackingSecretError(recoveryCode, 'Mã khôi phục bí mật'),
+                    ? 'Mã hỗ trợ là bắt buộc.'
+                    : getTrackingSecretError(recoveryCode, 'Mã hỗ trợ'),
                 }));
               }}
               autoCapitalize="none"

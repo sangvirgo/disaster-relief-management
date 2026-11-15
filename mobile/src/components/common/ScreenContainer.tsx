@@ -25,7 +25,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   showLogo,
 }) => {
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'bottom', 'left']}>
       <StatusBar style="dark" />
 
       {(title || onBack || headerRight || showLogo) && (

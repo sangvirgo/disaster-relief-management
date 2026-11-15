@@ -10,21 +10,18 @@ import { confirmAction } from '../../components/confirmAction';
 type Tracking = ResponseComponents['schemas']['ReporterTracking'];
 type Evidence = { id: string; state: string; size_bytes: number; created_at: string };
 type Event = { id?: string; event_type: string; occurred_at: string; public_text_code?: string };
-const headers = (code: string, secret: string) => ({
+const headers = (code: string) => ({
   'X-Tracking-Code': code.trim(),
-  ...(secret.trim() ? { 'X-Tracking-Secret': secret.trim() } : {}),
 });
 
 export function TrackingActions({
   tracking,
   code,
-  secret,
   canClaim,
   onUpdated,
 }: {
   tracking: Tracking;
   code: string;
-  secret: string;
   canClaim: boolean;
   onUpdated: () => Promise<void>;
 }) {
@@ -65,7 +62,7 @@ export function TrackingActions({
       supplementKey.current ||= newCommandKey();
       await api('response', `/requests/${tracking.id}/supplements`, {
         method: 'POST',
-        headers: headers(code, secret),
+        headers: headers(code),
         idempotencyKey: supplementKey.current,
         body: {
           expected_version: tracking.version,
@@ -137,7 +134,7 @@ export function TrackingActions({
         'response',
         `/requests/${tracking.id}/evidence`,
         file,
-        { headers: headers(code, secret), idempotencyKey: fileKey.current }
+        { headers: headers(code), idempotencyKey: fileKey.current }
       );
       fileKey.current = null;
       setFile(null);
@@ -156,7 +153,7 @@ export function TrackingActions({
     setMessage('');
     try {
       const result = await api<{ url: string }>('response', `/evidence/${id}/download`, {
-        headers: headers(code, secret),
+        headers: headers(code),
       });
       setDownloadUrls((current) => ({ ...current, [id]: result.url }));
       setMessage('Đã có liên kết riêng tư. Nhấn Mở tệp để xem minh chứng.');
@@ -169,7 +166,7 @@ export function TrackingActions({
   async function claim() {
     if (
       !(await confirmAction(
-        'Gắn yêu cầu này với tài khoản đang đăng nhập? Mã bảo mật cũ sẽ hết hiệu lực.'
+        'Gắn yêu cầu này với tài khoản đang đăng nhập?'
       ))
     )
       return;
@@ -179,7 +176,6 @@ export function TrackingActions({
       await api('response', '/requests/claim', {
         method: 'POST',
         body: { tracking_code: code.trim() },
-        headers: { 'X-Tracking-Secret': secret.trim() },
         idempotencyKey: newCommandKey(),
       });
       setMessage(
@@ -199,7 +195,7 @@ export function TrackingActions({
       const result = await api<{ items: Event[]; more: boolean; cursor?: string }>(
         'response',
         `/requests/${tracking.id}/events?cursor=${encodeURIComponent(cursor)}`,
-        { headers: headers(code, secret) }
+        { headers: headers(code) }
       );
       setEvents((current) => [...current, ...result.items]);
       setCursor(result.more ? result.cursor || null : null);
@@ -326,7 +322,7 @@ export function TrackingActions({
           </div>
         </form>}
       </div>
-      {canClaim && secret && (
+      {canClaim && (
         <button className="button secondary" type="button" onClick={claim} disabled={busy}>
           Gắn yêu cầu với tài khoản
         </button>

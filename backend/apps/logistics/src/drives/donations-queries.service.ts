@@ -30,9 +30,15 @@ export class DonationsQueriesService {
   ) {}
 
   async track(id: string, secret: string | undefined, request: Request): Promise<Record<string, unknown>> {
-    const session = await this.optionalSession(request);
     const delivery = await this.findDelivery(id);
-    this.assertDonorAccess(delivery, session, secret);
+    let session: AuthenticatedLogisticsSession | null = null;
+    try {
+      session = await this.optionalSession(request);
+    } catch {
+      // Tracking is public by opaque declaration identifier. An expired session must not block a read.
+    }
+    const canManage = (session !== null && delivery.donor_user_id === session.userId) ||
+      verifyDonationCapability(secret, delivery.capability_hash, this.secretConfig);
     const declarations = await this.dataSource.query(
       `SELECT revision,created_by_kind FROM donation_declaration WHERE delivery_id=$1 ORDER BY revision DESC LIMIT 1`,
       [id],
@@ -57,12 +63,14 @@ export class DonationsQueriesService {
       receipt,
       disputes,
       progress: { status: delivery.status },
+      can_manage: canManage,
     };
   }
 
   async listMine(query: MyDonationPageQueryDto, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
-    const filters = { route: 'logistics.donations.mine', user_id: session.userId, status: query.status ?? null };
+    const search = query.q?.trim() ?? '';
+    const filters = { route: 'logistics.donations.mine', user_id: session.userId, status: query.status ?? null, q: search };
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : null;
     const [sort] = cursor?.sort ?? [];
     if (cursor && (cursor.sort.length !== 1 || typeof sort !== 'string' || Number.isNaN(Date.parse(sort)) ||
@@ -72,6 +80,12 @@ export class DonationsQueriesService {
     const values: unknown[] = [session.userId];
     const conditions = ['dd.donor_user_id=$1'];
     if (query.status) conditions.push(`dd.status=$${values.push(query.status)}`);
+    if (search) {
+      const escaped = search.replace(/[!%_]/gu, '!$&');
+      const pattern = `%${escaped}%`;
+      const parameter = `$${values.push(pattern)}`;
+      conditions.push(`(dd.id::text ILIKE ${parameter} ESCAPE '!' OR dd.public_code ILIKE ${parameter} ESCAPE '!' OR d.title ILIKE ${parameter} ESCAPE '!')`);
+    }
     if (cursor) {
       values.push(cursor.sort[0], cursor.id);
       conditions.push(`(dd.created_at,dd.id)<($${values.length - 1}::timestamptz,$${values.length}::uuid)`);
@@ -140,16 +154,6 @@ export class DonationsQueriesService {
     ) as DeliveryAccessRow[];
     if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
     return rows[0];
-  }
-
-  private assertDonorAccess(
-    delivery: DeliveryAccessRow,
-    session: AuthenticatedLogisticsSession | null,
-    secret: string | undefined,
-  ): void {
-    if (session && delivery.donor_user_id === session.userId) return;
-    if (verifyDonationCapability(secret, delivery.capability_hash, this.secretConfig)) return;
-    throw new AppError('DONATION_SECRET_INVALID', { status: 400 });
   }
 
   private async currentReceipt(id: string): Promise<Record<string, unknown> | null> {

@@ -12,6 +12,7 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import * as Location from "expo-location";
 import { THEME } from "../../constants/theme";
@@ -499,10 +500,12 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       transparent={false}
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <SafeAreaProvider style={styles.container}>
+        <SafeAreaView style={styles.container} edges={["top", "right", "bottom", "left"]}>
+          <KeyboardAvoidingView
+            style={styles.container}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          >
         {/* Header Modal */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -750,7 +753,9 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             <Text style={styles.confirmBtnText}>{confirmButtonText}</Text>
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 };
@@ -765,7 +770,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === "ios" ? 50 : 16,
+    paddingTop: 12,
     paddingBottom: 12,
     backgroundColor: THEME.colors.surface.card,
     borderBottomWidth: 1,

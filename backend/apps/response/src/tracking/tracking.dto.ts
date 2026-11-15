@@ -15,6 +15,9 @@ export class ClaimRequestDto {
 }
 
 export class MineQueryDto {
+  @IsOptional() @IsString() @MaxLength(16)
+  declare q?: string;
+
   @IsOptional() @IsString() @MaxLength(2_000)
   declare cursor?: string;
 
