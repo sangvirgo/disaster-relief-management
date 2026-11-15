@@ -90,9 +90,18 @@ describe('CampaignCoordinationService engagements', () => {
     });
   });
 
-  it('does not allow the primary coordinator to start a secondary engagement', async () => {
-    const { service, idempotency } = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }]);
-    await expect(service.engage(campaignA, 'key-main', request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
-    expect(idempotency.execute).not.toHaveBeenCalled();
+  it('lets the primary coordinator engage a campaign like other coordinators', async () => {
+    const { service, idempotency } = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], (sql) => {
+      if (sql.includes('FROM campaign WHERE id')) return [{ id: campaignA, status: 'ACTIVE' }];
+      if (sql.includes('count(*)')) return [{ count: 0 }];
+      if (sql.includes('INSERT INTO campaign_engagement')) {
+        return [{ id: '00000000-0000-4000-8000-0000000000e1', campaign_id: campaignA, user_id: userId,
+          started_at: new Date(), last_active_at: new Date(), ended_at: null, ended_reason: null }];
+      }
+      return [];
+    });
+    const result = await service.engage(campaignA, 'key-main', request);
+    expect(idempotency.execute).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe(201);
   });
 });

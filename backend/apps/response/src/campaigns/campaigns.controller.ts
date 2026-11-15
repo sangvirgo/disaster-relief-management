@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
-import { CampaignActionDto, CampaignCreateDto, CampaignPageQueryDto, CampaignPatchDto, CampaignReasonActionDto } from './campaigns.dto';
+import { CampaignActionDto, CampaignAreaDto, CampaignCreateDto, CampaignPageQueryDto, CampaignPatchDto, CampaignReasonActionDto } from './campaigns.dto';
 import { CampaignCommandRequest, CampaignsService } from './campaigns.service';
 import { CampaignCoordinationService } from './campaign-coordination.service';
 import { ResponseServiceTokenGuard } from './service-token.guard';
@@ -144,6 +144,26 @@ export class CampaignsController {
   async close(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Body() dto: CampaignReasonActionDto,
     @Req() request: CampaignCommandRequest, @Res({ passthrough: true }) response: Response) {
     return this.transition(id, 'close', dto, request, response);
+  }
+
+  @Post('campaigns/:id/area')
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async changeArea(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Body() dto: CampaignAreaDto,
+    @Req() request: CampaignCommandRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.campaigns.changeArea(id, dto, key(request), request);
+    replay(response, result);
+    return result.value;
+  }
+
+  @Get('campaigns/common-queue/suggestions')
+  async commonQueueSuggestions(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.coordination.commonQueueSuggestions(request);
   }
 
   @Get('public/campaigns')

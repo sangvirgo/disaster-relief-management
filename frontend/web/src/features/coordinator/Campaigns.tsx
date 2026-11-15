@@ -21,6 +21,13 @@ type Campaign = {
   center?: { lat: number; lng: number } | null;
   radius_m?: number | null;
 };
+// Location fields store "longitude,latitude" (see CommandForm pointValue); campaigns use {lat, lng}.
+function centerFromValue(value: string | undefined): { lat: number; lng: number } | null {
+  if (!value?.includes(',')) return null;
+  const [lng, lat] = value.split(',').map(Number);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+
 export function Campaigns({ canManage = false }: { canManage?: boolean }) {
   const [items, setItems] = useState<Campaign[]>([]);
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
@@ -73,6 +80,13 @@ export function Campaigns({ canManage = false }: { canManage?: boolean }) {
     setStatusFilter(value);
     setSelected(current => current && value !== 'ALL' && current.status !== value ? null : current);
   }
+  // Other campaigns with a configured area are drawn as dashed context, so overlaps are visible while editing.
+  const campaignOverlay = (radiusValue: string | undefined, exceptId?: string) => ({
+    radiusM: radiusValue?.trim() ? Number(radiusValue) : null,
+    areas: items.flatMap((item) => item.center && item.radius_m && item.id !== exceptId
+      ? [{ id: item.id, label: item.name, latitude: item.center.lat, longitude: item.center.lng, radiusM: item.radius_m }]
+      : []),
+  });
   const create: CommandSpec = {
     title: 'Tạo chiến dịch',
     service: 'response',
@@ -82,25 +96,22 @@ export function Campaigns({ canManage = false }: { canManage?: boolean }) {
       { name: 'objective', label: 'Mục tiêu (nếu có)', type: 'textarea' },
       { name: 'starts_at', label: 'Thời điểm bắt đầu (nếu có)', type: 'datetime-local' },
       { name: 'ends_at', label: 'Thời điểm kết thúc (nếu có)', type: 'datetime-local' },
-      { name: 'center_lat', label: 'Vĩ độ tâm vùng (nếu có)', type: 'number', min: -90, max: 90 },
-      { name: 'center_lng', label: 'Kinh độ tâm vùng (nếu có)', type: 'number', min: -180, max: 180 },
+      { name: 'center', label: 'Tâm vùng (chạm lên bản đồ để chọn, để trống nếu chưa cần)', type: 'location', overlayFor: (values) => campaignOverlay(values.radius_m) },
       { name: 'radius_m', label: 'Bán kính tự động gắn (500–300.000 m)', type: 'number', min: 500, max: 300000, integer: true },
     ],
     build: (values) => {
       if (values.starts_at && values.ends_at && new Date(values.ends_at) <= new Date(values.starts_at))
         throw new Error('Thời điểm kết thúc phải sau thời điểm bắt đầu.');
-      const hasLat = Boolean(values.center_lat?.trim());
-      const hasLng = Boolean(values.center_lng?.trim());
-      if (hasLat !== hasLng) throw new Error('Hãy nhập cả vĩ độ và kinh độ của tâm vùng.');
+      const center = centerFromValue(values.center);
       const radius = values.radius_m?.trim() ? Number(values.radius_m) : null;
-      if ((hasLat && (!radius || !Number.isInteger(radius) || radius < 500 || radius > 300000)) || (!hasLat && radius !== null))
+      if ((center && (!radius || !Number.isInteger(radius) || radius < 500 || radius > 300000)) || (!center && radius !== null))
         throw new Error('Tâm và bán kính phải cùng được nhập; bán kính từ 500 đến 300.000 mét.');
       return {
         name: values.name.trim().normalize('NFC'),
         ...(values.objective?.trim() ? { objective: values.objective.trim() } : {}),
         ...(values.starts_at ? { starts_at: new Date(values.starts_at).toISOString() } : {}),
         ...(values.ends_at ? { ends_at: new Date(values.ends_at).toISOString() } : {}),
-        ...(hasLat ? { center: { lat: Number(values.center_lat), lng: Number(values.center_lng) }, radius_m: radius } : {}),
+        ...(center ? { center, radius_m: radius } : {}),
       };
     },
   };
@@ -136,17 +147,37 @@ export function Campaigns({ canManage = false }: { canManage?: boolean }) {
     fields: [
       { name: 'name', label: 'Tên chiến dịch', required: true, initialValue: selected!.name },
       { name: 'objective', label: 'Mục tiêu', type: 'textarea', initialValue: selected!.objective ?? '' },
-      { name: 'center_lat', label: 'Vĩ độ tâm vùng', type: 'number', min: -90, max: 90, initialValue: selected!.center ? String(selected!.center.lat) : '' },
-      { name: 'center_lng', label: 'Kinh độ tâm vùng', type: 'number', min: -180, max: 180, initialValue: selected!.center ? String(selected!.center.lng) : '' },
+      { name: 'center', label: 'Tâm vùng (chạm lên bản đồ để chọn hoặc đổi)', type: 'location',
+        initialValue: selected!.center ? `${selected!.center.lng},${selected!.center.lat}` : '',
+        overlayFor: (values) => campaignOverlay(values.radius_m, selected!.id) },
       { name: 'radius_m', label: 'Bán kính tự động gắn (500–300.000 m)', type: 'number', min: 500, max: 300000, integer: true, initialValue: selected!.radius_m ? String(selected!.radius_m) : '' },
     ],
     build: (values) => {
-      const hasLat = Boolean(values.center_lat?.trim()); const hasLng = Boolean(values.center_lng?.trim());
+      const center = centerFromValue(values.center);
       const radius = values.radius_m?.trim() ? Number(values.radius_m) : null;
-      if (hasLat !== hasLng || (hasLat && (!radius || !Number.isInteger(radius) || radius < 500 || radius > 300000)) || (!hasLat && radius !== null))
+      if (center ? (!radius || !Number.isInteger(radius) || radius < 500 || radius > 300000) : radius !== null)
         throw new Error('Tâm và bán kính phải cùng được nhập; bán kính từ 500 đến 300.000 mét.');
       return { name: values.name.trim().normalize('NFC'), objective: values.objective.trim() || null,
-        center: hasLat ? { lat: Number(values.center_lat), lng: Number(values.center_lng) } : null, radius_m: radius };
+        center, radius_m: radius };
+    },
+  }} onSuccess={() => done()} onStale={() => done()} /> : null;
+  // Live campaigns keep their name and details, but their area can be changed; the server adopts unmatched SOS inside it.
+  const changeArea = selected && id && version && ['ACTIVE', 'PAUSED'].includes(selected.status) ? <CommandForm key={`${id}-area-${version}`} spec={{
+    title: 'Điều chỉnh vùng chiến dịch', service: 'response', method: 'POST', path: `/campaigns/${id}/area`, version,
+    warning: 'Các SOS chưa thuộc vùng nằm trong vùng mới sẽ được gắn vào chiến dịch này. Xác nhận điều chỉnh?',
+    fields: [
+      { name: 'center', label: 'Tâm vùng (chạm lên bản đồ để chọn)', type: 'location',
+        initialValue: selected.center ? `${selected.center.lng},${selected.center.lat}` : '',
+        overlayFor: (values) => campaignOverlay(values.radius_m, selected.id) },
+      { name: 'radius_m', label: 'Bán kính tự động gắn (500–300.000 m)', type: 'number', min: 500, max: 300000, integer: true,
+        initialValue: selected.radius_m ? String(selected.radius_m) : '' },
+    ],
+    build: (values) => {
+      const center = centerFromValue(values.center);
+      const radius = Number(values.radius_m);
+      if (!center || !Number.isInteger(radius) || radius < 500 || radius > 300000)
+        throw new Error('Hãy chọn tâm trên bản đồ và nhập bán kính từ 500 đến 300.000 mét.');
+      return { center, radius_m: radius };
     },
   }} onSuccess={() => done()} onStale={() => done()} /> : null;
   return (
@@ -239,7 +270,8 @@ export function Campaigns({ canManage = false }: { canManage?: boolean }) {
           <div hidden={detailTab !== 'actions'}>
             <p>Chọn thao tác phù hợp với trạng thái hiện tại của chiến dịch.</p>
             <div className="action-grid">
-              {canManage && editSpatialAndDetails}
+              {canManage && selected.status === 'DRAFT' && editSpatialAndDetails}
+              {canManage && changeArea}
               {canManage && selected.status === 'DRAFT' && action('Kích hoạt chiến dịch', 'activate')}
               {canManage && selected.status === 'ACTIVE' && (
                 <>

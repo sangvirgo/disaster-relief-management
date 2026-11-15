@@ -3,6 +3,8 @@ import { api, newCommandKey } from '../../api/client';
 import type { Me } from '../../auth/session';
 import { Coordinator } from './Coordinator';
 import { Campaigns } from './Campaigns';
+import { CommonQueueSuggestions } from './CommonQueueSuggestions';
+import { HistorySummary, MyHistory, Timeline, type EngagementItem, type HistoryItem, type HistorySummaryData } from './CampaignHistory';
 
 type TriageCampaign = {
   id: string; name: string; urgency: {
@@ -11,14 +13,13 @@ type TriageCampaign = {
     longest_wait_seconds: number; active_coordinator_count: number; reason_codes: string[];
   }; urgency_reasons_vi: string[];
 };
-type Engagement = { id: string; campaign_id: string; campaign_name: string | null; started_at: string; ended_at?: string | null; active: boolean };
+type Engagement = EngagementItem;
 type OverviewCampaign = {
   id: string; name: string; status: string; center: { lat: number; lng: number } | null; radius_m: number | null;
   active_coordinators: Array<{ user_id: string; display_name: string | null; started_at: string; last_active_at: string }>;
   request_counts: Record<string, number>; active_claim_count: number; overdue_count: number; has_active_coordinator: boolean;
 };
-type HistoryItem = { occurred_at: string; event_type: string; actor: { id: string; display_name: string | null } | null; request_id: string | null; mission_id: string | null };
-type Summary = { completed_requests: number; cancelled_requests: number; open_requests: number; completed_missions: number; median_response_seconds: number | null; coordinators: Array<{ user_id: string; display_name: string | null; total_seconds: number }> };
+type Summary = HistorySummaryData;
 type Overview = { items: OverviewCampaign[]; common_queue?: { unmatched: number; conflict: number } };
 
 const reasonLabel: Record<string, string> = {
@@ -27,15 +28,6 @@ const reasonLabel: Record<string, string> = {
   OVERDUE: 'Có SOS quá hạn', LONG_WAIT: 'Có SOS chờ lâu',
   NO_COORDINATOR: 'Chưa có điều phối viên tham gia', ROUTINE: 'Không có dấu hiệu gấp nổi bật',
 };
-const eventLabel: Record<string, string> = {
-  COORDINATION_STARTED: 'Bắt đầu điều phối', COORDINATION_LEFT: 'Dừng điều phối',
-  COORDINATION_EXPIRED: 'Phiên điều phối hết hạn', COORDINATION_SWITCHED: 'Chuyển chiến dịch',
-  COORDINATION_CAMPAIGN_CLOSED: 'Chiến dịch kết thúc', CAMPAIGN_AUTO_ATTACHED: 'SOS tự động gắn theo vị trí',
-  CAMPAIGN_ATTACHED: 'SOS được gắn vào chiến dịch', CAMPAIGN_DETACHED: 'SOS được gỡ khỏi chiến dịch',
-  CAMPAIGN_MATCH_CONFLICT: 'Phát hiện xung đột vùng chiến dịch', CLAIM_TAKEN_OVER: 'Điều phối viên tiếp quản SOS',
-  MISSION_ACCEPTED: 'Đội cứu hộ nhận nhiệm vụ', MISSION_COMPLETED: 'Nhiệm vụ hoàn tất',
-};
-
 export function CampaignCoordination({ user }: { user: Me }) {
   const primary = user.grants.some((grant) => grant.role_code === 'COORDINATOR' && grant.scope_type === 'SYSTEM');
   const [tab, setTab] = useState(primary ? 'overview' : 'workspace');
@@ -53,24 +45,27 @@ export function CampaignCoordination({ user }: { user: Me }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const [queueRevision, setQueueRevision] = useState(0);
   const selectedEngagement = engagements.find((item) => item.campaign_id === selectedId) ?? engagements[0];
   const overviewCampaigns = overview;
 
   useEffect(() => {
     let live = true;
     setLoading(true); setError('');
-    const load = primary
-      ? api<Overview>('response', '/campaigns/overview').then((value) => { if (live) { setOverview(value.items); setCommonQueue(value.common_queue ?? { unmatched: 0, conflict: 0 }); } })
-      : Promise.all([
-        api<{ items: Engagement[] }>('response', '/me/engagements'),
-        api<{ items: TriageCampaign[] }>('response', '/campaigns/triage'),
-      ]).then(([mine, ranked]) => {
-        if (!live) return;
-        setEngagements(mine.items); setTriage(ranked.items);
-        setSelectedId((current) => mine.items.some((item) => item.campaign_id === current) ? current : mine.items[0]?.campaign_id ?? '');
-        if (mine.items.length) setTab((current) => current === 'choose' || current === 'my-history' ? current : 'workspace');
-        if (!mine.items.length) setTab((current) => current === 'workspace' ? 'choose' : current);
-      });
+    // The primary coordinator controls campaigns but can also engage and work campaigns like any other coordinator.
+    const load = Promise.all([
+      primary ? api<Overview>('response', '/campaigns/overview') : Promise.resolve(null),
+      api<{ items: Engagement[] }>('response', '/me/engagements'),
+      api<{ items: TriageCampaign[] }>('response', '/campaigns/triage'),
+    ]).then(([overviewValue, mine, ranked]) => {
+      if (!live) return;
+      if (overviewValue) { setOverview(overviewValue.items); setCommonQueue(overviewValue.common_queue ?? { unmatched: 0, conflict: 0 }); }
+      setEngagements(mine.items); setTriage(ranked.items);
+      setSelectedId((current) => mine.items.some((item) => item.campaign_id === current) ? current : mine.items[0]?.campaign_id ?? '');
+      if (primary) return;
+      if (mine.items.length) setTab((current) => current === 'choose' || current === 'my-history' ? current : 'workspace');
+      if (!mine.items.length) setTab((current) => current === 'workspace' ? 'choose' : current);
+    });
     void load.catch((cause: unknown) => { if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải dữ liệu điều phối.'); })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
@@ -119,7 +114,8 @@ export function CampaignCoordination({ user }: { user: Me }) {
   }
 
   const tabs = primary
-    ? [['overview', 'Tổng quan chiến dịch'], ['common', 'Hàng chờ chung'], ['management', 'Quản lý chiến dịch'], ['history', 'Lịch sử cứu trợ']]
+    ? [['overview', 'Tổng quan chiến dịch'], ['common', 'Hàng chờ chung'], ['management', 'Quản lý chiến dịch'], ['history', 'Lịch sử cứu trợ'],
+      ['workspace', 'Không gian điều phối'], ['choose', 'Chọn chiến dịch gấp'], ['my-history', 'Lịch sử điều phối của tôi']]
     : [['workspace', 'Không gian chiến dịch'], ['choose', 'Chọn chiến dịch gấp'], ['my-history', 'Lịch sử điều phối của tôi']];
   return <section className="campaign-coordination">
     <div className="tabs" role="tablist" aria-label="Điều phối chiến dịch">
@@ -137,14 +133,15 @@ export function CampaignCoordination({ user }: { user: Me }) {
         {campaign.active_coordinators.length > 0 && <p>{campaign.active_coordinators.map((person) => `${person.display_name ?? person.user_id} (từ ${new Date(person.started_at).toLocaleString('vi-VN')})`).join(' · ')}</p>}
         <button className="button secondary" type="button" onClick={() => void showHistory(campaign.id)}>Xem lịch sử cứu trợ</button>
       </article>)}
-      <p className="notice">Hàng chờ chung: {commonQueue.conflict} SOS xung đột chiến dịch · {commonQueue.unmatched} SOS chưa thuộc vùng nào.</p>
+      <p className="notice">Hàng chờ chung: {commonQueue.conflict} SOS trùng nhiều vùng chiến dịch · {commonQueue.unmatched} SOS ngoài mọi vùng chiến dịch.</p>
     </div>}
     {primary && tab === 'common' && <>
-      <p className="notice warning">SOS chưa thuộc chiến dịch và SOS xung đột vùng. Mở từng hồ sơ để chọn chiến dịch phù hợp.</p>
+      <CommonQueueSuggestions onChanged={() => setQueueRevision((value) => value + 1)} />
+      <p className="notice warning">SOS nằm ngoài mọi vùng chiến dịch hoặc trùng nhiều vùng. Mở từng hồ sơ để chọn chiến dịch phù hợp.</p>
       <label>Loại hàng chờ <select value={commonState} onChange={(event) => setCommonState(event.target.value as typeof commonState)}>
-        <option value="CONFLICT">Xung đột chiến dịch</option><option value="UNMATCHED">Chưa thuộc vùng nào</option>
+        <option value="CONFLICT">Trùng nhiều vùng chiến dịch</option><option value="UNMATCHED">Ngoài mọi vùng chiến dịch</option>
       </select></label>
-      <Coordinator key={commonState} page="queue" currentUserId={user.id} canSeeUnassigned campaignMatchState={commonState} initialUnassignedOnly />
+      <Coordinator key={`${commonState}-${queueRevision}`} page="queue" currentUserId={user.id} canSeeUnassigned campaignMatchState={commonState} initialUnassignedOnly />
     </>}
     {primary && tab === 'management' && <Campaigns canManage />}
     {primary && tab === 'history' && <>
@@ -155,7 +152,7 @@ export function CampaignCoordination({ user }: { user: Me }) {
       <Timeline items={history} />
       {cursor && <button className="button secondary" type="button" onClick={() => void loadMoreHistory()}>Tải các sự kiện cũ hơn</button>}
     </>}
-    {!primary && tab === 'choose' && <section aria-label="Chọn chiến dịch cần điều phối" className="record-list">
+    {tab === 'choose' && <section aria-label="Chọn chiến dịch cần điều phối" className="record-list">
       <h2>Chọn chiến dịch cần điều phối</h2><p>Các chiến dịch đang hoạt động được xếp theo số liệu SOS, thời gian chờ và số điều phối viên.</p>
       {triage.map((campaign, index) => <article className="card" key={campaign.id}>
         <div className="section-header"><div><span className="eyebrow">{index === 0 ? 'Gấp nhất hiện tại' : `Mức gấp ${index + 1}`}</span><h3>{campaign.name}</h3></div>
@@ -168,7 +165,7 @@ export function CampaignCoordination({ user }: { user: Me }) {
       </article>)}
       {!loading && !triage.length && <p className="empty">Hiện không có chiến dịch đang hoạt động.</p>}
     </section>}
-    {!primary && tab === 'workspace' && <>
+    {tab === 'workspace' && <>
       {engagements.length > 0 ? <div className="card campaign-engagement-toolbar">
         <label>Chiến dịch đang điều phối <select value={selectedEngagement?.campaign_id ?? ''} onChange={(event) => setSelectedId(event.target.value)}>
           {engagements.map((item) => <option key={item.id} value={item.campaign_id}>{item.campaign_name ?? item.campaign_id}</option>)}
@@ -178,24 +175,6 @@ export function CampaignCoordination({ user }: { user: Me }) {
       </div> : <div className="empty">Bạn chưa tham gia điều phối chiến dịch nào. Hãy chọn chiến dịch gấp.</div>}
       {selectedEngagement && <Coordinator key={selectedEngagement.campaign_id} page="queue" currentUserId={user.id} campaignId={selectedEngagement.campaign_id} />}
     </>}
-    {!primary && tab === 'my-history' && <div className="record-list">{myHistory.map((item) => <article className="card" key={item.id}>
-      <h3>{item.campaign_name ?? 'Chiến dịch'}</h3><p>Bắt đầu: {new Date(item.started_at).toLocaleString('vi-VN')}</p><p>{item.active ? 'Đang điều phối' : `Đã dừng: ${item.ended_at ? new Date(item.ended_at).toLocaleString('vi-VN') : 'phiên hết hạn'}`}</p>
-    </article>)}{!myHistory.length && <p className="empty">Chưa có lịch sử điều phối.</p>}</div>}
+    {tab === 'my-history' && <MyHistory items={myHistory} />}
   </section>;
-}
-
-function HistorySummary({ summary }: { summary: Summary | null }) {
-  if (!summary) return null;
-  return <section className="card"><h2>Tổng kết cứu trợ</h2>
-    <p>{summary.completed_requests} SOS hoàn tất · {summary.cancelled_requests} SOS hủy/từ chối · {summary.open_requests} SOS còn mở · {summary.completed_missions} nhiệm vụ hoàn tất.</p>
-    <p>Thời gian phản hồi trung vị: {summary.median_response_seconds == null ? 'Chưa đủ dữ liệu' : `${Math.round(summary.median_response_seconds / 60)} phút`}.</p>
-    <h3>Điều phối viên từng tham gia</h3><ul>{summary.coordinators.map((person) => <li key={person.user_id}>{person.display_name ?? person.user_id} · {Math.round(person.total_seconds / 60)} phút</li>)}</ul>
-  </section>;
-}
-
-function Timeline({ items }: { items: HistoryItem[] }) {
-  return <section className="record-list" aria-label="Dòng thời gian cứu trợ">{items.map((item) => <article className="card" key={`${item.occurred_at}:${item.event_type}:${item.request_id ?? item.mission_id ?? ''}`}>
-    <strong>{eventLabel[item.event_type] ?? item.event_type}</strong><p>{new Date(item.occurred_at).toLocaleString('vi-VN')} · {item.actor?.display_name ?? (item.actor ? 'Người dùng' : 'Hệ thống')}</p>
-    {item.request_id && <p>Mã hồ sơ: {item.request_id}</p>}{item.mission_id && <p>Mã nhiệm vụ: {item.mission_id}</p>}
-  </article>)}{!items.length && <p className="empty">Chưa có sự kiện trong lịch sử.</p>}</section>;
 }

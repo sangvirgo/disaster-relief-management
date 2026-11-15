@@ -74,3 +74,11 @@ export class CampaignReasonActionDto extends CampaignActionDto {
   @IsString() @MinLength(1) @Matches(/\S/u)
   reason!: string;
 }
+
+export class CampaignAreaDto extends CampaignActionDto {
+  @IsObject() @ValidateNested() @Type(() => CampaignCenterDto)
+  center!: CampaignCenterDto;
+
+  @Type(() => Number) @IsInt() @Min(CAMPAIGN_RADIUS_MIN_M) @Max(CAMPAIGN_RADIUS_MAX_M)
+  radius_m!: number;
+}

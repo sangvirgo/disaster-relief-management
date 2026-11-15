@@ -58,14 +58,23 @@ function arcgisNearbyAddress(value: unknown): string | null {
   return typeof result.address.Match_addr === 'string' ? result.address.Match_addr.trim() || null : null;
 }
 
+export type LocationOverlay = {
+  /** Radius (m) of the area being configured; drawn around the chosen point. */
+  radiusM?: number | null;
+  /** Other existing areas shown for context so overlaps are visible before saving. */
+  areas?: { id: string; label: string; latitude: number; longitude: number; radiusM: number }[];
+};
+
 export function LocationPicker({
   value,
   onSelect,
   initiallyOpen = false,
+  overlay,
 }: {
   value: Point | null;
   onSelect: (point: Point | null) => void;
   initiallyOpen?: boolean;
+  overlay?: LocationOverlay;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   const activeGoogleKey = envApiKey;
@@ -289,6 +298,29 @@ export function LocationPicker({
     if (pinMarkerRef.current) pinMarkerRef.current.setLatLng(position);
     else pinMarkerRef.current = L.marker(position, { icon: pinIcon, interactive: false, keyboard: false }).addTo(map);
   }, [draftPoint, open, mapEngine]);
+
+  // Area overlay: the configured radius around the chosen point, plus other areas as dashed context.
+  const overlayKey = JSON.stringify(overlay ?? null);
+  useEffect(() => {
+    const map = leafletMapRef.current;
+    if (!open || mapEngine !== 'osm' || !map) return;
+    const group = L.layerGroup();
+    for (const area of overlay?.areas ?? []) {
+      L.circle([area.latitude, area.longitude], {
+        radius: area.radiusM, color: '#64748b', weight: 1, dashArray: '4 4', fillOpacity: 0.05, interactive: false,
+      }).bindTooltip(area.label).addTo(group);
+    }
+    const center = draftPoint ?? value;
+    if (center && overlay?.radiusM) {
+      L.circle([center.latitude, center.longitude], {
+        radius: overlay.radiusM, color: '#2563eb', weight: 2, fillOpacity: 0.12, interactive: false,
+      }).addTo(group);
+    }
+    group.addTo(map);
+    return () => { group.remove(); };
+    // overlayKey stands in for overlay (new object each render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, mapEngine, draftPoint, value?.latitude, value?.longitude, overlayKey]);
 
   // Recenter and refresh the search text when coordinates are supplied outside the picker (for example, GPS).
   useEffect(() => {

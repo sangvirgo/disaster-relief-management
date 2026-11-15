@@ -1061,8 +1061,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     {item.review_lane === 'RATE_LIMITED_REVIEW' && <span className="chip chip--review">Báo lặp cần rà soát</span>}
                     {item.review_lane === 'PROXY_QUOTA_REVIEW' && <span className="chip chip--review">Báo hộ cần rà soát</span>}
                     {item.tracking_code.startsWith('C48HM') && <span className="chip">Mô phỏng</span>}
-                    {item.campaign_match_state === 'CONFLICT' && <span className="chip chip--review">Xung đột chiến dịch</span>}
-                    {item.campaign_match_state === 'UNMATCHED' && <span className="chip">Chưa thuộc vùng nào</span>}
+                    {item.campaign_match_state === 'CONFLICT' && <span className="chip chip--review">Trùng nhiều vùng chiến dịch</span>}
+                    {item.campaign_match_state === 'UNMATCHED' && <span className="chip">Ngoài mọi vùng chiến dịch</span>}
                     {item.campaign_match_state === 'AUTO_ATTACHED' && <span className="chip">Tự động gắn theo vị trí</span>}
                     {item.handled_by_name && <span className="chip">Đang do {item.handled_by_name} xử lý</span>}
                     {['SUBMITTED', 'VERIFYING'].includes(item.status) && item.fast_track && <>
@@ -1184,6 +1184,39 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </>
               ) : <p>Không có thông tin hồ sơ gốc trong phạm vi truy cập hiện tại.</p>)}
             </section>
+            {!(detail.fast_track && ['SUBMITTED', 'VERIFYING'].includes(detail.status)) && (() => {
+              const ai = detail.ai_priority_advisory;
+              const extracted = detail.ai_advisory?.extracted_json;
+              const done = ai?.status === 'COMPLETED' && ai.review_status !== 'REJECTED';
+              const status = ai?.status ?? detail.ai_advisory?.status;
+              return (
+                <section className="sos-ai-card" data-state={done ? 'done' : 'pending'} aria-label="Gợi ý của AI">
+                  <div className="sos-ai-card__head">
+                    <strong>Gợi ý của AI</strong>
+                    <span className="sos-ai-card__status">{done ? 'Đã đánh giá' : (advisoryStatusLabels[status ?? ''] ?? 'Chưa có đánh giá')}</span>
+                  </div>
+                  {done ? (
+                    <>
+                      <p className="sos-ai-card__verdict">
+                        {ai.suggested_priority ? <PriorityBadge priority={ai.suggested_priority} /> : <span>Chưa xác định mức</span>}
+                        {ai.score != null && <span>Điểm nguy cơ <b>{ai.score}</b>/100</span>}
+                        {ai.confidence != null && <span title="Mức chắc chắn do AI tự ước tính, chưa phải xác suất đúng đã kiểm định">Độ tin cậy ~{Math.round(ai.confidence * 100)}%</span>}
+                      </p>
+                      {extracted?.summary && <p>{extracted.summary}</p>}
+                      {ai.reasons.length > 0 && <p className="muted">Căn cứ: {ai.reasons.join(' · ')}</p>}
+                      {extracted?.weather_impact && <p className="muted">Thời tiết: {extracted.weather_impact}</p>}
+                    </>
+                  ) : (
+                    <p className="muted">
+                      {status === 'QUEUED' || status === 'PROCESSING'
+                        ? 'AI đang đánh giá, kết quả tự cập nhật sau ít phút.'
+                        : 'Chưa có đánh giá AI dùng được cho SOS này. Hãy xác minh thủ công.'}
+                    </p>
+                  )}
+                  <p className="sos-ai-card__note">Chỉ để tham khảo — điều phối viên quyết định mức ưu tiên và giao đội.</p>
+                </section>
+              );
+            })()}
             {detail.status === 'SUBMITTED' && <div className="sos-start-verification">
               {command({
                 title: 'Bắt đầu xác minh',
@@ -1861,9 +1894,9 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 <span className="detail-value">
                   {detail.campaign_id
                     ? campaignOptions.find((campaign) => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn'
-                    : detail.campaign_match_state === 'CONFLICT' ? 'Xung đột chiến dịch'
+                    : detail.campaign_match_state === 'CONFLICT' ? 'Trùng nhiều vùng chiến dịch'
                       : detail.campaign_match_state === 'AUTO_ATTACHED' ? 'Tự động gắn theo vị trí'
-                        : 'Chưa thuộc vùng chiến dịch'}
+                        : 'Ngoài mọi vùng chiến dịch'}
                 </span>
               </p>
             </div>

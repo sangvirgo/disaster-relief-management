@@ -6,7 +6,8 @@ import { AppError } from '@c48/technical/errors/errors';
 import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '@c48/technical/idempotency/idempotency';
 import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { Grant, hasPermission } from '@c48/identity-contracts/permissions';
-import { CampaignActionDto, CampaignCreateDto, CampaignPageQueryDto, CampaignPatchDto, CampaignReasonActionDto } from './campaigns.dto';
+import { CampaignActionDto, CampaignAreaDto, CampaignCreateDto, CampaignPageQueryDto, CampaignPatchDto, CampaignReasonActionDto } from './campaigns.dto';
+import { attachUnmatchedInArea } from './campaign-area';
 import {
   campaignNextStatus, campaignScopePredicate, campaignView, cleanCampaignName, CampaignAction, CampaignRow,
   publicCampaignView, validCampaignCursor, validateCampaignDates, validateCampaignSpatial,
@@ -140,6 +141,38 @@ export class CampaignsService {
     });
   }
 
+  /** Changes the coordination area of a live campaign and adopts unmatched SOS that fall inside the new area. */
+  async changeArea(id: string, dto: CampaignAreaDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
+    const session = await this.sessions.require(request);
+    return this.idempotency.execute(this.dataSource, {
+      scopeKey: `user:${session.userId}`,
+      command: 'response.campaign.area',
+      key,
+      requestHash: canonicalRequestHash({ actor_user_id: session.userId, campaign_id: id, dto }),
+      execute: async (manager) => {
+        const row = await this.findCampaign(manager, id, true);
+        this.assertCampaignPermission(session, row, 'CAMPAIGN_MANAGE');
+        this.assertVersion(row, dto.expected_version);
+        if (row.status === 'CLOSED') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+        validateCampaignSpatial(dto.center, dto.radius_m);
+        const [updated] = await manager.query(
+          `UPDATE campaign SET center=ST_SetSRID(ST_MakePoint($3::double precision,$2::double precision),4326)::geography,
+                  radius_m=$4::integer,version=version+1
+            WHERE id=$1 AND version=$5 RETURNING ${campaignColumns}`,
+          [id, dto.center.lat, dto.center.lng, dto.radius_m, dto.expected_version],
+        ) as [CampaignRow[], number];
+        const next = updated[0];
+        if (!next) throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
+        const before = campaignView(row);
+        const value = campaignView(next);
+        await this.audit(manager, session.userId, 'CAMPAIGN_AREA_CHANGED', id, before, value, null);
+        const attached = await attachUnmatchedInArea(manager, next, session.userId, 'CAMPAIGN_AREA_CHANGED');
+        return { status: 200, value: { ...value, attached_request_count: attached }, resource: { type: 'campaign', id } };
+      },
+      replay: async (manager, resource) => campaignView(await this.replayCampaign(manager, resource, session, 'CAMPAIGN_MANAGE')),
+    });
+  }
+
   async transition(
     id: string,
     action: CampaignAction,
@@ -188,6 +221,8 @@ export class CampaignsService {
           );
         }
         await this.audit(manager, session.userId, `CAMPAIGN_${action.toUpperCase()}`, id, before, value, reason);
+        // Activation adopts unmatched SOS already inside the campaign's area.
+        if (action === 'activate') await attachUnmatchedInArea(manager, next, session.userId, 'CAMPAIGN_ACTIVATED');
         return { status: 200, value, resource: { type: 'campaign', id } };
       },
       replay: async (manager, resource) => campaignView(await this.replayCampaign(manager, resource, session, 'CAMPAIGN_MANAGE')),

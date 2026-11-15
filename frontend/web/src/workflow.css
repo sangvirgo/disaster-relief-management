@@ -905,3 +905,11 @@
 .sos-suggestion__scores > div { display: grid; gap: 2px; }
 .sos-suggestion__scores dt { font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted, #64748b); }
 .sos-suggestion__scores dd { margin: 0; font-weight: 600; }
+
+.sos-ai-card { border: 1px solid #c7d2fe; background: #eef2ff; border-radius: 10px; padding: 12px 16px; margin: 12px 0; display: grid; gap: 6px; }
+.sos-ai-card[data-state='pending'] { border-style: dashed; background: #f8fafc; border-color: #cbd5e1; }
+.sos-ai-card p { margin: 0; }
+.sos-ai-card__head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.sos-ai-card__status { font-size: 0.8rem; color: #4338ca; font-weight: 600; }
+.sos-ai-card__verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+.sos-ai-card__note { font-size: 0.8rem; color: #64748b; }

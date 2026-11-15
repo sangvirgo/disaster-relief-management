@@ -2,7 +2,7 @@ import { useId, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload, type Service, type HttpMethod } from '../api/client';
 import { evidenceFileError } from '../i18n/evidence';
 import { SelectedFiles } from './ui/SelectedFiles';
-import { LocationPicker } from '../maps/LocationPicker';
+import { LocationPicker, type LocationOverlay } from '../maps/LocationPicker';
 import { confirmAction } from './confirmAction';
 
 export type Field = {
@@ -28,6 +28,8 @@ export type Field = {
   placeholder?: string;
   initialValue?: string;
   visibleWhen?: { field: string; value: string };
+  /** For `location` fields: area drawn on the map from the other form values. */
+  overlayFor?: (values: Record<string, string>) => LocationOverlay | undefined;
 };
 export interface CommandSpec {
   title: string;
@@ -330,6 +332,7 @@ export function CommandForm({
             <strong>{field.label}{isRequired(field, values) && <> <span className="required-mark" aria-hidden="true">*</span></>}</strong>
             <LocationPicker
               value={pointValue(values[field.name] || '')}
+              overlay={field.overlayFor?.(values)}
               onSelect={(point) => {
                 updateField(field, point ? `${point.longitude},${point.latitude}` : '');
               }}

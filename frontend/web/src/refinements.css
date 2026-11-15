@@ -1454,3 +1454,87 @@
   border: 0;
   box-shadow: none;
 }
+
+/* Primary coordinator: campaign-level suggestions beside the unmatched SOS queue. */
+.common-queue-suggestions {
+  display: grid;
+  gap: 12px;
+}
+
+.common-queue-suggestions .suggestion-group {
+  display: grid;
+  gap: 10px;
+}
+
+.common-queue-suggestions .suggestion-item {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.common-queue-suggestions .suggestion-item.is-highlighted {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.common-queue-suggestions .suggestion-item p {
+  margin: 0;
+}
+
+.common-queue-suggestions .suggestion-item { justify-items: stretch; }
+.common-queue-suggestions .suggestion-head {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px;
+}
+.common-queue-suggestions .suggestion-head .button { flex: none; }
+.common-queue-suggestions .sos-rows {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 4px;
+}
+.common-queue-suggestions .sos-rows li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  padding: 6px 10px; border-radius: 8px; background: rgba(100, 116, 139, 0.08);
+}
+.common-queue-suggestions .sos-rows li .button { margin-left: auto; }
+.common-queue-suggestions .sos-rows li.is-highlighted { outline: 2px solid #2563eb; }
+.common-queue-suggestions .sos-label { display: inline-flex; align-items: center; gap: 8px; }
+
+.campaign-area-label span {
+  display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; border: 2px solid; font-size: 12px; font-weight: 700;
+}
+.campaign-area-legend { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.campaign-area-legend li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.campaign-area-legend__badge {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid; font-size: 12px; font-weight: 700; background: #fff;
+}
+
+/* Relief history */
+.history-summary { display: grid; gap: 12px; margin: 12px 0; }
+.history-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.history-tile { display: grid; gap: 2px; padding: 12px 14px; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff; }
+.history-tile b { font-size: 1.5rem; line-height: 1.2; }
+.history-tile span { color: #64748b; font-size: 0.85rem; }
+.history-tile--good b { color: #059669; } .history-tile--warn b { color: #d97706; }
+.history-tile--info b { color: #2563eb; } .history-tile--muted b { color: #64748b; }
+.history-people { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 0; }
+.history-people em { font-style: normal; background: #f1f5f9; border-radius: 999px; padding: 2px 10px; font-size: 0.85rem; }
+.history-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.history-filter button { border: 1px solid #cbd5e1; background: #fff; border-radius: 999px; padding: 4px 14px; cursor: pointer; }
+.history-filter button.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+.history-day h3 { margin: 16px 0 8px; font-size: 0.9rem; text-transform: capitalize; color: #475569; }
+.history-day ol { list-style: none; margin: 0; padding: 0 0 0 18px; border-left: 2px solid #e2e8f0; display: grid; gap: 10px; }
+.history-event { display: flex; gap: 10px; position: relative; }
+.history-event__icon { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 50%; margin-left: -34px; background: #fff; border: 2px solid #cbd5e1; font-size: 14px; }
+.history-event--sos .history-event__icon { border-color: #f97316; }
+.history-event--mission .history-event__icon { border-color: #10b981; }
+.history-event--coordination .history-event__icon { border-color: #6366f1; }
+.history-event p { margin: 0; }
+.history-event__title { font-weight: 600; }
+.history-event__meta { color: #64748b; font-size: 0.85rem; }
+.history-event__note { font-size: 0.9rem; margin-top: 2px; }
+.history-code { margin-left: 8px; font-family: ui-monospace, monospace; font-size: 0.8rem; background: #f1f5f9; border-radius: 6px; padding: 1px 6px; }
+.history-sessions { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.history-sessions li { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; }
+.history-sessions p { margin: 2px 0 0; }
+.history-badge { border-radius: 999px; padding: 2px 12px; font-size: 0.8rem; background: #f1f5f9; color: #475569; white-space: nowrap; }
+.history-badge--live { background: #dcfce7; color: #166534; }

@@ -10,6 +10,7 @@ import { ReporterSession, ReporterSessionService } from '../requests/reporter-se
 import { openDangerStatuses, loadOperationsConfig } from '../operations/request-operations.helpers';
 
 import { ENGAGEMENT_TTL_MINUTES } from '../requests/engagement-ttl';
+import { AreaCampaign, buildCommonQueueSuggestions, OPEN_REQUEST_STATUSES, OpenRequestPoint } from './campaign-area';
 export { ENGAGEMENT_TTL_MINUTES };
 export const MAX_ACTIVE_ENGAGEMENTS = 3;
 const CLAIM_TTL_MINUTES = 15;
@@ -153,7 +154,7 @@ export class CampaignCoordinationService {
 
   async engage(campaignId: string, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    if (!campaignCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!canViewTriage(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `response.campaign-engagement:${session.userId}`,
       command: 'response.campaign.engage', key,
@@ -202,7 +203,7 @@ export class CampaignCoordinationService {
 
   async disengage(campaignId: string, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    if (!campaignCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!canViewTriage(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `response.campaign-engagement:${session.userId}`,
       command: 'response.campaign.disengage', key,
@@ -236,6 +237,33 @@ export class CampaignCoordinationService {
         ORDER BY ce.started_at DESC,ce.id DESC`, [session.userId],
     ) as SqlRows<EngagementRow>);
     return { items: found.map((item) => this.engagementView(item)) };
+  }
+
+  /** Control view for the primary coordinator: unmatched/conflicting SOS, clusters and one-click area suggestions. */
+  async commonQueueSuggestions(request: Request): Promise<Record<string, unknown>> {
+    const session = await this.sessions.require(request);
+    if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    const requests = rows(await this.dataSource.query(
+      `SELECT r.id,r.tracking_code,r.priority,r.status,r.version,r.campaign_match_state,
+              round(ST_Y(s.location::geometry)::numeric,3)::float8 AS latitude,
+              round(ST_X(s.location::geometry)::numeric,3)::float8 AS longitude
+         FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
+        WHERE r.campaign_id IS NULL AND r.campaign_match_state IN ('UNMATCHED','CONFLICT')
+          AND r.canonical_request_id IS NULL AND r.status IN (${OPEN_REQUEST_STATUSES})
+        ORDER BY r.received_at,r.id LIMIT 500`,
+    ) as SqlRows<Record<string, unknown>>).map((item): OpenRequestPoint => ({
+      id: String(item.id), tracking_code: String(item.tracking_code), priority: item.priority == null ? null : String(item.priority),
+      status: String(item.status), version: Number(item.version), campaign_match_state: String(item.campaign_match_state),
+      latitude: Number(item.latitude), longitude: Number(item.longitude),
+    }));
+    const campaigns = rows(await this.dataSource.query(
+      `SELECT id,name,status,version,radius_m,ST_Y(center::geometry) AS latitude,ST_X(center::geometry) AS longitude
+         FROM campaign WHERE status IN ('DRAFT','ACTIVE','PAUSED') AND center IS NOT NULL AND radius_m IS NOT NULL`,
+    ) as SqlRows<Record<string, unknown>>).map((item): AreaCampaign => ({
+      id: String(item.id), name: String(item.name), status: String(item.status), version: Number(item.version), radius_m: Number(item.radius_m),
+      latitude: Number(item.latitude), longitude: Number(item.longitude),
+    }));
+    return buildCommonQueueSuggestions(requests, campaigns);
   }
 
   async overview(request: Request): Promise<Record<string, unknown>> {
@@ -319,8 +347,14 @@ export class CampaignCoordinationService {
     const next = more ? page.at(-1) : undefined;
     const actorNames = await this.sessions.lookupUsers([...new Set(page.flatMap((item) => item.actor_user_id ? [item.actor_user_id] : []))]);
     const nameMap = new Map(actorNames.map((item) => [item.id, item.display_name]));
+    const requestIds = [...new Set(page.flatMap((item) => item.request_id ? [item.request_id] : []))];
+    const codeRows = requestIds.length
+      ? rows(await this.dataSource.query('SELECT id,tracking_code FROM assistance_request WHERE id=ANY($1::uuid[])', [requestIds]) as SqlRows<{ id: string; tracking_code: string }>)
+      : [];
+    const codeMap = new Map(codeRows.map((item) => [item.id, item.tracking_code]));
     return {
       items: page.map((item) => ({
+        tracking_code: item.request_id ? codeMap.get(item.request_id) ?? null : null,
         occurred_at: new Date(item.occurred_at).toISOString(), event_type: item.event_type,
         actor: item.actor_user_id ? { id: item.actor_user_id, display_name: nameMap.get(item.actor_user_id) ?? null } : null,
         request_id: item.request_id, mission_id: item.mission_id, payload: item.payload,

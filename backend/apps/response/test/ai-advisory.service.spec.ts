@@ -129,6 +129,27 @@ describe('AI advisory worker lifecycle', () => {
     expect(inputHash).toBe(aiAssessmentHash(facts, 2, 1));
     expect(query.mock.calls.find(([sql]) => sql.includes('INSERT INTO ai_daily_usage'))?.[1]).toEqual([0]);
   });
+  it('sends queued SOS in one Gemini call and settles each job by id', async () => {
+    process.env.GEMINI_API_KEY = 'unit-test';
+    const second = { ...job, id: '00000000-0000-4000-8000-000000000002', claim_token: '00000000-0000-4000-8000-000000000098' };
+    const third = { ...job, id: '00000000-0000-4000-8000-000000000003', claim_token: '00000000-0000-4000-8000-000000000097' };
+    const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
+    const worker = new AiAdvisoryService({ query } as unknown as DataSource);
+    const claim = jest.spyOn(worker as unknown as { claimJob(shared?: boolean): Promise<unknown> }, 'claimJob')
+      .mockResolvedValueOnce(job).mockResolvedValueOnce(second).mockResolvedValueOnce(third).mockResolvedValue(undefined);
+    const fetch = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ results: [{ id: 'S1', ...extraction }, { id: 'S3', ...extraction, suggested_priority: 'P2', priority_score: 50 }] }) }] } }] }),
+    } as Response);
+
+    await worker['processOne']();
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(claim.mock.calls.map(([shared]) => shared)).toEqual([undefined, true, true, true]);
+    const statuses = query.mock.calls.filter(([sql]) => String(sql).includes('UPDATE ai_advisory'))
+      .map(([sql, params]) => [String((params as unknown[])[0]), /COMPLETED/.test(String(sql)) ? 'COMPLETED' : 'FAILED']);
+    expect(statuses).toEqual([[job.id, 'COMPLETED'], [second.id, 'FAILED'], [third.id, 'COMPLETED']]);
+  });
   it('logs claim failure without database details and can run again', async () => {
     const transaction = jest.fn<() => Promise<undefined>>().mockRejectedValueOnce(new Error('secret connection string')).mockResolvedValueOnce(undefined);
     const worker = new AiAdvisoryService({ transaction } as unknown as DataSource);
