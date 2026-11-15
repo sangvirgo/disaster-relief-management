@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
 import { label, timeLabel } from '../../i18n/labels';
 import { evidenceFileError } from '../../i18n/evidence';
+import { SelectedFiles } from '../../components/ui/SelectedFiles';
 import type { components as ResponseComponents } from '../../api/generated/response';
 import { LocationPicker, type Point } from '../../maps/LocationPicker';
 import { confirmAction } from '../../components/confirmAction';
@@ -318,6 +319,7 @@ export function TrackingActions({
               <small>JPEG, PNG hoặc MP4</small>
             </span>
           </label>
+          <SelectedFiles files={file ? [file] : []} onRemove={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; fileKey.current = null; }} />
           {fileError && <small className="field-error" id="sos-evidence-file-error" role="alert">{fileError}</small>}
           <div className="tracking-evidence-actions">
             <button className="button" disabled={busy || !file || Boolean(fileError)}>Tải minh chứng lên</button>

@@ -490,6 +490,9 @@
 }
 
 .heatmap-canvas {
+  position: relative;
+  isolation: isolate;
+  z-index: 0;
   width: 100%;
   height: clamp(420px, 55vh, 620px);
   border: 1px solid var(--color-surface-border);

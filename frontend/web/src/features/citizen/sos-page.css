@@ -61,6 +61,8 @@
 .sos-form .location-map-panel { margin-top: 0; }
 .sos-form fieldset.sos-needs { display: grid; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; background: transparent; }
 .sos-needs legend { padding: 0 0 var(--space-2); font-weight: 650; }
+.sos-needs .sos-relief-items { display: grid; gap: var(--space-2); margin-top: var(--space-2); font-weight: 600; }
+.sos-needs .sos-relief-items textarea { width: 100%; min-height: 88px; resize: vertical; font-weight: 400; }
 .sos-needs .radio {
   min-height: 48px;
   padding: var(--space-2) var(--space-3);

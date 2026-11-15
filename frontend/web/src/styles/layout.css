@@ -609,3 +609,8 @@ html { zoom: 1.1; }
 }
 .pager__btn:hover:not(:disabled) { background: var(--color-surface-subtle); border-color: var(--color-primary); color: var(--color-primary); }
 .pager__btn:disabled { opacity: .45; cursor: not-allowed; }
+.admin-selected-action > label:has(> select) { position: relative; }
+.admin-selected-action > label:has(> select)::after { content: ''; position: absolute; right: var(--space-4); bottom: 20px; width: 8px; height: 8px; border-right: 2px solid var(--color-text-secondary); border-bottom: 2px solid var(--color-text-secondary); transform: rotate(45deg); pointer-events: none; }
+.admin-selected-action > label select { appearance: none; min-height: var(--control-h-lg); padding: 0 var(--space-6) 0 var(--space-4); border: 1px solid var(--color-surface-divider); border-radius: var(--radius-sm); background: var(--color-surface-card); color: var(--color-text-primary); font: 500 var(--text-body) var(--font-family); cursor: pointer; }
+.admin-selected-action > label select:hover { border-color: var(--color-primary); }
+.admin-selected-action > label select:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }

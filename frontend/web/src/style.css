@@ -51,9 +51,7 @@
   --sidebar-active-text: #2563eb;
 
   /* Typography đồng bộ font mobile hiện đại */
-  --font-family:
-    'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
-    Arial, sans-serif;
+  --font-family: Roboto, 'Segoe UI', Arial, sans-serif;
 
   /* Shadows & Radius đồng bộ Mobile */
   --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);

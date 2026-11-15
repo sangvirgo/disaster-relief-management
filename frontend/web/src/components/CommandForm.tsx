@@ -1,6 +1,7 @@
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload, type Service, type HttpMethod } from '../api/client';
 import { evidenceFileError } from '../i18n/evidence';
+import { SelectedFiles } from './ui/SelectedFiles';
 import { LocationPicker } from '../maps/LocationPicker';
 import { confirmAction } from './confirmAction';
 
@@ -408,7 +409,7 @@ export function CommandForm({
         );
       })}
       {spec.uploadPath && (
-        <label>
+        <div className="command-upload-field"><label>
           <span>{spec.uploadLabel || 'Ảnh hoặc video đối chiếu (không bắt buộc, tối đa 5 tệp)'}</span>
           <input type="file" multiple accept="image/jpeg,image/png,video/mp4"
             onChange={(event) => {
@@ -416,12 +417,13 @@ export function CommandForm({
               const problem = chosen.map(evidenceFileError).find(Boolean) ?? '';
               setFileError(problem || ((event.target.files?.length ?? 0) > 5 ? 'Chỉ nhận tối đa 5 tệp; các tệp thừa đã bị bỏ qua.' : ''));
               setFiles(problem ? [] : chosen);
-              if (problem) event.target.value = '';
+              event.target.value = '';
               pending.current = null;
             }} />
-          {files.length > 0 && <small>Đã chọn {files.length} tệp.</small>}
+          </label>
+          <SelectedFiles files={files} onRemove={(index) => { setFiles((current) => current.filter((_, position) => position !== index)); setFileError(''); pending.current = null; }} />
           {fileError && <small className="field-error" role="alert">{fileError}</small>}
-        </label>
+        </div>
       )}
       {message && (
         <p
