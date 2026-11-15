@@ -76,6 +76,7 @@ function reliefDescription(description: string | null | undefined) {
 }
 type AiPriorityAdvisory = {
   status: string;
+  suggested_priority?: 'P1' | 'P2' | 'P3' | 'P4' | null;
   score: number | null;
   level: 'CRITICAL' | 'HIGH' | 'ELEVATED' | 'STANDARD' | null;
   reasons: string[];
@@ -172,6 +173,8 @@ type Detail = QueueItem & {
     reason_codes: string[];
     extracted_json?: {
       summary?: string;
+      suggested_priority?: 'P1' | 'P2' | 'P3' | 'P4' | null;
+      weather_impact?: string;
       indicators?: string[];
       facts?: Record<string, unknown>;
       confidence?: number;
@@ -291,7 +294,7 @@ function SosCommandPopup({ spec, onSuccess, onStale }: { spec: CommandSpec; onSu
   if (!spec.fields?.length) return <CommandForm spec={spec} onSuccess={onSuccess} onStale={onStale} />;
   return <div className="sos-action-entry">
     <button type="button" className="button" onClick={() => setOpen(true)}>{spec.title}</button>
-    <DetailSurface modal open={open} label={spec.title} onClose={() => setOpen(false)}>
+    <DetailSurface modal open={open} label={spec.title} className="sos-command-dialog" onClose={() => setOpen(false)}>
       <CommandForm spec={spec} onSuccess={() => { setOpen(false); onSuccess(); }} onStale={onStale} />
     </DetailSurface>
   </div>;
@@ -448,6 +451,8 @@ const advisoryFactLabels: Record<string, string> = {
   needs_relief_supplies: 'Cần hàng cứu trợ',
 };
 const advisoryReasonLabels: Record<string, string> = {
+  CATASTROPHIC_TRAPPING: 'Có người mắc kẹt sau nổ hoặc sập',
+  FIRE_SMOKE_ENTRAPMENT: 'Có người kẹt trong khói lửa hoặc thiếu oxy',
   DECLARED_LIFE_DANGER: 'Người báo khai có nguy hiểm tính mạng',
   FLOOD_OR_TRAPPED: 'Có dấu hiệu ngập lụt hoặc mắc kẹt',
   CHILDREN_PRESENT: 'Có trẻ em',
@@ -553,7 +558,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     void loadCampaigns();
     return () => { live = false; };
   }, [revision]);
-  const refreshReasonRef = useRef<'success' | 'referral' | 'stale' | null>(null);
+  const refreshReasonRef = useRef<'success' | 'stale' | null>(null);
   const detailPanelRef = useRef<HTMLElement | null>(null);
   const listScrollRef = useRef(0);
   useEffect(() => {
@@ -682,9 +687,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             }
             setQueueStatus(value.status);
             setCursor('');
-            setUpdateMessage(reason === 'referral'
-              ? 'Đã ghi nhận việc chuyển cơ quan chức năng. Bản ghi có trong tab Lịch sử.'
-              : reason === 'success'
+            setUpdateMessage(reason === 'success'
                 ? `Đã cập nhật. Trạng thái hiện tại: ${requestStatusLabel(value.status)}.`
                 : `Đã tải lại hồ sơ. Trạng thái hiện tại: ${requestStatusLabel(value.status)}.`);
           }
@@ -751,10 +754,45 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     setRevision((value) => value + 1);
   }, []);
   const referralDone = useCallback(() => {
-    refreshReasonRef.current = 'referral';
-    setUpdateMessage('Đã gửi thao tác. Đang tải lại bản ghi chuyển cơ quan…');
-    setRevision((value) => value + 1);
-  }, []);
+    if (!detail) return;
+    const requestId = detail.id;
+    void (async () => {
+      setUpdateMessage('Đã ghi nhận chuyển cơ quan chức năng. Đang kiểm tra điều kiện đóng SOS…');
+      try {
+        let current = await api<Detail>('response', `/requests/${requestId}`);
+        if (!['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(current.status)) {
+          setUpdateMessage('Đã ghi nhận chuyển cơ quan. SOS cần được xác minh và đặt ưu tiên trước khi kết thúc.');
+          return;
+        }
+        const resolution = await api<{ operation_id: string }>('response', `/requests/${requestId}/resolve`, {
+          method: 'POST', idempotencyKey: newCommandKey(),
+          body: { expected_version: current.version, outcome_basis: 'NO_ACTION_REQUIRED',
+            resolution_reason: 'Đã chuyển thông tin cho cơ quan chức năng tiếp nhận; Reliva không tiếp tục điều đội hoặc cấp phát cho yêu cầu này.' },
+        });
+        for (let attempt = 0; attempt < 6; attempt++) {
+          const operation = await api<{ state: string }>('response', `/operations/${resolution.operation_id}`);
+          if (operation.state === 'ABORTED') throw new Error('Thao tác kết thúc đã bị hủy. Hãy kiểm tra lịch sử SOS.');
+          if (operation.state === 'COMPLETED') break;
+          if (attempt === 5) {
+            setUpdateMessage('Đã ghi nhận chuyển cơ quan. Thao tác kết thúc đang chờ; xem trạng thái trong hồ sơ trước khi đóng.');
+            return;
+          }
+          await new Promise((resolve) => window.setTimeout(resolve, 2000));
+        }
+        current = await api<Detail>('response', `/requests/${requestId}`);
+        if (current.status !== 'RESOLVED') throw new Error('SOS chưa ở trạng thái đã xử lý. Hãy kiểm tra lịch sử trước khi đóng.');
+        await api('response', `/requests/${requestId}/close`, {
+          method: 'POST', idempotencyKey: newCommandKey(), body: { expected_version: current.version },
+        });
+        setUpdateMessage('Đã ghi nhận chuyển cơ quan chức năng và đóng SOS.');
+      } catch (cause) {
+        const reason = cause instanceof Error ? cause.message : 'Không thể tự đóng SOS.';
+        setUpdateMessage(`Đã ghi nhận chuyển cơ quan. Chưa thể đóng SOS: ${reason} Kiểm tra điều kiện kết thúc trong hồ sơ.`);
+      } finally {
+        setRevision((value) => value + 1);
+      }
+    })();
+  }, [detail]);
   const runClaim = useCallback(async (action: 'claim' | 'release') => {
     if (!detail) return;
     setClaimBusy(true);
@@ -795,7 +833,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
   }
   function aiResubmitAction(status: string | undefined) {
     if (!detail) return null;
-    const title = 'Gửi lại cho AI đánh giá';
+    const title = status === 'SKIPPED' || status === 'STALE' || !detail.ai_advisory
+      ? 'Yêu cầu AI đánh giá' : 'Gửi lại cho AI đánh giá';
     if (status === 'FAILED' && detail.ai_advisory && !detail.ai_advisory.review_status) {
       return command({
         title, hideTitle: true, service: 'response',
@@ -1133,6 +1172,16 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </>
               ) : <p>Không có thông tin hồ sơ gốc trong phạm vi truy cập hiện tại.</p>)}
             </section>
+            {detail.status === 'SUBMITTED' && <div className="sos-start-verification">
+              {command({
+                title: 'Bắt đầu xác minh',
+                hideTitle: true,
+                service: 'response',
+                path: `/requests/${detail.id}/start-verification`,
+                version: detail.version,
+                warning: 'Bắt đầu xác minh yêu cầu này?',
+              })}
+            </div>}
             </div>
             <div className="sos-tab-group" hidden={activeTab !== 'overview'}>
             {detail.fast_track && ['SUBMITTED', 'VERIFYING'].includes(detail.status) && (() => {
@@ -1141,6 +1190,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               const ai = detail.ai_priority_advisory;
               const aiDone = ai?.status === 'COMPLETED' && ai.review_status !== 'REJECTED';
               const aiStatus = ai?.status;
+              const urgentMedicalReview = ft.reason_codes.includes('URGENT_MEDICAL_REVIEW_REQUIRED');
               return (
               <section className="sos-decision" data-tone={ft.eligible ? 'ready' : 'review'} aria-label="Quyết định xử lý">
                 <div className="sos-decision__head">
@@ -1165,12 +1215,12 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </>}
                 <dl className="sos-decision__scores">
                   <div>
-                    <dt>Quy tắc</dt>
+                    <dt title="Điểm từ dấu hiệu trong hồ sơ SOS; không phải độ tin cậy của AI">Điểm quy tắc</dt>
                     <dd>{rule?.score != null ? <><b>{rule.score}</b>/100</> : '—'}</dd>
                   </div>
                   <div>
-                    <dt>AI Gemini</dt>
-                    <dd>{aiDone && ai.score != null ? <><b>{ai.score}</b>/100{ai.confidence !== null ? <small> · tin cậy {Math.round(ai.confidence * 100)}%</small> : null}</> : '—'}</dd>
+                    <dt title="Mức chắc chắn do AI tự ước tính, chưa phải xác suất đúng đã kiểm định">Độ tin cậy</dt>
+                    <dd>{aiDone && ai.confidence != null ? <><b>{Math.round(ai.confidence * 100)}%</b></> : '—'}</dd>
                   </div>
                   <div className="sos-decision__aistatus">
                     <dt>Trạng thái AI</dt>
@@ -1178,9 +1228,13 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   </div>
                 </dl>
                 {aiDone && detail.ai_advisory?.extracted_json?.summary && (
-                  <p className="sos-decision__summary">{detail.ai_advisory.extracted_json.summary}</p>
+                  <p className="sos-decision__summary">
+                    <strong>AI gợi ý {ai?.suggested_priority ?? 'chưa xác định'}:</strong>{' '}
+                    {detail.ai_advisory.extracted_json.summary}
+                    {detail.ai_advisory.extracted_json.weather_impact && <> Thời tiết: {detail.ai_advisory.extracted_json.weather_impact}</>}
+                  </p>
                 )}
-                <div className="sos-decision__actions">
+                <div className={`sos-decision__actions${ft.eligible ? '' : ' sos-decision__actions--single'}`} key={`${aiStatus ?? 'NONE'}:${detail.ai_advisory?.id ?? ''}`}>
                   {ft.eligible && <>
                     {command({
                       title: `Xác nhận ${ft.suggested_priority} và chọn đội`,
@@ -1189,7 +1243,11 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       version: detail.version,
                       hideTitle: true,
                       warning: `Bạn đã xem thông tin SOS và đồng ý xác minh, đặt mức ưu tiên ${ft.suggested_priority}? Bước tiếp theo là chọn đội.`,
-                      build: () => ({ confirmed: true }),
+                      fields: urgentMedicalReview ? [{
+                        name: 'note', label: 'Nội dung đã đối chiếu và căn cứ xác minh',
+                        type: 'textarea', required: true, maxLength: 1000,
+                      }] : undefined,
+                      build: (values) => ({ confirmed: true, ...(urgentMedicalReview ? { note: values.note } : {}) }),
                     })}
                     {secondaryCommand({
                       title: 'Chọn mức ưu tiên khác',
@@ -1210,20 +1268,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               </section>
               );
             })()}
-            {(!detail.fast_track || !['SUBMITTED', 'VERIFYING'].includes(detail.status)) && <section className="sos-decision" aria-label="Gợi ý AI">
-              <h3>AI hỗ trợ quyết định</h3>
-              <p>{detail.ai_priority_advisory?.status === 'COMPLETED' && detail.ai_priority_advisory.score !== null
-                ? `Điểm gợi ý ${detail.ai_priority_advisory.score}/100 · ${advisoryLevelLabels[detail.ai_priority_advisory.level || ''] || 'Cần đối chiếu'}`
-                : advisoryStatusLabels[detail.ai_priority_advisory?.status || ''] || 'Chưa có đánh giá'}</p>
-              {detail.ai_advisory?.extracted_json?.summary && <p>{detail.ai_advisory.extracted_json.summary}</p>}
-              <p>Đối chiếu dữ liệu gốc và chọn mức ưu tiên theo nhận định của điều phối viên.</p>
-              {aiResubmitAction(detail.ai_priority_advisory?.status ?? detail.ai_advisory?.status)}
-              {detail.status === 'VERIFIED' && <button type="button" className="button secondary" onClick={() => document.getElementById('request-actions')?.scrollIntoView({ block: 'center' })}>Đến bước xác nhận ưu tiên</button>}
-              {['SUBMITTED', 'VERIFYING', 'VERIFIED'].includes(detail.status) && (!detail.ai_advisory || ['STALE', 'SKIPPED'].includes(detail.ai_advisory.status)) && command({
-                title: 'Nhờ AI đánh giá', service: 'response', path: `/requests/${detail.id}/ai-advisories`, version: detail.version,
-                warning: 'Gửi thông tin SOS đã rút gọn cho AI đánh giá? Kết quả chỉ để tham khảo.',
-              })}
-            </section>}
             </div>
             <div className="sos-tab-group" hidden={activeTab !== 'overview'}>
             {pendingSupplements.map((event) => {
@@ -1278,11 +1322,16 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   hideTitle: true,
                   service: 'response',
                   path: `/requests/${detail.id}/authority-referrals`,
-                  build: () => ({
-                    referred_body: 'Cơ quan chức năng (chưa ghi rõ)',
-                    note: `Điều phối viên xác nhận đã liên hệ và chuyển thông tin yêu cầu ${detail.tracking_code} đến cơ quan chức năng; chưa ghi rõ đơn vị tiếp nhận.`,
+                  fields: [
+                    { name: 'referred_body', label: 'Cơ quan tiếp nhận', type: 'text', required: true, maxLength: 200 },
+                    { name: 'note', label: 'Cách thức và nội dung đã chuyển', type: 'textarea', required: true, maxLength: 1000 },
+                  ],
+                  build: (values) => ({
+                    referred_body: values.referred_body,
+                    note: values.note,
+                    expected_version: detail.version,
                   }),
-                  warning: 'Bạn xác nhận đã liên hệ và chuyển thông tin yêu cầu này cho cơ quan chức năng? Tên đơn vị tiếp nhận chưa được ghi rõ.',
+                  warning: 'Xác nhận đã chuyển yêu cầu cho cơ quan chức năng được ghi rõ? Hệ thống sẽ thử kết thúc và đóng SOS nếu đủ điều kiện.',
                 }, undefined, referralDone)}
               {!detail.campaign_id &&
                 secondaryCommand({
@@ -1310,16 +1359,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </p>
               )}
               </div>
-              <div className="sos-tab-group sos-action-row" hidden={activeTab !== 'overview'}>
-              {detail.status === 'SUBMITTED' &&
-                command({
-                  title: 'Bắt đầu xác minh',
-                  hideTitle: true,
-                  service: 'response',
-                  path: `/requests/${detail.id}/start-verification`,
-                  version: detail.version,
-                  warning: 'Bắt đầu xác minh yêu cầu này?',
-                })}
+              <div className="sos-tab-group sos-action-row" hidden={activeTab !== 'overview' || !['VERIFYING', 'VERIFIED'].includes(detail.status)}>
               {detail.status === 'VERIFYING' && (
                 <>
                   {detail.report_mode === 'PROXY' && detail.timeline.items.some(event => event.event_type === 'VERIFICATION_STARTED' && event.actor_user_id === currentUserId) &&
@@ -1922,6 +1962,12 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </p>
                 {detail.ai_priority_advisory?.status === 'COMPLETED' && (
                   <>
+                    <p><strong>AI gợi ý {detail.ai_priority_advisory.suggested_priority ?? 'chưa xác định'}</strong>
+                      {detail.ai_priority_advisory.confidence != null ? ` · Độ tin cậy tự ước tính ${Math.round(detail.ai_priority_advisory.confidence * 100)}%` : ''}
+                    </p>
+                    {detail.ai_advisory.extracted_json?.summary && <p><strong>Tóm tắt tình huống:</strong> {detail.ai_advisory.extracted_json.summary}</p>}
+                    {detail.ai_advisory.extracted_json?.weather_impact && <p><strong>Ảnh hưởng thời tiết:</strong> {detail.ai_advisory.extracted_json.weather_impact}</p>}
+                    {detail.ai_priority_advisory.reasons.length > 0 && <p><strong>Căn cứ gợi ý:</strong> {detail.ai_priority_advisory.reasons.join(' · ')}</p>}
                     {detail.ai_advisory.extracted_json?.facts && (
                       <p>
                         <strong>Dữ kiện AI trích xuất:</strong>{' '}

@@ -51,19 +51,29 @@ export function scoreRequestRisk(facts: RiskFacts): { score: number | null; reas
   const add = (points: number, code: string) => { score += points; reasons.push(code); };
   // A reported life threat stays a prominent coordinator flag; it is not an automatic score input.
   if (facts.reporterDeclaredDanger) reasons.push('DECLARED_LIFE_DANGER');
+  const trapped = /\b(mac ket|bi ket|ket trong|ket duoi|ket nua nguoi|bi vui|vui lap)\b/u.test(text)
+    && !/\b(khong|chua)\s+(?:(?:co\s+)?(?:ai|nguoi)\s+)?(?:bi\s+)?(?:mac\s+)?ket\b/u.test(text);
+  const catastrophicTrapping = /\b(no tung|phat no|sap nha|nha sap|sap tuong|do nat)\b/u.test(text) && trapped;
+  if (catastrophicTrapping) add(80, 'CATASTROPHIC_TRAPPING');
+  const smokeOrFire = /\b(chay nha|lua chay|khoi lua|khoi day|khoi nghi ngut|ngat khoi|bep ga boc khoi)\b/u.test(text);
+  const oxygenDanger = /\b(thieu oxi|thieu oxy|ngat khoi|ngat tho|khong tho duoc|sac khoi)\b/u.test(text)
+    && !/\b(khong|chua)\s+(?:bi\s+)?(?:thieu\s+oxi|thieu\s+oxy|ngat\s+khoi|ngat\s+tho|sac\s+khoi)\b/u.test(text);
+  const fireSmokeEntrapment = !catastrophicTrapping && smokeOrFire && (trapped || oxygenDanger);
+  if (fireSmokeEntrapment) add(80, 'FIRE_SMOKE_ENTRAPMENT');
   if (/lu lut|nuoc dang|nuoc len|mac ket|tren mai|bi co lap/.test(text)) add(25, 'FLOOD_OR_TRAPPED');
   if ((facts.childrenCount ?? 0) > 0) add(Math.min(20, 12 + Math.min(4, facts.childrenCount!) * 2), 'CHILDREN_PRESENT');
   if ((facts.elderlyCount ?? 0) > 0) add(10, 'ELDERLY_PRESENT');
   if ((facts.peopleAffected ?? 0) >= 10) {
     add(Math.min(12, 4 + Math.floor(((facts.peopleAffected ?? 10) - 10) / 10) * 2), 'LARGE_GROUP_AFFECTED');
   }
-  const urgentMedicalRisk = /kho tho|bat tinh|ngat xiu|cap cuu/.test(text);
+  const urgentMedicalRisk = /kho tho|bat tinh|ngat xiu|cap cuu/.test(text) || oxygenDanger;
   if (urgentMedicalRisk) reasons.push('URGENT_MEDICAL_REVIEW_REQUIRED');
   else if (/bi thuong|chay mau/.test(text)) add(15, 'INJURY_OR_MEDICAL');
-  const hasRiskEvidence = reasons.includes('FLOOD_OR_TRAPPED') || reasons.includes('INJURY_OR_MEDICAL');
+  const directLifeThreat = catastrophicTrapping || fireSmokeEntrapment;
+  const hasRiskEvidence = directLifeThreat || reasons.includes('FLOOD_OR_TRAPPED') || reasons.includes('INJURY_OR_MEDICAL');
   if (facts.needsRescue) add(6, 'RESCUE_REQUESTED');
   if (facts.needsReliefSupplies && !facts.needsRescue) add(3, 'RELIEF_SUPPLIES_ONLY');
-  return { score: !urgentMedicalRisk && hasRiskEvidence ? Math.min(100, score) : null, reasonCodes: reasons };
+  return { score: (!urgentMedicalRisk || directLifeThreat) && hasRiskEvidence ? Math.min(100, score) : null, reasonCodes: reasons };
 }
 
 export type RiskAttentionLevel = 'CRITICAL' | 'HIGH' | 'ELEVATED' | 'STANDARD';

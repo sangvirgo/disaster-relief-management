@@ -5,10 +5,11 @@ describe('AI priority advisory view', () => {
     expect(aiPriorityAdvisory({
       model: 'gemini-3.5-flash-lite',
       status: 'COMPLETED',
-      extracted_json: { priority_score: 74, priority_reasons: ['Có dấu hiệu cháy lan.'], confidence: 0.82 },
+      extracted_json: { suggested_priority: 'P1', priority_score: 74, priority_reasons: ['Có dấu hiệu cháy lan.'], confidence: 0.82 },
       review_status: null,
     })).toEqual({
       status: 'COMPLETED',
+      suggested_priority: 'P1',
       score: 74,
       level: 'CRITICAL',
       reasons: ['Có dấu hiệu cháy lan.'],
@@ -27,6 +28,7 @@ describe('AI priority advisory view', () => {
       review_status: 'ACCEPTED',
     })).toEqual({
       status: 'COMPLETED',
+      suggested_priority: null,
       score: null,
       level: null,
       reasons: [],

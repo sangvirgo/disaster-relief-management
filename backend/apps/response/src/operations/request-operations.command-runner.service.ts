@@ -16,6 +16,7 @@ export const CLAIM_GUARDED_COMMANDS: ReadonlySet<string> = new Set([
   'response.requests.fast-track',
   'response.requests.attach-campaign',
   'response.requests.detach-campaign',
+  'response.requests.authority-referral',
 ]);
 
 @Injectable()

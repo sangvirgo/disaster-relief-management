@@ -1222,6 +1222,7 @@ export function applyOpenApiDetails(document, service) {
     }, ['outcome', 'score', 'level', 'reason_codes', 'source', 'rules_version']);
     const aiPriorityAdvisory = object({
       status: { type: 'string', enum: ['QUEUED', 'PROCESSING', 'COMPLETED', 'SKIPPED', 'FAILED', 'STALE', 'UNKNOWN'] },
+      suggested_priority: { anyOf: [{ type: 'string', enum: ['P1', 'P2', 'P3', 'P4'] }, { type: 'null' }] },
       score: { anyOf: [{ type: 'integer', minimum: 0, maximum: 100 }, { type: 'null' }] },
       level: { anyOf: [{ type: 'string', enum: ['CRITICAL', 'HIGH', 'ELEVATED', 'STANDARD'] }, { type: 'null' }] },
       reasons: array(text),
@@ -1229,7 +1230,12 @@ export function applyOpenApiDetails(document, service) {
       source: { type: 'string', enum: ['GEMINI', 'DEMO_FIXTURE'] },
       human_review_required: { type: 'boolean', const: true },
       review_status: { anyOf: [{ type: 'string', enum: ['ACCEPTED', 'ADJUSTED', 'REJECTED'] }, { type: 'null' }] },
-    }, ['status', 'score', 'level', 'reasons', 'confidence', 'source', 'human_review_required', 'review_status']);
+    }, ['status', 'suggested_priority', 'score', 'level', 'reasons', 'confidence', 'source', 'human_review_required', 'review_status']);
+    const authorityReferral = document.components.schemas.AuthorityReferralRequest;
+    if (authorityReferral) {
+      authorityReferral.required = [...new Set([...(authorityReferral.required ?? []), 'expected_version'])];
+      authorityReferral.properties.expected_version = { type: 'integer', minimum: 1 };
+    }
     const queueItem = document.components.schemas.RequestQueueItem;
     if (queueItem) {
       queueItem.required = [...new Set([...(queueItem.required ?? []), 'priority_advisory', 'ai_priority_advisory', 'handled_by', 'handled_at', 'handled_by_name'])];

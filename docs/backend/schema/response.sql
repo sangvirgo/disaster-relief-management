@@ -295,7 +295,7 @@ CREATE INDEX ai_advisory_request_idx ON ai_advisory (request_id, created_at DESC
 
 CREATE TABLE ai_daily_usage (
   usage_date date PRIMARY KEY,
-  calls int NOT NULL CHECK (calls BETWEEN 0 AND 500),
+  calls int NOT NULL CHECK (calls >= 0),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 

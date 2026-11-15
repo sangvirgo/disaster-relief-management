@@ -15742,6 +15742,22 @@
                                           "UNKNOWN"
                                         ]
                                       },
+                                      "suggested_priority": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "P1",
+                                              "P2",
+                                              "P3",
+                                              "P4"
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
                                       "score": {
                                         "anyOf": [
                                           {
@@ -15817,6 +15833,7 @@
                                     },
                                     "required": [
                                       "status",
+                                      "suggested_priority",
                                       "score",
                                       "level",
                                       "reasons",
@@ -16486,6 +16503,22 @@
                                             "UNKNOWN"
                                           ]
                                         },
+                                        "suggested_priority": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "enum": [
+                                                "P1",
+                                                "P2",
+                                                "P3",
+                                                "P4"
+                                              ]
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
                                         "score": {
                                           "anyOf": [
                                             {
@@ -16561,6 +16594,7 @@
                                       },
                                       "required": [
                                         "status",
+                                        "suggested_priority",
                                         "score",
                                         "level",
                                         "reasons",
@@ -16893,7 +16927,8 @@
         "type": "object",
         "required": [
           "referred_body",
-          "note"
+          "note",
+          "expected_version"
         ],
         "additionalProperties": false,
         "properties": {
@@ -16906,6 +16941,10 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1000
+          },
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
           }
         }
       },

@@ -416,6 +416,7 @@ try {
   assertVietnameseError(lowerPriorityWithoutReason, 400, 'REASON_REQUIRED');
 
   const referral = await command(`requests/${self.id}/authority-referrals`, coordinator, {
+    expected_version: 4,
     referred_body: 'Cơ quan phòng chống thiên tai', note: 'Đã chuyển thông tin qua điện thoại.',
   });
   assert.equal(referral.status, 201, JSON.stringify(referral.value));
