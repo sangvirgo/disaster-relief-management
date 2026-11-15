@@ -1990,6 +1990,7 @@ export interface components {
             ai_priority_advisory: {
                 /** @enum {string} */
                 status: "QUEUED" | "PROCESSING" | "COMPLETED" | "SKIPPED" | "FAILED" | "STALE" | "UNKNOWN";
+                suggested_priority: ("P1" | "P2" | "P3" | "P4") | null;
                 score: number | null;
                 level: ("CRITICAL" | "HIGH" | "ELEVATED" | "STANDARD") | null;
                 reasons: string[];
@@ -2145,6 +2146,7 @@ export interface components {
             ai_priority_advisory: {
                 /** @enum {string} */
                 status: "QUEUED" | "PROCESSING" | "COMPLETED" | "SKIPPED" | "FAILED" | "STALE" | "UNKNOWN";
+                suggested_priority: ("P1" | "P2" | "P3" | "P4") | null;
                 score: number | null;
                 level: ("CRITICAL" | "HIGH" | "ELEVATED" | "STANDARD") | null;
                 reasons: string[];
@@ -2236,6 +2238,7 @@ export interface components {
         AuthorityReferralRequest: {
             referred_body: string;
             note: string;
+            expected_version: number;
         };
         SupplementReviewRequest: {
             expected_version: number;

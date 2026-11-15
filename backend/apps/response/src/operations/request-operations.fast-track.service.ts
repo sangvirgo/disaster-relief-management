@@ -68,6 +68,9 @@ export class RequestOperationsFastTrackService {
         if (!assessment.eligible) {
           throw new AppError('FAST_TRACK_NOT_ELIGIBLE', { status: 409, details: { blockers: assessment.blockers } });
         }
+        if (assessment.reason_codes.includes('URGENT_MEDICAL_REVIEW_REQUIRED') && !note) {
+          throw new AppError('REASON_REQUIRED', { status: 400 });
+        }
         const priority = dto.priority ?? assessment.suggested_priority;
         if (priority !== assessment.suggested_priority && !note) throw new AppError('REASON_REQUIRED', { status: 400 });
 

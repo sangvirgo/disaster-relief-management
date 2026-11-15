@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
 import { useLoadMore } from '../../api/useCursorPages';
 import { LoadMore } from '../../components/ui/Pager';
+import { SelectedFiles } from '../../components/ui/SelectedFiles';
 import { label } from '../../i18n/labels';
 import { formatQuantity, quantityFitsScale, remainingQuantity } from '../../i18n/quantity';
 import { evidenceFileError as donationEvidenceError } from '../../i18n/evidence';
@@ -774,6 +775,7 @@ export function Donations({ user }: { user: Me | null }) {
                   }}
                 />
               </label>
+              <SelectedFiles files={file ? [file] : []} onRemove={() => { setFile(null); if (evidenceInput.current) evidenceInput.current.value = ''; uploadKey.current = null; }} />
               {evidenceError && <small className="field-error" id="donation-evidence-error" role="alert">{evidenceError}</small>}
               <button className="button donation-action" disabled={loading || !file || Boolean(evidenceError)}>
                 Tải minh chứng lên
@@ -845,6 +847,7 @@ export function Donations({ user }: { user: Me | null }) {
               onChange={(e) => { setCreatedFile(e.target.files?.[0] || null); setCreatedUploadMessage(''); }}
             />
           </label>
+          <SelectedFiles files={createdFile ? [createdFile] : []} onRemove={() => { setCreatedFile(null); if (createdFileInput.current) createdFileInput.current.value = ''; }} />
           {createdEvidenceError && <small className="field-error" id="created-donation-evidence-error" role="alert">{createdEvidenceError}</small>}
           <button className="button donation-action" disabled={loading || !createdFile || Boolean(createdEvidenceError)}>
             Tải ảnh kiện hàng lên

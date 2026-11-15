@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
 import { evidenceFileError } from '../../i18n/evidence';
+import { SelectedFiles } from '../../components/ui/SelectedFiles';
 import type { Me } from '../../auth/session';
 import { me } from '../../auth/session';
 import type { components as ResponseComponents } from '../../api/generated/response';
@@ -72,6 +73,7 @@ export function SosForm({
   const [danger, setDanger] = useState(initialDraft?.danger ?? false);
   const [needsRescue, setNeedsRescue] = useState(initialDraft?.needsRescue ?? true);
   const [needsRelief, setNeedsRelief] = useState(initialDraft?.needsRelief ?? false);
+  const [reliefItems, setReliefItems] = useState(initialDraft?.reliefItems ?? '');
   const [longitude, setLongitude] = useState(initialDraft?.longitude ?? '');
   const [latitude, setLatitude] = useState(initialDraft?.latitude ?? '');
   const [source, setSource] = useState<'MANUAL_PIN' | 'GPS'>('MANUAL_PIN');
@@ -100,7 +102,7 @@ export function SosForm({
     if (created) return;
     const draft: SosDraft = {
       mode, category, description, people, children, elderly, name, phone,
-      beneficiaryPhone, alternateName, alternatePhone, danger, needsRescue, needsRelief,
+      beneficiaryPhone, alternateName, alternatePhone, danger, needsRescue, needsRelief, reliefItems,
       longitude, latitude, relationship, informationSource, situationAt, contactability,
     };
     const hasInput = Object.entries(draft).some(([field, value]) =>
@@ -109,7 +111,7 @@ export function SosForm({
     if (hasInput) writeSosDraft(user?.id, draft);
     else clearSosDraft(user?.id);
   }, [user?.id, created, mode, category, description, people, children, elderly, name, phone,
-    beneficiaryPhone, alternateName, alternatePhone, danger, needsRescue, needsRelief,
+    beneficiaryPhone, alternateName, alternatePhone, danger, needsRescue, needsRelief, reliefItems,
     longitude, latitude, relationship, informationSource, situationAt, contactability]);
 
   function discardDraft() {
@@ -119,7 +121,7 @@ export function SosForm({
     setMode('SELF'); setCategory(''); setDescription(''); setPeople(''); setChildren('');
     setElderly(''); setName(''); setPhone(''); setBeneficiaryPhone('');
     setAlternateName(''); setAlternatePhone(''); setDanger(false); setNeedsRescue(true);
-    setNeedsRelief(false); setLongitude(''); setLatitude(''); setSource('MANUAL_PIN');
+    setNeedsRelief(false); setReliefItems(''); setLongitude(''); setLatitude(''); setSource('MANUAL_PIN');
     setAccuracy(null); setCaptured(null); setRelationship(''); setInformationSource('');
     setSituationAt(''); setContactability('UNKNOWN'); setProxyContactsOpen(false);
     setError(''); setFieldError(null); setTouched({}); setAttempted(false);
@@ -167,7 +169,9 @@ export function SosForm({
   function getClientErrors(): Record<string, string> {
     const errors: Record<string, string> = {};
     if (!category) errors.category = 'Loại sự cố là bắt buộc.';
-    if (description.length > 2000) errors.description = 'Mô tả không được vượt quá 2.000 ký tự.';
+    const fullDescription = [description.trim(), needsRelief && reliefItems.trim() ? `Hàng cứu trợ cần: ${reliefItems.trim()}` : ''].filter(Boolean).join('\n');
+    if (fullDescription.length > 2000) errors.description = 'Tổng nội dung mô tả và hàng cứu trợ không được vượt quá 2.000 ký tự.';
+    if (reliefItems.length > 300) errors.reliefItems = 'Nhu cầu hàng cứu trợ không được vượt quá 300 ký tự.';
     if (name.length > 200) errors.name = 'Họ tên người báo không được vượt quá 200 ký tự.';
     for (const [field, value] of [['phone', phone], ['beneficiaryPhone', beneficiaryPhone], ['alternatePhone', alternatePhone]] as const) {
       if (!value.trim()) continue;
@@ -228,7 +232,9 @@ export function SosForm({
       reporter_declared_danger: danger,
       needs_rescue: needsRescue,
       needs_relief_supplies: needsRelief,
-      ...(description.trim() ? { description: description.trim() } : {}),
+      ...([description.trim(), needsRelief && reliefItems.trim() ? `Hàng cứu trợ cần: ${reliefItems.trim()}` : ''].filter(Boolean).length
+        ? { description: [description.trim(), needsRelief && reliefItems.trim() ? `Hàng cứu trợ cần: ${reliefItems.trim()}` : ''].filter(Boolean).join('\n') }
+        : {}),
       ...(people ? { people_affected: Number(people) } : {}),
       ...(children ? { children_count: Number(children) } : {}),
       ...(elderly ? { elderly_count: Number(elderly) } : {}),
@@ -491,6 +497,19 @@ export function SosForm({
                 />{' '}
                 Cần hàng cứu trợ (lương thực, nước uống, vật dụng)
               </label>
+              {needsRelief && <label className="sos-relief-items">
+                Hàng cứu trợ cần (nếu biết)
+                <textarea
+                  data-sos-field="reliefItems"
+                  rows={2}
+                  maxLength={301}
+                  value={reliefItems}
+                  aria-invalid={fieldInvalid('reliefItems')}
+                  onChange={(event) => { setReliefItems(event.target.value); pending.current = null; }}
+                  placeholder="Ví dụ: nước uống, lương thực, thuốc, chăn màn…"
+                />
+                {fieldMessage('reliefItems')}
+              </label>}
               {fieldMessage('needs')}
             </fieldset>
           </Card>
@@ -573,13 +592,14 @@ export function SosForm({
                     const problem = chosen.map(evidenceFileError).find(Boolean) ?? '';
                     setFileMessage(problem || ((e.target.files?.length ?? 0) > 5 ? 'Chỉ nhận tối đa 5 tệp; các tệp thừa đã bị bỏ qua.' : ''));
                     setFiles(problem ? [] : chosen);
-                    if (problem) e.target.value = '';
+                    e.target.value = '';
                   }} />
                 <span className="sos-upload-button"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4" /><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>Chọn tệp</span>
                 <span className="sos-upload-status" aria-live="polite">{files.length ? `Đã chọn ${files.length}/5 tệp` : 'Chưa chọn tệp'}</span>
               </span>
               {fileMessage && <span className="sos-field-error" role="alert">{fileMessage}</span>}
             </label>
+            <SelectedFiles files={files} onRemove={(index) => { setFiles((current) => current.filter((_, position) => position !== index)); setFileMessage(''); }} />
           </Card>
           <Card className="sos-step-card" aria-labelledby="sos-contact-title">
             <h2 id="sos-contact-title"><span className="sos-step-number" aria-hidden="true">4</span>Người liên hệ</h2>

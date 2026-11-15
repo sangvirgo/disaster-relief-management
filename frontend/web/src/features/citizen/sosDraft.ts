@@ -13,6 +13,7 @@ export type SosDraft = {
   danger: boolean;
   needsRescue: boolean;
   needsRelief: boolean;
+  reliefItems?: string;
   longitude: string;
   latitude: string;
   relationship: string;
@@ -44,6 +45,7 @@ export function readSosDraft(userId?: string | null): SosDraft | null {
       'relationship', 'informationSource', 'situationAt', 'contactability',
     ];
     if (!textFields.every((field) => typeof draft[field] === 'string') ||
+      (draft.reliefItems !== undefined && typeof draft.reliefItems !== 'string') ||
       !['SELF', 'PROXY'].includes(draft.mode) ||
       !['UNKNOWN', 'REACHABLE', 'UNREACHABLE'].includes(draft.contactability) ||
       !['danger', 'needsRescue', 'needsRelief'].every((field) => typeof draft[field as keyof SosDraft] === 'boolean')) {

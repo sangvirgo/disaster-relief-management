@@ -82,10 +82,16 @@ export function assessFastTrack(input: FastTrackInput): FastTrackAssessment {
   const levels: Array<{ source: 'BACKEND_RULES' | 'AI'; level: RiskAttentionLevel }> = [];
   if (input.ruleAdvisory.level) levels.push({ source: 'BACKEND_RULES', level: input.ruleAdvisory.level });
   const ai = input.aiAdvisory;
-  if (ai && ai.status === 'COMPLETED' && ai.review_status !== 'REJECTED' && ai.level) {
-    levels.push({ source: 'AI', level: ai.level });
+  if (ai && ai.status === 'COMPLETED' && ai.review_status !== 'REJECTED' && ai.suggested_priority) {
+    const level = (Object.keys(levelPriority) as RiskAttentionLevel[])
+      .find((candidate) => levelPriority[candidate] === ai.suggested_priority);
+    if (level) levels.push({ source: 'AI', level });
   }
-  if (input.ruleAdvisory.reason_codes.includes('URGENT_MEDICAL_REVIEW_REQUIRED')) blockers.push('URGENT_MEDICAL_REVIEW');
+  // A live P1 assessment can open the coordinator-confirmed shortcut. The command
+  // still requires the coordinator to record what was checked before verification.
+  const aiCritical = ai?.status === 'COMPLETED' && ai.review_status !== 'REJECTED'
+    && ai.source === 'GEMINI' && ai.suggested_priority === 'P1';
+  if (input.ruleAdvisory.reason_codes.includes('URGENT_MEDICAL_REVIEW_REQUIRED') && !aiCritical) blockers.push('URGENT_MEDICAL_REVIEW');
   if (!levels.length) blockers.push('INSUFFICIENT_DATA');
   const rank = (level: RiskAttentionLevel) => Number(levelPriority[level].slice(1));
   const best = levels.reduce<typeof levels[number] | null>((current, item) => !current || rank(item.level) < rank(current.level) ? item : current, null);

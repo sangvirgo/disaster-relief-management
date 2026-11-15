@@ -8,6 +8,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { label, timeLabel } from '../../i18n/labels';
 import { useUrlView } from '../../app/useUrlView';
 import { auditTypes } from '../../app/routeViews';
+import './admin-audit.css';
 
 type Row = Record<string, unknown> & {
   id?: string;
@@ -145,7 +146,7 @@ export function Admin({ page }: { page: string }) {
         <div className="section-header list-action-header">
           <h2>
             {page === 'audit'
-              ? 'Lịch sử thao tác'
+              ? 'Các thay đổi gần đây'
               : 'Danh sách người dùng'}
           </h2>
           {page === 'users' && (
@@ -195,7 +196,7 @@ export function Admin({ page }: { page: string }) {
           </p>
         )}
         {!loading && !items.length && !error && !queryError && <div className="empty">{page === 'audit' ? 'Chưa có thay đổi nào thuộc loại đã chọn.' : 'Chưa có dữ liệu để hiển thị.'}</div>}
-        <div className={`record-list ${page === 'audit' ? '' : 'admin-record-list'}`}>
+        <div className={`record-list ${page === 'audit' ? 'admin-audit-list' : 'admin-record-list'}`}>
           {items.map((item, index) => {
             const canOpen = ['users', 'grants', 'overview'].includes(page) && Boolean(item.id);
             const title = page === 'audit'
@@ -214,19 +215,21 @@ export function Admin({ page }: { page: string }) {
                 {Boolean(item.created_at) && <small>{timeLabel(item.created_at)}</small>}
               </button>
             );
+            if (page === 'audit') return <article className="admin-audit-entry" key={item.id || index}>
+              <span className="admin-audit-entry__marker" aria-hidden="true" />
+              <div className="admin-audit-entry__body">
+                <div className="admin-audit-entry__head">
+                  <strong>{String(title)}</strong>
+                  {Boolean(item.created_at) && <time dateTime={String(item.created_at)}>{timeLabel(item.created_at)}</time>}
+                </div>
+                <p className="admin-audit-entry__subject"><span>{types[String(item.entity_type)] || 'Đối tượng'}</span><code title={String(item.entity_id || '')}>{String(item.entity_id || '')}</code></p>
+                {Boolean(item.reason) && <p className="admin-audit-entry__reason"><strong>Lý do:</strong> {String(item.reason)}</p>}
+              </div>
+            </article>;
             return <article className="record" key={item.id || index}>
               <div>
                 <strong>{title}</strong>
                 {item.username && <p>{item.username}</p>}
-                {page === 'audit' && (
-                  <>
-                    <p>
-                      {types[String(item.entity_type)] || 'Đối tượng'} ·{' '}
-                      {String(item.entity_id || '')}
-                    </p>
-                    {Boolean(item.reason) && <p>Lý do: {String(item.reason)}</p>}
-                  </>
-                )}
                 {item.status && <span className="chip">{label(item.status)}</span>}
                 {Boolean(item.created_at) && <small>{timeLabel(item.created_at)}</small>}
               </div>

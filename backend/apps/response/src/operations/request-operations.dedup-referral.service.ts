@@ -80,6 +80,7 @@ export class RequestOperationsDedupReferralService {
     return this.commandRunner.runCommand(requestId, session, key, 'response.requests.authority-referral', dto,
       async (manager) => {
         const row = await this.persistence.staffRequest(manager, requestId, session, 'REQUEST_VERIFY', true);
+        checkVersion(Number(row.version), dto.expected_version);
         if (terminalStatuses.has(row.status) || row.status === 'RESOLVING') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         const [updated] = await manager.query('UPDATE assistance_request SET version=version+1 WHERE id=$1 RETURNING version', [row.id]) as [Array<{ version: number }>, number];
         const eventId = await this.persistence.insertEvent(manager, row.id, session.userId, 'AUTHORITY_REFERRED', 'STAFF', row.status, row.status, note, { referred_body: referredBody });

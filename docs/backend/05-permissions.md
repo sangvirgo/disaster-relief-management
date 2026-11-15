@@ -12,9 +12,9 @@ Roles are a code catalog (`role_grant.role_code` CHECK in [identity.sql](schema/
 | `AUDIT_READ` (Identity and Logistics audit) |  |  |  |  |  |  |  |  |  | ● |
 | `REQUEST_CREATE_PROXY` (needs live session) | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● |
 | `REQUEST_QUEUE_READ`, `REQUEST_DETAIL_READ`, `MISSION_OVERDUE_READ` |  |  | ● | ● |  |  |  |  |  |  |
-| `TEAM_READ` |  |  | ● | ● |  |  |  |  |  | ● |
+| `TEAM_READ`, `TEAM_MANAGE_ANY` (team setup and skills only; ADMIN has system-wide team scope) |  |  | ● | ● |  |  |  |  |  | ● |
 | `REQUEST_VERIFY`, `REQUEST_TRIAGE`, `REQUEST_CANCEL`, `REQUEST_REOPEN`, `REQUEST_RESOLVE` |  |  | ● | ● |  |  |  |  |  |  |
-| `MISSION_ASSIGN`, `MISSION_RECORD_ON_BEHALF`, `TEAM_MANAGE_ANY`, `TEAM_POSITION_SET_ANY` |  |  | ● | ● |  |  |  |  |  | ● |
+| `MISSION_ASSIGN`, `MISSION_RECORD_ON_BEHALF`, `TEAM_POSITION_SET_ANY` |  |  | ● | ● |  |  |  |  |  |  |
 | `MAP_READ` (heatmap, grouped queue) |  |  | ● | ● |  | ● |  |  |  |  |
 | `CAMPAIGN_READ` |  |  | ● | ● | ● | ● |  |  |  |  |
 | `CAMPAIGN_MANAGE` (Response mutation additionally requires COORDINATOR + SYSTEM) |  |  | ● |  | ● | ● |  |  |  |  |
@@ -33,7 +33,7 @@ Roles are a code catalog (`role_grant.role_code` CHECK in [identity.sql](schema/
 | `LOSS_APPROVE`, `ADJUSTMENT_REVIEW` |  |  |  |  |  | ● |  | ● |  |  |
 | `STOCK_ADJUST_REQUEST` |  |  |  |  |  |  | ● |  | ● |  |
 
-○ = only when a separate `REVIEWER` grant is present; there is no implicit review right for managers or intake staff. `CAMPAIGN_COORDINATOR` has no Logistics permission. ADMIN has no request, victim or donor detail permission. Self-grant is refused by Identity.
+○ = only when a separate `REVIEWER` grant is present; there is no implicit review right for managers or intake staff. `CAMPAIGN_COORDINATOR` has no Logistics permission. ADMIN has no request, victim or donor detail permission. The ADMIN team-management extension does not grant mission assignment, request detail, or team-position reporting. Self-grant is refused by Identity. `GET` endpoints with no row above need a valid session and object scope (e.g. own notices, own team).
 
 ## 2. Scope matching
 
@@ -55,9 +55,9 @@ Only a primary system coordinator sees the shared intake queue. `unassigned=true
 
 | Object | Rule |
 |---|---|
-| Assistance request | Reporter (account owner or valid tracking secret) sees their own request, reporter-visible timeline and permitted supplements. Staff need the relevant `REQUEST_*` permission and matching scope. An unassigned request is visible only through SYSTEM scope. |
+| Assistance request | Reporter (account owner or valid tracking secret) sees their own request, reporter-visible timeline and permitted supplements. Staff need the relevant `REQUEST_*` permission and matching scope. An unassigned request is visible only through SYSTEM scope. Assigned team members see only permitted mission fields; contact phones are limited to the reporter, scoped coordinators and assigned team leader. |
 | Mission | Read: active team members and appropriately scoped coordinators. Accept, decline, advance and report result: active leader only. Cancel, fail and record-on-behalf: authorized coordinator with a reason. |
-| Team | Team resources are shared system-wide. Membership and active-leader checks remain separate from campaign access. Mission suggestions use skills, distance, fresh position (at most 30 minutes), radius and availability; they never filter by campaign or assign a team. |
+| Team | Team resources are shared system-wide. Active leaders may edit their team; `TEAM_MANAGE_ANY` permits authorized coordinators and system ADMIN to manage team setup and skills. Membership and active-leader checks remain separate from campaign access. Mission suggestions use skills, distance, fresh position (at most 30 minutes), radius and availability; they never filter by campaign or assign a team. |
 | Evidence | Download requires current authorization on the owning request, mission, donation or handoff; signed URL TTL is 60 seconds. RETURN evidence needs `DONATION_INTAKE` or `DISTRIBUTION_DISPATCH`; other handoff reads need `HANDOFF_RECORD`, except LOSS reads also allow `LOSS_APPROVE` for independent review. Recording or uploading LOSS evidence still needs `HANDOFF_RECORD`. |
 | Donation | Account owner or valid donation capability may use public tracking. Staff need the drive's campaign scope or SYSTEM. Receipt number, name and phone grant no access. |
 | Distribution | Approver differs from preparer and dispatcher; preparer may dispatch (database CHECK plus service). A handoff recorder differs from its receiver. LOSS approver differs from recorder. |

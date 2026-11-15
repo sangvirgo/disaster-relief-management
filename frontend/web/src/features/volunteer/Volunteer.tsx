@@ -3,6 +3,7 @@ import { api, ApiError, newCommandKey, upload } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
 import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
 import { ListNav } from '../../components/ui/Pager';
+import { SelectedFiles } from '../../components/ui/SelectedFiles';
 import { label, timeLabel } from '../../i18n/labels';
 import { evidenceFileError as missionEvidenceError } from '../../i18n/evidence';
 import type { components as ResponseComponents } from '../../api/generated/response';
@@ -340,6 +341,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
   const commandKeyRef = useRef<string | null>(null);
   const completionUploadKeyRef = useRef<{ file: File; key: string } | null>(null);
   const completionFileInputRef = useRef<HTMLInputElement | null>(null);
+  const evidenceFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (isTeam) return;
@@ -1395,6 +1397,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                     </p>
                     <label className="tracking-file-picker">
                       <input
+                        ref={evidenceFileInputRef}
                         type="file"
                         required
                         accept="image/jpeg,image/png,video/mp4"
@@ -1408,6 +1411,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                         <small>JPEG, PNG hoặc MP4</small>
                       </span>
                     </label>
+                    <SelectedFiles files={evidenceFile ? [evidenceFile] : []} onRemove={() => { setEvidenceFile(null); if (evidenceFileInputRef.current) evidenceFileInputRef.current.value = ''; }} />
                     {evidenceFile && missionEvidenceError(evidenceFile) && <small className="field-error" id="mission-evidence-file-error" role="alert">{missionEvidenceError(evidenceFile)}</small>}
                     <button className="button secondary" disabled={busy || !evidenceFile || Boolean(missionEvidenceError(evidenceFile))}>
                       {busy ? 'Đang xử lý…' : 'Tải minh chứng lên'}

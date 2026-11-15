@@ -6,6 +6,7 @@ type AdvisoryStatus = (typeof advisoryStatuses)[number] | 'UNKNOWN';
 
 export interface AiPriorityAdvisory {
   status: AdvisoryStatus;
+  suggested_priority: 'P1' | 'P2' | 'P3' | 'P4' | null;
   score: number | null;
   level: RiskAttentionLevel | null;
   reasons: string[];
@@ -50,6 +51,9 @@ export function aiPriorityAdvisory(value: unknown): AiPriorityAdvisory | null {
 
   return {
     status,
+    suggested_priority: status === 'COMPLETED' && advisory.review_status !== 'REJECTED' &&
+      ['P1', 'P2', 'P3', 'P4'].includes(String(extracted.suggested_priority))
+      ? extracted.suggested_priority as 'P1' | 'P2' | 'P3' | 'P4' : null,
     score: validScore ? Number(rawScore) : null,
     level: validScore ? riskAttentionLevel(Number(rawScore)) : null,
     reasons,

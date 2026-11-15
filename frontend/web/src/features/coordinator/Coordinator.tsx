@@ -69,8 +69,17 @@ const priorityMeaning: Record<string, string> = {
 function OptionalFold({ fold, summary, children }: { fold: boolean; summary: string; children: React.ReactNode }) {
   return fold ? <details className="sos-fold"><summary>{summary}</summary>{children}</details> : <>{children}</>;
 }
+function reliefDescription(description: string | null | undefined) {
+  const value = description ?? '';
+  const match = value.match(/(?:^|\n)Hàng cứu trợ cần:\s*([^\n]+)\s*$/);
+  return {
+    narrative: match ? value.slice(0, match.index).trim() : value.trim(),
+    items: match?.[1].trim() || '',
+  };
+}
 type AiPriorityAdvisory = {
   status: string;
+  suggested_priority?: 'P1' | 'P2' | 'P3' | 'P4' | null;
   score: number | null;
   level: 'CRITICAL' | 'HIGH' | 'ELEVATED' | 'STANDARD' | null;
   reasons: string[];
@@ -169,6 +178,8 @@ type Detail = QueueItem & {
     reason_codes: string[];
     extracted_json?: {
       summary?: string;
+      suggested_priority?: 'P1' | 'P2' | 'P3' | 'P4' | null;
+      weather_impact?: string;
       indicators?: string[];
       facts?: Record<string, unknown>;
       confidence?: number;
@@ -206,74 +217,24 @@ type Candidate = {
 };
 type Candidates = { items: Candidate[]; unknown_position: Candidate[] };
 
-type ScopedTeam = {
-  id: string;
-  name: string;
-  status: string;
-  availability: string;
-  readiness_required: boolean;
-  skills: string[];
-  position: { age_s: number } | null;
-};
-
-// Versioned demo prerequisites: docs/backend/seed/seed-response.sql.
-const requiredDemoSkills: Record<string, string[]> = {
-  FLOOD: ['BOAT'], TRAPPED: ['BOAT'], MEDICAL: ['FIRST_AID'], LANDSLIDE: ['CLIMBING'],
-};
-
-function TeamEligibilityDetails({ category, revision }: {
-  category: string; revision: number;
-}) {
-  const [teams, setTeams] = useState<ScopedTeam[] | null>(null);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    let live = true;
-    setTeams(null);
-    setError('');
-    async function load() {
-      try {
-        const found: ScopedTeam[] = [];
-        let cursor = '';
-        do {
-          const query = new URLSearchParams({ limit: '100' });
-          if (cursor) query.set('cursor', cursor);
-          const page = await api<{ items: ScopedTeam[]; more: boolean; cursor?: string }>('response', `/teams?${query}`);
-          found.push(...page.items);
-          cursor = page.more ? page.cursor || '' : '';
-        } while (cursor);
-        if (live) setTeams(found);
-      } catch {
-        if (live) setError('Chưa tải được tình trạng từng đội. Hãy kiểm tra danh sách đội và thử cập nhật SOS.');
-      }
-    }
-    void load();
-    return () => { live = false; };
-  }, [revision]);
-  const requiredSkills = requiredDemoSkills[category] || [];
-  return <div className="team-eligibility-details">
-    {requiredSkills.length > 0 && <p><strong>{label(category)}</strong> cần kỹ năng {requiredSkills.map(label).join(', ')}.</p>}
-    {error && <p role="alert">{error}</p>}
-    {!teams && !error && <p role="status">Đang kiểm tra tình trạng các đội…</p>}
-    {teams?.length === 0 && <p>Chưa có đội nào mà tài khoản này được phép xem.</p>}
-    {teams?.map((team) => {
-      const reasons = [
-        ...(team.status !== 'ACTIVE' ? ['Đội ngừng hoạt động'] : []),
-        ...(team.availability !== 'AVAILABLE' ? ['Đội chưa sẵn sàng'] : []),
-        ...(team.readiness_required ? ['Cần xác nhận sẵn sàng lại'] : []),
-        ...requiredSkills.filter((skill) => !team.skills.includes(skill)).map((skill) => `Thiếu kỹ năng ${label(skill)}`),
-        ...(!team.position ? ['Chưa có vị trí đội'] : team.position.age_s > 1800 ? ['Vị trí đã quá 30 phút'] : []),
-      ];
-      return <p key={team.id}><strong>{team.name}:</strong> {reasons.join(' · ') || 'Kỹ năng và thời gian vị trí phù hợp; hãy kiểm tra khoảng cách tối đa 10 km hoặc nhiệm vụ đội đang nhận.'}</p>;
-    })}
-    <p className="muted">Kỹ năng chỉ nên cập nhật sau khi xác nhận năng lực thực tế của đội. Vị trí phải được gửi lại trong 30 phút gần nhất.</p>
-  </div>;
-}
-
 function NearbyAddress({ coordinates }: { coordinates?: [number, number] }) {
   const longitude = coordinates?.[0];
   const latitude = coordinates?.[1];
-  if (longitude === undefined || latitude === undefined) return <>Chưa có tọa độ</>;
-  return <>Tọa độ SOS: {latitude.toFixed(6)}, {longitude.toFixed(6)}. Xem ghim trên bản đồ để đối chiếu vị trí.</>;
+  const [address, setAddress] = useState<string | null>(null);
+  useEffect(() => {
+    if (longitude === undefined || latitude === undefined) return;
+    const controller = new AbortController();
+    setAddress(null);
+    void fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?location=${encodeURIComponent(`${longitude},${latitude}`)}&langCode=VI&forStorage=false&f=json`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((value: { address?: { Match_addr?: string; CountryCode?: string } } | null) => {
+        if (!controller.signal.aborted) setAddress(value?.address?.CountryCode === 'VNM' ? value.address.Match_addr?.trim() || '' : '');
+      })
+      .catch(() => { if (!controller.signal.aborted) setAddress(''); });
+    return () => controller.abort();
+  }, [longitude, latitude]);
+  if (longitude === undefined || latitude === undefined) return <>Chưa có vị trí</>;
+  return <>{address === null ? 'Đang tìm địa chỉ gần vị trí SOS…' : address ? `Gần ${address}` : 'Chưa tìm được địa chỉ gần đúng; xem ghim trên bản đồ.'}</>;
 }
 
 type DuplicateCandidate = {
@@ -338,7 +299,7 @@ function SosCommandPopup({ spec, onSuccess, onStale }: { spec: CommandSpec; onSu
   if (!spec.fields?.length) return <CommandForm spec={spec} onSuccess={onSuccess} onStale={onStale} />;
   return <div className="sos-action-entry">
     <button type="button" className="button" onClick={() => setOpen(true)}>{spec.title}</button>
-    <DetailSurface modal open={open} label={spec.title} onClose={() => setOpen(false)}>
+    <DetailSurface modal open={open} label={spec.title} className="sos-command-dialog" onClose={() => setOpen(false)}>
       <CommandForm spec={spec} onSuccess={() => { setOpen(false); onSuccess(); }} onStale={onStale} />
     </DetailSurface>
   </div>;
@@ -449,7 +410,7 @@ const queueStatuses = [
 ] as const;
 const reviewLanes = ['NORMAL', 'RATE_LIMITED_REVIEW', 'PROXY_QUOTA_REVIEW'] as const;
 type QueueView = { status: string; reviewLane: string; overdue: boolean };
-const sosTabs = ['overview', 'review', 'dispatch', 'ai', 'history'] as const;
+const sosTabs = ['overview', 'dispatch', 'history'] as const;
 type SosTab = typeof sosTabs[number];
 
 function sosRoute(page: string): { id: string | null; tab: SosTab } {
@@ -458,7 +419,7 @@ function sosRoute(page: string): { id: string | null; tab: SosTab } {
   const rawTab = params.get('sos_tab');
   return {
     id: id && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id) ? id : null,
-    tab: sosTabs.find((tab) => tab === rawTab) ?? 'overview',
+    tab: rawTab === 'review' || rawTab === 'ai' ? 'overview' : sosTabs.find((tab) => tab === rawTab) ?? 'overview',
   };
 }
 
@@ -495,6 +456,8 @@ const advisoryFactLabels: Record<string, string> = {
   needs_relief_supplies: 'Cần hàng cứu trợ',
 };
 const advisoryReasonLabels: Record<string, string> = {
+  CATASTROPHIC_TRAPPING: 'Có người mắc kẹt sau nổ hoặc sập',
+  FIRE_SMOKE_ENTRAPMENT: 'Có người kẹt trong khói lửa hoặc thiếu oxy',
   DECLARED_LIFE_DANGER: 'Người báo khai có nguy hiểm tính mạng',
   FLOOD_OR_TRAPPED: 'Có dấu hiệu ngập lụt hoặc mắc kẹt',
   CHILDREN_PRESENT: 'Có trẻ em',
@@ -725,13 +688,17 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
           if (refreshReasonRef.current) {
             const reason = refreshReasonRef.current;
             refreshReasonRef.current = null;
+            if (reason === 'success' && value.status === 'TRIAGED') {
+              setActiveTab('dispatch');
+              const url = new URL(window.location.href);
+              url.searchParams.set('sos_tab', 'dispatch');
+              window.history.replaceState(null, '', url);
+            }
             setQueueStatus(value.status);
             setCursor('');
-            setUpdateMessage(
-              reason === 'success'
+            setUpdateMessage(reason === 'success'
                 ? `Đã cập nhật. Trạng thái hiện tại: ${requestStatusLabel(value.status)}.`
-                : `Đã tải lại hồ sơ. Trạng thái hiện tại: ${requestStatusLabel(value.status)}.`
-            );
+                : `Đã tải lại hồ sơ. Trạng thái hiện tại: ${requestStatusLabel(value.status)}.`);
           }
         }
       })
@@ -795,6 +762,46 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     setUpdateMessage('Đã lưu thay đổi. Đang tải trạng thái mới từ máy chủ…');
     setRevision((value) => value + 1);
   }, []);
+  const referralDone = useCallback(() => {
+    if (!detail) return;
+    const requestId = detail.id;
+    void (async () => {
+      setUpdateMessage('Đã ghi nhận chuyển cơ quan chức năng. Đang kiểm tra điều kiện đóng SOS…');
+      try {
+        let current = await api<Detail>('response', `/requests/${requestId}`);
+        if (!['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(current.status)) {
+          setUpdateMessage('Đã ghi nhận chuyển cơ quan. SOS cần được xác minh và đặt ưu tiên trước khi kết thúc.');
+          return;
+        }
+        const resolution = await api<{ operation_id: string }>('response', `/requests/${requestId}/resolve`, {
+          method: 'POST', idempotencyKey: newCommandKey(),
+          body: { expected_version: current.version, outcome_basis: 'NO_ACTION_REQUIRED',
+            resolution_reason: 'Đã chuyển thông tin cho cơ quan chức năng tiếp nhận; Reliva không tiếp tục điều đội hoặc cấp phát cho yêu cầu này.' },
+        });
+        for (let attempt = 0; attempt < 6; attempt++) {
+          const operation = await api<{ state: string }>('response', `/operations/${resolution.operation_id}`);
+          if (operation.state === 'ABORTED') throw new Error('Thao tác kết thúc đã bị hủy. Hãy kiểm tra lịch sử SOS.');
+          if (operation.state === 'COMPLETED') break;
+          if (attempt === 5) {
+            setUpdateMessage('Đã ghi nhận chuyển cơ quan. Thao tác kết thúc đang chờ; xem trạng thái trong hồ sơ trước khi đóng.');
+            return;
+          }
+          await new Promise((resolve) => window.setTimeout(resolve, 2000));
+        }
+        current = await api<Detail>('response', `/requests/${requestId}`);
+        if (current.status !== 'RESOLVED') throw new Error('SOS chưa ở trạng thái đã xử lý. Hãy kiểm tra lịch sử trước khi đóng.');
+        await api('response', `/requests/${requestId}/close`, {
+          method: 'POST', idempotencyKey: newCommandKey(), body: { expected_version: current.version },
+        });
+        setUpdateMessage('Đã ghi nhận chuyển cơ quan chức năng và đóng SOS.');
+      } catch (cause) {
+        const reason = cause instanceof Error ? cause.message : 'Không thể tự đóng SOS.';
+        setUpdateMessage(`Đã ghi nhận chuyển cơ quan. Chưa thể đóng SOS: ${reason} Kiểm tra điều kiện kết thúc trong hồ sơ.`);
+      } finally {
+        setRevision((value) => value + 1);
+      }
+    })();
+  }, [detail]);
   const runClaim = useCallback(async (action: 'claim' | 'release') => {
     if (!detail) return;
     setClaimBusy(true);
@@ -816,22 +823,50 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     setUpdateMessage('Đang tải lại hồ sơ để kiểm tra trạng thái.');
     setRevision((value) => value + 1);
   }, []);
-  function command(spec: CommandSpec) {
+  function command(spec: CommandSpec, onSuccess = done) {
     return (
       <SosCommandPopup
         key={spec.path + spec.title + detail?.version}
         spec={spec}
-        onSuccess={done}
+        onSuccess={onSuccess}
         onStale={refreshAfterConflict}
       />
     );
   }
-  function secondaryCommand(spec: CommandSpec) {
+  function secondaryCommand(spec: CommandSpec, tone?: 'danger', onSuccess = done) {
     return (
-      <div className="secondary-command">
-        {command(spec)}
+      <div className={`secondary-command${tone ? ` secondary-command--${tone}` : ''}`}>
+        {command(spec, onSuccess)}
       </div>
     );
+  }
+  function aiResubmitAction(status: string | undefined) {
+    if (!detail) return null;
+    const title = status === 'SKIPPED' || status === 'STALE' || !detail.ai_advisory
+      ? 'Yêu cầu AI đánh giá' : 'Gửi lại cho AI đánh giá';
+    if (status === 'FAILED' && detail.ai_advisory && !detail.ai_advisory.review_status) {
+      return command({
+        title, hideTitle: true, service: 'response',
+        path: `/requests/${detail.id}/ai-advisories/${detail.ai_advisory.id}/retry`,
+        version: detail.version,
+        warning: 'Gửi lại yêu cầu đánh giá AI? Kết quả vẫn chỉ để tham khảo.',
+      });
+    }
+    if (!detail.ai_advisory || status === 'STALE' || status === 'SKIPPED') {
+      return command({
+        title, hideTitle: true, service: 'response',
+        path: `/requests/${detail.id}/ai-advisories`,
+        version: detail.version,
+        warning: 'Gửi thông tin SOS đã rút gọn cho AI đánh giá? Kết quả chỉ để tham khảo.',
+      });
+    }
+    const reason = status === 'QUEUED' || status === 'PROCESSING'
+      ? 'Yêu cầu AI đã ở trong hàng đợi; gửi thêm lúc này không tạo lượt đánh giá mới.'
+      : 'Đã có kết quả AI. Hệ thống hiện chỉ cho gửi lại khi đánh giá lỗi hoặc thông tin SOS thay đổi.';
+    return <div className="sos-ai-resubmit">
+      <button type="button" className="button secondary" disabled aria-describedby="sos-ai-resubmit-reason">{title}</button>
+      <small id="sos-ai-resubmit-reason">{reason}</small>
+    </div>;
   }
   async function reviewAiAdvisory(decision: 'ACCEPTED' | 'ADJUSTED' | 'REJECTED') {
     if (!detail?.ai_advisory || detail.ai_priority_advisory?.status !== 'COMPLETED') return;
@@ -923,7 +958,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     if (tab === 'overview') url.searchParams.delete('sos_tab');
     else url.searchParams.set('sos_tab', tab);
     window.history.replaceState(null, '', url);
-    detailPanelRef.current?.scrollIntoView({ block: 'start' });
+    requestAnimationFrame(() => document.getElementById('sos-detail-content')?.scrollIntoView({ block: 'start' }));
   }
   return (
     <div className="coordinator-layout coordinator-sos-layout">
@@ -1111,11 +1146,11 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1;
               if (next >= 0) { event.preventDefault(); tabs[next].focus(); tabs[next].click(); }
             }}>
-              {([['overview', 'Tổng quan'], ['review', 'Xác minh & ưu tiên'], ['dispatch', 'Điều phối'], ['ai', 'AI hỗ trợ'], ['history', 'Lịch sử']] as const).map(([id, name]) =>
+              {([['overview', 'Tổng quan & xác minh'], ['dispatch', 'Điều phối'], ['history', 'Lịch sử']] as const).map(([id, name]) =>
                 <button key={id} id={`sos-tab-${id}`} type="button" role="tab" aria-selected={activeTab === id}
                   aria-controls="sos-detail-content" tabIndex={activeTab === id ? 0 : -1} onClick={() => changeTab(id)}>{name}</button>)}
             </div>
-            <div id="sos-detail-content" role="tabpanel" aria-labelledby={`sos-tab-${activeTab}`} className="sos-detail-content" tabIndex={0}>
+            <div id="sos-detail-content" role="tabpanel" aria-labelledby={`sos-tab-${activeTab}`} className="sos-detail-content" data-tab={activeTab} tabIndex={0}>
             <div className="sos-tab-group" hidden={activeTab !== 'overview'}>
             {(detail.declared_danger || detail.proxy_activity_flags.length > 0 || detail.tracking_code.startsWith('C48HM')) && (
               <div className="sos-alerts">
@@ -1125,7 +1160,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               </div>
             )}
             <section className="sos-summary" aria-label="Tóm tắt SOS">
-              <p className="sos-summary__desc">{detail.description || 'Chưa có mô tả tình huống.'}</p>
+              <p className="sos-summary__desc">{reliefDescription(detail.description).narrative || 'Chưa có mô tả tình huống.'}</p>
               <dl className="sos-summary__facts">
                 <div><dt>Cần hỗ trợ</dt><dd>
                   {detail.subject.people_affected == null ? 'Chưa rõ số người' : `${detail.subject.people_affected} người`}
@@ -1134,7 +1169,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </dd></div>
                 <div><dt>Nhu cầu</dt><dd>{[
                   ...(detail.needs_rescue ? ['Cứu hộ'] : []),
-                  ...(detail.needs_relief_supplies ? ['Hàng cứu trợ'] : []),
+                  ...(detail.needs_relief_supplies ? [reliefDescription(detail.description).items || 'Cần cứu trợ'] : []),
                 ].join(' · ') || 'Chưa khai báo'}</dd></div>
                 <div><dt>Người báo</dt><dd>{detail.reporter.name || 'Chưa có tên'} · {detail.reporter.contact_phone || 'Chưa có số liên hệ'}</dd></div>
                 <div className="sos-summary__wide"><dt>Vị trí</dt><dd><NearbyAddress coordinates={detail.subject.location?.coordinates} /></dd></div>
@@ -1149,16 +1184,25 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </>
               ) : <p>Không có thông tin hồ sơ gốc trong phạm vi truy cập hiện tại.</p>)}
             </section>
+            {detail.status === 'SUBMITTED' && <div className="sos-start-verification">
+              {command({
+                title: 'Bắt đầu xác minh',
+                hideTitle: true,
+                service: 'response',
+                path: `/requests/${detail.id}/start-verification`,
+                version: detail.version,
+                warning: 'Bắt đầu xác minh yêu cầu này?',
+              })}
+            </div>}
             </div>
-            <div className="sos-tab-group" hidden={activeTab !== 'review'}>
-            <h3>Xác minh và quyết định ưu tiên</h3>
-            <p className="muted">Đối chiếu thông tin người báo, minh chứng và gợi ý trước khi ghi nhận quyết định của điều phối viên.</p>
+            <div className="sos-tab-group" hidden={activeTab !== 'overview'}>
             {detail.fast_track && ['SUBMITTED', 'VERIFYING'].includes(detail.status) && (() => {
               const ft = detail.fast_track;
               const rule = detail.priority_advisory;
               const ai = detail.ai_priority_advisory;
               const aiDone = ai?.status === 'COMPLETED' && ai.review_status !== 'REJECTED';
               const aiStatus = ai?.status;
+              const urgentMedicalReview = ft.reason_codes.includes('URGENT_MEDICAL_REVIEW_REQUIRED');
               return (
               <section className="sos-decision" data-tone={ft.eligible ? 'ready' : 'review'} aria-label="Quyết định xử lý">
                 <div className="sos-decision__head">
@@ -1183,12 +1227,12 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </>}
                 <dl className="sos-decision__scores">
                   <div>
-                    <dt>Quy tắc</dt>
+                    <dt title="Điểm từ dấu hiệu trong hồ sơ SOS; không phải độ tin cậy của AI">Điểm quy tắc</dt>
                     <dd>{rule?.score != null ? <><b>{rule.score}</b>/100</> : '—'}</dd>
                   </div>
                   <div>
-                    <dt>AI Gemini</dt>
-                    <dd>{aiDone && ai.score != null ? <><b>{ai.score}</b>/100{ai.confidence !== null ? <small> · tin cậy {Math.round(ai.confidence * 100)}%</small> : null}</> : '—'}</dd>
+                    <dt title="Mức chắc chắn do AI tự ước tính, chưa phải xác suất đúng đã kiểm định">Độ tin cậy</dt>
+                    <dd>{aiDone && ai.confidence != null ? <><b>{Math.round(ai.confidence * 100)}%</b></> : '—'}</dd>
                   </div>
                   <div className="sos-decision__aistatus">
                     <dt>Trạng thái AI</dt>
@@ -1196,9 +1240,13 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   </div>
                 </dl>
                 {aiDone && detail.ai_advisory?.extracted_json?.summary && (
-                  <p className="sos-decision__summary">{detail.ai_advisory.extracted_json.summary}</p>
+                  <p className="sos-decision__summary">
+                    <strong>AI gợi ý {ai?.suggested_priority ?? 'chưa xác định'}:</strong>{' '}
+                    {detail.ai_advisory.extracted_json.summary}
+                    {detail.ai_advisory.extracted_json.weather_impact && <> Thời tiết: {detail.ai_advisory.extracted_json.weather_impact}</>}
+                  </p>
                 )}
-                <div className="sos-decision__actions">
+                <div className={`sos-decision__actions${ft.eligible ? '' : ' sos-decision__actions--single'}`} key={`${aiStatus ?? 'NONE'}:${detail.ai_advisory?.id ?? ''}`}>
                   {ft.eligible && <>
                     {command({
                       title: `Xác nhận ${ft.suggested_priority} và chọn đội`,
@@ -1207,7 +1255,11 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       version: detail.version,
                       hideTitle: true,
                       warning: `Bạn đã xem thông tin SOS và đồng ý xác minh, đặt mức ưu tiên ${ft.suggested_priority}? Bước tiếp theo là chọn đội.`,
-                      build: () => ({ confirmed: true }),
+                      fields: urgentMedicalReview ? [{
+                        name: 'note', label: 'Nội dung đã đối chiếu và căn cứ xác minh',
+                        type: 'textarea', required: true, maxLength: 1000,
+                      }] : undefined,
+                      build: (values) => ({ confirmed: true, ...(urgentMedicalReview ? { note: values.note } : {}) }),
                     })}
                     {secondaryCommand({
                       title: 'Chọn mức ưu tiên khác',
@@ -1223,24 +1275,13 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     })}
                   </>}
                   {(aiStatus === 'QUEUED' || aiStatus === 'PROCESSING') && <p className="sos-decision__hint">AI đang đánh giá, kết quả tự cập nhật sau ít phút.</p>}
-                  {aiStatus === 'FAILED' && detail.ai_advisory && !detail.ai_advisory.review_status && command({
-                    title: 'Gửi lại cho AI đánh giá',
-                    service: 'response',
-                    path: `/requests/${detail.id}/ai-advisories/${detail.ai_advisory.id}/retry`,
-                    version: detail.version,
-                    warning: 'Gửi lại yêu cầu đánh giá AI? Kết quả vẫn chỉ để tham khảo.',
-                  })}
-                  {(!aiStatus || aiStatus === 'STALE' || aiStatus === 'SKIPPED') && command({
-                    title: 'Nhờ AI đánh giá',
-                    service: 'response',
-                    path: `/requests/${detail.id}/ai-advisories`,
-                    version: detail.version,
-                    warning: 'Gửi thông tin SOS (đã rút gọn, không gồm số điện thoại hay tọa độ chính xác) cho AI đánh giá? Kết quả chỉ để tham khảo.',
-                  })}
+                  {aiResubmitAction(aiStatus)}
                 </div>
               </section>
               );
             })()}
+            </div>
+            <div className="sos-tab-group" hidden={activeTab !== 'overview'}>
             {pendingSupplements.map((event) => {
               const facts = event.payload?.reported_facts;
               const changes = facts && typeof facts === 'object' && !Array.isArray(facts)
@@ -1284,20 +1325,26 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               </section>
             ))}
             </div>
-            <fieldset className="claim-guard" disabled={claimBlockedBy(detail, currentUserId)} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-            <div className="action-grid sos-actions" id="request-actions" tabIndex={-1} hidden={activeTab !== 'review' && activeTab !== 'dispatch'}>
-              <div className="sos-tab-group" hidden={activeTab !== 'dispatch'}>
+            <fieldset className="claim-guard sos-actions-guard" disabled={claimBlockedBy(detail, currentUserId)} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+            <div className="action-grid sos-actions" id="request-actions" tabIndex={-1} hidden={activeTab !== 'overview' && activeTab !== 'dispatch'}>
+              <div className="sos-tab-group sos-action-row" hidden={activeTab !== 'dispatch'}>
               {!['RESOLVING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
                 secondaryCommand({
                   title: 'Ghi nhận chuyển cơ quan chức năng',
+                  hideTitle: true,
                   service: 'response',
                   path: `/requests/${detail.id}/authority-referrals`,
                   fields: [
-                    { name: 'referred_body', label: 'Cơ quan tiếp nhận', required: true, maxLength: 200 },
-                    { name: 'note', label: 'Nội dung và căn cứ chuyển', type: 'textarea', required: true, maxLength: 1000 },
+                    { name: 'referred_body', label: 'Cơ quan tiếp nhận', type: 'text', required: true, maxLength: 200 },
+                    { name: 'note', label: 'Cách thức và nội dung đã chuyển', type: 'textarea', required: true, maxLength: 1000 },
                   ],
-                  warning: 'Xác nhận đã liên hệ và chuyển thông tin yêu cầu này cho cơ quan chức năng?',
-                })}
+                  build: (values) => ({
+                    referred_body: values.referred_body,
+                    note: values.note,
+                    expected_version: detail.version,
+                  }),
+                  warning: 'Xác nhận đã chuyển yêu cầu cho cơ quan chức năng được ghi rõ? Hệ thống sẽ thử kết thúc và đóng SOS nếu đủ điều kiện.',
+                }, undefined, referralDone)}
               {canSeeUnassigned && !detail.campaign_id &&
                 secondaryCommand({
                   title: 'Gắn vào chiến dịch cứu trợ',
@@ -1318,17 +1365,13 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   version: detail.version,
                   warning: 'Xác nhận gỡ yêu cầu này khỏi chiến dịch?',
                 })}
+              {detail.timeline.items.some((event) => event.event_type === 'AUTHORITY_REFERRED') && (
+                <p className="notice sos-referral-status" role="status">
+                  Đã ghi nhận chuyển cơ quan chức năng lúc {timeLabel(detail.timeline.items.find((event) => event.event_type === 'AUTHORITY_REFERRED')!.occurred_at)}. Xem chi tiết trong tab Lịch sử.
+                </p>
+              )}
               </div>
-              <div className="sos-tab-group" hidden={activeTab !== 'review'}>
-              {detail.status === 'SUBMITTED' &&
-                command({
-                  title: 'Bắt đầu xác minh',
-                  hideTitle: true,
-                  service: 'response',
-                  path: `/requests/${detail.id}/start-verification`,
-                  version: detail.version,
-                  warning: 'Bắt đầu xác minh yêu cầu này?',
-                })}
+              <div className="sos-tab-group sos-action-row" hidden={activeTab !== 'overview' || !['VERIFYING', 'VERIFIED'].includes(detail.status)}>
               {detail.status === 'VERIFYING' && (
                 <>
                   {detail.report_mode === 'PROXY' && detail.timeline.items.some(event => event.event_type === 'VERIFICATION_STARTED' && event.actor_user_id === currentUserId) &&
@@ -1474,7 +1517,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     warning:
                       'Bạn có chắc muốn từ chối yêu cầu này? Lý do sẽ được lưu trong lịch sử.',
                     fields: [{ name: 'reason', label: 'Lý do', type: 'textarea', required: true, maxLength: 1000 }],
-                  })}
+                  }, 'danger')}
                 </>
               )}
               {detail.status === 'VERIFIED' &&
@@ -1531,13 +1574,9 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   {!candidates && !candidateError && <p role="status">Đang tải đội phù hợp…</p>}
                   {candidates?.items.length === 0 && (
                     <p role="status" className="notice warning">
-                      Chưa có đội đủ điều kiện gần SOS này. Hệ thống chỉ gợi ý đội đang sẵn sàng, có kỹ năng phù hợp,
-                      có vị trí được gửi trong 30 phút gần nhất và nằm trong bán kính cho phép. Xem tình trạng từng đội bên dưới;
-                      nếu đội đã di chuyển đến gần SOS, hãy nhờ đội gửi lại vị trí và xác nhận sẵn sàng.
+                      Chưa có đội đủ điều kiện để giao nhiệm vụ. Hãy cập nhật tình trạng và vị trí đội trong mục Đội cứu hộ, rồi tải lại SOS.
                     </p>
                   )}
-                  {candidates?.items.length === 0 &&
-                    <TeamEligibilityDetails category={detail.category} revision={revision} />}
                   {[...(candidates?.items ?? [])].sort((a, b) => Number(b.suggested) - Number(a.suggested)).map((candidate, _index, all) => (
                     <OptionalFold key={candidate.team.id} fold={!candidate.suggested && all.some((item) => item.suggested)}
                       summary={`Chọn đội khác: ${candidate.team.name} (cần ghi lý do)`}>
@@ -1588,42 +1627,32 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     </div>
                     </OptionalFold>
                   ))}
-                  {candidates?.unknown_position.map((candidate) => (
-                    <div className="candidate" key={candidate.team.id}>
-                      <p className="notice warning">
-                        {candidate.team.name}: vị trí đã cũ hoặc chưa có.
-                        {candidate.team.reporting_mode === 'APP'
-                          ? ' Đội trưởng cần cập nhật vị trí trước khi được xét giao nhiệm vụ.'
-                          : ' Điều phối viên có thể báo vị trí đã xác nhận.'}
-                      </p>
-                      {candidate.team.reporting_mode === 'COORDINATOR' &&
-                        <CoordinatorTeamPositionForm
-                          teamId={candidate.team.id}
-                          teamName={candidate.team.name}
-                          onSuccess={() => setDetailRevision((value) => value + 1)}
-                        />}
-                    </div>
-                  ))}
+                  {Boolean(candidates?.unknown_position.some((candidate) => candidate.team.reporting_mode === 'COORDINATOR')) &&
+                    <details className="sos-fold">
+                      <summary>Cập nhật vị trí đội do điều phối viên báo</summary>
+                      {candidates?.unknown_position.filter((candidate) => candidate.team.reporting_mode === 'COORDINATOR').map((candidate) =>
+                        <CoordinatorTeamPositionForm key={candidate.team.id} teamId={candidate.team.id} teamName={candidate.team.name}
+                          onSuccess={() => setDetailRevision((value) => value + 1)} />)}
+                    </details>}
                   </>}
                 </section>
               )}
               {['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(detail.status) && (
-                <div id="resolve-request"><AsyncRequestForm
+                <div id="resolve-request" className="sos-closeout">
+                  <div className="sos-closeout__head">
+                    <h3>Kết thúc xử lý yêu cầu</h3>
+                    <CancelRequestPopup key={`cancel-${detail.id}-${detail.version}`}
+                      requestId={detail.id} version={detail.version} onCompleted={done} onStale={refreshAfterConflict} />
+                  </div>
+                  <AsyncRequestForm
                   key={`resolve-${detail.id}-${detail.version}`}
                   requestId={detail.id}
                   version={detail.version}
                   kind="resolve"
+                  hideTitle
                   onCompleted={done}
                   onStale={refreshAfterConflict}
                 /></div>
-              )}
-              {[
-                'TRIAGED',
-                'DISPATCHED',
-                'IN_PROGRESS',
-              ].includes(detail.status) && (
-                <CancelRequestPopup key={`cancel-${detail.id}-${detail.version}`}
-                  requestId={detail.id} version={detail.version} onCompleted={done} onStale={refreshAfterConflict} />
               )}
               {detail.status === 'RESOLVED' &&
                 command({
@@ -1647,7 +1676,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               </div>
             </div>
             </fieldset>
-            <div className="sos-tab-group" hidden={activeTab !== 'review'}>
+            <div className="sos-tab-group" hidden={activeTab !== 'overview'}>
             {['SUBMITTED', 'VERIFYING'].includes(detail.status) && <>
               <RequestEvidencePanel items={detail.evidence?.items ?? []} />
               <ContactAttemptPanel
@@ -1845,7 +1874,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               </p>
             )}
             </div>
-            <div className="sos-tab-group" hidden={activeTab !== 'ai'}>
+            <div className="sos-tab-group" hidden={activeTab !== 'overview'}>
             <h3>Gợi ý hỗ trợ từ hệ thống</h3>
             {!detail.priority_advisory && !detail.ai_priority_advisory && !detail.ai_advisory &&
               <p className="empty">Chưa có gợi ý cho SOS này. Điều phối viên vẫn xác minh và quyết định theo thông tin đã kiểm tra.</p>}
@@ -1933,15 +1962,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </p>
               </section></details>
             )}
-            {detail.ai_advisory?.status === 'FAILED' && !detail.ai_advisory.review_status &&
-              !['SUBMITTED', 'VERIFYING'].includes(detail.status) &&
-              detail.ai_priority_advisory?.source === 'GEMINI' && command({
-                title: 'Thử đánh giá AI lại',
-                service: 'response',
-                path: `/requests/${detail.id}/ai-advisories/${detail.ai_advisory.id}/retry`,
-                version: detail.version,
-                warning: 'Gửi lại yêu cầu đánh giá AI? Kết quả vẫn chỉ để tham khảo; bạn tiếp tục xử lý SOS theo thông tin đã xác minh.',
-              })}
             {detail.ai_advisory && detail.ai_advisory.status === 'COMPLETED' && (
               <details className="sos-fold"><summary>Gợi ý từ AI{detail.ai_advisory.review_status ? ' · đã rà soát' : ' · chờ rà soát'}</summary><section className="notice">
                 <h3>
@@ -1956,6 +1976,12 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </p>
                 {detail.ai_priority_advisory?.status === 'COMPLETED' && (
                   <>
+                    <p><strong>AI gợi ý {detail.ai_priority_advisory.suggested_priority ?? 'chưa xác định'}</strong>
+                      {detail.ai_priority_advisory.confidence != null ? ` · Độ tin cậy tự ước tính ${Math.round(detail.ai_priority_advisory.confidence * 100)}%` : ''}
+                    </p>
+                    {detail.ai_advisory.extracted_json?.summary && <p><strong>Tóm tắt tình huống:</strong> {detail.ai_advisory.extracted_json.summary}</p>}
+                    {detail.ai_advisory.extracted_json?.weather_impact && <p><strong>Ảnh hưởng thời tiết:</strong> {detail.ai_advisory.extracted_json.weather_impact}</p>}
+                    {detail.ai_priority_advisory.reasons.length > 0 && <p><strong>Căn cứ gợi ý:</strong> {detail.ai_priority_advisory.reasons.join(' · ')}</p>}
                     {detail.ai_advisory.extracted_json?.facts && (
                       <p>
                         <strong>Dữ kiện AI trích xuất:</strong>{' '}

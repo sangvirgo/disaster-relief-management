@@ -8,12 +8,14 @@ export function AsyncRequestForm({
   requestId,
   version,
   kind,
+  hideTitle = false,
   onCompleted,
   onStale,
 }: {
   requestId: string;
   version: number;
   kind: Kind;
+  hideTitle?: boolean;
   onCompleted: () => void;
   onStale?: () => void;
 }) {
@@ -119,7 +121,7 @@ export function AsyncRequestForm({
   }
   return (
     <form className="form-stack command-form" onSubmit={submit} noValidate>
-      <h3>{kind === 'cancel' ? 'Hủy yêu cầu' : 'Kết thúc xử lý yêu cầu'}</h3>
+      {!hideTitle && <h3>{kind === 'cancel' ? 'Hủy yêu cầu' : 'Kết thúc xử lý yêu cầu'}</h3>}
       {!operationId && (
         <>
           <label>

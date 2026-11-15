@@ -143,6 +143,9 @@ export class TriageRequestDto extends RequestVersionDto {
 }
 
 export class AuthorityReferralDto {
+  @Type(() => Number) @IsInt() @Min(1)
+  expected_version!: number;
+
   @IsString() @MaxLength(200) @Matches(/\S/u)
   referred_body!: string;
 
