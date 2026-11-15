@@ -32,7 +32,7 @@ export async function validConcurrence(
       payload.material_fact_event_id !== await latestMaterialFactEventId(manager, row.id)) {
     throw new AppError('SECOND_COORDINATOR_REQUIRED', { status: 409 });
   }
-  if (!currentGrants.some((grant) => grant.role_code === 'COORDINATOR' && grant.user_id === event.actor_user_id && grantCovers(grant, row))) {
+  if (!currentGrants.some((grant) => grant.user_id === event.actor_user_id && grantCovers(grant, row))) {
     throw new AppError('SECOND_COORDINATOR_REQUIRED', { status: 409 });
   }
   return { actor_user_id: event.actor_user_id };
@@ -68,7 +68,7 @@ export async function validateSourceRefs(
   const requests: ValidatedSourceRefs['requests'] = [];
   if (requestIds.length) {
     const values: unknown[] = [row.id, requestIds];
-    const scope = scopeSql(session.grants, 'REQUEST_VERIFY', values, 'candidate');
+    const scope = scopeSql(session.grants, 'REQUEST_VERIFY', values, 'candidate', session.userId);
     const candidates = await manager.query(
       `SELECT candidate.id,candidate.reporter_user_id,candidate.reporter_contact_phone,candidate.source_ip_hash,
               target.reporter_user_id AS target_user_id,target.reporter_contact_phone AS target_phone,

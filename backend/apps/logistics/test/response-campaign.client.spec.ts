@@ -3,19 +3,18 @@ import { LogisticsResponseCampaignClient } from '../src/integrations/response/re
 import { AppError } from '@c48/technical/errors/errors';
 
 const campaignId = '66666666-6666-4666-8666-666666666666';
-const organizationId = '11111111-1111-4111-8111-111111111111';
 
 describe('Logistics Response campaign client', () => {
   it('requests a Response audience token and validates the internal campaign projection', async () => {
     const get = jest.fn(async () => ({
       status: 200,
-      body: { id: campaignId, status: 'ACTIVE', organization_id: organizationId, version: 3 },
+      body: { id: campaignId, status: 'ACTIVE',  version: 3 },
     }));
     const identity = { serviceToken: jest.fn(async () => 'response-token') };
     const service = new LogisticsResponseCampaignClient({ get } as never, identity as never);
 
     await expect(service.getCampaign(campaignId)).resolves.toEqual({
-      id: campaignId, status: 'ACTIVE', organization_id: organizationId, version: 3,
+      id: campaignId, status: 'ACTIVE',  version: 3,
     });
     expect(identity.serviceToken).toHaveBeenCalledWith('response');
     expect(get).toHaveBeenCalledWith(`/api/v1/response/internal/campaigns/${campaignId}`, {

@@ -17,6 +17,8 @@ export interface OperationRequestRow {
   received_at: Date | string;
   verifying_since: Date | string | null;
   campaign_id: string | null;
+  campaign_match_state: 'UNMATCHED' | 'AUTO_ATTACHED' | 'CONFLICT' | 'MANUAL';
+  campaign_candidate_ids: string[] | null;
   description: string | null;
   incident_category_code: string;
   reporter_declared_danger: boolean;
@@ -34,6 +36,9 @@ export interface QueueRow {
   tracking_code: string;
   status: string;
   priority: string | null;
+  campaign_id: string | null;
+  campaign_match_state: 'UNMATCHED' | 'AUTO_ATTACHED' | 'CONFLICT' | 'MANUAL';
+  campaign_candidate_ids: string[] | null;
   review_lane: string;
   report_mode: string;
   category: string;

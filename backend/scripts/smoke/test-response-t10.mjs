@@ -9,15 +9,12 @@ const responseUrl = requiredEnv('C48_RESPONSE_BASE_URL').replace(/\/+$/u, '');
 const identityUrl = requiredEnv('C48_IDENTITY_BASE_URL').replace(/\/+$/u, '');
 const responseDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
-const organizationId = randomUUID();
 const users = [];
 const notices = [randomUUID(), randomUUID(), randomUUID()];
 const requestId = randomUUID();
 const unverifiedRequestId = randomUUID();
 const closeRequestId = randomUUID();
 const duplicateRequestId = randomUUID();
-const outOfScopeRequestId = randomUUID();
-const otherOrganizationId = randomUUID();
 const missionTeamIds = [randomUUID(), randomUUID()];
 const missionIds = [randomUUID(), randomUUID()];
 let campaignId;
@@ -74,9 +71,9 @@ async function registerAndLogin(label) {
 
   if (label === 'coordinator') {
     await identityDb.query(
-      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-       VALUES ($1,'COORDINATOR','ORGANIZATION',$2)`,
-      [userId, organizationId],
+      `INSERT INTO role_grant (user_id,role_code,scope_type)
+       VALUES ($1,'COORDINATOR','SYSTEM')`,
+      [userId],
     );
   }
 
@@ -101,17 +98,6 @@ function bearer(token) { return { Authorization: `Bearer ${token}` }; }
 
 await Promise.all([responseDb.connect(), identityDb.connect()]);
 try {
-  await identityDb.query(
-    `INSERT INTO organization (id,name,organization_kind)
-     VALUES ($1,$2,'COORDINATION')`,
-    [organizationId, `T10 smoke ${organizationId}`],
-  );
-  await identityDb.query(
-    `INSERT INTO organization (id,name,organization_kind)
-     VALUES ($1,$2,'COORDINATION')`,
-    [otherOrganizationId, `T10 scope fixture ${otherOrganizationId}`],
-  );
-
   const coordinator = await registerAndLogin('coordinator');
   const otherRecipient = await registerAndLogin('recipient');
   const coordinatorAuth = bearer(coordinator.token);
@@ -262,8 +248,7 @@ try {
   const identityToken = await createServiceToken(requiredEnv('IDENTITY_SERVICE_CLIENT_ID'), requiredEnv('IDENTITY_SERVICE_CLIENT_SECRET'), 'response');
   const internalCampaign = await call(responseUrl, `internal/campaigns/${campaignId}`, { headers: bearer(identityToken) });
   expectSuccess(internalCampaign);
-  assert.deepEqual(Object.keys(internalCampaign.value).sort(), ['id', 'organization_id', 'status', 'version'].sort());
-  assert.equal(internalCampaign.value.organization_id, organizationId);
+  assert.deepEqual(Object.keys(internalCampaign.value).sort(), ['id', 'status', 'version'].sort());
 
   const draftToClose = await call(responseUrl, 'campaigns', {
     method: 'POST', body: { ...campaignCreateBody, name: 'Chiến dịch đóng từ bản nháp T10' },
@@ -301,9 +286,9 @@ try {
   const secondOfferAt = new Date(receivedAt.getTime() + 22 * 60_000);
   await responseDb.query(
     `INSERT INTO assistance_request
-       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,status,priority,priority_basis,received_at)
+       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,status,priority,priority_basis,received_at)
      VALUES ($1,$2,'UNKNOWN','SELF',$3,'DISPATCHED','P2','COMPLETE',$4)`,
-    [requestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, organizationId, receivedAt],
+    [requestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, receivedAt],
   );
   await responseDb.query(
     `INSERT INTO request_subject (request_id,location,location_source)
@@ -330,9 +315,9 @@ try {
 
   await responseDb.query(
     `INSERT INTO assistance_request
-       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,status,received_at)
+       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,status,received_at)
      VALUES ($1,$2,'UNKNOWN','SELF',$3,'SUBMITTED',$4)`,
-    [unverifiedRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, organizationId, receivedAt],
+    [unverifiedRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, receivedAt],
   );
   await responseDb.query(
     `INSERT INTO request_subject (request_id,location,location_source)
@@ -342,38 +327,15 @@ try {
 
   await responseDb.query(
     `INSERT INTO assistance_request
-       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,status,received_at)
-     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,'SUBMITTED',$5)`,
-    [duplicateRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, organizationId, receivedAt],
+       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,status,received_at)
+     VALUES ($1,$2,'UNKNOWN','SELF',$3,'SUBMITTED',$4)`,
+    [duplicateRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, receivedAt],
   );
   await responseDb.query(
     `INSERT INTO request_subject (request_id,location,location_source)
      VALUES ($1,ST_GeogFromText('SRID=4326;POINT(105 15)'),'MANUAL_PIN')`,
     [duplicateRequestId],
   );
-
-  await responseDb.query(
-    `INSERT INTO assistance_request
-       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,status,received_at)
-     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,'VERIFIED',$5)`,
-    [outOfScopeRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, coordinator.id, otherOrganizationId, receivedAt],
-  );
-  await responseDb.query(
-    `INSERT INTO request_subject (request_id,location,location_source)
-     VALUES ($1,ST_GeogFromText('SRID=4326;POINT(105 15)'),'MANUAL_PIN')`,
-    [outOfScopeRequestId],
-  );
-  const [foreignVerificationEvent] = (await responseDb.query(
-    `INSERT INTO request_event (request_id,actor_user_id,event_type,visibility,from_status,to_status,payload,occurred_at)
-     VALUES ($1,$2,'REQUEST_VERIFIED','STAFF','VERIFYING','VERIFIED',$3::jsonb,$4) RETURNING id`,
-    [outOfScopeRequestId, coordinator.id, JSON.stringify({ approved_facts: approvedFacts }), verifiedAt],
-  )).rows;
-  await responseDb.query(
-    `INSERT INTO verification_decision (request_id,outcome,basis,reviewer_user_id,decided_at)
-     VALUES ($1,'VERIFIED','EVIDENCE_REVIEWED',$2,$3)`,
-    [outOfScopeRequestId, coordinator.id, verifiedAt],
-  );
-  await responseDb.query('UPDATE assistance_request SET verification_revision=$2 WHERE id=$1', [outOfScopeRequestId, foreignVerificationEvent.id]);
 
   const canonicalAttachKey = key();
   const canonicalAttachBody = { campaign_id: campaignId, expected_version: 1 };
@@ -426,10 +388,10 @@ try {
   assert.equal(duplicateAttach.value.version, 3);
 
   await responseDb.query(
-    `INSERT INTO rescue_team (id,organization_id,name,team_kind,reporting_mode,external_contact_note)
-     VALUES ($1,$3,$4,'OTHER','COORDINATOR','Đội kiểm thử T10'),
-            ($2,$3,$5,'OTHER','COORDINATOR','Đội kiểm thử T10')`,
-    [missionTeamIds[0], missionTeamIds[1], organizationId, `T10 đội 1 ${missionTeamIds[0]}`, `T10 đội 2 ${missionTeamIds[1]}`],
+    `INSERT INTO rescue_team (id,name,team_kind,reporting_mode,external_contact_note)
+     VALUES ($1,$3,'OTHER','COORDINATOR','Đội kiểm thử T10'),
+            ($2,$4,'OTHER','COORDINATOR','Đội kiểm thử T10')`,
+    [missionTeamIds[0], missionTeamIds[1], `T10 đội 1 ${missionTeamIds[0]}`, `T10 đội 2 ${missionTeamIds[1]}`],
   );
   await responseDb.query('UPDATE assistance_request SET attribution_locked_at=now() WHERE id=$1', [requestId]);
   await responseDb.query(
@@ -541,9 +503,9 @@ try {
 
   await responseDb.query(
     `INSERT INTO assistance_request
-       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,organization_id,status,received_at)
-     VALUES ($1,$2,'UNKNOWN','SELF',$3,$4,'SUBMITTED',now())`,
-    [closeRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, otherRecipient.id, organizationId],
+       (id,tracking_code,incident_category_code,report_mode,reporter_user_id,status,received_at)
+     VALUES ($1,$2,'UNKNOWN','SELF',$3,'SUBMITTED',now())`,
+    [closeRequestId, `T10${randomBytes(5).toString('hex').toUpperCase()}`, otherRecipient.id],
   );
   await responseDb.query(
     `INSERT INTO request_subject (request_id,people_affected,location,location_source,location_accuracy_m,location_captured_at)

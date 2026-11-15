@@ -45,9 +45,9 @@ export function checkVersion(actual: number, expected: number): void {
 }
 
 export function scopeSql(
-  grants: readonly Grant[], permission: Permission, values: unknown[], alias = 'r',
+  grants: readonly Grant[], permission: Permission, values: unknown[], alias = 'r', userId?: string,
 ): string {
-  return requestScopeFilter(grants, permission, values, alias);
+  return requestScopeFilter(grants, permission, values, alias, userId);
 }
 
 export function grantCovers(grant: RequestCoordinatorGrant, row: Pick<OperationRequestRow, 'campaign_id'>): boolean {
@@ -67,13 +67,13 @@ export function parseBbox(value: string | undefined): [number, number, number, n
   return [west, south, east, north];
 }
 
-export function filtersHash(grants: readonly Grant[], userId: string, query: object, route: string): unknown {
+export function filtersHash(grants: readonly Grant[], userId: string, query: object, route: string, activeCampaignIds: readonly string[] = []): unknown {
   const queryFilters = { ...(query as Record<string, unknown>) };
   delete queryFilters.cursor;
   const scopes = grants.map(({ role_code, scope_type, campaign_id }) => ({
     role_code, scope_type, campaign_id: campaign_id ?? null,
   })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
-  return { route, user_id: userId, grants: scopes, query: queryFilters };
+  return { route, user_id: userId, grants: scopes, active_campaign_ids: [...activeCampaignIds].sort(), query: queryFilters };
 }
 
 export function relatedRequestIds(payload: Record<string, unknown>): string[] {

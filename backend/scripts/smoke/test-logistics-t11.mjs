@@ -9,8 +9,6 @@ const logisticsUrl = requiredEnv('C48_LOGISTICS_BASE_URL').replace(/\/+$/u, '');
 const identityUrl = requiredEnv('C48_IDENTITY_BASE_URL').replace(/\/+$/u, '');
 const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DATABASE_URL') });
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
-const organizationId = randomUUID();
-const otherOrganizationId = randomUUID();
 const identityNetwork = randomBytes(2);
 let identityIp = 10;
 
@@ -52,7 +50,7 @@ function expectVietnameseError(result, status, code) {
   assert.equal(result.headers.get('cache-control'), 'no-store');
 }
 
-async function registerAndLogin(label, roles, grantOrganizationId = organizationId) {
+async function registerAndLogin(label, roles) {
   const suffix = randomBytes(5).toString('hex');
   const credentials = {
     username: `t11${label}${suffix}`,
@@ -70,9 +68,9 @@ async function registerAndLogin(label, roles, grantOrganizationId = organization
   const userId = registered.value.user.id;
   for (const role of roles) {
     await identityDb.query(
-      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-       VALUES ($1,$2,'ORGANIZATION',$3)`,
-      [userId, role, grantOrganizationId],
+      `INSERT INTO role_grant (user_id,role_code,scope_type)
+       VALUES ($1,$2,'SYSTEM')`,
+      [userId, role],
     );
   }
   const login = await call(identityUrl, 'auth/login', {
@@ -90,17 +88,7 @@ function quantityMilli(value) {
 
 await Promise.all([logisticsDb.connect(), identityDb.connect()]);
 try {
-  await identityDb.query(
-    `INSERT INTO organization (id,name,organization_kind) VALUES ($1,$2,'COORDINATION')`,
-    [organizationId, `T11 test ${organizationId}`],
-  );
-  await identityDb.query(
-    `INSERT INTO organization (id,name,organization_kind) VALUES ($1,$2,'COORDINATION')`,
-    [otherOrganizationId, `T11 other organization ${otherOrganizationId}`],
-  );
-
   const operator = await registerAndLogin('ops', ['OPERATIONS_MANAGER']);
-  const otherOrganizationOperator = await registerAndLogin('other_org_ops', ['OPERATIONS_MANAGER'], otherOrganizationId);
   const requester = await registerAndLogin('requester', ['INTAKE_STAFF', 'REVIEWER']);
   const reviewers = await Promise.all([
     registerAndLogin('reviewer_a', ['REVIEWER']),
@@ -137,13 +125,13 @@ try {
 
   const warehouse = await call(logisticsUrl, 'warehouses', {
     method: 'POST', actor: operator, idempotencyKey: key(),
-    body: { organization_id: organizationId, name: `Kho T11 ${suffix}` },
+    body: { name: `Kho T11 ${suffix}` },
   });
   expectSuccess(warehouse, 201);
   const point = await call(logisticsUrl, 'relief-points', {
     method: 'POST', actor: operator, idempotencyKey: key(),
     body: {
-      organization_id: organizationId, name: `Điểm cứu trợ T11 ${suffix}`,
+      name: `Điểm cứu trợ T11 ${suffix}`,
       location: { type: 'Point', coordinates: [105.85, 21.03] },
     },
   });
@@ -151,7 +139,6 @@ try {
   const vehicle = await call(logisticsUrl, 'vehicles', {
     method: 'POST', actor: operator, idempotencyKey: key(),
     body: {
-      organization_id: organizationId,
       identifier: `T11-${suffix}`, vehicle_type: 'Xe tải kiểm thử', capacity: '100.00', capacity_unit: unitCode,
     },
   });
@@ -168,14 +155,6 @@ try {
   const pointDetail = await call(logisticsUrl, `relief-points/${point.value.id}`, { actor: operator });
   expectSuccess(pointDetail);
   assert.equal(pointDetail.value.id, point.value.id);
-
-  const hiddenPoint = await call(logisticsUrl, `relief-points/${point.value.id}`, { actor: otherOrganizationOperator });
-  expectVietnameseError(hiddenPoint, 404, 'NOT_FOUND');
-  const forbiddenPatch = await call(logisticsUrl, `relief-points/${point.value.id}`, {
-    method: 'PATCH', actor: otherOrganizationOperator, idempotencyKey: key(),
-    body: { expected_version: 1, operating_note: 'Không được phép cập nhật.' },
-  });
-  expectVietnameseError(forbiddenPatch, 404, 'NOT_FOUND');
 
   const invalidPointPatch = await call(logisticsUrl, `relief-points/${point.value.id}`, {
     method: 'PATCH', actor: operator, idempotencyKey: key(),

@@ -9,7 +9,8 @@ import { RequestOperationsCommandRunner } from './request-operations.command-run
 import { RequestOperationsPersistenceService } from './request-operations.persistence.service';
 import { RequestClaimGuard } from './request-claims.guard';
 import type { ClaimRow } from './request-claims.guard';
-import { canCoordinateRequest, claimIsActive, isSystemCoordinator } from './request-claims.helpers';
+import { claimIsActive, isSystemCoordinator } from './request-claims.helpers';
+import { assertRequestPermission } from '../requests/request-scope';
 
 @Injectable()
 export class RequestClaimService {
@@ -25,12 +26,16 @@ export class RequestClaimService {
     return this.commandRunner.runCommand(requestId, session, key, 'response.requests.claim', {},
       async (manager) => {
         const row = await this.guard.loadClaim(manager, requestId);
-        if (!canCoordinateRequest(session.grants, row.campaign_id)) throw new AppError('FORBIDDEN', { status: 403 });
+        assertRequestPermission(session, 'REQUEST_VERIFY', row);
         if (row.handled_by === session.userId) {
           await manager.query('UPDATE assistance_request SET handled_at=now() WHERE id=$1 AND handled_by=$2', [requestId, session.userId]);
           return { status: 200, value: this.projection(row, session.userId, row.db_now.toISOString()), resource: { type: 'assistance_request', id: requestId } };
         }
-        if (row.handled_by && claimIsActive(row.handled_at, row.db_now)) throw await this.guard.conflictFor(row.handled_by);
+        if (row.handled_by && claimIsActive(row.handled_at, row.db_now)) {
+          if (!isSystemCoordinator(session.grants)) throw await this.guard.conflictFor(row.handled_by);
+          await this.guard.takeover(manager, row, session, 'response.requests.claim');
+          return { status: 200, value: this.projection(row, session.userId, new Date().toISOString()), resource: { type: 'assistance_request', id: requestId } };
+        }
 
         await manager.query('UPDATE assistance_request SET handled_by=$2,handled_at=now() WHERE id=$1', [requestId, session.userId]);
         const eventId = await this.persistence.insertEvent(manager, requestId, session.userId, 'CLAIMED', 'STAFF',
@@ -61,7 +66,7 @@ export class RequestClaimService {
 
   private assertCanRelease(session: ReporterSession, row: ClaimRow): void {
     if (row.handled_by === session.userId) {
-      if (!canCoordinateRequest(session.grants, row.campaign_id)) throw new AppError('FORBIDDEN', { status: 403 });
+      assertRequestPermission(session, 'REQUEST_VERIFY', row);
       return;
     }
     if (!isSystemCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
@@ -91,7 +96,7 @@ export class RequestClaimService {
   ): Promise<Record<string, unknown>> {
     if (!resource) throw new AppError('INTERNAL_ERROR', { status: 500 });
     const row = await this.guard.loadClaim(manager, requestId);
-    if (!canCoordinateRequest(session.grants, row.campaign_id)) throw new AppError('FORBIDDEN', { status: 403 });
+    assertRequestPermission(session, 'REQUEST_VERIFY', row);
     return this.view(manager, requestId);
   }
 }

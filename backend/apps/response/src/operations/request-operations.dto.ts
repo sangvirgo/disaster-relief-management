@@ -7,6 +7,7 @@ import {
 const statuses = ['SUBMITTED', 'VERIFYING', 'VERIFIED', 'REJECTED', 'DUPLICATE', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS', 'RESOLVING', 'RESOLVED', 'CLOSED', 'CANCELLED'];
 const priorities = ['P1', 'P2', 'P3', 'P4'];
 const reviewLanes = ['NORMAL', 'RATE_LIMITED_REVIEW', 'PROXY_QUOTA_REVIEW'];
+const campaignMatchStates = ['UNMATCHED', 'AUTO_ATTACHED', 'CONFLICT', 'MANUAL'];
 const bboxPattern = /^-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?$/;
 
 export class RequestOperationPageDto {
@@ -23,6 +24,9 @@ export class TeamCandidatesQueryDto {
 }
 
 export class RequestQueueQueryDto extends RequestOperationPageDto {
+  @IsOptional() @IsUUID('all')
+  declare campaign_id?: string;
+
   @IsOptional() @IsIn(statuses)
   declare status?: string;
 
@@ -52,6 +56,9 @@ export class RequestQueueQueryDto extends RequestOperationPageDto {
 
   @IsOptional() @IsIn(['true', 'false'])
   declare unassigned?: string;
+
+  @IsOptional() @IsIn(campaignMatchStates)
+  declare campaign_match_state?: string;
 }
 
 export class RequestVersionDto {

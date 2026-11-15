@@ -8,7 +8,7 @@ import type { IdempotencyService } from '@c48/technical/idempotency/idempotency'
 import type { ReporterSession, ReporterSessionService } from '../src/requests/reporter-session';
 import { CampaignCreateDto } from '../src/campaigns/campaigns.dto';
 import { CampaignsService } from '../src/campaigns/campaigns.service';
-import { campaignNextStatus, campaignScopePredicate } from '../src/campaigns/campaigns.helpers';
+import { campaignNextStatus, campaignScopePredicate, publicCampaignView, validateCampaignSpatial } from '../src/campaigns/campaigns.helpers';
 
 const campaignId = '00000000-0000-4000-8000-000000000003';
 const userId = '00000000-0000-4000-8000-000000000004';
@@ -42,12 +42,25 @@ describe('CampaignsService', () => {
     for (const grants of [
       [],
       [{ role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId }] as ReporterSession['grants'],
+      [{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM' }] as ReporterSession['grants'],
     ]) {
       const { service, idempotency } = fixture(grants);
       await expect(service.create({ name: 'Cứu trợ' }, idemKey, request))
         .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
       expect(idempotency.execute).not.toHaveBeenCalled();
     }
+  });
+
+  it('rejects a campaign coordinator from changing campaign lifecycle', async () => {
+    const { service, idempotency, managerQuery } = fixture([{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM' }]);
+    managerQuery.mockResolvedValueOnce([{
+      id: campaignId, name: 'Cứu trợ', objective: null, status: 'ACTIVE', starts_at: null, ends_at: null,
+      version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'),
+    }]);
+    await expect(service.transition(campaignId, 'pause', { expected_version: 1, reason: 'Tạm dừng' }, idemKey, request))
+      .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+    expect(idempotency.execute).toHaveBeenCalledTimes(1);
+    expect(managerQuery).toHaveBeenCalledTimes(1);
   });
 
   it('allows only the documented lifecycle edges and keeps CLOSED terminal', () => {
@@ -90,10 +103,30 @@ describe('CampaignsService', () => {
     );
   });
 
+  it('keeps the public campaign projection to the documented allowlist (no coordination area)', () => {
+    const view = publicCampaignView({
+      id: campaignId, name: 'Cứu trợ', objective: null, status: 'ACTIVE', starts_at: null, ends_at: null,
+      version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'), center_latitude: 10.7, center_longitude: 106.6, radius_m: 5000,
+    } as never);
+    expect(Object.keys(view).sort()).toEqual(['ends_at', 'id', 'objective', 'starts_at', 'status', 'title']);
+  });
+
+  it('validates campaign center and radius together and keeps validation copy Vietnamese', () => {
+    expect(() => validateCampaignSpatial({ lat: 21.03, lng: 105.85 }, 5_000)).not.toThrow();
+    expect(() => validateCampaignSpatial(null, null)).not.toThrow();
+    expect(() => validateCampaignSpatial({ lat: 21.03, lng: 105.85 }, null)).toThrow(expect.objectContaining({
+      code: 'VALIDATION_FAILED', userMessage: 'Vui lòng nhập đồng thời tâm chiến dịch và bán kính, hoặc để trống cả hai.',
+    }));
+    expect(() => validateCampaignSpatial({ lat: 91, lng: 105.85 }, 5_000)).toThrow(expect.objectContaining({
+      code: 'VALIDATION_FAILED', userMessage: 'Tọa độ tâm chiến dịch nằm ngoài phạm vi hợp lệ.',
+    }));
+    expect(() => validateCampaignSpatial({ lat: 21.03, lng: 105.85 }, 499)).toThrow(expect.objectContaining({
+      code: 'VALIDATION_FAILED', userMessage: 'Bán kính chiến dịch phải từ 500 đến 300.000 mét.',
+    }));
+  });
+
   it('locks the campaign before rejecting close while canonical requests remain open', async () => {
-    const { service, managerQuery } = fixture([{
-      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId,
-    }]);
+    const { service, managerQuery } = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }]);
     managerQuery.mockResolvedValueOnce([{
       id: campaignId, name: 'Cứu trợ', objective: null,
       status: 'ACTIVE', starts_at: null, ends_at: null, version: 3, created_at: new Date('2026-01-01T00:00:00.000Z'),

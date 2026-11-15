@@ -9,7 +9,7 @@ import { Grant, hasPermission } from '@c48/identity-contracts/permissions';
 import { CampaignActionDto, CampaignCreateDto, CampaignPageQueryDto, CampaignPatchDto, CampaignReasonActionDto } from './campaigns.dto';
 import {
   campaignNextStatus, campaignScopePredicate, campaignView, cleanCampaignName, CampaignAction, CampaignRow,
-  publicCampaignView, validCampaignCursor, validateCampaignDates,
+  publicCampaignView, validCampaignCursor, validateCampaignDates, validateCampaignSpatial,
 } from './campaigns.helpers';
 import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';
 
@@ -20,6 +20,8 @@ export interface CampaignCommandRequest extends Request {
 type CampaignPage = { items: Record<string, unknown>[]; more: boolean; cursor?: string };
 
 const campaignColumns = `id,name,objective,status,starts_at,ends_at,version,created_at,
+  CASE WHEN center IS NULL THEN NULL ELSE ST_Y(center::geometry) END AS center_latitude,
+  CASE WHEN center IS NULL THEN NULL ELSE ST_X(center::geometry) END AS center_longitude,radius_m,
   to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at`;
 
 @Injectable()
@@ -35,6 +37,7 @@ export class CampaignsService {
     this.assertCreatePermission(session.grants);
     const name = cleanCampaignName(dto.name);
     validateCampaignDates(dto.starts_at, dto.ends_at);
+    validateCampaignSpatial(dto.center ?? null, dto.radius_m ?? null);
 
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `user:${session.userId}`,
@@ -43,9 +46,11 @@ export class CampaignsService {
       requestHash: canonicalRequestHash({ actor_user_id: session.userId, dto }),
       execute: async (manager) => {
         const rows = await manager.query(
-          `INSERT INTO campaign (name,objective,starts_at,ends_at,created_by_user_id)
-           VALUES ($1,$2,$3,$4,$5) RETURNING ${campaignColumns}`,
-          [name, dto.objective ?? null, dto.starts_at ?? null, dto.ends_at ?? null, session.userId],
+          `INSERT INTO campaign (name,objective,starts_at,ends_at,center,radius_m,created_by_user_id)
+           VALUES ($1,$2,$3,$4,CASE WHEN $5::double precision IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($6,$5),4326)::geography END,$7,$8)
+           RETURNING ${campaignColumns}`,
+          [name, dto.objective ?? null, dto.starts_at ?? null, dto.ends_at ?? null, dto.center?.lat ?? null,
+            dto.center?.lng ?? null, dto.radius_m ?? null, session.userId],
         ) as CampaignRow[];
         const row = rows[0];
         if (!row) throw new AppError('INTERNAL_ERROR', { status: 500 });
@@ -88,7 +93,7 @@ export class CampaignsService {
 
   async patch(id: string, dto: CampaignPatchDto, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    const changed = ['name', 'objective', 'starts_at', 'ends_at'].some((field) => Object.hasOwn(dto, field));
+    const changed = ['name', 'objective', 'starts_at', 'ends_at', 'center', 'radius_m'].some((field) => Object.hasOwn(dto, field));
     if (!changed) throw new AppError('VALIDATION_FAILED', { status: 400 });
     const name = dto.name === undefined ? undefined : cleanCampaignName(dto.name);
 
@@ -106,15 +111,23 @@ export class CampaignsService {
           dto.starts_at === undefined ? row.starts_at : dto.starts_at,
           dto.ends_at === undefined ? row.ends_at : dto.ends_at,
         );
+        validateCampaignSpatial(
+          dto.center === undefined ? (row.center_latitude == null || row.center_longitude == null
+            ? null : { lat: Number(row.center_latitude), lng: Number(row.center_longitude) }) : dto.center,
+          dto.radius_m === undefined ? row.radius_m ?? null : dto.radius_m,
+        );
         const [updated] = await manager.query(
           `UPDATE campaign SET
              name=CASE WHEN $3::boolean THEN $4::text ELSE name END,
              objective=CASE WHEN $5::boolean THEN $6::text ELSE objective END,
              starts_at=CASE WHEN $7::boolean THEN $8::timestamptz ELSE starts_at END,
              ends_at=CASE WHEN $9::boolean THEN $10::timestamptz ELSE ends_at END,
+             center=CASE WHEN $11::boolean THEN CASE WHEN $12::double precision IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($13,$12),4326)::geography END ELSE center END,
+             radius_m=CASE WHEN $14::boolean THEN $15::integer ELSE radius_m END,
              version=version+1 WHERE id=$1 AND version=$2 RETURNING ${campaignColumns}`,
           [id, dto.expected_version, dto.name !== undefined, name ?? null, dto.objective !== undefined, dto.objective ?? null,
-            dto.starts_at !== undefined, dto.starts_at ?? null, dto.ends_at !== undefined, dto.ends_at ?? null],
+            dto.starts_at !== undefined, dto.starts_at ?? null, dto.ends_at !== undefined, dto.ends_at ?? null,
+            dto.center !== undefined, dto.center?.lat ?? null, dto.center?.lng ?? null, dto.radius_m !== undefined, dto.radius_m ?? null],
         ) as [CampaignRow[], number];
         const next = updated[0];
         if (!next) throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
@@ -167,6 +180,13 @@ export class CampaignsService {
         if (!next) throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
         const before = campaignView(row);
         const value = campaignView(next);
+        if (action === 'pause' || action === 'close') {
+          await manager.query(
+            `UPDATE campaign_engagement SET ended_at=now(),ended_reason='CAMPAIGN_CLOSED'
+              WHERE campaign_id=$1 AND ended_at IS NULL`,
+            [id],
+          );
+        }
         await this.audit(manager, session.userId, `CAMPAIGN_${action.toUpperCase()}`, id, before, value, reason);
         return { status: 200, value, resource: { type: 'campaign', id } };
       },

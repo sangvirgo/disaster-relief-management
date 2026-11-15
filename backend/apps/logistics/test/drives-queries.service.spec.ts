@@ -8,7 +8,7 @@ describe('Logistics donation drive queries', () => {
   it('lists open drives by the indexed creation cursor and returns posted accepted totals', async () => {
     const query = jest.fn(async (sql: string) => {
       if (sql.includes('FROM donation_drive d')) return [{
-        id: driveId, organization_id: '11111111-1111-4111-8111-111111111111', intake_warehouse_id: '44444444-4444-4444-8444-444444444444',
+        id: driveId,  intake_warehouse_id: '44444444-4444-4444-8444-444444444444',
         campaign_id: null, campaign_status: 'ACTIVE', campaign_status_at: '2026-10-12T11:00:00.000Z', status: 'OPEN', title: 'Nước uống', description: null,
         opens_at: null, closes_at: null, version: 2, created_at: '2026-10-12T12:00:00.000Z', cursor_created_at: '2026-10-12T12:00:00.000000Z',
         warehouse_name: 'Kho trung tâm', address_note: 'Cổng phía đông', location_public: false, longitude: 106.7, latitude: 10.8,
@@ -34,7 +34,7 @@ describe('Logistics donation drive queries', () => {
 
   it('includes exact warehouse coordinates only when the manager made the location public', async () => {
     const query = jest.fn(async (sql: string) => sql.includes('FROM donation_drive d') ? [{
-      id: driveId, organization_id: '11111111-1111-4111-8111-111111111111', intake_warehouse_id: '44444444-4444-4444-8444-444444444444',
+      id: driveId,  intake_warehouse_id: '44444444-4444-4444-8444-444444444444',
       campaign_id: null, campaign_status: null, campaign_status_at: null, status: 'OPEN', title: 'Nước uống', description: null,
       opens_at: null, closes_at: null, version: 2, created_at: new Date('2026-10-12T12:00:00.000Z'), cursor_created_at: '2026-10-12T12:00:00.000000Z',
       warehouse_name: 'Kho trung tâm', address_note: null, location_public: true, longitude: 106.7, latitude: 10.8,

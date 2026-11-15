@@ -1,3 +1,4 @@
+-- Historical test fixture for InitialIdentity; not runnable against the current post-migration schema.
 \i constraint-tests.sql
 CREATE OR REPLACE FUNCTION expect_no_column(tbl text, col text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN

@@ -8,6 +8,7 @@ const facts = { version: 4, workCycle: 1, incidentCategoryCode: 'FLOOD', descrip
 
 describe('advisory input identity and review', () => {
   afterEach(() => {
+    delete process.env.GEMINI_API_KEYS;
     delete process.env.GEMINI_API_KEY;
   });
 
@@ -72,7 +73,7 @@ describe('advisory input identity and review', () => {
 
   it('manually queues a fresh failed advisory, resets its retry budget, and records a staff audit event', async () => {
     process.env.GEMINI_API_KEY = 'unit-test';
-    const session = { userId: 'coordinator' };
+    const session = { userId: 'coordinator', grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }] };
     const queries: Array<{ sql: string; parameters: unknown[] }> = [];
     const query = jest.fn(async (sql: string, parameters: unknown[] = []) => {
       queries.push({ sql, parameters });

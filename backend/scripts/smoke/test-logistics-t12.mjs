@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { activateEmailRegistration, withEmail } from './lib/email-registration.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -10,8 +9,8 @@ const logisticsUrl = requiredEnv('C48_LOGISTICS_BASE_URL').replace(/\/+$/u, '');
 const identityUrl = requiredEnv('C48_IDENTITY_BASE_URL').replace(/\/+$/u, '');
 const responseUrl = requiredEnv('C48_RESPONSE_BASE_URL').replace(/\/+$/u, '');
 const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DATABASE_URL') });
-const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
 const responseDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
+let identityIpSequence = 200;
 
 function requiredEnv(name) {
   const value = process.env[name];
@@ -72,30 +71,14 @@ function expectVietnameseError(result, status, code) {
   assert.equal(result.headers.get('cache-control'), 'no-store');
 }
 
-async function registerAndLogin(label, organizationId, roles) {
-  const suffix = randomBytes(5).toString('hex');
-  const credentials = {
-    username: `t12${label}${suffix}`,
-    display_name: `Người dùng kiểm thử T12 ${label} ${suffix}`,
-    password: `Logistics T12 test ${suffix}!`,
-  };
-  const registered = await call(identityUrl, 'auth/register', {
-    method: 'POST', body: withEmail(credentials), idempotencyKey: key(),
-  });
-  assert.equal(registered.status, 201, JSON.stringify(registered.value));
-  await activateEmailRegistration(identityDb, registered);
-  for (const role of roles) {
-    await identityDb.query(
-      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-       VALUES ($1,$2,'ORGANIZATION',$3)`,
-      [registered.value.user.id, role, organizationId],
-    );
-  }
+async function loginSeeded(username) {
   const login = await call(identityUrl, 'auth/login', {
-    method: 'POST', body: { username: credentials.username, password: credentials.password, client_kind: 'NATIVE' },
+    method: 'POST',
+    body: { username, password: requiredEnv('SEED_PASSWORD'), client_kind: 'NATIVE' },
+    extraHeaders: { 'X-Forwarded-For': `198.51.100.${identityIpSequence++}` },
   });
-  assert.equal(login.status, 200, JSON.stringify(login.value));
-  return { id: registered.value.user.id, token: login.value.access_token };
+  expectSuccess(login);
+  return { id: login.value.user.id, token: login.value.access_token };
 }
 
 async function createGuestDelivery(driveId, itemId, donorName, phone, secret, idempotencyKey = key()) {
@@ -126,19 +109,16 @@ async function checkIdentityDownGuestFlow() {
 }
 
 await logisticsDb.connect();
-if (!identityDown) await Promise.all([identityDb.connect(), responseDb.connect()]);
+if (!identityDown) await responseDb.connect();
 try {
   if (identityDown) {
     await checkIdentityDownGuestFlow();
     console.log('PASS Logistics T12 guest declarations and tracking with Identity stopped');
   } else {
-    const organizationId = randomUUID();
-    await identityDb.query('INSERT INTO organization (id,name,organization_kind) VALUES ($1,$2,\'COORDINATION\')',
-      [organizationId, `T12 test ${organizationId}`]);
-
-    const manager = await registerAndLogin('manager', organizationId, ['OPERATIONS_MANAGER', 'INTAKE_STAFF', 'CAMPAIGN_MANAGER']);
-    const intakeOnly = await registerAndLogin('intake_only', organizationId, ['INTAKE_STAFF']);
-    const donor = await registerAndLogin('donor', organizationId, []);
+    const coordinator = await loginSeeded('coord1');
+    const manager = await loginSeeded('ops_mgr');
+    const intakeOnly = await loginSeeded('intake1');
+    const donor = await loginSeeded('citizen1');
     const suffix = randomBytes(5).toString('hex').toUpperCase();
     const itemType = await call(logisticsUrl, 'item-types', {
       method: 'POST', actor: manager, idempotencyKey: key(), body: { code: `T12_${suffix}`, display_name: 'Thực phẩm kiểm thử T12' },
@@ -155,7 +135,7 @@ try {
     expectSuccess(item, 201);
     const warehouse = await call(logisticsUrl, 'warehouses', {
       method: 'POST', actor: manager, idempotencyKey: key(),
-      body: { organization_id: organizationId, name: `Kho T12 ${suffix}` },
+      body: { name: `Kho T12 ${suffix}` },
     });
     expectSuccess(warehouse, 201);
 
@@ -167,12 +147,12 @@ try {
     expectVietnameseError(intakeOnlyPublish, 403, 'FORBIDDEN');
 
     const campaign = await call(responseUrl, 'campaigns', {
-      method: 'POST', actor: manager, idempotencyKey: key(),
+      method: 'POST', actor: coordinator, idempotencyKey: key(),
       body: { name: `Chiến dịch T12 ${suffix}`, objective: 'Kiểm tra liên kết dịch vụ.' },
     });
     expectSuccess(campaign, 201);
     const activatedCampaign = await call(responseUrl, `campaigns/${campaign.value.id}/activate`, {
-      method: 'POST', actor: manager, idempotencyKey: key(), body: { expected_version: campaign.value.version },
+      method: 'POST', actor: coordinator, idempotencyKey: key(), body: { expected_version: campaign.value.version },
     });
     expectSuccess(activatedCampaign, 200);
 
@@ -278,13 +258,13 @@ try {
     const staffDelivery = await createGuestDelivery(publicDrive.id, item.value.id, 'Người quyên góp hỗ trợ', '09022223333', staffSecret);
     expectSuccess(staffDelivery.result, 201);
     const assisted = await call(logisticsUrl, `donation-deliveries/${staffDelivery.result.value.id}/assisted-declaration`, {
-      method: 'POST', actor: manager, idempotencyKey: key(),
+      method: 'POST', actor: intakeOnly, idempotencyKey: key(),
       body: { expected_version: 1, lines: [{ item_id: item.value.id, declared_quantity: '5.00' }] },
     });
     expectSuccess(assisted, 201);
     assert.equal(assisted.value.created_by_kind, 'STAFF_ASSISTED');
     const revoked = await call(logisticsUrl, `donation-deliveries/${staffDelivery.result.value.id}/capability/revoke`, {
-      method: 'POST', actor: manager, idempotencyKey: key(),
+      method: 'POST', actor: intakeOnly, idempotencyKey: key(),
     });
     expectSuccess(revoked, 200);
     const revokedTrack = await call(logisticsUrl, `public/donations/${staffDelivery.result.value.id}`, {
@@ -300,12 +280,12 @@ try {
       source_note: 'Gọi lại số điện thoại trong hồ sơ.',
     };
     const issued = await call(logisticsUrl, `donation-deliveries/${staffDelivery.result.value.id}/recovery`, {
-      method: 'POST', actor: manager, idempotencyKey: recoveryKey, body: recoveryBody,
+      method: 'POST', actor: intakeOnly, idempotencyKey: recoveryKey, body: recoveryBody,
     });
     expectSuccess(issued, 201);
     assert.equal(typeof issued.value.recovery_code, 'string');
     const issuedReplay = await call(logisticsUrl, `donation-deliveries/${staffDelivery.result.value.id}/recovery`, {
-      method: 'POST', actor: manager, idempotencyKey: recoveryKey, body: recoveryBody,
+      method: 'POST', actor: intakeOnly, idempotencyKey: recoveryKey, body: recoveryBody,
     });
     expectSuccess(issuedReplay, 201);
     assert.equal(issuedReplay.headers.get('idempotent-replay'), 'true');
@@ -344,5 +324,5 @@ try {
   }
 } finally {
   await logisticsDb.end();
-  if (!identityDown) await Promise.all([identityDb.end(), responseDb.end()]);
+  if (!identityDown) await responseDb.end();
 }

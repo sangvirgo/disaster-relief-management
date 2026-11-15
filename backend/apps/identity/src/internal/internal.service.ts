@@ -70,7 +70,6 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
     const first = rows[0];
     if (!first) return { active: false, user_id: input.sub, display_name: null, status: null, authz_version: null, grants: [] };
     const grants = rows.flatMap((row) => row.grant_id ? [{
-      id: row.grant_id,
       role_code: row.role_code,
       scope_type: row.scope_type,
       campaign_id: row.campaign_id,
@@ -169,8 +168,10 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
     const items = await this.introspectionDataSource.query(
       `SELECT g.user_id,g.role_code,g.scope_type,g.campaign_id
          FROM role_grant g JOIN app_user u ON u.id=g.user_id
-        WHERE g.revoked_at IS NULL AND u.status='ACTIVE' AND g.role_code='COORDINATOR'
-          AND (g.scope_type='SYSTEM' OR ($1::uuid IS NOT NULL AND g.scope_type='CAMPAIGN' AND g.campaign_id=$1))
+        WHERE g.revoked_at IS NULL AND u.status='ACTIVE'
+          AND ((g.role_code='COORDINATOR' AND
+                (g.scope_type='SYSTEM' OR ($1::uuid IS NOT NULL AND g.scope_type='CAMPAIGN' AND g.campaign_id=$1)))
+            OR (g.role_code='CAMPAIGN_COORDINATOR' AND g.scope_type='SYSTEM'))
         ORDER BY g.user_id,g.role_code,g.scope_type,g.campaign_id`,
       [campaignId],
     ) as Array<Record<string, unknown>>;

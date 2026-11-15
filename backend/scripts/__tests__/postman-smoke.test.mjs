@@ -25,7 +25,7 @@ const folder = (fragment) => {
 test('collection and main folder explain the optional-run boundary consistently', () => {
   assert.match(collection.info.description, /Chạy ở cấp collection cũng dừng sau folder 00/u);
   assert.match(collection.item[0].description, /Chạy ở cấp collection cũng dừng sau folder 00/u);
-  assert.match(collection.item[0].description, /folder tùy chọn 10–60 chỉ chạy khi chọn riêng/u);
+  assert.match(collection.item[0].description, /folder tùy chọn 10–70 chỉ chạy khi chọn riêng/u);
 });
 test('guest recovery SOS request disables ambient Postman cookies', () => {
   const guestRequest = all.find((item) => item.id === 'recovery-01');
@@ -336,10 +336,8 @@ test('complete main script chain carries actor tokens, IDs and versions without 
     assert.equal(runner.skipped, false, item.name);
     assert.equal(runner.failures.length, 0, item.name + ': ' + runner.failures.map(({ error }) => error.message).join(', '));
     if (operation === 'login') { actor = runner.body.username; actors.push(actor); }
-    if (operation === 'createIdentityUser') assert.equal(runner.body.organization_id, undefined);
     if (operation === 'responseTeamsCreate') {
       assert.equal(runner.body.leader_user_id, 'leader-a');
-      assert.equal(runner.body.organization_id, undefined);
     }
     if (operation === 'responseRequestResolutionResolve') assert.equal(runner.body.expected_version, 9);
     if (operation === 'transitionMission') assert.equal(actor, runner.values.get('demoLeaderUsername'));

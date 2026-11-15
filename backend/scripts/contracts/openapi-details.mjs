@@ -60,7 +60,9 @@ const logisticsCommandResponseHeaders = {
 const requestCampaignAssociationViewSchema = object({
   id, status: text, version,
   campaign_id: { anyOf: [id, { type: 'null' }] },
-}, ['id', 'status', 'version', 'campaign_id']);
+  campaign_match_state: { type: 'string', enum: ['UNMATCHED', 'AUTO_ATTACHED', 'CONFLICT', 'MANUAL'] },
+  campaign_candidate_ids: { anyOf: [array(id), { type: 'null' }] },
+}, ['id', 'status', 'version', 'campaign_id', 'campaign_match_state', 'campaign_candidate_ids']);
 const requestClaimViewSchema = object({
   id, status: text, version,
   campaign_id: { anyOf: [id, { type: 'null' }] },
@@ -68,6 +70,9 @@ const requestClaimViewSchema = object({
   handled_at: { anyOf: [dateTime, { type: 'null' }] },
 }, ['id', 'status', 'version', 'campaign_id', 'handled_by', 'handled_at']);
 const identityDetails = {
+  getIdentityUser: {
+    summary: 'Get a user profile.',
+  },
   registerCitizen: {
     summary: 'Start a citizen registration and send an email verification code.',
     description: 'Creates a pending registration request valid for ten minutes, without creating an account or reserving its username/email. The user object previews the prospective account UUID. A valid six-digit OTP creates the account and its CITIZEN grant atomically. Codes last five minutes, capped by the fixed registration deadline; resend never extends that deadline. Replaying an expired registration key returns REGISTRATION_EXPIRED; start again with a new key. WEB requests require the pre-session cookie and CSRF token; NATIVE requests send no cookies or Origin.',
@@ -110,7 +115,7 @@ const identityDetails = {
     ] }),
   },
   identityInternalSearchActiveUsers: {
-    summary: 'Search active accounts for Response team membership.',
+    summary: 'Search active accounts for a Response team roster.',
     description: 'Restricted to the Response service token. Searches active accounts by username or display-name prefix and returns only the fields needed by the team member picker. Results use a filter-bound keyset cursor and are not cached.',
     request: request(object({
       query: { type: 'string', minLength: 2, maxLength: 64 },
@@ -130,13 +135,133 @@ const identityDetails = {
   },
 };
 
+const identityRoleCodes = [
+  'CITIZEN', 'VOLUNTEER', 'COORDINATOR', 'CAMPAIGN_COORDINATOR', 'CAMPAIGN_MANAGER',
+  'OPERATIONS_MANAGER', 'INTAKE_STAFF', 'REVIEWER', 'DISTRIBUTION_STAFF', 'ADMIN',
+];
+
 const identityPaginationQueries = {
   listIdentityUsers: ['cursor', 'limit'],
   listIdentityUserGrants: ['cursor', 'limit'],
   listIdentityAuditLogs: ['cursor', 'limit'],
 };
 
+const campaignCenterSchema = object({
+  lat: { type: 'number', minimum: -90, maximum: 90 },
+  lng: { type: 'number', minimum: -180, maximum: 180 },
+}, ['lat', 'lng']);
+const campaignSpatialFields = {
+  center: { anyOf: [campaignCenterSchema, { type: 'null' }] },
+  radius_m: { anyOf: [{ type: 'integer', minimum: 500, maximum: 300000 }, { type: 'null' }] },
+};
+const campaignEngagementSchema = object({
+  id, campaign_id: id, campaign_name: { anyOf: [text, { type: 'null' }] },
+  campaign_status: { anyOf: [text, { type: 'null' }] }, user_id: id,
+  started_at: dateTime, last_active_at: dateTime, ended_at: { anyOf: [dateTime, { type: 'null' }] },
+  ended_reason: { anyOf: [{ type: 'string', enum: ['LEFT', 'EXPIRED', 'SWITCHED', 'CAMPAIGN_CLOSED'] }, { type: 'null' }] },
+  active: boolean(),
+}, ['id', 'campaign_id', 'user_id', 'started_at', 'last_active_at', 'ended_at', 'ended_reason', 'active']);
+const campaignHistoryItemSchema = object({
+  occurred_at: dateTime, event_type: text,
+  actor: { anyOf: [object({ id, display_name: { anyOf: [text, { type: 'null' }] } }, ['id', 'display_name']), { type: 'null' }] },
+  request_id: { anyOf: [id, { type: 'null' }] }, mission_id: { anyOf: [id, { type: 'null' }] },
+  payload: { anyOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }] },
+}, ['occurred_at', 'event_type', 'actor', 'request_id', 'mission_id', 'payload']);
+
 const responseDetails = {
+  listRequestQueue: {
+    query: [
+      { name: 'campaign_id', in: 'query', schema: id },
+      { name: 'campaign_match_state', in: 'query', schema: { type: 'string', enum: ['UNMATCHED', 'AUTO_ATTACHED', 'CONFLICT', 'MANUAL'] } },
+    ],
+  },
+  createCampaign: {
+    summary: 'Create a campaign with an optional spatial matching area.',
+    request: request(object({
+      name: { type: 'string', minLength: 1 }, objective: { anyOf: [text, { type: 'null' }] },
+      starts_at: { anyOf: [dateTime, { type: 'null' }] }, ends_at: { anyOf: [dateTime, { type: 'null' }] },
+      ...campaignSpatialFields,
+    }, ['name'])),
+  },
+  updateCampaign: {
+    summary: 'Update campaign details and its optional spatial matching area.',
+    request: request(versionBody({
+      name: { type: 'string', minLength: 1 }, objective: { anyOf: [text, { type: 'null' }] },
+      starts_at: { anyOf: [dateTime, { type: 'null' }] }, ends_at: { anyOf: [dateTime, { type: 'null' }] },
+      ...campaignSpatialFields,
+    })),
+  },
+  listCampaigns: {
+    response: response(page({
+      id, name: text, objective: { anyOf: [text, { type: 'null' }] }, status: text, version,
+      starts_at: { anyOf: [dateTime, { type: 'null' }] }, ends_at: { anyOf: [dateTime, { type: 'null' }] }, created_at: dateTime,
+      ...campaignSpatialFields,
+    }), 'Campaign page including optional spatial matching areas.'),
+  },
+  getCampaign: {
+    response: response(object({
+      id, name: text, objective: { anyOf: [text, { type: 'null' }] }, status: text, version,
+      starts_at: { anyOf: [dateTime, { type: 'null' }] }, ends_at: { anyOf: [dateTime, { type: 'null' }] }, created_at: dateTime,
+      ...campaignSpatialFields,
+    }, ['id', 'name', 'status', 'version', 'center', 'radius_m']), 'Campaign detail including optional spatial matching area.'),
+  },
+  responseCampaignsTriage: {
+    summary: 'List active campaigns ranked by deterministic SOS urgency counts.',
+    description: 'Ranks campaigns by unhandled SOS priority counts, overdue SOS count, longest wait, fewer active coordinators, then campaign ID. No AI or automatic SOS priority is used.',
+    response: response(object({ items: item({
+      id, name: text, status: text,
+      urgency: object({
+        highest_priority: { anyOf: [{ type: 'string', enum: ['P1', 'P2', 'P3', 'P4'] }, { type: 'null' }] },
+        highest_priority_unhandled_count: integer(),
+        unhandled_priority_counts: object({ P1: integer(), P2: integer(), P3: integer(), P4: integer() }, ['P1', 'P2', 'P3', 'P4']),
+        overdue_count: integer(), longest_wait_seconds: integer(), active_coordinator_count: integer(),
+        reason_codes: array({ type: 'string', enum: ['P1_UNHANDLED', 'P2_UNHANDLED', 'P3_UNHANDLED', 'P4_UNHANDLED', 'OVERDUE', 'LONG_WAIT', 'NO_COORDINATOR', 'ROUTINE'] }),
+      }, ['highest_priority', 'highest_priority_unhandled_count', 'unhandled_priority_counts', 'overdue_count', 'longest_wait_seconds', 'active_coordinator_count', 'reason_codes']),
+      urgency_reasons_vi: array(text),
+    }, ['id', 'name', 'status', 'urgency', 'urgency_reasons_vi']) }, ['items']), 'Active campaign triage order and reason labels.'),
+  },
+  responseCampaignsOverview: {
+    summary: 'Return campaign activity, SOS counts, effective claims, overdue SOS and common queue totals.',
+    response: response(object({
+      items: item({
+        id, name: text, status: text, ...campaignSpatialFields,
+        active_coordinators: item({ user_id: id, display_name: { anyOf: [text, { type: 'null' }] }, started_at: dateTime, last_active_at: dateTime }, ['user_id', 'display_name', 'started_at', 'last_active_at']),
+        request_counts: { type: 'object', additionalProperties: integer() }, active_claim_count: integer(), overdue_count: integer(), has_active_coordinator: boolean(),
+      }, ['id', 'name', 'status', 'center', 'radius_m', 'active_coordinators', 'request_counts', 'active_claim_count', 'overdue_count', 'has_active_coordinator']),
+      common_queue: object({ unmatched: integer(), conflict: integer() }, ['unmatched', 'conflict']),
+    }, ['items', 'common_queue']), 'Campaign overview for primary coordinators.'),
+  },
+  responseCampaignsMyEngagements: {
+    response: response(object({ items: array(campaignEngagementSchema) }, ['items'])),
+  },
+  responseCampaignsEngage: {
+    summary: 'Start or refresh the caller’s campaign coordination engagement.',
+    description: 'Requires CAMPAIGN_COORDINATOR and an ACTIVE campaign. Calls are idempotent by Idempotency-Key; at most three campaigns may be active for one user.',
+    response: response(campaignEngagementSchema, 'Engagement created or refreshed.', undefined, idempotentCommandResponseHeaders),
+  },
+  responseCampaignsDisengage: {
+    summary: 'End the caller’s coordination engagement without deleting its history.',
+    response: response({ oneOf: [
+      object({ ...campaignEngagementSchema.properties, ended_at: dateTime, ended_reason: { type: 'string', enum: ['LEFT', 'EXPIRED', 'SWITCHED', 'CAMPAIGN_CLOSED'] }, active: { type: 'boolean', const: false } }, ['id', 'campaign_id', 'user_id', 'started_at', 'last_active_at', 'ended_at', 'ended_reason', 'active']),
+      object({ campaign_id: id, active: { type: 'boolean', const: false } }, ['campaign_id', 'active']),
+    ] }, 'Ended engagement or an idempotent no-op.', undefined, idempotentCommandResponseHeaders),
+  },
+  responseCampaignsHistory: {
+    summary: 'Return a cursor-paginated campaign relief timeline.',
+    response: response(page(campaignHistoryItemSchema.properties), 'Unified append-only coordination, request and mission history.'),
+  },
+  responseCampaignsHistorySummary: {
+    response: response(object({
+      completed_requests: integer(), cancelled_requests: integer(), open_requests: integer(), completed_missions: integer(),
+      median_response_seconds: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+      coordinators: item({ user_id: id, display_name: { anyOf: [text, { type: 'null' }] }, total_seconds: integer() }, ['user_id', 'display_name', 'total_seconds']),
+    }, ['completed_requests', 'cancelled_requests', 'open_requests', 'completed_missions', 'median_response_seconds', 'coordinators']), 'Campaign relief summary using recorded request and mission events.'),
+  },
+  responseCampaignsMyHistory: {
+    response: response(object({ items: item({
+      ...campaignEngagementSchema.properties, duration_seconds: integer(),
+    }, ['id', 'campaign_id', 'user_id', 'started_at', 'last_active_at', 'ended_at', 'ended_reason', 'active', 'duration_seconds']) }, ['items'])),
+  },
   getStaffRequestDetail: {
     summary: 'Get scoped SOS details, coordinator timeline, mission history and separate rules and Gemini advisories.',
     description: 'Returns exact contacts and coordinates only to staff authorized for this request. Backend and Gemini risk advisories are untrusted human-reviewed aids; neither sets official priority, reorders the queue, or dispatches a team. Seeder examples are labeled DEMO_FIXTURE.',
@@ -322,7 +447,7 @@ const responseDetails = {
     response: response(object({
       items: item({ user_id: id, username: text, display_name: text }, ['user_id', 'username', 'display_name']),
       more: boolean(), cursor: text,
-    }, ['items', 'more']), 'Search results eligible for a team membership attempt.', undefined, {
+    }, ['items', 'more']), 'Search results eligible for a team roster update.', undefined, {
       'Cache-Control': { $ref: '#/components/headers/CacheControlNoStore' },
     }),
   },
@@ -359,6 +484,7 @@ const responsePaginationQueries = {
   responseTeamsListMemberCandidates: ['cursor', 'limit'],
   listCampaigns: ['cursor', 'limit'],
   listPublicCampaigns: ['cursor', 'limit'],
+  responseCampaignsHistory: ['cursor', 'limit'],
 };
 
 const logisticsDetails = {
@@ -867,12 +993,21 @@ const routeErrorCodes = {
   markRequestDuplicate: ['CANONICAL_INVALID', 'CANONICAL_HAS_DUPLICATES'],
   createMissionOffer: ['TEAM_BUSY', 'TEAM_NOT_ELIGIBLE', 'OVERRIDE_REASON_REQUIRED', 'CAMPAIGN_PAUSED', 'TEAM_HAS_ACTIVE_MISSION', 'CAMPAIGN_NOT_ACTIVE'],
   recordMissionOnBehalf: ['RECORDED_BASIS_REQUIRED', 'MISSION_NOT_LEADER', 'STATE_TRANSITION_INVALID'],
-  createCampaign: ['FORBIDDEN', 'VERSION_CONFLICT'],
+  createCampaign: ['FORBIDDEN', 'VERSION_CONFLICT', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
+  updateCampaign: ['FORBIDDEN', 'VERSION_CONFLICT', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
   closeCampaign: ['CAMPAIGN_HAS_OPEN_REQUESTS', 'VERSION_CONFLICT'],
-  responseRequestOperationsAttachCampaign: ['NOT_FOUND', 'CAMPAIGN_NOT_ACTIVE', 'ATTRIBUTION_LOCKED', 'VERSION_CONFLICT', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID', 'REQUEST_ALREADY_CLAIMED', 'FORBIDDEN'],
+  responseCampaignsTriage: ['FORBIDDEN'],
+  responseCampaignsOverview: ['FORBIDDEN'],
+  responseCampaignsMyEngagements: ['FORBIDDEN'],
+  responseCampaignsMyHistory: ['FORBIDDEN'],
+  responseCampaignsEngage: ['FORBIDDEN', 'NOT_FOUND', 'CAMPAIGN_NOT_ACTIVE', 'ENGAGEMENT_LIMIT_REACHED', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
+  responseCampaignsDisengage: ['FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
+  responseCampaignsHistory: ['FORBIDDEN', 'NOT_FOUND', 'CURSOR_INVALID', 'VALIDATION_FAILED'],
+  responseCampaignsHistorySummary: ['FORBIDDEN', 'NOT_FOUND'],
+  responseRequestOperationsAttachCampaign: ['NOT_FOUND', 'CAMPAIGN_NOT_ACTIVE', 'VERSION_CONFLICT', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID', 'REQUEST_ALREADY_CLAIMED', 'FORBIDDEN'],
   responseRequestOperationsClaim: ['NOT_FOUND', 'FORBIDDEN', 'REQUEST_ALREADY_CLAIMED', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID'],
   responseRequestOperationsRelease: ['NOT_FOUND', 'FORBIDDEN', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID'],
-  responseRequestOperationsDetachCampaign: ['NOT_FOUND', 'ATTRIBUTION_LOCKED', 'VERSION_CONFLICT', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID'],
+  responseRequestOperationsDetachCampaign: ['NOT_FOUND', 'VERSION_CONFLICT', 'IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_INVALID', 'FORBIDDEN'],
   getRequestHeatmap: ['TOO_MANY_CELLS', 'VALIDATION_FAILED'],
   responseRequestAdmissionAdmit: ['ATTRIBUTION_LOCKED', 'PENDING_SUPPLEMENT_REVIEW', 'REQUEST_NOT_VERIFIED'],
   responseMissionsReviewFailure: ['REASON_REQUIRED', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
@@ -1180,6 +1315,12 @@ export function applyOpenApiDetails(document, service) {
   };
   Object.assign(document.components.securitySchemes, serviceSecuritySchemes[service] ?? {});
   if (service === 'identity') {
+    for (const name of ['MeGrant', 'Grant', 'CreateGrantRequest']) {
+      const role = document.components.schemas[name]?.properties?.role_code;
+      if (role) role.enum = identityRoleCodes;
+    }
+    const createRole = document.components.schemas.CreateGrantRequest?.properties?.role_code;
+    if (createRole) createRole.description = 'CAMPAIGN_COORDINATOR grants require SYSTEM scope.';
     const registerRequest = document.components.schemas.RegisterRequest;
     if (registerRequest) {
       registerRequest.required = [...new Set([...(registerRequest.required ?? []), 'email'])];
@@ -1232,9 +1373,12 @@ export function applyOpenApiDetails(document, service) {
     }, ['status', 'score', 'level', 'reasons', 'confidence', 'source', 'human_review_required', 'review_status']);
     const queueItem = document.components.schemas.RequestQueueItem;
     if (queueItem) {
-      queueItem.required = [...new Set([...(queueItem.required ?? []), 'priority_advisory', 'ai_priority_advisory', 'handled_by', 'handled_at', 'handled_by_name'])];
+      queueItem.required = [...new Set([...(queueItem.required ?? []), 'campaign_id', 'campaign_match_state', 'campaign_candidate_ids', 'priority_advisory', 'ai_priority_advisory', 'handled_by', 'handled_at', 'handled_by_name'])];
       queueItem.properties = {
         ...queueItem.properties,
+        campaign_id: nullableValue(id),
+        campaign_match_state: { type: 'string', enum: ['UNMATCHED', 'AUTO_ATTACHED', 'CONFLICT', 'MANUAL'] },
+        campaign_candidate_ids: nullableValue(array(id)),
         priority_advisory: priorityAdvisory,
         ai_priority_advisory: nullableAdvisory(aiPriorityAdvisory),
         handled_by: nullableValue(id),
@@ -1244,9 +1388,12 @@ export function applyOpenApiDetails(document, service) {
     }
     const staffDetail = document.components.schemas.StaffRequestDetail;
     if (staffDetail) {
-      staffDetail.required = [...new Set([...(staffDetail.required ?? []), 'priority_advisory', 'ai_priority_advisory', 'handled_by', 'handled_at', 'handled_by_name'])];
+      staffDetail.required = [...new Set([...(staffDetail.required ?? []), 'campaign_id', 'campaign_match_state', 'campaign_candidate_ids', 'priority_advisory', 'ai_priority_advisory', 'handled_by', 'handled_at', 'handled_by_name'])];
       staffDetail.properties = {
         ...staffDetail.properties,
+        campaign_id: nullableValue(id),
+        campaign_match_state: { type: 'string', enum: ['UNMATCHED', 'AUTO_ATTACHED', 'CONFLICT', 'MANUAL'] },
+        campaign_candidate_ids: nullableValue(array(id)),
         handled_by: nullableValue(id),
         handled_at: nullableValue(dateTime),
         handled_by_name: nullableValue(text),

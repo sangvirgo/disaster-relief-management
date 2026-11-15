@@ -57,7 +57,7 @@ function expectVietnameseError(result, status, code) {
   assert.match(result.value?.message ?? '', /[\u0102-\u01b0\u1ea0-\u1ef9]/u, 'expected Vietnamese user-facing copy');
 }
 
-async function loginSmokeActor(organizationId, cleanupUserIds, roleCode) {
+async function loginSmokeActor(cleanupUserIds, roleCode) {
   const suffix = randomBytes(6).toString('hex');
   const username = `t17report${suffix}`;
   const password = `Logistics T17 report ${suffix}!`;
@@ -72,9 +72,9 @@ async function loginSmokeActor(organizationId, cleanupUserIds, roleCode) {
     grant: async (userId) => {
       if (!roleCode) return;
       await identityDb.query(
-        `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-         VALUES ($1,$2,'ORGANIZATION',$3)`,
-        [userId, roleCode, organizationId],
+        `INSERT INTO role_grant (user_id,role_code,scope_type)
+         VALUES ($1,$2,'SYSTEM')`,
+        [userId, roleCode],
       );
     },
     login: () => call(identityUrl, 'auth/login', {
@@ -363,44 +363,39 @@ async function main() {
     const to = now.toISOString();
     const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1_000).toISOString();
     const fulfillmentTargets = await logisticsDb.query(
-      `SELECT c.organization_id,c.campaign_id,count(n.id)::int AS fulfillment_need_count
+      `SELECT c.campaign_id,count(n.id)::int AS fulfillment_need_count
          FROM relief_need n
          JOIN fulfillment_cycle c ON c.id=n.cycle_id
         WHERE c.campaign_id IS NOT NULL
           AND n.created_at >= $1::timestamptz AND n.created_at < $2::timestamptz
-        GROUP BY c.organization_id,c.campaign_id
+        GROUP BY c.campaign_id
         ORDER BY fulfillment_need_count DESC,c.campaign_id LIMIT 1`,
       [from, to],
     );
     const fulfillmentTarget = fulfillmentTargets.rows[0];
     assert.ok(Number(fulfillmentTarget?.fulfillment_need_count) > 0, 'T17 smoke requires a recent fulfillment need in a campaign');
     const warehouses = await logisticsDb.query(
-      `SELECT w.id,w.organization_id,
+      `SELECT w.id,
               (SELECT count(*)::int FROM stock_balance b WHERE b.warehouse_id=w.id) AS balance_count
          FROM warehouse w
-        WHERE w.organization_id=$1
-          AND EXISTS (SELECT 1 FROM stock_balance b WHERE b.warehouse_id=w.id)
+        WHERE EXISTS (SELECT 1 FROM stock_balance b WHERE b.warehouse_id=w.id)
         ORDER BY balance_count DESC,w.id LIMIT 1`,
-      [fulfillmentTarget.organization_id],
     );
     const warehouse = warehouses.rows[0];
-    assert.ok(warehouse, 'T17 smoke requires a warehouse with stock balances in the fulfillment organization');
-    const organizationId = warehouse.organization_id;
+    assert.ok(warehouse, 'T17 smoke requires a warehouse with stock balances');
     const reportWarehouseCandidates = await logisticsDb.query(
-      `SELECT w.id,w.organization_id,count(b.id)::int AS balance_count
+      `SELECT w.id,count(b.id)::int AS balance_count
          FROM warehouse w
          JOIN stock_balance b ON b.warehouse_id=w.id
-        GROUP BY w.id,w.organization_id
+        GROUP BY w.id
         ORDER BY balance_count DESC,w.id`,
     );
     const reportWarehouse = selectReportWarehouse(reportWarehouseCandidates.rows, warehouse);
 
-    const actor = await loginSmokeActor(organizationId, cleanupUserIds, 'OPERATIONS_MANAGER');
-    const reportActor = reportWarehouse.organization_id === organizationId
-      ? actor
-      : await loginSmokeActor(reportWarehouse.organization_id, cleanupUserIds, 'OPERATIONS_MANAGER');
+    const actor = await loginSmokeActor(cleanupUserIds, 'OPERATIONS_MANAGER');
+    const reportActor = actor;
 
-    const deniedActor = await loginSmokeActor(organizationId, cleanupUserIds);
+    const deniedActor = await loginSmokeActor(cleanupUserIds);
     const deniedReport = await call(logisticsUrl, `reports/stock-summary?warehouse_id=${reportWarehouse.id}`, { actor: deniedActor });
     expectVietnameseError(deniedReport, 403, 'FORBIDDEN');
 
@@ -616,11 +611,11 @@ async function main() {
          JOIN item i ON i.id=n.item_id
          JOIN unit un ON un.code=i.unit_code
          LEFT JOIN commitment cm ON cm.relief_need_id=n.id
-        WHERE c.organization_id=$1 AND c.campaign_id=$2::uuid
-          AND n.created_at >= $3::timestamptz AND n.created_at < $4::timestamptz
+        WHERE c.campaign_id=$1::uuid
+          AND n.created_at >= $2::timestamptz AND n.created_at < $3::timestamptz
         GROUP BY n.id,c.id,i.id,un.code
         ORDER BY n.id ASC`,
-      [fulfillmentTarget.organization_id, fulfillmentTarget.campaign_id, from, to],
+      [fulfillmentTarget.campaign_id, from, to],
     );
     let fulfillmentOffset = 0;
     let fulfillmentCursor;

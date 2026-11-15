@@ -12,12 +12,11 @@ DECLARE
   v_aborted_id uuid := gen_random_uuid();
   v_sealed_id uuid := gen_random_uuid();
   v_request_id uuid := gen_random_uuid();
-  v_organization_id uuid := gen_random_uuid();
   state_value text;
   mismatch_count integer;
 BEGIN
-  INSERT INTO fulfillment_cycle (id,request_id,work_cycle,organization_id,state)
-    VALUES (v_cycle_id,v_request_id,1,v_organization_id,'OPEN');
+  INSERT INTO fulfillment_cycle (id,request_id,work_cycle,state)
+    VALUES (v_cycle_id,v_request_id,1,'OPEN');
   INSERT INTO cycle_intent (intent_id,cycle_id,kind,state)
     VALUES (v_aborted_id,v_cycle_id,'RESOLUTION','ABORTED');
   INSERT INTO cycle_intent (intent_id,cycle_id,kind,state)

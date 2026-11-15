@@ -6,6 +6,7 @@ import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { CampaignActionDto, CampaignCreateDto, CampaignPageQueryDto, CampaignPatchDto, CampaignReasonActionDto } from './campaigns.dto';
 import { CampaignCommandRequest, CampaignsService } from './campaigns.service';
+import { CampaignCoordinationService } from './campaign-coordination.service';
 import { ResponseServiceTokenGuard } from './service-token.guard';
 import { noStore, requireIdempotencyKey as key } from '@c48/technical/http/response-headers';
 
@@ -15,7 +16,67 @@ function replay(response: Response, result: { replay: boolean }): void {
 
 @Controller()
 export class CampaignsController {
-  constructor(private readonly campaigns: CampaignsService) {}
+  constructor(private readonly campaigns: CampaignsService, private readonly coordination: CampaignCoordinationService) {}
+
+  @Get('campaigns/triage')
+  async triage(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.coordination.triage(request);
+  }
+
+  @Get('campaigns/overview')
+  async overview(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.coordination.overview(request);
+  }
+
+  @Get('me/engagements')
+  async myEngagements(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.coordination.myEngagements(request);
+  }
+
+  @Get('me/coordination-history')
+  async myHistory(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.coordination.myHistory(request);
+  }
+
+  @Post('campaigns/:id/engage')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async engage(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Req() request: CampaignCommandRequest,
+    @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    const result = await this.coordination.engage(id, key(request), request);
+    replay(response, result);
+    return result.value;
+  }
+
+  @Post('campaigns/:id/disengage')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async disengage(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Req() request: CampaignCommandRequest,
+    @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    const result = await this.coordination.disengage(id, key(request), request);
+    replay(response, result);
+    return result.value;
+  }
+
+  @Get('campaigns/:id/history/summary')
+  async historySummary(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Req() request: Request,
+    @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.coordination.historySummary(id, request);
+  }
+
+  @Get('campaigns/:id/history')
+  async history(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Query() query: CampaignPageQueryDto,
+    @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.coordination.history(id, query.cursor, query.limit, request);
+  }
 
   @Get('campaigns')
   async list(@Query() query: CampaignPageQueryDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {

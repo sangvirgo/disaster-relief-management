@@ -14,7 +14,6 @@ const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DA
 const responseDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
 const connectedDatabases = [];
-const logisticsFixtureId = '40000000-0000-4000-8000-000000000004';
 const suffix = randomBytes(5).toString('hex').toUpperCase();
 const ipNetworks = ['192.0.2', '198.51.100', '203.0.113'];
 const identityNetwork = ipNetworks[Number.parseInt(suffix.slice(0, 2), 16) % ipNetworks.length];
@@ -229,7 +228,7 @@ try {
   });
   expectSuccess(sealedItem, 201);
   const warehouse = await command(logisticsUrl, 'warehouses', staff, {
-    organization_id: logisticsFixtureId, name: `Kho T14 ${suffix}`,
+    name: `Kho T14 ${suffix}`,
   });
   expectSuccess(warehouse, 201);
   const opening = await command(logisticsUrl, 'stock/opening', staff, {

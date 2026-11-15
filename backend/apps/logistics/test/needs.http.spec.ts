@@ -86,12 +86,12 @@ describe('POST /needs HTTP', () => {
     expect(needs.create.mock.calls[0]?.[0]).toMatchObject({ request_id: requestId, work_cycle: 2, item_id: itemId, quantity: '3' });
   });
 
-  it('rejects client-supplied ownership attribution with Vietnamese validation copy', async () => {
+  it('rejects client-supplied owner attribution with Vietnamese validation copy', async () => {
     needs.create.mockClear();
     const result = await request(app.getHttpServer())
       .post('/api/v1/logistics/needs')
       .set('Idempotency-Key', idempotencyKey)
-      .send({ request_id: requestId, work_cycle: 2, item_id: itemId, quantity: '3', organization_id: '88888888-8888-4888-8888-888888888888' });
+      .send({ request_id: requestId, work_cycle: 2, item_id: itemId, quantity: '3', owner_user_id: '22222222-2222-4222-8222-222222222222' });
 
     expect(result.status).toBe(400);
     expect(result.body.code).toBe('VALIDATION_FAILED');

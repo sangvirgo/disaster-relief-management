@@ -1,5 +1,8 @@
+-- Historical Initial-migration baseline, not the current post-migration Logistics schema.
+-- RemoveRegionAttribution1794700800000 and RemoveOrganizationLogistics1794787200000 apply later deltas.
+-- Keep this baseline DDL unchanged so the migration history remains reproducible.
 -- C48 Logistics service — physical schema (PostgreSQL 16+ with PostGIS 3 for point columns). v3: T0-S column/index cleanup (see 01-schema-review.md §7-§9).
--- Opaque cross-service ids: campaign_id, organization_id (except local FKs below), request_id, *_user_id. No GiST index until a spatial query exists.
+-- Opaque cross-service ids: campaign_id, request_id, *_user_id (except local FKs below). No GiST index until a spatial query exists.
 -- Stock changes ONLY by inserting a stock_movement; a SECURITY DEFINER trigger applies it to stock_balance. The app role (c48_logistics_app) has no UPDATE on stock_balance.
 CREATE EXTENSION IF NOT EXISTS postgis;
 

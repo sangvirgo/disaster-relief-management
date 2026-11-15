@@ -8,8 +8,9 @@ const baseUrl = process.env.C48_RESPONSE_BASE_URL;
 const proxyBaseUrl = process.env.C48_RESPONSE_PROXY_BASE_URL;
 const privateKey = Buffer.from(process.env.JWT_PRIVATE_KEY ?? '', 'base64');
 const origin = process.env.C48_SMOKE_ORIGIN;
-const organizationId = '40000000-0000-4000-8000-000000000004';
 const userId = '40000000-0000-4000-8000-000000000001';
+const smokeRequestIds = new Set();
+const smokeIdempotencyKeys = new Set();
 const fixtureTrigger = 't4_test_fail_subject';
 const fixtureFunction = 't4_test_fail_subject_fn';
 
@@ -69,6 +70,8 @@ async function post(base, { payload, idempotencyKey = key(), trackingSecret, tok
   const text = await response.text();
   let value;
   try { value = JSON.parse(text); } catch { value = text; }
+  if (typeof value?.id === 'string' && response.status === 201) smokeRequestIds.add(value.id);
+  smokeIdempotencyKeys.add(idempotencyKey);
   return { status: response.status, headers: response.headers, value, idempotencyKey };
 }
 
@@ -141,7 +144,7 @@ async function main() {
 
   const massAssignmentKey = key();
   const massAssignment = await post(baseUrl, {
-    payload: body({ organization_id: '00000000-0000-4000-8000-000000000099', status: 'RESOLVED', priority: 'P1' }),
+    payload: body({ campaign_id: randomUUID(), campaign_match_state: 'MANUAL', status: 'RESOLVED', priority: 'P1' }),
     idempotencyKey: massAssignmentKey, trackingSecret: secret(),
   });
   assertVietnameseError(massAssignment, 400, 'VALIDATION_FAILED');
@@ -178,7 +181,6 @@ async function main() {
   assert.equal(stored.rows[0].tracking_secret_hash.startsWith('v1:'), true);
   assert.notEqual(stored.rows[0].tracking_secret_hash, firstSecret);
   assert.equal(stored.rows[0].source_ip_hash.startsWith('v1:'), true);
-  assert.equal(stored.rows[0].organization_id, organizationId);
   assert.equal(stored.rows[0].status, 'SUBMITTED');
   assert.equal(stored.rows[0].review_lane, 'NORMAL');
   assert.equal(stored.rows[0].people_affected, 2);
@@ -223,7 +225,7 @@ async function main() {
     payload: firstBody, idempotencyKey: key(), trackingSecret: firstSecret,
   });
   assertVietnameseError(reusedSecret, 409, 'TRACKING_SECRET_IN_USE');
-  const firstRows = await db.query('SELECT count(*)::int AS count FROM assistance_request WHERE organization_id=$1', [organizationId]);
+  const firstRows = await db.query('SELECT count(*)::int AS count FROM assistance_request WHERE id=$1', [firstId]);
   assert.equal(firstRows.rows[0].count, 1);
 
   const secondPhone = secret();
@@ -293,8 +295,9 @@ async function main() {
   assertVietnameseError(bearerOrigin, 403, 'FORBIDDEN');
   await assertNoIdempotency(bearerOriginKey);
 
-  const beforeRollback = await db.query('SELECT count(*)::int AS count FROM assistance_request WHERE organization_id=$1', [organizationId]);
-  const secretsBeforeRollback = await db.query('SELECT count(*)::int AS count FROM assistance_request WHERE tracking_secret_hash IS NOT NULL AND organization_id=$1', [organizationId]);
+  const requestIds = [...smokeRequestIds];
+  const beforeRollback = await db.query('SELECT count(*)::int AS count FROM assistance_request WHERE id=ANY($1::uuid[])', [requestIds]);
+  const secretsBeforeRollback = await db.query('SELECT count(*)::int AS count FROM assistance_request WHERE tracking_secret_hash IS NOT NULL AND id=ANY($1::uuid[])', [requestIds]);
   await db.query(`CREATE OR REPLACE FUNCTION ${fixtureFunction}() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
       IF ST_X(NEW.location::geometry) BETWEEN 106.7765 AND 106.7775 THEN
@@ -317,15 +320,16 @@ async function main() {
   }
   assertVietnameseError(rollback, 500, 'INTERNAL_ERROR');
   await assertNoIdempotency(rollbackKey);
-  const afterRollback = await db.query('SELECT count(*)::int AS count FROM assistance_request WHERE organization_id=$1', [organizationId]);
+  const afterRollback = await db.query('SELECT count(*)::int AS count FROM assistance_request WHERE id=ANY($1::uuid[])', [[...smokeRequestIds]]);
   assert.equal(afterRollback.rows[0].count, beforeRollback.rows[0].count);
-  const secretsAfterRollback = await db.query('SELECT count(*)::int AS count FROM assistance_request WHERE tracking_secret_hash IS NOT NULL AND organization_id=$1', [organizationId]);
+  const secretsAfterRollback = await db.query('SELECT count(*)::int AS count FROM assistance_request WHERE tracking_secret_hash IS NOT NULL AND id=ANY($1::uuid[])', [[...smokeRequestIds]]);
   assert.equal(secretsAfterRollback.rows[0].count, secretsBeforeRollback.rows[0].count);
 
-  await db.query('UPDATE assistance_request SET received_at = clock_timestamp() - interval \'2 minutes\' WHERE organization_id = $1', [organizationId]);
+  await db.query('UPDATE assistance_request SET received_at = clock_timestamp() - interval \'2 minutes\' WHERE id=ANY($1::uuid[])', [[...smokeRequestIds]]);
   await db.query(
     `UPDATE idempotency_record SET created_at = clock_timestamp() - interval '2 minutes'
-      WHERE scope_key='response.requests.self' AND command='response.requests.create-self'`,
+      WHERE idempotency_key=ANY($1::uuid[])`,
+    [[...smokeIdempotencyKeys]],
   );
   let throttled = false;
   let hardRejected;
@@ -370,12 +374,13 @@ async function main() {
   assertVietnameseError(proxyCeiling, 429, 'SOS_RATE_CEILING');
   await assertNoProxyIdempotency(proxyCeiling.idempotencyKey);
   const proxyKeys = await db.query(
-    `SELECT count(*)::int AS count FROM idempotency_record WHERE scope_key='response.requests.self'
-      AND command='response.requests.create-self' AND created_at >= now() - interval '2 minutes'`,
+    `SELECT count(*)::int AS count FROM idempotency_record WHERE idempotency_key=ANY($1::uuid[])
+      AND scope_key='response.requests.self' AND command='response.requests.create-self' AND created_at >= now() - interval '2 minutes'`,
+    [[...smokeIdempotencyKeys]],
   );
   const acceptedProxyCount = await db.query(
-    `SELECT count(*)::int AS count FROM assistance_request WHERE organization_id=$1
-      AND received_at >= now() - interval '2 minutes'`, [organizationId],
+    `SELECT count(*)::int AS count FROM assistance_request WHERE id=ANY($1::uuid[])
+      AND received_at >= now() - interval '2 minutes'`, [[...smokeRequestIds]],
   );
   assert.equal(proxyKeys.rows[0].count, acceptedProxyCount.rows[0].count);
 

@@ -83,6 +83,7 @@ Every error the API can return has one row here. The implementation loads this t
 | `CAMPAIGN_NOT_ACTIVE` | 409 | Response / Logistics | Chiến dịch hiện không hoạt động. |
 | `CAMPAIGN_PAUSED` | 409 | Response / Logistics | Chiến dịch đang tạm dừng. |
 | `CAMPAIGN_HAS_OPEN_REQUESTS` | 409 | Response | Còn yêu cầu chưa kết thúc thuộc chiến dịch này. |
+| `ENGAGEMENT_LIMIT_REACHED` | 409 | Response | Bạn chỉ có thể điều phối tối đa 3 chiến dịch cùng lúc. |
 | `TOO_MANY_CELLS` | 400 | Response | Vùng bản đồ hoặc khoảng thời gian quá lớn. Vui lòng thu hẹp bộ lọc. |
 | **Logistics — catalog / stock** | | | |
 | `ITEM_NAME_TAKEN` | 409 | Logistics | Tên mặt hàng đã tồn tại. |

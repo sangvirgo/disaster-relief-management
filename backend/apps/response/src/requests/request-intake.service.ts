@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { canonicalRequestHash, IdempotencyService } from '@c48/technical/idempotency/idempotency';
@@ -8,6 +8,8 @@ import { enqueueAiAdvisory } from '../ai/ai-advisory-input';
 import { hashPurposeBoundSecret, PepperSet } from '@c48/technical/security/secret-hash';
 import { CreateProxyRequestDto, CreateSelfRequestDto } from './request-intake.dto';
 import { loadReporterTokenConfig, ReporterTokenConfig } from './reporter-token';
+import { CAMPAIGN_CONFLICT_NOTIFIER, CampaignConflictNotifier } from './campaign-conflict-notifier.token';
+import { applyAutomaticCampaignMatch } from '../operations/request-campaign-attribution';
 
 export const REQUEST_INTAKE_CONFIG = Symbol('REQUEST_INTAKE_CONFIG');
 const trackingAlphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
@@ -171,6 +173,7 @@ export class RequestIntakeService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly idempotency: IdempotencyService,
     @Inject(REQUEST_INTAKE_CONFIG) private readonly config: RequestIntakeConfig,
+    @Optional() @Inject(CAMPAIGN_CONFLICT_NOTIFIER) private readonly conflictNotifier?: CampaignConflictNotifier,
   ) {}
 
   async createSelf(
@@ -319,6 +322,9 @@ export class RequestIntakeService {
            VALUES ($1,$2,'REQUEST_SUBMITTED','REPORTER',NULL,'SUBMITTED',$3::jsonb)`,
           [request.id, reporterUserId, JSON.stringify({ public_text_code: 'RECEIVED', review_lane: request.review_lane })],
         );
+        await applyAutomaticCampaignMatch(manager, {
+          requestId: request.id, trackingCode: request.tracking_code, status: request.status, version: request.version,
+        }, this.conflictNotifier);
         await enqueueAiAdvisory(manager, request.id);
         if (proxy) await this.recordProxyActivityFlag(manager, request.id, reporterUserId!, phone, throttle.received_at);
         const value = createdResponse(request);

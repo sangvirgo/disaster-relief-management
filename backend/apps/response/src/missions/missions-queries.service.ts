@@ -70,7 +70,7 @@ export class MissionsQueriesService {
     if (!teams.length) throw new AppError('FORBIDDEN', { status: 403 });
     const teamIds = teams.map(({ team_id }) => team_id);
     const leaderTeams = new Set(teams.filter(({ member_role }) => member_role === 'LEADER').map(({ team_id }) => team_id));
-    const filters = filtersHash(session.grants, session.userId, query, 'missions/mine');
+    const filters = filtersHash(session.grants, session.userId, query, 'missions/mine', session.activeCampaignIds);
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
     const limit = query.limit ?? 50;
     const rows = await this.dataSource.query(
@@ -140,9 +140,9 @@ export class MissionsQueriesService {
 
   async overdueOffers(query: MissionPageQueryDto, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
-    const filters = filtersHash(session.grants, session.userId, query, 'missions/overdue-offers');
+    const filters = filtersHash(session.grants, session.userId, query, 'missions/overdue-offers', session.activeCampaignIds);
     const values: unknown[] = [this.config.offerOverdueMinutes];
-    const scope = scopeSql(session.grants, 'MISSION_OVERDUE_READ', values, 'r');
+    const scope = scopeSql(session.grants, 'MISSION_OVERDUE_READ', values, 'r', session.userId);
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
     const cursorTime = values.push(cursor?.sort[0] ?? null);
     const cursorId = values.push(cursor?.id ?? null);

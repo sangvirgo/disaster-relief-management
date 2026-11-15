@@ -5,12 +5,11 @@ import { DistributionQueriesService } from '../src/distributions/distribution-qu
 
 const distributionId = '88888888-8888-4888-8888-888888888888';
 const handoffId = '99999999-9999-4999-8999-999999999999';
-const organizationId = '22222222-2222-4222-8222-222222222222';
 
 const distribution = {
   id: distributionId,
   warehouse_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-  organization_id: organizationId,
+
   warehouse_status: 'ACTIVE',
   relief_point_id: null,
   relief_point_status: null,
@@ -68,7 +67,7 @@ function queriesForHandoff(kind: string | null, grants: Grant[]) {
   };
 }
 
-function organizationGrant(role_code: Grant['role_code']): Grant {
+function systemGrant(role_code: Grant['role_code']): Grant {
   return { role_code, scope_type: 'SYSTEM',};
 }
 
@@ -146,7 +145,7 @@ describe('DistributionQueriesService handoff detail', () => {
   });
 
   it('keeps missing handoffs indistinguishable from other not-found records', async () => {
-    const { query, service } = queriesForHandoff(null, [organizationGrant('DISTRIBUTION_STAFF')]);
+    const { query, service } = queriesForHandoff(null, [systemGrant('DISTRIBUTION_STAFF')]);
 
     await expect(service.handoffDetail(distributionId, handoffId, {} as Request))
       .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
@@ -158,7 +157,7 @@ describe('DistributionQueriesService handoff detail', () => {
     ['RETURN', 'OPERATIONS_MANAGER'],
     ['LOSS', 'COORDINATOR'],
   ] as const)('denies same-scope users without the handoff-kind permission (%s)', async (kind, role) => {
-    const { query, service } = queriesForHandoff(kind, [organizationGrant(role)]);
+    const { query, service } = queriesForHandoff(kind, [systemGrant(role)]);
 
     await expect(service.handoffDetail(distributionId, handoffId, {} as Request))
       .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
@@ -179,7 +178,7 @@ describe('DistributionQueriesService handoff detail', () => {
     ['LOSS', 'DISTRIBUTION_STAFF'],
     ['LOSS', 'OPERATIONS_MANAGER'],
   ] as const)('allows the authorized role for %s (%s)', async (kind, role) => {
-    const { query, service } = queriesForHandoff(kind, [organizationGrant(role)]);
+    const { query, service } = queriesForHandoff(kind, [systemGrant(role)]);
 
     await expect(service.handoffDetail(distributionId, handoffId, {} as Request)).resolves.toMatchObject({
       handoff_kind: kind,

@@ -170,7 +170,7 @@ try {
         ('00000000-0000-4000-8000-000000000115'::uuid, 'vol_member3', 'VOLUNTEER'),
         ('00000000-0000-4000-8000-000000000116'::uuid, 'vol_leader4', 'VOLUNTEER'),
         ('00000000-0000-4000-8000-000000000117'::uuid, 'vol_member4', 'VOLUNTEER'),
-        ('00000000-0000-4000-8000-000000000118'::uuid, 'coord_seed', 'COORDINATOR'),
+        ('00000000-0000-4000-8000-000000000118'::uuid, 'coord_seed', 'CAMPAIGN_COORDINATOR'),
         ('00000000-0000-4000-8000-000000000120'::uuid, 'vol_climb_north1', 'VOLUNTEER'),
         ('00000000-0000-4000-8000-000000000121'::uuid, 'vol_climb_north2', 'VOLUNTEER'),
         ('00000000-0000-4000-8000-000000000122'::uuid, 'vol_climb_north3', 'VOLUNTEER')
@@ -185,8 +185,8 @@ try {
         (SELECT count(*)::int FROM role_grant g JOIN app_user u ON u.id = g.user_id
           WHERE u.id = '00000000-0000-4000-8000-000000000118'
             AND u.username::text = 'coord_seed' AND u.status = 'ACTIVE'
-            AND g.role_code = 'COORDINATOR' AND g.scope_type = 'CAMPAIGN'
-            AND g.campaign_id = '00000000-0000-4000-8000-0000000000c3'
+            AND g.role_code = 'CAMPAIGN_COORDINATOR' AND g.scope_type = 'SYSTEM'
+            AND g.campaign_id IS NULL
             AND g.revoked_at IS NULL) AS coordinator_campaign_ready
     `);
     const identityReady = identityPrerequisites.rows[0];

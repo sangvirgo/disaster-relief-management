@@ -7,6 +7,7 @@ import { AddAuthEmailOtpGoogle1792953600000 } from './database/migrations/AddAut
 import { GrantExternalIdentitySelect1794144543000 } from './database/migrations/GrantExternalIdentitySelect1794144543000';
 import { RemoveRegionScope1794700800000 } from './database/migrations/RemoveRegionScope1794700800000';
 import { RemoveOrganizationIdentity1794787200000 } from './database/migrations/RemoveOrganizationIdentity1794787200000';
+import { AddCampaignCoordinatorRole1794960000000 } from './database/migrations/AddCampaignCoordinatorRole1794960000000';
 import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
 import { IdentityDashboardModule } from './dashboard/dashboard.module';
@@ -16,7 +17,7 @@ import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot(postgresOptions([InitialIdentity1710000000000, AddAuthEmailOtpGoogle1792953600000, AddPendingEmailRegistration1792953600001, GrantExternalIdentitySelect1794144543000, RemoveRegionScope1794700800000, RemoveOrganizationIdentity1794787200000], 'identity')),
+    TypeOrmModule.forRoot(postgresOptions([InitialIdentity1710000000000, AddAuthEmailOtpGoogle1792953600000, AddPendingEmailRegistration1792953600001, GrantExternalIdentitySelect1794144543000, RemoveRegionScope1794700800000, RemoveOrganizationIdentity1794787200000, AddCampaignCoordinatorRole1794960000000], 'identity')),
     HealthModule,
     AuthModule,
     UsersModule,

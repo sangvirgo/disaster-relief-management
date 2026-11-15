@@ -21,6 +21,38 @@ describe('Identity internal active user check service', () => {
   });
 });
 
+describe('Identity internal session introspection service', () => {
+  it('returns grant transport fields without database-only grant identifiers', async () => {
+    const query = jest.fn(async () => [{
+      user_id: '00000000-0000-4000-8000-000000000001',
+      display_name: 'Điều phối viên',
+      status: 'ACTIVE',
+      user_authz_version: 1,
+      family_authz_version: 1,
+      revoked_at: null,
+      absolute_expires_at: new Date(Date.now() + 60_000),
+      grant_id: '00000000-0000-4000-8000-000000000002',
+      role_code: 'CAMPAIGN_COORDINATOR',
+      scope_type: 'SYSTEM',
+      campaign_id: null,
+    }]);
+    const service = Object.assign(Object.create(InternalService.prototype), {
+      introspectionDataSource: { query },
+    }) as InternalService;
+
+    const result = await service.introspect({
+      sid: '00000000-0000-4000-8000-000000000003',
+      sub: '00000000-0000-4000-8000-000000000001',
+    });
+    expect(result).toMatchObject({
+      active: true,
+      grants: [{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM', campaign_id: null }],
+    });
+    expect(result.grants).toEqual([{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM', campaign_id: null }]);
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('Identity internal request coordinator grants service', () => {
   it.each([
     [null],
@@ -34,9 +66,9 @@ describe('Identity internal request coordinator grants service', () => {
     await expect(service.requestCoordinators(campaignId)).resolves.toEqual({ items: [] });
     const [sql, values] = query.mock.calls[0]!;
     expect(sql).toContain("g.role_code='COORDINATOR'");
+    expect(sql).toContain("g.role_code='CAMPAIGN_COORDINATOR' AND g.scope_type='SYSTEM'");
     expect(sql).toContain("g.scope_type='SYSTEM'");
     expect(sql).toContain("$1::uuid IS NOT NULL AND g.scope_type='CAMPAIGN' AND g.campaign_id=$1");
-    expect(sql).not.toContain('organization_id');
     expect(values).toEqual([campaignId]);
   });
 });
@@ -56,7 +88,6 @@ describe('Identity internal team leader eligibility service', () => {
     const [sql, values] = query.mock.calls[0]!;
     expect(sql).toContain("g.role_code = 'VOLUNTEER'");
     expect(sql).toContain("g.scope_type = 'SYSTEM'");
-    expect(sql).not.toContain('organization');
     expect(values).toEqual(['00000000-0000-4000-8000-000000000001']);
   });
 });

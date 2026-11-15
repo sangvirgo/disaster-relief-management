@@ -16,5 +16,6 @@ export function grantScopeIsValid(grant: GrantScopeInput): boolean {
   if (!shape) return false;
   if (grant.role_code === 'ADMIN') return grant.scope_type === 'SYSTEM';
   if (grant.role_code === 'CITIZEN' || grant.role_code === 'VOLUNTEER') return grant.scope_type === 'SYSTEM';
+  if (grant.role_code === 'CAMPAIGN_COORDINATOR') return grant.scope_type === 'SYSTEM';
   return true;
 }

@@ -6,6 +6,7 @@ import { AppError } from '@c48/technical/errors/errors';
 import { canonicalRequestHash, IdempotencyService, type IdempotentOutcome, type IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { LogisticsCycleClient, type FulfillmentNeedEvidence, type ResolutionOutcomeBasis } from '../integrations/logistics/logistics-cycle.client';
 import { ReporterSessionService, type ReporterSession } from '../requests/reporter-session';
+import { refreshCampaignEngagement } from '../requests/campaign-engagement';
 import { cleanText } from '../operations/request-operations.helpers';
 import { assertResolutionReady, type ResolutionMissionEvidence, type ResolutionNeedEvidence } from './request-resolution.rules';
 import type { ResolveRequestDto } from './request-resolution.dto';
@@ -88,7 +89,11 @@ export class RequestResolutionService {
       command,
       key,
       requestHash,
-      execute: (manager) => this.createResolutionIntent(manager, requestId, dto.expected_version, reason, dto.outcome_basis, needs, session),
+      execute: async (manager) => {
+        const outcome = await this.createResolutionIntent(manager, requestId, dto.expected_version, reason, dto.outcome_basis, needs, session);
+        await refreshCampaignEngagement(manager, requestId, session.userId, session.grants);
+        return outcome;
+      },
       replay: async (_manager, resource) => {
         if (resource?.type !== 'resolution_intent') throw new AppError('INTERNAL_ERROR', { status: 500 });
         return { operation_id: resource.id, state: 'PENDING' };

@@ -166,7 +166,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a user with memberships and live grants */
+        /** Get a user profile. */
         get: operations["getIdentityUser"];
         put?: never;
         post?: never;
@@ -498,7 +498,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Search active accounts for Response team membership.
+         * Search active accounts for a Response team roster.
          * @description Restricted to the Response service token. Searches active accounts by username or display-name prefix and returns only the fields needed by the team member picker. Results use a filter-bound keyset cursor and are not cached.
          */
         post: operations["identityInternalSearchActiveUsers"];
@@ -612,7 +612,8 @@ export interface components {
         MeGrant: {
             /** Format: uuid */
             id: string;
-            role_code: string;
+            /** @enum {string} */
+            role_code: "CITIZEN" | "VOLUNTEER" | "COORDINATOR" | "CAMPAIGN_COORDINATOR" | "CAMPAIGN_MANAGER" | "OPERATIONS_MANAGER" | "INTAKE_STAFF" | "REVIEWER" | "DISTRIBUTION_STAFF" | "ADMIN";
             scope_type: string;
             /** Format: uuid */
             campaign_id?: string | null;
@@ -661,7 +662,8 @@ export interface components {
             id: string;
             /** Format: uuid */
             user_id: string;
-            role_code: string;
+            /** @enum {string} */
+            role_code: "CITIZEN" | "VOLUNTEER" | "COORDINATOR" | "CAMPAIGN_COORDINATOR" | "CAMPAIGN_MANAGER" | "OPERATIONS_MANAGER" | "INTAKE_STAFF" | "REVIEWER" | "DISTRIBUTION_STAFF" | "ADMIN";
             /** @enum {string} */
             scope_type: "SYSTEM" | "CAMPAIGN";
             /** Format: uuid */
@@ -676,8 +678,11 @@ export interface components {
             next_cursor: string | null;
         };
         CreateGrantRequest: {
-            /** @enum {string} */
-            role_code: "CITIZEN" | "VOLUNTEER" | "COORDINATOR" | "CAMPAIGN_MANAGER" | "OPERATIONS_MANAGER" | "INTAKE_STAFF" | "REVIEWER" | "DISTRIBUTION_STAFF" | "ADMIN";
+            /**
+             * @description CAMPAIGN_COORDINATOR grants require SYSTEM scope.
+             * @enum {string}
+             */
+            role_code: "CITIZEN" | "VOLUNTEER" | "COORDINATOR" | "CAMPAIGN_COORDINATOR" | "CAMPAIGN_MANAGER" | "OPERATIONS_MANAGER" | "INTAKE_STAFF" | "REVIEWER" | "DISTRIBUTION_STAFF" | "ADMIN";
             /** @enum {string} */
             scope_type: "SYSTEM" | "CAMPAIGN";
             /** Format: uuid */

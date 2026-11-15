@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import {
-  IsDateString, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf,
+  IsDateString, IsInt, IsNumber, IsObject, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested,
 } from 'class-validator';
 
 export class CampaignPageQueryDto {
@@ -10,6 +10,17 @@ export class CampaignPageQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
   declare limit?: number;
 }
+
+export class CampaignCenterDto {
+  @IsNumber() @Min(-90) @Max(90)
+  lat!: number;
+
+  @IsNumber() @Min(-180) @Max(180)
+  lng!: number;
+}
+
+export const CAMPAIGN_RADIUS_MIN_M = 500;
+export const CAMPAIGN_RADIUS_MAX_M = 300_000;
 
 export class CampaignCreateDto {
   @IsString() @MinLength(1) @Matches(/\S/u)
@@ -23,6 +34,12 @@ export class CampaignCreateDto {
 
   @IsOptional() @IsDateString()
   declare ends_at?: string | null;
+
+  @IsOptional() @IsObject() @ValidateNested() @Type(() => CampaignCenterDto)
+  declare center?: CampaignCenterDto | null;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(CAMPAIGN_RADIUS_MIN_M) @Max(CAMPAIGN_RADIUS_MAX_M)
+  declare radius_m?: number | null;
 }
 
 export class CampaignPatchDto {
@@ -40,6 +57,12 @@ export class CampaignPatchDto {
 
   @IsOptional() @IsDateString()
   declare ends_at?: string | null;
+
+  @IsOptional() @IsObject() @ValidateNested() @Type(() => CampaignCenterDto)
+  declare center?: CampaignCenterDto | null;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(CAMPAIGN_RADIUS_MIN_M) @Max(CAMPAIGN_RADIUS_MAX_M)
+  declare radius_m?: number | null;
 }
 
 export class CampaignActionDto {

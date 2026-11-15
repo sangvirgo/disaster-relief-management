@@ -38,7 +38,7 @@ test('T17 fulfillment smoke rejects an empty primary report oracle', () => {
 test('T17 selects a recent populated fulfillment scope before registering smoke users', () => {
   assert.match(fulfillmentScopeSource, /fulfillment_need_count/u);
   assert.match(fulfillmentScopeSource, /ORDER BY fulfillment_need_count DESC/u);
-  assert.match(fulfillmentScopeSource, /AND EXISTS \(SELECT 1 FROM stock_balance b WHERE b\.warehouse_id=w\.id\)/u);
+  assert.match(fulfillmentScopeSource, /WHERE EXISTS \(SELECT 1 FROM stock_balance b WHERE b\.warehouse_id=w\.id\)/u);
   assert.match(fulfillmentScopeSource, /assert\.ok\(Number\(fulfillmentTarget\?\.fulfillment_need_count\) > 0/u);
 });
 

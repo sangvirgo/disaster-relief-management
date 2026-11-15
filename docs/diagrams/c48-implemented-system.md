@@ -1,5 +1,7 @@
 # Reliva Implemented System Diagrams
 
+> **Current Mermaid core views (2026-11-15):** the Mermaid ERDs below reflect the current role, campaign engagement, spatial SOS matching, and team model. Linked full-size SVG and Draw.io diagrams remain historical snapshots and have not been regenerated; use current schema files and migrations for their omitted details.
+
 The diagrams here summarize the backend that is present in this repository. They describe current API and database behavior; they are not a claim that every planned Web or Mobile screen has been built.
 
 Sources of truth:
@@ -180,23 +182,11 @@ erDiagram
     string status
     int authz_version
   }
-  ORGANIZATION {
-    uuid id PK
-    string name
-    string organization_kind
-    string status
-  }
-  MEMBERSHIP {
-    uuid user_id PK
-    uuid organization_id PK
-    string status
-  }
   ROLE_GRANT {
     uuid id PK
     uuid user_id FK
     string role_code
     string scope_type
-    uuid organization_id FK
     uuid campaign_id
     timestamp revoked_at
   }
@@ -219,15 +209,12 @@ erDiagram
     string entity_id
   }
 
-  APP_USER ||--o{ MEMBERSHIP : joins
-  ORGANIZATION ||--o{ MEMBERSHIP : has
   APP_USER ||--o{ ROLE_GRANT : receives
-  ORGANIZATION o|--o{ ROLE_GRANT : scopes
   APP_USER ||--o{ SESSION_FAMILY : authenticates
   SESSION_FAMILY ||--o{ REFRESH_SESSION : rotates
 ```
 
-`ROLE_GRANT.campaign_id` is an opaque Response campaign ID and has no foreign key to the Response database. The audit actor ID is not an FK. `ROLE_GRANT.organization_id` scopes grants; the role catalog and role-to-permission rules are enforced by application code and database checks.
+`ROLE_GRANT.campaign_id` is an opaque Response campaign ID and has no foreign key to the Response database. The audit actor ID is not an FK. The grant scope is `SYSTEM` or `CAMPAIGN`; `CAMPAIGN_COORDINATOR` is allowed only at `SYSTEM` scope.
 
 ## 6. Response physical ERD (core)
 
@@ -235,9 +222,19 @@ erDiagram
 erDiagram
   CAMPAIGN {
     uuid id PK
-    uuid organization_id
     string name
     string status
+    geography center nullable
+    int radius_m nullable
+  }
+  CAMPAIGN_ENGAGEMENT {
+    uuid id PK
+    uuid campaign_id FK
+    uuid user_id
+    timestamp started_at
+    timestamp last_active_at
+    timestamp ended_at nullable
+    string ended_reason nullable
   }
   INCIDENT_CATEGORY {
     string code PK
@@ -257,7 +254,8 @@ erDiagram
     string incident_category_code FK
     uuid canonical_request_id FK
     uuid reporter_user_id
-    uuid organization_id
+    string campaign_match_state
+    uuid[] campaign_candidate_ids nullable
     string status
     string priority
     int work_cycle
@@ -336,6 +334,7 @@ erDiagram
   }
 
   CAMPAIGN o|--o{ ASSISTANCE_REQUEST : relates
+  CAMPAIGN ||--o{ CAMPAIGN_ENGAGEMENT : coordinated_by
   INCIDENT_CATEGORY ||--o{ ASSISTANCE_REQUEST : classifies
   INCIDENT_CATEGORY ||--o{ INCIDENT_CATEGORY_SKILL : requires
   SKILL ||--o{ INCIDENT_CATEGORY_SKILL : required_by
@@ -357,7 +356,7 @@ erDiagram
   MISSION o|--o{ EVIDENCE_METADATA : evidence_for_mission
 ```
 
-`EVIDENCE_METADATA` must belong to exactly one request or mission. User and organization IDs are owned by Identity and intentionally have no cross-service foreign keys.
+`EVIDENCE_METADATA` must belong to exactly one request or mission. Engagement `user_id` is owned by Identity and intentionally has no cross-service foreign key. Rescue teams have no campaign association; request matching is recorded on the request and can be resolved manually by a primary coordinator.
 
 ## 7. Logistics physical ERD (core)
 
@@ -381,19 +380,16 @@ erDiagram
   }
   WAREHOUSE {
     uuid id PK
-    uuid organization_id
     string name
     string status
   }
   RELIEF_POINT {
     uuid id PK
-    uuid organization_id
     string name
     string status
   }
   VEHICLE {
     uuid id PK
-    uuid organization_id
     string identifier
     string status
   }
@@ -554,11 +550,11 @@ erDiagram
   COMMITMENT ||--o{ ISSUED_LINE_SETTLEMENT : reconciles
 ```
 
-This is a core view, not every Logistics table. Donation disputes, attachments, stock adjustment review, and additional stock movement links are omitted to keep the ERD readable. `request_id`, `campaign_id`, `organization_id`, and user IDs are opaque references owned by other services where applicable.
+This is a core view, not every Logistics table. Donation disputes, attachments, stock adjustment review, and additional stock movement links are omitted to keep the ERD readable. `request_id`, `campaign_id`, and user IDs are opaque references owned by other services where applicable. Campaign synchronization and the existing fulfillment accounting rules remain unchanged.
 
 ## Deliberately not represented as implemented
 
-- No Web or Mobile screen code is present in this workspace, so a screen-by-screen navigation diagram cannot be derived from implementation.
+- Web and Mobile workflows are implemented in the workspace; this document shows service relationships, not screen navigation.
 - Volunteer assignment is represented through scoped role grants and team membership; no self-service volunteer application screen or API is shown here.
 - The current backend models in-kind donation deliveries and stock receipts; it has no cash checkout or `PaymentTransaction` table.
 - No external weather-service integration or AI/LLM dispatch endpoint is represented. Request verification, priority, assignment, and dispatch remain human-controlled.

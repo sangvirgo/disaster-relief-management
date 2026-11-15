@@ -47,6 +47,7 @@ export const pages: Record<Workspace, Page[]> = {
     { id: 'notices', title: 'Thông báo', icon: 'notice', service: 'response', path: '/notices' },
   ],
   coordinator: [
+    { id: 'campaigns', title: 'Chiến dịch và điều phối', icon: 'campaign', service: 'response', path: '/campaigns/overview' },
     { id: 'dashboard', title: 'Thống kê', icon: 'report' },
     {
       id: 'reports', title: 'Tổng quan và bản đồ', icon: 'report', service: 'response',
@@ -129,10 +130,10 @@ export const workspaceLabels: Record<Workspace, string> = {
   admin: 'Quản trị',
 };
 export function allowedWorkspaces(user: Me | null): Workspace[] {
-  const r = roles(user);
+  const r: ReadonlySet<string> = roles(user);
   const result: Workspace[] = ['citizen'];
   if (r.has('VOLUNTEER')) result.push('volunteer');
-  if (r.has('COORDINATOR')) result.push('coordinator');
+  if (r.has('COORDINATOR') || r.has('CAMPAIGN_COORDINATOR')) result.push('coordinator');
   if (
     [
       'OPERATIONS_MANAGER',
@@ -149,19 +150,19 @@ export function allowedWorkspaces(user: Me | null): Workspace[] {
 const operationsRoles = ['OPERATIONS_MANAGER', 'CAMPAIGN_MANAGER', 'INTAKE_STAFF', 'REVIEWER', 'DISTRIBUTION_STAFF'];
 /** Role codes of the user that grant access to a workspace (for display only). */
 export function workspaceRoleCodes(workspace: Workspace, user: Me | null): string[] {
-  const r = roles(user);
+  const r: ReadonlySet<string> = roles(user);
   if (workspace === 'citizen') return ['CITIZEN'];
   if (workspace === 'volunteer') return ['VOLUNTEER'];
-  if (workspace === 'coordinator') return ['COORDINATOR'];
+  if (workspace === 'coordinator') return ['COORDINATOR', 'CAMPAIGN_COORDINATOR'].filter((role) => r.has(role));
   if (workspace === 'admin') return ['ADMIN'];
   return operationsRoles.filter((role) => r.has(role));
 }
 export function allowedPages(workspace: Workspace, user: Me | null): Page[] {
-  const r = roles(user);
+  const r: ReadonlySet<string> = roles(user);
   return pages[workspace].filter((page) => {
     if (workspace === 'citizen') return true;
     if (workspace === 'volunteer') return r.has('VOLUNTEER');
-    if (workspace === 'coordinator') return r.has('COORDINATOR');
+    if (workspace === 'coordinator') return r.has('COORDINATOR') || r.has('CAMPAIGN_COORDINATOR');
     if (workspace === 'admin') return r.has('ADMIN');
     if (page.id === 'drives')
       return (

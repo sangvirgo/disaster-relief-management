@@ -25,6 +25,9 @@ type QueueItem = {
   tracking_code: string;
   status: string;
   priority?: string | null;
+  campaign_id?: string | null;
+  campaign_match_state?: 'UNMATCHED' | 'AUTO_ATTACHED' | 'CONFLICT' | 'MANUAL';
+  campaign_candidate_ids?: string[] | null;
   category: string;
   received_at: string;
   review_lane: string;
@@ -106,6 +109,8 @@ function supplementValue(value: unknown): string {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : 'Xem chi tiết trong hồ sơ';
 }
 type Detail = QueueItem & {
+  campaign_match_state?: 'UNMATCHED' | 'AUTO_ATTACHED' | 'CONFLICT' | 'MANUAL';
+  campaign_candidate_ids?: string[] | null;
   handled_by?: string | null;
   handled_at?: string | null;
   handled_by_name?: string | null;
@@ -537,8 +542,10 @@ function claimBlockedBy(detail: Pick<Detail, 'handled_by' | 'handled_at'>, curre
   return Boolean(detail.handled_by) && detail.handled_by !== currentUserId && claimActive(detail);
 }
 
-export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnassigned = false }: {
+export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnassigned = false,
+  campaignId, campaignMatchState, initialUnassignedOnly = false }: {
   page: string; initialRequestId?: string; currentUserId: string; canSeeUnassigned?: boolean;
+  campaignId?: string; campaignMatchState?: 'UNMATCHED' | 'CONFLICT'; initialUnassignedOnly?: boolean;
 }) {
   const restoredView = useRef<QueueView | null>(null);
   if (!restoredView.current) restoredView.current = readQueueView(currentUserId, page);
@@ -554,7 +561,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
   const [duplicateError, setDuplicateError] = useState('');
   const [reviewLane, setReviewLane] = useState(restoredView.current.reviewLane);
   const [overdue, setOverdue] = useState(restoredView.current.overdue);
-  const [unassignedOnly, setUnassignedOnly] = useState(false);
+  const [unassignedOnly, setUnassignedOnly] = useState(initialUnassignedOnly);
   const [error, setError] = useState('');
   const [detailError, setDetailError] = useState('');
   const [updateMessage, setUpdateMessage] = useState('');
@@ -690,6 +697,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     if (reviewLane) params.set('review_lane', reviewLane);
     if (overdue) params.set('overdue', 'true');
     if (unassignedOnly && canSeeUnassigned) params.set('unassigned', 'true');
+    if (campaignId) params.set('campaign_id', campaignId);
+    if (campaignMatchState && canSeeUnassigned) params.set('campaign_match_state', campaignMatchState);
     api<Queue>('response', `/requests${params.size ? '?' + params : ''}`)
       .then((value) => {
         if (live) setQueue(value);
@@ -703,7 +712,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     return () => {
       live = false;
     };
-  }, [page, queueStatus, cursor, revision, reviewLane, overdue, unassignedOnly, canSeeUnassigned]);
+  }, [page, queueStatus, cursor, revision, reviewLane, overdue, unassignedOnly, canSeeUnassigned, campaignId, campaignMatchState]);
   useEffect(() => {
     if (!selected) return;
     let live = true;
@@ -1017,6 +1026,9 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     {item.review_lane === 'RATE_LIMITED_REVIEW' && <span className="chip chip--review">Báo lặp cần rà soát</span>}
                     {item.review_lane === 'PROXY_QUOTA_REVIEW' && <span className="chip chip--review">Báo hộ cần rà soát</span>}
                     {item.tracking_code.startsWith('C48HM') && <span className="chip">Mô phỏng</span>}
+                    {item.campaign_match_state === 'CONFLICT' && <span className="chip chip--review">Xung đột chiến dịch</span>}
+                    {item.campaign_match_state === 'UNMATCHED' && <span className="chip">Chưa thuộc vùng nào</span>}
+                    {item.campaign_match_state === 'AUTO_ATTACHED' && <span className="chip">Tự động gắn theo vị trí</span>}
                     {item.handled_by_name && <span className="chip">Đang do {item.handled_by_name} xử lý</span>}
                     {['SUBMITTED', 'VERIFYING'].includes(item.status) && item.fast_track && <>
                       <span className="chip chip--suggest" data-priority={item.fast_track.suggested_priority}>{item.fast_track.suggestion_confidence === 'LOW' ? 'Tạm gợi ý' : 'Gợi ý'} {item.fast_track.suggested_priority}</span>
@@ -1286,7 +1298,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   ],
                   warning: 'Xác nhận đã liên hệ và chuyển thông tin yêu cầu này cho cơ quan chức năng?',
                 })}
-              {!detail.campaign_id &&
+              {canSeeUnassigned && !detail.campaign_id &&
                 secondaryCommand({
                   title: 'Gắn vào chiến dịch cứu trợ',
                   service: 'response',
@@ -1298,7 +1310,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   ],
                   warning: 'Xác nhận gắn yêu cầu này vào chiến dịch đã chọn?',
                 })}
-              {detail.campaign_id &&
+              {canSeeUnassigned && detail.campaign_id &&
                 secondaryCommand({
                   title: 'Gỡ khỏi chiến dịch',
                   service: 'response',
@@ -1820,7 +1832,9 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 <span className="detail-value">
                   {detail.campaign_id
                     ? campaignOptions.find((campaign) => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn'
-                    : 'Chưa gắn'}
+                    : detail.campaign_match_state === 'CONFLICT' ? 'Xung đột chiến dịch'
+                      : detail.campaign_match_state === 'AUTO_ATTACHED' ? 'Tự động gắn theo vị trí'
+                        : 'Chưa thuộc vùng chiến dịch'}
                 </span>
               </p>
             </div>

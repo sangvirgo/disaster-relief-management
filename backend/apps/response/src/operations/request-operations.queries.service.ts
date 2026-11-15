@@ -50,20 +50,22 @@ export class RequestOperationsQueriesService {
   async queue(query: RequestQueueQueryDto, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     const limit = query.limit ?? 50;
-    const filters = filtersHash(session.grants, session.userId, query, 'requests');
+    const filters = filtersHash(session.grants, session.userId, query, 'requests', session.activeCampaignIds);
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
     const values: unknown[] = [];
-    const scope = scopeSql(session.grants, 'REQUEST_QUEUE_READ', values);
+    const scope = scopeSql(session.grants, 'REQUEST_QUEUE_READ', values, 'r', session.userId);
     const conditions = [scope];
     const add = (clause: (index: number) => string, value: unknown) => { values.push(value); conditions.push(clause(values.length)); };
     if (!(query.overdue === 'true' && query.review_lane === undefined)) add((index) => `r.review_lane=$${index}`, query.review_lane ?? 'NORMAL');
     if (query.status) add((index) => `r.status=$${index}`, query.status);
+    if (query.campaign_id) add((index) => `r.campaign_id=$${index}::uuid`, query.campaign_id);
     if (query.priority) add((index) => `r.priority=$${index}`, query.priority);
     if (query.category) add((index) => `r.incident_category_code=$${index}`, query.category);
     if (query.from) add((index) => `r.received_at >= $${index}::timestamptz`, query.from);
     if (query.to) add((index) => `r.received_at <= $${index}::timestamptz`, query.to);
     if (query.declared_danger) add((index) => `r.reporter_declared_danger=$${index}`, query.declared_danger === 'true');
-    if (query.unassigned === 'true') conditions.push('r.campaign_id IS NULL');
+    if (query.unassigned === 'true') conditions.push("r.campaign_id IS NULL AND r.campaign_match_state IN ('UNMATCHED','CONFLICT')");
+    if (query.campaign_match_state) add((index) => `r.campaign_match_state=$${index}`, query.campaign_match_state);
     const bbox = parseBbox(query.bbox);
     if (bbox) {
       values.push(...bbox);
@@ -77,7 +79,8 @@ export class RequestOperationsQueriesService {
     conditions.push(`($${values.length - 1}::timestamptz IS NULL OR (r.received_at,r.id)<($${values.length - 1}::timestamptz,$${values.length}::uuid))`);
     values.push(limit + 1);
     const rows = await this.dataSource.query(
-      `SELECT r.id,r.tracking_code,r.status,r.priority,r.handled_by,r.handled_at,r.review_lane,r.report_mode,r.incident_category_code AS category,
+      `SELECT r.id,r.tracking_code,r.status,r.priority,r.campaign_id,r.campaign_match_state,r.campaign_candidate_ids,
+              r.handled_by,r.handled_at,r.review_lane,r.report_mode,r.incident_category_code AS category,
               r.description,r.needs_rescue,r.needs_relief_supplies,r.work_cycle,
               s.people_affected,s.children_count,s.elderly_count,r.received_at,
               to_char(r.received_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_received_at,
@@ -120,6 +123,8 @@ export class RequestOperationsQueriesService {
       } : undefined, facts, Number(row.work_cycle)));
       return {
         id: row.id, tracking_code: row.tracking_code, status: row.status, priority: row.priority,
+        campaign_id: row.campaign_id, campaign_match_state: row.campaign_match_state,
+        campaign_candidate_ids: row.campaign_candidate_ids,
         handled_by: row.handled_by ?? null, handled_at: row.handled_at ? toIso(row.handled_at) : null,
         handled_by_name: row.handled_by ? holderNames.get(row.handled_by) ?? null : null,
         review_lane: row.review_lane, category: row.category, people_affected: row.people_affected,
@@ -218,7 +223,8 @@ export class RequestOperationsQueriesService {
       status: row.status, version: Number(row.version), work_cycle: Number(row.work_cycle),
       priority: row.priority, priority_basis: row.priority_basis, review_lane: row.review_lane,
       category: row.incident_category_code, description: row.description,
-      campaign_id: row.campaign_id, received_at: toIso(row.received_at),
+        campaign_id: row.campaign_id, campaign_match_state: row.campaign_match_state,
+        campaign_candidate_ids: row.campaign_candidate_ids, received_at: toIso(row.received_at),
       declared_danger: row.reporter_declared_danger,
       needs_rescue: row.needs_rescue, needs_relief_supplies: row.needs_relief_supplies,
       priority_advisory: requestPriorityAdvisory,
@@ -228,7 +234,7 @@ export class RequestOperationsQueriesService {
         proxyFlagCount: Array.isArray(flagViews[0]?.flags) ? (flagViews[0]!.flags as unknown[]).length : 0, peopleAffected: countOrNull(subject.people_affected), declaredDanger: row.reporter_declared_danger,
         ruleAdvisory: requestPriorityAdvisory, aiAdvisory: aiView,
         pendingSupplement: await hasPendingSupplement(this.dataSource, row.id),
-        possibleDuplicate: await hasPossibleDuplicate(this.dataSource, row.id, session.grants),
+        possibleDuplicate: await hasPossibleDuplicate(this.dataSource, row.id, session.grants, session.userId),
       }),
       reporter: { user_id: row.reporter_user_id, name: row.reporter_name, contact_phone: row.reporter_contact_phone },
       subject: {
@@ -335,7 +341,7 @@ export class RequestOperationsQueriesService {
 
   private async findCandidates(source: OperationRequestRow, session: ReporterSession, independentOnly: boolean): Promise<Record<string, unknown>> {
     const values: unknown[] = [source.id, source.received_at];
-    const scope = scopeSql(session.grants, 'REQUEST_VERIFY', values, 'candidate');
+    const scope = scopeSql(session.grants, 'REQUEST_VERIFY', values, 'candidate', session.userId);
     const independence = independentOnly
       ? `AND (target.reporter_user_id IS NULL OR candidate.reporter_user_id IS DISTINCT FROM target.reporter_user_id)
          AND (target.reporter_contact_phone IS NULL OR candidate.reporter_contact_phone IS DISTINCT FROM target.reporter_contact_phone)
@@ -424,10 +430,10 @@ export class RequestOperationsQueriesService {
     queryable: Pick<DataSource | EntityManager, 'query'>, requestId: string, rawCursor: string | undefined, limit: number,
     session: ReporterSession,
   ): Promise<{ items: Array<Record<string, unknown>>; more: boolean; cursor?: string }> {
-    const filters = filtersHash(session.grants, session.userId, { request_id: requestId }, 'duplicates');
+    const filters = filtersHash(session.grants, session.userId, { request_id: requestId }, 'duplicates', session.activeCampaignIds);
     const cursor = rawCursor ? decodeKeysetCursor(rawCursor, filters) : undefined;
     const values: unknown[] = [requestId];
-    const scope = scopeSql(session.grants, 'REQUEST_DETAIL_READ', values, 'child');
+    const scope = scopeSql(session.grants, 'REQUEST_DETAIL_READ', values, 'child', session.userId);
     const cursorTimeIndex = values.length + 1;
     values.push(cursor?.sort[0] ?? null, cursor?.id ?? null, limit + 1);
     const rows = await queryable.query(
@@ -449,7 +455,7 @@ export class RequestOperationsQueriesService {
     const ids = [...new Set(events.flatMap((event) => relatedRequestIds(asObject(event.payload))))];
     if (!ids.length) return events;
     const values: unknown[] = [ids];
-    const scope = scopeSql(session.grants, 'REQUEST_DETAIL_READ', values);
+    const scope = scopeSql(session.grants, 'REQUEST_DETAIL_READ', values, 'r', session.userId);
     const rows = await this.dataSource.query(
       `SELECT r.id FROM assistance_request r WHERE r.id=ANY($1::uuid[]) AND ${scope}`,
       values,

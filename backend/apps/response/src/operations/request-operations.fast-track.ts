@@ -106,9 +106,9 @@ export function assessFastTrack(input: FastTrackInput): FastTrackAssessment {
 }
 
 /** Nearby in-scope open reports of the same incident type; a coordinator must compare these. */
-export async function hasPossibleDuplicate(manager: Pick<EntityManager, 'query'>, requestId: string, grants: readonly Grant[]): Promise<boolean> {
+export async function hasPossibleDuplicate(manager: Pick<EntityManager, 'query'>, requestId: string, grants: readonly Grant[], userId?: string): Promise<boolean> {
   const values: unknown[] = [requestId];
-  const candidateScope = requestScopeFilter(grants, 'REQUEST_VERIFY', values, 'candidate');
+  const candidateScope = requestScopeFilter(grants, 'REQUEST_VERIFY', values, 'candidate', userId);
   const rows = await manager.query(
     `SELECT 1
        FROM assistance_request target JOIN request_subject ts ON ts.request_id=target.id

@@ -1,3 +1,4 @@
+-- Historical test fixture for InitialLogistics; not runnable against the current post-migration schema.
 \i constraint-tests.sql
 -- seed
 INSERT INTO item_type VALUES ('FOOD','Lương thực'); INSERT INTO unit VALUES ('PIECE','cái',0),('KG','kg',3);

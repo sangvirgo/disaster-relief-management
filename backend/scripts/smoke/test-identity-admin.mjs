@@ -87,7 +87,6 @@ try {
   assert.equal(introspected.body.user_id, adminId);
   assert.equal(introspected.body.grants[0].role_code, 'ADMIN');
   assert.ok(introspected.body.grants.every((grant) => ['SYSTEM', 'CAMPAIGN'].includes(grant.scope_type)));
-  assert.ok(introspected.body.grants.every((grant) => !Object.hasOwn(grant, 'organization_id')));
 
   const temporaryPassword = `Temporary field password ${randomBytes(6).toString('hex')}!`;
   const userPayload = {

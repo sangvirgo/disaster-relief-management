@@ -69,23 +69,26 @@ describe('RequestCampaignAssociationService', () => {
     managerQuery.mockResolvedValueOnce([{ campaign_id: null }])
       .mockResolvedValueOnce([activeCampaign()])
       .mockResolvedValueOnce([unlockedRequest()])
-      .mockResolvedValueOnce([[{ id: requestId, status: 'VERIFIED', version: 5, campaign_id: campaignId }], 1])
+      .mockResolvedValueOnce([[{ id: requestId, status: 'VERIFIED', version: 5, campaign_id: campaignId,
+        campaign_match_state: 'MANUAL', campaign_candidate_ids: null }], 1])
       .mockResolvedValueOnce([{ id: eventId }]);
 
     const result = await service.attach(requestId, { campaign_id: campaignId, expected_version: 4 }, key, request);
 
-    expect(result.value).toEqual({ id: requestId, status: 'VERIFIED', version: 5, campaign_id: campaignId });
+    expect(result.value).toEqual({ id: requestId, status: 'VERIFIED', version: 5, campaign_id: campaignId,
+      campaign_match_state: 'MANUAL', campaign_candidate_ids: null });
     expect(idempotency.execute).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       command: 'response.requests.attach-campaign',
     }));
     expect(managerQuery.mock.calls[0]?.[0]).toContain('SELECT campaign_id FROM assistance_request');
     expect(managerQuery.mock.calls[1]?.[0]).toContain('FROM campaign WHERE id=$1 FOR SHARE');
     expect(managerQuery.mock.calls[2]?.[0]).toContain('FROM assistance_request WHERE id=$1 FOR UPDATE');
-    expect(managerQuery.mock.calls[3]?.[0]).toContain('SET campaign_id=$3,version=version+1');
+    expect(managerQuery.mock.calls[3]?.[0]).toContain('SET campaign_id=$2,campaign_match_state=$3');
     expect(managerQuery.mock.calls[4]?.[0]).toContain('INSERT INTO request_event');
     expect(managerQuery.mock.calls[4]?.[1]).toEqual([
-      requestId, userId, 'CAMPAIGN_ATTACHED', 'STAFF', 'VERIFIED', 'VERIFIED', null,
-      JSON.stringify({ previous_campaign_id: null, campaign_id: campaignId }),
+      requestId, userId, 'CAMPAIGN_ATTACHED', 'VERIFIED',
+      JSON.stringify({ previous_campaign_id: null, campaign_id: campaignId,
+        campaign_match_state: 'MANUAL', campaign_candidate_ids: null }),
     ]);
   });
 
@@ -114,7 +117,7 @@ describe('RequestCampaignAssociationService', () => {
     expect(managerQuery).toHaveBeenCalledTimes(3);
   });
 
-  it('allows a campaign grant to attach an unassigned request to that campaign', async () => {
+  it('rejects a campaign-scoped user from changing campaign attribution', async () => {
     const { service, managerQuery } = fixture([{ role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId }]);
     managerQuery.mockResolvedValueOnce([{ campaign_id: null }])
       .mockResolvedValueOnce([activeCampaign()])
@@ -123,8 +126,8 @@ describe('RequestCampaignAssociationService', () => {
       .mockResolvedValueOnce([{ id: eventId }]);
 
     await expect(service.attach(requestId, { campaign_id: campaignId, expected_version: 4 }, key, request))
-      .resolves.toMatchObject({ value: { campaign_id: campaignId } });
-    expect(managerQuery).toHaveBeenCalledTimes(5);
+      .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+    expect(managerQuery).toHaveBeenCalledTimes(3);
   });
 
   it('does not allow a campaign grant to attach an unassigned request to another campaign', async () => {
@@ -138,15 +141,36 @@ describe('RequestCampaignAssociationService', () => {
     expect(managerQuery).toHaveBeenCalledTimes(3);
   });
 
-  it('rejects changing campaign attribution after it is locked', async () => {
+  it('allows the primary coordinator to change campaign attribution after Logistics admission', async () => {
     const { service, managerQuery } = fixture();
     managerQuery.mockResolvedValueOnce([{ campaign_id: null }])
       .mockResolvedValueOnce([activeCampaign()])
-      .mockResolvedValueOnce([unlockedRequest({ attribution_locked_at: new Date() })]);
+      .mockResolvedValueOnce([unlockedRequest({ attribution_locked_at: new Date() })])
+      .mockResolvedValueOnce([[{ id: requestId, status: 'VERIFIED', version: 5, campaign_id: campaignId,
+        campaign_match_state: 'MANUAL', campaign_candidate_ids: null }], 1])
+      .mockResolvedValueOnce([{ id: eventId }]);
 
-    await expect(service.attach(requestId, { campaign_id: campaignId, expected_version: 4 }, key, request))
-      .rejects.toMatchObject({ code: 'ATTRIBUTION_LOCKED', status: 409 });
-    expect(managerQuery).toHaveBeenCalledTimes(3);
+    const result = await service.attach(requestId, { campaign_id: campaignId, expected_version: 4 }, key, request);
+
+    expect(result.value).toEqual({ id: requestId, status: 'VERIFIED', version: 5, campaign_id: campaignId,
+      campaign_match_state: 'MANUAL', campaign_candidate_ids: null });
+    expect(managerQuery).toHaveBeenCalledTimes(6);
+  });
+
+  it('allows the primary coordinator to detach attribution after Logistics admission', async () => {
+    const { service, managerQuery } = fixture();
+    managerQuery.mockResolvedValueOnce([{ campaign_id: campaignId }])
+      .mockResolvedValueOnce([activeCampaign()])
+      .mockResolvedValueOnce([unlockedRequest({ campaign_id: campaignId, attribution_locked_at: new Date() })])
+      .mockResolvedValueOnce([[{ id: requestId, status: 'VERIFIED', version: 5, campaign_id: null,
+        campaign_match_state: 'MANUAL', campaign_candidate_ids: null }], 1])
+      .mockResolvedValueOnce([{ id: eventId }]);
+
+    const result = await service.detach(requestId, { expected_version: 4 }, key, request);
+
+    expect(result.value).toEqual({ id: requestId, status: 'VERIFIED', version: 5, campaign_id: null,
+      campaign_match_state: 'MANUAL', campaign_candidate_ids: null });
+    expect(managerQuery).toHaveBeenCalledTimes(6);
   });
 
   it('detaches an unlocked request with a version check and event', async () => {
@@ -154,19 +178,21 @@ describe('RequestCampaignAssociationService', () => {
     managerQuery.mockResolvedValueOnce([{ campaign_id: campaignId }])
       .mockResolvedValueOnce([activeCampaign()])
       .mockResolvedValueOnce([unlockedRequest({ campaign_id: campaignId })])
-      .mockResolvedValueOnce([[{ id: requestId, status: 'VERIFIED', version: 5, campaign_id: null }], 1])
+      .mockResolvedValueOnce([[{ id: requestId, status: 'VERIFIED', version: 5, campaign_id: null,
+        campaign_match_state: 'MANUAL', campaign_candidate_ids: null }], 1])
       .mockResolvedValueOnce([{ id: eventId }]);
 
     const result = await service.detach(requestId, { expected_version: 4 }, key, request);
 
-    expect(result.value).toEqual({ id: requestId, status: 'VERIFIED', version: 5, campaign_id: null });
+    expect(result.value).toEqual({ id: requestId, status: 'VERIFIED', version: 5, campaign_id: null,
+      campaign_match_state: 'MANUAL', campaign_candidate_ids: null });
     expect(managerQuery.mock.calls[0]?.[0]).toContain('SELECT campaign_id FROM assistance_request');
     expect(managerQuery.mock.calls[1]?.[0]).toContain('FROM campaign WHERE id=$1 FOR SHARE');
     expect(managerQuery.mock.calls[2]?.[0]).toContain('FROM assistance_request WHERE id=$1 FOR UPDATE');
-    expect(managerQuery.mock.calls[3]?.[0]).toContain('SET campaign_id=NULL,version=version+1');
+    expect(managerQuery.mock.calls[3]?.[0]).toContain('SET campaign_id=$2,campaign_match_state=$3');
     expect(managerQuery.mock.calls[4]?.[1]).toEqual([
-      requestId, userId, 'CAMPAIGN_DETACHED', 'STAFF', 'VERIFIED', 'VERIFIED', null,
-      JSON.stringify({ previous_campaign_id: campaignId, campaign_id: null }),
+      requestId, userId, 'CAMPAIGN_DETACHED', 'VERIFIED', JSON.stringify({ previous_campaign_id: campaignId, campaign_id: null,
+        campaign_match_state: 'MANUAL', campaign_candidate_ids: null }),
     ]);
   });
 
@@ -250,7 +276,7 @@ describe('RequestCampaignAssociationService', () => {
     expect(managerQuery.mock.calls[2]?.[0]).toContain('verification_revision');
   });
 
-  it('allows a campaign-scoped user to replay a detach after the current association is null', async () => {
+  it('rejects a campaign-scoped user from replaying a detach after the current association is null', async () => {
     const grants: ReporterSession['grants'] = [{
       role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId,
     }];
@@ -264,16 +290,9 @@ describe('RequestCampaignAssociationService', () => {
         priority: 'P2', priority_basis: 'COMPLETE', verification_revision: 1, canonical_request_id: null,
       }]);
 
-    const result = await service.detach(requestId, { expected_version: 4 }, key, request);
-
-    expect(result).toMatchObject({
-      status: 200,
-      replay: true,
-      value: { id: requestId, campaign_id: null },
-    });
-    expect(managerQuery).toHaveBeenCalledTimes(3);
+    await expect(service.detach(requestId, { expected_version: 4 }, key, request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+    expect(managerQuery).toHaveBeenCalledTimes(2);
     expect(managerQuery.mock.calls[0]?.[0]).toContain('FOR UPDATE');
     expect(managerQuery.mock.calls[1]?.[0]).toContain('FROM request_event');
-    expect(managerQuery.mock.calls[2]?.[0]).toContain('verification_revision');
   });
 });

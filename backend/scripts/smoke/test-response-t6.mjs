@@ -9,7 +9,6 @@ const responseUrl = process.env.C48_RESPONSE_BASE_URL;
 const identityUrl = process.env.C48_IDENTITY_BASE_URL;
 const responseDb = new Client({ connectionString: process.env.C48_RESPONSE_DATABASE_URL });
 const identityDb = new Client({ connectionString: process.env.C48_IDENTITY_DATABASE_URL });
-const organizationId = '40000000-0000-4000-8000-000000000004';
 let ipSequence = 80;
 
 function key() { return randomUUID(); }
@@ -109,10 +108,6 @@ async function createProxy(reporter, payload, idempotencyKey = key()) {
 
 await Promise.all([responseDb.connect(), identityDb.connect()]);
 try {
-  await identityDb.query(
-    `INSERT INTO organization (id,name,organization_kind) VALUES ($1,'T6 test organization','COORDINATION') ON CONFLICT (id) DO NOTHING`,
-    [organizationId],
-  );
   await responseDb.query("INSERT INTO incident_category (code,display_name) VALUES ('T6_FLOOD','Lũ lụt') ON CONFLICT (code) DO NOTHING");
 
   const missingSessionKey = key();
@@ -248,7 +243,7 @@ try {
   assert.equal((await responseDb.query("SELECT 1 FROM idempotency_record WHERE command='response.requests.create-proxy' AND idempotency_key=$1", [revokedKey])).rowCount, 0);
 
   const massAssignmentKey = key();
-  const massAssignment = await createProxy(reporter, proxyBody([108.5, 12.5], { organization_id: organizationId, reporter_user_id: reporter.id } ), massAssignmentKey);
+  const massAssignment = await createProxy(reporter, proxyBody([108.5, 12.5], { reporter_user_id: reporter.id } ), massAssignmentKey);
   assertVietnameseError(massAssignment, 400, 'VALIDATION_FAILED');
   assert.equal((await responseDb.query("SELECT 1 FROM idempotency_record WHERE command='response.requests.create-proxy' AND idempotency_key=$1", [massAssignmentKey])).rowCount, 0);
 

@@ -1,6 +1,8 @@
 # Reliva Physical ERD Decomposition
 
-These diagrams are decomposed views of the current physical schemas in `docs/backend/schema/`. The SQL files remain authoritative for columns, constraints, indexes, triggers, and migrations.
+> **Historical diagram snapshot:** these Draw.io and SVG exports reflect the pre-2026-11-15 physical schema. They do not show `campaign_engagement`, campaign center/radius, or request campaign-match metadata. SQL schemas and migrations are authoritative until these assets are regenerated.
+
+These Draw.io/SVG exports are a decomposed snapshot of the pre-2026-11-15 physical schemas. They have not been regenerated for campaign engagement or spatial SOS matching. The current Mermaid core views are in [c48-implemented-system.md](../c48-implemented-system.md); SQL schemas and migrations remain authoritative for columns, constraints, indexes, triggers, and migrations.
 
 ## Diagram set
 

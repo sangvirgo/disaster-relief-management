@@ -1614,6 +1614,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/{id}/disengage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End the caller’s coordination engagement without deleting its history.
+         * @description Route exported from backend/apps/response/src/campaigns/campaigns.controller.ts#CampaignsController.disengage. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        post: operations["responseCampaignsDisengage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/engage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start or refresh the caller’s campaign coordination engagement.
+         * @description Requires CAMPAIGN_COORDINATOR and an ACTIVE campaign. Calls are idempotent by Idempotency-Key; at most three campaigns may be active for one user.
+         */
+        post: operations["responseCampaignsEngage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Return a cursor-paginated campaign relief timeline.
+         * @description Route exported from backend/apps/response/src/campaigns/campaigns.controller.ts#CampaignsController.history. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        get: operations["responseCampaignsHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/history/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * CampaignsController.historySummary
+         * @description Route exported from backend/apps/response/src/campaigns/campaigns.controller.ts#CampaignsController.historySummary. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        get: operations["responseCampaignsHistorySummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Return campaign activity, SOS counts, effective claims, overdue SOS and common queue totals.
+         * @description Route exported from backend/apps/response/src/campaigns/campaigns.controller.ts#CampaignsController.overview. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        get: operations["responseCampaignsOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/triage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List active campaigns ranked by deterministic SOS urgency counts.
+         * @description Ranks campaigns by unhandled SOS priority counts, overdue SOS count, longest wait, fewer active coordinators, then campaign ID. No AI or automatic SOS priority is used.
+         */
+        get: operations["responseCampaignsTriage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/coordination-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * CampaignsController.myHistory
+         * @description Route exported from backend/apps/response/src/campaigns/campaigns.controller.ts#CampaignsController.myHistory. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        get: operations["responseCampaignsMyHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/engagements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * CampaignsController.myEngagements
+         * @description Route exported from backend/apps/response/src/campaigns/campaigns.controller.ts#CampaignsController.myEngagements. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        get: operations["responseCampaignsMyEngagements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1843,6 +2003,10 @@ export interface components {
             handled_by: string | null;
             handled_at: string | null;
             handled_by_name: string | null;
+            campaign_id: string | null;
+            /** @enum {string} */
+            campaign_match_state: "UNMATCHED" | "AUTO_ATTACHED" | "CONFLICT" | "MANUAL";
+            campaign_candidate_ids: string[] | null;
         };
         RequestQueuePage: {
             items: components["schemas"]["RequestQueueItem"][];
@@ -1994,6 +2158,10 @@ export interface components {
             handled_by: string | null;
             handled_at: string | null;
             handled_by_name: string | null;
+            campaign_id: string | null;
+            /** @enum {string} */
+            campaign_match_state: "UNMATCHED" | "AUTO_ATTACHED" | "CONFLICT" | "MANUAL";
+            campaign_candidate_ids: string[] | null;
         } & {
             [key: string]: unknown;
         };
@@ -2557,6 +2725,8 @@ export interface operations {
                 overdue?: string;
                 cursor?: components["parameters"]["Cursor"];
                 limit?: components["parameters"]["PageLimit"];
+                campaign_id?: string;
+                campaign_match_state?: "UNMATCHED" | "AUTO_ATTACHED" | "CONFLICT" | "MANUAL";
                 unassigned?: string;
             };
             header?: never;
@@ -5191,14 +5361,33 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Campaign page. */
+            /** @description Campaign page including optional spatial matching areas. */
             200: {
                 headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CampaignPage"];
+                    "application/json": {
+                        items?: {
+                            /** Format: uuid */
+                            id?: string;
+                            name?: string;
+                            objective?: string | null;
+                            status?: string;
+                            version?: number;
+                            starts_at?: string | null;
+                            ends_at?: string | null;
+                            /** Format: date-time */
+                            created_at?: string;
+                            center?: {
+                                lat: number;
+                                lng: number;
+                            } | null;
+                            radius_m?: number | null;
+                        }[];
+                        more?: boolean;
+                        cursor?: string;
+                    };
                 };
             };
             /** @description Vietnamese error message; clients branch on the stable code. */
@@ -5265,7 +5454,16 @@ export interface operations {
                     "application/json": components["schemas"]["Campaign"];
                 };
             };
-            400: components["responses"]["Error"];
+            /** @description Vietnamese error message; clients branch on the stable code. */
+            400: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
             /** @description Vietnamese error message; clients branch on the stable code. */
             401: {
                 headers: {
@@ -5312,14 +5510,29 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Campaign detail. */
+            /** @description Campaign detail including optional spatial matching area. */
             200: {
                 headers: {
-                    "Cache-Control": components["headers"]["CacheControlNoStore"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Campaign"];
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        name: string;
+                        objective?: string | null;
+                        status: string;
+                        version: number;
+                        starts_at?: string | null;
+                        ends_at?: string | null;
+                        /** Format: date-time */
+                        created_at?: string;
+                        center: {
+                            lat: number;
+                            lng: number;
+                        } | null;
+                        radius_m: number | null;
+                    };
                 };
             };
             400: components["responses"]["Error"];
@@ -5379,7 +5592,16 @@ export interface operations {
                     "application/json": components["schemas"]["Campaign"];
                 };
             };
-            400: components["responses"]["Error"];
+            /** @description Vietnamese error message; clients branch on the stable code. */
+            400: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
             /** @description Vietnamese error message; clients branch on the stable code. */
             401: {
                 headers: {
@@ -5401,7 +5623,16 @@ export interface operations {
                 };
             };
             404: components["responses"]["Error"];
-            409: components["responses"]["Error"];
+            /** @description Vietnamese error message; clients branch on the stable code. */
+            409: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
             500: components["responses"]["Error"];
             503: components["responses"]["Error"];
         };
@@ -7288,6 +7519,9 @@ export interface operations {
                         status: string;
                         version: number;
                         campaign_id: string | null;
+                        /** @enum {string} */
+                        campaign_match_state: "UNMATCHED" | "AUTO_ATTACHED" | "CONFLICT" | "MANUAL";
+                        campaign_candidate_ids: string[] | null;
                     };
                 };
             };
@@ -7384,6 +7618,9 @@ export interface operations {
                         status: string;
                         version: number;
                         campaign_id: string | null;
+                        /** @enum {string} */
+                        campaign_match_state: "UNMATCHED" | "AUTO_ATTACHED" | "CONFLICT" | "MANUAL";
+                        campaign_candidate_ids: string[] | null;
                     };
                 };
             };
@@ -7708,7 +7945,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Search results eligible for a team membership attempt. */
+            /** @description Search results eligible for a team roster update. */
             200: {
                 headers: {
                     "Cache-Control": components["headers"]["CacheControlNoStore"];
@@ -8269,6 +8506,557 @@ export interface operations {
             };
             /** @description Documented error response; clients branch on the stable code. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseCampaignsDisengage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ended engagement or an idempotent no-op. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
+                    "Idempotent-Replay": components["headers"]["IdempotentReplay"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        campaign_id: string;
+                        campaign_name?: string | null;
+                        campaign_status?: string | null;
+                        /** Format: uuid */
+                        user_id: string;
+                        /** Format: date-time */
+                        started_at: string;
+                        /** Format: date-time */
+                        last_active_at: string;
+                        /** Format: date-time */
+                        ended_at: string;
+                        /** @enum {string} */
+                        ended_reason: "LEFT" | "EXPIRED" | "SWITCHED" | "CAMPAIGN_CLOSED";
+                        /** @constant */
+                        active: false;
+                    } | {
+                        /** Format: uuid */
+                        campaign_id: string;
+                        /** @constant */
+                        active: false;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseCampaignsEngage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Engagement created or refreshed. */
+            201: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
+                    "Idempotent-Replay": components["headers"]["IdempotentReplay"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        campaign_id: string;
+                        campaign_name?: string | null;
+                        campaign_status?: string | null;
+                        /** Format: uuid */
+                        user_id: string;
+                        /** Format: date-time */
+                        started_at: string;
+                        /** Format: date-time */
+                        last_active_at: string;
+                        ended_at: string | null;
+                        ended_reason: ("LEFT" | "EXPIRED" | "SWITCHED" | "CAMPAIGN_CLOSED") | null;
+                        active: boolean;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseCampaignsHistory: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unified append-only coordination, request and mission history. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: {
+                            /** Format: date-time */
+                            occurred_at?: string;
+                            event_type?: string;
+                            actor?: {
+                                /** Format: uuid */
+                                id: string;
+                                display_name: string | null;
+                            } | null;
+                            request_id?: string | null;
+                            mission_id?: string | null;
+                            payload?: {
+                                [key: string]: unknown;
+                            } | null;
+                        }[];
+                        more?: boolean;
+                        cursor?: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseCampaignsHistorySummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Campaign relief summary using recorded request and mission events. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        completed_requests: number;
+                        cancelled_requests: number;
+                        open_requests: number;
+                        completed_missions: number;
+                        median_response_seconds: number | null;
+                        coordinators: {
+                            /** Format: uuid */
+                            user_id: string;
+                            display_name: string | null;
+                            total_seconds: number;
+                        }[];
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseCampaignsOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Campaign overview for primary coordinators. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            status: string;
+                            center: {
+                                lat: number;
+                                lng: number;
+                            } | null;
+                            radius_m: number | null;
+                            active_coordinators: {
+                                /** Format: uuid */
+                                user_id: string;
+                                display_name: string | null;
+                                /** Format: date-time */
+                                started_at: string;
+                                /** Format: date-time */
+                                last_active_at: string;
+                            }[];
+                            request_counts: {
+                                [key: string]: number;
+                            };
+                            active_claim_count: number;
+                            overdue_count: number;
+                            has_active_coordinator: boolean;
+                        }[];
+                        common_queue: {
+                            unmatched: number;
+                            conflict: number;
+                        };
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseCampaignsTriage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active campaign triage order and reason labels. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            status: string;
+                            urgency: {
+                                highest_priority: ("P1" | "P2" | "P3" | "P4") | null;
+                                highest_priority_unhandled_count: number;
+                                unhandled_priority_counts: {
+                                    P1: number;
+                                    P2: number;
+                                    P3: number;
+                                    P4: number;
+                                };
+                                overdue_count: number;
+                                longest_wait_seconds: number;
+                                active_coordinator_count: number;
+                                reason_codes: ("P1_UNHANDLED" | "P2_UNHANDLED" | "P3_UNHANDLED" | "P4_UNHANDLED" | "OVERDUE" | "LONG_WAIT" | "NO_COORDINATOR" | "ROUTINE")[];
+                            };
+                            urgency_reasons_vi: string[];
+                        }[];
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseCampaignsMyHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            campaign_id: string;
+                            campaign_name?: string | null;
+                            campaign_status?: string | null;
+                            /** Format: uuid */
+                            user_id: string;
+                            /** Format: date-time */
+                            started_at: string;
+                            /** Format: date-time */
+                            last_active_at: string;
+                            ended_at: string | null;
+                            ended_reason: ("LEFT" | "EXPIRED" | "SWITCHED" | "CAMPAIGN_CLOSED") | null;
+                            active: boolean;
+                            duration_seconds: number;
+                        }[];
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseCampaignsMyEngagements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            campaign_id: string;
+                            campaign_name?: string | null;
+                            campaign_status?: string | null;
+                            /** Format: uuid */
+                            user_id: string;
+                            /** Format: date-time */
+                            started_at: string;
+                            /** Format: date-time */
+                            last_active_at: string;
+                            ended_at: string | null;
+                            ended_reason: ("LEFT" | "EXPIRED" | "SWITCHED" | "CAMPAIGN_CLOSED") | null;
+                            active: boolean;
+                        }[];
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

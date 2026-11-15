@@ -1,4 +1,4 @@
--- Logistics EXPLAIN (ANALYZE, BUFFERS, COSTS OFF) evidence for T0-S (01-schema-review.md §9.4).
+-- Historical InitialLogistics EXPLAIN (ANALYZE, BUFFERS, COSTS OFF) fixture for T0-S (01-schema-review.md §9.4).
 -- Historical large-fixture proof; do not execute as part of current integration checks.
 -- Current checks must not create scratch databases or schemas. Run only through a reviewed
 -- transactional check against the primary c48_logistics database if this proof is reactivated.
