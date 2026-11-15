@@ -1,5 +1,10 @@
+-- Historical Initial-migration baseline, not the current post-migration Response schema.
+-- Current deltas are applied by RemoveOrganizationResponse1794787200000 and
+-- AddCampaignEngagementAndSpatialMatching1794960000000 (campaign geography/radius,
+-- request match metadata and append-only campaign engagements). Keep baseline DDL
+-- unchanged so the migration history remains reproducible.
 -- C48 Response service — physical schema (PostgreSQL 16+ with PostGIS 3).
--- Same conventions as identity.sql. No cross-service FKs: *_user_id, organization_id, campaign refs from other services are opaque uuids.
+-- Same conventions as identity.sql. No cross-service FKs: *_user_id and campaign refs from other services are opaque uuids.
 CREATE EXTENSION IF NOT EXISTS postgis;
 
 CREATE FUNCTION is_clean_text(t text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$ SELECT btrim(t) <> '' AND t = normalize(t, NFC) $$;

@@ -1,3 +1,7 @@
+-- Historical Initial-migration baseline, not the current post-migration Identity schema.
+-- Current deltas are applied by RemoveOrganizationIdentity1794787200000 and
+-- AddCampaignCoordinatorRole1794960000000 (role_grant scope/role catalogue/backfill).
+-- Keep this baseline DDL unchanged so the migration history remains reproducible.
 -- C48 Identity service — physical schema (PostgreSQL 16+; PostGIS NOT required here).
 -- Conventions: uuid PKs (app generates UUIDv7; DEFAULT gen_random_uuid() is a fallback),
 -- timestamptz in UTC, text + CHECK instead of native enums, version column on mutable aggregates.

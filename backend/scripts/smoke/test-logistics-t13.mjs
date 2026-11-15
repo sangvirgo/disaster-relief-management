@@ -9,7 +9,6 @@ const logisticsUrl = requiredEnv('C48_LOGISTICS_BASE_URL').replace(/\/+$/u, '');
 const identityUrl = requiredEnv('C48_IDENTITY_BASE_URL').replace(/\/+$/u, '');
 const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DATABASE_URL') });
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
-const organizationId = randomUUID();
 let identityIp = 210;
 
 function requiredEnv(name) {
@@ -65,9 +64,9 @@ async function registerAndLogin(label, roles) {
   await activateEmailRegistration(identityDb, registered);
   for (const role of roles) {
     await identityDb.query(
-      `INSERT INTO role_grant (user_id,role_code,scope_type,organization_id)
-       VALUES ($1,$2,'ORGANIZATION',$3)`,
-      [registered.value.user.id, role, organizationId],
+      `INSERT INTO role_grant (user_id,role_code,scope_type)
+       VALUES ($1,$2,'SYSTEM')`,
+      [registered.value.user.id, role],
     );
   }
   const login = await call(identityUrl, 'auth/login', {
@@ -84,9 +83,6 @@ function addDays(days) {
 
 await Promise.all([logisticsDb.connect(), identityDb.connect()]);
 try {
-  await identityDb.query('INSERT INTO organization (id,name,organization_kind) VALUES ($1,$2,\'COORDINATION\')',
-    [organizationId, `T13 test ${organizationId}`]);
-
   const manager = await registerAndLogin('manager', ['OPERATIONS_MANAGER', 'INTAKE_STAFF', 'CAMPAIGN_MANAGER']);
   const counter = await registerAndLogin('counter', ['INTAKE_STAFF', 'REVIEWER']);
   const reviewer = await registerAndLogin('reviewer', ['REVIEWER']);
@@ -107,7 +103,7 @@ try {
   expectSuccess(item, 201);
   const warehouse = await call(logisticsUrl, 'warehouses', {
     method: 'POST', actor: manager, idempotencyKey: key(),
-    body: { organization_id: organizationId, name: `Kho T13 ${suffix}` },
+    body: { name: `Kho T13 ${suffix}` },
   });
   expectSuccess(warehouse, 201);
   const drive = await call(logisticsUrl, 'donation-drives', {
@@ -306,7 +302,7 @@ try {
   expectSuccess(raceItemB, 201);
   const raceWarehouse = await call(logisticsUrl, 'warehouses', {
     method: 'POST', actor: manager, idempotencyKey: key(),
-    body: { organization_id: organizationId, name: `Kho race T13 ${suffix}` },
+    body: { name: `Kho race T13 ${suffix}` },
   });
   expectSuccess(raceWarehouse, 201);
   const raceDrive = await call(logisticsUrl, 'donation-drives', {

@@ -8,6 +8,7 @@ import { claimConflictMessage, claimIsActive, isSystemCoordinator } from './requ
 
 export interface ClaimRow {
   id: string;
+  tracking_code: string;
   status: string;
   version: number;
   campaign_id: string | null;
@@ -31,7 +32,7 @@ export class RequestClaimGuard {
 
   async loadClaim(manager: EntityManager, requestId: string): Promise<ClaimRow> {
     const rows = await manager.query(
-      `SELECT id,status,version,campaign_id,handled_by,handled_at,now() AS db_now
+      `SELECT id,tracking_code,status,version,campaign_id,handled_by,handled_at,now() AS db_now
          FROM assistance_request WHERE id=$1 FOR UPDATE`,
       [requestId],
     ) as ClaimRow[];
@@ -64,9 +65,25 @@ export class RequestClaimGuard {
     if (!row.handled_by || !claimIsActive(row.handled_at, row.db_now)) return;
 
     if (!isSystemCoordinator(session.grants)) throw await this.conflictFor(row.handled_by);
+    await this.takeover(manager, row, session, command);
+  }
 
-    await this.persistence.insertEvent(manager, requestId, session.userId, 'CLAIM_TAKEN_OVER', 'STAFF',
+  async takeover(manager: EntityManager, row: ClaimRow, session: ReporterSession, command: string): Promise<void> {
+    if (!row.handled_by || !isSystemCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    let actorName = 'Điều phối chính';
+    try {
+      actorName = (await this.sessions.lookupUsers([session.userId])).find((profile) => profile.id === session.userId)?.display_name || actorName;
+    } catch (error) {
+      this.logger.warn({ code: error instanceof AppError ? error.code : 'IDENTITY_LOOKUP_FAILED' }, 'takeover actor lookup');
+    }
+    await this.persistence.insertEvent(manager, row.id, session.userId, 'CLAIM_TAKEN_OVER', 'STAFF',
       row.status, row.status, null, { previous_handled_by: row.handled_by, command });
-    await manager.query('UPDATE assistance_request SET handled_by=$2,handled_at=now() WHERE id=$1', [requestId, session.userId]);
+    await manager.query('UPDATE assistance_request SET handled_by=$2,handled_at=now() WHERE id=$1', [row.id, session.userId]);
+    await manager.query(
+      `INSERT INTO notice (recipient_user_id,source_id,source_version,notice_type,payload)
+       VALUES ($1,$2,$3,'CLAIM_TAKEN_OVER',jsonb_build_object('text_code','CLAIM_TAKEN_OVER','request_id',$2::uuid,'message',$4::text))
+       ON CONFLICT (source_id,source_version,recipient_user_id,notice_type) DO NOTHING`,
+      [row.handled_by, row.id, row.version, `Hồ sơ ${row.tracking_code} vừa được ${actorName} tiếp quản.`],
+    );
   }
 }

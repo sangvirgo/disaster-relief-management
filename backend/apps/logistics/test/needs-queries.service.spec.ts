@@ -7,14 +7,13 @@ import type { LogisticsSessionService } from '../src/auth/logistics-session.serv
 const requestId = '11111111-1111-4111-8111-111111111111';
 const cycleId = '22222222-2222-4222-8222-222222222222';
 const needId = '33333333-3333-4333-8333-333333333333';
-const organizationId = '44444444-4444-4444-8444-444444444444';
 
 describe('NeedsQueriesService', () => {
   it('returns a scoped fulfillment board with derived totals and bounded contributions', async () => {
     const query = jest.fn()
-      .mockResolvedValueOnce([{ id: cycleId, request_id: requestId, work_cycle: 2, organization_id: organizationId, campaign_id: null, state: 'OPEN' }])
+      .mockResolvedValueOnce([{ id: cycleId, request_id: requestId, work_cycle: 2,  campaign_id: null, state: 'OPEN' }])
       .mockResolvedValueOnce([{
-        id: needId, cycle_id: cycleId, request_id: requestId, work_cycle: 2, organization_id: organizationId,
+        id: needId, cycle_id: cycleId, request_id: requestId, work_cycle: 2,
         campaign_id: null, item_id: '55555555-5555-4555-8555-555555555555', item_name: 'Nước sạch',
         unit_code: 'BOTTLE', unit_name: 'Chai', unit_scale: 0, original: '10.000', requested: '10.000',
         committed_reserved: '4.000', issued_unsettled: '2.000', delivered: '3.000', returned: '1.000', lost: '0.000',
@@ -99,7 +98,7 @@ describe('NeedsQueriesService', () => {
   it('preserves PostgreSQL microseconds in the needs-list cursor', async () => {
     const cursorTime = '2026-10-13T00:00:00.000123Z';
     const row = {
-      id: needId, cycle_id: cycleId, request_id: requestId, work_cycle: 2, organization_id: organizationId,
+      id: needId, cycle_id: cycleId, request_id: requestId, work_cycle: 2,
       campaign_id: null, item_id: '55555555-5555-4555-8555-555555555555', item_name: 'Nước sạch',
       unit_code: 'BOTTLE', unit_name: 'Chai', unit_scale: 0, original: '10.000', requested: '10.000',
       committed_reserved: '0.000', issued_unsettled: '0.000', delivered: '0.000', returned: '0.000', lost: '0.000',
@@ -132,9 +131,9 @@ describe('NeedsQueriesService', () => {
       created_at: '2026-10-13T00:00:00.000123Z', cursor_created_at: '2026-10-13T00:00:00.000123Z',
     };
     const query = jest.fn()
-      .mockResolvedValueOnce([{ id: needId, organization_id: organizationId, campaign_id: null, unit_scale: 2 }])
+      .mockResolvedValueOnce([{ id: needId,  campaign_id: null, unit_scale: 2 }])
       .mockResolvedValueOnce([first, { ...first, id: '99999999-9999-4999-8999-999999999999' }])
-      .mockResolvedValueOnce([{ id: needId, organization_id: organizationId, campaign_id: null, unit_scale: 2 }])
+      .mockResolvedValueOnce([{ id: needId,  campaign_id: null, unit_scale: 2 }])
       .mockResolvedValueOnce([]);
     const service = new NeedsQueriesService(
       { query } as unknown as DataSource,

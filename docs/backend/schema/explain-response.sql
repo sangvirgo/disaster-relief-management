@@ -14,20 +14,20 @@ INSERT INTO incident_category VALUES ('FLOOD','Ngập lụt'),('FIRE','Hỏa ho�
 ON CONFLICT (code) DO NOTHING;
 INSERT INTO skill VALUES ('BOAT','Xuồng'),('ROPE','Dây cứu hộ'),('MEDIC','Y tế');
 INSERT INTO incident_category_skill VALUES ('FLOOD','BOAT'),('FLOOD','ROPE'),('FIRE','ROPE'),('MEDICAL','MEDIC');
-INSERT INTO campaign (id,organization_id,name,status,created_by_user_id)
-  SELECT gen_random_uuid(), '00000000-0000-0000-0000-0000000000d1', 'Chiến dịch '||i, 'ACTIVE', gen_random_uuid() FROM generate_series(1,20) i;
+INSERT INTO campaign (id,name,status,created_by_user_id)
+  SELECT gen_random_uuid(), 'Chiến dịch '||i, 'ACTIVE', gen_random_uuid() FROM generate_series(1,20) i;
 
 -- ---------- requests (200k): exactly 10k scoped, confirmed/open heatmap rows in the 31-day window ----------
 CREATE TEMP TABLE seed AS
 SELECT i, gen_random_uuid() AS id, random() AS u,
        CASE WHEN i<=10000 THEN 106.1+random()*0.1 ELSE 105+random()*3.03 END AS lon,
        CASE WHEN i<=10000 THEN 10.1+random()*0.1 ELSE 10+random() END AS lat,
-       random() AS ut, random() AS uc, random() AS uorg, random() AS ucat, random() AS uuser, random() AS ucamp
+       random() AS ut, random() AS uc, random() AS ucat, random() AS uuser, random() AS ucamp
 FROM generate_series(1,200000) i;
 CREATE TEMP TABLE camp AS SELECT id, row_number() OVER (ORDER BY id) AS n FROM campaign;
 
 INSERT INTO assistance_request (id,tracking_code,campaign_id,incident_category_code,report_mode,reporter_user_id,reporter_contact_phone,
-    source_ip_hash,organization_id,status,verifying_since,priority,priority_basis,reporter_declared_danger,resolved_at,received_at)
+    source_ip_hash,status,verifying_since,priority,priority_basis,reporter_declared_danger,resolved_at,received_at)
 SELECT s.id, upper(substr(md5(s.i::text),1,12)),
        CASE WHEN s.i <= 10000 THEN (SELECT id FROM camp WHERE n=1)
             WHEN s.ucamp < 0.3 THEN (SELECT id FROM camp WHERE n=2 + (s.i % 19)) END,
@@ -37,8 +37,6 @@ SELECT s.id, upper(substr(md5(s.i::text),1,12)),
        CASE WHEN s.uuser < 0.5 THEN ('00000000-0000-0000-0000-'||lpad((1 + (s.i % 2000))::text,12,'0'))::uuid END,
        CASE WHEN s.uc < 0.86 THEN '09'||lpad((s.i % 100000000)::text,8,'0') END,
        CASE WHEN s.i % 100 = 0 THEN 'v1:'||repeat('a',64) END,
-       CASE WHEN s.i <= 10000 THEN '00000000-0000-0000-0000-0000000000d1'::uuid
-            WHEN s.uorg < 0.9 THEN '00000000-0000-0000-0000-0000000000d1'::uuid ELSE '00000000-0000-0000-0000-0000000000d2'::uuid END,
        st, CASE WHEN st = 'VERIFYING' THEN now() - s.ut*interval '2 days' END,
        CASE WHEN st IN ('TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING','CLOSED') THEN 'P3' END,
        CASE WHEN st IN ('TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING','CLOSED') THEN 'COMPLETE' END,
@@ -68,8 +66,7 @@ DECLARE benchmark_count bigint; decision_count bigint;
 BEGIN
   SELECT count(*) INTO benchmark_count
     FROM assistance_request a JOIN seed s ON s.id=a.id JOIN camp c ON c.n=1
-   WHERE s.i<=10000 AND a.organization_id='00000000-0000-0000-0000-0000000000d1'
-     AND a.campaign_id=c.id AND a.incident_category_code='FLOOD'
+   WHERE s.i<=10000 AND a.campaign_id=c.id AND a.incident_category_code='FLOOD'
      AND a.status IN ('VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING')
      AND a.canonical_request_id IS NULL
      AND a.received_at>=now()-interval '31 days' AND a.received_at<now();
@@ -86,14 +83,14 @@ END $$;
 SELECT a.id AS rid
   FROM assistance_request a JOIN request_subject s ON s.request_id=a.id
  WHERE a.status='VERIFIED' AND a.incident_category_code='FLOOD'
-   AND a.organization_id='00000000-0000-0000-0000-0000000000d1' AND a.received_at>now()-interval '20 days'
+   AND a.received_at>now()-interval '20 days'
  ORDER BY a.id LIMIT 1 \gset
 
 -- ---------- teams (3k), positions, skills ----------
 CREATE TEMP TABLE team_seed AS
 SELECT gen_random_uuid() AS id,i AS n FROM generate_series(1,3000) i;
-INSERT INTO rescue_team (id,organization_id,name,team_kind,availability)
-SELECT id, '00000000-0000-0000-0000-0000000000d1', 'Đội '||n,
+INSERT INTO rescue_team (id,name,team_kind,availability)
+SELECT id, 'Đội '||n,
        (ARRAY['VOLUNTEER','MILITARY','GOVERNMENT'])[1 + n % 3], CASE WHEN random() < 0.9 THEN 'AVAILABLE' ELSE 'UNAVAILABLE' END
 FROM team_seed;
 CREATE TEMP TABLE tm AS SELECT id,n FROM team_seed;
@@ -138,9 +135,9 @@ SELECT 'assistance_request' t, count(*) FROM assistance_request UNION ALL SELECT
  UNION ALL SELECT 'mission', count(*) FROM mission UNION ALL SELECT 'request_event', count(*) FROM request_event;
 
 -- ---------- parameters ----------
-SELECT a.id AS rid, a.organization_id AS oid, s.location AS rloc, a.received_at AS rts, a.incident_category_code AS rcat
+SELECT a.id AS rid, s.location AS rloc, a.received_at AS rts, a.incident_category_code AS rcat
   FROM assistance_request a JOIN request_subject s ON s.request_id = a.id
- WHERE a.status = 'VERIFIED' AND a.incident_category_code = 'FLOOD' AND a.organization_id = '00000000-0000-0000-0000-0000000000d1' AND a.received_at > now() - interval '20 days'
+ WHERE a.status = 'VERIFIED' AND a.incident_category_code = 'FLOOD' AND a.received_at > now() - interval '20 days'
  ORDER BY a.id LIMIT 1 \gset
 SELECT id AS cid FROM camp WHERE n=1 \gset
 SELECT reporter_user_id AS uid FROM assistance_request WHERE reporter_user_id IS NOT NULL GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT 1 \gset
@@ -151,7 +148,7 @@ SELECT count(*) AS events_on_timeline_request FROM request_event WHERE request_i
 
 -- ---------- queries: stored as text with @token@ placeholders, substituted with quoted literals (so the planner sees constants) ----------
 CREATE TEMP TABLE params (k text PRIMARY KEY, v text);
-INSERT INTO params VALUES ('rid',:'rid'),('oid',:'oid'),('rloc',:'rloc'),('rts',:'rts'),('rcat','FLOOD'),('cid',:'cid'),('uid',:'uid'),('tid',:'tid'),('kts',:'kts'),('kid',:'kid'),('sourcehash','v1:'||repeat('a',64)),('team_radius','10000'),('from',(now()-interval '31 days')::text),('to',now()::text),('overdue_minutes','10');
+INSERT INTO params VALUES ('rid',:'rid'),('rloc',:'rloc'),('rts',:'rts'),('rcat','FLOOD'),('cid',:'cid'),('uid',:'uid'),('tid',:'tid'),('kts',:'kts'),('kid',:'kid'),('sourcehash','v1:'||repeat('a',64)),('team_radius','10000'),('from',(now()-interval '31 days')::text),('to',now()::text),('overdue_minutes','10');
 CREATE TEMP TABLE q (n int PRIMARY KEY, label text, sql text);
 INSERT INTO q VALUES
 (1, 'i   candidate teams (10 km, fresh, AVAILABLE, no active mission, skills superset, band order)', $q$
@@ -172,12 +169,11 @@ ORDER BY (b.dist_m <= b.nearest_m + 2000) DESC,
          CASE WHEN b.dist_m <= b.nearest_m + 2000 THEN b.recent_missions END ASC NULLS LAST,
          b.dist_m, b.team_id
 LIMIT 20 $q$),
-(2, 'ii  heatmap current 1 km projection, 31-day org/campaign/category scope, confirmed canonical rows', $q$
+(2, 'ii  heatmap current 1 km projection, 31-day campaign/category scope, confirmed canonical rows', $q$
 WITH located AS (
   SELECT ST_SnapToGrid(ST_Transform(s.location::geometry, 32648), 1000::float8) AS center
     FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
-   WHERE r.organization_id=@oid@
-     AND r.received_at>=@from@::timestamptz AND r.received_at<@to@::timestamptz
+   WHERE r.received_at>=@from@::timestamptz AND r.received_at<@to@::timestamptz
      AND r.status IN ('VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING')
      AND r.canonical_request_id IS NULL
      AND r.campaign_id=@cid@::uuid AND r.incident_category_code=@rcat@
@@ -195,7 +191,7 @@ SELECT ST_AsGeoJSON(ST_ForcePolygonCCW(ST_Transform(ST_MakeEnvelope(ST_X(center)
 (3, 'iii duplicate candidates (same category, +-24 h, within 1 km)', $q$
 SELECT a.id, ST_Distance(s.location, @rloc@::geography) AS dist_m
   FROM assistance_request a JOIN request_subject s ON s.request_id = a.id
- WHERE a.organization_id = @oid@ AND a.incident_category_code = @rcat@ AND a.id <> @rid@
+ WHERE a.incident_category_code = @rcat@ AND a.id <> @rid@
    AND a.received_at BETWEEN @rts@::timestamptz - interval '24 hours' AND @rts@::timestamptz + interval '24 hours'
    AND ST_DWithin(s.location, @rloc@::geography, 1000) $q$),
 (4, 'iv  request timeline newest 50', $q$
@@ -204,9 +200,9 @@ SELECT * FROM request_event WHERE request_id = @tid@ ORDER BY occurred_at DESC, 
 SELECT id, status, received_at FROM assistance_request
  WHERE reporter_user_id = @uid@ AND (received_at, id) < (@kts@::timestamptz, @kid@::uuid)
  ORDER BY received_at DESC, id DESC LIMIT 20 $q$),
-(6, 'vi  organization open queue (status filter), FIFO 50', $q$
+(6, 'vi  unassigned open queue (status filter), FIFO 50', $q$
 SELECT id, received_at FROM assistance_request
- WHERE organization_id = @oid@ AND status NOT IN ('REJECTED','DUPLICATE','CANCELLED','CLOSED')
+ WHERE campaign_id IS NULL AND status NOT IN ('REJECTED','DUPLICATE','CANCELLED','CLOSED')
  ORDER BY received_at, id LIMIT 50 $q$),
 (7, 'vii campaign-scoped queue (open), FIFO 50', $q$
 SELECT id, received_at FROM assistance_request
@@ -217,12 +213,12 @@ SELECT count(*) FROM assistance_request
  WHERE source_ip_hash = @sourcehash@ AND received_at >= now() - interval '1 minute' $q$),
 (9, 'ix   T8 current candidate eligibility SQL (3k teams; request_operations.team-candidates.service.ts:37-84)', $q$
 WITH target AS (
-  SELECT r.id,r.organization_id,r.incident_category_code,s.location AS request_location,
+  SELECT r.id,r.incident_category_code,s.location AS request_location,
          statement_timestamp() AS query_time
     FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
-   WHERE r.id=@rid@ AND r.organization_id=@oid@
+   WHERE r.id=@rid@
 ), eligible AS (
-  SELECT t.id,t.organization_id,t.name,t.team_kind,t.reporting_mode,t.availability,t.status,
+  SELECT t.id,t.name,t.team_kind,t.reporting_mode,t.availability,t.status,
          t.readiness_required,t.version,t.created_at,
          COALESCE((SELECT array_agg(ts.skill_code ORDER BY ts.skill_code) FROM team_skill ts WHERE ts.team_id=t.id),ARRAY[]::text[]) AS skills,
          floor(extract(epoch FROM (q.query_time-p.captured_at)))::int AS position_age_s,
@@ -244,7 +240,6 @@ WITH target AS (
                          AND me.recorded_at BETWEEN q.query_time-interval '24 hours' AND q.query_time))
     ) recent ON true
    WHERE t.status='ACTIVE' AND t.availability='AVAILABLE' AND NOT t.readiness_required
-     AND t.organization_id=q.organization_id
      AND ((t.reporting_mode='APP' AND EXISTS (
              SELECT 1 FROM team_member tm WHERE tm.team_id=t.id AND tm.member_role='LEADER' AND tm.left_at IS NULL))
        OR (t.reporting_mode='COORDINATOR' AND NULLIF(btrim(t.external_contact_note),'') IS NOT NULL))
@@ -255,21 +250,19 @@ WITH target AS (
                         AND NOT EXISTS (SELECT 1 FROM team_skill ts
                                          WHERE ts.team_id=t.id AND ts.skill_code=required.skill_code))
 )
-SELECT id,organization_id,name,team_kind,reporting_mode,availability,status,readiness_required,version,created_at,
+SELECT id,name,team_kind,reporting_mode,availability,status,readiness_required,version,created_at,
        skills,position_age_s,position_accuracy_m,position_source,longitude,latitude,distance_m,recent_missions_24h
   FROM eligible
  WHERE position_team_id IS NULL
     OR captured_at < query_time-interval '30 minutes' OR captured_at > query_time
     OR (captured_at >= query_time-interval '30 minutes' AND captured_at <= query_time
         AND ST_DWithin(request_location,position_location,@team_radius@::float8)) $q$),
-(10, 'x   Response ReportsService.summary, bounded organization/campaign scope', $q$
+(10, 'x   Response ReportsService.summary, bounded time/campaign scope', $q$
 WITH filtered_requests AS MATERIALIZED (
   SELECT r.id,r.received_at,r.status::text AS status,r.priority::text AS priority
     FROM assistance_request r
    WHERE r.received_at>=@from@::timestamptz
      AND r.received_at<@to@::timestamptz
-     AND r.organization_id=@oid@
-
      AND r.campaign_id=@cid@::uuid
 ), first_verified AS (
   SELECT d.request_id,MIN(d.decided_at) AS decided_at

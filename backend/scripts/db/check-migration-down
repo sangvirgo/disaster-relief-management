@@ -63,17 +63,14 @@ SQL
 
 # Check every primary database before the first migration is reverted. This prevents a
 # later populated database from failing after an earlier service schema has been dropped.
+declare -A expected_counts=()
 for service in identity response logistics; do
   assert_no_application_rows "$service"
-  case "$service" in
-    identity) expected=2 ;;
-    response) expected=5 ;;
-    logistics) expected=1 ;;
-  esac
   tracker_exists="$(query "$service" "SELECT to_regclass('public.typeorm_migrations') IS NOT NULL")"
   [[ "$tracker_exists" == "t" ]] || { printf 'FAIL %s has no primary migration history; run reset and migration first\n' "$service" >&2; exit 1; }
   applied="$(query "$service" 'SELECT count(*) FROM public.typeorm_migrations')"
-  [[ "$applied" == "$expected" ]] || { printf 'FAIL %s expected %s primary migrations before rollback, got %s\n' "$service" "$expected" "$applied" >&2; exit 1; }
+  [[ "$applied" =~ ^[1-9][0-9]*$ ]] || { printf 'FAIL %s has no applied primary migrations\n' "$service" >&2; exit 1; }
+  expected_counts["$service"]="$applied"
 done
 
 for service in identity response logistics; do
@@ -82,30 +79,43 @@ for service in identity response logistics; do
     response) password="$RESPONSE_MIGRATOR_PASSWORD" ;;
     logistics) password="$LOGISTICS_MIGRATOR_PASSWORD" ;;
   esac
-  down_runs=1
-  [[ "$service" == response ]] && down_runs=5
+  down_runs="${expected_counts[$service]}"
 
   for ((run = 0; run < down_runs; run++)); do
+    latest="$(query "$service" 'SELECT name FROM public.typeorm_migrations ORDER BY timestamp DESC, id DESC LIMIT 1')"
+    before_count="$(query "$service" 'SELECT count(*) FROM public.typeorm_migrations')"
     run_migration "$service" "$password" down
-    if [[ "$service" == response && "$run" == 0 ]]; then
+    remaining_migrations="$(query "$service" 'SELECT count(*) FROM public.typeorm_migrations')"
+    expected_remaining=$((before_count - 1))
+    [[ "$remaining_migrations" == "$expected_remaining" ]] || { printf 'FAIL %s rollback of %s did not remove exactly one migration\n' "$service" "$latest" >&2; exit 1; }
+
+    if [[ "$service" == identity && "$latest" == AddCampaignCoordinatorRole1794960000000 ]]; then
+      role_constraint_count="$(query identity "SELECT count(*) FROM pg_constraint WHERE conrelid='public.role_grant'::regclass AND contype='c' AND pg_get_constraintdef(oid) LIKE '%CAMPAIGN_COORDINATOR%'")"
+      [[ "$role_constraint_count" == "0" ]] || { echo 'FAIL campaign coordinator rollback left the role in an Identity check constraint' >&2; exit 1; }
+    fi
+    if [[ "$service" == response && "$latest" == AddCampaignEngagementAndSpatialMatching1794960000000 ]]; then
+      engagement_table="$(query response "SELECT to_regclass('public.campaign_engagement') IS NULL")"
+      spatial_columns="$(query response "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND ((table_name='campaign' AND column_name IN ('center','radius_m')) OR (table_name='assistance_request' AND column_name IN ('campaign_match_state','campaign_candidate_ids')))")"
+      [[ "$engagement_table" == "t" && "$spatial_columns" == "0" ]] || { echo 'FAIL campaign engagement/spatial rollback left its schema delta' >&2; exit 1; }
+    fi
+    if [[ "$service" == response && "$latest" == AddAiAdvisory1792953600001 ]]; then
       ai_tables="$(query response "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('ai_advisory','ai_daily_usage')")"
       [[ "$ai_tables" == "0" ]] || { echo 'FAIL AI advisory rollback left AI tables' >&2; exit 1; }
     fi
-    if [[ "$service" == response && "$run" == 1 ]]; then
+    if [[ "$service" == response && "$latest" == AddSosFactsAndMissionKind1792953600000 ]]; then
       rescue_count="$(query response "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND ((table_name='assistance_request' AND column_name IN ('needs_rescue','needs_relief_supplies')) OR (table_name='request_subject' AND column_name IN ('children_count','elderly_count')) OR (table_name='mission' AND column_name IN ('mission_kind','distribution_id')))")"
       [[ "$rescue_count" == "0" ]] || { echo 'FAIL SOS facts rollback left migrated columns' >&2; exit 1; }
     fi
-    if [[ "$service" == response && "$run" == 2 ]]; then
+    if [[ "$service" == response && "$latest" == AddEvidenceUploadIpQuota1710000000002 ]]; then
       index_count="$(query response "SELECT count(*) FROM pg_class WHERE relname='evidence_upload_ip_created_idx'")"
       column_count="$(query response "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='evidence_metadata' AND column_name='upload_source_ip_hash'")"
       cleanup_index_count="$(query response "SELECT count(*) FROM pg_class WHERE relname='evidence_cleanup_pending_idx'")"
       cleanup_column_count="$(query response "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='evidence_metadata' AND column_name='cleanup_completed_at'")"
-      source_count="$(query response "SELECT count(*) FROM pg_class WHERE relname='request_source_ip_idx'")"
-      [[ "$index_count" == "0" && "$column_count" == "0" && "$cleanup_index_count" == "0" && "$cleanup_column_count" == "0" && "$source_count" == "1" ]] || { echo 'FAIL T5 rollback did not remove only its evidence storage delta' >&2; exit 1; }
+      [[ "$index_count" == "0" && "$column_count" == "0" && "$cleanup_index_count" == "0" && "$cleanup_column_count" == "0" ]] || { echo 'FAIL evidence storage rollback left its schema delta' >&2; exit 1; }
     fi
-    if [[ "$service" == response && "$run" == 3 ]]; then
+    if [[ "$service" == response && "$latest" == AddRequestSourceIpIndex1710000000001 ]]; then
       index_count="$(query response "SELECT count(*) FROM pg_class WHERE relname='request_source_ip_idx'")"
-      [[ "$index_count" == "0" ]] || { echo 'FAIL T4 rollback left request_source_ip_idx in the T3 schema' >&2; exit 1; }
+      [[ "$index_count" == "0" ]] || { echo 'FAIL request source IP rollback left request_source_ip_idx' >&2; exit 1; }
     fi
   done
 
@@ -114,8 +124,7 @@ for service in identity response logistics; do
 
   run_migration "$service" "$password"
   applied="$(query "$service" 'SELECT count(*) FROM public.typeorm_migrations')"
-  expected=2
-  [[ "$service" == response ]] && expected=5
+  expected="${expected_counts[$service]}"
   [[ "$applied" == "$expected" ]] || { printf 'FAIL %s expected %s applied migrations, got %s\n' "$service" "$expected" "$applied" >&2; exit 1; }
   printf 'PASS %s primary database migration down/up\n' "$service"
 done

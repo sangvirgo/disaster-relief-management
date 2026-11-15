@@ -8,7 +8,7 @@ const itemId = '44444444-4444-4444-8444-444444444444';
 const cancelledDistribution = {
   id: 'distribution-1',
   warehouse_id: 'warehouse-1',
-  organization_id: 'organization-1',
+
   warehouse_status: 'ACTIVE',
   relief_point_id: null,
   relief_point_status: null,
@@ -124,7 +124,7 @@ describe('distribution cancellation idempotency replay', () => {
     const session = { userId: 'preparer-1', grants, identityHeaders: {} };
     const dataSource = {
       query: jest.fn().mockResolvedValue([{
-        id: 'warehouse-1', organization_id: 'organization-1', status: 'INACTIVE',
+        id: 'warehouse-1',  status: 'INACTIVE',
       }]),
     };
     const idempotency = {
@@ -137,7 +137,7 @@ describe('distribution cancellation idempotency replay', () => {
       })),
     };
     const sessions = { require: jest.fn().mockResolvedValue(session) };
-    const campaigns = { getCampaign: jest.fn().mockResolvedValue({ organization_id: 'organization-1', status: 'PAUSED' }) };
+    const campaigns = { getCampaign: jest.fn().mockResolvedValue({  status: 'PAUSED' }) };
     const service = new DistributionCommandsService(
       dataSource as unknown as DataSource,
       idempotency as never,

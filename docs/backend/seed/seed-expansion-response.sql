@@ -94,7 +94,7 @@ ON CONFLICT DO NOTHING;
 
 INSERT INTO team_position (team_id, location, accuracy_m, captured_at, source, set_by_user_id)
 SELECT team.id, ST_SetSRID(ST_MakePoint(fixture.longitude, fixture.latitude), 4326)::geography,
-       NULL, now() - interval '5 minutes', 'COORDINATOR_REPORTED', '00000000-0000-4000-8000-000000000118'
+       NULL, now(), 'COORDINATOR_REPORTED', '00000000-0000-4000-8000-000000000118'
   FROM (VALUES
     ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', 'VOLUNTEER', 'APP', 105.8500::float8, 21.0300::float8),
     ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', 'VOLUNTEER', 'APP', 106.7000::float8, 10.7800::float8),
@@ -106,7 +106,12 @@ SELECT team.id, ST_SetSRID(ST_MakePoint(fixture.longitude, fixture.latitude), 43
   JOIN rescue_team team ON team.id = fixture.team_id AND team.name = fixture.team_name
                        AND team.team_kind = fixture.team_kind AND team.reporting_mode = fixture.reporting_mode
  WHERE true
-ON CONFLICT DO NOTHING;
+ON CONFLICT (team_id) DO UPDATE SET
+  location = EXCLUDED.location,
+  accuracy_m = EXCLUDED.accuracy_m,
+  captured_at = EXCLUDED.captured_at,
+  source = EXCLUDED.source,
+  set_by_user_id = EXCLUDED.set_by_user_id;
 
 -- Three additional APP-led northern teams for the terrain-rescue demo.
 -- Positions are initial synthetic fixtures; leaders must refresh them after 30 minutes.
@@ -144,14 +149,19 @@ ON CONFLICT DO NOTHING;
 
 INSERT INTO team_position (team_id, location, accuracy_m, captured_at, source, set_by_user_id)
 SELECT t.id, ST_SetSRID(ST_MakePoint(fixture.longitude, fixture.latitude), 4326)::geography,
-       NULL, now() - interval '2 minutes', 'COORDINATOR_REPORTED', '00000000-0000-4000-8000-000000000118'
+       NULL, now(), 'COORDINATOR_REPORTED', '00000000-0000-4000-8000-000000000118'
   FROM (VALUES
     ('00000000-0000-4000-8000-0000000000af'::uuid, 'Đội cứu hộ địa hình Bắc 1 (demo)', 105.8450::float8, 21.0280::float8),
     ('00000000-0000-4000-8000-0000000000b0'::uuid, 'Đội cứu hộ địa hình Bắc 2 (demo)', 105.8550::float8, 21.0150::float8),
     ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc (demo)', 105.8500::float8, 21.0350::float8)
   ) AS fixture(team_id, team_name, longitude, latitude)
   JOIN rescue_team t ON t.id=fixture.team_id AND t.name=fixture.team_name
-ON CONFLICT DO NOTHING;
+ON CONFLICT (team_id) DO UPDATE SET
+  location = EXCLUDED.location,
+  accuracy_m = EXCLUDED.accuracy_m,
+  captured_at = EXCLUDED.captured_at,
+  source = EXCLUDED.source,
+  set_by_user_id = EXCLUDED.set_by_user_id;
 
 INSERT INTO assistance_request (id, tracking_code, tracking_secret_hash, campaign_id, incident_category_code, report_mode,
                                 reporter_user_id, reporter_name, reporter_contact_phone, description,
@@ -239,4 +249,169 @@ SELECT fixture.event_id, request.id, '00000000-0000-4000-8000-000000000118', 'VE
   ) AS fixture(event_id, request_id, tracking_code)
   JOIN assistance_request request ON request.id = fixture.request_id AND request.tracking_code = fixture.tracking_code
  WHERE request.status = 'VERIFYING'
+ON CONFLICT DO NOTHING;
+
+-- Verified, human-triaged P1 request with no active mission for campaign/team coordination demos.
+UPDATE assistance_request
+   SET status='VERIFYING',verifying_since=COALESCE(verifying_since,now()-interval '59 minutes'),version=version+1
+ WHERE id='00000000-0000-4000-8000-00000000f107' AND status='SUBMITTED';
+
+INSERT INTO request_event (id,request_id,actor_user_id,event_type,visibility,from_status,to_status,payload,occurred_at)
+SELECT '00000000-0000-4000-8000-0000000e1213',request.id,'00000000-0000-4000-8000-000000000102',
+       'VERIFICATION_STARTED','REPORTER','SUBMITTED','VERIFYING',
+       '{"public_text_code":"VERIFYING"}'::jsonb,request.verifying_since
+  FROM assistance_request request
+ WHERE request.id='00000000-0000-4000-8000-00000000f107' AND request.verifying_since IS NOT NULL
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO request_event (id,request_id,actor_user_id,event_type,visibility,from_status,to_status,payload,occurred_at)
+SELECT '00000000-0000-4000-8000-0000000e1214',request.id,'00000000-0000-4000-8000-000000000102',
+       'VERIFICATION_APPROVED','REPORTER','VERIFYING','VERIFIED',
+       jsonb_build_object('public_text_code','VERIFIED','snapshot',jsonb_build_object(
+         'incident_category_code',request.incident_category_code,'people_affected',subject.people_affected,
+         'children_count',subject.children_count,'elderly_count',subject.elderly_count,
+         'life_threat',request.reporter_declared_danger,'needs_rescue',request.needs_rescue,
+         'needs_relief_supplies',request.needs_relief_supplies)),
+       now()-interval '58 minutes'
+  FROM assistance_request request JOIN request_subject subject ON subject.request_id=request.id
+ WHERE request.id='00000000-0000-4000-8000-00000000f107'
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO verification_decision (id,request_id,outcome,basis,reviewer_user_id,reason,reason_kind,decided_at)
+SELECT '00000000-0000-4000-8000-00000000d108',request.id,'VERIFIED','CONTACT_CONFIRMED',
+       '00000000-0000-4000-8000-000000000102',NULL,NULL,now()-interval '58 minutes'
+  FROM assistance_request request
+ WHERE request.id='00000000-0000-4000-8000-00000000f107'
+ON CONFLICT (id) DO NOTHING;
+
+UPDATE assistance_request
+   SET verification_revision='00000000-0000-4000-8000-0000000e1214',
+       status=CASE WHEN status='VERIFYING' THEN 'VERIFIED'::request_status ELSE status END,
+       verifying_since=CASE WHEN status='VERIFYING' THEN NULL ELSE verifying_since END,
+       version=version+1
+ WHERE id='00000000-0000-4000-8000-00000000f107'
+   AND verification_revision IS NULL
+   AND status IN ('VERIFYING','VERIFIED','TRIAGED');
+
+-- Campaign attribution fixtures mirror the deterministic PostGIS rule and retain audit history.
+UPDATE assistance_request
+   SET campaign_id='00000000-0000-4000-8000-0000000000c3',campaign_match_state='AUTO_ATTACHED',
+       campaign_candidate_ids=NULL,version=version+1
+ WHERE id='00000000-0000-4000-8000-0000000000f1'
+   AND (campaign_id IS DISTINCT FROM '00000000-0000-4000-8000-0000000000c3'::uuid OR campaign_match_state<>'AUTO_ATTACHED');
+
+UPDATE assistance_request
+   SET campaign_id=NULL,campaign_match_state='CONFLICT',
+       campaign_candidate_ids=ARRAY['00000000-0000-4000-8000-0000000000c1'::uuid,'00000000-0000-4000-8000-0000000000c2'::uuid],
+       version=version+1
+ WHERE id='00000000-0000-4000-8000-00000000f103'
+   AND (campaign_id IS NOT NULL OR campaign_match_state<>'CONFLICT'
+        OR campaign_candidate_ids IS DISTINCT FROM ARRAY['00000000-0000-4000-8000-0000000000c1'::uuid,'00000000-0000-4000-8000-0000000000c2'::uuid]);
+
+UPDATE assistance_request
+   SET campaign_match_state='MANUAL',campaign_candidate_ids=NULL
+ WHERE campaign_id IS NOT NULL AND id<>'00000000-0000-4000-8000-0000000000f1'
+   AND campaign_match_state<>'MANUAL';
+
+UPDATE assistance_request
+   SET campaign_match_state='UNMATCHED',campaign_candidate_ids=NULL
+ WHERE campaign_id IS NULL AND campaign_match_state<>'CONFLICT'
+   AND (campaign_match_state<>'UNMATCHED' OR campaign_candidate_ids IS NOT NULL);
+
+-- Primary coordinator claim examples: one live claim and one retained but expired claim.
+UPDATE assistance_request
+   SET handled_by='00000000-0000-4000-8000-000000000102',handled_at=now()-interval '5 minutes'
+ WHERE id='00000000-0000-4000-8000-00000000f102'
+   AND (handled_by IS DISTINCT FROM '00000000-0000-4000-8000-000000000102'::uuid OR handled_at<=now()-interval '15 minutes');
+UPDATE assistance_request
+   SET handled_by='00000000-0000-4000-8000-000000000102',handled_at=now()-interval '20 minutes'
+ WHERE id='00000000-0000-4000-8000-00000000f106'
+   AND handled_by IS DISTINCT FROM '00000000-0000-4000-8000-000000000102'::uuid;
+INSERT INTO request_event (id,request_id,actor_user_id,event_type,visibility,from_status,to_status,payload,occurred_at)
+SELECT fixture.event_id,request.id,'00000000-0000-4000-8000-000000000102','CLAIMED','STAFF',request.status,request.status,
+       jsonb_build_object('handled_at',request.handled_at,'seed_fixture',true),request.handled_at
+  FROM (VALUES
+    ('00000000-0000-4000-8000-0000000e1210'::uuid,'00000000-0000-4000-8000-00000000f102'::uuid),
+    ('00000000-0000-4000-8000-0000000e1211'::uuid,'00000000-0000-4000-8000-00000000f106'::uuid)
+  ) AS fixture(event_id,request_id)
+  JOIN assistance_request request ON request.id=fixture.request_id AND request.handled_by='00000000-0000-4000-8000-000000000102'
+ON CONFLICT (id) DO NOTHING;
+
+WITH changed AS (
+  UPDATE assistance_request SET status='TRIAGED',priority='P1',priority_basis='COMPLETE',version=version+1
+   WHERE id='00000000-0000-4000-8000-00000000f107'
+     AND (status<>'TRIAGED' OR priority IS DISTINCT FROM 'P1' OR priority_basis IS DISTINCT FROM 'COMPLETE')
+   RETURNING id,version
+)
+INSERT INTO request_event (id,request_id,actor_user_id,event_type,visibility,from_status,to_status,payload,occurred_at)
+SELECT md5('c48-seed-priority:'||changed.id::text)::uuid,changed.id,'00000000-0000-4000-8000-000000000102',
+       'REQUEST_TRIAGED','STAFF','SUBMITTED','TRIAGED',jsonb_build_object('priority','P1','priority_basis','COMPLETE','version',changed.version),now()-interval '55 minutes'
+  FROM changed ON CONFLICT (id) DO NOTHING;
+
+WITH attached AS (
+  SELECT r.* FROM assistance_request r
+   WHERE r.id='00000000-0000-4000-8000-0000000000f1' AND r.campaign_match_state='AUTO_ATTACHED'
+)
+INSERT INTO request_event (id,request_id,actor_user_id,event_type,visibility,from_status,to_status,payload,occurred_at)
+SELECT '00000000-0000-4000-8000-0000000e1201'::uuid,a.id,NULL,'CAMPAIGN_AUTO_ATTACHED','STAFF',a.status,a.status,
+       jsonb_build_object('campaign_id',a.campaign_id,'campaign_match_state','AUTO_ATTACHED','matching_rule','POSTGIS_RADIUS'),now()-interval '90 minutes'
+  FROM attached a ON CONFLICT (id) DO NOTHING;
+
+WITH conflicted AS (
+  SELECT r.* FROM assistance_request r
+   WHERE r.id='00000000-0000-4000-8000-00000000f103' AND r.campaign_match_state='CONFLICT'
+)
+INSERT INTO request_event (id,request_id,actor_user_id,event_type,visibility,from_status,to_status,payload,occurred_at)
+SELECT '00000000-0000-4000-8000-0000000e1202'::uuid,r.id,NULL,'CAMPAIGN_MATCH_CONFLICT','STAFF',r.status,r.status,
+       jsonb_build_object('campaign_candidate_ids',r.campaign_candidate_ids,'matching_rule','POSTGIS_RADIUS'),now()-interval '140 minutes'
+  FROM conflicted r ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO request_event (id,request_id,actor_user_id,event_type,visibility,from_status,to_status,payload,occurred_at)
+SELECT md5('c48-seed-manual-campaign:'||r.id::text)::uuid,r.id,NULL,'CAMPAIGN_ATTACHED','STAFF',r.status,r.status,
+       jsonb_build_object('campaign_id',r.campaign_id,'campaign_match_state','MANUAL','seed_fixture',true),r.received_at
+  FROM assistance_request r
+ WHERE r.campaign_id IS NOT NULL AND r.campaign_match_state='MANUAL'
+   AND NOT EXISTS (SELECT 1 FROM request_event e WHERE e.request_id=r.id AND e.event_type IN ('CAMPAIGN_ATTACHED','CAMPAIGN_AUTO_ATTACHED'))
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO audit_log (actor_user_id,action,entity_type,entity_id,before_state,after_state,reason)
+SELECT NULL,'CAMPAIGN_AUTO_ATTACHED','assistance_request',r.id::text,
+       jsonb_build_object('campaign_id',NULL,'campaign_match_state','UNMATCHED'),
+       jsonb_build_object('campaign_id',r.campaign_id,'campaign_match_state','AUTO_ATTACHED'),'SEED_AUTO_ATTRIBUTION'
+  FROM assistance_request r
+ WHERE r.id='00000000-0000-4000-8000-0000000000f1'
+   AND NOT EXISTS (SELECT 1 FROM audit_log a WHERE a.entity_id=r.id::text AND a.action='CAMPAIGN_AUTO_ATTACHED' AND a.reason='SEED_AUTO_ATTRIBUTION');
+
+INSERT INTO audit_log (actor_user_id,action,entity_type,entity_id,before_state,after_state,reason)
+SELECT NULL,'CAMPAIGN_MATCH_CONFLICT','assistance_request',r.id::text,
+       jsonb_build_object('campaign_id','00000000-0000-4000-8000-0000000000c5','campaign_match_state','MANUAL'),
+       jsonb_build_object('campaign_id',NULL,'campaign_match_state','CONFLICT','campaign_candidate_ids',r.campaign_candidate_ids),'SEED_CONFLICT_ATTRIBUTION'
+  FROM assistance_request r
+ WHERE r.id='00000000-0000-4000-8000-00000000f103'
+   AND NOT EXISTS (SELECT 1 FROM audit_log a WHERE a.entity_id=r.id::text AND a.action='CAMPAIGN_MATCH_CONFLICT' AND a.reason='SEED_CONFLICT_ATTRIBUTION');
+
+INSERT INTO audit_log (actor_user_id,action,entity_type,entity_id,before_state,after_state,reason)
+SELECT NULL,'CAMPAIGN_ATTACHED','assistance_request',r.id::text,
+       jsonb_build_object('campaign_id',NULL,'campaign_match_state','UNMATCHED'),
+       jsonb_build_object('campaign_id',r.campaign_id,'campaign_match_state','MANUAL'),'SEED_MANUAL_ATTRIBUTION'
+  FROM assistance_request r
+ WHERE r.campaign_id IS NOT NULL AND r.campaign_match_state='MANUAL'
+   AND NOT EXISTS (SELECT 1 FROM audit_log a WHERE a.entity_id=r.id::text AND a.action='CAMPAIGN_ATTACHED' AND a.reason='SEED_MANUAL_ATTRIBUTION');
+
+INSERT INTO notice (source_id,source_version,recipient_user_id,notice_type,payload)
+SELECT r.id,r.version,'00000000-0000-4000-8000-000000000102','CAMPAIGN_MATCH_CONFLICT',
+       jsonb_build_object('text_code','CAMPAIGN_MATCH_CONFLICT','request_id',r.id::text,
+         'message',format('SOS %s nằm trong vùng của nhiều chiến dịch (%s, %s). Cần điều phối chính chọn chiến dịch.',r.tracking_code,c1.name,c2.name),
+         'campaign_ids',jsonb_build_array(c1.id,c2.id))
+  FROM assistance_request r
+  JOIN campaign c1 ON c1.id='00000000-0000-4000-8000-0000000000c1'
+  JOIN campaign c2 ON c2.id='00000000-0000-4000-8000-0000000000c2'
+ WHERE r.id='00000000-0000-4000-8000-00000000f103' AND r.campaign_match_state='CONFLICT'
+ON CONFLICT (source_id,source_version,recipient_user_id,notice_type) DO NOTHING;
+
+INSERT INTO campaign_engagement (id,campaign_id,user_id,started_at,last_active_at,ended_at,ended_reason) VALUES
+  ('00000000-0000-4000-8000-00000000e201'::uuid,'00000000-0000-4000-8000-0000000000c1'::uuid,'00000000-0000-4000-8000-000000000103'::uuid,now()-interval '50 minutes',now()-interval '5 minutes',NULL,NULL),
+  ('00000000-0000-4000-8000-00000000e202'::uuid,'00000000-0000-4000-8000-0000000000c3'::uuid,'00000000-0000-4000-8000-000000000125'::uuid,now()-interval '25 minutes',now()-interval '20 minutes',now()-interval '15 minutes','LEFT'),
+  ('00000000-0000-4000-8000-00000000e203'::uuid,'00000000-0000-4000-8000-0000000000c4'::uuid,'00000000-0000-4000-8000-000000000103'::uuid,now()-interval '8 hours',now()-interval '7 hours',now()-interval '6 hours','LEFT'),
+  ('00000000-0000-4000-8000-00000000e204'::uuid,'00000000-0000-4000-8000-0000000000c7'::uuid,'00000000-0000-4000-8000-000000000125'::uuid,now()-interval '3 hours',now()-interval '2 hours',now()-interval '1 hour','EXPIRED')
 ON CONFLICT DO NOTHING;

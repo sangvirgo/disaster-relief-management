@@ -72,6 +72,7 @@ const TrackingActions = React.lazy(() => import('./features/citizen/TrackingActi
 const Coordinator = React.lazy(() => import('./features/coordinator/Coordinator').then((module) => ({ default: module.Coordinator })));
 const CoordinatorMap = React.lazy(() => import('./features/coordinator/Coordinator').then((module) => ({ default: module.CoordinatorMap })));
 const Campaigns = React.lazy(() => import('./features/coordinator/Campaigns').then((module) => ({ default: module.Campaigns })));
+const CampaignCoordination = React.lazy(() => import('./features/coordinator/CampaignCoordination').then((module) => ({ default: module.CampaignCoordination })));
 const Notices = React.lazy(() => import('./features/volunteer/Volunteer').then((module) => ({ default: module.Notices })));
 const Volunteer = React.lazy(() => import('./features/volunteer/Volunteer').then((module) => ({ default: module.Volunteer })));
 const Admin = React.lazy(() => import('./features/admin/Admin').then((module) => ({ default: module.Admin })));
@@ -1440,9 +1441,9 @@ function LivePage({ page, user }: { page: Page; user: Me | null }) {
 
 function defaultWorkspaceForUser(user: Me | null): Workspace {
   if (!user) return 'citizen';
-  const r = roles(user);
+  const r: ReadonlySet<string> = roles(user);
   if (r.has('ADMIN')) return 'admin';
-  if (r.has('COORDINATOR')) return 'coordinator';
+  if (r.has('COORDINATOR') || r.has('CAMPAIGN_COORDINATOR')) return 'coordinator';
   if (r.has('VOLUNTEER')) return 'volunteer';
   if (
     [
@@ -1998,6 +1999,8 @@ function App() {
                   />
                 ) : workspace === 'citizen' && selected.id === 'drives' ? (
                   <Donations user={user} />
+                ) : workspace === 'coordinator' && selected.id === 'campaigns' ? (
+                  <CampaignCoordination user={user!} />
                 ) : workspace === 'coordinator' &&
                   ['queue', 'verify', 'triage', 'assign'].includes(selected.id) ? (
                   <Coordinator key={`${selected.id}:${selectedRequestId}`} page={selected.id} currentUserId={user!.id}

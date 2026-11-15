@@ -1,3 +1,4 @@
+-- Historical test fixture for InitialResponse; not runnable against the current post-migration schema.
 \i constraint-tests.sql
 CREATE OR REPLACE FUNCTION assert_that(label text, ok boolean) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF ok IS TRUE THEN RAISE NOTICE 'PASS %', label; ELSE RAISE EXCEPTION 'FAIL %', label; END IF; END $$;

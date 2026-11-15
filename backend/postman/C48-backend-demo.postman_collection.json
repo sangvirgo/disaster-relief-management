@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "b794aaf5-169e-470b-a0c4-9a2176a8c480",
     "name": "C48 · Kịch bản SOS và cứu hộ qua Nginx",
-    "description": "Chọn folder 00 để chạy kịch bản chính: SOS SELF → xác minh → ưu tiên do điều phối viên quyết định → cứu hộ hoàn tất → kết thúc → công dân theo dõi. Chạy ở cấp collection cũng dừng sau folder 00 tại bước xác nhận cuối. Chọn riêng folder tùy chọn 10–60 khi cần trình diễn; mỗi folder có thể tạo dữ liệu bền vững. Collection giữ các bước theo kịch bản, danh mục API đầy đủ ở contracts/openapi. Không cần environment riêng. seedPassword đã có sẵn theo SEED_PASSWORD; ID tổ chức, SOS mẫu, dữ liệu quyên góp và kho được tự lấy qua GET; ID tạo mới được lấy từ POST response. Folder 60 dùng fixture ảnh guest và tạo dữ liệu bền vững; đặt Postman working directory tại backend. URL ảnh đã ký dùng S3_PUBLIC_ENDPOINT. Mọi URL qua Nginx 127.0.0.1:8080. Không cần SMTP/Google/MinIO/Gemini cho luồng chính. Không reset DB hoặc sửa đội đang bận. Sau login quản trị, folder 00 tự GET tổ chức C48 để lấy ID; mỗi lần chạy tạo đội trưởng và đội APP mới để bảo đảm đúng tổ chức và có slot rảnh. Lặp login/detail/transition là bước nghiệp vụ cần thiết. Khi có lỗi/thiếu dữ liệu, Runner dừng và ghi assertion thất bại; không bỏ qua lỗi như thành công. Poll operation/AI có giới hạn tối đa 30 lần, mặc định 10 lần cách nhau 1 giây. Dữ liệu demo giả lập; ưu tiên và điều phối luôn do con người quyết định.",
+    "description": "Chọn folder 00 để chạy kịch bản chính: SOS SELF → xác minh → ưu tiên do điều phối viên quyết định → cứu hộ hoàn tất → kết thúc → công dân theo dõi. Chạy ở cấp collection cũng dừng sau folder 00; folder tùy chọn 10–70 chỉ chạy khi chọn riêng. Collection giữ các bước demo, danh mục API đầy đủ ở contracts/openapi. Tài khoản demo lấy mật khẩu từ seedPassword. ID chiến dịch, SOS, dữ liệu quyên góp và kho được tự lấy qua API. Mọi URL đi qua Nginx 127.0.0.1:8080. Không cần SMTP/Google/MinIO/Gemini cho luồng chính. Không reset DB hoặc sửa đội đang bận. Điều phối chính dùng coord1; coord2 là điều phối phụ, chọn chiến dịch bằng phiên điều phối. Các lệnh ghi dùng Idempotency-Key. Dữ liệu demo giả lập; ưu tiên và điều phối luôn do con người quyết định.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -225,6 +225,26 @@
       "key": "signedEvidenceUrl",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "triageCampaignId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "conflictRequestId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "conflictRequestVersion",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "createdCampaignId",
+      "value": "",
+      "type": "string"
     }
   ],
   "event": [
@@ -241,7 +261,7 @@
   "item": [
     {
       "name": "00 · Luồng chính · SOS SELF đến kết thúc",
-      "description": "Chọn Run folder này để chạy đủ từ đầu. Chạy ở cấp collection cũng dừng sau folder 00 tại bước xác nhận cuối; folder tùy chọn 10–60 chỉ chạy khi chọn riêng. Cần main stack đã migrate/seed, seedPassword khớp SEED_PASSWORD; ID tổ chức được tự lấy bằng GET sau login quản trị. Tọa độ mẫu phải thuộc DEMO_A. Luồng tạo đội APP riêng cùng tổ chức với SOS; không chiếm slot của đội seed. SMTP, MinIO và Gemini không bắt buộc. Kết thúc ở bước 26. Không chạy đồng thời nhiều Runner; chờ hết cửa sổ rate-limit nếu chạy lại liên tục.",
+      "description": "Chạy đủ kịch bản SOS → xác minh → quyết định ưu tiên → giao nhiệm vụ → hoàn tất cứu hộ. Chạy ở cấp collection cũng dừng sau folder 00; folder tùy chọn 10–70 chỉ chạy khi chọn riêng. Dùng coord1 làm điều phối chính; điều phối phụ chọn chiến dịch qua phiên điều phối.",
       "item": [
         {
           "name": "01 · Chuẩn bị đội riêng cho mỗi lần chạy",
@@ -4507,6 +4527,569 @@
           },
           "protocolProfileBehavior": {
             "disableCookies": true
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "70 - Điều phối chiến dịch",
+      "description": "Chạy riêng folder này sau khi seed. coord2 bắt đầu một phiên, xem hàng đợi đúng chiến dịch rồi dừng; coord1 xem tổng quan, tạo chiến dịch và giải quyết SOS xung đột. Các ID được lấy từ phản hồi trước đó.",
+      "item": [
+        {
+          "name": "Đăng nhập điều phối phụ coord2",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"login\\\",\\\"expectedStatus\\\":200}\");",
+                  "['triageCampaignId','conflictRequestId','conflictRequestVersion','createdCampaignId','coord2AccessToken','coord1AccessToken'].forEach(key => pm.collectionVariables.unset(key));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });",
+                  "pm.collectionVariables.set('coord2AccessToken', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"coord2\",\n  \"password\": \"{{seedPassword}}\",\n  \"client_kind\": \"NATIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{identityBaseUrl}}/auth/login",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+          },
+          "response": []
+        },
+        {
+          "name": "Lấy chiến dịch ACTIVE theo mức gấp",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"responseCampaignsTriage\\\",\\\"expectedStatus\\\":200}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });",
+                  "const items = pm.response.json().items || []; if (!items.length) throw new Error(\"Chưa có chiến dịch ACTIVE để điều phối.\"); pm.collectionVariables.set(\"triageCampaignId\", items[0].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{coord2AccessToken}}"
+              }
+            ],
+            "url": "{{responseBaseUrl}}/campaigns/triage",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+          },
+          "response": []
+        },
+        {
+          "name": "Bắt đầu điều phối chiến dịch đầu tiên",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"responseCampaignsEngage\\\",\\\"expectedStatus\\\":200}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{coord2AccessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": "{{responseBaseUrl}}/campaigns/{{triageCampaignId}}/engage",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+          },
+          "response": []
+        },
+        {
+          "name": "Xem hàng đợi SOS trong chiến dịch",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"listRequestQueue\\\",\\\"expectedStatus\\\":200}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{coord2AccessToken}}"
+              }
+            ],
+            "url": "{{responseBaseUrl}}/requests?campaign_id={{triageCampaignId}}&limit=50",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+          },
+          "response": []
+        },
+        {
+          "name": "Xem các phiên đang tham gia",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"responseCampaignsMyEngagements\\\",\\\"expectedStatus\\\":200}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{coord2AccessToken}}"
+              }
+            ],
+            "url": "{{responseBaseUrl}}/me/engagements",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+          },
+          "response": []
+        },
+        {
+          "name": "Xem lịch sử cứu trợ chiến dịch",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"responseCampaignsHistory\\\",\\\"expectedStatus\\\":200}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{coord2AccessToken}}"
+              }
+            ],
+            "url": "{{responseBaseUrl}}/campaigns/{{triageCampaignId}}/history?limit=20",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+          },
+          "response": []
+        },
+        {
+          "name": "Dừng điều phối chiến dịch",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"responseCampaignsDisengage\\\",\\\"expectedStatus\\\":200}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{coord2AccessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": "{{responseBaseUrl}}/campaigns/{{triageCampaignId}}/disengage",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+          },
+          "response": []
+        },
+        {
+          "name": "Xem lịch sử điều phối của tôi",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"responseCampaignsMyHistory\\\",\\\"expectedStatus\\\":200}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{coord2AccessToken}}"
+              }
+            ],
+            "url": "{{responseBaseUrl}}/me/coordination-history?limit=20",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+          },
+          "response": []
+        },
+        {
+          "name": "Đăng nhập điều phối chính coord1",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"login\\\",\\\"expectedStatus\\\":200}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });",
+                  "pm.collectionVariables.set('coord1AccessToken', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"coord1\",\n  \"password\": \"{{seedPassword}}\",\n  \"client_kind\": \"NATIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{identityBaseUrl}}/auth/login",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+          },
+          "response": []
+        },
+        {
+          "name": "Tổng quan chiến dịch dành cho điều phối chính",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"responseCampaignsOverview\\\",\\\"expectedStatus\\\":200}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{coord1AccessToken}}"
+              }
+            ],
+            "url": "{{responseBaseUrl}}/campaigns/overview",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+          },
+          "response": []
+        },
+        {
+          "name": "Tạo chiến dịch có tâm và bán kính",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"createCampaign\\\",\\\"expectedStatus\\\":201}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });",
+                  "pm.collectionVariables.set(\"createdCampaignId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{coord1AccessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Chiến dịch Postman {{runSuffix}}\",\n  \"objective\": \"Kiểm tra vùng tự động gắn SOS.\",\n  \"center\": {\n    \"lat\": 21.0285,\n    \"lng\": 105.8542\n  },\n  \"radius_m\": 5000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{responseBaseUrl}}/campaigns",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+          },
+          "response": []
+        },
+        {
+          "name": "Tìm SOS xung đột ở hàng chờ chung",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"listRequestQueue\\\",\\\"expectedStatus\\\":200}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });",
+                  "const item = (pm.response.json().items || [])[0]; if (!item) throw new Error(\"Seed chưa có SOS xung đột chiến dịch.\"); pm.collectionVariables.set(\"conflictRequestId\", item.id); pm.collectionVariables.set(\"conflictRequestVersion\", String(item.version));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{coord1AccessToken}}"
+              }
+            ],
+            "url": "{{responseBaseUrl}}/requests?unassigned=true&campaign_match_state=CONFLICT&limit=20",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+          },
+          "response": []
+        },
+        {
+          "name": "Điều phối chính chọn chiến dịch cho SOS xung đột",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"responseRequestOperationsAttachCampaign\\\",\\\"expectedStatus\\\":200}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{coord1AccessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaign_id\": \"{{triageCampaignId}}\",\n  \"expected_version\": \"{{conflictRequestVersion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{responseBaseUrl}}/requests/{{conflictRequestId}}/attach-campaign",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+          },
+          "response": []
+        },
+        {
+          "name": "Đọc lịch sử cứu trợ sau khi xử lý",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"responseCampaignsHistory\\\",\\\"expectedStatus\\\":200}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });",
+                  "pm.execution.setNextRequest(null);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{coord1AccessToken}}"
+              }
+            ],
+            "url": "{{responseBaseUrl}}/campaigns/{{triageCampaignId}}/history?limit=20",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
           },
           "response": []
         }

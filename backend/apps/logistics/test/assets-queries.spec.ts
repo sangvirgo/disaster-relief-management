@@ -5,7 +5,7 @@ describe('Logistics asset lists', () => {
   it('applies SYSTEM scope in SQL and omits private notes from list rows', async () => {
     const dataSource = { query: jest.fn().mockResolvedValue([{
       id: '33333333-3333-4333-8333-333333333333',
-      organization_id: '22222222-2222-4222-8222-222222222222',
+
       name: 'Điểm cứu trợ',
       contact_note: 'Số điện thoại cá nhân',
       operating_note: 'Ghi chú riêng',

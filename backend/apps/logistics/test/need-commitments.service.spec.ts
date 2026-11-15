@@ -9,7 +9,6 @@ import type { LogisticsResponseCampaignClient } from '../src/integrations/respon
 
 const needId = '55555555-5555-4555-8555-555555555555';
 const cycleId = '33333333-3333-4333-8333-333333333333';
-const organizationId = '22222222-2222-4222-8222-222222222222';
 const actorId = '66666666-6666-4666-8666-666666666666';
 const itemId = '44444444-4444-4444-8444-444444444444';
 const warehouseId = '88888888-8888-4888-8888-888888888888';
@@ -23,7 +22,7 @@ const managerGrant: Grant = {
 
 const need = {
   id: needId, cycle_id: cycleId, request_id: '11111111-1111-4111-8111-111111111111', work_cycle: 2,
-  organization_id: organizationId, campaign_id: null, item_id: itemId,
+   campaign_id: null, item_id: itemId,
   item_name: 'Nước uống', unit_code: 'L', unit_name: 'Lít', unit_scale: 2,
   original_quantity: '3.00', requested_quantity: '3.00', cancelled_remaining: null,
   designated_point_id: null, status: 'OPEN', version: 1, created_at: new Date('2026-10-12T12:00:00.000Z'),
@@ -49,12 +48,12 @@ type SetupOptions = {
 function setup(options: SetupOptions = {}) {
   const calls: Array<{ sql: string; values?: unknown[] }> = [];
   const cycle = {
-    id: cycleId, organization_id: organizationId,
+    id: cycleId,
     campaign_id: options.campaign ?? null, state: options.cycleState ?? 'OPEN',
   };
   const lockedNeed = { ...need, campaign_id: cycle.campaign_id, status: options.needStatus ?? 'OPEN', requested_quantity: options.requested ?? '3.00' };
   const commitments = options.commitments ?? [];
-  const warehouse = { id: warehouseId, organization_id: organizationId, status: 'ACTIVE' };
+  const warehouse = { id: warehouseId,  status: 'ACTIVE' };
   const balance = options.balance === null ? [] : [{ id: balanceId, warehouse_id: warehouseId, item_id: itemId, ...options.balance ?? { on_hand: '5.00', reserved: '2.00' } }];
   const manager = {
     query: jest.fn(async (sql: string, values?: unknown[]) => {
@@ -70,7 +69,7 @@ function setup(options: SetupOptions = {}) {
       if (sql.includes('INSERT INTO stock_movement') || sql.includes('INSERT INTO audit_log')) return [];
       if (sql.includes('FROM commitment')) return [{
         id: commitmentId, relief_need_id: needId, item_id: itemId, warehouse_id: warehouseId,
-        cycle_id: cycleId, organization_id: organizationId, campaign_id: null,
+        cycle_id: cycleId,  campaign_id: null,
         unit_scale: 2, status: 'OPEN', requested_quantity: '3.00',
         quantity: '2.00', released_quantity: '1.00', issued_quantity: '0.00', delivered_quantity: '0.00',
         returned_quantity: '0.00', lost_quantity: '0.00', version: 4,
@@ -81,11 +80,11 @@ function setup(options: SetupOptions = {}) {
   const dataSource = {
     query: jest.fn(async (sql: string) => {
       if (sql.includes('FROM relief_need')) return [{
-        ...lockedNeed, cycle_id: cycleId, warehouse_id: warehouseId, warehouse_organization_id: organizationId,
+        ...lockedNeed, cycle_id: cycleId, warehouse_id: warehouseId,
       }];
       if (sql.includes('FROM commitment')) return [{
-        id: commitmentId, relief_need_id: needId, cycle_id: cycleId, organization_id: organizationId,
-        warehouse_id: warehouseId, warehouse_organization_id: organizationId,
+        id: commitmentId, relief_need_id: needId, cycle_id: cycleId,
+        warehouse_id: warehouseId,
         item_id: itemId,
       }];
       if (sql.includes('FROM warehouse')) return [warehouse];
@@ -106,7 +105,7 @@ function setup(options: SetupOptions = {}) {
   };
   const campaigns = {
     getCampaign: jest.fn(async (id: string) => ({
-      id, status: options.campaignStatus ?? 'ACTIVE', organization_id: organizationId, version: 1,
+      id, status: options.campaignStatus ?? 'ACTIVE',  version: 1,
     })),
   };
   const service = new NeedCommitmentsService(

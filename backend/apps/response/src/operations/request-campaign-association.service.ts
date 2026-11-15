@@ -3,18 +3,22 @@ import type { Request } from 'express';
 import type { EntityManager } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
 import type { IdempotentResult, ResourceRef } from '@c48/technical/idempotency/idempotency';
-import { hasPermission } from '@c48/identity-contracts/permissions';
 import { ReporterSessionService } from '../requests/reporter-session';
 import { AttachCampaignDto, RequestVersionDto } from './request-operations.dto';
 import { RequestOperationsCommandRunner } from './request-operations.command-runner.service';
 import { RequestOperationsPersistenceService } from './request-operations.persistence.service';
 import { checkVersion } from './request-operations.helpers';
+import { isSystemCoordinator } from './request-claims.helpers';
+import { updateCampaignAttribution } from './request-campaign-attribution';
 
 interface RequestCampaignRow {
   id: string;
   status: string;
   version: number;
   campaign_id: string | null;
+  campaign_match_state: string;
+  campaign_candidate_ids: string[] | null;
+  handled_by: string | null;
   attribution_locked_at: Date | string | null;
 }
 
@@ -28,6 +32,8 @@ interface RequestCampaignView {
   status: string;
   version: number;
   campaign_id: string | null;
+  campaign_match_state: string;
+  campaign_candidate_ids: string[] | null;
 }
 
 @Injectable()
@@ -57,24 +63,17 @@ export class RequestCampaignAssociationService {
         this.assertPermission(session, dto.campaign_id);
         if (row.campaign_id && row.campaign_id !== dto.campaign_id) this.assertPermission(session, row.campaign_id);
         checkVersion(Number(row.version), dto.expected_version);
-        if (row.attribution_locked_at) throw new AppError('ATTRIBUTION_LOCKED', { status: 409 });
-        if (row.campaign_id === campaign.id) {
+        if (row.campaign_id === campaign.id && row.campaign_match_state === 'MANUAL') {
           return { status: 200, value: this.view(row), resource: { type: 'assistance_request', id: row.id } };
         }
         if (campaign.status !== 'ACTIVE') throw new AppError('CAMPAIGN_NOT_ACTIVE', { status: 409 });
-        const [updated] = await manager.query(
-          `UPDATE assistance_request SET campaign_id=$3,version=version+1
-            WHERE id=$1 AND version=$2
-            RETURNING id,status,version,campaign_id`,
-          [row.id, dto.expected_version, campaign.id],
-        ) as [Array<RequestCampaignView>, number];
-        const result = updated?.[0];
-        if (!result) checkVersion(Number(row.version), dto.expected_version);
-        const eventId = await this.persistence.insertEvent(
-          manager, row.id, session.userId, 'CAMPAIGN_ATTACHED', 'STAFF', row.status, row.status, null,
-          { previous_campaign_id: row.campaign_id, campaign_id: campaign.id },
-        );
-        return { status: 200, value: this.view(result!), resource: { type: 'request_event', id: eventId } };
+        checkVersion(Number(row.version), dto.expected_version);
+        const { row: result, eventId } = await updateCampaignAttribution(manager, row, {
+          campaignId: campaign.id, matchState: 'MANUAL', actorId: session.userId,
+          eventType: 'CAMPAIGN_ATTACHED', auditAction: 'CAMPAIGN_ATTACHED', reason: 'MANUAL_ATTRIBUTION',
+        });
+        await this.releaseAttachingClaim(manager, row, session.userId);
+        return { status: 200, value: this.view(result), resource: { type: 'request_event', id: eventId } };
       },
       (manager, resource) => this.replay(manager, resource, requestId, session, 'CAMPAIGN_ATTACHED'),
     );
@@ -94,24 +93,16 @@ export class RequestCampaignAssociationService {
         }
         this.assertPermission(session, row.campaign_id);
         checkVersion(Number(row.version), dto.expected_version);
-        if (row.attribution_locked_at) throw new AppError('ATTRIBUTION_LOCKED', { status: 409 });
-        if (!row.campaign_id) {
+        if (!row.campaign_id && row.campaign_match_state === 'MANUAL' && !row.campaign_candidate_ids?.length) {
           return { status: 200, value: this.view(row), resource: { type: 'assistance_request', id: row.id } };
         }
 
-        const [updated] = await manager.query(
-          `UPDATE assistance_request SET campaign_id=NULL,version=version+1
-            WHERE id=$1 AND version=$2
-            RETURNING id,status,version,campaign_id`,
-          [row.id, dto.expected_version],
-        ) as [Array<RequestCampaignView>, number];
-        const result = updated?.[0];
-        if (!result) checkVersion(Number(row.version), dto.expected_version);
-        const eventId = await this.persistence.insertEvent(
-          manager, row.id, session.userId, 'CAMPAIGN_DETACHED', 'STAFF', row.status, row.status, null,
-          { previous_campaign_id: row.campaign_id, campaign_id: null },
-        );
-        return { status: 200, value: this.view(result!), resource: { type: 'request_event', id: eventId } };
+        checkVersion(Number(row.version), dto.expected_version);
+        const { row: result, eventId } = await updateCampaignAttribution(manager, row, {
+          campaignId: null, matchState: 'MANUAL', actorId: session.userId,
+          eventType: 'CAMPAIGN_DETACHED', auditAction: 'CAMPAIGN_DETACHED', reason: 'MANUAL_ATTRIBUTION',
+        });
+        return { status: 200, value: this.view(result), resource: { type: 'request_event', id: eventId } };
       },
       (manager, resource) => this.replay(manager, resource, requestId, session, 'CAMPAIGN_DETACHED'),
     );
@@ -135,6 +126,7 @@ export class RequestCampaignAssociationService {
   private async loadRequest(manager: EntityManager, requestId: string, lock = false): Promise<RequestCampaignRow> {
     const rows = await manager.query(
       `SELECT id,status,version,campaign_id,attribution_locked_at
+              ,campaign_match_state,campaign_candidate_ids,handled_by
          FROM assistance_request WHERE id=$1${lock ? ' FOR UPDATE' : ''}`,
       [requestId],
     ) as RequestCampaignRow[];
@@ -146,7 +138,15 @@ export class RequestCampaignAssociationService {
     session: Awaited<ReturnType<ReporterSessionService['require']>>,
     campaignId: string | null,
   ): void {
-    if (!hasPermission(session.grants, 'CAMPAIGN_MANAGE', { campaignId })) throw new AppError('FORBIDDEN', { status: 403 });
+    void campaignId;
+    if (!isSystemCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+  }
+
+  private async releaseAttachingClaim(manager: EntityManager, row: RequestCampaignRow, userId: string): Promise<void> {
+    if (row.handled_by !== userId) return;
+    await manager.query('UPDATE assistance_request SET handled_by=NULL,handled_at=NULL WHERE id=$1 AND handled_by=$2', [row.id, userId]);
+    await this.persistence.insertEvent(manager, row.id, userId, 'CLAIM_RELEASED', 'STAFF', row.status, row.status, null,
+      { previous_handled_by: userId, reason: 'CAMPAIGN_ATTACHED' });
   }
 
   private async replay(
@@ -183,6 +183,8 @@ export class RequestCampaignAssociationService {
       status: row.status,
       version: Number(row.version),
       campaign_id: row.campaign_id,
+      campaign_match_state: row.campaign_match_state,
+      campaign_candidate_ids: row.campaign_candidate_ids,
     };
   }
 }

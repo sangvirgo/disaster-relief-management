@@ -13,6 +13,9 @@ export interface CampaignRow extends Record<string, unknown> {
   ends_at: Date | string | null;
   version: number | string;
   created_at: Date | string;
+  center_latitude?: number | string | null;
+  center_longitude?: number | string | null;
+  radius_m?: number | null;
   cursor_created_at?: string;
 }
 
@@ -24,6 +27,10 @@ export function campaignView(row: CampaignRow): Record<string, unknown> {
     status: row.status,
     starts_at: iso(row.starts_at),
     ends_at: iso(row.ends_at),
+    center: row.center_latitude == null || row.center_longitude == null
+      ? null
+      : { lat: Number(row.center_latitude), lng: Number(row.center_longitude) },
+    radius_m: row.radius_m == null ? null : Number(row.radius_m),
     version: Number(row.version),
     created_at: iso(row.created_at),
   };
@@ -75,6 +82,25 @@ export function cleanCampaignName(value: string): string {
 export function validateCampaignDates(startsAt: Date | string | null | undefined, endsAt: Date | string | null | undefined): void {
   if (startsAt && endsAt && new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
     throw new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: { ends_at: ['VALIDATION_FAILED'] } });
+  }
+}
+
+export function validateCampaignSpatial(
+  center: { lat: number; lng: number } | null | undefined,
+  radius: number | null | undefined,
+): void {
+  if ((center == null) !== (radius == null)) {
+    throw new AppError('VALIDATION_FAILED', { status: 400, userMessage: 'Vui lòng nhập đồng thời tâm chiến dịch và bán kính, hoặc để trống cả hai.',
+      fieldErrors: { center: ['CAMPAIGN_SPATIAL_PAIR_REQUIRED'], radius_m: ['CAMPAIGN_SPATIAL_PAIR_REQUIRED'] } });
+  }
+  if (center && (!Number.isFinite(center.lat) || center.lat < -90 || center.lat > 90 ||
+      !Number.isFinite(center.lng) || center.lng < -180 || center.lng > 180)) {
+    throw new AppError('VALIDATION_FAILED', { status: 400, userMessage: 'Tọa độ tâm chiến dịch nằm ngoài phạm vi hợp lệ.',
+      fieldErrors: { center: ['COORDINATES_OUT_OF_RANGE'] } });
+  }
+  if (radius != null && (!Number.isInteger(radius) || radius < 500 || radius > 300_000)) {
+    throw new AppError('VALIDATION_FAILED', { status: 400, userMessage: 'Bán kính chiến dịch phải từ 500 đến 300.000 mét.',
+      fieldErrors: { radius_m: ['CAMPAIGN_RADIUS_OUT_OF_RANGE'] } });
   }
 }
 

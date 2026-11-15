@@ -11,9 +11,8 @@ const identityUrl = requiredEnv('C48_IDENTITY_BASE_URL').replace(/\/+$/u, '');
 const logisticsDb = new Client({ connectionString: requiredEnv('C48_LOGISTICS_DATABASE_URL') });
 const responseDb = new Client({ connectionString: requiredEnv('C48_RESPONSE_DATABASE_URL') });
 const identityDb = new Client({ connectionString: requiredEnv('C48_IDENTITY_DATABASE_URL') });
-const logisticsFixtureId = '40000000-0000-4000-8000-000000000004';
 const suffix = randomBytes(5).toString('hex').toUpperCase();
-const categoryCode = `T15_FLOOD_${suffix}`;
+const categoryCode = 'FLOOD';
 let identityIp = 20 + randomBytes(1)[0] % 200;
 let requestIp = 120;
 
@@ -227,8 +226,6 @@ async function distributionDetail(id, actor) {
 
 await Promise.all([logisticsDb.connect(), responseDb.connect(), identityDb.connect()]);
 try {
-  await responseDb.query('INSERT INTO incident_category (code,display_name) VALUES ($1,$2)', [categoryCode, 'Lũ lụt']);
-
   const staff = await registerAndLogin('staff', ['COORDINATOR', 'OPERATIONS_MANAGER']);
   const approver = await cloneAndLogin('approver', ['COORDINATOR', 'REVIEWER'], staff);
   const dispatcher = await cloneAndLogin('dispatcher', ['DISTRIBUTION_STAFF'], staff);
@@ -251,11 +248,10 @@ try {
   });
   expectSuccess(item, 201);
   const warehouse = await command(logisticsUrl, 'warehouses', staff, {
-    organization_id: logisticsFixtureId, name: `Kho phân phối T15 ${suffix}`,
+    name: `Kho phân phối T15 ${suffix}`,
   });
   expectSuccess(warehouse, 201);
   const lowCapacityVehicle = await command(logisticsUrl, 'vehicles', staff, {
-    organization_id: logisticsFixtureId,
     identifier: `T15-${suffix}`,
     vehicle_type: 'Xe tải kiểm thử',
     capacity: '1.00',
@@ -269,7 +265,6 @@ try {
   });
   expectSuccess(opening, 201);
   const reliefPoint = await command(logisticsUrl, 'relief-points', staff, {
-    organization_id: logisticsFixtureId,
     name: `Điểm cứu trợ T15 ${suffix}`,
     location: { type: 'Point', coordinates: [107.6, 16.0] },
   });
@@ -392,7 +387,7 @@ try {
   assert.equal(Object.hasOwn(uploadedEvidence.value, 'object_key'), false);
 
   const handoffDetail = await call(
-    logisticsUrl, `distributions/${requestAid.id}/handoffs/${recorded.result.value.id}`, { actor: staff },
+    logisticsUrl, `distributions/${requestAid.id}/handoffs/${recorded.result.value.id}`, { actor: fieldRecorder },
   );
   expectSuccess(handoffDetail);
   assert.ok(handoffDetail.value.evidence.some((file) => file.id === uploadedEvidence.value.id && file.state === 'READY'));

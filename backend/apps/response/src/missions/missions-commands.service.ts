@@ -13,6 +13,7 @@ import { cleanText, checkVersion } from '../operations/request-operations.helper
 import { CreateMissionDto, MissionReasonDto, MissionTransitionDto, MissionVersionDto, RecordMissionOnBehalfDto } from './missions.dto';
 import { missionProgressStatus, missionTransitionAllowed, MissionStatus } from './missions.helpers';
 import { canAccessRequest } from '../requests/request-scope';
+import { refreshCampaignEngagement } from '../requests/campaign-engagement';
 
 type MissionRequest = Request & { idempotencyKey?: string };
 type Queryable = Pick<DataSource | EntityManager, 'query'>;
@@ -219,6 +220,7 @@ export class MissionsCommandsService {
          ON CONFLICT DO NOTHING`, [recipient, mission.id, requestId],
       );
     }
+    await refreshCampaignEngagement(manager, requestId, session.userId, session.grants);
     return { status: 201, value: this.commandView(mission), resource: { type: 'mission', id: mission.id } };
   }
 
@@ -315,6 +317,7 @@ export class MissionsCommandsService {
       );
     }
     await this.recomputeRequest(manager, request, session.userId, missionId);
+    await refreshCampaignEngagement(manager, requestId, session.userId, session.grants);
     return { status: 200, value: this.commandView(updated!), resource: { type: 'mission', id: missionId } };
   }
 

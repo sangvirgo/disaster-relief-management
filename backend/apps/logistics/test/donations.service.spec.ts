@@ -32,7 +32,7 @@ describe('Logistics donor declarations', () => {
     const manager = { query: jest.fn(async (sql: string, values: unknown[] = []) => {
       calls.push({ sql, values });
       if (sql.includes('FROM donation_drive') && sql.includes('FOR UPDATE')) {
-        return [{ id: driveId, organization_id: userId, status: 'OPEN', opens_at: null, closes_at: null, version: 1 }];
+        return [{ id: driveId,  status: 'OPEN', opens_at: null, closes_at: null, version: 1 }];
       }
       if (sql.includes('FROM drive_item')) return [{ item_id: itemId, target_quantity: '8', accepted_total: '2', scale: 0 }];
       if (sql.includes('INSERT INTO donation_delivery')) return [{ id: deliveryId, public_code: 'ABCDEFGH' }];
@@ -43,7 +43,7 @@ describe('Logistics donor declarations', () => {
       return [];
     }) };
     const dataSource = { query: jest.fn(async (sql: string) => sql.includes('FROM donation_drive')
-      ? [{ id: driveId, organization_id: userId, status: 'OPEN', version: 1 }]
+      ? [{ id: driveId,  status: 'OPEN', version: 1 }]
       : []) };
     const idempotencyService = idempotency(manager);
     const sessions = { require: jest.fn(async () => ({ userId, grants: [] })) };

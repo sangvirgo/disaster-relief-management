@@ -26,7 +26,7 @@ const attachment = {
   public_code: 'ABCDEFGH',
   donor_user_id: donorId,
   capability_hash: null,
-  organization_id: '22222222-2222-4222-8222-222222222222',
+
   campaign_id: null,
 };
 
@@ -123,7 +123,7 @@ describe('donation attachment access and upload', () => {
       attachment_handoff_id: handoffId,
       handoff_id: handoffId,
       handoff_kind: 'LOSS',
-      organization_id: attachment.organization_id,
+
       donor_user_id: null,
       capability_hash: null,
     };
@@ -141,7 +141,7 @@ describe('donation attachment access and upload', () => {
     expect(storage.signedGetUrl).toHaveBeenCalledWith(attachment.object_key, 'image/png', 60);
   });
 
-  it('denies a campaign-scoped loss reviewer access to an organization-only handoff', async () => {
+  it('denies a campaign-scoped loss reviewer access to a handoff without campaign attribution', async () => {
     const handoffAttachment = {
       ...attachment,
       attachment_delivery_id: null,
@@ -149,7 +149,7 @@ describe('donation attachment access and upload', () => {
       attachment_handoff_id: handoffId,
       handoff_id: handoffId,
       handoff_kind: 'LOSS',
-      organization_id: attachment.organization_id,
+
       donor_user_id: null,
       capability_hash: null,
     };
@@ -172,7 +172,7 @@ describe('donation attachment access and upload', () => {
       id: handoffId,
       distribution_id: distributionId,
       handoff_kind: 'DIRECT_HOUSEHOLD',
-      organization_id: attachment.organization_id,
+
     };
     const manager = {
       query: jest.fn(async (sql: string, values: unknown[] = []) => {
@@ -243,7 +243,7 @@ describe('donation attachment access and upload', () => {
       id: handoffId,
       distribution_id: distributionId,
       handoff_kind: 'DIRECT_HOUSEHOLD',
-      organization_id: attachment.organization_id,
+
     };
     const manager = {
       query: jest.fn(async (sql: string) => {
@@ -275,7 +275,7 @@ describe('donation attachment access and upload', () => {
   it('reserves quota and persists declared bytes from the file, then marks it ready', async () => {
     const delivery = {
       id: deliveryId, public_code: 'ABCDEFGH', donor_user_id: donorId, capability_hash: null,
-      organization_id: attachment.organization_id, campaign_id: null,
+       campaign_id: null,
     };
     const readyAttachment = {
       id: attachmentId, delivery_id: deliveryId, dispute_id: null,
@@ -338,7 +338,7 @@ describe('donation attachment access and upload', () => {
   it('retains the object when the READY update throws after the row is committed', async () => {
     const delivery = {
       id: deliveryId, public_code: 'ABCDEFGH', donor_user_id: donorId, capability_hash: null,
-      organization_id: attachment.organization_id, campaign_id: null,
+       campaign_id: null,
     };
     const manager = {
       query: jest.fn(async (sql: string) => {

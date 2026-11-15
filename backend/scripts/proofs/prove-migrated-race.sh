@@ -9,7 +9,6 @@ P() { psql -X -qAt -v ON_ERROR_STOP=1 -d "$DB" "$@"; }
 request_a="$(P -c 'SELECT gen_random_uuid()')"
 request_b="$(P -c 'SELECT gen_random_uuid()')"
 team_id="$(P -c 'SELECT gen_random_uuid()')"
-organization_id="$(P -c 'SELECT gen_random_uuid()')"
 request_event_a="$(P -c 'SELECT gen_random_uuid()')"
 request_event_b="$(P -c 'SELECT gen_random_uuid()')"
 category_code="C48_RACE_$(printf '%s' "$request_b" | tr -d '-' | cut -c1-12 | tr '[:lower:]' '[:upper:]')"
@@ -26,16 +25,16 @@ trap cleanup EXIT
 
 P >/dev/null <<SQL
 INSERT INTO incident_category VALUES ('$category_code','Kiểm tra cạnh tranh');
-INSERT INTO rescue_team (id,organization_id,name,team_kind) VALUES
-  ('$team_id','$organization_id','Đội kiểm tra $team_id','VOLUNTEER');
-INSERT INTO assistance_request (id,tracking_code,incident_category_code,report_mode,organization_id) VALUES
-  ('$request_a','$track_a','$category_code','SELF','$organization_id'),
-  ('$request_b','$track_b','$category_code','SELF','$organization_id');
+INSERT INTO rescue_team (id,name,team_kind) VALUES
+  ('$team_id','Đội kiểm tra $team_id','VOLUNTEER');
+INSERT INTO assistance_request (id,tracking_code,incident_category_code,report_mode) VALUES
+  ('$request_a','$track_a','$category_code','SELF'),
+  ('$request_b','$track_b','$category_code','SELF');
 INSERT INTO request_event (id,request_id,event_type) VALUES
   ('$request_event_a','$request_a','VERIFIED_SNAPSHOT'),
   ('$request_event_b','$request_b','VERIFIED_SNAPSHOT');
 INSERT INTO team_position (team_id,location,captured_at,source,set_by_user_id) VALUES
-  ('$team_id',ST_SetSRID(ST_MakePoint(106.5,10.5),4326)::geography,now(),'GPS','$organization_id');
+  ('$team_id',ST_SetSRID(ST_MakePoint(106.5,10.5),4326)::geography,now(),'GPS',gen_random_uuid());
 SQL
 
 NEAR="$(P -c "SELECT count(*) FROM team_position WHERE ST_DWithin(location, ST_SetSRID(ST_MakePoint(106.5,10.5),4326)::geography, 1000)")"

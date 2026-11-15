@@ -602,7 +602,7 @@ test('T8 membership eligibility failures use state-transition errors while prese
 
   const docs = fs.readFileSync(path.join(repositoryRoot, sourceDocuments.response), 'utf8');
   assert.ok(docs.includes('inactive Identity account → `STATE_TRANSITION_INVALID` 409'));
-  assert.ok(docs.includes('`USER_INACTIVE`, `MEMBERSHIP_REQUIRED`, or `VOLUNTEER_GRANT_REQUIRED` → `STATE_TRANSITION_INVALID` 409'));
+  assert.ok(docs.includes('`USER_INACTIVE` or `VOLUNTEER_GRANT_REQUIRED` → `STATE_TRANSITION_INVALID` 409'));
 });
 
 test('T10 campaign association contracts document validated requests, responses, headers, and errors', () => {
@@ -640,6 +640,27 @@ test('OpenAPI details preserve shared response references when no examples are r
   applyOpenApiDetails(document, 'identity');
 
   assert.deepEqual(document.paths['/unrelated'].get.responses['409'], response);
+});
+
+test('documented summaries refresh curated operations with source metadata', () => {
+  const document = {
+    components: { schemas: {}, securitySchemes: {} },
+    paths: {
+      '/users/{id}': {
+        get: {
+          operationId: 'getIdentityUser',
+          summary: 'Get a user with memberships and live grants',
+          security: [],
+          responses: { 200: { description: 'Credential-free user detail.' } },
+          'x-c48-contract-source': 'docs/backend/02-identity-api.md',
+        },
+      },
+    },
+  };
+
+  applyOpenApiDetails(document, 'identity');
+
+  assert.equal(document.paths['/users/{id}'].get.summary, 'Get a user profile.');
 });
 
 test('Identity auth transport security distinguishes Web CSRF and native refresh credentials', () => {

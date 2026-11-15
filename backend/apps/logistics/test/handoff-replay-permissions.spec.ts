@@ -11,7 +11,7 @@ const { HandoffCommandsService } = await import('../src/distributions/handoff-co
 const distribution = {
   id: 'distribution-1',
   warehouse_id: 'warehouse-1',
-  organization_id: 'organization-1',
+
   warehouse_status: 'ACTIVE',
   relief_point_id: null,
   relief_point_status: null,

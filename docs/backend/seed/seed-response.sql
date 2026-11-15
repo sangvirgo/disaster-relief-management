@@ -73,13 +73,18 @@ INSERT INTO team_skill (team_id, skill_code) VALUES
 ON CONFLICT DO NOTHING;
 
 INSERT INTO team_position (team_id, location, accuracy_m, captured_at, source, set_by_user_id) VALUES
-  (pg_temp.u('a1'), pg_temp.pt(106.70, 10.78), 12.0, now() - interval '2 minutes',  'GPS',                 pg_temp.u('10c')),
+  (pg_temp.u('a1'), pg_temp.pt(106.70, 10.78), 12.0, now(),                         'GPS',                 pg_temp.u('10c')),
   (pg_temp.u('a2'), pg_temp.pt(106.65, 10.73), 18.0, now() - interval '40 minutes', 'GPS',                 pg_temp.u('10d')),   -- stale
   (pg_temp.u('a3'), pg_temp.pt(106.75, 10.80), NULL, now() - interval '5 minutes',  'COORDINATOR_REPORTED', pg_temp.u('102')),
   (pg_temp.u('a6'), pg_temp.pt(106.7176, 10.79), NULL, now() - interval '5 minutes', 'COORDINATOR_REPORTED', pg_temp.u('102')),
   (pg_temp.u('a7'), pg_temp.pt(106.7268, 10.79), NULL, now() - interval '5 minutes', 'COORDINATOR_REPORTED', pg_temp.u('102')),
   (pg_temp.u('a8'), pg_temp.pt(106.7814, 10.79), NULL, now() - interval '5 minutes', 'COORDINATOR_REPORTED', pg_temp.u('102'))
-ON CONFLICT DO NOTHING;
+ON CONFLICT (team_id) DO UPDATE SET
+  location = EXCLUDED.location,
+  accuracy_m = EXCLUDED.accuracy_m,
+  captured_at = EXCLUDED.captured_at,
+  source = EXCLUDED.source,
+  set_by_user_id = EXCLUDED.set_by_user_id;
 
 -- ---------- requests (snapshot pointer is set after the snapshot events exist) ----------
 -- R1 guest SELF, as little information as possible
@@ -424,10 +429,14 @@ SELECT pg_temp.must('P3 comparison: B is 3 km with 2 recent missions, C is 4 km 
        AND recorded_basis = 'RADIO' AND reported_by IS NOT NULL) = 7);
 SELECT pg_temp.must('9 categories / 5 skills / 4 category-skill links',
   (SELECT count(*) FROM incident_category) = 9 AND (SELECT count(*) FROM skill) = 5 AND (SELECT count(*) FROM incident_category_skill) = 4);
-SELECT pg_temp.must('6 active campaigns; 3 notices for coord1',
+SELECT pg_temp.must('6 active campaigns; conflict notice for coord1',
   (SELECT count(*) FROM campaign WHERE status = 'ACTIVE') = 6
-  AND (SELECT count(*) FROM notice WHERE recipient_user_id = pg_temp.u('102')) = 3
+  AND (SELECT count(*) FROM notice WHERE recipient_user_id = pg_temp.u('102') AND notice_type='CAMPAIGN_MATCH_CONFLICT') = 1
   AND (SELECT count(*) FROM evidence_metadata) = 0);
+SELECT pg_temp.must('active demo engagement and unstaffed urgent campaign',
+  EXISTS (SELECT 1 FROM campaign_engagement WHERE user_id=pg_temp.u('103') AND campaign_id=pg_temp.u('c1') AND ended_at IS NULL)
+  AND NOT EXISTS (SELECT 1 FROM campaign_engagement WHERE campaign_id=pg_temp.u('c3') AND ended_at IS NULL)
+  AND EXISTS (SELECT 1 FROM campaign WHERE id=pg_temp.u('c3') AND status='ACTIVE'));
 
 \o
 COMMIT;

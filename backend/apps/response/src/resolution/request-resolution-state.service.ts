@@ -10,6 +10,7 @@ import type { ReopenRequestDto, RequestVersionDto } from './request-resolution.d
 import { enqueueAiAdvisory } from '../ai/ai-advisory-input';
 import { assertRequestPermission } from '../requests/request-scope';
 import { hasPermission } from '@c48/identity-contracts/permissions';
+import { refreshCampaignEngagement } from '../requests/campaign-engagement';
 
 interface RequestStateRow {
   id: string;
@@ -42,7 +43,11 @@ export class RequestResolutionStateService {
       command: 'response.requests.close',
       key,
       requestHash: canonicalRequestHash({ request_id: requestId, actor_user_id: session.userId, dto }),
-      execute: (manager) => this.closeInTransaction(manager, requestId, dto, session),
+      execute: async (manager) => {
+        const outcome = await this.closeInTransaction(manager, requestId, dto, session);
+        await refreshCampaignEngagement(manager, requestId, session.userId, session.grants);
+        return outcome;
+      },
       replay: (manager, resource) => this.replayRequest(manager, resource, session, 'REQUEST_RESOLVE'),
     });
   }
@@ -56,7 +61,11 @@ export class RequestResolutionStateService {
       command: 'response.requests.reopen',
       key,
       requestHash: canonicalRequestHash({ request_id: requestId, actor_user_id: session.userId, dto }),
-      execute: (manager) => this.reopenInTransaction(manager, requestId, dto, session, preflight),
+      execute: async (manager) => {
+        const outcome = await this.reopenInTransaction(manager, requestId, dto, session, preflight);
+        await refreshCampaignEngagement(manager, requestId, session.userId, session.grants);
+        return outcome;
+      },
       replay: (manager, resource) => this.replayRequest(manager, resource, session, 'REQUEST_REOPEN'),
     });
   }

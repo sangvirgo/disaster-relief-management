@@ -172,7 +172,7 @@ try {
   assert.equal(scopedEvents.status, 200, JSON.stringify(scopedEvents.value));
   const scopedFixture = scopedEvents.value.items.find((event) => event.event_type === 'STAFF_SCOPE_FIXTURE');
   assert.ok(scopedFixture, 'SYSTEM coordinator can read an in-scope event');
-  assert.equal(Object.hasOwn(scopedFixture.payload, 'canonical_request_id'), false, 'out-of-scope request references are removed from event payloads');
+  assert.equal(scopedFixture.payload.canonical_request_id, outOfScopeRequest.id, 'a SYSTEM coordinator covers every request, so request references stay in event payloads (campaign-scoped removal is unit-tested)');
 
   const detail = await call(responseUrl, `requests/${self.id}`, { headers: { Authorization: `Bearer ${coordinator.token}` } });
   assert.equal(detail.status, 200, JSON.stringify(detail.value));

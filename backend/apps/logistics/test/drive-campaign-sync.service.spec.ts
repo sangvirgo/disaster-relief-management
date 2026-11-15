@@ -23,14 +23,14 @@ describe('Logistics drive campaign synchronization', () => {
     const manager = { query: jest.fn(async (sql: string, values: unknown[] = []) => {
       calls.push({ sql, values });
       if (sql.includes('FROM donation_drive')) return [{
-        id: driveId, organization_id: '11111111-1111-4111-8111-111111111111', status: 'OPEN', campaign_status: 'ACTIVE', version: 2,
+        id: driveId,  status: 'OPEN', campaign_status: 'ACTIVE', version: 2,
       }];
       if (sql.includes('UPDATE donation_drive')) return [{ id: driveId, version: 3 }];
       return [];
     }) };
     const dataSource = { transaction: jest.fn(async (work: (manager: never) => Promise<unknown>) => work(manager as never)) };
     const client = { getCampaign: jest.fn(async () => ({
-      id: campaignId, status: 'CLOSED', organization_id: '11111111-1111-4111-8111-111111111111', version: 4,
+      id: campaignId, status: 'CLOSED',  version: 4,
     })) };
     const service = new DriveCampaignSyncService(dataSource as never, client as never);
 

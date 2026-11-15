@@ -21,6 +21,7 @@ describe('AI advisory worker lifecycle', () => {
   beforeEach(() => { jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined); });
   afterEach(() => {
     jest.restoreAllMocks();
+    delete process.env.GEMINI_API_KEYS;
     delete process.env.GEMINI_API_KEY;
     delete process.env.SCHEDULER_ENABLED;
     delete process.env.GEMINI_MAX_RETRIES;
@@ -76,6 +77,31 @@ describe('AI advisory worker lifecycle', () => {
       expect(saved.priority_score).toBe(fixture.value.priority_score);
     }
   });
+  it.each([401, 403, 429, 503])('falls back to the next Gemini key after provider status %s without putting keys in the URL', async (status) => {
+    process.env.GEMINI_API_KEYS = '["first-key","second-key"]';
+    const fetch = jest.spyOn(globalThis, 'fetch');
+    fetch.mockResolvedValueOnce({ ok: false, status } as Response);
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(extraction) }] } }] }),
+    } as Response);
+    const worker = new AiAdvisoryService({} as DataSource);
+
+    await expect(worker['extract'](job, '{"description":"Nước đang dâng."}')).resolves.toEqual(extraction);
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(String(fetch.mock.calls[0]?.[0])).not.toContain('first-key');
+    expect(fetch.mock.calls[0]?.[1]?.headers).toMatchObject({ 'x-goog-api-key': 'first-key' });
+    expect(fetch.mock.calls[1]?.[1]?.headers).toMatchObject({ 'x-goog-api-key': 'second-key' });
+  });
+  it('returns a non-retryable provider failure after every configured key is rate-limited', async () => {
+    process.env.GEMINI_API_KEYS = '["first-key","second-key"]';
+    const fetch = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 429 } as Response);
+    const worker = new AiAdvisoryService({} as DataSource);
+
+    await expect(worker['extract'](job, '{}')).rejects.toThrow('AI_PROVIDER_ERROR:429');
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
   it('claims an actually enqueued hash and sends sanitized narrative by default', async () => {
     process.env.GEMINI_API_KEY = 'unit-test';
     const facts = { version: 2, workCycle: 1, incidentCategoryCode: 'FLOOD', description: 'Tôi tên Nguyễn Văn An, số điện thoại 0912345678; nước lũ dâng nhanh; 4 người mắc kẹt.',
@@ -112,6 +138,7 @@ describe('AI advisory worker lifecycle', () => {
     expect(JSON.stringify(jest.mocked(Logger.prototype.warn).mock.calls)).not.toContain('secret');
   });
   it('retries network failures with a safe status and job identifier', async () => {
+    process.env.GEMINI_API_KEY = 'unit-test';
     const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
     const worker = new AiAdvisoryService({ query } as unknown as DataSource);
     jest.spyOn(worker as unknown as { claimJob(): Promise<typeof job> }, 'claimJob').mockResolvedValue(job);
@@ -126,6 +153,7 @@ describe('AI advisory worker lifecycle', () => {
     expect(JSON.stringify(jest.mocked(Logger.prototype.warn).mock.calls)).not.toContain('secret');
   });
   it('does not spend another provider call on invalid Gemini output', async () => {
+    process.env.GEMINI_API_KEY = 'unit-test';
     const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
     const worker = new AiAdvisoryService({ query } as unknown as DataSource);
     jest.spyOn(worker as unknown as { claimJob(): Promise<typeof job> }, 'claimJob').mockResolvedValue(job);
@@ -141,6 +169,7 @@ describe('AI advisory worker lifecycle', () => {
   });
   it.each([{ attempts: 1, delaySeconds: 30 }])(
     'requeues a transient Gemini failure after attempt $attempts with a $delaySeconds second delay', async ({ attempts, delaySeconds }) => {
+      process.env.GEMINI_API_KEY = 'unit-test';
       const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
       const worker = new AiAdvisoryService({ query } as unknown as DataSource);
       jest.spyOn(worker as unknown as { claimJob(): Promise<typeof job> }, 'claimJob').mockResolvedValue({ ...job, attempts });
@@ -157,6 +186,7 @@ describe('AI advisory worker lifecycle', () => {
     },
   );
   it('fails after the configured retry is exhausted', async () => {
+    process.env.GEMINI_API_KEY = 'unit-test';
     const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
     const worker = new AiAdvisoryService({ query } as unknown as DataSource);
     jest.spyOn(worker as unknown as { claimJob(): Promise<typeof job> }, 'claimJob').mockResolvedValue({ ...job, attempts: 2 });
@@ -168,6 +198,7 @@ describe('AI advisory worker lifecycle', () => {
     expect(query.mock.calls.some(([sql]) => String(sql).includes("status='QUEUED'"))).toBe(false);
   });
   it('uses GEMINI_MAX_RETRIES to limit attempts after the initial provider call', async () => {
+    process.env.GEMINI_API_KEY = 'unit-test';
     process.env.GEMINI_MAX_RETRIES = '1';
     const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
     const worker = new AiAdvisoryService({ query } as unknown as DataSource);
@@ -179,6 +210,7 @@ describe('AI advisory worker lifecycle', () => {
     expect(query).toHaveBeenCalledWith(expect.stringContaining("status='FAILED'"), [job.id, 'AI_PROVIDER_ERROR', job.claim_token]);
   });
   it('does not retry permanent Gemini client errors', async () => {
+    process.env.GEMINI_API_KEY = 'unit-test';
     const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
     const worker = new AiAdvisoryService({ query } as unknown as DataSource);
     jest.spyOn(worker as unknown as { claimJob(): Promise<typeof job> }, 'claimJob').mockResolvedValue(job);
@@ -190,6 +222,7 @@ describe('AI advisory worker lifecycle', () => {
     expect(query.mock.calls.some(([sql]) => String(sql).includes("status='QUEUED'"))).toBe(false);
   });
   it('does not automatically repeat a quota-limited provider call', async () => {
+    process.env.GEMINI_API_KEY = 'unit-test';
     const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
     const worker = new AiAdvisoryService({ query } as unknown as DataSource);
     jest.spyOn(worker as unknown as { claimJob(): Promise<typeof job> }, 'claimJob').mockResolvedValue(job);

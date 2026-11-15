@@ -30,9 +30,9 @@ export class DashboardService {
     @Inject(MISSIONS_CONFIG) private readonly missions: MissionsConfig,
   ) {}
 
-  private scoped(grants: readonly Grant[], alias: string, extra: unknown[] = []): { where: string; values: unknown[] } {
+  private scoped(grants: readonly Grant[], alias: string, userId?: string, extra: unknown[] = []): { where: string; values: unknown[] } {
     const values: unknown[] = [];
-    const where = scopeSql(grants, 'REPORT_READ', values, alias);
+    const where = scopeSql(grants, 'RESPONSE_REPORT_READ', values, alias, userId);
     values.push(...extra);
     return { where, values };
   }
@@ -47,13 +47,13 @@ export class DashboardService {
     const positionFresh = envMinutes('TEAM_POSITION_FRESH_MINUTES', 30);
     const offerOverdue = this.missions.offerOverdueMinutes;
 
-    const rq = this.scoped(session.grants, 'r');
-    const mq = this.scoped(session.grants, 'r');
+    const rq = this.scoped(session.grants, 'r', session.userId);
+    const mq = this.scoped(session.grants, 'r', session.userId);
     const tq = {
-      where: hasPermission(session.grants, 'REPORT_READ', { campaignId: null }) ? 'TRUE' : 'FALSE',
+      where: hasPermission(session.grants, 'RESPONSE_REPORT_READ', { campaignId: null }) ? 'TRUE' : 'FALSE',
       values: [] as unknown[],
     };
-    const cq = this.scoped(session.grants, 'r');
+    const cq = this.scoped(session.grants, 'r', session.userId);
     const verifyParam = `$${rq.values.length + 1}`;
     const offerParam = `$${mq.values.length + 1}`;
     const freshParam = `$${tq.values.length + 1}`;

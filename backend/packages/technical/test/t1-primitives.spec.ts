@@ -155,8 +155,8 @@ describe('T1 technical package', () => {
     expect(hasPermission([admin], 'USER_MANAGE', { systemAction: 'USER_MANAGE' })).toBe(true);
     const invalidCitizenGrant = { role_code: 'CITIZEN' as const, scope_type: 'CAMPAIGN' as const, campaign_id: 'campaign-1' };
     expect(hasPermission([invalidCitizenGrant], 'REQUEST_CREATE_PROXY', { campaignId: 'campaign-1' })).toBe(false);
-    const legacyOrganizationGrant = { role_code: 'COORDINATOR', scope_type: 'ORGANIZATION', organization_id: 'org-1' } as never;
-    expect(hasPermission([legacyOrganizationGrant], 'REQUEST_VERIFY', { campaignId: 'campaign-1' })).toBe(false);
+    const malformedGrant = { role_code: 'COORDINATOR', scope_type: 'REGION' } as never;
+    expect(hasPermission([malformedGrant], 'REQUEST_VERIFY', { campaignId: 'campaign-1' })).toBe(false);
   });
 
   it('encodes keyset cursors with filter binding and rejects changed filters', () => {

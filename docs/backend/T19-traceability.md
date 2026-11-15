@@ -1,5 +1,7 @@
 # T19 traceability and acceptance evidence
 
+> **Historical evidence snapshot:** this matrix is dated 2026-10-16. Campaign coordination, spatial SOS attribution, and the current contract inventory were added later; see the [current handoff](HANDOFF.md), current API specifications, and OpenAPI snapshots before relying on counts or access behavior below.
+
 Status: evidence refreshed on 2026-10-16 after the T18 primary-stack and source-audit follow-up. This file connects the backend API snapshots to the plan's requirements and records the checks that ran. It is not a replacement for the complete SRS, SDD, or user guide.
 
 > The evidence below is a dated snapshot through 2026-10-16 unless a later date is stated. AIStor/license references describe the pre-2026-10-27 state; MinIO Community is the current selection and needs no license. Current API-smoke and restore status is recorded in [HANDOFF](HANDOFF.md#2026-10-27--object-storage-switched-to-minio-community).

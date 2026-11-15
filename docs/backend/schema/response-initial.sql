@@ -1,5 +1,6 @@
 -- C48 Response service — physical schema (PostgreSQL 16+ with PostGIS 3).
 -- Same conventions as identity.sql. No cross-service FKs: *_user_id, organization_id, campaign refs from other services are opaque uuids.
+-- Historical InitialResponse DDL excerpt; later migrations define the current runtime schema.
 CREATE EXTENSION IF NOT EXISTS postgis;
 
 CREATE FUNCTION is_clean_text(t text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$ SELECT btrim(t) <> '' AND t = normalize(t, NFC) $$;

@@ -1,5 +1,7 @@
 # Frontend handoff: dashboards, weather alerts, drive suggestions, validation errors
 
+> **Historical handoff:** this document describes the 2026-11-14 dashboard slice and is superseded for access scopes and campaign coordination by the [current handoff](HANDOFF.md) and [permissions](05-permissions.md).
+
 Date: 2026-11-14. Source: backend work in this session. Everything below is implemented, built into the running Compose stack, and checked with real calls against the seeded demo data. **No frontend code is part of this change.** Contracts are exported in `contracts/openapi/*.json` (217 operations: 39 Identity, 88 Response, 90 Logistics).
 
 ## 0. Conventions that apply to every endpoint

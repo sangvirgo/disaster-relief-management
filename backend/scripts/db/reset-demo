@@ -15,5 +15,8 @@ read -r -p 'This replaces the primary C48 database contents and reseeds demo dat
 
 bash "$ROOT/backend/scripts/db/reset-primary-databases" --reset
 bash "$ROOT/backend/scripts/db/migrate"
+if [[ "${C48_CHECK_MIGRATION_DOWN:-0}" == 1 ]]; then
+  bash "$ROOT/backend/scripts/db/check-migration-down" --after-reset
+fi
 bash "$ROOT/backend/scripts/db/seed"
 bash "$ROOT/backend/scripts/dev/up"

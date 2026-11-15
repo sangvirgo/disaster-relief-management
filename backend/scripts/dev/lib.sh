@@ -30,10 +30,16 @@ require_env_file() {
   fi
 }
 load_backend_env() {
-  set -a
-  # The local .env values are project-generated and use shell-safe base64/url-safe secrets.
-  source "$ROOT/backend/.env"
-  set +a
+  local key value
+  while IFS= read -r -d '' key && IFS= read -r -d '' value; do
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    export "$key=$value"
+  done < <(node -e '
+    const fs = require("node:fs");
+    const dotenv = require(process.argv[1]);
+    const parsed = dotenv.parse(fs.readFileSync(process.argv[2], "utf8"));
+    for (const [key, value] of Object.entries(parsed)) process.stdout.write(key + "\0" + value + "\0");
+  ' "$ROOT/backend/node_modules/dotenv" "$ROOT/backend/.env")
 }
 require_nonproduction_env() {
   if [[ "${NODE_ENV:-}" == "production" ]] || awk -F= '

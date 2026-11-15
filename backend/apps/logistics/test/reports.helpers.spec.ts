@@ -28,7 +28,7 @@ describe('Logistics report helpers', () => {
   });
 
   it('validates a warehouse/item cursor for inventory keys without balance rows', () => {
-    const filters = { route: 'report', organization_id: 'org-1' };
+    const filters = { route: 'report', };
     const cursor = encodeKeysetCursor(
       ['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002'],
       '00000000-0000-4000-8000-000000000002',
