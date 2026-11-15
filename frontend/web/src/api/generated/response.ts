@@ -19,7 +19,7 @@ export interface paths {
         put?: never;
         /**
          * Create a SELF assistance request
-         * @description A guest must provide X-Tracking-Secret. Cookie-authenticated writes require an allowed Origin and X-CSRF-Token. Soft rate limits retain the report for review; the hard per-IP Nginx ceiling rejects it before persistence.
+         * @description A guest provides X-Tracking-Secret only for safe create retries; it is not used for tracking after acknowledgement. Cookie-authenticated writes require an allowed Origin and X-CSRF-Token. Soft rate limits retain the report for review; the hard per-IP Nginx ceiling rejects it before persistence.
          */
         post: operations["createSelfRequest"];
         delete?: never;
@@ -424,7 +424,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revoke the guest tracking capability */
+        /**
+         * Clear the legacy guest create-retry secret
+         * @description Clears the stored create-retry hash. The tracking code remains the sole reporter credential and is not revoked by this operation.
+         */
         post: operations["revokeRequestTrackingSecret"];
         delete?: never;
         options?: never;
@@ -1384,7 +1387,7 @@ export interface paths {
         get?: never;
         /**
          * Update editable facts on an SOS report before verification.
-         * @description Uses expected_version for concurrency control. Omitted facts retain their current values. The request must be owned by the signed-in reporter or accompanied by valid tracking credentials.
+         * @description Uses expected_version for concurrency control. Omitted facts retain their current values. Reporters may authorize with the tracking code alone; cookie-authenticated writes require CSRF protection.
          */
         put: operations["responseTrackingUpdateReport"];
         post?: never;
@@ -2514,12 +2517,12 @@ export interface components {
     };
     parameters: {
         IdempotencyKey: string;
-        /** @description Required for a guest. It is purpose-bound hashed at rest and never returned. */
+        /** @description Guest create-retry value; purpose-bound hashed at rest and never returned. Not used for tracking after acknowledgement. */
         TrackingSecret: string;
-        /** @description Required proof for claiming a guest request; never sent as Authorization. */
-        RequiredTrackingSecret: string;
         /** @description Never place the tracking code in a URL. */
         TrackingCodeHeader: string;
+        /** @description Reporter credential for request-visible events and evidence; staff sessions may omit it. Never place the code in a URL. */
+        OptionalTrackingCodeHeader: string;
         /** @description Purpose-bound, one-time recovery proof; never logged or returned after issuance. */
         RecoveryCode: string;
         ContentLength: number;
@@ -2618,7 +2621,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                /** @description Required for a guest. It is purpose-bound hashed at rest and never returned. */
+                /** @description Guest create-retry value; purpose-bound hashed at rest and never returned. Not used for tracking after acknowledgement. */
                 "X-Tracking-Secret"?: components["parameters"]["TrackingSecret"];
                 /** @description Required for cookie-authenticated writes. */
                 "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
@@ -3701,8 +3704,6 @@ export interface operations {
             header: {
                 /** @description Never place the tracking code in a URL. */
                 "X-Tracking-Code": components["parameters"]["TrackingCodeHeader"];
-                /** @description Required for a guest. It is purpose-bound hashed at rest and never returned. */
-                "X-Tracking-Secret"?: components["parameters"]["TrackingSecret"];
             };
             path?: never;
             cookie?: never;
@@ -3768,11 +3769,9 @@ export interface operations {
                 cursor?: components["parameters"]["Cursor"];
                 limit?: components["parameters"]["PageLimit"];
             };
-            header: {
-                /** @description Never place the tracking code in a URL. */
-                "X-Tracking-Code": components["parameters"]["TrackingCodeHeader"];
-                /** @description Required for a guest. It is purpose-bound hashed at rest and never returned. */
-                "X-Tracking-Secret"?: components["parameters"]["TrackingSecret"];
+            header?: {
+                /** @description Reporter credential for request-visible events and evidence; staff sessions may omit it. Never place the code in a URL. */
+                "X-Tracking-Code"?: components["parameters"]["OptionalTrackingCodeHeader"];
             };
             path: {
                 id: components["parameters"]["RequestId"];
@@ -3840,6 +3839,8 @@ export interface operations {
             query?: {
                 cursor?: components["parameters"]["Cursor"];
                 limit?: components["parameters"]["PageLimit"];
+                /** @description Optional substring of the caller's tracking code. The page cursor is bound to this query. */
+                q?: string;
             };
             header?: never;
             path?: never;
@@ -3898,8 +3899,6 @@ export interface operations {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Never place the tracking code in a URL. */
                 "X-Tracking-Code": components["parameters"]["TrackingCodeHeader"];
-                /** @description Required for a guest. It is purpose-bound hashed at rest and never returned. */
-                "X-Tracking-Secret"?: components["parameters"]["TrackingSecret"];
                 /** @description Required for cookie-authenticated writes. */
                 "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
             };
@@ -3966,8 +3965,6 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-                /** @description Required proof for claiming a guest request; never sent as Authorization. */
-                "X-Tracking-Secret": components["parameters"]["RequiredTrackingSecret"];
                 /** @description Required for cookie-authenticated writes. */
                 "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
             };
@@ -4288,8 +4285,6 @@ export interface operations {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Never place the tracking code in a URL. */
                 "X-Tracking-Code": components["parameters"]["TrackingCodeHeader"];
-                /** @description Required for a guest. It is purpose-bound hashed at rest and never returned. */
-                "X-Tracking-Secret"?: components["parameters"]["TrackingSecret"];
                 "Content-Length": components["parameters"]["ContentLength"];
                 /** @description Required for cookie-authenticated writes. */
                 "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
@@ -4398,11 +4393,9 @@ export interface operations {
     getRequestEvidenceDownloadUrl: {
         parameters: {
             query?: never;
-            header: {
-                /** @description Never place the tracking code in a URL. */
-                "X-Tracking-Code": components["parameters"]["TrackingCodeHeader"];
-                /** @description Required for a guest. It is purpose-bound hashed at rest and never returned. */
-                "X-Tracking-Secret"?: components["parameters"]["TrackingSecret"];
+            header?: {
+                /** @description Reporter credential for request-visible events and evidence; staff sessions may omit it. Never place the code in a URL. */
+                "X-Tracking-Code"?: components["parameters"]["OptionalTrackingCodeHeader"];
             };
             path: {
                 id: components["parameters"]["EvidenceId"];
@@ -7528,6 +7521,10 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Never place the tracking code in a URL. */
+                "X-Tracking-Code": components["parameters"]["TrackingCodeHeader"];
+                /** @description Required for cookie-authenticated writes. */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
             };
             path: {
                 id: components["parameters"]["RequestId"];

@@ -933,7 +933,7 @@ export interface paths {
         };
         /**
          * DonationsController.track
-         * @description Route exported from backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.track. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         * @description Read-only tracking by opaque declaration identifier; no secret is required. Mutating commands still require the owner session or guest capability. Detailed contract: docs/backend/04-logistics-api.md.
          */
         get: operations["logisticsDonationsTrack"];
         put?: never;
@@ -6232,7 +6232,10 @@ export interface operations {
     logisticsDonationsTrack: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional guest capability for write actions; it does not gate read-only tracking. */
+                "X-Donation-Secret"?: string;
+            };
             path: {
                 id: string;
             };
@@ -6292,16 +6295,9 @@ export interface operations {
                         progress?: {
                             status?: string;
                         };
+                        /** @description Whether the caller has the owner session or guest capability required for write actions. */
+                        can_manage?: boolean;
                     };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
             /** @description Documented error response; clients branch on the stable code. */
@@ -9092,7 +9088,13 @@ export interface operations {
     };
     logisticsDonationsListMine: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Substring of declaration ID, public code, or drive title. The page cursor is bound to this query. */
+                q?: string;
+                status?: "DECLARED" | "COUNTING" | "PENDING_REVIEW" | "APPROVED" | "POSTED" | "REJECTED" | "CANCELLED";
+                limit?: number;
+                cursor?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

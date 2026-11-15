@@ -13,7 +13,7 @@ import { ReporterAccessService, ReporterRequestRow, trackingCodeMatches } from '
 import { TrackingReadRateLimiter } from './tracking-read-rate-limiter';
 import { previouslyReportedFacts, unverifiedRequestAssignments, unverifiedSubjectAssignments } from './supplement.update';
 import { invalidField, supplementAllowed, validateSupplement } from './supplement.validation';
-import { RecoveryIssueDto, RequestEventsQueryDto, SupplementRequestDto } from './tracking.dto';
+import { MineQueryDto, RecoveryIssueDto, RequestEventsQueryDto, SupplementRequestDto } from './tracking.dto';
 import { RequestOperationsService } from '../operations/request-operations.service';
 import { terminalStatuses, unverifiedStatuses } from '../operations/request-operations.helpers';
 import { assessmentFields, enqueueAiAdvisory } from '../ai/ai-advisory-input';
@@ -67,56 +67,53 @@ export class TrackingService {
 
   async track(
     trackingCode: string | undefined,
-    trackingSecret: string | undefined,
     request: import('express').Request,
   ): Promise<Record<string, unknown>> {
     this.readRateLimiter.assertAllowed(trackingClientIp(request));
-    const session = await this.sessions.optional(request, this.access.validTrackingSecret(trackingSecret));
-    const row = await this.access.byTrackingCapability(trackingCode, trackingSecret, session);
+    const row = await this.access.byTrackingCode(trackingCode);
     return this.trackingView(row);
   }
 
   async events(
     requestId: string,
     trackingCode: string | undefined,
-    trackingSecret: string | undefined,
     query: RequestEventsQueryDto,
     request: import('express').Request,
   ): Promise<{ items: ReporterEventView[]; more: boolean; cursor?: string }> {
     this.readRateLimiter.assertAllowed(trackingClientIp(request));
-    if (this.access.validTrackingSecret(trackingSecret)) {
-      const row = await this.access.forRequest(requestId, trackingCode, trackingSecret, null);
-      return this.readEvents(this.dataSource, row.id, query.cursor, query.limit ?? 50);
-    }
-    const session = await this.sessions.optional(request);
-    if (session) {
+    if (trackingCode) {
       try {
-        const row = await this.access.forRequest(requestId, trackingCode, trackingSecret, session);
+        const row = await this.access.forRequest(requestId, trackingCode);
         return this.readEvents(this.dataSource, row.id, query.cursor, query.limit ?? 50);
       } catch (error) {
         if (!(error instanceof AppError) || error.code !== 'NOT_FOUND') throw error;
       }
+    }
+    const session = await this.sessions.optional(request);
+    if (session) {
       if (!session.grants.some((grant) => (ROLE_PERMISSIONS[grant.role_code] as readonly string[]).includes('REQUEST_DETAIL_READ'))) {
         throw new AppError('NOT_FOUND', { status: 404 });
       }
       return this.operations.events(requestId, query, request, session) as Promise<{ items: ReporterEventView[]; more: boolean; cursor?: string }>;
     }
-    const row = await this.access.forRequest(requestId, trackingCode, trackingSecret, null);
-    return this.readEvents(this.dataSource, row.id, query.cursor, query.limit ?? 50);
+    throw new AppError('NOT_FOUND', { status: 404 });
   }
 
-  async mine(query: RequestEventsQueryDto, request: import('express').Request): Promise<{ items: Array<Record<string, unknown>>; more: boolean; cursor?: string }> {
+  async mine(query: MineQueryDto, request: import('express').Request): Promise<{ items: Array<Record<string, unknown>>; more: boolean; cursor?: string }> {
     const session = await this.sessions.require(request);
-    const filters = { reporter_user_id: session.userId };
+    const search = query.q?.trim().toUpperCase() ?? '';
+    const filters = { reporter_user_id: session.userId, q: search };
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
+    const codePattern = search ? `%${search.replace(/[!%_]/gu, '!$&')}%` : null;
     const rows = await this.dataSource.query(
       `SELECT id, tracking_code, status, received_at,
               to_char(received_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_received_at
          FROM assistance_request
         WHERE reporter_user_id = $1
-          AND ($2::timestamptz IS NULL OR (received_at, id) < ($2::timestamptz, $3::uuid))
-        ORDER BY received_at DESC, id DESC LIMIT $4`,
-      [session.userId, cursor?.sort[0] ?? null, cursor?.id ?? null, (query.limit ?? 50) + 1],
+          AND ($2::text IS NULL OR tracking_code ILIKE $2 ESCAPE '!')
+          AND ($3::timestamptz IS NULL OR (received_at, id) < ($3::timestamptz, $4::uuid))
+        ORDER BY received_at DESC, id DESC LIMIT $5`,
+      [session.userId, codePattern, cursor?.sort[0] ?? null, cursor?.id ?? null, (query.limit ?? 50) + 1],
     ) as Array<{ id: string; tracking_code: string; status: string; received_at: Date | string; cursor_received_at: string }>;
     const more = rows.length > (query.limit ?? 50);
     const page = rows.slice(0, query.limit ?? 50);
@@ -130,22 +127,24 @@ export class TrackingService {
     dto: SupplementRequestDto,
     key: string,
     trackingCode: string | undefined,
-    trackingSecret: string | undefined,
     request: import('express').Request,
     mode: 'SUPPLEMENT' | 'PUT' = 'SUPPLEMENT',
   ): Promise<IdempotentResult<Record<string, unknown>>> {
     validateSupplement(dto);
-    const hasTrackingCapability = this.access.validTrackingSecret(trackingSecret);
-    const session = await this.sessions.optional(request, hasTrackingCapability);
-    const secretHash = hasTrackingCapability ? this.access.trackingSecretHash(trackingSecret!) : undefined;
-    const scope = session ? `user:${session.userId}` : `guest:${requestId}`;
+    await this.access.forRequest(requestId, trackingCode);
+    let session: ReporterSession | null = null;
+    try {
+      session = await this.sessions.optional(request);
+    } catch (error) {
+      if (!(error instanceof AppError) || ![401, 503].includes(error.status ?? 0)) throw error;
+    }
     return this.idempotency.execute(this.dataSource, {
-      scopeKey: `response.requests.supplement:${scope}`,
+      scopeKey: `response.requests.supplement:${requestId}`,
       command: mode === 'PUT' ? 'response.requests.report.update' : 'response.requests.supplement',
       key,
-      requestHash: requestHashWithSecret({ request_id: requestId, session_user_id: session?.userId ?? null, dto }, secretHash),
+      requestHash: canonicalRequestHash({ request_id: requestId, dto }),
       execute: async (manager) => {
-        const row = await this.access.forRequest(requestId, trackingCode, trackingSecret, session, manager, true);
+        const row = await this.access.forRequest(requestId, trackingCode, manager, true);
         if (!supplementAllowed(row.status, row.review_lane)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         if (Number(row.version) !== dto.expected_version) versionConflict(Number(row.version), dto.expected_version);
         const subjectRows = await manager.query(
@@ -211,27 +210,22 @@ export class TrackingService {
   async claim(
     dto: { tracking_code: string },
     key: string,
-    trackingSecret: string | undefined,
     request: import('express').Request,
   ): Promise<IdempotentResult<{ id: string; tracking_code: string }>> {
     const session = await this.sessions.require(request);
-    if (!this.access.validTrackingSecret(trackingSecret)) throw new AppError('NOT_FOUND', { status: 404 });
-    const secretHash = this.access.trackingSecretHash(trackingSecret!);
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `user:${session.userId}`,
       command: 'response.requests.claim',
       key,
-      requestHash: requestHashWithSecret({ tracking_code: dto.tracking_code, user_id: session.userId }, secretHash),
+      requestHash: canonicalRequestHash({ tracking_code: dto.tracking_code, user_id: session.userId }),
       execute: async (manager) => {
         const rows = await manager.query(
-          `SELECT id, tracking_code, tracking_secret_hash, reporter_user_id, version
-             FROM assistance_request WHERE tracking_secret_hash=$1 FOR UPDATE`, [secretHash],
-        ) as Array<{ id: string; tracking_code: string; tracking_secret_hash: string | null; reporter_user_id: string | null; version: number }>;
+          `SELECT id, tracking_code, reporter_user_id, version
+             FROM assistance_request WHERE tracking_code=$1 FOR UPDATE`, [dto.tracking_code],
+        ) as Array<{ id: string; tracking_code: string; reporter_user_id: string | null; version: number }>;
         const row = rows[0];
         const codeMatches = trackingCodeMatches(row?.tracking_code ?? '0000000000', dto.tracking_code);
-        if (!row || !codeMatches || !row.tracking_secret_hash) throw new AppError('NOT_FOUND', { status: 404 });
-        const secretMatches = this.access.validTrackingSecret(trackingSecret) && row.tracking_secret_hash === secretHash;
-        if (!secretMatches) throw new AppError('NOT_FOUND', { status: 404 });
+        if (!row || !codeMatches) throw new AppError('NOT_FOUND', { status: 404 });
         if (row.reporter_user_id) throw new AppError('ALREADY_CLAIMED', { status: 409 });
         const [changedRows] = await manager.query(
           `UPDATE assistance_request SET reporter_user_id=$2, tracking_secret_hash=NULL, version=version+1

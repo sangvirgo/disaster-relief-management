@@ -75,13 +75,11 @@ const isPublicDonationCode = (value: string) => /^[0-9A-HJKMNP-TV-Z]{8,16}$/i.te
 const isValidDonationQuery = (value: string) => isDonationUuid(value) || isPublicDonationCode(value);
 const donationQueryError = (value: string) => {
   const query = value.trim();
-  if (value.length > 36) return 'Mã tra cứu không được vượt quá 36 ký tự.';
+  if (value.length > 36) return 'Mã định danh bản khai không được vượt quá 36 ký tự.';
   if (!query) return undefined;
   if (isDonationUuid(query)) return undefined;
-  if (value.length > 16) return 'Mã biên nhận không được vượt quá 16 ký tự, hoặc hãy nhập mã UUID đầy đủ.';
   if (isPublicDonationCode(query)) return undefined;
-  if (query.length < 8) return 'Mã biên nhận phải có ít nhất 8 ký tự, hoặc hãy nhập mã UUID đầy đủ.';
-  return 'Mã biên nhận chứa ký tự không hợp lệ, hoặc hãy nhập mã UUID đầy đủ.';
+  return 'Mã định danh bản khai không đúng định dạng.';
 };
 const quantityFieldError = (value: string) => quantityError(value) ||
   (value.trim() && !isPositiveQuantity(value) ? 'Số lượng phải lớn hơn 0.' : undefined);
@@ -188,21 +186,17 @@ export const DonationScreen: React.FC = () => {
   const [pendingDonationCommand, setPendingDonationCommand] = useState<PendingDonationCommand | null>(null);
   const [submissionReceipt, setSubmissionReceipt] = useState<{
     id: string;
-    publicCode: string;
-    secret: string;
     description: string;
   } | null>(null);
 
   // Tra cứu & Thao tác biên nhận quyên góp
   const [searchCode, setSearchCode] = useState<string>('');
-  const [donationTrackingSecret, setDonationTrackingSecret] = useState<string>('');
   const [donationRecoveryCode, setDonationRecoveryCode] = useState<string>('');
   const [recoveryIdempotencyKey, setRecoveryIdempotencyKey] = useState<string>(generateUUID);
   const [trackingLoading, setTrackingLoading] = useState<boolean>(false);
   const [trackingResult, setTrackingResult] = useState<DonationTrackingDetail | null>(null);
   const [trackingError, setTrackingError] = useState<string | null>(null);
   const [trackingCodeError, setTrackingCodeError] = useState<string | undefined>();
-  const [trackingSecretError, setTrackingSecretError] = useState<string | undefined>();
   const [donationRecoveryError, setDonationRecoveryError] = useState<string | undefined>();
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
   const [trackingCapabilityAvailable, setTrackingCapabilityAvailable] = useState<boolean>(false);
@@ -588,8 +582,6 @@ export const DonationScreen: React.FC = () => {
       setDonationPhoto(null);
       setSubmissionReceipt({
         id: res.id,
-        publicCode: res.public_code,
-        secret: command.donationSecret,
         description: evidenceFailed
           ? 'Tờ khai đã được ghi nhận, nhưng minh chứng chưa tải lên. Bạn có thể bổ sung ảnh hoặc video trong phần tra cứu biên nhận.'
           : 'Thủ kho sẽ kiểm đếm độc lập khi nhận hàng.',
@@ -686,25 +678,14 @@ export const DonationScreen: React.FC = () => {
   const handleTrackDonation = async (targetIdOrCode?: string, targetSecret?: string) => {
     const query = (targetIdOrCode || searchCode).trim();
     if (!query) {
-      setTrackingError('Vui lòng nhập mã biên nhận hoặc mã nhận diện quyên góp.');
+      setTrackingError('Vui lòng nhập mã định danh bản khai.');
       return;
     }
     if (!isValidDonationQuery(query)) {
-      setTrackingCodeError(donationQueryError(query) || 'Mã biên nhận chưa hợp lệ.');
+      setTrackingCodeError(donationQueryError(query) || 'Mã định danh bản khai chưa hợp lệ.');
       return;
     }
     setTrackingCodeError(undefined);
-
-    const providedSecret = targetSecret || (
-      query.toUpperCase() === searchCode.trim().toUpperCase()
-        ? donationTrackingSecret.trim()
-        : ''
-    );
-    if (providedSecret && !isValidTrackingSecret(providedSecret)) {
-      setTrackingSecretError('Khóa bí mật phải gồm đúng 43 ký tự hợp lệ.');
-      return;
-    }
-    setTrackingSecretError(undefined);
 
     setTrackingLoading(true);
     setTrackingError(null);
@@ -712,7 +693,7 @@ export const DonationScreen: React.FC = () => {
     setTrackingCapabilityAvailable(false);
     try {
       let resolvedId = query;
-      let secret = providedSecret || undefined;
+      let secret = targetSecret || undefined;
 
       // Tìm trong danh sách đã lưu nếu là public_code
       const saved = recentReceipts.find(
@@ -720,7 +701,7 @@ export const DonationScreen: React.FC = () => {
       );
       if (saved) {
         resolvedId = saved.id;
-        setSearchCode(saved.public_code);
+        setSearchCode(saved.id);
         if (!secret) secret = await getReceiptSecret(saved.id, saved.public_code);
       } else if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(query)) {
         throw new Error('DONATION_RECOVERY_REQUIRED');
@@ -729,15 +710,12 @@ export const DonationScreen: React.FC = () => {
       if (!secret) {
         secret = await getReceiptSecret(resolvedId, query);
       }
-      if (secret && !isValidTrackingSecret(secret)) {
-        setTrackingError('Khóa bí mật phải gồm đúng 43 ký tự hợp lệ.');
-        return;
-      }
+      if (secret && !isValidTrackingSecret(secret)) secret = undefined;
 
       const res = await LogisticsApi.trackDonation(resolvedId, secret);
       setTrackingResult(res);
       setTrackingCapabilityAvailable(Boolean(secret));
-      setSearchCode(res.public_code || query);
+      setSearchCode(res.id);
       if (secret) {
         try {
           await StorageService.saveDonationReceipt({ id: res.id, public_code: res.public_code, secret });
@@ -872,7 +850,7 @@ export const DonationScreen: React.FC = () => {
       setTrackingResult(detail);
       setTrackingCapabilityAvailable(false);
       setClaimedDonationIds((current) => current.includes(detail.id) ? current : [...current, detail.id]);
-      setSearchCode(detail.public_code);
+      setSearchCode(detail.id);
       setDonationRecoveryCode('');
       setRecoveryIdempotencyKey(generateUUID());
       await loadRecentReceipts();
@@ -936,7 +914,7 @@ export const DonationScreen: React.FC = () => {
   const copyDonationCode = async (code: string) => {
     try {
       await Clipboard.setStringAsync(code);
-      Alert.alert('Đã sao chép', 'Mã biên nhận đã được sao chép vào bộ nhớ tạm.');
+      Alert.alert('Đã sao chép', 'Mã định danh bản khai đã được sao chép vào bộ nhớ tạm.');
     } catch {
       Alert.alert('Không thể sao chép', 'Vui lòng thử lại.');
     }
@@ -984,22 +962,21 @@ export const DonationScreen: React.FC = () => {
   const canRecoverDonation = Boolean(
     isAuthenticated &&
     trackingError &&
-    searchCode.trim() &&
-    !isDonationUuid(searchCode)
+    isPublicDonationCode(searchCode)
   );
   const savedTrackingReceipt = trackingResult
     ? recentReceipts.find((receipt) => receipt.id === trackingResult.id || receipt.public_code === trackingResult.public_code)
     : undefined;
   const trackingEvidence = savedTrackingReceipt?.evidence ?? [];
-  const canUploadTrackingEvidence = Boolean(isAuthenticated || trackingCapabilityAvailable);
+  const canManageTrackingResult = Boolean(trackingResult?.can_manage || trackingCapabilityAvailable);
+  const canUploadTrackingEvidence = canManageTrackingResult;
   const hasPositiveQuantity = Object.values(quantities).some(isPositiveQuantity);
   const hasInvalidQuantity = Object.values(quantities).some((value) => Boolean(quantityFieldError(value)));
   const declarationSubmitDisabled = isSubmitting || (!pendingDonationCommand && (
     !donorName.trim() || donorName.length > 200 || !normalizePhone(donorPhone) || !isValidPhone(donorPhone) || donorPhone.length > 32 ||
     !hasPositiveQuantity || hasInvalidQuantity
   ));
-  const trackingLookupDisabled = trackingLoading || Boolean(donationQueryError(searchCode)) || !isValidDonationQuery(searchCode) ||
-    donationTrackingSecret.length > 43 || (donationTrackingSecret.length > 0 && !isValidTrackingSecret(donationTrackingSecret));
+  const trackingLookupDisabled = trackingLoading || Boolean(donationQueryError(searchCode)) || !isValidDonationQuery(searchCode);
   const recoverySubmitDisabled = trackingLoading || searchCode.length > 16 || donationRecoveryCode.length > 43 ||
     !isPublicDonationCode(searchCode) || !isValidTrackingSecret(donationRecoveryCode);
   const disputeSubmitDisabled = isSubmittingDispute || !disputeReason.trim() || disputeReason.length > 2000;
@@ -1250,25 +1227,23 @@ export const DonationScreen: React.FC = () => {
       ) : (
         /* NỘI DUNG TAB 2: TRA CỨU BIÊN NHẬN QUYÊN GÓP */
         <View>
-          {/* Ô TÌM KIẾM MÃ BIÊN NHẬN */}
+          {/* Ô TÌM KIẾM MÃ ĐỊNH DANH BẢN KHAI */}
           <View style={styles.searchCard}>
             <Text style={styles.searchTitle}>TRA CỨU TIẾN ĐỘ KIỂM ĐẾM TẠI KHO</Text>
             <Text style={styles.searchSubtitle}>
-              Nhập mã định danh tra cứu; mã biên nhận đã lưu trên thiết bị cũng được chấp nhận:
+              Nhập mã định danh bản khai để xem tiến độ kiểm đếm.
             </Text>
-            <Text style={styles.inputLabel}>Mã biên nhận hoặc mã định danh tra cứu <RequiredAsterisk /></Text>
+            <Text style={styles.inputLabel}>Mã định danh bản khai <RequiredAsterisk /></Text>
             <View style={styles.searchRow}>
               <TextInput
                 style={styles.searchInput}
-                placeholder="Mã biên nhận hoặc mã định danh tra cứu"
+                placeholder="Nhập mã định danh bản khai"
                 placeholderTextColor={THEME.colors.text.muted}
                 value={searchCode}
                 maxLength={37}
                 onChangeText={(value) => {
                   setSearchCode(value);
-                  setDonationTrackingSecret('');
                   setTrackingCodeError(donationQueryError(value));
-                  setTrackingSecretError(undefined);
                   setDonationRecoveryError(undefined);
                   setTrackingResult(null);
                   setTrackingCapabilityAvailable(false);
@@ -1276,7 +1251,7 @@ export const DonationScreen: React.FC = () => {
                 }}
                 onBlur={() => {
                   setTrackingCodeError(!searchCode.trim()
-                    ? 'Mã biên nhận hoặc mã định danh tra cứu là bắt buộc.'
+                    ? 'Mã định danh bản khai là bắt buộc.'
                     : donationQueryError(searchCode));
                 }}
                 autoCapitalize="characters"
@@ -1298,24 +1273,6 @@ export const DonationScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             <FormFieldError message={trackingCodeError} />
-            <TextInput
-              style={[styles.searchInput, styles.secretInput]}
-              placeholder="Khóa bí mật (nếu bạn đã lưu)"
-              placeholderTextColor={THEME.colors.text.muted}
-              value={donationTrackingSecret}
-              onChangeText={(value) => {
-                setDonationTrackingSecret(value);
-                setTrackingSecretError(getTrackingSecretError(value));
-              }}
-              onBlur={() => {
-                setTrackingSecretError(getTrackingSecretError(donationTrackingSecret));
-              }}
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry
-              maxLength={44}
-            />
-            <FormFieldError message={trackingSecretError} />
             {canRecoverDonation ? (
               <View style={styles.recoveryBox}>
                 <Text style={styles.recoveryHint}>Để liên kết mã biên nhận công khai, cần mã khôi phục do kho tiếp nhận cấp.</Text>
@@ -1367,7 +1324,7 @@ export const DonationScreen: React.FC = () => {
                   activeOpacity={0.8}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.recentCode}>{item.public_code}</Text>
+                    <Text style={styles.recentCode} numberOfLines={2}>{item.id}</Text>
                     <Text style={styles.recentTitle} numberOfLines={1}>
                       {item.drive_title}
                     </Text>
@@ -1393,12 +1350,12 @@ export const DonationScreen: React.FC = () => {
             <View style={styles.resultContainer}>
               <View style={styles.resultSummaryCard}>
                 <View style={styles.resultSummaryHeader}>
-                  <View>
-                    <Text style={styles.resultCodeLabel}>MÃ BIÊN NHẬN BÀN GIAO</Text>
-                    <Text style={styles.resultCodeValue}>{trackingResult.public_code}</Text>
+                  <View style={{ flex: 1, minWidth: 0, marginRight: 10 }}>
+                    <Text style={styles.resultCodeLabel}>MÃ ĐỊNH DANH BẢN KHAI</Text>
+                    <Text style={styles.resultCodeValue} numberOfLines={2}>{trackingResult.id}</Text>
                     <TouchableOpacity
                       style={styles.copyReceiptCodeBtn}
-                      onPress={() => copyDonationCode(trackingResult.public_code)}
+                      onPress={() => copyDonationCode(trackingResult.id)}
                       activeOpacity={0.75}
                     >
                       <Copy size={14} color={THEME.colors.primary.main} />
@@ -1624,17 +1581,19 @@ export const DonationScreen: React.FC = () => {
                   </TouchableOpacity>
                 )}
 
-                <TouchableOpacity
-                  style={styles.disputeBtn}
-                onPress={() => {
-                  setDisputeError(undefined);
-                  setShowDisputeModal(true);
-                }}
-                  activeOpacity={0.8}
-                >
-                  <MessageSquareWarning size={18} color={THEME.colors.warning.main} />
-                  <Text style={styles.disputeBtnText}>Khiếu Nại Kiểm Đếm Thiếu / Sai</Text>
-                </TouchableOpacity>
+                {canManageTrackingResult ? (
+                  <TouchableOpacity
+                    style={styles.disputeBtn}
+                    onPress={() => {
+                      setDisputeError(undefined);
+                      setShowDisputeModal(true);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <MessageSquareWarning size={18} color={THEME.colors.warning.main} />
+                    <Text style={styles.disputeBtnText}>Khiếu nại kiểm đếm thiếu / sai</Text>
+                  </TouchableOpacity>
+                ) : null}
 
                 <TouchableOpacity
                   style={styles.recheckBtn}
@@ -2021,20 +1980,18 @@ export const DonationScreen: React.FC = () => {
           visible
           title="Đã khai báo bàn giao thành công"
           description={submissionReceipt.description}
-          helperText="Lưu mã định danh và khóa bí mật để tra cứu trên thiết bị khác."
+          helperText="Lưu mã định danh bản khai để tra cứu trên thiết bị khác."
           credentials={[
-            { key: 'donation-public-code', label: 'Mã biên nhận', value: submissionReceipt.publicCode },
-            { key: 'donation-id', label: 'Mã định danh tra cứu', value: submissionReceipt.id },
-            { key: 'donation-secret', label: 'Khóa bí mật', value: submissionReceipt.secret, sensitive: true },
+            { key: 'donation-id', label: 'Mã định danh bản khai', value: submissionReceipt.id },
           ]}
           onClose={() => setSubmissionReceipt(null)}
           primaryAction={{
             label: 'Tra cứu tiến độ ngay',
             onPress: () => {
-              const { id, secret } = submissionReceipt;
+              const { id } = submissionReceipt;
               setSubmissionReceipt(null);
               setActiveTab('TRACKING');
-              handleTrackDonation(id, secret);
+              handleTrackDonation(id);
             },
           }}
         />
@@ -2360,11 +2317,6 @@ const styles = StyleSheet.create({
     fontSize: THEME.typography.fontSizes.sm,
     fontWeight: '700',
     color: THEME.colors.text.primary,
-  },
-  secretInput: {
-    flex: 0,
-    width: '100%',
-    marginTop: 8,
   },
   recoveryBox: {
     backgroundColor: THEME.colors.primary.bg,

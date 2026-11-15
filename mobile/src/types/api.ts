@@ -307,6 +307,33 @@ export interface PublicCampaign {
   ends_at?: string | null;
 }
 
+export type WeatherAlertLevel = 'WATCH' | 'WARNING' | 'SEVERE';
+
+export interface WeatherPointForecast {
+  latitude: number;
+  longitude: number;
+  rain_24h_mm: number;
+  peak_rain_1h_mm: number;
+  max_gust_kmh: number;
+  alerts: {
+    code: 'HEAVY_RAIN' | 'STRONG_WIND' | 'THUNDERSTORM';
+    level: WeatherAlertLevel;
+    message: string;
+    value: number | null;
+  }[];
+  hourly: {
+    time: string[];
+    rain_mm: number[];
+    gust_kmh: number[];
+  };
+  source: string;
+  attribution: string;
+  disclaimer: string;
+  horizon_hours: number;
+  fetched_at: string;
+  stale: boolean;
+}
+
 // ==================== LOGISTICS (DONATIONS) ====================
 
 export interface DonationDriveItem {
@@ -366,6 +393,7 @@ export type DonationDeliveryStatus =
 export interface DonationTrackingDetail {
   id: string;
   public_code: string;
+  can_manage: boolean;
   status: DonationDeliveryStatus;
   progress: { status: DonationDeliveryStatus };
   declaration: {

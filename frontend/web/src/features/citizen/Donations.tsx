@@ -49,6 +49,7 @@ type Tracking = {
   id: string;
   public_code: string;
   status: string;
+  can_manage: boolean;
   declaration?: { lines: { item_id: string; item_name: string; unit_name: string; declared_quantity: string }[] };
   receipt?: {
     id: string;
@@ -86,10 +87,13 @@ function DonationLookupCode({ id }: { id: string }) {
     }
   }
   return <div className="donation-lookup-code">
-    <label><strong>Định danh bản khai</strong><input aria-label="Định danh để lưu và tra cứu" readOnly value={id} onFocus={event => event.currentTarget.select()} /></label>
-    <p>Giữ định danh này để tra cứu trên trình duyệt hoặc thiết bị khác.</p>
-    <button type="button" className="button secondary" onClick={() => void copy()}>Sao chép định danh</button>
-    {message && <p role="status">{message}</p>}
+    <strong>Định danh bản khai</strong>
+    <div className="donation-lookup-code-row">
+      <input aria-label="Định danh để lưu và tra cứu" readOnly value={id} onFocus={event => event.currentTarget.select()} />
+      <button type="button" className="button secondary" onClick={() => void copy()}>Sao chép</button>
+    </div>
+    <small>Giữ định danh này để tra cứu trên thiết bị khác.</small>
+    {message && <small className="donation-copy-message" role="status">{message}</small>}
   </div>;
 }
 
@@ -116,7 +120,8 @@ export function Donations({ user }: { user: Me | null }) {
   const [createdSecret, setCreatedSecret] = useState('');
   const [trackId, setTrackId] = useState('');
   const trackIdInput = useRef<HTMLInputElement>(null);
-  const [trackSecret, setTrackSecret] = useState('');
+  const [ownedSearch, setOwnedSearch] = useState('');
+  const [ownedSearchTerm, setOwnedSearchTerm] = useState('');
   const [tracking, setTracking] = useState<Tracking | null>(null);
   const [trackingFor, setTrackingFor] = useState<string | null>(null);
   const [ownedDonations, setOwnedDonations] = useState<OwnedDonation[]>([]);
@@ -178,9 +183,6 @@ export function Donations({ user }: { user: Me | null }) {
     : trackId.trim().length > 36 ? 'Định danh bản khai không được vượt quá 36 ký tự.'
       : !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trackId.trim())
         ? 'Định danh bản khai không đúng định dạng.' : '';
-  const donationTrackSecretError = !user && !trackSecret.trim() ? 'Mã bảo mật bản khai là bắt buộc.'
-    : trackSecret.length > 43 ? 'Mã bảo mật không được vượt quá 43 ký tự.'
-      : trackSecret.trim() && !/^[A-Za-z0-9_-]{43}$/.test(trackSecret.trim()) ? 'Mã bảo mật không đúng định dạng.' : '';
   const donationRecoveryPublicError = !recoveryPublicCode.trim() ? 'Mã bản khai công khai là bắt buộc.'
     : recoveryPublicCode.length > 16 ? 'Mã bản khai công khai không được vượt quá 16 ký tự.'
       : !/^[0-9A-HJKMNP-TV-Z]{8,16}$/i.test(recoveryPublicCode.trim()) ? 'Mã bản khai công khai không đúng định dạng.' : '';
@@ -198,7 +200,8 @@ export function Donations({ user }: { user: Me | null }) {
     previousAccountKey.current = accountKey;
     lookupVersion.current += 1;
     setTrackId('');
-    setTrackSecret('');
+    setOwnedSearch('');
+    setOwnedSearchTerm('');
     setVerifiedSecret('');
     setTracking(null);
     setTrackingFor(null);
@@ -217,12 +220,17 @@ export function Donations({ user }: { user: Me | null }) {
     setOwnedError('');
     setOwnedLoading(true);
     const refresh = async () => {
+      const normalizedSearch = ownedSearchTerm.trim().toLocaleLowerCase('vi');
+      const matchesSearch = (item: OwnedDonation) => !normalizedSearch ||
+        [item.id, item.public_code, item.drive_title].some((value) => value?.toLocaleLowerCase('vi').includes(normalizedSearch));
       const saved: unknown = JSON.parse(localStorage.getItem('reliva.donation-history.' + accountKey) || '[]');
       const records: OwnedDonation[] = Array.isArray(saved) ? saved.filter((item): item is OwnedDonation => Boolean(item && typeof item.id === 'string' && typeof item.public_code === 'string' && typeof item.status === 'string' && typeof item.created_at === 'string')).slice(0, 10) : [];
-      if (live) setOwnedDonations(records);
+      if (live) setOwnedDonations(records.filter(matchesSearch));
       if (view !== 'donation') return;
       try {
-        const page = await api<{ items: OwnedDonation[] }>('logistics', '/public/donations/mine?limit=50');
+        const params = new URLSearchParams({ limit: '50' });
+        if (ownedSearchTerm.trim()) params.set('q', ownedSearchTerm.trim());
+        const page = await api<{ items: OwnedDonation[] }>('logistics', `/public/donations/mine?${params}`);
         if (!live) return;
         const updated = page.items.map((item) => ({ id: item.id, public_code: item.public_code, status: item.status,
           created_at: item.created_at, drive_title: item.drive_title || 'Phiếu quyên góp', has_count_result: Boolean(item.has_count_result) }));
@@ -235,7 +243,7 @@ export function Donations({ user }: { user: Me | null }) {
     void refresh().catch(() => { if (live) setOwnedError('Không đọc được lịch sử trên trình duyệt này. Bạn vẫn có thể tra cứu bằng định danh.'); })
       .finally(() => { if (live) setOwnedLoading(false); });
     return () => { live = false; };
-  }, [accountKey, ownedRevision, view]);
+  }, [accountKey, ownedRevision, ownedSearchTerm, view]);
   function rememberDonation(value: Declaration, driveTitle?: string, hasCountResult = false) {
     if (!user) return;
     try {
@@ -364,6 +372,8 @@ export function Donations({ user }: { user: Me | null }) {
     setLoading(true);
     setError('');
     setTracking(null);
+    setVerifiedSecret('');
+    setActionMessage('');
     try {
       const result = await api<Tracking>(
         'logistics',
@@ -373,15 +383,12 @@ export function Donations({ user }: { user: Me | null }) {
       if (version === lookupVersion.current) {
         setVerifiedSecret(secret);
         setTracking(result);
-        if (!secret) rememberDonation(result, undefined, Boolean(result.receipt));
+        if (!secret && result.can_manage) rememberDonation(result, undefined, Boolean(result.receipt));
         setTrackingFor(accountKey);
       }
     } catch (cause) {
       if (version === lookupVersion.current) {
-        const ownerHelp = cause instanceof ApiError && cause.code === 'DONATION_SECRET_INVALID' && user && !secret;
-        setError(ownerHelp
-          ? 'Không thể mở phiếu bằng tài khoản hiện tại. Hãy đăng nhập tài khoản đã khai, hoặc nhập mã bảo mật nếu khai với tư cách khách.'
-          : cause instanceof Error ? cause.message : 'Không thể tra cứu đóng góp.');
+        setError(cause instanceof Error ? cause.message : 'Không thể tra cứu đóng góp.');
       }
     } finally {
       if (version === lookupVersion.current) setLoading(false);
@@ -390,8 +397,8 @@ export function Donations({ user }: { user: Me | null }) {
   function track(event: FormEvent) {
     event.preventDefault();
     setTrackingAttempted(true);
-    if (donationTrackIdError || donationTrackSecretError) return;
-    void lookupDonation(trackId, trackSecret);
+    if (donationTrackIdError) return;
+    void lookupDonation(trackId, '');
   }
   function invalidateTracking() {
     lookupVersion.current += 1;
@@ -509,7 +516,6 @@ export function Donations({ user }: { user: Me | null }) {
         idempotencyKey: newCommandKey(),
         headers: { 'X-Donation-Secret': verifiedSecret },
       });
-      setTrackSecret('');
       setVerifiedSecret('');
       setActionMessage('Bản khai đã được gắn với tài khoản của bạn.');
       rememberDonation(tracking, undefined, Boolean(tracking.receipt));
@@ -552,24 +558,9 @@ export function Donations({ user }: { user: Me | null }) {
     return (
       <>{nav}
       <div className="grid-two donation-layout">
-        {user && <section className="card donation-owned-list">
-          <div className="section-header"><h2>Phiếu quyên góp của tôi</h2><button type="button" className="button secondary" disabled={ownedLoading} onClick={() => setOwnedRevision((value) => value + 1)}>Cập nhật danh sách</button></div>
-          <p>Danh sách phiếu gắn với tài khoản của bạn trên hệ thống. Bấm một phiếu để xem trạng thái mới nhất.</p>
-          {ownedLoading && <p role="status">Đang tải đóng góp của bạn…</p>}
-          {ownedError && <p className="notice error" role="alert">{ownedError}</p>}
-          {!ownedLoading && !ownedError && ownedFor === accountKey && !ownedDonations.length && <div className="donation-history-empty"><p>Chưa có phiếu quyên góp nào gắn với tài khoản này.</p><button type="button" className="button secondary" onClick={() => trackIdInput.current?.focus()}>Tra cứu phiếu đã có</button></div>}
-          <div className="record-list">
-            {(ownedFor === accountKey ? ownedDonations : []).map((donation) => <button type="button" key={donation.id}
-              className="record record-clickable" aria-label={`Xem phiếu quyên góp ${donation.public_code}`}
-              onClick={() => { setTrackId(donation.id); setTrackSecret(''); void lookupDonation(donation.id, ''); }}>
-              <span><strong>{donation.drive_title}</strong><small>Phiếu {donation.public_code} · Tạo lúc {new Date(donation.created_at).toLocaleString('vi-VN')}</small></span>
-              <span className="record-actions"><StatusBadge status={donation.status} /><small>{donation.has_count_result ? 'Đã có kết quả kiểm đếm' : 'Chờ kết quả kiểm đếm'}</small></span>
-            </button>)}
-          </div>
-        </section>}
-        <section className="card">
+        <section className="card donation-lookup-card">
           <h2>Tra cứu đóng góp</h2>
-          <p>{user ? 'Mở trực tiếp phiếu đã lưu ở trên, hoặc nhập định danh bản khai chưa lưu. Không cần mã bảo mật nếu bạn đăng nhập đúng tài khoản đã khai. Phiếu khai với tư cách khách cần thêm mã bảo mật.' : 'Nhập định danh bản khai và mã bảo mật riêng tư. Mã bảo mật không nằm trong URL.'}</p>
+          <p>Nhập định danh bản khai để xem tiến độ. Không cần mã bảo mật, dù bạn đã đăng nhập hay đang là khách.</p>
           <form className="form-stack" onSubmit={track} noValidate>
             <label>
               <span>Định danh bản khai <span className="required-mark" aria-hidden="true">*</span></span>
@@ -594,27 +585,7 @@ export function Donations({ user }: { user: Me | null }) {
               <small id="donation-lookup-id-hint">Dùng định danh được cấp sau khi gửi bản khai, khác với mã phiếu ngắn.</small>
               {(trackingAttempted || trackingTouched.trackId) && donationTrackIdError && <small className="field-error" role="alert">{donationTrackIdError}</small>}
             </label>
-            <label>
-              <span>Mã bảo mật (nếu khai với tư cách khách){!user && <> <span className="required-mark" aria-hidden="true">*</span></>}</span>
-              <input
-                type="password"
-                name="donation-secret"
-                disabled={loading}
-                required={!user}
-                maxLength={44}
-                aria-invalid={Boolean((trackingAttempted || trackingTouched.trackSecret) && donationTrackSecretError)}
-                value={trackSecret}
-                onChange={(e) => {
-                  setTrackSecret(e.target.value);
-                  setTrackingTouched((current) => ({ ...current, trackSecret: true }));
-                  invalidateTracking();
-                }}
-                onBlur={() => setTrackingTouched((current) => ({ ...current, trackSecret: true }))}
-                autoComplete="one-time-code"
-              />
-              {(trackingAttempted || trackingTouched.trackSecret) && donationTrackSecretError && <small className="field-error" role="alert">{donationTrackSecretError}</small>}
-            </label>
-            <button className="button" disabled={loading || Boolean(donationTrackIdError || donationTrackSecretError)}>
+            <button className="button" disabled={loading || Boolean(donationTrackIdError)}>
               Xem tiến độ
             </button>
           </form>
@@ -677,11 +648,38 @@ export function Donations({ user }: { user: Me | null }) {
             </details>
           )}
         </section>
+        {user && <section className="card donation-owned-list">
+          <div className="section-header"><div><h2>Phiếu quyên góp của tôi</h2><p>Chọn một phiếu để xem trạng thái mới nhất.</p></div><button type="button" className="button secondary" disabled={ownedLoading} onClick={() => setOwnedRevision((value) => value + 1)}>Cập nhật danh sách</button></div>
+          <form className="donation-history-search" onSubmit={(event) => { event.preventDefault(); if (ownedSearch.trim() === ownedSearchTerm) setOwnedRevision((value) => value + 1); else setOwnedSearchTerm(ownedSearch.trim()); }}>
+            <label htmlFor="donation-history-search">Tìm theo mã phiếu, định danh hoặc đợt quyên góp</label>
+            <div className="donation-lookup-code-row">
+              <input id="donation-history-search" type="search" value={ownedSearch} maxLength={120} disabled={ownedLoading}
+                onChange={(event) => setOwnedSearch(event.target.value)} placeholder="Nhập từ khóa cần tìm" />
+              <button type="submit" className="button secondary" disabled={ownedLoading}>Tìm kiếm</button>
+              {ownedSearchTerm && <button type="button" className="button secondary" disabled={ownedLoading} onClick={() => { setOwnedSearch(''); setOwnedSearchTerm(''); }}>Xóa lọc</button>}
+            </div>
+          </form>
+          {ownedLoading && <p role="status">Đang tải đóng góp của bạn…</p>}
+          {ownedError && <p className="notice error" role="alert">{ownedError}</p>}
+          {!ownedLoading && !ownedError && ownedFor === accountKey && !ownedDonations.length && <div className="donation-history-empty">
+            {ownedSearchTerm ? <><p>Không tìm thấy phiếu quyên góp phù hợp.</p><button type="button" className="button secondary" onClick={() => { setOwnedSearch(''); setOwnedSearchTerm(''); }}>Xóa từ khóa tìm kiếm</button></>
+              : <><p>Chưa có phiếu quyên góp nào gắn với tài khoản này.</p><button type="button" className="button secondary" onClick={() => trackIdInput.current?.focus()}>Tra cứu phiếu đã có</button></>}
+          </div>}
+          <div className="record-list">
+            {(ownedFor === accountKey ? ownedDonations : []).map((donation) => <button type="button" key={donation.id}
+              className="record record-clickable" aria-label={`Xem phiếu quyên góp ${donation.public_code}`}
+              onClick={() => { setTrackId(donation.id); void lookupDonation(donation.id, ''); }}>
+              <span><strong>{donation.drive_title}</strong><small>Phiếu {donation.public_code} · Tạo lúc {new Date(donation.created_at).toLocaleString('vi-VN')}</small></span>
+              <span className="record-actions"><StatusBadge status={donation.status} /><small>{donation.has_count_result ? 'Đã có kết quả kiểm đếm' : 'Chờ kết quả kiểm đếm'}</small></span>
+            </button>)}
+          </div>
+        </section>}
         {tracking && trackingFor === accountKey && (
           <DetailSurface modal open label="Chi tiết phiếu quyên góp" className="donation-tracking-dialog" onClose={invalidateTracking}>
-            <h2>Đóng góp</h2>
-            <p>Mã phiếu: <strong>{tracking.public_code}</strong></p>
-            <StatusBadge status={tracking.status} />
+            <div className="donation-tracking-heading">
+              <div><h2>Đóng góp</h2><p>Mã phiếu: <strong>{tracking.public_code}</strong></p></div>
+              <StatusBadge status={tracking.status} />
+            </div>
             <DonationLookupCode key={tracking.id} id={tracking.id} />
             <h3>Đã khai báo</h3>
             <div className="donation-declaration-table">
@@ -736,6 +734,7 @@ export function Donations({ user }: { user: Me | null }) {
             ) : (
               <p>Chưa có khiếu nại.</p>
             )}
+            {tracking.can_manage ? <>
           <form className="form-stack donation-dispute-form" onSubmit={dispute} noValidate>
               <label>
                 <span>Nội dung cần rà soát <span className="required-mark" aria-hidden="true">*</span></span>
@@ -795,6 +794,7 @@ export function Donations({ user }: { user: Me | null }) {
                 Gắn bản khai với tài khoản
               </button>
             )}
+            </> : <p className="notice donation-readonly-note">Bạn đang tra cứu bằng định danh. Các thao tác gửi khiếu nại hoặc minh chứng chỉ dành cho chủ phiếu.</p>}
             {actionMessage && (
               <p className="notice" role="status">
                 {actionMessage}
@@ -815,14 +815,12 @@ export function Donations({ user }: { user: Me | null }) {
         </p>
         <DonationLookupCode key={created.id} id={created.id} />
         <p>
-          Định danh để tra cứu: <strong className="secret">{created.id}</strong>
-        </p>
-        <p>
           Trạng thái: {label(created.status)}. Vật phẩm chưa được ghi vào tồn kho cho đến khi kiểm
           đếm và duyệt.
         </p>
         {createdSecret && (
           <div className="notice warning">
+            <p>Định danh phía trên đã đủ để tra cứu tiến độ. Mã này chỉ dùng khi khách cần gửi khiếu nại hoặc minh chứng.</p>
             <strong>Hãy lưu mã bảo mật ngay:</strong>
             <div className="secret">{createdSecret}</div>
             <p>Mã này chỉ hiển thị một lần; ứng dụng không lưu trên trình duyệt.</p>
@@ -864,7 +862,6 @@ export function Donations({ user }: { user: Me | null }) {
             onClick={() => {
               setView('donation');
               setTrackId(created.id);
-              setTrackSecret(createdSecret);
               setCreated(null);
               setCreatedSecret('');
               setShowCreatedTracking(true);

@@ -93,7 +93,6 @@ export function SosForm({
   const [files, setFiles] = useState<File[]>([]);
   const [fileMessage, setFileMessage] = useState('');
   const [uploadReport, setUploadReport] = useState('');
-  const [ackSecret, setAckSecret] = useState('');
   const pending = useRef<Pending | null>(null);
   const locationAttempt = useRef(0);
   useEffect(() => () => { locationAttempt.current += 1; }, []);
@@ -294,14 +293,13 @@ export function SosForm({
         headers: command.secret ? { 'X-Tracking-Secret': command.secret } : {},
       });
       clearSosDraft(user?.id);
-      setAckSecret(command.secret);
       setCreated(result);
       if (files.length) {
         let failed = 0;
         for (const file of files) {
           try {
             await upload('response', `/requests/${result.id}/evidence`, file, {
-              headers: { 'X-Tracking-Code': result.tracking_code, ...(command.secret ? { 'X-Tracking-Secret': command.secret } : {}) },
+              headers: { 'X-Tracking-Code': result.tracking_code },
               idempotencyKey: newCommandKey(),
             });
           } catch { failed += 1; }
@@ -323,7 +321,7 @@ export function SosForm({
         setError(cause instanceof ApiError && cause.code === 'TRACKING_SECRET_INVALID'
           ? user
             ? 'Phiên đăng nhập có thể đã hết hạn. Vui lòng đăng nhập lại rồi gửi yêu cầu.'
-            : 'Mã bảo mật gửi SOS chưa hợp lệ. Vui lòng tải lại trang rồi gửi lại.'
+            : 'Không thể xác nhận yêu cầu gửi SOS. Vui lòng tải lại trang rồi thử lại.'
           : cause instanceof Error ? cause.message : 'Chưa gửi được yêu cầu. Vui lòng thử lại.');
       }
     } finally {
@@ -344,17 +342,6 @@ export function SosForm({
         <div className="sos-confirmation-heading"><span className="sos-confirmation-icon" aria-hidden="true">✓</span><div><span className="eyebrow">Đã gửi thành công</span><h2>Yêu cầu đã được tiếp nhận</h2></div></div>
         <div className="sos-tracking-receipt"><div><span>Mã theo dõi</span><strong>{created.tracking_code}</strong></div><button type="button" className="button secondary" onClick={() => copyReceipt(created.tracking_code)}>Sao chép mã</button></div>
         <p className="sos-confirmation-meta"><span>Trạng thái: <strong>{requestStatusLabel(created.status)}</strong></span><span>Tiếp nhận lúc {timeLabel(created.received_at)}</span></p>
-        {ackSecret && (
-          <div className="notice warning">
-            <strong>Lưu mã bảo mật này ngay:</strong>
-            <div className="secret">{ackSecret}</div>
-            <button type="button" className="button secondary" onClick={() => copyReceipt(ackSecret)}>Sao chép mã bảo mật</button>
-            <p>
-              Mã chỉ hiển thị trong lần này. Hãy giữ riêng tư để tra cứu và bổ sung thông tin. Ứng
-              dụng không lưu mã trên trình duyệt.
-            </p>
-          </div>
-        )}
         <p>
           Điều phối viên sẽ xác minh và quyết định ưu tiên. Nếu đang nguy hiểm, hãy gọi 113, 114
           hoặc 115.

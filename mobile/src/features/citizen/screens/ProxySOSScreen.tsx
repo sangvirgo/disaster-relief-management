@@ -27,6 +27,7 @@ import { THEME } from '../../../constants/theme';
 import { isValidPhone, normalizePhone } from '../../../utils/formValidation';
 import { LocationPickerModal } from '../../../components/common/LocationPickerModal';
 import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
+import { SosWeatherCard } from '../components/SosWeatherCard';
 import {
   Users,
   MapPin,
@@ -489,6 +490,11 @@ export const ProxySOSScreen: React.FC = () => {
         </View>
         <FormFieldError message={formErrors.location} />
       </View>
+
+      <SosWeatherCard point={householdLocation ? {
+        latitude: householdLocation.coordinates[1],
+        longitude: householdLocation.coordinates[0],
+      } : null} />
 
       {/* Modal Ghim Vị Trí Trên Bản Đồ */}
       <LocationPickerModal

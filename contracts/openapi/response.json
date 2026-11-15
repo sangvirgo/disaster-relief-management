@@ -229,7 +229,7 @@
       "post": {
         "operationId": "createSelfRequest",
         "summary": "Create a SELF assistance request",
-        "description": "A guest must provide X-Tracking-Secret. Cookie-authenticated writes require an allowed Origin and X-CSRF-Token. Soft rate limits retain the report for review; the hard per-IP Nginx ceiling rejects it before persistence.",
+        "description": "A guest provides X-Tracking-Secret only for safe create retries; it is not used for tracking after acknowledgement. Cookie-authenticated writes require an allowed Origin and X-CSRF-Token. Soft rate limits retain the report for review; the hard per-IP Nginx ceiling rejects it before persistence.",
         "security": [
           {
             "TrackingSecret": []
@@ -2861,7 +2861,6 @@
         "summary": "Read the reporter-visible request projection",
         "security": [
           {
-            "TrackingSecret": [],
             "TrackingCode": []
           },
           {
@@ -2876,9 +2875,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/TrackingCodeHeader"
-          },
-          {
-            "$ref": "#/components/parameters/TrackingSecret"
           }
         ],
         "responses": {
@@ -3016,16 +3012,13 @@
         "summary": "List reporter or scoped staff request events",
         "security": [
           {
-            "TrackingSecret": [],
             "TrackingCode": []
           },
           {
-            "NativeBearer": [],
-            "TrackingCode": []
+            "NativeBearer": []
           },
           {
-            "WebAccessCookie": [],
-            "TrackingCode": []
+            "WebAccessCookie": []
           }
         ],
         "parameters": [
@@ -3033,10 +3026,7 @@
             "$ref": "#/components/parameters/RequestId"
           },
           {
-            "$ref": "#/components/parameters/TrackingCodeHeader"
-          },
-          {
-            "$ref": "#/components/parameters/TrackingSecret"
+            "$ref": "#/components/parameters/OptionalTrackingCodeHeader"
           },
           {
             "$ref": "#/components/parameters/Cursor"
@@ -3205,6 +3195,16 @@
           },
           {
             "$ref": "#/components/parameters/PageLimit"
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "description": "Optional substring of the caller's tracking code. The page cursor is bound to this query.",
+            "schema": {
+              "type": "string",
+              "maxLength": 16
+            }
           }
         ],
         "responses": {
@@ -3322,7 +3322,6 @@
         "summary": "Append reporter-supplied facts",
         "security": [
           {
-            "TrackingSecret": [],
             "TrackingCode": []
           },
           {
@@ -3344,9 +3343,6 @@
           },
           {
             "$ref": "#/components/parameters/TrackingCodeHeader"
-          },
-          {
-            "$ref": "#/components/parameters/TrackingSecret"
           },
           {
             "$ref": "#/components/parameters/CsrfToken"
@@ -3510,21 +3506,16 @@
         "summary": "Bind a guest request to the active reporter account",
         "security": [
           {
-            "NativeBearer": [],
-            "TrackingSecret": []
+            "NativeBearer": []
           },
           {
             "WebAccessCookie": [],
-            "CsrfToken": [],
-            "TrackingSecret": []
+            "CsrfToken": []
           }
         ],
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
-          },
-          {
-            "$ref": "#/components/parameters/RequiredTrackingSecret"
           },
           {
             "$ref": "#/components/parameters/CsrfToken"
@@ -3669,7 +3660,8 @@
     "/requests/{id}/tracking-secret/revoke": {
       "post": {
         "operationId": "revokeRequestTrackingSecret",
-        "summary": "Revoke the guest tracking capability",
+        "summary": "Clear the legacy guest create-retry secret",
+        "description": "Clears the stored create-retry hash. The tracking code remains the sole reporter credential and is not revoked by this operation.",
         "security": [
           {
             "NativeBearer": []
@@ -4124,7 +4116,6 @@
         "description": "Requires Content-Length. Accepts JPEG/PNG up to 10 MiB or an MP4 container up to 50 MiB. Storage failure leaves the request unchanged.",
         "security": [
           {
-            "TrackingSecret": [],
             "TrackingCode": []
           },
           {
@@ -4146,9 +4137,6 @@
           },
           {
             "$ref": "#/components/parameters/TrackingCodeHeader"
-          },
-          {
-            "$ref": "#/components/parameters/TrackingSecret"
           },
           {
             "$ref": "#/components/parameters/ContentLength"
@@ -4568,7 +4556,9 @@
         "operationId": "getRequestEvidenceDownloadUrl",
         "summary": "Get a short-lived evidence download URL",
         "security": [
-          {},
+          {
+            "TrackingCode": []
+          },
           {
             "NativeBearer": []
           },
@@ -4581,10 +4571,7 @@
             "$ref": "#/components/parameters/EvidenceId"
           },
           {
-            "$ref": "#/components/parameters/TrackingCodeHeader"
-          },
-          {
-            "$ref": "#/components/parameters/TrackingSecret"
+            "$ref": "#/components/parameters/OptionalTrackingCodeHeader"
           }
         ],
         "responses": {
@@ -12591,13 +12578,33 @@
       "put": {
         "operationId": "responseTrackingUpdateReport",
         "summary": "Update editable facts on an SOS report before verification.",
-        "description": "Uses expected_version for concurrency control. Omitted facts retain their current values. The request must be owned by the signed-in reporter or accompanied by valid tracking credentials.",
+        "description": "Uses expected_version for concurrency control. Omitted facts retain their current values. Reporters may authorize with the tracking code alone; cookie-authenticated writes require CSRF protection.",
+        "security": [
+          {
+            "TrackingCode": []
+          },
+          {
+            "NativeBearer": [],
+            "TrackingCode": []
+          },
+          {
+            "WebAccessCookie": [],
+            "CsrfToken": [],
+            "TrackingCode": []
+          }
+        ],
         "parameters": [
           {
             "$ref": "#/components/parameters/RequestId"
           },
           {
             "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/TrackingCodeHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
         "responses": {
@@ -12767,21 +12774,6 @@
         },
         "x-c48-contract-source": "docs/backend/03-response-api.md",
         "x-c48-controller-source": "backend/apps/response/src/tracking/tracking.controller.ts#TrackingController.updateReport",
-        "security": [
-          {
-            "TrackingSecret": [],
-            "TrackingCode": []
-          },
-          {
-            "NativeBearer": [],
-            "TrackingCode": []
-          },
-          {
-            "WebAccessCookie": [],
-            "CsrfToken": [],
-            "TrackingCode": []
-          }
-        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -14622,7 +14614,8 @@
       "TrackingSecret": {
         "type": "apiKey",
         "in": "header",
-        "name": "X-Tracking-Secret"
+        "name": "X-Tracking-Secret",
+        "description": "Guest SOS create-retry value only; not used for reporter tracking after acknowledgement."
       },
       "TrackingCode": {
         "type": "apiKey",
@@ -14655,17 +14648,7 @@
         "name": "X-Tracking-Secret",
         "in": "header",
         "required": false,
-        "description": "Required for a guest. It is purpose-bound hashed at rest and never returned.",
-        "schema": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9_-]{43}$"
-        }
-      },
-      "RequiredTrackingSecret": {
-        "name": "X-Tracking-Secret",
-        "in": "header",
-        "required": true,
-        "description": "Required proof for claiming a guest request; never sent as Authorization.",
+        "description": "Guest create-retry value; purpose-bound hashed at rest and never returned. Not used for tracking after acknowledgement.",
         "schema": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]{43}$"
@@ -14676,6 +14659,16 @@
         "in": "header",
         "required": true,
         "description": "Never place the tracking code in a URL.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{10,16}$"
+        }
+      },
+      "OptionalTrackingCodeHeader": {
+        "name": "X-Tracking-Code",
+        "in": "header",
+        "required": false,
+        "description": "Reporter credential for request-visible events and evidence; staff sessions may omit it. Never place the code in a URL.",
         "schema": {
           "type": "string",
           "pattern": "^[0-9A-HJKMNP-TV-Z]{10,16}$"

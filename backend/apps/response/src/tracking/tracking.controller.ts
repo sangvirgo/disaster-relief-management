@@ -25,7 +25,6 @@ export class TrackingController {
     noStore(response);
     return this.tracking.track(
       headerValue(request.headers['x-tracking-code']),
-      headerValue(request.headers['x-tracking-secret']),
       request,
     );
   }
@@ -44,7 +43,7 @@ export class TrackingController {
     @Res({ passthrough: true }) response: Response,
   ) {
     noStore(response);
-    return this.tracking.events(id, headerValue(request.headers['x-tracking-code']), headerValue(request.headers['x-tracking-secret']), query, request);
+    return this.tracking.events(id, headerValue(request.headers['x-tracking-code']), query, request);
   }
 
   @Post('claim')
@@ -56,7 +55,7 @@ export class TrackingController {
     @Res({ passthrough: true }) response: Response,
   ) {
     noStore(response);
-    const result = await this.tracking.claim(dto, idempotencyKey(request), headerValue(request.headers['x-tracking-secret']), request);
+    const result = await this.tracking.claim(dto, idempotencyKey(request), request);
     replayHeader(response, result.replay);
     return result.value;
   }
@@ -86,8 +85,7 @@ export class TrackingController {
   ) {
     noStore(response);
     const result = await this.tracking.supplement(
-      id, dto, idempotencyKey(request), headerValue(request.headers['x-tracking-code']),
-      headerValue(request.headers['x-tracking-secret']), request,
+      id, dto, idempotencyKey(request), headerValue(request.headers['x-tracking-code']), request,
     );
     replayHeader(response, result.replay);
     return result.value;
@@ -104,8 +102,7 @@ export class TrackingController {
   ) {
     noStore(response);
     const result = await this.tracking.supplement(
-      id, dto, idempotencyKey(request), headerValue(request.headers['x-tracking-code']),
-      headerValue(request.headers['x-tracking-secret']), request, 'PUT',
+      id, dto, idempotencyKey(request), headerValue(request.headers['x-tracking-code']), request, 'PUT',
     );
     replayHeader(response, result.replay);
     return result.value;

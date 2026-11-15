@@ -21,7 +21,7 @@ import { ResponseApi } from '../../../api/responseApi';
 import { getApiErrorMessage } from '../../../api/client';
 import { MyRequestItem } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
-import { getTrackingCodeError, getTrackingSecretError, isValidTrackingCode, isValidTrackingSecret } from '../../../utils/formValidation';
+import { getTrackingCodeError, isValidTrackingCode } from '../../../utils/formValidation';
 import { StorageService } from '../../../utils/secureStore';
 import {
   ClipboardList,
@@ -45,7 +45,6 @@ export const MyRequestsScreen: React.FC = () => {
   // Modal gắn yêu cầu ẩn danh vào tài khoản
   const [showClaimModal, setShowClaimModal] = useState<boolean>(false);
   const [claimTrackingCode, setClaimTrackingCode] = useState<string>('');
-  const [claimSecret, setClaimSecret] = useState<string>('');
   const [claimErrors, setClaimErrors] = useState<Record<string, string | undefined>>({});
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
 
@@ -91,13 +90,10 @@ export const MyRequestsScreen: React.FC = () => {
 
   const handleClaim = async () => {
     const code = claimTrackingCode.trim().toUpperCase();
-    const secret = claimSecret.trim();
 
     const errors: Record<string, string> = {};
     if (!code) errors.trackingCode = 'Vui lòng nhập mã tra cứu.';
     else if (!isValidTrackingCode(code)) errors.trackingCode = 'Mã tra cứu phải gồm đúng 10 ký tự hợp lệ.';
-    if (!secret) errors.secret = 'Vui lòng nhập chuỗi bí mật.';
-    else if (!isValidTrackingSecret(secret)) errors.secret = 'Chuỗi bí mật phải gồm đúng 43 ký tự hợp lệ.';
     setClaimErrors(errors);
     if (Object.keys(errors).length > 0) {
       return;
@@ -105,7 +101,7 @@ export const MyRequestsScreen: React.FC = () => {
 
     setIsClaiming(true);
     try {
-      const claimed = await ResponseApi.claimRequest(code, secret);
+      const claimed = await ResponseApi.claimRequest(code);
       try {
         await StorageService.deleteGuestTrackingSecret(claimed.tracking_code || code);
       } catch {
@@ -116,19 +112,17 @@ export const MyRequestsScreen: React.FC = () => {
         `Yêu cầu cứu hộ ${code} đã được gắn chính thức vào tài khoản của bạn.`
       );
       setClaimTrackingCode('');
-      setClaimSecret('');
       setClaimErrors({});
       setShowClaimModal(false);
       fetchMyRequests(undefined, false, true);
     } catch (err: any) {
-      Alert.alert('Lỗi', getApiErrorMessage(err, 'Không thể gắn yêu cầu. Vui lòng kiểm tra lại mã và bí mật.'));
+      Alert.alert('Lỗi', getApiErrorMessage(err, 'Không thể gắn yêu cầu. Vui lòng kiểm tra lại mã tra cứu.'));
     } finally {
       setIsClaiming(false);
     }
   };
 
-  const claimDisabled = isClaiming || claimTrackingCode.length > 10 || claimSecret.length > 43 ||
-    !isValidTrackingCode(claimTrackingCode) || !isValidTrackingSecret(claimSecret);
+  const claimDisabled = isClaiming || claimTrackingCode.length > 10 || !isValidTrackingCode(claimTrackingCode);
 
   const renderItem = ({ item }: { item: MyRequestItem }) => {
     const formattedDate = new Date(item.received_at).toLocaleString('vi-VN', {
@@ -249,7 +243,7 @@ export const MyRequestsScreen: React.FC = () => {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>GẮN YÊU CẦU ẨN DANH</Text>
             <Text style={styles.modalSubtitle}>
-              Nếu bạn đã từng gửi yêu cầu cứu nạn khi chưa đăng nhập, hãy nhập mã tra cứu và chuỗi bí mật để liên kết vào tài khoản.
+              Nếu bạn đã từng gửi yêu cầu cứu nạn khi chưa đăng nhập, hãy nhập mã tra cứu để liên kết vào tài khoản.
             </Text>
 
             <View style={styles.modalInputGroup}>
@@ -278,36 +272,6 @@ export const MyRequestsScreen: React.FC = () => {
                 maxLength={11}
               />
               <FormFieldError message={claimErrors.trackingCode} />
-            </View>
-
-            <View style={styles.modalInputGroup}>
-              <Text style={styles.modalInputLabel}>Chuỗi bí mật <RequiredAsterisk /></Text>
-              <TextInput
-                style={styles.modalTextInput}
-                placeholder="Nhập chuỗi bí mật gồm 43 ký tự..."
-                placeholderTextColor={THEME.colors.text.muted}
-                value={claimSecret}
-                onChangeText={(value) => {
-                  setClaimSecret(value);
-                  setClaimErrors((current) => ({
-                    ...current,
-                    secret: getTrackingSecretError(value, 'Chuỗi bí mật'),
-                  }));
-                }}
-                onBlur={() => {
-                  setClaimErrors((current) => ({
-                    ...current,
-                    secret: !claimSecret.trim()
-                      ? 'Chuỗi bí mật là bắt buộc.'
-                      : getTrackingSecretError(claimSecret, 'Chuỗi bí mật'),
-                  }));
-                }}
-                autoCapitalize="none"
-                autoCorrect={false}
-                maxLength={44}
-                secureTextEntry
-              />
-              <FormFieldError message={claimErrors.secret} />
             </View>
 
             <View style={styles.modalButtonRow}>

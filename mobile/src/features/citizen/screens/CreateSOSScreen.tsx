@@ -25,6 +25,7 @@ import { isValidPhone, normalizePhone } from '../../../utils/formValidation';
 import { reverseGeocodeCoordinates } from '../../../utils/locationGeocoding';
 import { LocationPickerModal } from '../../../components/common/LocationPickerModal';
 import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
+import { SosWeatherCard } from '../components/SosWeatherCard';
 import {
   MapPin,
   AlertTriangle,
@@ -72,7 +73,6 @@ export const CreateSOSScreen: React.FC = () => {
   const [restoringPending, setRestoringPending] = useState<boolean>(true);
   const [submissionSuccess, setSubmissionSuccess] = useState<{
     trackingCode: string;
-    trackingSecret: string;
   } | null>(null);
 
   const longitude = location?.coordinates[0] ?? null;
@@ -284,13 +284,11 @@ export const CreateSOSScreen: React.FC = () => {
       setPendingCommand(command);
       const response = await ResponseApi.createSelfSOS(payload, command.trackingSecret, command.idempotencyKey);
 
-      await StorageService.saveGuestTrackingSecret(response.tracking_code, command.trackingSecret);
       await StorageService.clearPendingSOS();
       setPendingCommand(null);
 
       setSubmissionSuccess({
         trackingCode: response.tracking_code,
-        trackingSecret: command.trackingSecret,
       });
     } catch (error: any) {
       if (error instanceof Error && error.message === 'PENDING_SOS_MUST_BE_RESUMED') {
@@ -474,6 +472,11 @@ export const CreateSOSScreen: React.FC = () => {
         )}
         <FormFieldError message={!location ? formErrors.location : undefined} />
       </View>
+
+      <SosWeatherCard point={location ? {
+        latitude: location.coordinates[1],
+        longitude: location.coordinates[0],
+      } : null} />
 
       {/* Modal Ghim Vị Trí Trên Bản Đồ */}
       <LocationPickerModal
@@ -709,10 +712,9 @@ export const CreateSOSScreen: React.FC = () => {
           visible
           title="Đã gửi yêu cầu cứu nạn"
           description="Máy chủ đã ghi nhận yêu cầu. Điều phối viên sẽ xác minh thông tin trước khi điều phối lực lượng."
-          helperText="Hãy lưu mã tra cứu và khóa bí mật để tra cứu trên thiết bị khác."
+          helperText="Hãy lưu mã tra cứu để xem tiến độ và bổ sung thông tin sau này."
           credentials={[
             { key: 'tracking-code', label: 'Mã tra cứu', value: submissionSuccess.trackingCode },
-            { key: 'tracking-secret', label: 'Khóa bí mật', value: submissionSuccess.trackingSecret, sensitive: true },
           ]}
           onClose={() => setSubmissionSuccess(null)}
           primaryAction={{

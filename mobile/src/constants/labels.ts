@@ -21,7 +21,7 @@ export const RESCUE_SKILL_LABELS: Record<string, string> = {
 
 export const INCIDENT_CATEGORIES: Record<string, { label: string; icon: string; desc: string }> = {
   FLOOD: {
-    label: 'Lũ lụt dâng cao',
+    label: 'Ngập lụt',
     icon: 'Waves',
     desc: 'Nước dâng nhanh, ngập nóc nhà, cô lập hoàn toàn',
   },
@@ -31,12 +31,12 @@ export const INCIDENT_CATEGORIES: Record<string, { label: string; icon: string; 
     desc: 'Mắc kẹt trên mái nhà, cây cao, trong nhà sập không lối thoát',
   },
   LANDSLIDE: {
-    label: 'Sạt lở đất đá',
+    label: 'Sạt lở đất',
     icon: 'Mountain',
     desc: 'Núi lở, đất đá sụp đổ vùi lấp đường sá, nhà cửa',
   },
   STORM: {
-    label: 'Bão & Gió lốc',
+    label: 'Bão, gió lốc',
     icon: 'CloudLightning',
     desc: 'Gió giật mạnh làm sập nhà, tốc mái, gãy đổ nguy hiểm',
   },
@@ -46,22 +46,22 @@ export const INCIDENT_CATEGORIES: Record<string, { label: string; icon: string; 
     desc: 'Có người bị thương nặng, sinh nở, tai biến nguy cấp',
   },
   FIRE: {
-    label: 'Cháy & Hỏa hoạn',
+    label: 'Cháy',
     icon: 'Flame',
     desc: 'Cháy nhà, cháy rừng, nổ bình gas trong bão lũ',
   },
   SUPPLY_SHORTAGE: {
-    label: 'Thiếu lương thực, nước',
+    label: 'Thiếu lương thực, nhu yếu phẩm',
     icon: 'Package',
     desc: 'Hết thức ăn, nước uống, thuốc men nhiều ngày',
   },
   OTHER: {
-    label: 'Sự cố nguy cấp khác',
+    label: 'Khác',
     icon: 'AlertTriangle',
     desc: 'Tình huống nguy hiểm khẩn cấp cần cứu nạn ngay',
   },
   UNKNOWN: {
-    label: 'Chưa rõ tình hình',
+    label: 'Chưa rõ',
     icon: 'AlertCircle',
     desc: 'Cần xác minh thêm thông tin hiện trường',
   },

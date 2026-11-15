@@ -130,7 +130,7 @@ export function LocationPicker({
       return;
     }
     const coordinateLabel = `Tọa độ ${pointLabel(point)}`;
-    setSearchQuery('Đang tìm địa chỉ gần ghim…');
+    setSearchQuery(coordinateLabel);
     setSelectedAddress(`${confirmed ? 'Đã xác nhận vị trí' : 'Vị trí ghim'}: ${coordinateLabel}. Đang tìm địa chỉ gần đúng…`);
     const controller = new AbortController();
     addressAbortRef.current = controller;
@@ -290,20 +290,23 @@ export function LocationPicker({
     else pinMarkerRef.current = L.marker(position, { icon: pinIcon, interactive: false, keyboard: false }).addTo(map);
   }, [draftPoint, open, mapEngine]);
 
-  // Recenter when coordinates are edited outside the picker.
+  // Recenter and refresh the search text when coordinates are supplied outside the picker (for example, GPS).
   useEffect(() => {
-    if (mapEngine === 'osm' && value && leafletMapRef.current) {
-      const { latitude, longitude } = value;
+    if (!value || (confirmedPointRef.current && samePoint(confirmedPointRef.current, value))) return;
+    const { latitude, longitude } = value;
+    if (mapEngine === 'osm' && leafletMapRef.current) {
       suppressMoveRef.current = true;
-      leafletMapRef.current.setView(
-        [latitude, longitude],
-        Math.max(leafletMapRef.current.getZoom(), 17),
-        { animate: false }
-      );
+      leafletMapRef.current.setView([latitude, longitude], Math.max(leafletMapRef.current.getZoom(), 17), { animate: false });
       suppressMoveRef.current = false;
-      setDraftPoint(value);
-      confirmedPointRef.current = value;
+    } else if (mapEngine === 'google' && googleMapRef.current) {
+      suppressMoveRef.current = true;
+      googleMapRef.current.setCenter({ lat: latitude, lng: longitude });
+      googleMapRef.current.setZoom(Math.max(googleMapRef.current.getZoom() ?? 6, 16));
+      suppressMoveRef.current = false;
     }
+    setDraftPoint(value);
+    confirmedPointRef.current = value;
+    lookupAddress(value, true);
   }, [value?.latitude, value?.longitude, mapEngine]);
 
   // 2. Khởi tạo Google Maps (nếu có API Key và đang chọn Google Engine)

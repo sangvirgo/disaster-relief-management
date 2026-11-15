@@ -81,8 +81,6 @@ interface EvidenceUploadOwner {
   missionId?: string;
   session: ReporterSession | null;
   trackingCode?: string;
-  trackingSecret?: string;
-  hasTrackingCapability: boolean;
   staff?: boolean;
 }
 
@@ -120,17 +118,19 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
     requestId: string,
     idempotencyKey: string,
     trackingCode: string | undefined,
-    trackingSecret: string | undefined,
     request: Request,
   ): Promise<IdempotentResult<EvidenceView>> {
-    const hasTrackingCapability = this.access.validTrackingSecret(trackingSecret);
-    const session = await this.sessions.optional(request, hasTrackingCapability);
-    const owner = await this.access.forRequest(requestId, trackingCode, trackingSecret, session);
+    const owner = await this.access.forRequest(requestId, trackingCode);
+    let session: ReporterSession | null = null;
+    try {
+      session = await this.sessions.optional(request);
+    } catch (error) {
+      if (!(error instanceof AppError) || ![401, 503].includes(error.status ?? 0)) throw error;
+    }
     if (!uploadEligible(owner)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
     return this.uploadOwned({
-      requestId, session, hasTrackingCapability,
+      requestId, session,
       ...(trackingCode === undefined ? {} : { trackingCode }),
-      ...(trackingSecret === undefined ? {} : { trackingSecret }),
     }, idempotencyKey, request);
   }
 
@@ -138,7 +138,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
     const session = await this.sessions.require(request);
     const owner = await this.staffRequestRow(this.dataSource, requestId, session);
     if (!uploadEligible(owner)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
-    return this.uploadOwned({ requestId, session, hasTrackingCapability: false, staff: true }, idempotencyKey, request);
+    return this.uploadOwned({ requestId, session, staff: true }, idempotencyKey, request);
   }
 
   private async staffRequestRow(
@@ -161,7 +161,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
     const session = await this.sessions.require(request);
     const owner = await this.missionUploadOwner(this.dataSource, missionId, session);
     if (!uploadEligible(owner)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
-    return this.uploadOwned({ requestId: owner.request_id, missionId, session, hasTrackingCapability: false }, idempotencyKey, request);
+    return this.uploadOwned({ requestId: owner.request_id, missionId, session }, idempotencyKey, request);
   }
 
   private async uploadOwned(owner: EvidenceUploadOwner, idempotencyKey: string, request: Request): Promise<IdempotentResult<EvidenceView>> {
@@ -179,20 +179,19 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
     try {
       staged = await stageEvidenceMultipart(request, declaredBytes);
       const sourceIpHash = hashPurposeBoundSecret(requestIp(request), 'sos-source-ip', this.intakeConfig.peppers, 'v1');
-      const quotaIpHash = owner.session ? null : sourceIpHash;
-      const capabilityHash = owner.hasTrackingCapability ? this.access.trackingSecretHash(owner.trackingSecret!) : undefined;
+      const quotaIpHash = owner.staff || owner.missionId ? null : sourceIpHash;
       scopeKey = owner.staff
         ? `response.evidence.staff:${owner.requestId}:${owner.session!.userId}`
         : owner.missionId
         ? `response.evidence.mission:${owner.missionId}:${owner.session!.userId}`
-        : `response.evidence.request:${owner.requestId}:${owner.session?.userId ?? 'guest'}`;
+        : `response.evidence.request:${owner.requestId}:reporter`;
       const requestHash = canonicalRequestHash(owner.missionId ? {
         mission_id: owner.missionId, uploader_user_id: owner.session?.userId ?? null, declared_bytes: declaredBytes,
         file_bytes: staged.size, detected_mime: staged.mime, checksum: staged.checksum,
       } : {
-        request_id: owner.requestId, uploader_user_id: owner.session?.userId ?? null, declared_bytes: declaredBytes,
+        request_id: owner.requestId, declared_bytes: declaredBytes,
         file_bytes: staged.size, detected_mime: staged.mime, checksum: staged.checksum,
-      }, capabilityHash);
+      });
       const result = await this.idempotency.execute(this.dataSource, {
         scopeKey,
         command: 'response.evidence.upload',
@@ -204,7 +203,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
             ? await this.missionUploadOwner(manager, owner.missionId, owner.session!, true)
             : owner.staff
             ? await this.staffRequestRow(manager, owner.requestId, owner.session!, true)
-            : await this.access.forRequest(owner.requestId, owner.trackingCode, owner.trackingSecret, owner.session, manager, true);
+            : await this.access.forRequest(owner.requestId, owner.trackingCode, manager, true);
           if (!uploadEligible(lockedOwner)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
           await this.reserveQuota(manager, owner.requestId, quotaIpHash, declaredBytes);
           evidenceId = randomUUID();
@@ -263,7 +262,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async download(evidenceId: string, trackingCode: string | undefined, trackingSecret: string | undefined, request: Request): Promise<{ url: string; expires_in: number }> {
+  async download(evidenceId: string, trackingCode: string | undefined, request: Request): Promise<{ url: string; expires_in: number }> {
     const rows = await this.dataSource.query(
       `SELECT e.id,e.request_id,e.mission_id,e.object_key,e.state,
               r.tracking_code,r.reporter_user_id,r.campaign_id,m.team_id
@@ -278,7 +277,16 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
     }>;
     const evidence = rows[0];
     if (!evidence) throw new AppError('NOT_FOUND', { status: 404 });
-    const session = await this.sessions.optional(request, this.access.validTrackingSecret(trackingSecret));
+    let reporterCodeValid = false;
+    if (evidence.request_id && trackingCode) {
+      try {
+        await this.access.forRequest(evidence.request_id, trackingCode);
+        reporterCodeValid = true;
+      } catch (error) {
+        if (!(error instanceof AppError) || error.code !== 'NOT_FOUND') throw error;
+      }
+    }
+    const session = reporterCodeValid ? null : await this.sessions.optional(request);
     const staffAllowed = session && canAccessRequest(session, 'REQUEST_DETAIL_READ', evidence);
     if (evidence.mission_id) {
       if (!session) throw new AppError('UNAUTHENTICATED', { status: 401 });
@@ -292,7 +300,7 @@ export class EvidenceService implements OnModuleInit, OnModuleDestroy {
       if (!memberRows.length && !staffAllowed && !coordinatorAllowed) throw new AppError('FORBIDDEN', { status: 403 });
     } else {
       if (!evidence.request_id) throw new AppError('INTERNAL_ERROR', { status: 500 });
-      if (!staffAllowed) await this.access.forRequest(evidence.request_id, trackingCode, trackingSecret, session);
+      if (!staffAllowed && !reporterCodeValid) await this.access.forRequest(evidence.request_id, trackingCode);
     }
     try {
       return { url: await this.storage.signedGetUrl(evidence.object_key, this.storageConfig.signedUrlTtlSeconds), expires_in: this.storageConfig.signedUrlTtlSeconds };

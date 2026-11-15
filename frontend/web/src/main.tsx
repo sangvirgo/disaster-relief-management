@@ -750,9 +750,8 @@ function Tracking({
   onNewSos: () => void;
 }) {
   const [code, setCode] = useState(initialCode);
-  const [secret, setSecret] = useState('');
   const [data, setData] = useState<ResponseComponents['schemas']['ReporterTracking'] | null>(null);
-  const [verified, setVerified] = useState<{ code: string; secret: string } | null>(null);
+  const [verified, setVerified] = useState<{ code: string } | null>(null);
   const lookupVersion = useRef(0);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -766,18 +765,15 @@ function Tracking({
   const codeError = !code.trim() ? 'Mã theo dõi là bắt buộc.'
     : code.trim().length > 10 ? 'Mã theo dõi không được vượt quá 10 ký tự.'
       : !/^[0-9A-HJKMNP-TV-Z]{10}$/i.test(code.trim()) ? 'Mã theo dõi cần gồm 10 ký tự hợp lệ.' : '';
-  const secretError = !user && !secret.trim() ? 'Mã bảo mật là bắt buộc.'
-    : secret.length > 43 ? 'Mã bảo mật không được vượt quá 43 ký tự.'
-      : secret.trim() && !/^[A-Za-z0-9_-]{43}$/.test(secret.trim()) ? 'Mã bảo mật cần gồm 43 ký tự hợp lệ.' : '';
   const recoveryError = !recoveryCode.trim() ? 'Mã khôi phục một lần là bắt buộc.'
     : recoveryCode.length > 43 ? 'Mã khôi phục không được vượt quá 43 ký tự.'
       : !/^[A-Za-z0-9_-]{43}$/.test(recoveryCode.trim()) ? 'Mã khôi phục không đúng định dạng.' : '';
-  const lookupInvalid = Boolean(codeError || secretError);
+  const lookupInvalid = Boolean(codeError);
   useEffect(() => {
     if (!user || !initialCode.trim()) return;
     let active = true;
     const version = ++lookupVersion.current;
-    const credentials = { code: initialCode.trim(), secret: '' };
+    const credentials = { code: initialCode.trim().toUpperCase() };
     setBusy(true);
     api<ResponseComponents['schemas']['ReporterTracking']>('response', '/requests/track', {
       headers: { 'X-Tracking-Code': credentials.code },
@@ -803,10 +799,7 @@ function Tracking({
       'response',
       '/requests/track',
       {
-        headers: {
-          'X-Tracking-Code': credentials.code,
-          ...(credentials.secret ? { 'X-Tracking-Secret': credentials.secret } : {}),
-        },
+        headers: { 'X-Tracking-Code': credentials.code },
       }
     );
     if (version === lookupVersion.current) {
@@ -819,7 +812,7 @@ function Tracking({
     setLookupAttempted(true);
     if (lookupInvalid) return;
     const version = ++lookupVersion.current;
-    const credentials = { code: code.trim(), secret: secret.trim() };
+    const credentials = { code: code.trim().toUpperCase() };
     setBusy(true);
     setError('');
     setData(null);
@@ -857,7 +850,6 @@ function Tracking({
       recoveryKey.current = null;
       setRecoveryCode('');
       setRecoveryTouched(false);
-      setSecret('');
       invalidateLookup();
       setRecoveryMessage('Yêu cầu đã được gắn với tài khoản. Hãy tra cứu lại bằng mã theo dõi.');
     } catch (cause) {
@@ -887,7 +879,7 @@ function Tracking({
           )}
           <h2>Tra cứu SOS bằng mã</h2>
           <p>
-            Nhập mã theo dõi đã nhận khi gửi SOS. Nếu gửi khi chưa đăng nhập, nhập thêm mã bảo mật.
+            Nhập mã theo dõi đã nhận khi gửi SOS.
           </p>
           <form onSubmit={lookup} className="form-stack" noValidate>
           <label>
@@ -899,7 +891,7 @@ function Tracking({
               aria-invalid={Boolean((lookupAttempted || lookupTouched.code) && codeError)}
               value={code}
               onChange={(e) => {
-                setCode(e.target.value);
+                setCode(e.target.value.toUpperCase());
                 setLookupTouched((current) => ({ ...current, code: true }));
                 recoveryKey.current = null;
                 invalidateLookup();
@@ -908,25 +900,6 @@ function Tracking({
               autoComplete="off"
             />
             {(lookupAttempted || lookupTouched.code) && codeError && <small className="field-error" role="alert">{codeError}</small>}
-          </label>
-          <label>
-            <span>Mã bảo mật {user ? '(nếu chưa gắn với tài khoản)' : ''}{!user && <> <span className="required-mark" aria-hidden="true">*</span></>}</span>
-            <input
-              required={!user}
-              type="password"
-              name="tracking_secret"
-              maxLength={44}
-              aria-invalid={Boolean((lookupAttempted || lookupTouched.secret) && secretError)}
-              value={secret}
-              onChange={(e) => {
-                setSecret(e.target.value);
-                setLookupTouched((current) => ({ ...current, secret: true }));
-                invalidateLookup();
-              }}
-              onBlur={() => setLookupTouched((current) => ({ ...current, secret: true }))}
-              autoComplete="new-password"
-            />
-            {(lookupAttempted || lookupTouched.secret) && secretError && <small className="field-error" role="alert">{secretError}</small>}
           </label>
           <button className="button" disabled={busy || lookupInvalid}>
             {busy ? 'Đang tra cứu…' : 'Xem tiến độ'}
@@ -1019,7 +992,6 @@ function Tracking({
           key={data.id}
           tracking={data}
           code={verified.code}
-          secret={verified.secret}
           canClaim={Boolean(user)}
           onUpdated={refreshTracking}
         />
