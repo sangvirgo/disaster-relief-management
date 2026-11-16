@@ -53,7 +53,6 @@ export const pages: Record<Workspace, Page[]> = {
       id: 'reports', title: 'Tổng quan và bản đồ', icon: 'report', service: 'response',
       path: '/reports/summary', note: 'Tình hình SOS, nhiệm vụ và bản đồ nhiệt.',
     },
-    { id: 'queue', title: 'Xử lý SOS', icon: 'queue', service: 'response', path: '/requests' },
     { id: 'teams', title: 'Đội cứu hộ', icon: 'team', service: 'response', path: '/teams' },
     { id: 'notices', title: 'Thông báo', icon: 'notice', service: 'response', path: '/notices' },
   ],

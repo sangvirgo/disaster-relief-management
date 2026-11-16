@@ -913,3 +913,14 @@
 .sos-ai-card__status { font-size: 0.8rem; color: #4338ca; font-weight: 600; }
 .sos-ai-card__verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
 .sos-ai-card__note { font-size: 0.8rem; color: #64748b; }
+
+/* Campaign area map editor: draggable centre / radius handles */
+.campaign-edit-handle span {
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  background: #fff; color: #111827; border: 2px solid #111827; font-size: 15px; line-height: 1;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.3); cursor: grab;
+}
+.campaign-edit-handle--radius span { background: #2563eb; color: #fff; border-color: #fff; }
+.campaign-area-editor { display: grid; gap: 8px; margin: 8px 0 12px; }
+.campaign-area-editor__row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.campaign-area-editor__row label { display: grid; gap: 4px; min-width: 160px; }

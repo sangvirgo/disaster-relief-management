@@ -293,6 +293,111 @@ UPDATE assistance_request
    AND verification_revision IS NULL
    AND status IN ('VERIFYING','VERIFIED','TRIAGED');
 
+-- ---------- Campaign-attribution demo SOS (C48CAM*): inside one campaign, inside two, outside every campaign ----------
+-- Attribution is derived from the campaign areas with the same PostGIS rule the API uses (ACTIVE campaigns only).
+INSERT INTO assistance_request (id, tracking_code, incident_category_code, report_mode, status, verifying_since, received_at,
+                                description, reporter_contact_phone, reporter_name)
+SELECT fixture.id, fixture.tracking_code, fixture.category_code, 'SELF', fixture.status::request_status, fixture.verifying_since,
+       fixture.received_at, fixture.description, fixture.phone, fixture.reporter_name
+  FROM (VALUES
+    ('00000000-0000-4000-8000-00000000f201'::uuid, 'C48CAM00A01', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '17 minutes', 'Nước dâng vào nhà, cần hỗ trợ di dời người già và trẻ nhỏ.', '0900400001', 'Người báo A01 (demo)'),
+    ('00000000-0000-4000-8000-00000000f202'::uuid, 'C48CAM00A02', 'TRAPPED', 'SUBMITTED', NULL::timestamptz, now() - interval '24 minutes', 'Người cao tuổi mắc kẹt tầng trệt do nước chảy xiết.', '0900400002', 'Người báo A02 (demo)'),
+    ('00000000-0000-4000-8000-00000000f203'::uuid, 'C48CAM00A03', 'STORM', 'VERIFYING', now() - interval '23 minutes', now() - interval '31 minutes', 'Gió lớn làm sập mái nhà, gia đình cần chỗ trú tạm.', '0900400003', 'Người báo A03 (demo)'),
+    ('00000000-0000-4000-8000-00000000f204'::uuid, 'C48CAM00A04', 'MEDICAL', 'SUBMITTED', NULL::timestamptz, now() - interval '38 minutes', 'Người bệnh cần hỗ trợ y tế, đường vào bị ngập.', '0900400004', 'Người báo A04 (demo)'),
+    ('00000000-0000-4000-8000-00000000f205'::uuid, 'C48CAM00A05', 'LANDSLIDE', 'SUBMITTED', NULL::timestamptz, now() - interval '45 minutes', 'Sạt lở chặn đường vào bản, cần kiểm tra an toàn.', '0900400005', 'Người báo A05 (demo)'),
+    ('00000000-0000-4000-8000-00000000f206'::uuid, 'C48CAM00B01', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '52 minutes', 'Khu dân cư bị cô lập bởi nước lũ, cần xuồng cứu hộ.', '0900400006', 'Người báo B01 (demo)'),
+    ('00000000-0000-4000-8000-00000000f207'::uuid, 'C48CAM00B02', 'TRAPPED', 'VERIFYING', now() - interval '27 minutes', now() - interval '59 minutes', 'Gia đình mắc kẹt trên tầng hai, nước còn dâng.', '0900400007', 'Người báo B02 (demo)'),
+    ('00000000-0000-4000-8000-00000000f208'::uuid, 'C48CAM00B03', 'MEDICAL', 'SUBMITTED', NULL::timestamptz, now() - interval '66 minutes', 'Người già khó thở, cần sơ cứu tại chỗ.', '0900400008', 'Người báo B03 (demo)'),
+    ('00000000-0000-4000-8000-00000000f209'::uuid, 'C48CAM00C01', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '73 minutes', 'Nước ngập đường, cần nhu yếu phẩm cho 4 người.', '0900400009', 'Người báo C01 (demo)'),
+    ('00000000-0000-4000-8000-00000000f20a'::uuid, 'C48CAM00C02', 'STORM', 'SUBMITTED', NULL::timestamptz, now() - interval '80 minutes', 'Cây đổ chắn lối vào nhà, cần hỗ trợ dọn dẹp.', '0900400010', 'Người báo C02 (demo)'),
+    ('00000000-0000-4000-8000-00000000f20b'::uuid, 'C48CAM00C03', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '87 minutes', 'Ngập sâu, cần cứu trợ lương thực và nước sạch.', '0900400011', 'Người báo C03 (demo)'),
+    ('00000000-0000-4000-8000-00000000f20c'::uuid, 'C48CAM00C04', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '94 minutes', 'Nước tràn vào khu nhà, cần hỗ trợ di dời.', '0900400012', 'Người báo C04 (demo)'),
+    ('00000000-0000-4000-8000-00000000f20d'::uuid, 'C48CAM00C05', 'TRAPPED', 'SUBMITTED', NULL::timestamptz, now() - interval '101 minutes', 'Người già và trẻ nhỏ chờ cứu hộ trên mái nhà.', '0900400013', 'Người báo C05 (demo)'),
+    ('00000000-0000-4000-8000-00000000f20e'::uuid, 'C48CAM00C06', 'MEDICAL', 'VERIFYING', now() - interval '34 minutes', now() - interval '108 minutes', 'Cần hỗ trợ y tế khẩn cho người cao tuổi.', '0900400014', 'Người báo C06 (demo)'),
+    ('00000000-0000-4000-8000-00000000f20f'::uuid, 'C48CAM00C07', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '115 minutes', 'Nằm ngay sát ngoài vùng chiến dịch Nam, cần hỗ trợ nước uống.', '0900400015', 'Người báo C07 (demo)')
+  ) AS fixture(id, tracking_code, category_code, status, verifying_since, received_at, description, phone, reporter_name)
+ WHERE true
+ON CONFLICT DO NOTHING;
+
+INSERT INTO request_subject (request_id, people_affected, children_count, elderly_count, location, location_source)
+SELECT fixture.id, fixture.people_affected, fixture.children_count, fixture.elderly_count,
+       ST_SetSRID(ST_MakePoint(fixture.longitude, fixture.latitude), 4326)::geography, 'MANUAL_PIN'
+  FROM (VALUES
+    ('00000000-0000-4000-8000-00000000f201'::uuid, 'C48CAM00A01', 4, 1, 1, 106.6900::float8, 10.7900::float8),
+    ('00000000-0000-4000-8000-00000000f202'::uuid, 'C48CAM00A02', 3, 0, 1, 106.7500::float8, 10.7400::float8),
+    ('00000000-0000-4000-8000-00000000f203'::uuid, 'C48CAM00A03', 2, 0, 0, 108.2100::float8, 16.0600::float8),
+    ('00000000-0000-4000-8000-00000000f204'::uuid, 'C48CAM00A04', 1, 0, 1, 105.7500::float8, 10.0500::float8),
+    ('00000000-0000-4000-8000-00000000f205'::uuid, 'C48CAM00A05', 5, 2, 0, 103.4800::float8, 22.4000::float8),
+    ('00000000-0000-4000-8000-00000000f206'::uuid, 'C48CAM00B01', 6, 2, 1, 105.8700::float8, 21.0300::float8),
+    ('00000000-0000-4000-8000-00000000f207'::uuid, 'C48CAM00B02', 3, 1, 0, 105.8900::float8, 21.0400::float8),
+    ('00000000-0000-4000-8000-00000000f208'::uuid, 'C48CAM00B03', 2, 0, 1, 105.8800::float8, 21.0200::float8),
+    ('00000000-0000-4000-8000-00000000f209'::uuid, 'C48CAM00C01', 4, 1, 0, 107.5900::float8, 16.4600::float8),
+    ('00000000-0000-4000-8000-00000000f20a'::uuid, 'C48CAM00C02', 2, 0, 1, 108.4400::float8, 11.9400::float8),
+    ('00000000-0000-4000-8000-00000000f20b'::uuid, 'C48CAM00C03', 5, 1, 1, 105.6900::float8, 18.6700::float8),
+    ('00000000-0000-4000-8000-00000000f20c'::uuid, 'C48CAM00C04', 3, 1, 0, 106.6800::float8, 20.8600::float8),
+    ('00000000-0000-4000-8000-00000000f20d'::uuid, 'C48CAM00C05', 4, 0, 2, 106.7000::float8, 20.8700::float8),
+    ('00000000-0000-4000-8000-00000000f20e'::uuid, 'C48CAM00C06', 2, 0, 1, 106.6600::float8, 20.8500::float8),
+    ('00000000-0000-4000-8000-00000000f20f'::uuid, 'C48CAM00C07', 3, 0, 0, 106.7000::float8, 11.0500::float8)
+  ) AS fixture(id, tracking_code, people_affected, children_count, elderly_count, longitude, latitude)
+  JOIN assistance_request request ON request.id = fixture.id AND request.tracking_code = fixture.tracking_code
+ WHERE true
+ON CONFLICT DO NOTHING;
+
+INSERT INTO request_event (id, request_id, actor_user_id, event_type, visibility, from_status, to_status, payload, occurred_at)
+SELECT fixture.event_id, request.id, NULL, 'REQUEST_SUBMITTED', 'REPORTER', NULL::request_status, 'SUBMITTED'::request_status,
+       '{"public_text_code":"RECEIVED"}'::jsonb, request.received_at
+  FROM (VALUES
+    ('00000000-0000-4000-8000-0000000e1301'::uuid, '00000000-0000-4000-8000-00000000f201'::uuid, 'C48CAM00A01'),
+    ('00000000-0000-4000-8000-0000000e1302'::uuid, '00000000-0000-4000-8000-00000000f202'::uuid, 'C48CAM00A02'),
+    ('00000000-0000-4000-8000-0000000e1303'::uuid, '00000000-0000-4000-8000-00000000f203'::uuid, 'C48CAM00A03'),
+    ('00000000-0000-4000-8000-0000000e1304'::uuid, '00000000-0000-4000-8000-00000000f204'::uuid, 'C48CAM00A04'),
+    ('00000000-0000-4000-8000-0000000e1305'::uuid, '00000000-0000-4000-8000-00000000f205'::uuid, 'C48CAM00A05'),
+    ('00000000-0000-4000-8000-0000000e1306'::uuid, '00000000-0000-4000-8000-00000000f206'::uuid, 'C48CAM00B01'),
+    ('00000000-0000-4000-8000-0000000e1307'::uuid, '00000000-0000-4000-8000-00000000f207'::uuid, 'C48CAM00B02'),
+    ('00000000-0000-4000-8000-0000000e1308'::uuid, '00000000-0000-4000-8000-00000000f208'::uuid, 'C48CAM00B03'),
+    ('00000000-0000-4000-8000-0000000e1309'::uuid, '00000000-0000-4000-8000-00000000f209'::uuid, 'C48CAM00C01'),
+    ('00000000-0000-4000-8000-0000000e130a'::uuid, '00000000-0000-4000-8000-00000000f20a'::uuid, 'C48CAM00C02'),
+    ('00000000-0000-4000-8000-0000000e130b'::uuid, '00000000-0000-4000-8000-00000000f20b'::uuid, 'C48CAM00C03'),
+    ('00000000-0000-4000-8000-0000000e130c'::uuid, '00000000-0000-4000-8000-00000000f20c'::uuid, 'C48CAM00C04'),
+    ('00000000-0000-4000-8000-0000000e130d'::uuid, '00000000-0000-4000-8000-00000000f20d'::uuid, 'C48CAM00C05'),
+    ('00000000-0000-4000-8000-0000000e130e'::uuid, '00000000-0000-4000-8000-00000000f20e'::uuid, 'C48CAM00C06'),
+    ('00000000-0000-4000-8000-0000000e130f'::uuid, '00000000-0000-4000-8000-00000000f20f'::uuid, 'C48CAM00C07')
+  ) AS fixture(event_id, request_id, tracking_code)
+  JOIN assistance_request request ON request.id = fixture.request_id AND request.tracking_code = fixture.tracking_code
+ WHERE true
+ON CONFLICT (id) DO NOTHING;
+
+WITH hits AS (
+  SELECT r.id, array_agg(c.id ORDER BY c.id) AS campaign_ids
+    FROM assistance_request r
+    JOIN request_subject s ON s.request_id = r.id
+    JOIN campaign c ON c.status = 'ACTIVE' AND c.center IS NOT NULL AND c.radius_m IS NOT NULL
+                   AND ST_DWithin(c.center, s.location, c.radius_m)
+   WHERE r.tracking_code LIKE 'C48CAM%'
+   GROUP BY r.id
+)
+UPDATE assistance_request r
+   SET campaign_id = CASE WHEN cardinality(h.campaign_ids) = 1 THEN h.campaign_ids[1] ELSE NULL END,
+       campaign_match_state = CASE WHEN cardinality(h.campaign_ids) = 1 THEN 'AUTO_ATTACHED' ELSE 'CONFLICT' END,
+       campaign_candidate_ids = CASE WHEN cardinality(h.campaign_ids) = 1 THEN NULL ELSE h.campaign_ids END,
+       version = r.version + 1
+  FROM hits h
+ WHERE r.id = h.id
+   AND (r.campaign_match_state NOT IN ('AUTO_ATTACHED','CONFLICT','MANUAL'));
+
+INSERT INTO request_event (id, request_id, actor_user_id, event_type, visibility, from_status, to_status, payload, occurred_at)
+SELECT md5('c48-seed-cam-attribution:' || r.id::text)::uuid, r.id, NULL,
+       CASE r.campaign_match_state WHEN 'AUTO_ATTACHED' THEN 'CAMPAIGN_AUTO_ATTACHED' ELSE 'CAMPAIGN_MATCH_CONFLICT' END,
+       'STAFF', r.status, r.status,
+       CASE r.campaign_match_state
+         WHEN 'AUTO_ATTACHED' THEN jsonb_build_object('campaign_id', r.campaign_id, 'campaign_match_state', 'AUTO_ATTACHED', 'matching_rule', 'POSTGIS_RADIUS')
+         ELSE jsonb_build_object('campaign_candidate_ids', r.campaign_candidate_ids, 'matching_rule', 'POSTGIS_RADIUS')
+       END,
+       r.received_at + interval '1 minute'
+  FROM assistance_request r
+ WHERE r.tracking_code LIKE 'C48CAM%' AND r.campaign_match_state IN ('AUTO_ATTACHED','CONFLICT')
+ON CONFLICT (id) DO NOTHING;
+
 -- Campaign attribution fixtures mirror the deterministic PostGIS rule and retain audit history.
 UPDATE assistance_request
    SET campaign_id='00000000-0000-4000-8000-0000000000c3',campaign_match_state='AUTO_ATTACHED',
@@ -311,6 +416,7 @@ UPDATE assistance_request
 UPDATE assistance_request
    SET campaign_match_state='MANUAL',campaign_candidate_ids=NULL
  WHERE campaign_id IS NOT NULL AND id<>'00000000-0000-4000-8000-0000000000f1'
+   AND tracking_code NOT LIKE 'C48CAM%'
    AND campaign_match_state<>'MANUAL';
 
 UPDATE assistance_request

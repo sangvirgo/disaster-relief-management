@@ -43,21 +43,46 @@ export type AreaMapCampaign = {
   radius_m: number;
 };
 
-/** Read-only overview: campaign areas plus unmatched SOS. Clicking a SOS marker reports its id. */
+export type AreaEditor = {
+  /** Area being drawn or adjusted; null until the coordinator taps the map. */
+  center: { lat: number; lng: number } | null;
+  radiusM: number;
+  /** Campaign being adjusted: its saved circle is hidden while the editable one is shown. */
+  hideCampaignId?: string;
+  onChange: (center: { lat: number; lng: number }, radiusM: number) => void;
+};
+
+const RADIUS_MIN_M = 500;
+const RADIUS_MAX_M = 300_000;
+const editHandleIcon = (kind: 'center' | 'radius') => L.divIcon({
+  className: `campaign-edit-handle campaign-edit-handle--${kind}`,
+  html: `<span aria-hidden="true">${kind === 'center' ? '✥' : '↔'}</span>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+});
+const eastOf = (center: { lat: number; lng: number }, radiusM: number): L.LatLngTuple =>
+  [center.lat, center.lng + radiusM / (111_320 * Math.cos(center.lat * Math.PI / 180))];
+
+/** Campaign areas plus unmatched SOS. With `editor`, the coordinator draws (tap), moves (drag centre) and resizes (drag edge handle) one area. */
 export function CampaignAreaMap({
   requests,
   campaigns,
   onSelect,
+  editor,
 }: {
   requests: AreaMapRequest[];
   campaigns: AreaMapCampaign[];
   onSelect?: (requestId: string) => void;
+  editor?: AreaEditor | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
+  const editLayerRef = useRef<L.LayerGroup | null>(null);
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -69,14 +94,55 @@ export function CampaignAreaMap({
     }
     mapRef.current = map;
     layerRef.current = L.layerGroup().addTo(map);
+    editLayerRef.current = L.layerGroup().addTo(map);
+    map.on('click', (event: L.LeafletMouseEvent) => {
+      const current = editorRef.current;
+      if (current && !current.center) current.onChange({ lat: event.latlng.lat, lng: event.latlng.lng }, current.radiusM);
+    });
     const timer = window.setTimeout(() => map.invalidateSize(), 200);
     return () => {
       window.clearTimeout(timer);
       map.remove();
       mapRef.current = null;
       layerRef.current = null;
+      editLayerRef.current = null;
     };
   }, []);
+
+  const hideId = editor?.hideCampaignId;
+  const editing = Boolean(editor);
+  const centerLat = editor?.center?.lat;
+  const centerLng = editor?.center?.lng;
+  const editRadius = editor?.radiusM;
+  useEffect(() => {
+    const map = mapRef.current;
+    const layer = editLayerRef.current;
+    if (!map || !layer) return;
+    layer.clearLayers();
+    map.getContainer().style.cursor = editing && centerLat === undefined ? 'crosshair' : '';
+    if (!editing || centerLat === undefined || centerLng === undefined || editRadius === undefined) return;
+    const center = { lat: centerLat, lng: centerLng };
+    const circle = L.circle([center.lat, center.lng], {
+      radius: editRadius, color: '#111827', weight: 3, dashArray: '8 5', fillColor: '#2563eb', fillOpacity: 0.12, interactive: false,
+    }).addTo(layer);
+    const centerMarker = L.marker([center.lat, center.lng], { icon: editHandleIcon('center'), draggable: true, zIndexOffset: 2000 })
+      .bindTooltip('Kéo để di chuyển vùng').addTo(layer);
+    const radiusMarker = L.marker(eastOf(center, editRadius), { icon: editHandleIcon('radius'), draggable: true, zIndexOffset: 2000 })
+      .bindTooltip('Kéo để đổi bán kính').addTo(layer);
+    const commit = (nextCenter: { lat: number; lng: number }, radius: number) =>
+      editorRef.current?.onChange(nextCenter, Math.min(RADIUS_MAX_M, Math.max(RADIUS_MIN_M, Math.round(radius / 100) * 100)));
+    centerMarker.on('drag', () => {
+      const at = centerMarker.getLatLng();
+      circle.setLatLng(at);
+      radiusMarker.setLatLng(eastOf({ lat: at.lat, lng: at.lng }, editRadius));
+    });
+    centerMarker.on('dragend', () => { const at = centerMarker.getLatLng(); commit({ lat: at.lat, lng: at.lng }, editRadius); });
+    radiusMarker.on('drag', () => {
+      const radius = Math.min(RADIUS_MAX_M, Math.max(RADIUS_MIN_M, map.distance([center.lat, center.lng], radiusMarker.getLatLng())));
+      circle.setRadius(radius);
+    });
+    radiusMarker.on('dragend', () => commit(center, map.distance([center.lat, center.lng], radiusMarker.getLatLng())));
+  }, [editing, centerLat, centerLng, editRadius]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -85,6 +151,7 @@ export function CampaignAreaMap({
     layer.clearLayers();
     const bounds: L.LatLngTuple[] = [];
     campaigns.forEach((campaign, index) => {
+      if (campaign.id === hideId) return;
       const active = campaign.status === 'ACTIVE';
       const color = areaColor(index);
       L.circle([campaign.center.lat, campaign.center.lng], {
@@ -124,7 +191,7 @@ export function CampaignAreaMap({
       bounds.push(position);
     }
     if (bounds.length) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 14 });
-  }, [requests, campaigns]);
+  }, [requests, campaigns, hideId]);
 
   return (
     <>

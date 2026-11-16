@@ -136,7 +136,7 @@ type Detail = QueueItem & {
     people_affected?: number | null;
     children_count?: number | null;
     elderly_count?: number | null;
-    location?: { coordinates: [number, number]; source: string };
+    location?: { coordinates: [number, number]; source: string; accuracy_m?: number | string | null };
     reporter_relationship?: string | null;
     beneficiary_contact_phone?: string | null;
     alternate_contact?: { name?: string | null; phone?: string | null };
@@ -217,7 +217,7 @@ type Candidate = {
 };
 type Candidates = { items: Candidate[]; unknown_position: Candidate[] };
 
-function NearbyAddress({ coordinates }: { coordinates?: [number, number] }) {
+function NearbyAddress({ coordinates, accuracyM }: { coordinates?: [number, number]; accuracyM?: number | string | null }) {
   const longitude = coordinates?.[0];
   const latitude = coordinates?.[1];
   const [address, setAddress] = useState<string | null>(null);
@@ -225,7 +225,7 @@ function NearbyAddress({ coordinates }: { coordinates?: [number, number] }) {
     if (longitude === undefined || latitude === undefined) return;
     const controller = new AbortController();
     setAddress(null);
-    void fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?location=${encodeURIComponent(`${longitude},${latitude}`)}&langCode=VI&forStorage=false&f=json`, { signal: controller.signal })
+    void fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?location=${encodeURIComponent(`${longitude},${latitude}`)}&langCode=VI&featureTypes=${encodeURIComponent('StreetAddress,PointAddress,StreetName,StreetInt,Locality')}&forStorage=false&f=json`, { signal: controller.signal })
       .then((response) => response.ok ? response.json() : null)
       .then((value: { address?: { Match_addr?: string; CountryCode?: string } } | null) => {
         if (!controller.signal.aborted) setAddress(value?.address?.CountryCode === 'VNM' ? value.address.Match_addr?.trim() || '' : '');
@@ -234,7 +234,12 @@ function NearbyAddress({ coordinates }: { coordinates?: [number, number] }) {
     return () => controller.abort();
   }, [longitude, latitude]);
   if (longitude === undefined || latitude === undefined) return <>Chưa có vị trí</>;
-  return <>{address === null ? 'Đang tìm địa chỉ gần vị trí SOS…' : address ? `Gần ${address}` : 'Chưa tìm được địa chỉ gần đúng; xem ghim trên bản đồ.'}</>;
+  const accuracy = Number(accuracyM);
+  const precision = Number.isFinite(accuracy) && accuracy > 0 ? ` · sai số khoảng ${Math.round(accuracy)} m` : '';
+  return <>
+    {address === null ? 'Đang tìm địa chỉ gần vị trí SOS…' : address ? `Gần ${address}` : 'Chưa tìm được địa chỉ gần đúng; xem ghim trên bản đồ.'}
+    <small className="muted" style={{ display: 'block' }}>{`${latitude.toFixed(5)}, ${longitude.toFixed(5)}${precision}`}</small>
+  </>;
 }
 
 type DuplicateCandidate = {
@@ -840,8 +845,12 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
       </div>
     );
   }
+  const decisionShown = Boolean(detail?.fast_track && ['SUBMITTED', 'VERIFYING'].includes(detail.status));
   function aiResubmitAction(status: string | undefined) {
     if (!detail) return null;
+    if (!reliefDescription(detail.description).narrative.trim() && !detail.description?.trim()) {
+      return <small className="muted">AI cần mô tả tình huống để đánh giá; hồ sơ này chưa có nên hãy xác minh trực tiếp.</small>;
+    }
     const title = status === 'SKIPPED' || status === 'STALE' || !detail.ai_advisory
       ? 'Yêu cầu AI đánh giá' : 'Gửi lại cho AI đánh giá';
     if (status === 'FAILED' && detail.ai_advisory && !detail.ai_advisory.review_status) {
@@ -1172,7 +1181,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   ...(detail.needs_relief_supplies ? [reliefDescription(detail.description).items || 'Cần cứu trợ'] : []),
                 ].join(' · ') || 'Chưa khai báo'}</dd></div>
                 <div><dt>Người báo</dt><dd>{detail.reporter.name || 'Chưa có tên'} · {detail.reporter.contact_phone || 'Chưa có số liên hệ'}</dd></div>
-                <div className="sos-summary__wide"><dt>Vị trí</dt><dd><NearbyAddress coordinates={detail.subject.location?.coordinates} /></dd></div>
+                <div className="sos-summary__wide"><dt>Vị trí</dt><dd><NearbyAddress coordinates={detail.subject.location?.coordinates} accuracyM={detail.subject.location?.accuracy_m} /></dd></div>
               </dl>
               {detail.status === 'DUPLICATE' && (detail.canonical ? (
                 <>
@@ -1240,25 +1249,24 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               <section className="sos-decision" data-tone={ft.eligible ? 'ready' : 'review'} aria-label="Quyết định xử lý">
                 <div className="sos-decision__head">
                   <div>
-                    <p className="sos-decision__eyebrow">{ft.suggestion_confidence === 'LOW' ? 'Tạm gợi ý (thiếu thông tin)' : 'Hệ thống gợi ý mức ưu tiên'}</p>
+                    <p className="sos-decision__eyebrow">{ft.suggestion_confidence === 'LOW' ? 'Gợi ý tạm thời' : 'Hệ thống gợi ý mức ưu tiên'}</p>
                     <p className="sos-decision__priority"><PriorityBadge priority={ft.suggested_priority} /> <span>{priorityMeaning[ft.suggested_priority].split(' · ')[1]}</span></p>
                   </div>
-                  <p className="sos-decision__basis">
-                    {ft.sources.length === 0 ? 'Chưa có điểm đánh giá' : ft.sources.includes('AI') ? 'Quy tắc nghiệp vụ + AI' : 'Quy tắc nghiệp vụ'}
-                  </p>
+                  {ft.sources.length > 0 && <p className="sos-decision__basis">
+                    {ft.sources.includes('AI') ? 'Quy tắc nghiệp vụ + AI' : 'Quy tắc nghiệp vụ'}
+                  </p>}
                 </div>
                 {ft.reason_codes.length > 0 && (
                   <ul className="sos-decision__chips">
                     {ft.reason_codes.map((code) => <li key={code}>{advisoryReasonLabels[code] ?? 'Có yếu tố cần chú ý'}</li>)}
                   </ul>
                 )}
-                {!ft.eligible && <>
+                {!ft.eligible && ft.blockers.length > 0 && (
                   <ul className="sos-decision__chips sos-decision__chips--warn">
-                    {ft.blockers.map((code) => <li key={code}>{fastTrackBlockerLabels[code] ?? 'Cần điều phối viên kiểm tra thêm'}</li>)}
+                    {ft.blockers.slice(0, 1).map((code) => <li key={code}>{fastTrackBlockerLabels[code] ?? 'Cần điều phối viên kiểm tra thêm'}</li>)}
                   </ul>
-                  <p className="sos-decision__hint">Đây chỉ là gợi ý. Hãy xác minh từng bước bên dưới, rồi đặt mức ưu tiên (hệ thống sẽ nhắc lại gợi ý ở bước đó).</p>
-                </>}
-                <dl className="sos-decision__scores">
+                )}
+                {(rule?.score != null || aiDone) && <dl className="sos-decision__scores">
                   <div>
                     <dt title="Điểm từ dấu hiệu trong hồ sơ SOS; không phải độ tin cậy của AI">Điểm quy tắc</dt>
                     <dd>{rule?.score != null ? <><b>{rule.score}</b>/100</> : '—'}</dd>
@@ -1271,7 +1279,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     <dt>Trạng thái AI</dt>
                     <dd>{aiDone ? 'Đã đánh giá' : (advisoryStatusLabels[aiStatus ?? ''] ?? 'Chưa có đánh giá')}</dd>
                   </div>
-                </dl>
+                </dl>}
                 {aiDone && detail.ai_advisory?.extracted_json?.summary && (
                   <p className="sos-decision__summary">
                     <strong>AI gợi ý {ai?.suggested_priority ?? 'chưa xác định'}:</strong>{' '}
@@ -1840,7 +1848,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               <p>
                 <strong>Vị trí</strong>
                 <span className="detail-value">
-                  <NearbyAddress coordinates={detail.subject.location?.coordinates} />
+                  <NearbyAddress coordinates={detail.subject.location?.coordinates} accuracyM={detail.subject.location?.accuracy_m} />
                 </span>
               </p>
               <p>
@@ -1908,10 +1916,10 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             )}
             </div>
             <div className="sos-tab-group" hidden={activeTab !== 'overview'}>
-            <h3>Gợi ý hỗ trợ từ hệ thống</h3>
-            {!detail.priority_advisory && !detail.ai_priority_advisory && !detail.ai_advisory &&
+            {!decisionShown && <h3>Gợi ý hỗ trợ từ hệ thống</h3>}
+            {!decisionShown && !detail.priority_advisory && !detail.ai_priority_advisory && !detail.ai_advisory &&
               <p className="empty">Chưa có gợi ý cho SOS này. Điều phối viên vẫn xác minh và quyết định theo thông tin đã kiểm tra.</p>}
-            {detail.priority_advisory && (
+            {!decisionShown && detail.priority_advisory && (
               <details className="sos-fold sos-fold--advisory">
                 <summary>
                   Đánh giá ban đầu: <strong>{advisoryScoreLabel(detail.priority_advisory.score, detail.priority_advisory.level)}</strong>
@@ -1928,7 +1936,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </p>
               </details>
             )}
-            {detail.ai_priority_advisory && detail.ai_advisory?.status !== 'COMPLETED' && (
+            {!decisionShown && detail.ai_priority_advisory && detail.ai_advisory?.status !== 'COMPLETED' && (
               <details className="sos-fold"><summary>Đánh giá AI hỗ trợ</summary><section className="notice">
                 <h3>
                   {detail.ai_priority_advisory.source === 'DEMO_FIXTURE'

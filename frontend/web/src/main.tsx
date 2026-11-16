@@ -1972,7 +1972,7 @@ function App() {
                 ) : workspace === 'citizen' && selected.id === 'drives' ? (
                   <Donations user={user} />
                 ) : workspace === 'coordinator' && selected.id === 'campaigns' ? (
-                  <CampaignCoordination user={user!} />
+                  <CampaignCoordination key={selectedRequestId} user={user!} initialRequestId={selectedRequestId} />
                 ) : workspace === 'coordinator' &&
                   ['queue', 'verify', 'triage', 'assign'].includes(selected.id) ? (
                   <Coordinator key={`${selected.id}:${selectedRequestId}`} page={selected.id} currentUserId={user!.id}
@@ -1982,8 +1982,8 @@ function App() {
                   selected.id === 'notices' ? (
                   <Notices key={workspace} onOpenRequest={workspace === 'coordinator' ? (requestId) => {
                     setSelectedRequestId(requestId);
-                    setPageId('queue');
-                    writeRoute('coordinator', 'queue', user);
+                    setPageId('campaigns');
+                    writeRoute('coordinator', 'campaigns', user);
                   } : undefined} onOpenMission={workspace === 'volunteer' ? (missionId) => {
                     setSelectedMissionId(missionId);
                     setPageId('missions');
@@ -1999,8 +1999,8 @@ function App() {
                 ) : (workspace === 'coordinator' || workspace === 'admin') && selected.id === 'dashboard' ? (
                   <RoleDashboard role={workspace} onOpenRequest={workspace === 'coordinator' ? (requestId) => {
                     setSelectedRequestId(requestId);
-                    setPageId('queue');
-                    writeRoute('coordinator', 'queue', user);
+                    setPageId('campaigns');
+                    writeRoute('coordinator', 'campaigns', user);
                   } : undefined} />
                 ) : workspace === 'operations' && selected.id === 'overview' ? (
                   <RoleDashboard role="operations" showReports={roles(user).has('OPERATIONS_MANAGER') || roles(user).has('CAMPAIGN_MANAGER')} />

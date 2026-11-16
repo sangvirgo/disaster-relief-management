@@ -11,6 +11,11 @@ import type { AiAdvisoryReviewDto, RequestVersionDto } from './request-operation
 import { enqueueAiAdvisory, isAiAdvisoryFresh, loadAssessmentFacts } from '../ai/ai-advisory-input';
 import { getGeminiApiKeys, hasGeminiApiKeys } from '../ai/gemini-api-keys';
 
+/** TypeORM returns `[rows, affectedCount]` for UPDATE ... RETURNING on Postgres, but plain rows for SELECT/INSERT. */
+function returnedRows<T>(result: unknown): T[] {
+  return Array.isArray(result) && Array.isArray(result[0]) ? result[0] as T[] : result as T[];
+}
+
 function assertGeminiConfigured(): void {
   if (hasGeminiApiKeys()) return;
   let message = 'Gợi ý AI chưa được cấu hình. Vui lòng liên hệ quản trị viên.';
@@ -60,8 +65,8 @@ export class RequestOperationsAiAdvisoryService {
         const updated = await manager.query(
           'UPDATE ai_advisory SET review_status=$2,review_by_user_id=$3,review_at=now(),review_note=$4 WHERE id=$1 AND review_status IS NULL RETURNING id',
           [advisory.id, dto.decision, session.userId, dto.note?.trim() ?? null],
-        ) as Array<{ id: string }>;
-        if (!updated[0]) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+        );
+        if (!returnedRows<{ id: string }>(updated)[0]) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         const payload = { advisory_id: advisory.id, decision: dto.decision, note: dto.note?.trim() ?? null };
         const events = await manager.query(
           `INSERT INTO request_event (request_id,actor_user_id,event_type,visibility,payload)
@@ -107,8 +112,8 @@ export class RequestOperationsAiAdvisoryService {
           const updated = await manager.query(
             `UPDATE ai_advisory SET status='QUEUED',attempts=0,error_code=NULL,completed_at=NULL,extracted_json=NULL,lease_until=NULL,claim_token=NULL
               WHERE id=$1 AND status='SKIPPED' RETURNING id`, [latest.id],
-          ) as Array<{ id: string }>;
-          advisoryId = updated[0]?.id;
+          );
+          advisoryId = returnedRows<{ id: string }>(updated)[0]?.id;
         } else {
           await enqueueAiAdvisory(manager, requestId);
           const created = await manager.query(
@@ -165,8 +170,8 @@ export class RequestOperationsAiAdvisoryService {
           `UPDATE ai_advisory SET status='QUEUED',attempts=0,error_code=NULL,completed_at=NULL,
                   extracted_json=NULL,lease_until=NULL,claim_token=NULL
             WHERE id=$1 AND status='FAILED' AND review_status IS NULL RETURNING id`, [advisory.id],
-        ) as Array<{ id: string }>;
-        if (!updated[0]) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+        );
+        if (!returnedRows<{ id: string }>(updated)[0]) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         const payload = { advisory_id: advisory.id, previous_attempts: Number(advisory.attempts), status: 'QUEUED' };
         const events = await manager.query(
           `INSERT INTO request_event (request_id,actor_user_id,event_type,visibility,payload)

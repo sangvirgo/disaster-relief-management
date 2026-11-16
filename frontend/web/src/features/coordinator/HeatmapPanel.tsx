@@ -122,6 +122,7 @@ function HeatmapCanvas({
   heatOpacity,
   weather,
   radarUrl,
+  hideCellPins = false,
 }: {
   cells: HeatmapCell[];
   selected: SelectedSos | null;
@@ -130,6 +131,8 @@ function HeatmapCanvas({
   heatOpacity: number;
   weather: WeatherPoint[];
   radarUrl: string | null;
+  /** Single-SOS views draw only the exact selected pin; aggregate cell centres look like a second, wrong location. */
+  hideCellPins?: boolean;
 }) {
   const elementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -298,7 +301,7 @@ function HeatmapCanvas({
       fieldContext.putImageData(image, 0, 0);
       context.imageSmoothingEnabled = true;
       context.drawImage(field, 0, 0, size.x, size.y);
-      if (zoom >= 12) {
+      if (zoom >= 12 && !hideCellPins) {
         const bounds = map.getBounds().pad(0.1);
         const minSeparation = zoom >= 15 ? 20 : zoom >= 14 ? 27 : 36;
         const pinClusters: { position: L.LatLngTuple; x: number; y: number; count: number; cells: number }[] = [];
@@ -355,7 +358,7 @@ function HeatmapCanvas({
       map.off('zoomend moveend resize', redraw);
       map.off('click', showCellCount);
     };
-  }, [cells, onResolutionChange, onZoomChange]);
+  }, [cells, onResolutionChange, onZoomChange, hideCellPins]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -542,7 +545,7 @@ export function HeatmapPanel({
       <>
         {loading && <p role="status">Đang cập nhật bản đồ nhiệt…</p>}
         {error && <p className="notice error" role="alert">{error}</p>}
-        <HeatmapCanvas cells={visibleCells} selected={selected} onResolutionChange={onResolutionChange} onZoomChange={onZoomChange} heatOpacity={heatOpacity}
+        <HeatmapCanvas hideCellPins={compact && Boolean(selected)} cells={visibleCells} selected={selected} onResolutionChange={onResolutionChange} onZoomChange={onZoomChange} heatOpacity={heatOpacity}
           weather={showWeather ? weatherData?.locations ?? [] : []}
           radarUrl={showRadar ? radarTemplate : null} />
         {compact ? <div className="weather-layer-control">

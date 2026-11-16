@@ -28,9 +28,11 @@ const reasonLabel: Record<string, string> = {
   OVERDUE: 'Có SOS quá hạn', LONG_WAIT: 'Có SOS chờ lâu',
   NO_COORDINATOR: 'Chưa có điều phối viên tham gia', ROUTINE: 'Không có dấu hiệu gấp nổi bật',
 };
-export function CampaignCoordination({ user }: { user: Me }) {
+export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me; initialRequestId?: string }) {
   const primary = user.grants.some((grant) => grant.role_code === 'COORDINATOR' && grant.scope_type === 'SYSTEM');
-  const [tab, setTab] = useState(primary ? 'overview' : 'workspace');
+  const opensSos = Boolean(initialRequestId) || Boolean(new URL(window.location.href).searchParams.get('sos_id'));
+  // Primary: campaigns (map + list) · SOS queue · coordination workspace · history. Others: workspace · history.
+  const [tab, setTab] = useState(primary ? (opensSos ? 'sos' : 'campaigns') : 'workspace');
   const [triage, setTriage] = useState<TriageCampaign[]>([]);
   const [overview, setOverview] = useState<OverviewCampaign[]>([]);
   const [commonQueue, setCommonQueue] = useState({ unmatched: 0, conflict: 0 });
@@ -40,7 +42,6 @@ export function CampaignCoordination({ user }: { user: Me }) {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [myHistory, setMyHistory] = useState<Engagement[]>([]);
-  const [commonState, setCommonState] = useState<'CONFLICT' | 'UNMATCHED'>('CONFLICT');
   const [cursor, setCursor] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -114,37 +115,45 @@ export function CampaignCoordination({ user }: { user: Me }) {
   }
 
   const tabs = primary
-    ? [['overview', 'Tổng quan chiến dịch'], ['common', 'Hàng chờ chung'], ['management', 'Quản lý chiến dịch'], ['history', 'Lịch sử cứu trợ'],
-      ['workspace', 'Không gian điều phối'], ['choose', 'Chọn chiến dịch gấp'], ['my-history', 'Lịch sử điều phối của tôi']]
-    : [['workspace', 'Không gian chiến dịch'], ['choose', 'Chọn chiến dịch gấp'], ['my-history', 'Lịch sử điều phối của tôi']];
+    ? [['campaigns', 'Chiến dịch'], ['sos', 'Xử lý SOS'], ['workspace', 'Không gian điều phối'], ['history', 'Lịch sử']]
+    : [['workspace', 'Không gian chiến dịch'], ['my-history', 'Lịch sử của tôi']];
+  const activeTab = (id: string) => tab === id || (id === 'workspace' && tab === 'choose') || (id === 'history' && tab === 'my-history');
   return <section className="campaign-coordination">
     <div className="tabs" role="tablist" aria-label="Điều phối chiến dịch">
-      {tabs.map(([id, title]) => <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? 'active' : ''}
+      {tabs.map(([id, title]) => <button key={id} type="button" role="tab" aria-selected={activeTab(id)} className={activeTab(id) ? 'active' : ''}
         onClick={() => id === 'my-history' ? void showMyHistory() : setTab(id)}>{title}</button>)}
     </div>
     {error && <p role="alert" className="notice error">{error}</p>}
     {loading && <p role="status">Đang cập nhật dữ liệu điều phối…</p>}
-    {primary && tab === 'overview' && <div className="record-list">
-      {overviewCampaigns.map((campaign) => <article className="card" key={campaign.id}>
-        <div className="section-header"><div><h2>{campaign.name}</h2><p>{campaign.status} · {campaign.center ? `Tâm ${campaign.center.lat}, ${campaign.center.lng} · bán kính ${campaign.radius_m} m` : 'Chưa thiết lập vùng tự động gắn SOS'}</p></div>
-          {!campaign.has_active_coordinator && <strong className="notice warning">Chưa có ai điều phối</strong>}</div>
-        <p>SOS theo trạng thái: {Object.entries(campaign.request_counts).map(([status, count]) => `${status}: ${count}`).join(' · ') || 'Chưa có SOS'}.</p>
-        <p>{campaign.active_coordinators.length} điều phối viên · {campaign.active_claim_count} claim hiệu lực · {campaign.overdue_count} SOS quá hạn.</p>
-        {campaign.active_coordinators.length > 0 && <p>{campaign.active_coordinators.map((person) => `${person.display_name ?? person.user_id} (từ ${new Date(person.started_at).toLocaleString('vi-VN')})`).join(' · ')}</p>}
-        <button className="button secondary" type="button" onClick={() => void showHistory(campaign.id)}>Xem lịch sử cứu trợ</button>
-      </article>)}
-      <p className="notice">Hàng chờ chung: {commonQueue.conflict} SOS trùng nhiều vùng chiến dịch · {commonQueue.unmatched} SOS ngoài mọi vùng chiến dịch.</p>
-    </div>}
-    {primary && tab === 'common' && <>
-      <CommonQueueSuggestions onChanged={() => setQueueRevision((value) => value + 1)} />
-      <p className="notice warning">SOS nằm ngoài mọi vùng chiến dịch hoặc trùng nhiều vùng. Mở từng hồ sơ để chọn chiến dịch phù hợp.</p>
-      <label>Loại hàng chờ <select value={commonState} onChange={(event) => setCommonState(event.target.value as typeof commonState)}>
-        <option value="CONFLICT">Trùng nhiều vùng chiến dịch</option><option value="UNMATCHED">Ngoài mọi vùng chiến dịch</option>
-      </select></label>
-      <Coordinator key={`${commonState}-${queueRevision}`} page="queue" currentUserId={user.id} canSeeUnassigned campaignMatchState={commonState} initialUnassignedOnly />
+    {primary && tab === 'campaigns' && <>
+      {(commonQueue.conflict > 0 || commonQueue.unmatched > 0) && <p className="notice warning">
+        {commonQueue.unmatched} SOS ngoài mọi vùng · {commonQueue.conflict} SOS trùng nhiều vùng.{' '}
+        <button type="button" className="button secondary" onClick={() => setTab('sos')}>Xem trong Xử lý SOS</button>
+      </p>}
+      <CommonQueueSuggestions onChanged={() => { setQueueRevision((value) => value + 1); setRefresh((value) => value + 1); }} />
+      {overviewCampaigns.length > 0 && <div className="operations-table-scroll" role="region" aria-label="Tình hình các chiến dịch" tabIndex={0}>
+        <table className="operations-record-table">
+          <thead><tr><th scope="col">Chiến dịch</th><th scope="col">SOS đang mở</th><th scope="col">Điều phối viên</th><th scope="col">Cần chú ý</th><th scope="col"><span className="sr-only">Lịch sử</span></th></tr></thead>
+          <tbody>{overviewCampaigns.map((campaign) => {
+            const open = Object.entries(campaign.request_counts).filter(([status]) => !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(status)).reduce((sum, [, count]) => sum + count, 0);
+            return <tr key={campaign.id}>
+              <th scope="row">{campaign.name}</th>
+              <td>{open}</td>
+              <td>{campaign.active_coordinators.length}</td>
+              <td>{!campaign.has_active_coordinator ? 'Chưa có ai điều phối' : campaign.overdue_count > 0 ? `${campaign.overdue_count} SOS quá hạn` : '—'}</td>
+              <td><button className="button secondary" type="button" onClick={() => void showHistory(campaign.id)}>Lịch sử</button></td>
+            </tr>;
+          })}</tbody>
+        </table>
+      </div>}
+      <details className="sos-fold" open>
+        <summary>Danh sách và vòng đời chiến dịch (kích hoạt, tạm dừng, kết thúc)</summary>
+        <Campaigns canManage />
+      </details>
     </>}
-    {primary && tab === 'management' && <Campaigns canManage />}
+    {primary && tab === 'sos' && <Coordinator key={`sos-${queueRevision}-${initialRequestId}`} page="queue" currentUserId={user.id} canSeeUnassigned initialRequestId={initialRequestId} />}
     {primary && tab === 'history' && <>
+      <p><button className="button secondary" type="button" onClick={() => void showMyHistory()}>Xem lịch sử điều phối của tôi</button></p>
       <label>Chiến dịch <select value={historyId} onChange={(event) => void showHistory(event.target.value)}>
         <option value="">Chọn chiến dịch</option>{overviewCampaigns.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select></label>
@@ -175,6 +184,9 @@ export function CampaignCoordination({ user }: { user: Me }) {
       </div> : <div className="empty">Bạn chưa tham gia điều phối chiến dịch nào. Hãy chọn chiến dịch gấp.</div>}
       {selectedEngagement && <Coordinator key={selectedEngagement.campaign_id} page="queue" currentUserId={user.id} campaignId={selectedEngagement.campaign_id} />}
     </>}
-    {tab === 'my-history' && <MyHistory items={myHistory} />}
+    {tab === 'my-history' && <>
+      {primary && <p><button className="button secondary" type="button" onClick={() => setTab('history')}>← Lịch sử theo chiến dịch</button></p>}
+      <MyHistory items={myHistory} />
+    </>}
   </section>;
 }

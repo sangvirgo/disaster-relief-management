@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import { CampaignAreaMap } from '../../maps/CampaignAreaMap';
 
@@ -48,6 +48,11 @@ const STATE_VI: Record<string, string> = { UNMATCHED: 'Ngoài mọi vùng chiế
 const STATUS_VI: Record<string, string> = { DRAFT: 'bản nháp', ACTIVE: 'đang hoạt động', PAUSED: 'tạm dừng' };
 
 const messageOf = (cause: unknown) => (cause instanceof Error ? cause.message : 'Chưa thực hiện được thao tác. Hãy thử lại.');
+function haversineM(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const rad = (value: number) => value * Math.PI / 180;
+  const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lng - a.lng) / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
 const km = (meters: number) => (meters / 1000).toFixed(1).replace('.', ',');
 const post = <T,>(path: string, body: unknown) =>
   api<T>('response', path, { method: 'POST', body, idempotencyKey: newCommandKey() });
@@ -117,6 +122,11 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
   const [message, setMessage] = useState('');
   const [revision, setRevision] = useState(0);
   const [highlight, setHighlight] = useState('');
+  // Map editor: draw a new campaign area, or adjust an existing one (kind 'adjust' carries the campaign id).
+  const [editMode, setEditMode] = useState<{ kind: 'create' } | { kind: 'adjust'; id: string } | null>(null);
+  const [draftCenter, setDraftCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [draftRadius, setDraftRadius] = useState(3000);
+  const [draftName, setDraftName] = useState('');
 
   useEffect(() => {
     let live = true;
@@ -177,9 +187,56 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
       try {
         await post(`/campaigns/${created.id}/activate`, { expected_version: created.version });
       } catch (cause) {
-        throw new Error(`Đã tạo chiến dịch "${name}" nhưng chưa kích hoạt được: ${messageOf(cause)} Hãy kích hoạt trong tab Quản lý chiến dịch.`);
+        throw new Error(`Đã tạo chiến dịch "${name}" nhưng chưa kích hoạt được: ${messageOf(cause)} Hãy kích hoạt trong danh sách chiến dịch bên dưới.`);
       }
     }, success);
+  }
+
+  function startCreate() {
+    setEditMode({ kind: 'create' }); setDraftCenter(null); setDraftRadius(NEW_CAMPAIGN_RADIUS_M); setDraftName('');
+    setError(''); setMessage('');
+  }
+  function startAdjust(id: string) {
+    const campaign = data?.campaigns.find((item) => item.id === id);
+    if (!campaign) { setEditMode(null); return; }
+    setEditMode({ kind: 'adjust', id }); setDraftCenter(campaign.center); setDraftRadius(campaign.radius_m);
+    setError(''); setMessage('');
+  }
+  function cancelEdit() { setEditMode(null); setDraftCenter(null); }
+  const draftReady = Boolean(draftCenter) && Number.isInteger(draftRadius) && draftRadius >= 500 && draftRadius <= MAX_RADIUS_M;
+  const coveredByDraft = useMemo(() => {
+    if (!draftCenter || !data) return 0;
+    return data.requests.filter((item) => haversineM(draftCenter, { lat: item.location.latitude, lng: item.location.longitude }) <= draftRadius).length;
+  }, [data, draftCenter, draftRadius]);
+  const adjusting = editMode?.kind === 'adjust' ? data?.campaigns.find((item) => item.id === editMode.id) : undefined;
+
+  async function createFromDraft(activate: boolean) {
+    if (!draftCenter || !draftReady) return;
+    const name = draftName.trim().normalize('NFC');
+    if (!name) { setError('Hãy đặt tên cho chiến dịch.'); return; }
+    await run(async () => {
+      const created = await post<{ id: string; version: number }>('/campaigns', {
+        name, center: draftCenter, radius_m: draftRadius,
+      });
+      if (activate) {
+        try { await post(`/campaigns/${created.id}/activate`, { expected_version: created.version }); }
+        catch (cause) { throw new Error(`Đã tạo chiến dịch "${name}" nhưng chưa kích hoạt được: ${messageOf(cause)}`); }
+      }
+      cancelEdit();
+    }, activate ? `Đã tạo và kích hoạt chiến dịch "${name}".` : `Đã lưu bản nháp "${name}".`);
+  }
+  async function saveAdjusted() {
+    if (!adjusting || !draftCenter || !draftReady) return;
+    await run(async () => {
+      if (adjusting.status === 'DRAFT') {
+        await api('response', `/campaigns/${adjusting.id}`, {
+          method: 'PATCH', body: { expected_version: adjusting.version, center: draftCenter, radius_m: draftRadius }, idempotencyKey: newCommandKey(),
+        });
+      } else {
+        await post(`/campaigns/${adjusting.id}/area`, { expected_version: adjusting.version, center: draftCenter, radius_m: draftRadius });
+      }
+      cancelEdit();
+    }, `Đã cập nhật vùng "${adjusting.name}".`);
   }
 
   const stamp = () => new Date().toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -192,27 +249,65 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
     <section className="card common-queue-suggestions">
       <div className="section-header">
         <div>
-          <span className="eyebrow">Gợi ý cho điều phối chính</span>
-          <h3>Quyết định cấp chiến dịch</h3>
+          <h3>Bản đồ chiến dịch</h3>
         </div>
         <button type="button" className="button secondary" disabled={loading || busy} onClick={() => setRevision((value) => value + 1)}>
           Làm mới gợi ý
         </button>
       </div>
-      <p>Mỗi gợi ý là một thao tác với chiến dịch. Sau khi SOS được gắn, điều phối viên chiến dịch sẽ tiếp nhận và chăm sóc từng ca.</p>
-      {error && <p className="notice error" role="alert">{error}</p>}
+            {error && <p className="notice error" role="alert">{error}</p>}
       {message && <p className="notice" role="status">{message}</p>}
 
+      <div className="campaign-area-editor">
+        <div className="campaign-area-editor__row">
+          <button type="button" className="button primary" disabled={busy || editMode?.kind === 'create'} onClick={startCreate}>Vẽ chiến dịch mới trên bản đồ</button>
+          <label>Chỉnh vùng chiến dịch
+            <select value={editMode?.kind === 'adjust' ? editMode.id : ''} disabled={busy} onChange={(event) => event.target.value ? startAdjust(event.target.value) : cancelEdit()}>
+              <option value="">Chọn chiến dịch…</option>
+              {data?.campaigns.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </label>
+        </div>
+        {editMode && <>
+          <p className="notice" role="status">
+            {!draftCenter ? 'Chạm lên bản đồ để đặt tâm vùng.' : 'Kéo ✥ để di chuyển vùng, kéo ↔ ở mép vòng để đổi bán kính.'}
+          </p>
+          <div className="campaign-area-editor__row">
+            {editMode.kind === 'create' && <label>Tên chiến dịch
+              <input value={draftName} maxLength={200} onChange={(event) => setDraftName(event.target.value)} placeholder="Ví dụ: Cứu trợ lũ Hải Phòng" />
+            </label>}
+            <label>Bán kính (m)
+              <input type="number" min={500} max={MAX_RADIUS_M} step={500} value={draftRadius}
+                onChange={(event) => setDraftRadius(Math.round(Number(event.target.value)))} />
+            </label>
+            {draftReady && <span className="muted">≈ {km(draftRadius)} km · {coveredByDraft} SOS chưa thuộc vùng nằm trong vòng này</span>}
+          </div>
+          <div className="campaign-area-editor__row">
+            {editMode.kind === 'create' ? <>
+              <button type="button" className="button primary" disabled={busy || !draftReady || !draftName.trim()} onClick={() => void createFromDraft(true)}>Tạo và kích hoạt</button>
+              <button type="button" className="button secondary" disabled={busy || !draftReady || !draftName.trim()} onClick={() => void createFromDraft(false)}>Lưu bản nháp</button>
+            </> : <button type="button" className="button primary" disabled={busy || !draftReady} onClick={() => void saveAdjusted()}>
+              Lưu vùng mới
+            </button>}
+            <button type="button" className="button secondary" disabled={busy} onClick={cancelEdit}>Hủy</button>
+          </div>
+          {adjusting && adjusting.status === 'ACTIVE' && <p className="muted">SOS chưa thuộc vùng nằm trong vùng mới sẽ được gắn vào chiến dịch này.</p>}
+        </>}
+      </div>
       <CampaignAreaMap
         requests={data?.requests ?? []}
         campaigns={data?.campaigns ?? []}
+        editor={editMode ? {
+          center: draftCenter, radiusM: draftRadius, hideCampaignId: adjusting?.id,
+          onChange: (center, radiusM) => { setDraftCenter(center); setDraftRadius(radiusM); },
+        } : null}
         onSelect={(id) => {
           setHighlight(id);
           document.getElementById(`sos-suggestion-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }}
       />
       <p className="muted">
-        Chấm cam: ngoài mọi vùng · chấm tím: trùng nhiều vùng · chấm lớn: ưu tiên P1 · vòng liền: chiến dịch đang hoạt động · vòng nét đứt: chiến dịch tạm dừng/bản nháp. Số trên vòng khớp với danh sách bên dưới bản đồ.
+        Chấm cam: ngoài mọi vùng · chấm tím: trùng nhiều vùng · chấm lớn: ưu tiên P1 · vòng liền: đang hoạt động · vòng nét đứt: tạm dừng/bản nháp.
       </p>
 
       {data && data.clusters.length > 0 && (
@@ -305,7 +400,7 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
         {groups.inactive.map(({ campaign, items }) => (
           <article className="card suggestion-item" key={`inactive-${campaign.id}`}>
             <strong>{items.length} SOS nằm trong vùng {campaign.name}</strong>
-            <p className="muted">Chiến dịch đang {STATUS_VI[campaign.status] ?? campaign.status}. Kích hoạt chiến dịch trong tab Quản lý để gắn SOS.</p>
+            <p className="muted">Chiến dịch đang {STATUS_VI[campaign.status] ?? campaign.status}. Kích hoạt chiến dịch trong danh sách bên dưới để gắn SOS.</p>
             <SosRows items={items} highlight={highlight} />
           </article>
         ))}
