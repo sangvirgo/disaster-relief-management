@@ -79,6 +79,7 @@ export function CampaignAreaMap({
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
   const editLayerRef = useRef<L.LayerGroup | null>(null);
+  const boundsRef = useRef<L.LatLngTuple[]>([]);
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
   const editorRef = useRef(editor);
@@ -99,7 +100,11 @@ export function CampaignAreaMap({
       const current = editorRef.current;
       if (current && !current.center) current.onChange({ lat: event.latlng.lat, lng: event.latlng.lng }, current.radiusM);
     });
-    const timer = window.setTimeout(() => map.invalidateSize(), 200);
+    // The container may still be laying out when the first fit runs, so size is re-read and the view re-fitted once.
+    const timer = window.setTimeout(() => {
+      map.invalidateSize();
+      if (boundsRef.current.length) map.fitBounds(boundsRef.current, { padding: [24, 24], maxZoom: 12 });
+    }, 250);
     return () => {
       window.clearTimeout(timer);
       map.remove();
@@ -190,7 +195,9 @@ export function CampaignAreaMap({
         .addTo(layer);
       bounds.push(position);
     }
-    if (bounds.length) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 14 });
+    boundsRef.current = bounds;
+    map.invalidateSize();
+    if (bounds.length) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 12 });
   }, [requests, campaigns, hideId]);
 
   return (

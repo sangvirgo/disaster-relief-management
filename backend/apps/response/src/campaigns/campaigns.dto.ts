@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import {
-  IsDateString, IsInt, IsNumber, IsObject, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested,
+  IsDateString, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested,
 } from 'class-validator';
 
 export class CampaignPageQueryDto {
@@ -9,6 +9,11 @@ export class CampaignPageQueryDto {
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
   declare limit?: number;
+}
+
+export class CommonQueueQueryDto extends CampaignPageQueryDto {
+  @IsOptional() @IsIn(['UNMATCHED', 'CONFLICT'])
+  declare match_state?: 'UNMATCHED' | 'CONFLICT';
 }
 
 export class CampaignCenterDto {

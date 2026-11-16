@@ -10,6 +10,7 @@ import { ReporterSession, ReporterSessionService } from '../requests/reporter-se
 import { openDangerStatuses, loadOperationsConfig } from '../operations/request-operations.helpers';
 
 import { ENGAGEMENT_TTL_MINUTES } from '../requests/engagement-ttl';
+import { CommonQueueQueryDto } from './campaigns.dto';
 import { AreaCampaign, buildCommonQueueSuggestions, OPEN_REQUEST_STATUSES, OpenRequestPoint } from './campaign-area';
 export { ENGAGEMENT_TTL_MINUTES };
 export const MAX_ACTIVE_ENGAGEMENTS = 3;
@@ -239,23 +240,36 @@ export class CampaignCoordinationService {
     return { items: found.map((item) => this.engagementView(item)) };
   }
 
-  /** Control view for the primary coordinator: unmatched/conflicting SOS, clusters and one-click area suggestions. */
-  async commonQueueSuggestions(request: Request): Promise<Record<string, unknown>> {
+  /**
+   * Control view for the primary coordinator. `requests` is one keyset page of SOS that still need a campaign decision;
+   * `map_points` (all, capped) and `clusters` cover the whole set so the map stays complete.
+   */
+  async commonQueueSuggestions(query: CommonQueueQueryDto, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
-    const requests = rows(await this.dataSource.query(
-      `SELECT r.id,r.tracking_code,r.priority,r.status,r.version,r.campaign_match_state,
-              round(ST_Y(s.location::geometry)::numeric,3)::float8 AS latitude,
-              round(ST_X(s.location::geometry)::numeric,3)::float8 AS longitude
-         FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
-        WHERE r.campaign_id IS NULL AND r.campaign_match_state IN ('UNMATCHED','CONFLICT')
-          AND r.canonical_request_id IS NULL AND r.status IN (${OPEN_REQUEST_STATUSES})
-        ORDER BY r.received_at,r.id LIMIT 500`,
-    ) as SqlRows<Record<string, unknown>>).map((item): OpenRequestPoint => ({
+    const filters = { route: 'response.campaign-common-queue', match_state: query.match_state ?? null };
+    const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : null;
+    if (cursor) {
+      const when = typeof cursor.sort[0] === 'string' ? new Date(cursor.sort[0]) : null;
+      if (cursor.sort.length !== 2 || !when || Number.isNaN(when.getTime()) || when.toISOString() !== cursor.sort[0] || cursor.sort[1] !== cursor.id) {
+        throw new AppError('CURSOR_INVALID', { status: 400 });
+      }
+    }
+    const limit = query.limit ?? 10;
+    const baseWhere = `r.campaign_id IS NULL AND r.campaign_match_state IN ('UNMATCHED','CONFLICT')
+          AND r.canonical_request_id IS NULL AND r.status IN (${OPEN_REQUEST_STATUSES})`;
+    const lat = "round(ST_Y(s.location::geometry)::numeric,3)::float8";
+    const lng = "round(ST_X(s.location::geometry)::numeric,3)::float8";
+    const toPoint = (item: Record<string, unknown>): OpenRequestPoint => ({
       id: String(item.id), tracking_code: String(item.tracking_code), priority: item.priority == null ? null : String(item.priority),
       status: String(item.status), version: Number(item.version), campaign_match_state: String(item.campaign_match_state),
       latitude: Number(item.latitude), longitude: Number(item.longitude),
-    }));
+    });
+    const all = rows(await this.dataSource.query(
+      `SELECT r.id,r.tracking_code,r.priority,r.status,r.version,r.campaign_match_state,${lat} AS latitude,${lng} AS longitude
+         FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
+        WHERE ${baseWhere} ORDER BY r.received_at,r.id LIMIT 500`,
+    ) as SqlRows<Record<string, unknown>>).map(toPoint);
     const campaigns = rows(await this.dataSource.query(
       `SELECT id,name,status,version,radius_m,ST_Y(center::geometry) AS latitude,ST_X(center::geometry) AS longitude
          FROM campaign WHERE status IN ('DRAFT','ACTIVE','PAUSED') AND center IS NOT NULL AND radius_m IS NOT NULL`,
@@ -263,7 +277,53 @@ export class CampaignCoordinationService {
       id: String(item.id), name: String(item.name), status: String(item.status), version: Number(item.version), radius_m: Number(item.radius_m),
       latitude: Number(item.latitude), longitude: Number(item.longitude),
     }));
-    return buildCommonQueueSuggestions(requests, campaigns);
+    const built = buildCommonQueueSuggestions(all, campaigns) as {
+      requests: Array<{ id: string; tracking_code: string; priority: string | null; campaign_match_state: string; location: unknown }>;
+    } & Record<string, unknown>;
+
+    const values: unknown[] = [];
+    const conditions = [baseWhere];
+    if (query.match_state) { values.push(query.match_state); conditions.push(`r.campaign_match_state=$${values.length}`); }
+    const countRows = await this.dataSource.query(
+      `SELECT count(*)::int AS total FROM assistance_request r WHERE ${conditions.join(' AND ')}`, values,
+    ) as Array<{ total: number }>;
+    if (cursor) {
+      values.push(cursor.sort[0], cursor.id);
+      conditions.push(`(date_trunc('milliseconds',r.received_at),r.id)>($${values.length - 1}::timestamptz,$${values.length}::uuid)`);
+    }
+    values.push(limit + 1);
+    const pageRows = rows(await this.dataSource.query(
+      `SELECT r.id,r.tracking_code,r.priority,r.status,r.version,r.campaign_match_state,r.campaign_candidate_ids,
+              date_trunc('milliseconds',r.received_at) AS received_at,
+              ${lat} AS latitude,${lng} AS longitude
+         FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
+        WHERE ${conditions.join(' AND ')} ORDER BY date_trunc('milliseconds',r.received_at),r.id LIMIT $${values.length}`, values,
+    ) as SqlRows<Record<string, unknown>>);
+    const page = pageRows.slice(0, limit);
+    const pageIds = new Set(page.map((item) => String(item.id)));
+    const decorated = new Map(buildCommonQueueSuggestions(page.map(toPoint), campaigns).requests.map((item) => [item.id, item]));
+    const last = page.at(-1);
+    return {
+      requests: page.map((item) => ({
+        ...decorated.get(String(item.id)),
+        candidate_campaign_ids: (item.campaign_candidate_ids as string[] | null) ?? [],
+        received_at: new Date(item.received_at as Date | string).toISOString(),
+      })),
+      total: Number(countRows[0]?.total ?? 0),
+      more: pageRows.length > limit,
+      ...(pageRows.length > limit && last
+        ? { cursor: encodeKeysetCursor([new Date(last.received_at as Date | string).toISOString(), String(last.id)], String(last.id), filters) }
+        : {}),
+      map_points: built.requests.map((item) => ({
+        id: item.id, tracking_code: item.tracking_code, priority: item.priority,
+        campaign_match_state: item.campaign_match_state, location: item.location, on_page: pageIds.has(item.id),
+      })),
+      clusters: built.clusters,
+      campaigns: built.campaigns,
+      attach_targets: await this.dataSource.query(
+        "SELECT id,name FROM campaign WHERE status='ACTIVE' ORDER BY name,id",
+      ) as Array<{ id: string; name: string }>,
+    };
   }
 
   async overview(request: Request): Promise<Record<string, unknown>> {

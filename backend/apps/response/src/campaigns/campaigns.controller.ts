@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
-import { CampaignActionDto, CampaignAreaDto, CampaignCreateDto, CampaignPageQueryDto, CampaignPatchDto, CampaignReasonActionDto } from './campaigns.dto';
+import { CampaignActionDto, CampaignAreaDto, CampaignCreateDto, CommonQueueQueryDto, CampaignPageQueryDto, CampaignPatchDto, CampaignReasonActionDto } from './campaigns.dto';
 import { CampaignCommandRequest, CampaignsService } from './campaigns.service';
 import { CampaignCoordinationService } from './campaign-coordination.service';
 import { ResponseServiceTokenGuard } from './service-token.guard';
@@ -161,9 +161,9 @@ export class CampaignsController {
   }
 
   @Get('campaigns/common-queue/suggestions')
-  async commonQueueSuggestions(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+  async commonQueueSuggestions(@Query() query: CommonQueueQueryDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     noStore(response);
-    return this.coordination.commonQueueSuggestions(request);
+    return this.coordination.commonQueueSuggestions(query, request);
   }
 
   @Get('public/campaigns')

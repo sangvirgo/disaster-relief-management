@@ -1538,3 +1538,15 @@
 .history-sessions p { margin: 2px 0 0; }
 .history-badge { border-radius: 999px; padding: 2px 12px; font-size: 0.8rem; background: #f1f5f9; color: #475569; white-space: nowrap; }
 .history-badge--live { background: #dcfce7; color: #166534; }
+
+/* Common-queue SOS rows: one compact card per SOS with its own decision controls */
+.common-queue-suggestions .suggestion-item { border: 1px solid var(--line, #e5e7eb); border-radius: 10px; padding: 12px 14px; margin-top: 8px; background: #fff; }
+.common-queue-suggestions .suggestion-head { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: flex-start; }
+.common-queue-suggestions .suggestion-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+.common-queue-suggestions .suggestion-actions select { min-width: 200px; max-width: 280px; }
+.common-queue-suggestions .chip--warn { background: #f3e8ff; color: #6b21a8; }
+.common-queue-suggestions .campaign-filters { margin: 0; }
+@media (max-width: 720px) {
+  .common-queue-suggestions .suggestion-actions { justify-content: flex-start; width: 100%; }
+  .common-queue-suggestions .suggestion-actions select { max-width: none; flex: 1 1 100%; }
+}
