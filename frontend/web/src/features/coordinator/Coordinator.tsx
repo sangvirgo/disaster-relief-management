@@ -669,7 +669,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     if (campaignMatchState && canSeeUnassigned) params.set('campaign_match_state', campaignMatchState);
     api<Queue>('response', `/requests${params.size ? '?' + params : ''}`)
       .then((value) => {
-        if (live) setQueue(value);
+        if (live) setQueue({ ...value, items: value.items.filter((item) => !claimBlockedBy(item, currentUserId)) });
       })
       .catch((cause) => {
         if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải hàng đợi.');
@@ -680,7 +680,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     return () => {
       live = false;
     };
-  }, [page, queueStatus, cursor, revision, reviewLane, overdue, unassignedOnly, canSeeUnassigned, campaignId, campaignMatchState]);
+  }, [page, queueStatus, cursor, revision, reviewLane, overdue, unassignedOnly, canSeeUnassigned, campaignId, campaignMatchState, currentUserId]);
   useEffect(() => {
     if (!selected) return;
     let live = true;
@@ -1056,7 +1056,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
           <>
             <p className="muted">Cập nhật: {timeLabel(queue.generated_at)}</p>
             {queue.items.length === 0 && (
-              <div className="empty">Không có yêu cầu trong hàng đợi này.</div>
+              <div className="empty">Không có SOS nào khả dụng trên trang này. Những SOS đang do điều phối viên khác tiếp nhận đã được ẩn.</div>
             )}
             {queue.items.length > 0 && <div className="sos-table-scroll" role="region" aria-label="Bảng danh sách SOS" tabIndex={0}>
               <table className="sos-table">

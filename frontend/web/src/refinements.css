@@ -1508,6 +1508,56 @@
   border: 2px solid; font-size: 12px; font-weight: 700; background: #fff;
 }
 
+.campaign-area-map { position: relative; overflow: hidden; isolation: isolate; z-index: 0; }
+.campaign-area-map .leaflet-container { width: 100%; height: 100%; }
+.campaign-area-map-shell { position: relative; min-width: 0; isolation: isolate; }
+.campaign-area-map__confirm { position: absolute; z-index: 1000; top: 14px; right: 14px; display: flex; align-items: center; gap: 9px; max-width: calc(100% - 80px); padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; box-shadow: 0 8px 24px #0f172a26; font-weight: 700; }
+.campaign-area-map__confirm button { display: grid; place-items: center; width: 38px; height: 38px; flex: none; border: 1px solid transparent; border-radius: 10px; color: #fff; font-size: 23px; font-weight: 700; cursor: pointer; }
+.campaign-area-map__accept { background: #15803d; }
+.campaign-area-map__accept:hover { background: #166534; }
+.campaign-area-map__reject { background: #dc2626; }
+.campaign-area-map__reject:hover { background: #b91c1c; }
+.campaign-area-map__confirm button:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 600px) { .campaign-area-map__confirm span { display: none; } }
+.campaign-area-legend__button { border: 0; padding: 3px 5px; border-radius: 6px; background: transparent; color: var(--color-text-primary); text-align: left; cursor: pointer; }
+.campaign-area-legend__button:hover, .campaign-area-legend__button[aria-pressed='true'] { background: var(--color-primary-bg); color: var(--color-primary-dark); }
+.campaign-area-label { cursor: pointer; }
+.campaign-map-reset { justify-self: start; }
+.campaign-area-editor { gap: 9px; padding: 14px; margin: 4px 0 8px; border: 1px solid var(--color-surface-border); border-radius: 12px; background: var(--color-surface-subtle); }
+.campaign-area-editor .notice { margin: 0; padding: 9px 12px; }
+.campaign-area-editor > .muted { margin: 0; }
+.campaign-area-editor__row { gap: 10px; align-items: end; }
+.campaign-area-editor__row label { min-width: min(100%, 230px); gap: 7px; font-weight: 600; }
+.campaign-area-editor__row label:has(select) { flex: 1 1 270px; max-width: 420px; }
+.campaign-area-editor__row input, .campaign-area-editor__row select,
+.common-queue-suggestions .suggestion-actions select, .campaign-history-select select {
+  appearance: none; width: 100%; min-height: 44px; padding: 9px 38px 9px 13px;
+  border: 1px solid #cbd9ed; border-radius: 10px; background: #fff; color: var(--color-text-primary);
+  font: inherit; box-shadow: 0 1px 3px #0f172a0a;
+}
+.campaign-area-editor__row select, .common-queue-suggestions .suggestion-actions select, .campaign-history-select select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 13px center; cursor: pointer;
+}
+.campaign-area-editor__row :is(input, select):hover, .common-queue-suggestions .suggestion-actions select:hover, .campaign-history-select select:hover { border-color: var(--color-primary-light); }
+.campaign-area-editor__row :is(input, select):focus-visible, .common-queue-suggestions .suggestion-actions select:focus-visible, .campaign-history-select select:focus-visible { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 4px #2563eb24; }
+.campaign-history-select { display: grid; gap: 7px; max-width: 420px; font-weight: 600; margin-bottom: 14px; }
+.common-queue-suggestions .suggestion-head { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(320px, 1.2fr); align-items: center; gap: 20px; }
+.common-queue-suggestions .suggestion-actions { display: grid; gap: 10px; min-width: 0; }
+.common-queue-suggestions .suggestion-actions__attach { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.common-queue-suggestions .suggestion-actions__alternatives { display: flex; flex-wrap: wrap; gap: 10px; }
+.common-queue-suggestions .suggestion-actions__alternatives .button { flex: 1 1 220px; }
+.common-queue-suggestions .suggestion-actions select { min-width: 0; max-width: none; }
+.common-queue-suggestions .suggestion-actions .button { min-height: 44px; white-space: normal; }
+.common-queue-suggestions .suggestion-actions__create { color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
+.common-queue-suggestions .suggestion-actions__create:hover { background: #dbeafe; }
+.common-queue-suggestions .suggestion-actions__expand { color: #92400e; background: #fffbeb; border-color: #fcd34d; }
+.common-queue-suggestions .suggestion-actions__expand:hover { background: #fef3c7; }
+@media (max-width: 900px) {
+  .common-queue-suggestions .suggestion-head { grid-template-columns: 1fr; }
+  .common-queue-suggestions .suggestion-actions { width: 100%; }
+}
+
 /* Relief history */
 .history-summary { display: grid; gap: 12px; margin: 12px 0; }
 .history-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
@@ -1540,13 +1590,10 @@
 .history-badge--live { background: #dcfce7; color: #166534; }
 
 /* Common-queue SOS rows: one compact card per SOS with its own decision controls */
-.common-queue-suggestions .suggestion-item { border: 1px solid var(--line, #e5e7eb); border-radius: 10px; padding: 12px 14px; margin-top: 8px; background: #fff; }
-.common-queue-suggestions .suggestion-head { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: flex-start; }
-.common-queue-suggestions .suggestion-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
-.common-queue-suggestions .suggestion-actions select { min-width: 200px; max-width: 280px; }
+.common-queue-suggestions .suggestion-item { border: 1px solid #d9e5f3; border-radius: 12px; padding: 16px 18px; margin-top: 10px; background: #f8fbff; }
 .common-queue-suggestions .chip--warn { background: #f3e8ff; color: #6b21a8; }
 .common-queue-suggestions .campaign-filters { margin: 0; }
 @media (max-width: 720px) {
-  .common-queue-suggestions .suggestion-actions { justify-content: flex-start; width: 100%; }
-  .common-queue-suggestions .suggestion-actions select { max-width: none; flex: 1 1 100%; }
+  .common-queue-suggestions .suggestion-actions__attach { grid-template-columns: 1fr; }
+  .common-queue-suggestions .suggestion-actions__alternatives { display: grid; }
 }

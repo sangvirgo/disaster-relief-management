@@ -69,11 +69,19 @@ export function CampaignAreaMap({
   campaigns,
   onSelect,
   editor,
+  selectedCampaignId,
+  onCampaignSelect,
+  onCampaignEdit,
+  editActions,
 }: {
   requests: AreaMapRequest[];
   campaigns: AreaMapCampaign[];
   onSelect?: (requestId: string) => void;
   editor?: AreaEditor | null;
+  selectedCampaignId?: string | null;
+  onCampaignSelect?: (id: string) => void;
+  onCampaignEdit?: (id: string) => void;
+  editActions?: { onConfirm: () => void; onCancel: () => void; busy: boolean; canConfirm: boolean } | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -84,6 +92,11 @@ export function CampaignAreaMap({
   selectRef.current = onSelect;
   const editorRef = useRef(editor);
   editorRef.current = editor;
+  const campaignSelectRef = useRef(onCampaignSelect);
+  campaignSelectRef.current = onCampaignSelect;
+  const campaignEditRef = useRef(onCampaignEdit);
+  campaignEditRef.current = onCampaignEdit;
+  const focusedRef = useRef(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -103,7 +116,7 @@ export function CampaignAreaMap({
     // The container may still be laying out when the first fit runs, so size is re-read and the view re-fitted once.
     const timer = window.setTimeout(() => {
       map.invalidateSize();
-      if (boundsRef.current.length) map.fitBounds(boundsRef.current, { padding: [24, 24], maxZoom: 12 });
+      if (boundsRef.current.length && !focusedRef.current) map.fitBounds(boundsRef.current, { padding: [24, 24], maxZoom: 12, animate: false });
     }, 250);
     return () => {
       window.clearTimeout(timer);
@@ -171,14 +184,15 @@ export function CampaignAreaMap({
       // Name sits on the circle's northern edge, so nested circles get labels at different heights.
       const edge: L.LatLngTuple = [campaign.center.lat + campaign.radius_m / 111_320, campaign.center.lng];
       L.marker(edge, {
-        interactive: false,
+        interactive: true,
         icon: L.divIcon({
           className: 'campaign-area-label',
           html: `<span style="border-color:${color};color:${color}">${index + 1}</span>`,
           iconSize: [22, 22],
           iconAnchor: [11, 11],
         }),
-      }).addTo(layer);
+      }).bindTooltip(campaign.name).on('click', () => campaignSelectRef.current?.(campaign.id))
+        .on('dblclick', () => campaignEditRef.current?.(campaign.id)).addTo(layer);
       bounds.push([campaign.center.lat, campaign.center.lng]);
     });
     for (const request of requests) {
@@ -197,24 +211,54 @@ export function CampaignAreaMap({
     }
     boundsRef.current = bounds;
     map.invalidateSize();
-    if (bounds.length) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 12 });
+    if (bounds.length && !focusedRef.current) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 12, animate: false });
   }, [requests, campaigns, hideId]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const selected = campaigns.find((campaign) => campaign.id === selectedCampaignId);
+    if (!selected) {
+      focusedRef.current = false;
+      if (boundsRef.current.length) map.fitBounds(boundsRef.current, { padding: [24, 24], maxZoom: 12, animate: false });
+      return;
+    }
+    focusedRef.current = true;
+    map.invalidateSize();
+    // Circle.getBounds() needs a circle already mounted on the map. Derive the
+    // visible area from the center and diameter so selecting a campaign cannot
+    // throw during React's effect phase.
+    const bounds = L.latLng(selected.center.lat, selected.center.lng).toBounds(selected.radius_m * 2);
+    map.stop();
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14, animate: false });
+    containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [selectedCampaignId, campaigns]);
 
   return (
     <>
-      <div
-        ref={containerRef}
-        className="campaign-area-map"
-        role="region"
-        aria-label="Bản đồ chiến dịch và SOS cần quyết định"
-        style={{ height: 380, width: '100%', borderRadius: 8 }}
-      />
+      <div className="campaign-area-map-shell">
+        <div
+          ref={containerRef}
+          className="campaign-area-map"
+          role="region"
+          aria-label="Bản đồ chiến dịch và SOS cần quyết định"
+          style={{ height: 380, width: '100%', borderRadius: 8 }}
+        />
+        {editActions && <div className="campaign-area-map__confirm" role="group" aria-label="Xác nhận thay đổi vùng chiến dịch">
+          <span>Áp dụng vòng vừa chỉnh?</span>
+          <button type="button" className="campaign-area-map__accept" aria-label="Xác nhận vùng mới" title="Xác nhận vùng mới"
+            disabled={editActions.busy || !editActions.canConfirm} onClick={editActions.onConfirm}>✓</button>
+          <button type="button" className="campaign-area-map__reject" aria-label="Bỏ thay đổi, về vòng ban đầu" title="Bỏ thay đổi, về vòng ban đầu"
+            disabled={editActions.busy} onClick={editActions.onCancel}>✕</button>
+        </div>}
+      </div>
       {campaigns.length > 0 && (
         <ol className="campaign-area-legend" aria-label="Chú giải vùng chiến dịch">
           {campaigns.map((campaign, index) => (
             <li key={campaign.id}>
               <span className="campaign-area-legend__badge" style={{ borderColor: areaColor(index), color: areaColor(index) }}>{index + 1}</span>
-              {campaign.name}
+              <button type="button" className="campaign-area-legend__button" aria-pressed={selectedCampaignId === campaign.id}
+                onClick={() => onCampaignSelect?.(campaign.id)}><strong>{campaign.name}</strong></button>
               <span className="muted"> · {CAMPAIGN_STATUS_VI[campaign.status] ?? campaign.status} · bán kính {(campaign.radius_m / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km</span>
             </li>
           ))}

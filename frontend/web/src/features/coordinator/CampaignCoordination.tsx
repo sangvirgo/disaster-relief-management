@@ -154,7 +154,7 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
     {primary && tab === 'sos' && <Coordinator key={`sos-${queueRevision}-${initialRequestId}`} page="queue" currentUserId={user.id} canSeeUnassigned initialRequestId={initialRequestId} />}
     {primary && tab === 'history' && <>
       <p><button className="button secondary" type="button" onClick={() => void showMyHistory()}>Xem lịch sử điều phối của tôi</button></p>
-      <label>Chiến dịch <select value={historyId} onChange={(event) => void showHistory(event.target.value)}>
+      <label className="campaign-history-select">Chiến dịch <select value={historyId} onChange={(event) => void showHistory(event.target.value)}>
         <option value="">Chọn chiến dịch</option>{overviewCampaigns.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select></label>
       <HistorySummary summary={summary} />
